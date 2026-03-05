@@ -58,7 +58,7 @@ export default function NewSoftBlockPage() {
 
         <div>
           <label className="form-label">Reason <span className="text-zinc-700">(internal only)</span></label>
-          <select value={blockReason} onChange={e => setBlockReason(e.target.value)} className="form-input">
+          <select value={blockReason} onChange={e => setBlockReason(e.target.value as typeof BLOCK_REASONS[number])} className="form-input">
             {BLOCK_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
