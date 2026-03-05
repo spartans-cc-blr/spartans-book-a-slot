@@ -39,8 +39,8 @@ export const authOptions: NextAuthOptions = {
   },
 
   pages: {
-    signIn:  '/admin/login',
-    error:   '/admin/login',    // Redirect here on auth errors (e.g. unauthorised email)
+    signIn:  '/login',
+    error:   '/login',    // Redirect here on auth errors (e.g. unauthorised email)
   },
 
   session: {
