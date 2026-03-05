@@ -9,7 +9,7 @@ export default function NewSoftBlockPage() {
   const router = useRouter()
   const [gameDate,     setGameDate]     = useState('')
   const [slotTime,     setSlotTime]     = useState<SlotTime | ''>('')
-  const [blockReason,  setBlockReason]  = useState(BLOCK_REASONS[0])
+  const [blockReason, setBlockReason] = useState<string>(BLOCK_REASONS[0])
   const [notes,        setNotes]        = useState('')
   const [submitting,   setSubmitting]   = useState(false)
   const [error,        setError]        = useState('')
