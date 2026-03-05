@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-cinzel:   'Cinzel', serif;
+  --font-rajdhani: 'Rajdhani', sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: #080808;
+    color: #F0E8D0;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar       { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #111; }
+  ::-webkit-scrollbar-thumb { background: #7A6030; border-radius: 2px; }
+}
+
+@layer utilities {
+  .font-cinzel   { font-family: var(--font-cinzel); }
+  .font-rajdhani { font-family: var(--font-rajdhani); }
+
+  /* Slot status colours */
+  .slot-open      { @apply bg-emerald-950 border border-emerald-800 text-emerald-400; }
+  .slot-booked    { @apply bg-red-950     border border-red-900     text-red-400; }
+  .slot-softblock { @apply bg-yellow-950  border border-yellow-800  text-yellow-500; }
+  .slot-clash     { @apply bg-ink-3       border border-ink-5       text-zinc-600; }
+
+  /* Gold divider */
+  .gold-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #7A6030, transparent);
+  }
+
+  /* Grain texture overlay */
+  .grain::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.35s ease both; }
+
+@keyframes pulseOpen {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52,212,100,0); }
+  50%       { box-shadow: 0 0 0 3px rgba(52,212,100,0.12); }
+}
+.animate-pulse-open { animation: pulseOpen 3s ease infinite; }
