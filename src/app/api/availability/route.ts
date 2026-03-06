@@ -25,17 +25,26 @@ export async function GET(req: NextRequest) {
   const weeksParam = parseInt(searchParams.get('weeks') ?? '13')
 
   // Default: start from next upcoming Saturday
-  let from: Date
+ let from: Date
   if (fromParam) {
     from = parseISO(fromParam)
   } else {
     from = new Date()
-    // Find next Saturday
     const day = from.getDay()
-    const daysUntilSat = day === 6 ? 0 : (6 - day)
-    from = addDays(from, daysUntilSat)
+    // Show current weekend until Sunday is over
+    // If today is Sunday (0), start from yesterday (Saturday)
+    // If today is Saturday (6), start from today
+    // Otherwise find the most recent Saturday
+    if (day === 0) {
+      from = addDays(from, -1) // Sunday — go back to Saturday
+    } else if (day === 6) {
+      // today is Saturday — start from today
+    } else {
+      // Weekday — find next Saturday
+      const daysUntilSat = 6 - day
+      from = addDays(from, daysUntilSat)
+    }
   }
-
   // Fetch all non-cancelled bookings in the range
   const supabase = createServiceClient()
   const endDate = addDays(from, weeksParam * 7)
