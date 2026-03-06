@@ -40,6 +40,19 @@ export function ScheduleGrid() {
 
   const week = weeks[currentWeek]
 
+  {/* Weekend capacity banner */}
+      {week?.weekendFull && (
+        <div className="bg-amber-950/60 border border-amber-800 border-l-4 border-l-amber-500 rounded px-4 py-3 mb-4 flex items-start gap-3">
+          <span className="text-xl flex-shrink-0">🔒</span>
+          <div>
+            <p className="font-rajdhani font-bold text-amber-400 text-sm">This weekend is at capacity</p>
+            <p className="font-rajdhani text-amber-600 text-xs mt-0.5">
+              3 of 3 games are already scheduled. No further bookings are possible for this weekend. Please check another weekend.
+            </p>
+          </div>
+        </div>
+      )}
+
   const toggleDay = (date: string) => {
     setExpandedDays(prev => ({ ...prev, [date]: !prev[date] }))
   }
@@ -146,7 +159,7 @@ export function ScheduleGrid() {
                             {cfg.label}
                           </span>
                         </div>
-                        {slot.status === 'open' && slot.waLink && (
+                        {slot.status === 'open' && slot.waLink && !week?.weekendFull && (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 bg-[#128C7E] hover:bg-[#0d7a6e] text-white text-xs font-bold tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap">
                             <WAIcon /> Book
@@ -189,7 +202,7 @@ export function ScheduleGrid() {
                     const cfg = STATUS_CONFIG[slot.status]
                     return (
                       <td key={slot.time} className="p-1.5 border-b border-ink-4">
-                        {slot.status === 'open' && slot.waLink ? (
+                        {slot.status === 'open' && slot.waLink && !week?.weekendFull ? (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${cfg.gridCls} group`}
                             title="Click to WhatsApp about this slot">
