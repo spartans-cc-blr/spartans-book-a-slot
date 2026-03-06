@@ -80,8 +80,9 @@ export interface CreateSoftBlockRequest {
 }
 
 export interface ValidationResult {
-  valid:   boolean
-  errors:  ValidationError[]
+  valid:    boolean
+  errors:   ValidationError[]
+  warnings: ValidationError[]
 }
 
 export interface ValidationError {
