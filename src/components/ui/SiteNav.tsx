@@ -13,7 +13,7 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
         {/* Logo */}
         <Link href="/schedule" className="flex items-center gap-2.5">
           <img 
-            src="/Transparent_High_Resolution.png" 
+            src="/Transparent High Resolution.png" 
             alt="Spartans CC" 
             className="w-8 h-8 object-contain"
           />
