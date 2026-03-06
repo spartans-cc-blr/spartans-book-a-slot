@@ -106,43 +106,34 @@ export function validateBooking(
     })
   }
 
-  // ── R5: T20 10:30 ↔ T30 conflict ────────────────────────────
-  const sameDayBookings = active.filter(b => b.game_date === booking.game_date)
-  if (hasT20T30Conflict(booking.format, booking.slot_time, sameDayBookings)) {
-    errors.push({
-      rule: 'R5',
-      message:
-        booking.format === 'T20' && booking.slot_time === '10:30'
-          ? `A T30 game is already scheduled on ${booking.game_date}. T20 at 10:30 conflicts with T30 slots.`
-          : `A T20 game at 10:30 is already scheduled on ${booking.game_date}. This T30 slot conflicts with it.`,
-    })
-  }
+  // ── R5/R6: Time overlap rules ────────────────────────────────
+  const sameDayActive = active.filter(b => b.game_date === booking.game_date && b.status === 'confirmed')
 
-  // ── R6: 12:30 blocks 14:30 (game runs till evening) ─────────
-  if (booking.slot_time === '14:30') {
-    const noon = active.find(b =>
-      b.game_date === booking.game_date &&
-      b.slot_time === '12:30' &&
-      b.status === 'confirmed'
-    )
-    if (noon) {
-      errors.push({
-        rule: 'R6',
-        message: `A game is already scheduled at 12:30 on ${booking.game_date}. It runs until evening, blocking the 14:30 slot.`,
-      })
+  // T30 at 07:30 blocks 10:30
+  if (booking.slot_time === '10:30') {
+    if (sameDayActive.find(b => b.slot_time === '07:30' && b.format === 'T30')) {
+      errors.push({ rule: 'R5', message: `A T30 game at 07:30 runs past 10:30. This slot cannot be booked.` })
     }
   }
+
+  // T20 at 10:30 blocks 12:30
   if (booking.slot_time === '12:30') {
-    const afternoon = active.find(b =>
-      b.game_date === booking.game_date &&
-      b.slot_time === '14:30' &&
-      b.status === 'confirmed'
-    )
-    if (afternoon) {
-      errors.push({
-        rule: 'R6',
-        message: `A game is already scheduled at 14:30 on ${booking.game_date}. Booking 12:30 would conflict as it runs until evening.`,
-      })
+    if (sameDayActive.find(b => b.slot_time === '10:30' && b.format === 'T20')) {
+      errors.push({ rule: 'R5', message: `A T20 game at 10:30 runs until 12:30. This slot cannot be booked.` })
+    }
+  }
+
+  // Any game at 12:30 blocks 10:30 and 14:30
+  if (booking.slot_time === '10:30' || booking.slot_time === '14:30') {
+    if (sameDayActive.find(b => b.slot_time === '12:30')) {
+      errors.push({ rule: 'R6', message: `A game at 12:30 conflicts with the ${booking.slot_time} slot.` })
+    }
+  }
+
+  // T20 at 14:30 blocks 12:30
+  if (booking.slot_time === '12:30') {
+    if (sameDayActive.find(b => b.slot_time === '14:30' && b.format === 'T20')) {
+      errors.push({ rule: 'R6', message: `A T20 game at 14:30 conflicts with the 12:30 slot.` })
     }
   }
 
@@ -162,32 +153,34 @@ export function computeSlotStatus(
     b => b.game_date === date && b.status !== 'cancelled'
   )
 
-  // Direct match
+  // Direct match — slot is directly booked
   const direct = active.find(b => b.slot_time === slotTime)
   if (direct) {
     return direct.status === 'soft_block' ? 'soft_block' : 'booked'
   }
 
-  // R5: T20 10:30 blocks T30 adjacent slots
-  const t20at1030 = active.find(
-    b => b.format === 'T20' && b.slot_time === '10:30' && b.status === 'confirmed'
-  )
-  if (t20at1030 && (slotTime === '07:30' || slotTime === '12:30')) {
-    return 'clash'
-  }
-  const t30exists = active.find(
-    b => b.format === 'T30' && b.status === 'confirmed'
-  )
-  if (t30exists && slotTime === '10:30') {
-    return 'clash'
+  // Rule: T30 at 07:30 blocks 10:30
+  if (slotTime === '10:30') {
+    const t30at0730 = active.find(b => b.slot_time === '07:30' && b.format === 'T30')
+    if (t30at0730) return 'clash'
   }
 
-  // R6: 12:30 blocks 14:30
-  const noonGame = active.find(
-    b => b.slot_time === '12:30' && b.status === 'confirmed'
-  )
-  if (noonGame && slotTime === '14:30') {
-    return 'clash'
+  // Rule: T20 at 10:30 blocks 12:30
+  if (slotTime === '12:30') {
+    const t20at1030 = active.find(b => b.slot_time === '10:30' && b.format === 'T20')
+    if (t20at1030) return 'clash'
+  }
+
+  // Rule: Any game at 12:30 blocks 10:30 and 14:30
+  if (slotTime === '10:30' || slotTime === '14:30') {
+    const gameat1230 = active.find(b => b.slot_time === '12:30')
+    if (gameat1230) return 'clash'
+  }
+
+  // Rule: T20 at 14:30 blocks 12:30
+  if (slotTime === '12:30') {
+    const t20at1430 = active.find(b => b.slot_time === '14:30' && b.format === 'T20')
+    if (t20at1430) return 'clash'
   }
 
   return 'open'
