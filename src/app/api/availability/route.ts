@@ -46,6 +46,8 @@ export async function GET(req: NextRequest) {
     .neq('status', 'cancelled')
     .order('game_date')
 
+console.log('All bookings from DB:', JSON.stringify(bookings))
+
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
