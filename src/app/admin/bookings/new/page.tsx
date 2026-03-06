@@ -54,11 +54,12 @@ export default function NewBookingPage() {
       body: JSON.stringify({ game_date: gameDate, format, slot_time: slotTime, captain_id: captainId, tournament_id: tournamentId }),
     })
     const result: ValidationResult = await res.json()
-    const errorMap = Object.fromEntries(result.errors.map(e => [e.rule, e.message]))
+    const errorMap   = Object.fromEntries(result.errors.map(e => [e.rule, e.message]))
+    const warningMap = Object.fromEntries((result.warnings ?? []).map(e => [e.rule, e.message]))
     setRuleChecks(RULES.map(r => ({
       ...r,
-      status:  errorMap[r.rule] ? 'fail' : 'pass',
-      message: errorMap[r.rule] ?? '✓ Passed',
+      status:  errorMap[r.rule] ? 'fail' : warningMap[r.rule] ? 'warn' : 'pass',
+      message: errorMap[r.rule] ?? warningMap[r.rule] ?? '✓ Passed',
     })))
   }, [gameDate, format, slotTime, captainId, tournamentId])
 
