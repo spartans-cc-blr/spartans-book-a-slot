@@ -44,8 +44,6 @@ export async function GET(req: NextRequest) {
     .from('bookings')
     .select('*')
     .neq('status', 'cancelled')
-    .gte('game_date', format(from, 'yyyy-MM-dd'))
-    .lte('game_date', format(endDate, 'yyyy-MM-dd'))
     .order('game_date')
 
   if (error) {
