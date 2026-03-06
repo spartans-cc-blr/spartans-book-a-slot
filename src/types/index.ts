@@ -55,9 +55,11 @@ export interface DayAvailability {
 }
 
 export interface WeekAvailability {
-  weekStart: string   // ISO date of Saturday
-  label:     string   // e.g. 'Weekend of 1–2 March 2026'
-  days:      DayAvailability[]
+  weekStart:   string
+  label:       string
+  days:        DayAvailability[]
+  weekendFull: boolean
+  gamesBooked: number
 }
 
 // ── API request/response types ────────────────────────────────────
