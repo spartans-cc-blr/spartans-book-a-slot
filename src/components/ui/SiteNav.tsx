@@ -12,10 +12,11 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
       <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
         {/* Logo */}
         <Link href="/schedule" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-gradient-to-br from-gold to-gold-dim flex items-center justify-center font-cinzel font-black text-ink text-sm"
-            style={{ clipPath: 'polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)' }}>
-            S
-          </div>
+          <img 
+            src="/Transparent_High_Resolution.png" 
+            alt="Spartans CC" 
+            className="w-8 h-8 object-contain"
+          />
           <span className="font-cinzel font-bold text-gold tracking-[2px] text-[13px] hidden sm:block">
             SPARTANS CC
           </span>
