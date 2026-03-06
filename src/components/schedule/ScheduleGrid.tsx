@@ -12,11 +12,11 @@ const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
 ]
 
 const STATUS_CONFIG = {
-  open:       { label: 'Open',         gridLabel: 'Open',     icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
-  booked:     { label: 'Booked',       gridLabel: 'Booked',   icon: '🔴', pill: 'slot-booked',     gridCls: 'bg-red-950 border border-red-900 cursor-default' },
-  soft_block: { label: 'Reserved',     gridLabel: 'Reserved', icon: '🟡', pill: 'slot-softblock',  gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default' },
-  clash:      { label: 'Game in Progress', gridLabel: 'In Progress', icon: '⛔',
-  na:         { label: '',             gridLabel: '',         icon: '—',  pill: '',                gridCls: 'bg-transparent border-transparent cursor-default' },
+  open:       { label: 'Open',             gridLabel: 'Open',        icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
+  booked:     { label: 'Booked',           gridLabel: 'Booked',      icon: '🔴', pill: 'slot-booked',     gridCls: 'bg-red-950 border border-red-900 cursor-default' },
+  soft_block: { label: 'Reserved',         gridLabel: 'Reserved',    icon: '🟡', pill: 'slot-softblock',  gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default' },
+  clash:      { label: 'Game in Progress', gridLabel: 'In Progress', icon: '⛔', pill: 'slot-clash',      gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
+  na:         { label: '',                 gridLabel: '',            icon: '—',  pill: '',                gridCls: 'bg-transparent border-transparent cursor-default' },
 }
 
 export function ScheduleGrid() {
@@ -30,7 +30,6 @@ export function ScheduleGrid() {
       .then(r => r.json())
       .then(d => {
         setWeeks(d.weeks ?? [])
-        // Auto-expand first day on mobile
         if (d.weeks?.length > 0) {
           setExpandedDays({ [d.weeks[0].days[0].date]: true })
         }
@@ -39,19 +38,6 @@ export function ScheduleGrid() {
   }, [])
 
   const week = weeks[currentWeek]
-
-  {/* Weekend capacity banner */}
-      {week?.weekendFull && (
-        <div className="bg-amber-950/60 border border-amber-800 border-l-4 border-l-amber-500 rounded px-4 py-3 mb-4 flex items-start gap-3">
-          <span className="text-xl flex-shrink-0">🔒</span>
-          <div>
-            <p className="font-rajdhani font-bold text-amber-400 text-sm">This weekend is at capacity</p>
-            <p className="font-rajdhani text-amber-600 text-xs mt-0.5">
-              3 of 3 games are already scheduled. No further bookings are possible for this weekend. Please check another weekend.
-            </p>
-          </div>
-        </div>
-      )}
 
   const toggleDay = (date: string) => {
     setExpandedDays(prev => ({ ...prev, [date]: !prev[date] }))
@@ -108,7 +94,7 @@ export function ScheduleGrid() {
         </div>
         {/* Progress dots */}
         <div className="hidden sm:flex gap-1">
-          {weeks.slice(0, 13).map((_, i) => (
+          {weeks.slice(0, 15).map((_, i) => (
             <button key={i} onClick={() => setCurrentWeek(i)}
               className={`w-1.5 h-1.5 rounded-full transition-colors ${i === currentWeek ? 'bg-gold' : 'bg-ink-5 hover:bg-gold-dim'}`} />
           ))}
@@ -136,6 +122,19 @@ export function ScheduleGrid() {
         )}
       </div>
 
+      {/* Weekend capacity banner */}
+      {week?.weekendFull && (
+        <div className="bg-amber-950/60 border border-amber-800 border-l-4 border-l-amber-500 rounded px-4 py-3 mb-4 flex items-start gap-3">
+          <span className="text-xl flex-shrink-0">🔒</span>
+          <div>
+            <p className="font-rajdhani font-bold text-amber-400 text-sm">This weekend is at capacity</p>
+            <p className="font-rajdhani text-amber-600 text-xs mt-0.5">
+              3 of 3 games are already scheduled. No further bookings are possible for this weekend. Please check another weekend.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── MOBILE: Day cards ── */}
       <div className="flex flex-col gap-2.5 md:hidden">
         {week?.days.map((day, di) => {
@@ -150,7 +149,6 @@ export function ScheduleGrid() {
               {/* Card header */}
               <button className="w-full flex items-center gap-3 p-3 text-left border-b border-ink-5"
                 onClick={() => toggleDay(day.date)}>
-                {/* Date badge */}
                 <div className="w-11 h-11 bg-ink-4 border border-gold-dim rounded flex flex-col items-center justify-center flex-shrink-0">
                   <span className="font-cinzel text-gold text-[8px] font-bold tracking-wider">{dayName}</span>
                   <span className="font-cinzel text-parchment text-lg font-bold leading-none">{dayNum}</span>
@@ -159,8 +157,9 @@ export function ScheduleGrid() {
                 <div className="flex-1 min-w-0">
                   <p className="font-rajdhani font-bold text-base text-parchment">{day.label}</p>
                   <div className="flex gap-1.5 mt-1 flex-wrap">
-                    {openCount  > 0 && <span className="slot-open  text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border">{openCount} open</span>}
+                    {openCount  > 0 && !week?.weekendFull && <span className="slot-open text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border">{openCount} open</span>}
                     {takenCount > 0 && <span className="slot-booked text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border">{takenCount} taken</span>}
+                    {week?.weekendFull && <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border border-zinc-700 text-zinc-500">Weekend Full</span>}
                   </div>
                 </div>
                 <span className={`text-zinc-600 text-xl transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>⌄</span>
@@ -174,15 +173,15 @@ export function ScheduleGrid() {
                     const header = SLOT_HEADERS[si]
                     return (
                       <div key={slot.time}
-                        className={`flex items-center gap-3 px-4 py-3 border-b border-ink-4 last:border-0 ${slot.status === 'open' ? 'hover:bg-emerald-950/20' : ''}`}>
+                        className={`flex items-center gap-3 px-4 py-3 border-b border-ink-4 last:border-0 ${slot.status === 'open' && !week?.weekendFull ? 'hover:bg-emerald-950/20' : ''}`}>
                         <div className="w-14 flex-shrink-0">
                           <p className="font-cinzel text-sm font-semibold text-parchment">{slot.time}</p>
                           <p className="text-[10px] text-zinc-600 font-rajdhani">{header.label}</p>
                         </div>
-                       <div className="flex-1">
+                        <div className="flex-1">
                           <span className={`inline-flex items-center gap-1.5 ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                             <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                            {slot.status === 'open' && week?.weekendFull ? 'Weekend Full' : cfg.label}
+                            {slot.status === 'open' && week?.weekendFull ? 'Capacity Full' : cfg.label}
                           </span>
                         </div>
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull && (
@@ -219,7 +218,7 @@ export function ScheduleGrid() {
             {week?.days.map((day, di) => {
               const [dayName, dayNum, mon] = day.label.split(' ')
               return (
-                <tr key={day.date} className={di === 0 ? '' : ''}>
+                <tr key={day.date}>
                   <td className="bg-ink-3 border-r border-ink-5 border-b border-ink-4 px-4 py-3">
                     <p className="font-cinzel text-xs text-gold font-semibold">{dayName}</p>
                     <p className="font-rajdhani text-sm text-muted">{dayNum} {mon}</p>
@@ -243,7 +242,7 @@ export function ScheduleGrid() {
                                 slot.status === 'booked'     ? 'text-red-500'    :
                                 slot.status === 'soft_block' ? 'text-yellow-600' :
                                 'text-zinc-700'}`}>
-                              {slot.status === 'open' && week?.weekendFull ? 'Full' : cfg.gridLabel}
+                              {slot.status === 'open' && week?.weekendFull ? '' : cfg.gridLabel}
                             </span>
                           </div>
                         )}
