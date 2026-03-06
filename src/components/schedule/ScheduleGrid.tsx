@@ -12,11 +12,11 @@ const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
 ]
 
 const STATUS_CONFIG = {
-  open:       { label: 'Open',        gridLabel: 'Open',     icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
-  booked:     { label: 'Unavailable', gridLabel: 'Unavail',  icon: '🔴', pill: 'slot-booked',     gridCls: 'bg-red-950 border border-red-900 cursor-default' },
-  soft_block: { label: 'Reserved',    gridLabel: 'Reserved', icon: '🟡', pill: 'slot-softblock',  gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default' },
-  clash:      { label: 'Format clash',gridLabel: 'Clash',    icon: '⛔', pill: 'slot-clash',      gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
-  na:         { label: '',            gridLabel: '',         icon: '—',  pill: '',                gridCls: 'bg-transparent border-transparent cursor-default' },
+  open:       { label: 'Open',         gridLabel: 'Open',     icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
+  booked:     { label: 'Booked',       gridLabel: 'Booked',   icon: '🔴', pill: 'slot-booked',     gridCls: 'bg-red-950 border border-red-900 cursor-default' },
+  soft_block: { label: 'Reserved',     gridLabel: 'Reserved', icon: '🟡', pill: 'slot-softblock',  gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default' },
+  clash:      { label: 'Blocked',      gridLabel: 'Blocked',  icon: '⛔', pill: 'slot-clash',      gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
+  na:         { label: '',             gridLabel: '',         icon: '—',  pill: '',                gridCls: 'bg-transparent border-transparent cursor-default' },
 }
 
 export function ScheduleGrid() {
@@ -102,12 +102,18 @@ export function ScheduleGrid() {
 
       {/* Legend */}
       <div className="flex gap-4 flex-wrap mb-5">
-        {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+        {Object.entries(STATUS_CONFIG).filter(([key]) => key !== 'na').map(([key, cfg]) => (
           <div key={key} className="flex items-center gap-1.5 text-xs text-zinc-500 font-rajdhani">
             <span className="text-sm">{cfg.icon}</span>
             {cfg.label}
           </div>
         ))}
+        {week?.weekendFull && (
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-rajdhani">
+            <span className="text-sm">🔒</span>
+            Capacity Full
+          </div>
+        )}
       </div>
 
       {/* ── MOBILE: Day cards ── */}
