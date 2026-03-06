@@ -181,7 +181,7 @@ export function ScheduleGrid() {
                         <div className="flex-1">
                           <span className={`inline-flex items-center gap-1.5 ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                             <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                            {slot.status === 'open' && week?.weekendFull ? 'Capacity Full' : cfg.label}
+                            {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? 'Capacity Full' : cfg.label}
                           </span>
                         </div>
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull && (
@@ -236,13 +236,13 @@ export function ScheduleGrid() {
                           </a>
                         ) : (
                           <div className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>
-                            <span className="text-lg">{slot.status === 'open' && week?.weekendFull ? '🔒' : cfg.icon}</span>
+                            <span className="text-lg">{week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '🔒' : cfg.icon}</span>
                             <span className={`font-rajdhani text-[11px] font-bold tracking-wide
                               ${slot.status === 'open' && week?.weekendFull ? 'text-zinc-600' :
                                 slot.status === 'booked'     ? 'text-red-500'    :
                                 slot.status === 'soft_block' ? 'text-yellow-600' :
                                 'text-zinc-700'}`}>
-                              {slot.status === 'open' && week?.weekendFull ? '' : cfg.gridLabel}
+                              {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '' : cfg.gridLabel}
                             </span>
                           </div>
                         )}
