@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
     .select('*')
     .neq('status', 'cancelled')
     .order('game_date')
+    .limit(100)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
