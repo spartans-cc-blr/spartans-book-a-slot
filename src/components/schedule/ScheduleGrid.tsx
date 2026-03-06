@@ -153,10 +153,10 @@ export function ScheduleGrid() {
                           <p className="font-cinzel text-sm font-semibold text-parchment">{slot.time}</p>
                           <p className="text-[10px] text-zinc-600 font-rajdhani">{header.label}</p>
                         </div>
-                        <div className="flex-1">
-                          <span className={`inline-flex items-center gap-1.5 ${cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
+                       <div className="flex-1">
+                          <span className={`inline-flex items-center gap-1.5 ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                             <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                            {cfg.label}
+                            {slot.status === 'open' && week?.weekendFull ? 'Weekend Full' : cfg.label}
                           </span>
                         </div>
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull && (
@@ -210,13 +210,14 @@ export function ScheduleGrid() {
                             <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400">{cfg.gridLabel}</span>
                           </a>
                         ) : (
-                          <div className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${cfg.gridCls}`}>
-                            <span className="text-lg">{cfg.icon}</span>
+                          <div className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>
+                            <span className="text-lg">{slot.status === 'open' && week?.weekendFull ? '🔒' : cfg.icon}</span>
                             <span className={`font-rajdhani text-[11px] font-bold tracking-wide
-                              ${slot.status === 'booked'     ? 'text-red-500'    :
+                              ${slot.status === 'open' && week?.weekendFull ? 'text-zinc-600' :
+                                slot.status === 'booked'     ? 'text-red-500'    :
                                 slot.status === 'soft_block' ? 'text-yellow-600' :
                                 'text-zinc-700'}`}>
-                              {cfg.gridLabel}
+                              {slot.status === 'open' && week?.weekendFull ? 'Full' : cfg.gridLabel}
                             </span>
                           </div>
                         )}
