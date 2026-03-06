@@ -11,6 +11,7 @@ const RULES: { rule: string; label: string }[] = [
   { rule: 'R3', label: 'Max 2 games per tournament/month' },
   { rule: 'R4', label: 'Slot not already taken' },
   { rule: 'R5', label: 'No T20/T30 format clash' },
+  { rule: 'R6', label: '12:30 game runs till evening' },
 ]
 
 export default function NewBookingPage() {
@@ -65,7 +66,7 @@ export default function NewBookingPage() {
 
   useEffect(() => { validate() }, [validate])
 
-  const allPassed = ruleChecks.every(r => r.status === 'pass')
+  const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'warn')
 
   const availableSlots = format
     ? SLOT_TIMES.filter(t => SLOT_FORMATS[t].includes(format as GameFormat))
@@ -210,10 +211,10 @@ export default function NewBookingPage() {
             {ruleChecks.map(r => (
               <div key={r.rule} className="px-4 py-3 border-b border-ink-4 flex gap-3 items-start">
                 <span className="text-sm mt-0.5 flex-shrink-0">
-                  {r.status === 'pass' ? '✅' : r.status === 'fail' ? '❌' : '⏳'}
+                  {r.status === 'pass' ? '✅' : r.status === 'fail' ? '❌' : r.status === 'warn' ? '⚠️' : '⏳'}
                 </span>
                 <div>
-                  <p className={`font-rajdhani text-xs font-bold ${r.status === 'pass' ? 'text-emerald-400' : r.status === 'fail' ? 'text-red-400' : 'text-zinc-600'}`}>
+                  <p className={`font-rajdhani text-xs font-bold ${r.status === 'pass' ? 'text-emerald-400' : r.status === 'fail' ? 'text-red-400' : r.status === 'warn' ? 'text-yellow-400' : 'text-zinc-600'}`}>
                     {r.rule}: {r.label}
                   </p>
                   <p className="font-rajdhani text-xs text-zinc-600 mt-0.5">{r.message}</p>
