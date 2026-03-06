@@ -50,7 +50,11 @@ export async function GET(req: NextRequest) {
   const endDate = addDays(from, weeksParam * 7)
 
   const { data: bookings, error } = await supabase
-    .rpc('get_all_bookings')
+    .from('bookings')
+    .select('*')
+    .neq('status', 'cancelled')
+    .order('game_date')
+    .limit(1000)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
