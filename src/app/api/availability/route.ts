@@ -49,8 +49,24 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const endDate = addDays(from, weeksParam * 7)
 
-  const { data: bookings, error } = await supabase
-    .rpc('get_all_bookings')
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/bookings?status=neq.cancelled&order=game_date,slot_time&limit=1000`,
+    {
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Range-Unit': 'items',
+        'Range': '0-999',
+        'Prefer': 'count=none',
+      },
+      cache: 'no-store',
+    }
+  )
+  const bookings = await response.json()
+  const error = response.ok ? null : bookings
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
