@@ -147,24 +147,26 @@ export function computeSlotStatus(
     b => b.game_date === date && b.status !== 'cancelled'
   )
 
-  // Direct match
+  // Direct match first
   const direct = active.find(b => b.slot_time === slotTime)
   if (direct) {
     return direct.status === 'soft_block' ? 'soft_block' : 'booked'
   }
 
-  // R5 clash check — T20 10:30 blocks T30 adjacent slots
-  if (slotTime === '07:30' || slotTime === '12:30') {
-    const t20at1030 = active.find(
-      b => b.format === 'T20' && b.slot_time === '10:30' && b.status === 'confirmed'
-    )
-    if (t20at1030) return 'clash'
+  // R5 clash — only apply if there's a confirmed T20 at 10:30
+  const t20at1030 = active.find(
+    b => b.format === 'T20' && b.slot_time === '10:30' && b.status === 'confirmed'
+  )
+  if (t20at1030 && (slotTime === '07:30' || slotTime === '12:30')) {
+    return 'clash'
   }
-  if (slotTime === '10:30') {
-    const t30exists = active.find(
-      b => b.format === 'T30' && b.status === 'confirmed'
-    )
-    if (t30exists) return 'clash'
+
+  // R5 clash — only apply if there's a confirmed T30
+  const t30exists = active.find(
+    b => b.format === 'T30' && b.status === 'confirmed'
+  )
+  if (t30exists && slotTime === '10:30') {
+    return 'clash'
   }
 
   return 'open'
