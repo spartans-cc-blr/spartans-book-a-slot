@@ -102,12 +102,19 @@ export async function GET(req: NextRequest) {
       return { date: dateStr, label: dayLabel, slots }
     })
 
+    // Count confirmed games this weekend
+    const weekendGameCount = (bookings ?? []).filter(
+      (b: any) => (b.game_date === satStr || b.game_date === sunStr) && b.status === 'confirmed'
+    ).length
+
     const satFmt = format(sat, 'd')
     const sunFmt = format(sun, 'd MMM yyyy')
     weeks.push({
-      weekStart: satStr,
-      label:     `Weekend of ${satFmt}–${sunFmt}`,
+      weekStart:    satStr,
+      label:        `Weekend of ${satFmt}–${sunFmt}`,
       days,
+      weekendFull:  weekendGameCount >= 3,
+      gamesBooked:  weekendGameCount,
     })
   }
 
