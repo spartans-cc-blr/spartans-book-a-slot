@@ -29,10 +29,24 @@ export function ScheduleGrid() {
     fetch('/api/availability?weeks=15')
       .then(r => r.json())
       .then(d => {
-        setWeeks(d.weeks ?? [])
-        if (d.weeks?.length > 0) {
-          setExpandedDays({ [d.weeks[0].days[0].date]: true })
+        const fetchedWeeks = d.weeks ?? []
+        setWeeks(fetchedWeeks)
+
+        // Auto-jump to first week with an open slot
+        const firstOpenWeek = fetchedWeeks.findIndex((w: any) =>
+          !w.weekendFull &&
+          w.days.some((day: any) =>
+            day.slots.some((slot: any) => slot.status === 'open')
+          )
+        )
+        const startWeek = firstOpenWeek >= 0 ? firstOpenWeek : 0
+        setCurrentWeek(startWeek)
+
+        // Auto-expand first day of that week on mobile
+        if (fetchedWeeks[startWeek]?.days?.length > 0) {
+          setExpandedDays({ [fetchedWeeks[startWeek].days[0].date]: true })
         }
+
         setLoading(false)
       })
   }, [])
