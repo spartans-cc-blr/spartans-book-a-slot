@@ -29,6 +29,7 @@ export function ScheduleGrid() {
     fetch(`/api/availability?weeks=13&from=2026-03-07&t=${Date.now()}`)
       .then(r => r.json())
       .then(d => {
+        console.log('API response:', JSON.stringify(d.weeks?.[0]?.days?.[0]?.slots))
         setWeeks(d.weeks ?? [])
         // Auto-expand first day on mobile
         if (d.weeks?.length > 0) {
