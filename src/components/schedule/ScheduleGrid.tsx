@@ -15,7 +15,7 @@ const STATUS_CONFIG = {
   open:       { label: 'Open',         gridLabel: 'Open',     icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
   booked:     { label: 'Booked',       gridLabel: 'Booked',   icon: '🔴', pill: 'slot-booked',     gridCls: 'bg-red-950 border border-red-900 cursor-default' },
   soft_block: { label: 'Reserved',     gridLabel: 'Reserved', icon: '🟡', pill: 'slot-softblock',  gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default' },
-  clash:      { label: 'Blocked',      gridLabel: 'Blocked',  icon: '⛔', pill: 'slot-clash',      gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
+  clash:      { label: 'Game in Progress', gridLabel: 'In Progress', icon: '⛔',
   na:         { label: '',             gridLabel: '',         icon: '—',  pill: '',                gridCls: 'bg-transparent border-transparent cursor-default' },
 }
 
@@ -63,16 +63,29 @@ export function ScheduleGrid() {
     <div>
       {/* Month pills */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-none">
-        {['Mar', 'Apr', 'May'].map((m, i) => (
-          <button key={m}
-            onClick={() => setCurrentWeek(i === 0 ? 0 : i === 1 ? 4 : 8)}
-            className={`font-rajdhani text-xs font-semibold tracking-widest px-4 py-1.5 rounded-full border transition-all whitespace-nowrap
-              ${currentWeek >= (i === 0 ? 0 : i === 1 ? 4 : 8) && currentWeek < (i === 0 ? 4 : i === 1 ? 8 : 13)
-                ? 'border-gold text-gold bg-gold/10'
-                : 'border-ink-5 text-zinc-600 hover:border-gold-dim hover:text-gold'}`}>
-            {m} 2026
-          </button>
-        ))}
+        {weeks
+          .filter((w, i, arr) =>
+            i === arr.findIndex(x =>
+              new Date(x.weekStart).getMonth() === new Date(w.weekStart).getMonth() &&
+              new Date(x.weekStart).getFullYear() === new Date(w.weekStart).getFullYear()
+            )
+          )
+          .map(w => {
+            const d = new Date(w.weekStart)
+            const monthLabel = d.toLocaleString('default', { month: 'short' })
+            const year = d.getFullYear()
+            const weekIndex = weeks.indexOf(w)
+            return (
+              <button key={w.weekStart}
+                onClick={() => setCurrentWeek(weekIndex)}
+                className={`font-rajdhani text-xs font-semibold tracking-widest px-4 py-1.5 rounded-full border transition-all whitespace-nowrap
+                  ${currentWeek >= weekIndex && currentWeek < weekIndex + 4
+                    ? 'border-gold text-gold bg-gold/10'
+                    : 'border-ink-5 text-zinc-600 hover:border-gold-dim hover:text-gold'}`}>
+                {monthLabel} {year}
+              </button>
+            )
+          })}
       </div>
 
       {/* Week navigator */}
@@ -83,7 +96,14 @@ export function ScheduleGrid() {
           ‹
         </button>
         <div className="flex-1 min-w-0">
-          <p className="font-cinzel text-sm text-gold-light truncate">{week?.label}</p>
+          <p className="font-cinzel text-sm text-gold-light truncate flex items-center gap-2">
+            {week?.label}
+            {week?.weekendFull && (
+              <span className="font-rajdhani text-[10px] font-bold tracking-wide bg-zinc-800 border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded-full whitespace-nowrap">
+                🔒 Capacity Full
+              </span>
+            )}
+          </p>
           <p className="text-xs text-zinc-600 font-rajdhani mt-0.5">Week {currentWeek + 1} of {weeks.length}</p>
         </div>
         {/* Progress dots */}
