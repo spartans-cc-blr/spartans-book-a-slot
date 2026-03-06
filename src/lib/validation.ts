@@ -8,23 +8,18 @@ import type {
   GameFormat,
 } from '@/types'
 
-// ── Helpers ──────────────────────────────────────────────────────
-
-/** Returns ISO week number for a date string */
 export function getWeekNumber(dateStr: string): number {
   return getISOWeek(parseISO(dateStr))
 }
 
-/** Returns 'YYYY-MM' for a date string */
 export function getYearMonth(dateStr: string): string {
   const d = parseISO(dateStr)
   return `${getYear(d)}-${String(getMonth(d) + 1).padStart(2, '0')}`
 }
 
-/** Saturday and Sunday of the same ISO week as a given date */
 export function getWeekendDates(dateStr: string): string[] {
   const d = parseISO(dateStr)
-  const day = d.getDay() // 0=Sun, 6=Sat
+  const day = d.getDay()
   const sat = new Date(d)
   sat.setDate(d.getDate() - (day === 0 ? 1 : day - 6))
   const sun = new Date(sat)
@@ -35,30 +30,21 @@ export function getWeekendDates(dateStr: string): string[] {
   ]
 }
 
-// ── T20 10:30 conflict check ──────────────────────────────────────
-// R5: A T20 at 10:30 blocks T30 slots (07:30 and 12:30) on the same day,
-// and vice versa — T30 at 07:30 or 12:30 blocks T20 at 10:30.
-function hasSlotConflict(
+function hasT20T30Conflict(
   format: GameFormat,
   slotTime: SlotTime,
   sameDayBookings: Booking[]
 ): boolean {
   const active = sameDayBookings.filter(b => b.status === 'confirmed')
-
   if (format === 'T20' && slotTime === '10:30') {
-    // Booking a T20 at 10:30 — blocked if any T30 exists today
     return active.some(b => b.format === 'T30')
   }
-
   if (format === 'T30' && (slotTime === '07:30' || slotTime === '12:30')) {
-    // Booking a T30 — blocked if a T20 at 10:30 exists today
     return active.some(b => b.format === 'T20' && b.slot_time === '10:30')
   }
-
   return false
 }
 
-// ── Main validation function ──────────────────────────────────────
 export function validateBooking(
   booking: CreateBookingRequest,
   existingBookings: Booking[],
@@ -66,6 +52,7 @@ export function validateBooking(
   tournamentName: string
 ): ValidationResult {
   const errors: ValidationError[] = []
+  const warnings: ValidationError[] = []
   const active = existingBookings.filter(b => b.status !== 'cancelled')
   const weekend = getWeekendDates(booking.game_date)
   const month   = getYearMonth(booking.game_date)
@@ -77,20 +64,20 @@ export function validateBooking(
   if (weekendGames.length >= 3) {
     errors.push({
       rule: 'R1',
-      message: `The club already has 3 confirmed games this weekend (${weekend[0]} & ${weekend[1]}). Maximum reached.`,
+      message: `The club already has 3 confirmed games this weekend. Maximum reached.`,
     })
   }
 
-  // ── R2: One game per captain per weekend ─────────────────────
+  // ── R2: One game per captain per weekend (WARNING only) ──────
   const captainWeekend = active.filter(b =>
     weekend.includes(b.game_date) &&
     b.captain_id === booking.captain_id &&
     b.status === 'confirmed'
   )
   if (captainWeekend.length > 0) {
-    errors.push({
+    warnings.push({
       rule: 'R2',
-      message: `${captainName} is already playing this weekend. Each captain can only play once per weekend.`,
+      message: `${captainName} is already playing this weekend. Confirm only if the captain has agreed to play again.`,
     })
   }
 
@@ -103,7 +90,7 @@ export function validateBooking(
   if (tournamentMonth.length >= 2) {
     errors.push({
       rule: 'R3',
-      message: `${tournamentName} already has 2 confirmed games in ${month}. Maximum 2 games per tournament per month.`,
+      message: `${tournamentName} already has 2 confirmed games in ${month}. Maximum 2 per tournament per month.`,
     })
   }
 
@@ -121,7 +108,7 @@ export function validateBooking(
 
   // ── R5: T20 10:30 ↔ T30 conflict ────────────────────────────
   const sameDayBookings = active.filter(b => b.game_date === booking.game_date)
-  if (hasSlotConflict(booking.format, booking.slot_time, sameDayBookings)) {
+  if (hasT20T30Conflict(booking.format, booking.slot_time, sameDayBookings)) {
     errors.push({
       rule: 'R5',
       message:
@@ -131,13 +118,41 @@ export function validateBooking(
     })
   }
 
+  // ── R6: 12:30 blocks 14:30 (game runs till evening) ─────────
+  if (booking.slot_time === '14:30') {
+    const noon = active.find(b =>
+      b.game_date === booking.game_date &&
+      b.slot_time === '12:30' &&
+      b.status === 'confirmed'
+    )
+    if (noon) {
+      errors.push({
+        rule: 'R6',
+        message: `A game is already scheduled at 12:30 on ${booking.game_date}. It runs until evening, blocking the 14:30 slot.`,
+      })
+    }
+  }
+  if (booking.slot_time === '12:30') {
+    const afternoon = active.find(b =>
+      b.game_date === booking.game_date &&
+      b.slot_time === '14:30' &&
+      b.status === 'confirmed'
+    )
+    if (afternoon) {
+      errors.push({
+        rule: 'R6',
+        message: `A game is already scheduled at 14:30 on ${booking.game_date}. Booking 12:30 would conflict as it runs until evening.`,
+      })
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
+    warnings,
   }
 }
 
-// ── Availability computation for the public grid ─────────────────
 export function computeSlotStatus(
   date: string,
   slotTime: SlotTime,
@@ -147,25 +162,31 @@ export function computeSlotStatus(
     b => b.game_date === date && b.status !== 'cancelled'
   )
 
-  // Direct match first
+  // Direct match
   const direct = active.find(b => b.slot_time === slotTime)
   if (direct) {
     return direct.status === 'soft_block' ? 'soft_block' : 'booked'
   }
 
-  // R5 clash — only apply if there's a confirmed T20 at 10:30
+  // R5: T20 10:30 blocks T30 adjacent slots
   const t20at1030 = active.find(
     b => b.format === 'T20' && b.slot_time === '10:30' && b.status === 'confirmed'
   )
   if (t20at1030 && (slotTime === '07:30' || slotTime === '12:30')) {
     return 'clash'
   }
-
-  // R5 clash — only apply if there's a confirmed T30
   const t30exists = active.find(
     b => b.format === 'T30' && b.status === 'confirmed'
   )
   if (t30exists && slotTime === '10:30') {
+    return 'clash'
+  }
+
+  // R6: 12:30 blocks 14:30
+  const noonGame = active.find(
+    b => b.slot_time === '12:30' && b.status === 'confirmed'
+  )
+  if (noonGame && slotTime === '14:30') {
     return 'clash'
   }
 
