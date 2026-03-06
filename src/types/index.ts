@@ -86,7 +86,7 @@ export interface ValidationResult {
 }
 
 export interface ValidationError {
-  rule:    'R1' | 'R2' | 'R3' | 'R4' | 'R5'
+  rule:    'R1' | 'R2' | 'R3' | 'R4' | 'R5' | 'R6'
   message: string
 }
 
