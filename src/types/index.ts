@@ -95,7 +95,7 @@ export interface ValidationError {
 export interface RuleCheckItem {
   rule:    string
   label:   string
-  status:  'pass' | 'fail' | 'pending'
+  status:  'pass' | 'fail' | 'pending' | 'warn'
   message: string
 }
 
