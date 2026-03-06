@@ -26,7 +26,7 @@ export function ScheduleGrid() {
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    fetch('/api/availability?weeks=13')
+    fetch('/api/availability?weeks=15')
       .then(r => r.json())
       .then(d => {
         setWeeks(d.weeks ?? [])
