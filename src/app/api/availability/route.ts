@@ -89,12 +89,11 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  return NextResponse.json(
+ return NextResponse.json(
     { weeks },
     {
       headers: {
-        // Cache for 60 seconds — keeps the page fast without being stale
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        'Cache-Control': 'no-store',
       },
     }
   )
