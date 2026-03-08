@@ -48,11 +48,13 @@ export interface Booking {
 // ── Slot model for the availability grid ─────────────────────────
 
 export interface SlotInfo {
-  time:          SlotTime
-  status:        SlotStatus
-  waLink?:       string
-  reserved_until?: string | null   // ← add
-  organiser_name?: string | null   // ← add
+  time:             SlotTime
+  status:           SlotStatus
+  waLink?:          string
+  reserved_until?:  string | null
+  organiser_name?:  string | null
+  cricheroes_url?:  string | null
+  tournament_name?: string | null
 }
 
 export interface DayAvailability {
