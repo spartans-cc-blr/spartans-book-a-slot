@@ -7,7 +7,6 @@ Fixture availability and booking management for Spartans Cricket Club, Bengaluru
 
 ---
 
-
 ## What this app does
 
 | Who | What they see |
