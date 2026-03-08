@@ -1,4 +1,4 @@
-# Spartans CC — Book a Slot
+# Spartans CC Bengaluru — Book a Slot
 
 Fixture availability and booking management for Spartans Cricket Club, Bengaluru.
 
