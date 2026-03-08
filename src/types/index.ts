@@ -48,10 +48,11 @@ export interface Booking {
 // ── Slot model for the availability grid ─────────────────────────
 
 export interface SlotInfo {
-  time:   SlotTime
-  status: SlotStatus
-  // Only populated for open slots
-  waLink?: string
+  time:          SlotTime
+  status:        SlotStatus
+  waLink?:       string
+  reserved_until?: string | null   // ← add
+  organiser_name?: string | null   // ← add
 }
 
 export interface DayAvailability {
