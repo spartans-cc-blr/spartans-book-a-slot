@@ -32,8 +32,6 @@ function formatExpiryLabel(reserved_until: string): string {
   return `Expires ${day} ${h}:${mins}${ampm}`
 }
 
-console.log('formatExpiryLabel test:', formatExpiryLabel('2026-03-10T07:59:42.417+00:00'))
-
 export function ScheduleGrid() {
   const [weeks, setWeeks]         = useState<WeekAvailability[]>([])
   const [currentWeek, setCurrentWeek] = useState(0)
@@ -262,9 +260,6 @@ export function ScheduleGrid() {
                   </td>
                   {day.slots.map((slot, si) => {
                     const cfg = STATUS_CONFIG[slot.status]
-                    if (slot.status === 'soft_block') {
-                      console.log('soft_block slot:', slot.time, slot.reserved_until, slot.organiser_name)
-                    }
                     return (
                       <td key={slot.time} className="p-1.5 border-b border-ink-4">
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull ? (
