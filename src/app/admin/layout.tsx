@@ -15,10 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       {/* Admin top bar */}
       <header className="bg-ink-2 border-b border-ink-5 h-12 flex items-center px-5 gap-4 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-gradient-to-br from-gold to-gold-dim flex items-center justify-center font-cinzel font-black text-ink text-xs"
-            style={{ clipPath: 'polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)' }}>
-            S
-          </div>
+          <<img src="/Transparent_High_Resolution.png" alt="Spartans CC" className="w-7 h-7 object-contain" />
           <span className="font-cinzel text-gold-dim text-xs tracking-widest">SPARTANS CC</span>
           <span className="font-rajdhani text-zinc-700 text-xs tracking-widest">/ ADMIN</span>
         </div>
