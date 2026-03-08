@@ -42,7 +42,6 @@ export interface Booking {
   organiser_phone?: string | null
   match_id?: string | null
   opponent_name?: string | null
-  venue?: string | null
   cricheroes_url?: string | null
 }
 
