@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
   const now = new Date().toISOString()
   const response = await fetch(
-    `${supabaseUrl}/rest/v1/bookings?status=neq.cancelled&or=(reserved_until.is.null,reserved_until.gt.${now})&order=game_date,slot_time&limit=1000&select=*`,
+    `${supabaseUrl}/rest/v1/bookings?status=neq.cancelled&or=(reserved_until.is.null,reserved_until.gt.${now})&order=game_date,slot_time&limit=1000&select=*,tournament:tournaments(name)`,
     {
       headers: {
         'apikey': supabaseKey,
@@ -96,9 +96,20 @@ export async function GET(req: NextRequest) {
           const booking = (bookings ?? []).find(
             (b: any) => b.game_date === dateStr && b.slot_time === time && b.status === 'soft_block'
           )
-          if (booking?.reserved_until) {
-            slotInfo.reserved_until = booking.reserved_until
-            slotInfo.organiser_name = booking.organiser_name ?? null
+          if (booking) {
+            slotInfo.reserved_until  = booking.reserved_until ?? null
+            slotInfo.organiser_name  = booking.organiser_name ?? null
+            slotInfo.tournament_name = booking.tournament?.name ?? null
+          }
+        }
+
+        if (status === 'booked') {
+          const booking = (bookings ?? []).find(
+            (b: any) => b.game_date === dateStr && b.slot_time === time && b.status === 'confirmed'
+          )
+          if (booking?.cricheroes_url) {
+            slotInfo.cricheroes_url  = booking.cricheroes_url
+            slotInfo.tournament_name = booking.tournament?.name ?? null
           }
         }
 
