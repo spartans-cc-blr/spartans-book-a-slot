@@ -5,7 +5,6 @@ export type GameFormat    = 'T20' | 'T30'
 export type SlotTime      = '07:30' | '10:30' | '12:30' | '14:30'
 export type SlotStatus    = 'open' | 'booked' | 'soft_block' | 'clash' | 'na'
 
-
 export interface Captain {
   id:         string
   name:       string
