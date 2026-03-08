@@ -217,12 +217,23 @@ export function ScheduleGrid() {
                                 {formatExpiryLabel(slot.reserved_until)}
                               </span>
                             )}
+                            {slot.status === 'soft_block' && slot.tournament_name && (
+                              <span className="text-[9px] font-normal text-yellow-700 opacity-75 mt-0.5 pl-3">
+                                {slot.tournament_name}
+                              </span>
+                            )}
                           </div>
                         </div>
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull && (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 bg-[#128C7E] hover:bg-[#0d7a6e] text-white text-xs font-bold tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap">
                             <WAIcon /> Book
+                          </a>
+                        )}
+                        {slot.status === 'booked' && slot.cricheroes_url && (
+                          <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 bg-red-950 hover:bg-red-900 border border-red-800 text-red-400 text-xs font-bold tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap">
+                            🏏 View
                           </a>
                         )}
                       </div>
@@ -269,9 +280,20 @@ export function ScheduleGrid() {
                             <span className="text-lg group-hover:scale-110 transition-transform">{cfg.icon}</span>
                             <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400">{cfg.gridLabel}</span>
                           </a>
+                        ) : slot.status === 'booked' && slot.cricheroes_url ? (
+                          <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
+                            className={`flex flex-col items-center justify-center gap-0.5 min-h-16 py-2 px-1 rounded ${cfg.gridCls} hover:border-red-700 transition-colors`}
+                            title="View match on CricHeroes">
+                            <span className="text-lg">{cfg.icon}</span>
+                            <span className="font-rajdhani text-[11px] font-bold tracking-wide text-red-500">Booked</span>
+                            {slot.tournament_name && (
+                              <span className="font-rajdhani text-[9px] text-red-400 opacity-75 text-center leading-tight px-1 truncate w-full">
+                                {slot.tournament_name}
+                              </span>
+                            )}
+                          </a>
                         ) : (
-                          <div className={`flex flex-col items-center justify-center gap-0.5 min-h-16 py-2 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>
-                            <span className="text-lg">{week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '🔒' : cfg.icon}</span>
+                          <div className={`flex flex-col items-center justify-center gap-0.5 min-h-16 py-2 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>                            <span className="text-lg">{week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '🔒' : cfg.icon}</span>
                             <span className="font-rajdhani text-[11px] font-bold tracking-wide text-center px-1 flex flex-col items-center">
                               <span className={
                                 slot.status === 'open' && week?.weekendFull ? 'text-zinc-600' :
@@ -284,6 +306,11 @@ export function ScheduleGrid() {
                               {slot.status === 'soft_block' && slot.reserved_until && (
                                 <span className="text-[9px] font-normal text-yellow-600 opacity-80 mt-0.5">
                                   {formatExpiryLabel(slot.reserved_until)}
+                                </span>
+                              )}
+                              {slot.status === 'soft_block' && slot.tournament_name && (
+                                <span className="text-[9px] font-normal text-yellow-700 opacity-75 text-center leading-tight px-1 truncate w-full">
+                                  {slot.tournament_name}
                                 </span>
                               )}
                             </span>
