@@ -37,6 +37,13 @@ export interface Booking {
   // Joined fields (from API responses)
   captain?:      Captain
   tournament?:   Tournament
+  reserved_until?: string | null
+  organiser_name?: string | null
+  organiser_phone?: string | null
+  match_id?: string | null
+  opponent_name?: string | null
+  venue?: string | null
+  cricheroes_url?: string | null
 }
 
 // ── Slot model for the availability grid ─────────────────────────
