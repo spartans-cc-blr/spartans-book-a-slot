@@ -14,9 +14,16 @@ const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
 const STATUS_CONFIG = {
   open:       { label: 'Open',             gridLabel: 'Open',        icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
   booked:     { label: 'Booked',           gridLabel: 'Booked',      icon: '🔴', pill: 'slot-booked',     gridCls: 'bg-red-950 border border-red-900 cursor-default' },
-  soft_block: { label: 'Reserved',         gridLabel: 'Reserved',    icon: '🟡', pill: 'slot-softblock',  gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default' },
+  soft_block: { label: 'Reserved',         gridLabel: 'Reserved',    icon: '🟡', pill: 'slot-softblock',  gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
   clash:      { label: 'Slot Blocked',     gridLabel: 'Slot Blocked', icon: '⛔', pill: 'slot-clash',      gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
   na:         { label: '',                 gridLabel: '',            icon: '—',  pill: '',                gridCls: 'bg-transparent border-transparent cursor-default' },
+}
+
+function formatExpiryLabel(reserved_until: string): string {
+  const expiry = new Date(reserved_until)
+  const now    = new Date()
+  if (expiry <= now) return 'Expiring soon'
+  return `Expires ${expiry.toLocaleDateString('en-IN', { weekday: 'short' })} ${expiry.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })}`
 }
 
 export function ScheduleGrid() {
@@ -195,7 +202,10 @@ export function ScheduleGrid() {
                         <div className="flex-1">
                           <span className={`inline-flex items-center gap-1.5 ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                             <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                            {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? 'Capacity Full' : cfg.label}
+                            {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? 'Capacity Full' :
+                              slot.status === 'soft_block' && slot.reserved_until
+                                ? formatExpiryLabel(slot.reserved_until)
+                                : cfg.label}
                           </span>
                         </div>
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull && (
@@ -251,12 +261,15 @@ export function ScheduleGrid() {
                         ) : (
                           <div className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>
                             <span className="text-lg">{week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '🔒' : cfg.icon}</span>
-                            <span className={`font-rajdhani text-[11px] font-bold tracking-wide
+                            <span className={`font-rajdhani text-[11px] font-bold tracking-wide text-center px-1
                               ${slot.status === 'open' && week?.weekendFull ? 'text-zinc-600' :
                                 slot.status === 'booked'     ? 'text-red-500'    :
-                                slot.status === 'soft_block' ? 'text-yellow-600' :
+                                slot.status === 'soft_block' ? 'text-yellow-500' :
                                 'text-zinc-700'}`}>
-                              {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '' : cfg.gridLabel}
+                              {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '' :
+                                slot.status === 'soft_block' && slot.reserved_until
+                                  ? formatExpiryLabel(slot.reserved_until)
+                                  : cfg.gridLabel}
                             </span>
                           </div>
                         )}
