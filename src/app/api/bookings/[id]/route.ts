@@ -3,6 +3,25 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+
+  const supabase = createServiceClient()
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(`*, captain:captains(*), tournament:tournaments(*)`)
+    .eq('id', params.id)
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ booking: data })
+}
+
 // ── PATCH /api/bookings/[id] ──────────────────────────────────────
 // Update status (cancel, restore) or edit fields.
 export async function PATCH(
