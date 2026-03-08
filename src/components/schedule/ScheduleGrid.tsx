@@ -23,7 +23,13 @@ function formatExpiryLabel(reserved_until: string): string {
   const expiry = new Date(reserved_until)
   const now    = new Date()
   if (expiry <= now) return 'Expiring soon'
-  return `Expires ${expiry.toLocaleDateString('en-IN', { weekday: 'short' })} ${expiry.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const day  = days[expiry.getDay()]
+  const hrs  = expiry.getHours()
+  const mins = expiry.getMinutes().toString().padStart(2, '0')
+  const ampm = hrs >= 12 ? 'pm' : 'am'
+  const h    = hrs % 12 || 12
+  return `Expires ${day} ${h}:${mins}${ampm}`
 }
 
 export function ScheduleGrid() {
