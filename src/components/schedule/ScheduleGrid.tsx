@@ -209,9 +209,9 @@ export function ScheduleGrid() {
                           <span className={`inline-flex items-center gap-1.5 ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                             <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
                             {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? 'Capacity Full' :
-                              slot.status === 'soft_block' && slot.reserved_until
-                                ? formatExpiryLabel(slot.reserved_until)
-                                : cfg.label}
+                              slot.status === 'soft_block' && slot.reserved_until ? (
+                                <><span className="block">Reserved</span><span className="block text-[9px] font-normal opacity-80">{formatExpiryLabel(slot.reserved_until)}</span></>
+                              ) : cfg.label}
                           </span>
                         </div>
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull && (
@@ -265,7 +265,7 @@ export function ScheduleGrid() {
                             <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400">{cfg.gridLabel}</span>
                           </a>
                         ) : (
-                          <div className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>
+                          <div className={`flex flex-col items-center justify-center gap-0.5 min-h-16 py-2 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>
                             <span className="text-lg">{week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '🔒' : cfg.icon}</span>
                             <span className={`font-rajdhani text-[11px] font-bold tracking-wide text-center px-1
                               ${slot.status === 'open' && week?.weekendFull ? 'text-zinc-600' :
@@ -273,9 +273,9 @@ export function ScheduleGrid() {
                                 slot.status === 'soft_block' ? 'text-yellow-500' :
                                 'text-zinc-700'}`}>
                               {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '' :
-                                slot.status === 'soft_block' && slot.reserved_until
-                                  ? formatExpiryLabel(slot.reserved_until)
-                                  : cfg.gridLabel}
+                                slot.status === 'soft_block' && slot.reserved_until ? (
+                                  <><span className="block">Reserved</span><span className="block text-[9px] font-normal opacity-80">{formatExpiryLabel(slot.reserved_until)}</span></>
+                                ) : cfg.gridLabel}
                             </span>
                           </div>
                         )}
