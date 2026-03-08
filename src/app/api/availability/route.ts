@@ -46,8 +46,9 @@ export async function GET(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+  const now = new Date().toISOString()
   const response = await fetch(
-    `${supabaseUrl}/rest/v1/bookings?status=neq.cancelled&order=game_date,slot_time&limit=1000&select=*`,
+    `${supabaseUrl}/rest/v1/bookings?status=neq.cancelled&or=(reserved_until.is.null,reserved_until.gt.${now})&order=game_date,slot_time&limit=1000&select=*`,
     {
       headers: {
         'apikey': supabaseKey,
