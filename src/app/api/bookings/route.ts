@@ -5,6 +5,8 @@ import { createServiceClient } from '@/lib/supabase'
 import { validateBooking } from '@/lib/validation'
 import type { CreateBookingRequest } from '@/types'
 
+
+
 // ── GET /api/bookings ─────────────────────────────────────────────
 // Admin only. Returns all bookings with captain and tournament joined.
 export async function GET(req: NextRequest) {
