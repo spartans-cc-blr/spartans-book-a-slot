@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase'
-import { computeSlotStatus, getWeekendDates } from '@/lib/validation'
+import { computeSlotStatus } from '@/lib/validation'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { addDays, format, parseISO, startOfDay } from 'date-fns'
+import { addDays, format, parseISO, formatDistanceToNow } from 'date-fns'
 import type { SlotTime, WeekAvailability, DayAvailability, SlotInfo } from '@/types'
 
 const SLOT_TIMES: SlotTime[] = ['07:30', '10:30', '12:30', '14:30']
@@ -14,46 +13,41 @@ const SLOT_LABELS: Record<SlotTime, string> = {
   '14:30': 'T20 only',
 }
 
-/**
- * GET /api/availability?from=YYYY-MM-DD&weeks=13
- * Returns availability grid for N weekends starting from the given date.
- * Public endpoint — no auth required.
- */
+function formatExpiryLabel(reserved_until: string): string {
+  const expiry = new Date(reserved_until)
+  const now = new Date()
+  const diffMs = expiry.getTime() - now.getTime()
+  if (diffMs <= 0) return 'Expiring soon'
+  // Show day + time e.g. "Sat 9:00pm"
+  return `Expires ${format(expiry, 'EEE h:mma')}`
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const fromParam = searchParams.get('from')
-  const weeksParam = parseInt(searchParams.get('weeks') ?? '13')
+  const weeksParam = parseInt(searchParams.get('weeks') ?? '15')
 
-  // Default: start from next upcoming Saturday
- let from: Date
+  let from: Date
   if (fromParam) {
     from = parseISO(fromParam)
   } else {
     from = new Date()
     const day = from.getDay()
-    // Show current weekend until Sunday is over
-    // If today is Sunday (0), start from yesterday (Saturday)
-    // If today is Saturday (6), start from today
-    // Otherwise find the most recent Saturday
     if (day === 0) {
-      from = addDays(from, -1) // Sunday — go back to Saturday
+      from = addDays(from, -1)
     } else if (day === 6) {
       // today is Saturday — start from today
     } else {
-      // Weekday — find next Saturday
       const daysUntilSat = 6 - day
       from = addDays(from, daysUntilSat)
     }
   }
-  // Fetch all non-cancelled bookings in the range
-  const supabase = createServiceClient()
-  const endDate = addDays(from, weeksParam * 7)
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  
+
   const response = await fetch(
-    `${supabaseUrl}/rest/v1/bookings?status=neq.cancelled&order=game_date,slot_time&limit=1000`,
+    `${supabaseUrl}/rest/v1/bookings?status=neq.cancelled&order=game_date,slot_time&limit=1000&select=*`,
     {
       headers: {
         'apikey': supabaseKey,
@@ -72,7 +66,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Build week-by-week availability
   const weeks: WeekAvailability[] = []
 
   for (let w = 0; w < weeksParam; w++) {
@@ -96,13 +89,24 @@ export async function GET(req: NextRequest) {
             format: SLOT_LABELS[time],
           })
         }
+
+        // Attach reservation details for soft_block (reserved) slots
+        if (status === 'soft_block') {
+          const booking = (bookings ?? []).find(
+            (b: any) => b.game_date === dateStr && b.slot_time === time && b.status === 'soft_block'
+          )
+          if (booking?.reserved_until) {
+            slotInfo.reserved_until = booking.reserved_until
+            slotInfo.organiser_name = booking.organiser_name ?? null
+          }
+        }
+
         return slotInfo
       })
 
       return { date: dateStr, label: dayLabel, slots }
     })
 
-    // Count confirmed games this weekend
     const weekendGameCount = (bookings ?? []).filter(
       (b: any) => (b.game_date === satStr || b.game_date === sunStr) && b.status === 'confirmed'
     ).length
@@ -110,20 +114,16 @@ export async function GET(req: NextRequest) {
     const satFmt = format(sat, 'd')
     const sunFmt = format(sun, 'd MMM yyyy')
     weeks.push({
-      weekStart:    satStr,
-      label:        `Weekend of ${satFmt}–${sunFmt}`,
+      weekStart:   satStr,
+      label:       `Weekend of ${satFmt}–${sunFmt}`,
       days,
-      weekendFull:  weekendGameCount >= 3,
-      gamesBooked:  weekendGameCount,
+      weekendFull: weekendGameCount >= 3,
+      gamesBooked: weekendGameCount,
     })
   }
 
- return NextResponse.json(
+  return NextResponse.json(
     { weeks },
-    {
-      headers: {
-        'Cache-Control': 'no-store',
-      },
-    }
+    { headers: { 'Cache-Control': 'no-store' } }
   )
 }
