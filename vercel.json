@@ -14,9 +14,9 @@
     }
   ],
   "crons": [
-    {
-      "path": "/api/cron/expire-reservations",
-      "schedule": "0 * * * *"
-    }
-  ]
+  {
+    "path": "/api/cron/expire-reservations",
+    "schedule": "30 18 * * *"
+  }
+]
 }
