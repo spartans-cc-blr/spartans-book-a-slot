@@ -20,7 +20,7 @@ export default async function AdminDashboard() {
     .gte('game_date', today)
     .order('game_date')
     .order('slot_time')
-    .limit(20) as { data: Booking[] | null }
+    .limit(100) as { data: Booking[] | null }
 
   // This weekend games count
   const day = new Date().getDay()
