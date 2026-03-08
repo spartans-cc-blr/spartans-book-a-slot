@@ -2,7 +2,7 @@
 
 Fixture availability and booking management for Spartans Cricket Club, Bengaluru.
 
-**Public URL:** `To be updated`
+**Public URL:** `To be updated - watch this space for more.`
 **Tech stack:** Next.js 14 · Supabase · NextAuth (Google OAuth) · Tailwind CSS · Vercel
 
 ---
