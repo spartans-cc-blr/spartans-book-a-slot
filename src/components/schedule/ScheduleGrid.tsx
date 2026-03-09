@@ -32,7 +32,7 @@ function formatExpiryLabel(reserved_until: string): string {
   return `Expires ${day} ${h}:${mins}${ampm}`
 }
 
-export function ScheduleGrid() {
+export async function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
   const [weeks, setWeeks]         = useState<WeekAvailability[]>([])
   const [currentWeek, setCurrentWeek] = useState(0)
   const [loading, setLoading]     = useState(true)
@@ -45,21 +45,31 @@ export function ScheduleGrid() {
         const fetchedWeeks = d.weeks ?? []
         setWeeks(fetchedWeeks)
 
-        // Auto-jump to first week with an open slot
-        const firstOpenWeek = fetchedWeeks.findIndex((w: any) =>
-          !w.weekendFull &&
-          w.days.some((day: any) =>
-            day.slots.some((slot: any) => slot.status === 'open')
-          )
-        )
-        const startWeek = firstOpenWeek >= 0 ? firstOpenWeek : 0
-        setCurrentWeek(startWeek)
+        let startWeek = 0
 
-        // Auto-expand first day of that week on mobile
+        if (playerView) {
+          // For fixtures page — land on current or next upcoming weekend
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const idx = fetchedWeeks.findIndex((w: any) =>
+            w.days.some((day: any) => new Date(day.date) >= today)
+          )
+          startWeek = idx >= 0 ? idx : 0
+        } else {
+          // For schedule page — jump to first week with an open slot
+          const firstOpenWeek = fetchedWeeks.findIndex((w: any) =>
+            !w.weekendFull &&
+            w.days.some((day: any) =>
+              day.slots.some((slot: any) => slot.status === 'open')
+            )
+          )
+          startWeek = firstOpenWeek >= 0 ? firstOpenWeek : 0
+        }
+
+        setCurrentWeek(startWeek)
         if (fetchedWeeks[startWeek]?.days?.length > 0) {
           setExpandedDays({ [fetchedWeeks[startWeek].days[0].date]: true })
         }
-
         setLoading(false)
       })
   }, [])
@@ -210,7 +220,8 @@ export function ScheduleGrid() {
                             <span className="flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
                               {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? 'Capacity Full' :
-                                slot.status === 'soft_block' ? 'Reserved' : cfg.label}
+                                slot.status === 'soft_block' ? 'Reserved' :
+                                slot.status === 'open' && playerView ? 'Scheduling in progress' : cfg.label}
                             </span>
                             {slot.status === 'soft_block' && slot.reserved_until && (
                               <span className="text-[9px] font-normal opacity-70 mt-0.5 pl-3">
@@ -224,7 +235,7 @@ export function ScheduleGrid() {
                             )}
                           </div>
                         </div>
-                        {slot.status === 'open' && slot.waLink && !week?.weekendFull && (
+                        {slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView && (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 bg-[#128C7E] hover:bg-[#0d7a6e] text-white text-xs font-bold tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap">
                             <WAIcon /> Book
@@ -233,7 +244,7 @@ export function ScheduleGrid() {
                         {slot.status === 'booked' && slot.cricheroes_url && (
                           <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 bg-red-950 hover:bg-red-900 border border-red-800 text-red-400 text-xs font-bold tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap">
-                            🏏 View
+                            🔗 View
                           </a>
                         )}
                       </div>
@@ -273,20 +284,26 @@ export function ScheduleGrid() {
                     const cfg = STATUS_CONFIG[slot.status]
                     return (
                       <td key={slot.time} className="p-1.5 border-b border-ink-4">
-                        {slot.status === 'open' && slot.waLink && !week?.weekendFull ? (
+                        {slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView ? (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${cfg.gridCls} group`}
                             title="Click to WhatsApp about this slot">
                             <span className="text-lg group-hover:scale-110 transition-transform">{cfg.icon}</span>
                             <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400">{cfg.gridLabel}</span>
                           </a>
+                        ) : slot.status === 'open' && !week?.weekendFull && playerView ? (
+                          <div className={`flex flex-col items-center justify-center gap-1 h-16 rounded bg-ink-3 border border-ink-5`}>
+                            <span className="font-rajdhani text-[10px] text-zinc-600 text-center px-1">Scheduling in progress</span>
+                          </div>
                         ) : slot.status === 'booked' && slot.cricheroes_url ? (
                           <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
                             className={`flex flex-col items-center justify-center gap-0.5 min-h-16 py-2 px-1 rounded ${cfg.gridCls} hover:border-red-700 transition-colors`}
                             title="View match on CricHeroes">
                             <span className="text-lg">{cfg.icon}</span>
-                            <span className="font-rajdhani text-[11px] font-bold tracking-wide text-red-500">Booked</span>
-                            {slot.tournament_name && (
+                            <span className="font-rajdhani text-[11px] font-bold tracking-wide text-red-500 flex items-center gap-1">
+                              Booked <span className="text-[9px] opacity-60">🔗</span>
+                            </span>
+                            {playerView && slot.tournament_name && (
                               <span className="font-rajdhani text-[9px] text-red-400 opacity-75 text-center leading-tight px-1 truncate w-full">
                                 {slot.tournament_name}
                               </span>
