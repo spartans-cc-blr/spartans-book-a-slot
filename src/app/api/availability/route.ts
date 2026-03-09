@@ -110,6 +110,7 @@ export async function GET(req: NextRequest) {
           if (booking?.cricheroes_url) {
             slotInfo.cricheroes_url  = booking.cricheroes_url
             slotInfo.tournament_name = booking.tournament?.name ?? null
+            slotInfo.opponent_name   = booking.opponent_name ?? null
           }
         }
 
