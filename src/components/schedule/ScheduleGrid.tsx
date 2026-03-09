@@ -100,7 +100,7 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
               <button key={w.weekStart}
                 onClick={() => setCurrentWeek(weekIndex)}
                 className={`font-rajdhani text-xs font-semibold tracking-widest px-4 py-1.5 rounded-full border transition-all whitespace-nowrap
-                  ${currentWeek >= weekIndex && currentWeek < weekIndex + 4
+                  ${week && new Date(week.weekStart).getMonth() === d.getMonth() && new Date(week.weekStart).getFullYear() === d.getFullYear()
                     ? 'border-gold text-gold bg-gold/10'
                     : 'border-ink-5 text-zinc-600 hover:border-gold-dim hover:text-gold'}`}>
                 {monthLabel} {year}
@@ -212,16 +212,25 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                           <p className="font-cinzel text-sm font-semibold text-parchment">{slot.time}</p>
                           <p className="text-[10px] text-zinc-600 font-rajdhani">{header.label}</p>
                         </div>
-                        <div className="flex-1">
+                       <div className="flex-1">
+                          {slot.status === 'booked' && slot.cricheroes_url ? (
+                            <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
+                              className={`flex flex-col ${cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
+                              <span className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                                {[slot.opponent_name ? `vs ${slot.opponent_name}` : null, slot.tournament_name ? `@ ${slot.tournament_name}` : null].filter(Boolean).join(' ') || 'Booked'}
+                              </span>
+                            </a>
+                          ) : (
                           <div className={`flex flex-col ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                             <span className="flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
                               {slot.status === 'soft_block' ? 'Reserved' :
                                slot.status === 'open' && playerView && !week?.weekendFull ? 'Scheduling in progress' :
                                slot.status === 'open' && week?.weekendFull ? 'Capacity Full' :
-                               slot.status === 'booked' && slot.cricheroes_url && playerView ? (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked') :
-                               slot.status === 'booked' && slot.cricheroes_url && !playerView ? (slot.tournament_name ?? cfg.label) :
-                               cfg.label}
+                               slot.status === 'booked' && slot.cricheroes_url
+                                 ? [slot.opponent_name ? `vs ${slot.opponent_name}` : null, slot.tournament_name ? `@ ${slot.tournament_name}` : null].filter(Boolean).join(' ') || 'Booked'
+                                 : cfg.label}
                             </span>
                             {slot.status === 'soft_block' && slot.reserved_until && (
                               <span className="text-[9px] font-normal opacity-70 mt-0.5 pl-3">
@@ -234,17 +243,12 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                               </span>
                             )}
                           </div>
+                          )}
                         </div>
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView && (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 bg-[#128C7E] hover:bg-[#0d7a6e] text-white text-xs font-bold tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap">
                             <WAIcon /> Book
-                          </a>
-                        )}
-                        {slot.status === 'booked' && slot.cricheroes_url && (
-                          <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 bg-red-950 hover:bg-red-900 border border-red-800 text-red-400 text-xs font-bold tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap">
-                            🏏 View
                           </a>
                         )}
                       </div>
