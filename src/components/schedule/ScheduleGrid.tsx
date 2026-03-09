@@ -268,7 +268,7 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
             <tr>
               <th className="text-left font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-600 py-2.5 px-4 bg-ink-3 border-b border-ink-5 w-28">Day</th>
               {SLOT_HEADERS.map(h => (
-                <th key={h.time} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-600 py-2.5 px-2 bg-ink-3 border-b border-ink-5 text-center">
+                <th key={h.time} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-600 py-2.5 px-2 bg-ink-3 border-b border-ink-5 text-center w-1/4">
                   {h.time}<br />
                   <span className="text-[9px] text-zinc-700 font-normal normal-case tracking-normal">{h.label}</span>
                 </th>
@@ -287,7 +287,7 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                   {day.slots.map((slot) => {
                     const cfg = STATUS_CONFIG[slot.status]
                     return (
-                      <td key={slot.time} className="p-1.5 border-b border-ink-4">
+                      <td key={slot.time} className="p-1.5 border-b border-ink-4 w-1/4">
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView ? (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${cfg.gridCls} group`}
@@ -304,7 +304,7 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                             className={`flex flex-col items-center justify-center gap-0.5 h-16 px-1 rounded ${cfg.gridCls} hover:border-red-700 transition-colors`}
                             title="View match on CricHeroes">
                             <span className="text-lg">🏏</span>
-                            <span className="font-rajdhani text-[11px] font-bold tracking-wide text-red-400 text-center px-1">
+                            <span className="font-rajdhani text-[10px] font-bold tracking-wide text-red-400 text-center w-full px-1 truncate">
                               {playerView
                                 ? (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked')
                                 : (slot.tournament_name ?? 'Booked')}
