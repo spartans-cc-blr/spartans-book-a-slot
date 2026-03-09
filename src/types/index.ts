@@ -53,6 +53,7 @@ export interface SlotInfo {
   waLink?:          string
   reserved_until?:  string | null
   organiser_name?:  string | null
+  opponent_name?:   string | null
   cricheroes_url?:  string | null
   tournament_name?: string | null
 }
