@@ -218,8 +218,13 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                               className={`flex flex-col ${cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                               <span className="flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                                {[slot.opponent_name ? `vs ${slot.opponent_name}` : null, slot.tournament_name ? `@ ${slot.tournament_name}` : null].filter(Boolean).join(' ') || 'Booked'}
+                                {slot.opponent_name ? `vs ${slot.opponent_name}` : (!slot.tournament_name ? 'Booked' : '')}
                               </span>
+                              {slot.tournament_name && (
+                                <span className="text-[9px] font-normal opacity-75 mt-0.5 pl-3">
+                                  @ {slot.tournament_name}
+                                </span>
+                              )}
                             </a>
                           ) : (
                           <div className={`flex flex-col ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
@@ -304,11 +309,21 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                             className={`flex flex-col items-center justify-center gap-0.5 h-16 px-1 rounded ${cfg.gridCls} hover:border-red-700 transition-colors`}
                             title="View match on CricHeroes">
                             <span className="text-lg">🏏</span>
-                            <span className="font-rajdhani text-[10px] font-bold tracking-wide text-red-400 text-center w-full px-1 truncate">
-                              {playerView
-                                ? (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked')
-                                : (slot.tournament_name ?? 'Booked')}
-                            </span>
+                            {slot.opponent_name && (
+                              <span className="font-rajdhani text-[10px] font-bold tracking-wide text-red-400 text-center w-full px-1 truncate">
+                                vs {slot.opponent_name}
+                              </span>
+                            )}
+                            {slot.tournament_name && (
+                              <span className="font-rajdhani text-[9px] text-red-300 opacity-75 text-center w-full px-1 truncate">
+                                @ {slot.tournament_name}
+                              </span>
+                            )}
+                            {!slot.opponent_name && !slot.tournament_name && (
+                              <span className="font-rajdhani text-[10px] font-bold tracking-wide text-red-400 text-center w-full px-1">
+                                Booked
+                              </span>
+                            )}
                           </a>
                         ) : (
                           <div className={`flex flex-col items-center justify-center gap-0.5 min-h-16 py-2 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>
