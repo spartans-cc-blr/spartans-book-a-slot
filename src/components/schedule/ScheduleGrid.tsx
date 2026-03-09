@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import type { WeekAvailability, SlotInfo, SlotTime } from '@/types'
+import { useEffect, useState } from 'react'
+import type { WeekAvailability, SlotTime } from '@/types'
 import { buildGenericWhatsAppLink } from '@/lib/whatsapp'
 
 const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
@@ -12,11 +12,11 @@ const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
 ]
 
 const STATUS_CONFIG = {
-  open:       { label: 'Open',             gridLabel: 'Open',        icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
-  booked:     { label: 'Booked',           gridLabel: 'Booked',      icon: '🔴', pill: 'slot-booked',     gridCls: 'bg-red-950 border border-red-900 cursor-default' },
-  soft_block: { label: 'Reserved',         gridLabel: 'Reserved',    icon: '🟡', pill: 'slot-softblock',  gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
-  clash:      { label: 'Slot Blocked',     gridLabel: 'Slot Blocked', icon: '⛔', pill: 'slot-clash',      gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
-  na:         { label: '',                 gridLabel: '',            icon: '—',  pill: '',                gridCls: 'bg-transparent border-transparent cursor-default' },
+  open:       { label: 'Open',         gridLabel: 'Open',         icon: '🟢', pill: 'slot-open',     gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
+  booked:     { label: 'Booked',       gridLabel: 'Booked',       icon: '🔴', pill: 'slot-booked',   gridCls: 'bg-red-950 border border-red-900 cursor-default' },
+  soft_block: { label: 'Reserved',     gridLabel: 'Reserved',     icon: '🟡', pill: 'slot-softblock',gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
+  clash:      { label: 'Slot Blocked', gridLabel: 'Slot Blocked', icon: '⛔', pill: 'slot-clash',    gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
+  na:         { label: '',             gridLabel: '',             icon: '—',  pill: '',              gridCls: 'bg-transparent border-transparent cursor-default' },
 }
 
 function formatExpiryLabel(reserved_until: string): string {
@@ -32,10 +32,10 @@ function formatExpiryLabel(reserved_until: string): string {
   return `Expires ${day} ${h}:${mins}${ampm}`
 }
 
-export async function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
-  const [weeks, setWeeks]         = useState<WeekAvailability[]>([])
-  const [currentWeek, setCurrentWeek] = useState(0)
-  const [loading, setLoading]     = useState(true)
+export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
+  const [weeks, setWeeks]               = useState<WeekAvailability[]>([])
+  const [currentWeek, setCurrentWeek]   = useState(0)
+  const [loading, setLoading]           = useState(true)
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
@@ -48,7 +48,6 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
         let startWeek = 0
 
         if (playerView) {
-          // For fixtures page — land on current or next upcoming weekend
           const today = new Date()
           today.setHours(0, 0, 0, 0)
           const idx = fetchedWeeks.findIndex((w: any) =>
@@ -56,7 +55,6 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
           )
           startWeek = idx >= 0 ? idx : 0
         } else {
-          // For schedule page — jump to first week with an open slot
           const firstOpenWeek = fetchedWeeks.findIndex((w: any) =>
             !w.weekendFull &&
             w.days.some((day: any) =>
@@ -129,7 +127,6 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
           </p>
           <p className="text-xs text-zinc-600 font-rajdhani mt-0.5">Week {currentWeek + 1} of {weeks.length}</p>
         </div>
-        {/* Progress dots */}
         <div className="hidden sm:flex gap-1">
           {weeks.slice(0, 15).map((_, i) => (
             <button key={i} onClick={() => setCurrentWeek(i)}
@@ -166,7 +163,9 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
           <div>
             <p className="font-rajdhani font-bold text-amber-400 text-sm">This weekend is at capacity</p>
             <p className="font-rajdhani text-amber-600 text-xs mt-0.5">
-              3 of 3 games are already scheduled. No further bookings are possible for this weekend. Please check another weekend.
+              {playerView
+                ? `${week.gamesBooked} of 3 games are scheduled this weekend.`
+                : `3 of 3 games are already scheduled. No further bookings are possible for this weekend. Please check another weekend.`}
             </p>
           </div>
         </div>
@@ -183,7 +182,6 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
           return (
             <div key={day.date} className="bg-ink-3 border border-ink-5 rounded overflow-hidden animate-fade-up"
               style={{ animationDelay: `${di * 60}ms` }}>
-              {/* Card header */}
               <button className="w-full flex items-center gap-3 p-3 text-left border-b border-ink-5"
                 onClick={() => toggleDay(day.date)}>
                 <div className="w-11 h-11 bg-ink-4 border border-gold-dim rounded flex flex-col items-center justify-center flex-shrink-0">
@@ -202,7 +200,6 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
                 <span className={`text-zinc-600 text-xl transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>⌄</span>
               </button>
 
-              {/* Slot rows */}
               {expanded && (
                 <div>
                   {day.slots.map((slot, si) => {
@@ -220,11 +217,11 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
                             <span className="flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
                               {slot.status === 'soft_block' ? 'Reserved' :
-                             slot.status === 'open' && playerView ? 'Scheduling in progress' :
-                             slot.status === 'open' && week?.weekendFull ? 'Capacity Full' :
-                             slot.status === 'booked' && slot.cricheroes_url && playerView ? (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked 🏏') :
-                             slot.status === 'booked' && slot.cricheroes_url && !playerView ? (slot.tournament_name ?? cfg.label) :
-                             cfg.label}
+                               slot.status === 'open' && playerView && !week?.weekendFull ? 'Scheduling in progress' :
+                               slot.status === 'open' && week?.weekendFull ? 'Capacity Full' :
+                               slot.status === 'booked' && slot.cricheroes_url && playerView ? (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked') :
+                               slot.status === 'booked' && slot.cricheroes_url && !playerView ? (slot.tournament_name ?? cfg.label) :
+                               cfg.label}
                             </span>
                             {slot.status === 'soft_block' && slot.reserved_until && (
                               <span className="text-[9px] font-normal opacity-70 mt-0.5 pl-3">
@@ -275,7 +272,7 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
             </tr>
           </thead>
           <tbody>
-            {week?.days.map((day, di) => {
+            {week?.days.map((day) => {
               const [dayName, dayNum, mon] = day.label.split(' ')
               return (
                 <tr key={day.date}>
@@ -283,7 +280,7 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
                     <p className="font-cinzel text-xs text-gold font-semibold">{dayName}</p>
                     <p className="font-rajdhani text-sm text-muted">{dayNum} {mon}</p>
                   </td>
-                  {day.slots.map((slot, si) => {
+                  {day.slots.map((slot) => {
                     const cfg = STATUS_CONFIG[slot.status]
                     return (
                       <td key={slot.time} className="p-1.5 border-b border-ink-4">
@@ -294,7 +291,7 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
                             <span className="text-lg group-hover:scale-110 transition-transform">{cfg.icon}</span>
                             <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400">{cfg.gridLabel}</span>
                           </a>
-                        ) : slot.status === 'open' && playerView ? (
+                        ) : slot.status === 'open' && playerView && !week?.weekendFull ? (
                           <div className="flex flex-col items-center justify-center gap-1 h-16 rounded bg-ink-3 border border-ink-5">
                             <span className="font-rajdhani text-[10px] text-zinc-600 text-center px-1">Scheduling in progress</span>
                           </div>
@@ -305,12 +302,13 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
                             <span className="text-lg">🏏</span>
                             <span className="font-rajdhani text-[11px] font-bold tracking-wide text-red-400 text-center px-1">
                               {playerView
-                                ? (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked 🏏')
-                                : (slot.tournament_name ?? 'Booked 🏏')}
+                                ? (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked')
+                                : (slot.tournament_name ?? 'Booked')}
                             </span>
                           </a>
                         ) : (
-                          <div className={`flex flex-col items-center justify-center gap-0.5 min-h-16 py-2 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>                            <span className="text-lg">{week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '🔒' : cfg.icon}</span>
+                          <div className={`flex flex-col items-center justify-center gap-0.5 min-h-16 py-2 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>
+                            <span className="text-lg">{week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '🔒' : cfg.icon}</span>
                             <span className="font-rajdhani text-[11px] font-bold tracking-wide text-center px-1 flex flex-col items-center">
                               <span className={
                                 slot.status === 'open' && week?.weekendFull ? 'text-zinc-600' :
@@ -343,30 +341,31 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
         </table>
       </div>
 
-      {/* CTA */}
-      {/* CTA */}
-      {!playerView && <div className="mt-7 bg-gradient-to-br from-ink-3 to-ink-2 border border-gold-dim rounded p-5 lg:flex lg:items-center lg:gap-6 relative overflow-hidden">
-        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
-        <div className="flex items-start gap-4 mb-4 lg:mb-0 lg:flex-1">
-          <span className="text-3xl flex-shrink-0">🏏</span>
-          <div>
-            <h3 className="font-cinzel text-gold text-sm font-semibold mb-1">Found a slot that works?</h3>
-            <p className="font-rajdhani text-zinc-500 text-sm leading-relaxed">
-              Tap below to WhatsApp us directly. We'll confirm your game within a few hours. No forms, no email chains.
+      {/* CTA — organiser schedule only */}
+      {!playerView && (
+        <div className="mt-7 bg-gradient-to-br from-ink-3 to-ink-2 border border-gold-dim rounded p-5 lg:flex lg:items-center lg:gap-6 relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
+          <div className="flex items-start gap-4 mb-4 lg:mb-0 lg:flex-1">
+            <span className="text-3xl flex-shrink-0">🏏</span>
+            <div>
+              <h3 className="font-cinzel text-gold text-sm font-semibold mb-1">Found a slot that works?</h3>
+              <p className="font-rajdhani text-zinc-500 text-sm leading-relaxed">
+                Tap below to WhatsApp us directly. We'll confirm your game within a few hours. No forms, no email chains.
+              </p>
+            </div>
+          </div>
+          <div className="lg:flex-shrink-0">
+            <a href={buildGenericWhatsAppLink()} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2.5 w-full lg:w-auto bg-[#25D366] hover:bg-[#1aaa52] text-white font-rajdhani font-bold text-sm tracking-widest uppercase px-6 py-3.5 rounded transition-colors">
+              <WAIcon size={18} /> WhatsApp Us to Book
+            </a>
+            <p className="font-rajdhani text-xs text-zinc-700 mt-1.5 text-center lg:text-left italic">
+              Opens with a pre-filled message including your chosen slot
             </p>
           </div>
         </div>
-        <div className="lg:flex-shrink-0">
-          <a href={buildGenericWhatsAppLink()} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2.5 w-full lg:w-auto bg-[#25D366] hover:bg-[#1aaa52] text-white font-rajdhani font-bold text-sm tracking-widest uppercase px-6 py-3.5 rounded transition-colors">
-            <WAIcon size={18} /> WhatsApp Us to Book
-          </a>
-          <p className="font-rajdhani text-xs text-zinc-700 mt-1.5 text-center lg:text-left italic">
-            Opens with a pre-filled message including your chosen slot
-          </p>
-        </div>
-      </div>}
+      )}
     </div>
   )
 }
