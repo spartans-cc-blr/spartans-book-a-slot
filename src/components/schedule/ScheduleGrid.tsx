@@ -344,7 +344,8 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
       </div>
 
       {/* CTA */}
-      <div className="mt-7 bg-gradient-to-br from-ink-3 to-ink-2 border border-gold-dim rounded p-5 lg:flex lg:items-center lg:gap-6 relative overflow-hidden">
+      {/* CTA */}
+      {!playerView && <div className="mt-7 bg-gradient-to-br from-ink-3 to-ink-2 border border-gold-dim rounded p-5 lg:flex lg:items-center lg:gap-6 relative overflow-hidden">
         <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
         <div className="flex items-start gap-4 mb-4 lg:mb-0 lg:flex-1">
@@ -365,7 +366,7 @@ export async function ScheduleGrid({ playerView = false }: { playerView?: boolea
             Opens with a pre-filled message including your chosen slot
           </p>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
