@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       name:              body.name,
       organiser_name:    body.organiser_name ?? null,
       organiser_contact: body.organiser_contact ?? null,
+      active:            true,
     })
     .select()
     .single()
