@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const body: CreateBookingRequest = await req.json()
-  const { game_date, slot_time, format, captain_id, tournament_id, venue, notes } = body
-
+  const { game_date, slot_time, format, captain_id, tournament_id, venue, notes, opponent_name, match_id, cricheroes_url } = body as any
+  
   // Basic presence check
   if (!game_date || !slot_time || !format || !captain_id || !tournament_id) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -71,7 +71,6 @@ export async function POST(req: NextRequest) {
   }
 
   const { body: rawBody } = req  // already parsed above
-  const { opponent_name, match_id, cricheroes_url } = body as any
 
   const { data, error } = await supabase
     .from('bookings')
