@@ -19,7 +19,6 @@ const RULES: { rule: string; label: string }[] = [
 export default function NewBookingPage() {
   const router = useRouter()
 
-  // Booking mode
   const [mode, setMode] = useState<BookingMode>('confirmed')
 
   // Shared fields
@@ -32,37 +31,46 @@ export default function NewBookingPage() {
   const [captainId,     setCaptainId]     = useState('')
   const [tournamentId,  setTournamentId]  = useState('')
   const [venue,         setVenue]         = useState('')
+  const [opponentName,  setOpponentName]  = useState('')
+  const [matchId,       setMatchId]       = useState('')
+  const [cricHeroesUrl, setCricHeroesUrl] = useState('')
 
   // Reservation-only fields
   const [organiserName,  setOrganiserName]  = useState('')
   const [organiserPhone, setOrganiserPhone] = useState('')
 
+  // Quick-add tournament
+  const [showAddTournament, setShowAddTournament] = useState(false)
+  const [newTournamentName, setNewTournamentName] = useState('')
+  const [newTournamentOrg,  setNewTournamentOrg]  = useState('')
+  const [addingTournament,  setAddingTournament]  = useState(false)
+
   // Data
-  const [captains,     setCaptains]     = useState<Captain[]>([])
-  const [tournaments,  setTournaments]  = useState<Tournament[]>([])
+  const [captains,    setCaptains]    = useState<Captain[]>([])
+  const [tournaments, setTournaments] = useState<Tournament[]>([])
 
   // Validation
-  const [ruleChecks,   setRuleChecks]   = useState<RuleCheckItem[]>(
+  const [ruleChecks,  setRuleChecks]  = useState<RuleCheckItem[]>(
     RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' }))
   )
-  const [submitting,   setSubmitting]   = useState(false)
-  const [submitError,  setSubmitError]  = useState('')
+  const [submitting,  setSubmitting]  = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     fetch('/api/captains').then(r => r.json()).then(d => setCaptains(d.captains ?? []))
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
   }, [])
 
-  // Reset form fields when mode changes
   useEffect(() => {
     setGameDate(''); setSlotTime(''); setFormat(''); setNotes('')
     setCaptainId(''); setTournamentId(''); setVenue('')
+    setOpponentName(''); setMatchId(''); setCricHeroesUrl('')
     setOrganiserName(''); setOrganiserPhone('')
+    setShowAddTournament(false); setNewTournamentName(''); setNewTournamentOrg('')
     setSubmitError('')
     setRuleChecks(RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' })))
   }, [mode])
 
-  // Live validation — only for confirmed bookings
   const validate = useCallback(async () => {
     if (mode === 'reserved') {
       setRuleChecks(RULES.map(r => ({ ...r, status: 'pass', message: 'N/A for reservations' })))
@@ -90,13 +98,27 @@ export default function NewBookingPage() {
   useEffect(() => { validate() }, [validate])
 
   const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'warn')
-
-  const availableSlots = format
-    ? SLOT_TIMES.filter(t => SLOT_FORMATS[t].includes(format as GameFormat))
-    : SLOT_TIMES
-
-  // Reservation ready check
+  const availableSlots = format ? SLOT_TIMES.filter(t => SLOT_FORMATS[t].includes(format as GameFormat)) : SLOT_TIMES
   const reservationReady = mode === 'reserved' && gameDate && slotTime && organiserName.trim().length > 0
+
+  async function handleAddTournament() {
+    if (!newTournamentName.trim()) return
+    setAddingTournament(true)
+    const res = await fetch('/api/tournaments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newTournamentName.trim(), organiser_name: newTournamentOrg.trim() || null }),
+    })
+    if (res.ok) {
+      const d = await res.json()
+      setTournaments(prev => [...prev, d.tournament])
+      setTournamentId(d.tournament.id)
+      setShowAddTournament(false)
+      setNewTournamentName('')
+      setNewTournamentOrg('')
+    }
+    setAddingTournament(false)
+  }
 
   async function handleSubmit() {
     if (mode === 'confirmed' && !allPassed) return
@@ -109,7 +131,18 @@ export default function NewBookingPage() {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_date: gameDate, format, slot_time: slotTime, captain_id: captainId, tournament_id: tournamentId, venue, notes }),
+        body: JSON.stringify({
+          game_date:     gameDate,
+          format,
+          slot_time:     slotTime,
+          captain_id:    captainId,
+          tournament_id: tournamentId,
+          venue:         venue || null,
+          notes:         notes || null,
+          opponent_name: opponentName || null,
+          match_id:      matchId || null,
+          cricheroes_url: cricHeroesUrl || null,
+        }),
       })
       if (res.ok) {
         router.push('/admin?booked=1')
@@ -119,18 +152,17 @@ export default function NewBookingPage() {
         setSubmitting(false)
       }
     } else {
-      // Reserve slot — 48 hours from now
       const reservedUntil = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
       const res = await fetch('/api/bookings/reserve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          game_date:      gameDate,
-          slot_time:      slotTime,
-          organiser_name: organiserName.trim(),
+          game_date:       gameDate,
+          slot_time:       slotTime,
+          organiser_name:  organiserName.trim(),
           organiser_phone: organiserPhone.trim() || null,
-          reserved_until: reservedUntil,
-          notes,
+          reserved_until:  reservedUntil,
+          notes:           notes || null,
         }),
       })
       if (res.ok) {
@@ -150,7 +182,7 @@ export default function NewBookingPage() {
         <p className="font-rajdhani text-zinc-500 text-sm mt-1">Confirm a game or reserve a slot for an organiser.</p>
       </div>
 
-      {/* ── MODE TOGGLE ── */}
+      {/* Mode toggle */}
       <div className="flex border border-ink-5 rounded overflow-hidden mb-6 max-w-sm">
         {(['confirmed', 'reserved'] as BookingMode[]).map(m => (
           <button key={m} onClick={() => setMode(m)}
@@ -162,7 +194,7 @@ export default function NewBookingPage() {
       </div>
 
       <div className="grid lg:grid-cols-[1fr_300px] gap-6">
-        {/* ── LEFT: FORM ── */}
+        {/* Left: Form */}
         <div className="space-y-4">
 
           {/* Step 1: Date & Format */}
@@ -197,8 +229,7 @@ export default function NewBookingPage() {
                 const available = mode === 'reserved' ? true : availableSlots.includes(t)
                 const disabled  = mode === 'confirmed' ? (!available || !format) : !gameDate
                 return (
-                  <button key={t} disabled={disabled}
-                    onClick={() => setSlotTime(t)}
+                  <button key={t} disabled={disabled} onClick={() => setSlotTime(t)}
                     className={`py-3 rounded border text-center transition-all
                       ${disabled ? 'opacity-30 cursor-not-allowed bg-ink-4 border-ink-5' :
                         slotTime === t ? 'border-gold bg-gold/10 text-gold' :
@@ -249,12 +280,36 @@ export default function NewBookingPage() {
               </FormCard>
 
               <FormCard step={4} title="Tournament">
-                <select value={tournamentId} onChange={e => setTournamentId(e.target.value)} className="form-input">
+                <select value={tournamentId} onChange={e => { setTournamentId(e.target.value); setShowAddTournament(false) }}
+                  className="form-input">
                   <option value="">Select tournament...</option>
                   {tournaments.filter(t => t.active).map(t => (
                     <option key={t.id} value={t.id}>{t.name}{t.organiser_name ? ` — ${t.organiser_name}` : ''}</option>
                   ))}
                 </select>
+                <button onClick={() => setShowAddTournament(v => !v)}
+                  className="mt-2 font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors flex items-center gap-1">
+                  {showAddTournament ? '✕ Cancel' : '＋ Add new tournament'}
+                </button>
+                {showAddTournament && (
+                  <div className="mt-3 border border-ink-5 rounded p-3 space-y-2 bg-ink-4">
+                    <div>
+                      <label className="form-label">Tournament Name <span className="text-crimson">*</span></label>
+                      <input type="text" value={newTournamentName} onChange={e => setNewTournamentName(e.target.value)}
+                        placeholder="e.g. Lakeview RCG Edition 11" className="form-input" />
+                    </div>
+                    <div>
+                      <label className="form-label">Organiser Name <span className="text-zinc-600">(optional)</span></label>
+                      <input type="text" value={newTournamentOrg} onChange={e => setNewTournamentOrg(e.target.value)}
+                        placeholder="e.g. Ravi Kumar" className="form-input" />
+                    </div>
+                    <button onClick={handleAddTournament}
+                      disabled={!newTournamentName.trim() || addingTournament}
+                      className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
+                      {addingTournament ? 'Adding...' : '＋ Add Tournament'}
+                    </button>
+                  </div>
+                )}
               </FormCard>
 
               <FormCard step={5} title="Venue & Notes (optional)">
@@ -271,6 +326,29 @@ export default function NewBookingPage() {
                   </div>
                 </div>
               </FormCard>
+
+              {tournamentId && (
+                <FormCard step={6} title="Match Details (optional)">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="form-label">Opponent Name</label>
+                      <input type="text" value={opponentName} onChange={e => setOpponentName(e.target.value)}
+                        placeholder="e.g. Challengers CC" className="form-input" />
+                    </div>
+                    <div>
+                      <label className="form-label">CricHeroes Match URL</label>
+                      <input type="text" value={cricHeroesUrl} onChange={e => setCricHeroesUrl(e.target.value)}
+                        placeholder="e.g. https://cricheroes.in/match/12345678" className="form-input" />
+                    </div>
+                    <div>
+                      <label className="form-label">Match ID</label>
+                      <input type="text" value={matchId} onChange={e => setMatchId(e.target.value)}
+                        placeholder="e.g. 12345678" className="form-input" />
+                      <p className="font-rajdhani text-xs text-zinc-600 mt-1">Can be added later once organiser creates the match in CricHeroes.</p>
+                    </div>
+                  </div>
+                </FormCard>
+              )}
             </>
           )}
 
@@ -281,7 +359,6 @@ export default function NewBookingPage() {
             </FormCard>
           )}
 
-          {/* Reservation info box */}
           {mode === 'reserved' && (
             <div className="bg-amber-950/30 border border-amber-800/40 rounded p-4 font-rajdhani text-sm text-amber-300 space-y-1">
               <p className="font-bold">🟡 How reservations work</p>
@@ -302,19 +379,16 @@ export default function NewBookingPage() {
               className="font-rajdhani text-sm font-bold tracking-wide border border-ink-5 text-zinc-500 hover:text-zinc-300 px-5 py-2.5 rounded transition-colors">
               Cancel
             </button>
-            <button
-              onClick={handleSubmit}
+            <button onClick={handleSubmit}
               disabled={mode === 'confirmed' ? (!allPassed || submitting) : (!reservationReady || submitting)}
               className={`font-rajdhani text-sm font-bold tracking-widest uppercase disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors
                 ${mode === 'confirmed' ? 'bg-crimson hover:bg-crimson-dark' : 'bg-amber-700 hover:bg-amber-600'}`}>
-              {submitting
-                ? 'Saving...'
-                : mode === 'confirmed' ? '✓ Confirm Booking' : '🟡 Reserve Slot'}
+              {submitting ? 'Saving...' : mode === 'confirmed' ? '✓ Confirm Booking' : '🟡 Reserve Slot'}
             </button>
           </div>
         </div>
 
-        {/* ── RIGHT: RULE PANEL ── */}
+        {/* Right: Rule panel */}
         <div>
           <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden sticky top-20">
             <div className="bg-ink-4 px-4 py-3 border-b border-ink-5">
@@ -348,19 +422,24 @@ export default function NewBookingPage() {
             )}
           </div>
 
-          {/* Summary */}
           {gameDate && slotTime && (
             <div className="mt-4 bg-ink-3 border border-ink-5 rounded p-4">
               <p className="font-cinzel text-xs text-gold mb-3">
                 {mode === 'confirmed' ? 'Booking Summary' : 'Reservation Summary'}
               </p>
               <div className="font-rajdhani text-sm text-zinc-400 space-y-1.5 leading-relaxed">
-                {gameDate       && <p>📅 {gameDate}</p>}
-                {slotTime       && <p>🕐 {slotTime}{format ? ` — ${format}` : ''}</p>}
-                {mode === 'confirmed' && captainId && <p>👤 {captains.find(c => c.id === captainId)?.name}</p>}
+                {gameDate      && <p>📅 {gameDate}</p>}
+                {slotTime      && <p>🕐 {slotTime}{format ? ` — ${format}` : ''}</p>}
+                {mode === 'confirmed' && captainId    && <p>👤 {captains.find(c => c.id === captainId)?.name}</p>}
                 {mode === 'confirmed' && tournamentId && <p>🏆 {tournaments.find(t => t.id === tournamentId)?.name}</p>}
-                {mode === 'confirmed' && venue && <p>📍 {venue}</p>}
-                {mode === 'reserved' && organiserName && <p>🤝 {organiserName}</p>}
+                {mode === 'confirmed' && venue        && <p>📍 {venue}</p>}
+                {mode === 'confirmed' && opponentName && <p>⚔️ vs {opponentName}</p>}
+                {mode === 'confirmed' && cricHeroesUrl && (
+                  <a href={cricHeroesUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline flex items-center gap-1">
+                    🔗 CricHeroes
+                  </a>
+                )}
+                {mode === 'reserved' && organiserName  && <p>🤝 {organiserName}</p>}
                 {mode === 'reserved' && organiserPhone && <p>📱 {organiserPhone}</p>}
                 {mode === 'reserved' && <p className="text-amber-400">⏱ Expires in 48 hours</p>}
               </div>
