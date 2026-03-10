@@ -70,14 +70,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ errors: result.errors }, { status: 422 })
   }
 
+  const { body: rawBody } = req  // already parsed above
+  const { opponent_name, match_id, cricheroes_url } = body as any
+
   const { data, error } = await supabase
     .from('bookings')
     .insert({
       game_date, slot_time, format,
       captain_id, tournament_id,
-      venue: venue ?? null,
-      notes: notes ?? null,
-      status: 'confirmed',
+      venue:          venue ?? null,
+      notes:          notes ?? null,
+      status:         'confirmed',
+      opponent_name:  opponent_name ?? null,
+      match_id:       match_id ?? null,
+      cricheroes_url: cricheroes_url ?? null,
     })
     .select(`*, captain:captains(*), tournament:tournaments(*)`)
     .single()
