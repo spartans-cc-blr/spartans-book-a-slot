@@ -127,7 +127,7 @@ export default function BookingDetailPage() {
     const opponent = opponentName || 'TBD'
     const venue_str = venue || 'TBD'
     const msg = encodeURIComponent(
-      `Hi ${captain.name}! You have been assigned as captain for a game on *${date} at ${slot}*.\n\nOpponent: ${opponent}\nVenue: ${venue_str}${matchId ? `\nCricHeroes: https://cricheroes.in/match/${matchId}` : ''}\n\nPlease confirm your availability.`
+      `Hi ${captain.name}! You have been assigned as captain for a game on *${date} at ${slot}*.\n\nOpponent: ${opponent}\nVenue: ${venue_str}${cricheroes ? `\nCricHeroes: ${cricheroes}` : ''}\n\nPlease confirm your availability.`
     )
     return `https://wa.me/?text=${msg}`
   }
