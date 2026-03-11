@@ -290,11 +290,11 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                               className={`flex flex-col ${cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                               <span className="flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                                {slot.opponent_name ? `vs ${slot.opponent_name}` : (!slot.tournament_name ? 'Booked' : '')}
+                                {slot.tournament_name ?? (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked')}
                               </span>
-                              {slot.tournament_name && (
+                              {slot.opponent_name && (
                                 <span className="text-[9px] font-normal opacity-75 mt-0.5 pl-3">
-                                  @ {slot.tournament_name}
+                                  vs {slot.opponent_name}
                                 </span>
                               )}
                             </a>
@@ -408,14 +408,14 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                             className={`flex flex-col items-center justify-center gap-0.5 h-16 px-1 rounded ${cfg.gridCls} hover:border-red-700 transition-colors`}
                             title="View match on CricHeroes">
                             <span className="text-lg">🏏</span>
-                            {slot.opponent_name && (
+                            {slot.tournament_name && (
                               <span className="font-rajdhani text-[10px] font-bold tracking-wide text-red-400 text-center w-full px-1 truncate">
-                                vs {slot.opponent_name}
+                                {slot.tournament_name}
                               </span>
                             )}
-                            {slot.tournament_name && (
+                            {slot.opponent_name && (
                               <span className="font-rajdhani text-[9px] text-red-300 opacity-75 text-center w-full px-1 truncate">
-                                @ {slot.tournament_name}
+                                vs {slot.opponent_name}
                               </span>
                             )}
                             {!slot.opponent_name && !slot.tournament_name && (
