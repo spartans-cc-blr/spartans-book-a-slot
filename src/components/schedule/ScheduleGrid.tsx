@@ -11,12 +11,73 @@ const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
   { time: '14:30', label: 'T20 only' },
 ]
 
+const SLOT_INDEX: Record<SlotTime, number> = {
+  '07:30': 0,
+  '10:30': 1,
+  '12:30': 2,
+  '14:30': 3,
+}
+
 const STATUS_CONFIG = {
-  open:       { label: 'Open',         gridLabel: 'Open',         icon: '🟢', pill: 'slot-open',     gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
-  booked:     { label: 'Booked',       gridLabel: 'Booked',       icon: '🔴', pill: 'slot-booked',   gridCls: 'bg-red-950 border border-red-900 cursor-default' },
-  soft_block: { label: 'Reserved',     gridLabel: 'Reserved',     icon: '🟡', pill: 'slot-softblock',gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
-  clash:      { label: 'Slot Blocked', gridLabel: 'Slot Blocked', icon: '⛔', pill: 'slot-clash',    gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
-  na:         { label: '',             gridLabel: '',             icon: '—',  pill: '',              gridCls: 'bg-transparent border-transparent cursor-default' },
+  open:       { label: 'Open',              gridLabel: 'Open',              icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
+  booked:     { label: 'Booked',            gridLabel: 'Booked',            icon: '🔴', pill: 'slot-booked',    gridCls: 'bg-red-950 border border-red-900 cursor-default' },
+  soft_block: { label: 'Reserved',          gridLabel: 'Reserved',          icon: '🟡', pill: 'slot-softblock', gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
+  clash:      { label: 'Play in progress',  gridLabel: 'Play in progress',  icon: '⛔', pill: 'slot-clash',     gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
+  na:         { label: '',                  gridLabel: '',                  icon: '—',  pill: '',               gridCls: 'bg-transparent border-transparent cursor-default' },
+}
+
+// Returns the SlotTime that causes a clash for the given slotTime, based on the day's slots
+function getClashSource(
+  slotTime: SlotTime,
+  daySlots: { time: SlotTime; status: string }[]
+): SlotTime | null {
+  const slotMap = Object.fromEntries(daySlots.map(s => [s.time, s.status]))
+
+  if (slotTime === '10:30') {
+    // Blocked by T30 at 07:30 or any game at 12:30
+    if (slotMap['07:30'] === 'booked') return '07:30'
+    if (slotMap['12:30'] === 'booked') return '12:30'
+  }
+  if (slotTime === '12:30') {
+    // Blocked by T20 at 10:30 or T20 at 14:30
+    if (slotMap['10:30'] === 'booked') return '10:30'
+    if (slotMap['14:30'] === 'booked') return '14:30'
+  }
+  if (slotTime === '14:30') {
+    // Blocked by any game at 12:30
+    if (slotMap['12:30'] === 'booked') return '12:30'
+  }
+  return null
+}
+
+// Returns arrow direction: 'left' | 'right' | 'up' | 'down' | null
+function getArrowDirection(
+  slotTime: SlotTime,
+  clashSource: SlotTime | null,
+  mobile: boolean
+): 'left' | 'right' | 'up' | 'down' | null {
+  if (!clashSource) return null
+  const clashIdx = SLOT_INDEX[clashSource]
+  const thisIdx  = SLOT_INDEX[slotTime]
+  if (mobile) {
+    return clashIdx < thisIdx ? 'up' : 'down'
+  }
+  return clashIdx < thisIdx ? 'left' : 'right'
+}
+
+function ArrowIcon({ direction }: { direction: 'left' | 'right' | 'up' | 'down' }) {
+  const paths: Record<string, string> = {
+    left:  'M15 18l-6-6 6-6',
+    right: 'M9 18l6-6-6-6',
+    up:    'M18 15l-6-6-6 6',
+    down:  'M6 9l6 6 6-6',
+  }
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points={paths[direction].replace(/[A-Z]/g, '').trim()} />
+      <path d={paths[direction]} />
+    </svg>
+  )
 }
 
 function formatExpiryLabel(reserved_until: string): string {
@@ -142,12 +203,14 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
 
       {/* Legend */}
       <div className="flex gap-4 flex-wrap mb-5">
-        {Object.entries(STATUS_CONFIG).filter(([key]) => key !== 'na').map(([key, cfg]) => (
-          <div key={key} className="flex items-center gap-1.5 text-xs text-zinc-500 font-rajdhani">
-            <span className="text-sm">{cfg.icon}</span>
-            {cfg.label}
-          </div>
-        ))}
+        {Object.entries(STATUS_CONFIG)
+          .filter(([key]) => key !== 'na')
+          .map(([key, cfg]) => (
+            <div key={key} className="flex items-center gap-1.5 text-xs text-zinc-500 font-rajdhani">
+              <span className="text-sm">{cfg.icon}</span>
+              {cfg.label}
+            </div>
+          ))}
         {week?.weekendFull && (
           <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-rajdhani">
             <span className="text-sm">🔒</span>
@@ -203,8 +266,12 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
               {expanded && (
                 <div>
                   {day.slots.map((slot, si) => {
-                    const cfg    = STATUS_CONFIG[slot.status]
-                    const header = SLOT_HEADERS[si]
+                    const cfg         = STATUS_CONFIG[slot.status]
+                    const header      = SLOT_HEADERS[si]
+                    const isLocked    = week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' && slot.status !== 'clash'
+                    const clashSource = slot.status === 'clash' ? getClashSource(slot.time as SlotTime, day.slots) : null
+                    const arrowDir    = slot.status === 'clash' ? getArrowDirection(slot.time as SlotTime, clashSource, true) : null
+
                     return (
                       <div key={slot.time}
                         className={`flex items-center gap-3 px-4 py-3 border-b border-ink-4 last:border-0 ${slot.status === 'open' && !week?.weekendFull ? 'hover:bg-emerald-950/20' : ''}`}>
@@ -212,8 +279,13 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                           <p className="font-cinzel text-sm font-semibold text-parchment">{slot.time}</p>
                           <p className="text-[10px] text-zinc-600 font-rajdhani">{header.label}</p>
                         </div>
-                       <div className="flex-1">
-                          {slot.status === 'booked' && slot.cricheroes_url ? (
+                        <div className="flex-1">
+                          {/* Capacity full locked — just lock icon, no text */}
+                          {isLocked ? (
+                            <div className="flex items-center justify-center h-8 rounded bg-zinc-900 border border-zinc-800">
+                              <span className="text-zinc-700 text-sm">🔒</span>
+                            </div>
+                          ) : slot.status === 'booked' && slot.cricheroes_url ? (
                             <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
                               className={`flex flex-col ${cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                               <span className="flex items-center gap-1.5">
@@ -226,28 +298,36 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                                 </span>
                               )}
                             </a>
+                          ) : slot.status === 'clash' ? (
+                            <div className={`flex items-center gap-1.5 ${cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
+                              {arrowDir && (
+                                <span className="text-zinc-600 flex-shrink-0">
+                                  <ArrowIcon direction={arrowDir} />
+                                </span>
+                              )}
+                              <span className="text-zinc-600">Play in progress</span>
+                            </div>
                           ) : (
-                          <div className={`flex flex-col ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
-                            <span className="flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                              {slot.status === 'soft_block' ? 'Reserved' :
-                               slot.status === 'open' && playerView && !week?.weekendFull ? 'Scheduling in progress' :
-                               slot.status === 'open' && week?.weekendFull ? 'Capacity Full' :
-                               slot.status === 'booked' && slot.cricheroes_url
-                                 ? [slot.opponent_name ? `vs ${slot.opponent_name}` : null, slot.tournament_name ? `@ ${slot.tournament_name}` : null].filter(Boolean).join(' ') || 'Booked'
-                                 : cfg.label}
-                            </span>
-                            {slot.status === 'soft_block' && slot.reserved_until && (
-                              <span className="text-[9px] font-normal opacity-70 mt-0.5 pl-3">
-                                {formatExpiryLabel(slot.reserved_until)}
+                            <div className={`flex flex-col ${cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
+                              <span className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                                {slot.status === 'soft_block' ? 'Reserved' :
+                                 slot.status === 'open' && playerView && !week?.weekendFull ? 'Scheduling in progress' :
+                                 slot.status === 'booked' && slot.cricheroes_url
+                                   ? [slot.opponent_name ? `vs ${slot.opponent_name}` : null, slot.tournament_name ? `@ ${slot.tournament_name}` : null].filter(Boolean).join(' ') || 'Booked'
+                                   : cfg.label}
                               </span>
-                            )}
-                            {slot.status === 'soft_block' && slot.tournament_name && (
-                              <span className="text-[9px] font-normal text-yellow-700 opacity-75 mt-0.5 pl-3">
-                                {slot.tournament_name}
-                              </span>
-                            )}
-                          </div>
+                              {slot.status === 'soft_block' && slot.reserved_until && (
+                                <span className="text-[9px] font-normal opacity-70 mt-0.5 pl-3">
+                                  {formatExpiryLabel(slot.reserved_until)}
+                                </span>
+                              )}
+                              {slot.status === 'soft_block' && slot.tournament_name && (
+                                <span className="text-[9px] font-normal text-yellow-700 opacity-75 mt-0.5 pl-3">
+                                  {slot.tournament_name}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                         {slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView && (
@@ -290,10 +370,19 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                     <p className="font-rajdhani text-sm text-muted">{dayNum} {mon}</p>
                   </td>
                   {day.slots.map((slot) => {
-                    const cfg = STATUS_CONFIG[slot.status]
+                    const cfg         = STATUS_CONFIG[slot.status]
+                    const isLocked    = week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' && slot.status !== 'clash'
+                    const clashSource = slot.status === 'clash' ? getClashSource(slot.time as SlotTime, day.slots) : null
+                    const arrowDir    = slot.status === 'clash' ? getArrowDirection(slot.time as SlotTime, clashSource, false) : null
+
                     return (
                       <td key={slot.time} className="p-1.5 border-b border-ink-4 w-1/4">
-                        {slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView ? (
+                        {/* Capacity full locked — just lock icon */}
+                        {isLocked ? (
+                          <div className="flex items-center justify-center h-16 rounded bg-zinc-900 border border-zinc-800">
+                            <span className="text-zinc-700 text-lg">🔒</span>
+                          </div>
+                        ) : slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView ? (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${cfg.gridCls} group`}
                             title="Click to WhatsApp about this slot">
@@ -303,6 +392,16 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                         ) : slot.status === 'open' && playerView && !week?.weekendFull ? (
                           <div className="flex flex-col items-center justify-center gap-1 h-16 rounded bg-ink-3 border border-ink-5">
                             <span className="font-rajdhani text-[10px] text-zinc-600 text-center px-1">Scheduling in progress</span>
+                          </div>
+                        ) : slot.status === 'clash' ? (
+                          <div className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${cfg.gridCls}`}>
+                            <div className="flex items-center gap-1.5 text-zinc-600">
+                              {arrowDir && <ArrowIcon direction={arrowDir} />}
+                              <span className="font-rajdhani text-[10px] font-bold tracking-wide text-center leading-tight">
+                                Play in<br />progress
+                              </span>
+                              {arrowDir === 'right' && <ArrowIcon direction={arrowDir} />}
+                            </div>
                           </div>
                         ) : slot.status === 'booked' && slot.cricheroes_url ? (
                           <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
@@ -326,16 +425,14 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                             )}
                           </a>
                         ) : (
-                          <div className={`flex flex-col items-center justify-center gap-0.5 min-h-16 py-2 rounded ${slot.status === 'open' && week?.weekendFull ? 'bg-zinc-900 border border-zinc-700 cursor-not-allowed' : cfg.gridCls}`}>
-                            <span className="text-lg">{week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '🔒' : cfg.icon}</span>
+                          <div className={`flex flex-col items-center justify-center gap-0.5 h-16 rounded ${cfg.gridCls}`}>
+                            <span className="text-lg">{cfg.icon}</span>
                             <span className="font-rajdhani text-[11px] font-bold tracking-wide text-center px-1 flex flex-col items-center">
                               <span className={
-                                slot.status === 'open' && week?.weekendFull ? 'text-zinc-600' :
                                 slot.status === 'booked'     ? 'text-red-500'    :
                                 slot.status === 'soft_block' ? 'text-yellow-500' :
                                 'text-zinc-700'}>
-                                {week?.weekendFull && slot.status !== 'booked' && slot.status !== 'soft_block' ? '' :
-                                  slot.status === 'soft_block' ? 'Reserved' : cfg.gridLabel}
+                                {slot.status === 'soft_block' ? 'Reserved' : cfg.gridLabel}
                               </span>
                               {slot.status === 'soft_block' && slot.reserved_until && (
                                 <span className="text-[9px] font-normal text-yellow-600 opacity-80 mt-0.5">
