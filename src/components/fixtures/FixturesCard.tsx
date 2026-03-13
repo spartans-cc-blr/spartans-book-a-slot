@@ -114,12 +114,13 @@ function JerseyIcon({ colour = "gold", size = 20 }: { colour?: 'gold' | 'white';
 // ── CricHeroes Icon ───────────────────────────────────────────────
 function CricHeroesIcon({ size = 20 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="20" cy="20" r="19" fill="#1A1A2E"/>
-      <circle cx="20" cy="20" r="19" fill="none" stroke="#E63946" strokeWidth="1.5"/>
-      {/* stylised CH monogram */}
-      <text x="20" y="26" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="bold" fontSize="14" fill="#E63946">CH</text>
-    </svg>
+    <img
+      src="/cricheroes-logo.jpg"
+      alt="CricHeroes"
+      width={size}
+      height={size}
+      style={{ borderRadius: "50%", objectFit: "cover" }}
+    />
   );
 }
 
@@ -180,15 +181,19 @@ type BookingProp = {
   format: string
   opponent_name?: string | null
   cricheroes_url?: string | null
-  tournament?: { name: string; ball_type: 'red' | 'white' | 'pink' } | null
-  ground?: { name: string; maps_url: string; hospital_url: string } | null
+  tournament?: {
+    name: string
+    ball_type: 'red' | 'white' | 'pink'
+    ground?: { name: string; maps_url: string; hospital_url: string } | null
+  } | null
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
-  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, ground } = booking;
-  const ballType  = tournament?.ball_type  || "red";
+  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament } = booking;
+  const ballType  = tournament?.ball_type || "red";
   const jColour   = jerseyColour(ballType);
   const jLabel    = jerseyLabel(ballType);
+  const ground    = tournament?.ground;
   const hasGround = ground?.maps_url;
   const hasHosp   = ground?.hospital_url;
 
@@ -203,7 +208,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       gap: "10px",
       fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
       boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-      maxWidth: "380px",
+      width: "100%",
       position: "relative",
       overflow: "hidden",
     }}>
@@ -297,34 +302,31 @@ const DEMO_BOOKINGS: BookingProp[] = [
     id: "1", game_date: "2026-04-05", slot_time: "07:30", format: "T30",
     opponent_name: "Royal Challengers XI",
     cricheroes_url: "https://cricheroes.in/match/123456",
-    tournament: { name: "Bengaluru Premier League", ball_type: "red" },
-    ground: {
+    tournament: { name: "Bengaluru Premier League", ball_type: "red", ground: {
       name: "Chinnaswamy Ground 2",
       maps_url: "https://maps.google.com/?q=M.Chinnaswamy+Stadium,Bengaluru",
       hospital_url: "https://maps.google.com/?q=Bowring+Hospital+Bengaluru",
-    }
+    }},
   },
   {
     id: "2", game_date: "2026-04-12", slot_time: "10:30", format: "T20",
     opponent_name: "Thunder Strikers",
     cricheroes_url: "https://cricheroes.in/match/789012",
-    tournament: { name: "Sunday Super League", ball_type: "white" },
-    ground: {
+    tournament: { name: "Sunday Super League", ball_type: "white", ground: {
       name: "KSCA Ground B",
       maps_url: "https://maps.google.com/?q=KSCA+Cricket+Ground+Bengaluru",
       hospital_url: "https://maps.google.com/?q=Victoria+Hospital+Bengaluru",
-    }
+    }},
   },
   {
     id: "3", game_date: "2026-04-19", slot_time: "14:30", format: "T20",
     opponent_name: "Night Owls CC",
     cricheroes_url: null,
-    tournament: { name: "Pink Ball Invitational", ball_type: "pink" },
-    ground: {
+    tournament: { name: "Pink Ball Invitational", ball_type: "pink", ground: {
       name: "Kanteerava Stadium",
       maps_url: "https://maps.google.com/?q=Kanteerava+Stadium+Bengaluru",
       hospital_url: "https://maps.google.com/?q=St+Johns+Hospital+Bengaluru",
-    }
+    }},
   },
 ];
 
