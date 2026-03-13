@@ -292,7 +292,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
 }
 
 // ── Demo preview ──────────────────────────────────────────────────
-const DEMO_BOOKINGS = [
+const DEMO_BOOKINGS: BookingProp[] = [
   {
     id: "1", game_date: "2026-04-05", slot_time: "07:30", format: "T30", status: "confirmed",
     opponent_name: "Royal Challengers XI",
