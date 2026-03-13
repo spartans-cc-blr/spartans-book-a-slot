@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Captain, Tournament, SlotTime, GameFormat, ValidationResult, RuleCheckItem } from '@/types'
+
+type Ground = { id: string; name: string; maps_url: string; hospital_url: string }
 import { SLOT_TIMES, SLOT_FORMATS } from '@/types'
 
 type BookingMode = 'confirmed' | 'reserved'
@@ -40,14 +42,17 @@ export default function NewBookingPage() {
   const [organiserPhone, setOrganiserPhone] = useState('')
 
   // Quick-add tournament
-  const [showAddTournament, setShowAddTournament] = useState(false)
-  const [newTournamentName, setNewTournamentName] = useState('')
-  const [newTournamentOrg,  setNewTournamentOrg]  = useState('')
-  const [addingTournament,  setAddingTournament]  = useState(false)
+  const [showAddTournament,   setShowAddTournament]   = useState(false)
+  const [newTournamentName,   setNewTournamentName]   = useState('')
+  const [newTournamentOrg,    setNewTournamentOrg]    = useState('')
+  const [newTournamentBall,   setNewTournamentBall]   = useState<'red' | 'white' | 'pink'>('red')
+  const [newTournamentGround, setNewTournamentGround] = useState('')
+  const [addingTournament,    setAddingTournament]    = useState(false)
 
   // Data
   const [captains,    setCaptains]    = useState<Captain[]>([])
   const [tournaments, setTournaments] = useState<Tournament[]>([])
+  const [grounds,     setGrounds]     = useState<Ground[]>([])
 
   // Validation
   const [ruleChecks,  setRuleChecks]  = useState<RuleCheckItem[]>(
@@ -59,6 +64,7 @@ export default function NewBookingPage() {
   useEffect(() => {
     fetch('/api/captains').then(r => r.json()).then(d => setCaptains(d.captains ?? []))
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
+    fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? []))
   }, [])
 
   useEffect(() => {
@@ -67,6 +73,7 @@ export default function NewBookingPage() {
     setOpponentName(''); setMatchId(''); setCricHeroesUrl('')
     setOrganiserName(''); setOrganiserPhone('')
     setShowAddTournament(false); setNewTournamentName(''); setNewTournamentOrg('')
+    setNewTournamentBall('red'); setNewTournamentGround('')
     setSubmitError('')
     setRuleChecks(RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' })))
   }, [mode])
@@ -107,7 +114,12 @@ export default function NewBookingPage() {
     const res = await fetch('/api/tournaments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newTournamentName.trim(), organiser_name: newTournamentOrg.trim() || null }),
+      body: JSON.stringify({
+        name: newTournamentName.trim(),
+        organiser_name: newTournamentOrg.trim() || null,
+        ball_type: newTournamentBall,
+        ground_id: newTournamentGround || null,
+      }),
     })
     if (res.ok) {
       const d = await res.json()
@@ -302,6 +314,31 @@ export default function NewBookingPage() {
                       <label className="form-label">Organiser Name <span className="text-zinc-600">(optional)</span></label>
                       <input type="text" value={newTournamentOrg} onChange={e => setNewTournamentOrg(e.target.value)}
                         placeholder="e.g. Ravi Kumar" className="form-input" />
+                    </div>
+                    <div>
+                      <label className="form-label">Ball Type</label>
+                      <div className="flex gap-2">
+                        {(['red', 'white', 'pink'] as const).map(b => (
+                          <button key={b} onClick={() => setNewTournamentBall(b)}
+                            className={`flex-1 py-2 rounded border font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
+                              ${newTournamentBall === b ? 'border-gold bg-gold/10 text-gold' : 'border-ink-5 bg-ink-3 text-zinc-500 hover:border-gold-dim'}`}>
+                            {b === 'red' ? '🔴' : b === 'white' ? '⚪' : '🩷'} {b}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                        {newTournamentBall === 'white' ? 'White ball → Gold jersey' : 'Red/Pink ball → White jersey'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="form-label">Ground <span className="text-zinc-600">(optional)</span></label>
+                      <select value={newTournamentGround} onChange={e => setNewTournamentGround(e.target.value)}
+                        className="form-input">
+                        <option value="">Select ground...</option>
+                        {grounds.map(g => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <button onClick={handleAddTournament}
                       disabled={!newTournamentName.trim() || addingTournament}
