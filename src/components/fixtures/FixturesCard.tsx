@@ -294,7 +294,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
 // ── Demo preview ──────────────────────────────────────────────────
 const DEMO_BOOKINGS: BookingProp[] = [
   {
-    id: "1", game_date: "2026-04-05", slot_time: "07:30", format: "T30", status: "confirmed",
+    id: "1", game_date: "2026-04-05", slot_time: "07:30", format: "T30",
     opponent_name: "Royal Challengers XI",
     cricheroes_url: "https://cricheroes.in/match/123456",
     tournament: { name: "Bengaluru Premier League", ball_type: "red" },
@@ -305,7 +305,7 @@ const DEMO_BOOKINGS: BookingProp[] = [
     }
   },
   {
-    id: "2", game_date: "2026-04-12", slot_time: "10:30", format: "T20", status: "confirmed",
+    id: "2", game_date: "2026-04-12", slot_time: "10:30", format: "T20",
     opponent_name: "Thunder Strikers",
     cricheroes_url: "https://cricheroes.in/match/789012",
     tournament: { name: "Sunday Super League", ball_type: "white" },
@@ -316,7 +316,7 @@ const DEMO_BOOKINGS: BookingProp[] = [
     }
   },
   {
-    id: "3", game_date: "2026-04-19", slot_time: "14:30", format: "T20", status: "confirmed",
+    id: "3", game_date: "2026-04-19", slot_time: "14:30", format: "T20",
     opponent_name: "Night Owls CC",
     cricheroes_url: null,
     tournament: { name: "Pink Ball Invitational", ball_type: "pink" },
