@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase'
 
 export async function GET() {
-  const supabase = createClient()
+  const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('tournaments')
     .select('id, name, organiser_name, organiser_contact, ball_type, ground_id, active, created_at')
@@ -13,7 +13,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = createServiceClient()
   const body = await request.json()
   const { name, organiser_name, organiser_contact, ball_type = 'red', ground_id } = body
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const supabase = createClient()
+  const supabase = createServiceClient()
   const body = await request.json()
   const { id, ...updates } = body
 
