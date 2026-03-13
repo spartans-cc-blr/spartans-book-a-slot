@@ -4,6 +4,17 @@ import { ScheduleGrid } from '@/components/schedule/ScheduleGrid'
 import { ScheduleSkeleton } from '@/components/schedule/ScheduleSkeleton'
 import type { Metadata } from 'next'
 
+const { data } = await supabase
+  .from('bookings')
+  .select(`
+    *,
+    tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url)),
+    captain:captains(name)
+  `)
+  .eq('status', 'confirmed')
+  .gte('game_date', today)
+  .order('game_date', { ascending: true })
+
 export const metadata: Metadata = {
   title: 'Upcoming Fixtures — Spartans Cricket Club',
   description: 'Upcoming match fixtures for Spartans CC players.',
