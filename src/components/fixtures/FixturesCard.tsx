@@ -162,12 +162,12 @@ function jerseyLabel(ballType: 'red' | 'white' | 'pink'): string {
 }
 
 // ── Slot label ────────────────────────────────────────────────────
-function slotLabel(slot) {
-  const map = { "07:30": "7:30 AM", "10:30": "10:30 AM", "12:30": "12:30 PM", "14:30": "2:30 PM" };
+function slotLabel(slot: string): string {
+  const map: Record<string, string> = { "07:30": "7:30 AM", "10:30": "10:30 AM", "12:30": "12:30 PM", "14:30": "2:30 PM" };
   return map[slot] || slot;
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 }
