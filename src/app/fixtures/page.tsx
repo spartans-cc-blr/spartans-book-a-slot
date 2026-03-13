@@ -1,7 +1,6 @@
-import { Suspense } from 'react'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { ScheduleGrid } from '@/components/schedule/ScheduleGrid'
-import { ScheduleSkeleton } from '@/components/schedule/ScheduleSkeleton'
+import { FixturesCard } from '@/components/fixtures/FixturesCard'
+import { createServiceClient } from '@/lib/supabase'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -12,6 +11,20 @@ export const metadata: Metadata = {
 export const revalidate = 60
 
 export default async function PlayersPage() {
+  const supabase = createServiceClient()
+  const today = new Date().toISOString().split('T')[0]
+
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select(`
+      id, game_date, slot_time, format, opponent_name, cricheroes_url,
+      tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
+    `)
+    .eq('status', 'confirmed')
+    .gte('game_date', today)
+    .order('game_date', { ascending: true })
+    .order('slot_time', { ascending: true })
+
   return (
     <div className="min-h-screen bg-ink grain">
       <SiteNav activePage="players" />
@@ -28,14 +41,20 @@ export default async function PlayersPage() {
           Upcoming Fixtures
         </h1>
         <p className="text-muted text-sm md:text-base max-w-xl leading-relaxed font-rajdhani">
-          Confirmed and upcoming matches for Spartans CC. Tap a booked slot to view match details on CricHeroes.
+          Confirmed matches for Spartans CC. Tap the icons to open CricHeroes, venue, or nearest hospital.
         </p>
       </div>
 
-      <div className="px-5 md:px-8 lg:px-10 py-6">
-        <Suspense fallback={<ScheduleSkeleton />}>
-          <ScheduleGrid playerView />
-        </Suspense>
+      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
+        {!bookings || bookings.length === 0 ? (
+          <p className="font-rajdhani text-zinc-500 text-sm">No upcoming fixtures confirmed yet. Check back soon.</p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {bookings.map((b: any) => (
+              <FixturesCard key={b.id} booking={b} />
+            ))}
+          </div>
+        )}
       </div>
 
       <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
