@@ -153,13 +153,12 @@ function BallIcon({ type, size = 20 }: { type: 'red' | 'white' | 'pink'; size?: 
 }
 
 // ── Jersey logic ──────────────────────────────────────────────────
-function jerseyColour(ballType) {
-  // red or pink → white jersey; white ball → gold jersey
+function jerseyColour(ballType: 'red' | 'white' | 'pink'): 'gold' | 'white' {
   return ballType === "white" ? "gold" : "white";
 }
 
-function jerseyLabel(ballType) {
-  return ballType === "white" ? "Gold jersey" : "White jersey";
+function jerseyLabel(ballType: 'red' | 'white' | 'pink'): string {
+  return ballType === "white" ? "Colour jersey" : "White jersey";
 }
 
 // ── Slot label ────────────────────────────────────────────────────
@@ -365,7 +364,7 @@ export default function App() {
       }}>
         {[
           { icon: <RedBall size={16}/>,   label: "Red ball → White jersey" },
-          { icon: <WhiteBall size={16}/>, label: "White ball → Gold jersey" },
+          { icon: <WhiteBall size={16}/>, label: "White ball → Colour jersey" },
           { icon: <PinkBall size={16}/>,  label: "Pink ball → White jersey" },
         ].map(({ icon, label }) => (
           <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
