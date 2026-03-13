@@ -17,7 +17,7 @@ import { useState } from "react";
 
 // ── Cricket Ball SVG Components ──────────────────────────────────
 
-function RedBall({ size = 20 }) {
+function RedBall({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -44,7 +44,7 @@ function RedBall({ size = 20 }) {
   );
 }
 
-function WhiteBall({ size = 20 }) {
+function WhiteBall({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -68,7 +68,7 @@ function WhiteBall({ size = 20 }) {
   );
 }
 
-function PinkBall({ size = 20 }) {
+function PinkBall({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -93,7 +93,7 @@ function PinkBall({ size = 20 }) {
 }
 
 // ── Jersey Icon ───────────────────────────────────────────────────
-function JerseyIcon({ colour = "gold", size = 20 }) {
+function JerseyIcon({ colour = "gold", size = 20 }: { colour?: 'gold' | 'white'; size?: number }) {
   const fill   = colour === "gold" ? "#C9A84C" : "#F8FAFC";
   const stroke = colour === "gold" ? "#9A7A2E" : "#CBD5E1";
   const shadow = colour === "gold" ? "#7A5E1A" : "#94A3B8";
@@ -112,7 +112,7 @@ function JerseyIcon({ colour = "gold", size = 20 }) {
 }
 
 // ── CricHeroes Icon ───────────────────────────────────────────────
-function CricHeroesIcon({ size = 20 }) {
+function CricHeroesIcon({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="20" cy="20" r="19" fill="#1A1A2E"/>
@@ -124,7 +124,7 @@ function CricHeroesIcon({ size = 20 }) {
 }
 
 // ── Map Pin Icon ──────────────────────────────────────────────────
-function MapPinIcon({ size = 18 }) {
+function MapPinIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
@@ -135,7 +135,7 @@ function MapPinIcon({ size = 18 }) {
 }
 
 // ── Hospital Icon ─────────────────────────────────────────────────
-function HospitalIcon({ size = 18 }) {
+function HospitalIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="3" y="3" width="18" height="18" rx="3" fill="#EF4444" stroke="#B91C1C" strokeWidth="0.5"/>
@@ -146,7 +146,7 @@ function HospitalIcon({ size = 18 }) {
 }
 
 // ── Ball Component Selector ───────────────────────────────────────
-function BallIcon({ type, size = 20 }) {
+function BallIcon({ type, size = 20 }: { type: 'red' | 'white' | 'pink'; size?: number }) {
   if (type === "white") return <WhiteBall size={size} />;
   if (type === "pink")  return <PinkBall  size={size} />;
   return                        <RedBall   size={size} />;
@@ -174,7 +174,18 @@ function formatDate(dateStr) {
 }
 
 // ── Main Card Component ───────────────────────────────────────────
-export function FixturesCard({ booking }) {
+type BookingProp = {
+  id: string
+  game_date: string
+  slot_time: string
+  format: string
+  opponent_name?: string | null
+  cricheroes_url?: string | null
+  tournament?: { name: string; ball_type: 'red' | 'white' | 'pink' } | null
+  ground?: { name: string; maps_url: string; hospital_url: string } | null
+}
+
+export function FixturesCard({ booking }: { booking: BookingProp }) {
   const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, ground } = booking;
   const ballType  = tournament?.ball_type  || "red";
   const jColour   = jerseyColour(ballType);
