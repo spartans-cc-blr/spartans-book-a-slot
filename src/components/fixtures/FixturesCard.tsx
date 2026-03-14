@@ -19,75 +19,69 @@ import { useState } from "react";
 
 function RedBall({ size = 20 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="red-grad" cx="38%" cy="32%" r="62%">
-          <stop offset="0%" stopColor="#E05A4A" />
-          <stop offset="45%" stopColor="#C0392B" />
-          <stop offset="100%" stopColor="#7B1A12" />
+        <radialGradient id="rb" cx="38%" cy="30%" r="62%">
+          <stop offset="0%" stopColor="#E8553A"/>
+          <stop offset="35%" stopColor="#C0392B"/>
+          <stop offset="75%" stopColor="#8B1A0F"/>
+          <stop offset="100%" stopColor="#5C0E08"/>
         </radialGradient>
+        <clipPath id="rc"><circle cx="30" cy="30" r="28"/></clipPath>
       </defs>
-      <circle cx="20" cy="20" r="19" fill="url(#red-grad)" />
-      {/* seam lines */}
-      <path d="M 8 14 Q 20 10 32 14" stroke="#1a0a08" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      <path d="M 8 26 Q 20 30 32 26" stroke="#1a0a08" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      {/* seam thread stitches */}
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="12.5" x2={x+1} y2="11" stroke="#E8C9A0" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="27.5" x2={x+1} y2="29" stroke="#E8C9A0" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      {/* shine */}
-      <ellipse cx="14" cy="13" rx="4" ry="2.5" fill="white" opacity="0.12" transform="rotate(-20 14 13)" />
+      <circle cx="30" cy="30" r="28" fill="url(#rb)"/>
+      <g transform="rotate(-30 30 30)" clipPath="url(#rc)">
+        <line x1="2" y1="30" x2="58" y2="30" stroke="#5C0E08" strokeWidth="3"/>
+        <line x1="2" y1="24" x2="58" y2="24" stroke="#E8C49A" strokeWidth="1" strokeDasharray="3 2.5"/>
+        <line x1="2" y1="36" x2="58" y2="36" stroke="#E8C49A" strokeWidth="1" strokeDasharray="3 2.5"/>
+      </g>
+      <ellipse cx="21" cy="17" rx="9" ry="5" fill="white" opacity="0.13" transform="rotate(-30 21 17)"/>
     </svg>
   );
 }
 
 function WhiteBall({ size = 20 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="white-grad" cx="38%" cy="32%" r="62%">
-          <stop offset="0%" stopColor="#FFFFFF" />
-          <stop offset="50%" stopColor="#F0EDE5" />
-          <stop offset="100%" stopColor="#C8C4B8" />
+        <radialGradient id="wb" cx="38%" cy="30%" r="62%">
+          <stop offset="0%" stopColor="#FFFFFF"/>
+          <stop offset="45%" stopColor="#EDE9DF"/>
+          <stop offset="80%" stopColor="#C8C2B0"/>
+          <stop offset="100%" stopColor="#A09880"/>
         </radialGradient>
+        <clipPath id="wc"><circle cx="30" cy="30" r="28"/></clipPath>
       </defs>
-      <circle cx="20" cy="20" r="19" fill="url(#white-grad)" stroke="#D0CCC2" strokeWidth="0.5"/>
-      <path d="M 8 14 Q 20 10 32 14" stroke="#555" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      <path d="M 8 26 Q 20 30 32 26" stroke="#555" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="12.5" x2={x+1} y2="11" stroke="#888" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="27.5" x2={x+1} y2="29" stroke="#888" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      <ellipse cx="14" cy="13" rx="4" ry="2.5" fill="white" opacity="0.6" transform="rotate(-20 14 13)" />
+      <circle cx="30" cy="30" r="28" fill="url(#wb)" stroke="#C0BAA8" strokeWidth="0.5"/>
+      <g transform="rotate(-30 30 30)" clipPath="url(#wc)">
+        <line x1="2" y1="30" x2="58" y2="30" stroke="#9A9080" strokeWidth="3"/>
+        <line x1="2" y1="24" x2="58" y2="24" stroke="#707060" strokeWidth="1" strokeDasharray="3 2.5"/>
+        <line x1="2" y1="36" x2="58" y2="36" stroke="#707060" strokeWidth="1" strokeDasharray="3 2.5"/>
+      </g>
+      <ellipse cx="21" cy="17" rx="9" ry="5" fill="white" opacity="0.45" transform="rotate(-30 21 17)"/>
     </svg>
   );
 }
 
 function PinkBall({ size = 20 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="pink-grad" cx="38%" cy="32%" r="62%">
-          <stop offset="0%" stopColor="#F472B6" />
-          <stop offset="45%" stopColor="#EC4899" />
-          <stop offset="100%" stopColor="#9D174D" />
+        <radialGradient id="pb" cx="38%" cy="30%" r="62%">
+          <stop offset="0%" stopColor="#F780B8"/>
+          <stop offset="35%" stopColor="#EC4899"/>
+          <stop offset="75%" stopColor="#9D1A5C"/>
+          <stop offset="100%" stopColor="#6B0D3A"/>
         </radialGradient>
+        <clipPath id="pc"><circle cx="30" cy="30" r="28"/></clipPath>
       </defs>
-      <circle cx="20" cy="20" r="19" fill="url(#pink-grad)" />
-      <path d="M 8 14 Q 20 10 32 14" stroke="#1a0a10" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      <path d="M 8 26 Q 20 30 32 26" stroke="#1a0a10" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="12.5" x2={x+1} y2="11" stroke="#C9A06B" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="27.5" x2={x+1} y2="29" stroke="#C9A06B" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      <ellipse cx="14" cy="13" rx="4" ry="2.5" fill="white" opacity="0.15" transform="rotate(-20 14 13)" />
+      <circle cx="30" cy="30" r="28" fill="url(#pb)"/>
+      <g transform="rotate(-30 30 30)" clipPath="url(#pc)">
+        <line x1="2" y1="30" x2="58" y2="30" stroke="#7A0A3C" strokeWidth="3"/>
+        <line x1="2" y1="24" x2="58" y2="24" stroke="#C9956B" strokeWidth="1" strokeDasharray="3 2.5"/>
+        <line x1="2" y1="36" x2="58" y2="36" stroke="#C9956B" strokeWidth="1" strokeDasharray="3 2.5"/>
+      </g>
+      <ellipse cx="21" cy="17" rx="9" ry="5" fill="white" opacity="0.16" transform="rotate(-30 21 17)"/>
     </svg>
   );
 }
