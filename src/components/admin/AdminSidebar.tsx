@@ -8,7 +8,9 @@ const NAV = [
   { href: '/admin/soft-blocks',  label: 'Soft Blocks',  icon: '🔒' },
   { href: '/admin/captains',     label: 'Captains',     icon: '👥', section: 'Master Data' },
   { href: '/admin/tournaments',  label: 'Tournaments',  icon: '🏆' },
+  { href: '/admin/grounds',      label: 'Grounds',      icon: '📍' },
   { href: '/schedule',           label: 'Public View',  icon: '🌐', section: 'Views' },
+  { href: '/fixtures',           label: 'Fixtures',     icon: '🏏' },
 ]
 
 export function AdminSidebar() {
