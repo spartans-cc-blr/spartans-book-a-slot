@@ -41,7 +41,7 @@ export default async function PlayersPage() {
           Upcoming Fixtures
         </h1>
         <p className="text-muted text-sm md:text-base max-w-xl leading-relaxed font-rajdhani">
-          Confirmed matches for Spartans CC. Tap the icons to open CricHeroes, venue, or nearest hospital.
+          Confirmed matches for Spartans CC. Tap the icons for match link, directions to ground, and nearest hospital.
         </p>
       </div>
 
