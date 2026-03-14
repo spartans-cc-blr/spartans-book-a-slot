@@ -27,32 +27,15 @@ function RedBall({ size = 20 }: { size?: number }) {
           <stop offset="75%" stopColor="#8B1A0F" />
           <stop offset="100%" stopColor="#5C0E08" />
         </radialGradient>
-        <radialGradient id="rb-shine" cx="35%" cy="28%" r="50%">
-          <stop offset="0%" stopColor="white" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="white" stopOpacity="0" />
-        </radialGradient>
         <clipPath id="rb-clip"><circle cx="30" cy="30" r="28"/></clipPath>
       </defs>
-      {/* body */}
       <circle cx="30" cy="30" r="28" fill="url(#rb-body)" />
-      {/* equator seam - horizontal S-curve */}
-      <path d="M 2 30 C 10 18, 20 42, 30 30 C 40 18, 50 42, 58 30"
-        stroke="#6B0F08" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#rb-clip)"/>
-      {/* stitches along top seam */}
-      {[5,9,13,17,21,25,29,33,37,41,45,49,53].map((x, i) => {
-        const t = (x - 2) / 56;
-        const y = 30 + (i % 2 === 0 ? -12 : 12) * Math.sin(t * Math.PI);
-        const dy = i < 6 ? -3 : i < 7 ? 0 : 3;
-        return <line key={i} x1={x} y1={y - 1.5} x2={x + 1.5} y2={y + 1.5}
-          stroke="#E8C49A" strokeWidth="1" strokeLinecap="round" clipPath="url(#rb-clip)"/>
-      })}
-      {/* vertical seam */}
-      <path d="M 30 2 C 18 10, 42 20, 30 30 C 18 40, 42 50, 30 58"
-        stroke="#6B0F08" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#rb-clip)"/>
-      {/* shine overlay */}
-      <circle cx="30" cy="30" r="28" fill="url(#rb-shine)" />
-      {/* specular highlight */}
-      <ellipse cx="21" cy="18" rx="7" ry="4.5" fill="white" opacity="0.18" transform="rotate(-30 21 18)"/>
+      <path d="M 2 30 C 10 18, 20 42, 30 30 C 40 18, 50 42, 58 30" stroke="#6B0F08" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#rb-clip)"/>
+      <path d="M 30 2 C 18 10, 42 20, 30 30 C 18 40, 42 50, 30 58" stroke="#6B0F08" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#rb-clip)"/>
+      {[6,10,14,18,22,26,30,34,38,42,46,50,54].map((x, i) => (
+        <line key={i} x1={x} y1={30 + (i%2===0?-10:10)*Math.sin((x-2)/56*Math.PI) - 1.5} x2={x+1.5} y2={30 + (i%2===0?-10:10)*Math.sin((x-2)/56*Math.PI) + 1.5} stroke="#E8C49A" strokeWidth="1" strokeLinecap="round" clipPath="url(#rb-clip)"/>
+      ))}
+      <ellipse cx="21" cy="18" rx="7" ry="4" fill="white" opacity="0.18" transform="rotate(-30 21 18)"/>
     </svg>
   );
 }
@@ -67,25 +50,15 @@ function WhiteBall({ size = 20 }: { size?: number }) {
           <stop offset="80%" stopColor="#C8C2B0" />
           <stop offset="100%" stopColor="#A09880" />
         </radialGradient>
-        <radialGradient id="wb-shine" cx="35%" cy="28%" r="50%">
-          <stop offset="0%" stopColor="white" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="white" stopOpacity="0" />
-        </radialGradient>
         <clipPath id="wb-clip"><circle cx="30" cy="30" r="28"/></clipPath>
       </defs>
       <circle cx="30" cy="30" r="28" fill="url(#wb-body)" stroke="#C0BAA8" strokeWidth="0.5"/>
-      <path d="M 2 30 C 10 18, 20 42, 30 30 C 40 18, 50 42, 58 30"
-        stroke="#8A8070" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#wb-clip)"/>
-      {[5,9,13,17,21,25,29,33,37,41,45,49,53].map((x, i) => {
-        const t = (x - 2) / 56;
-        const y = 30 + (i % 2 === 0 ? -12 : 12) * Math.sin(t * Math.PI);
-        return <line key={i} x1={x} y1={y - 1.5} x2={x + 1.5} y2={y + 1.5}
-          stroke="#706860" strokeWidth="1" strokeLinecap="round" clipPath="url(#wb-clip)"/>
-      })}
-      <path d="M 30 2 C 18 10, 42 20, 30 30 C 18 40, 42 50, 30 58"
-        stroke="#8A8070" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#wb-clip)"/>
-      <circle cx="30" cy="30" r="28" fill="url(#wb-shine)" />
-      <ellipse cx="21" cy="18" rx="7" ry="4.5" fill="white" opacity="0.4" transform="rotate(-30 21 18)"/>
+      <path d="M 2 30 C 10 18, 20 42, 30 30 C 40 18, 50 42, 58 30" stroke="#8A8070" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#wb-clip)"/>
+      <path d="M 30 2 C 18 10, 42 20, 30 30 C 18 40, 42 50, 30 58" stroke="#8A8070" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#wb-clip)"/>
+      {[6,10,14,18,22,26,30,34,38,42,46,50,54].map((x, i) => (
+        <line key={i} x1={x} y1={30 + (i%2===0?-10:10)*Math.sin((x-2)/56*Math.PI) - 1.5} x2={x+1.5} y2={30 + (i%2===0?-10:10)*Math.sin((x-2)/56*Math.PI) + 1.5} stroke="#706860" strokeWidth="1" strokeLinecap="round" clipPath="url(#wb-clip)"/>
+      ))}
+      <ellipse cx="21" cy="18" rx="7" ry="4" fill="white" opacity="0.5" transform="rotate(-30 21 18)"/>
     </svg>
   );
 }
@@ -100,25 +73,15 @@ function PinkBall({ size = 20 }: { size?: number }) {
           <stop offset="75%" stopColor="#9D1A5C" />
           <stop offset="100%" stopColor="#6B0D3A" />
         </radialGradient>
-        <radialGradient id="pb-shine" cx="35%" cy="28%" r="50%">
-          <stop offset="0%" stopColor="white" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="white" stopOpacity="0" />
-        </radialGradient>
         <clipPath id="pb-clip"><circle cx="30" cy="30" r="28"/></clipPath>
       </defs>
       <circle cx="30" cy="30" r="28" fill="url(#pb-body)" />
-      <path d="M 2 30 C 10 18, 20 42, 30 30 C 40 18, 50 42, 58 30"
-        stroke="#7A0A3C" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#pb-clip)"/>
-      {[5,9,13,17,21,25,29,33,37,41,45,49,53].map((x, i) => {
-        const t = (x - 2) / 56;
-        const y = 30 + (i % 2 === 0 ? -12 : 12) * Math.sin(t * Math.PI);
-        return <line key={i} x1={x} y1={y - 1.5} x2={x + 1.5} y2={y + 1.5}
-          stroke="#C9956B" strokeWidth="1" strokeLinecap="round" clipPath="url(#pb-clip)"/>
-      })}
-      <path d="M 30 2 C 18 10, 42 20, 30 30 C 18 40, 42 50, 30 58"
-        stroke="#7A0A3C" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#pb-clip)"/>
-      <circle cx="30" cy="30" r="28" fill="url(#pb-shine)" />
-      <ellipse cx="21" cy="18" rx="7" ry="4.5" fill="white" opacity="0.2" transform="rotate(-30 21 18)"/>
+      <path d="M 2 30 C 10 18, 20 42, 30 30 C 40 18, 50 42, 58 30" stroke="#7A0A3C" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#pb-clip)"/>
+      <path d="M 30 2 C 18 10, 42 20, 30 30 C 18 40, 42 50, 30 58" stroke="#7A0A3C" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#pb-clip)"/>
+      {[6,10,14,18,22,26,30,34,38,42,46,50,54].map((x, i) => (
+        <line key={i} x1={x} y1={30 + (i%2===0?-10:10)*Math.sin((x-2)/56*Math.PI) - 1.5} x2={x+1.5} y2={30 + (i%2===0?-10:10)*Math.sin((x-2)/56*Math.PI) + 1.5} stroke="#C9956B" strokeWidth="1" strokeLinecap="round" clipPath="url(#pb-clip)"/>
+      ))}
+      <ellipse cx="21" cy="18" rx="7" ry="4" fill="white" opacity="0.2" transform="rotate(-30 21 18)"/>
     </svg>
   );
 }
@@ -241,17 +204,19 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       {/* Gold top accent bar */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)" }} />
 
-      {/* Date + Time + Format row */}
+      {/* Date + Slot + Format row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: "12px", fontWeight: 600, color: "#C9A84C", letterSpacing: "0.05em" }}>
           {formatDate(game_date)} · {slotLabel(slot_time)}
         </span>
-        <span style={{
-          background: "#1E3A5F", color: "#93C5FD",
-          fontSize: "10px", fontWeight: 700,
-          padding: "2px 8px", borderRadius: "999px",
-          letterSpacing: "0.08em"
-        }}>{format}</span>
+        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          <span style={{
+            background: "#1E3A5F", color: "#93C5FD",
+            fontSize: "10px", fontWeight: 700,
+            padding: "2px 8px", borderRadius: "999px",
+            letterSpacing: "0.08em"
+          }}>{format}</span>
+        </div>
       </div>
 
       {/* Tournament + Opponent */}
