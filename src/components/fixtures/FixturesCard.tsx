@@ -164,7 +164,7 @@ function jerseyLabel(ballType: 'red' | 'white' | 'pink'): string {
 
 // ── Slot label ────────────────────────────────────────────────────
 function slotLabel(slot: string): string {
-  const map: Record<string, string> = { "07:30": "7:30 AM", "10:30": "10:30 AM", "12:30": "12:30 PM", "14:30": "2:30 PM" };
+  const map: Record<string, string> = { "07:30": "7:15 AM", "10:30": "10:15 AM", "12:30": "12:15 PM", "14:30": "2:15 PM" };
   return map[slot] || slot;
 }
 
@@ -218,7 +218,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       {/* Date + Slot + Format row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: "12px", fontWeight: 600, color: "#C9A84C", letterSpacing: "0.05em" }}>
-          {formatDate(game_date)}
+          {formatDate(game_date)} · {slotLabel(slot_time)}
         </span>
         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
           <span style={{
@@ -227,7 +227,6 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             padding: "2px 8px", borderRadius: "999px",
             letterSpacing: "0.08em"
           }}>{format}</span>
-          <span style={{ fontSize: "11px", color: "#6B7280" }}>{slotLabel(slot_time)}</span>
         </div>
       </div>
 
@@ -278,7 +277,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             title="Open ground in Google Maps"
             style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", textDecoration: "none" }}>
             <MapPinIcon size={22} />
-            <span style={{ fontSize: "9px", color: "#6B7280" }}>Venue</span>
+            <span style={{ fontSize: "9px", color: "#6B7280" }}>Ground</span>
           </a>
         )}
 
