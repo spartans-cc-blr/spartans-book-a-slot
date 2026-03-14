@@ -19,75 +19,106 @@ import { useState } from "react";
 
 function RedBall({ size = 20 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="red-grad" cx="38%" cy="32%" r="62%">
-          <stop offset="0%" stopColor="#E05A4A" />
-          <stop offset="45%" stopColor="#C0392B" />
-          <stop offset="100%" stopColor="#7B1A12" />
+        <radialGradient id="rb-body" cx="35%" cy="28%" r="65%">
+          <stop offset="0%" stopColor="#E8553A" />
+          <stop offset="30%" stopColor="#C0392B" />
+          <stop offset="75%" stopColor="#8B1A0F" />
+          <stop offset="100%" stopColor="#5C0E08" />
         </radialGradient>
+        <radialGradient id="rb-shine" cx="35%" cy="28%" r="50%">
+          <stop offset="0%" stopColor="white" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="white" stopOpacity="0" />
+        </radialGradient>
+        <clipPath id="rb-clip"><circle cx="30" cy="30" r="28"/></clipPath>
       </defs>
-      <circle cx="20" cy="20" r="19" fill="url(#red-grad)" />
-      {/* seam lines */}
-      <path d="M 8 14 Q 20 10 32 14" stroke="#1a0a08" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      <path d="M 8 26 Q 20 30 32 26" stroke="#1a0a08" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      {/* seam thread stitches */}
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="12.5" x2={x+1} y2="11" stroke="#E8C9A0" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="27.5" x2={x+1} y2="29" stroke="#E8C9A0" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      {/* shine */}
-      <ellipse cx="14" cy="13" rx="4" ry="2.5" fill="white" opacity="0.12" transform="rotate(-20 14 13)" />
+      {/* body */}
+      <circle cx="30" cy="30" r="28" fill="url(#rb-body)" />
+      {/* equator seam - horizontal S-curve */}
+      <path d="M 2 30 C 10 18, 20 42, 30 30 C 40 18, 50 42, 58 30"
+        stroke="#6B0F08" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#rb-clip)"/>
+      {/* stitches along top seam */}
+      {[5,9,13,17,21,25,29,33,37,41,45,49,53].map((x, i) => {
+        const t = (x - 2) / 56;
+        const y = 30 + (i % 2 === 0 ? -12 : 12) * Math.sin(t * Math.PI);
+        const dy = i < 6 ? -3 : i < 7 ? 0 : 3;
+        return <line key={i} x1={x} y1={y - 1.5} x2={x + 1.5} y2={y + 1.5}
+          stroke="#E8C49A" strokeWidth="1" strokeLinecap="round" clipPath="url(#rb-clip)"/>
+      })}
+      {/* vertical seam */}
+      <path d="M 30 2 C 18 10, 42 20, 30 30 C 18 40, 42 50, 30 58"
+        stroke="#6B0F08" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#rb-clip)"/>
+      {/* shine overlay */}
+      <circle cx="30" cy="30" r="28" fill="url(#rb-shine)" />
+      {/* specular highlight */}
+      <ellipse cx="21" cy="18" rx="7" ry="4.5" fill="white" opacity="0.18" transform="rotate(-30 21 18)"/>
     </svg>
   );
 }
 
 function WhiteBall({ size = 20 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="white-grad" cx="38%" cy="32%" r="62%">
+        <radialGradient id="wb-body" cx="35%" cy="28%" r="65%">
           <stop offset="0%" stopColor="#FFFFFF" />
-          <stop offset="50%" stopColor="#F0EDE5" />
-          <stop offset="100%" stopColor="#C8C4B8" />
+          <stop offset="40%" stopColor="#EDE9DF" />
+          <stop offset="80%" stopColor="#C8C2B0" />
+          <stop offset="100%" stopColor="#A09880" />
         </radialGradient>
+        <radialGradient id="wb-shine" cx="35%" cy="28%" r="50%">
+          <stop offset="0%" stopColor="white" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="white" stopOpacity="0" />
+        </radialGradient>
+        <clipPath id="wb-clip"><circle cx="30" cy="30" r="28"/></clipPath>
       </defs>
-      <circle cx="20" cy="20" r="19" fill="url(#white-grad)" stroke="#D0CCC2" strokeWidth="0.5"/>
-      <path d="M 8 14 Q 20 10 32 14" stroke="#555" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      <path d="M 8 26 Q 20 30 32 26" stroke="#555" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="12.5" x2={x+1} y2="11" stroke="#888" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="27.5" x2={x+1} y2="29" stroke="#888" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      <ellipse cx="14" cy="13" rx="4" ry="2.5" fill="white" opacity="0.6" transform="rotate(-20 14 13)" />
+      <circle cx="30" cy="30" r="28" fill="url(#wb-body)" stroke="#C0BAA8" strokeWidth="0.5"/>
+      <path d="M 2 30 C 10 18, 20 42, 30 30 C 40 18, 50 42, 58 30"
+        stroke="#8A8070" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#wb-clip)"/>
+      {[5,9,13,17,21,25,29,33,37,41,45,49,53].map((x, i) => {
+        const t = (x - 2) / 56;
+        const y = 30 + (i % 2 === 0 ? -12 : 12) * Math.sin(t * Math.PI);
+        return <line key={i} x1={x} y1={y - 1.5} x2={x + 1.5} y2={y + 1.5}
+          stroke="#706860" strokeWidth="1" strokeLinecap="round" clipPath="url(#wb-clip)"/>
+      })}
+      <path d="M 30 2 C 18 10, 42 20, 30 30 C 18 40, 42 50, 30 58"
+        stroke="#8A8070" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#wb-clip)"/>
+      <circle cx="30" cy="30" r="28" fill="url(#wb-shine)" />
+      <ellipse cx="21" cy="18" rx="7" ry="4.5" fill="white" opacity="0.4" transform="rotate(-30 21 18)"/>
     </svg>
   );
 }
 
 function PinkBall({ size = 20 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="pink-grad" cx="38%" cy="32%" r="62%">
-          <stop offset="0%" stopColor="#F472B6" />
-          <stop offset="45%" stopColor="#EC4899" />
-          <stop offset="100%" stopColor="#9D174D" />
+        <radialGradient id="pb-body" cx="35%" cy="28%" r="65%">
+          <stop offset="0%" stopColor="#F780B8" />
+          <stop offset="30%" stopColor="#EC4899" />
+          <stop offset="75%" stopColor="#9D1A5C" />
+          <stop offset="100%" stopColor="#6B0D3A" />
         </radialGradient>
+        <radialGradient id="pb-shine" cx="35%" cy="28%" r="50%">
+          <stop offset="0%" stopColor="white" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="white" stopOpacity="0" />
+        </radialGradient>
+        <clipPath id="pb-clip"><circle cx="30" cy="30" r="28"/></clipPath>
       </defs>
-      <circle cx="20" cy="20" r="19" fill="url(#pink-grad)" />
-      <path d="M 8 14 Q 20 10 32 14" stroke="#1a0a10" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      <path d="M 8 26 Q 20 30 32 26" stroke="#1a0a10" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="12.5" x2={x+1} y2="11" stroke="#C9A06B" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      {[10,13,16,19,22,25,28].map((x, i) => (
-        <line key={i} x1={x} y1="27.5" x2={x+1} y2="29" stroke="#C9A06B" strokeWidth="0.8" strokeLinecap="round"/>
-      ))}
-      <ellipse cx="14" cy="13" rx="4" ry="2.5" fill="white" opacity="0.15" transform="rotate(-20 14 13)" />
+      <circle cx="30" cy="30" r="28" fill="url(#pb-body)" />
+      <path d="M 2 30 C 10 18, 20 42, 30 30 C 40 18, 50 42, 58 30"
+        stroke="#7A0A3C" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#pb-clip)"/>
+      {[5,9,13,17,21,25,29,33,37,41,45,49,53].map((x, i) => {
+        const t = (x - 2) / 56;
+        const y = 30 + (i % 2 === 0 ? -12 : 12) * Math.sin(t * Math.PI);
+        return <line key={i} x1={x} y1={y - 1.5} x2={x + 1.5} y2={y + 1.5}
+          stroke="#C9956B" strokeWidth="1" strokeLinecap="round" clipPath="url(#pb-clip)"/>
+      })}
+      <path d="M 30 2 C 18 10, 42 20, 30 30 C 18 40, 42 50, 30 58"
+        stroke="#7A0A3C" strokeWidth="1.8" fill="none" strokeLinecap="round" clipPath="url(#pb-clip)"/>
+      <circle cx="30" cy="30" r="28" fill="url(#pb-shine)" />
+      <ellipse cx="21" cy="18" rx="7" ry="4.5" fill="white" opacity="0.2" transform="rotate(-30 21 18)"/>
     </svg>
   );
 }
@@ -114,13 +145,12 @@ function JerseyIcon({ colour = "gold", size = 20 }: { colour?: 'gold' | 'white';
 // ── CricHeroes Icon ───────────────────────────────────────────────
 function CricHeroesIcon({ size = 20 }: { size?: number }) {
   return (
-    <img
-      src="/cricheroes-logo.jpg"
-      alt="CricHeroes"
-      width={size}
-      height={size}
-      style={{ borderRadius: "50%", objectFit: "cover" }}
-    />
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="20" cy="20" r="19" fill="#1A1A2E"/>
+      <circle cx="20" cy="20" r="19" fill="none" stroke="#E63946" strokeWidth="1.5"/>
+      {/* stylised CH monogram */}
+      <text x="20" y="26" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="bold" fontSize="14" fill="#E63946">CH</text>
+    </svg>
   );
 }
 
@@ -164,7 +194,7 @@ function jerseyLabel(ballType: 'red' | 'white' | 'pink'): string {
 
 // ── Slot label ────────────────────────────────────────────────────
 function slotLabel(slot: string): string {
-  const map: Record<string, string> = { "07:30": "7:30 AM", "10:30": "10:30 AM", "12:30": "12:30 PM", "14:30": "2:30 PM" };
+  const map: Record<string, string> = { "07:30": "7:15 AM", "10:30": "10:15 AM", "12:30": "12:15 PM", "14:30": "2:15 PM" };
   return map[slot] || slot;
 }
 
@@ -181,19 +211,15 @@ type BookingProp = {
   format: string
   opponent_name?: string | null
   cricheroes_url?: string | null
-  tournament?: {
-    name: string
-    ball_type: 'red' | 'white' | 'pink'
-    ground?: { name: string; maps_url: string; hospital_url: string } | null
-  } | null
+  tournament?: { name: string; ball_type: 'red' | 'white' | 'pink' } | null
+  ground?: { name: string; maps_url: string; hospital_url: string } | null
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
-  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament } = booking;
-  const ballType  = tournament?.ball_type || "red";
+  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, ground } = booking;
+  const ballType  = tournament?.ball_type  || "red";
   const jColour   = jerseyColour(ballType);
   const jLabel    = jerseyLabel(ballType);
-  const ground    = tournament?.ground;
   const hasGround = ground?.maps_url;
   const hasHosp   = ground?.hospital_url;
 
@@ -208,27 +234,24 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       gap: "10px",
       fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
       boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-      width: "100%",
+      maxWidth: "380px",
       position: "relative",
       overflow: "hidden",
     }}>
       {/* Gold top accent bar */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)" }} />
 
-      {/* Date + Slot + Format row */}
+      {/* Date + Time + Format row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: "12px", fontWeight: 600, color: "#C9A84C", letterSpacing: "0.05em" }}>
-          {formatDate(game_date)}
+          {formatDate(game_date)} · {slotLabel(slot_time)}
         </span>
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-          <span style={{
-            background: "#1E3A5F", color: "#93C5FD",
-            fontSize: "10px", fontWeight: 700,
-            padding: "2px 8px", borderRadius: "999px",
-            letterSpacing: "0.08em"
-          }}>{format}</span>
-          <span style={{ fontSize: "11px", color: "#6B7280" }}>{slotLabel(slot_time)}</span>
-        </div>
+        <span style={{
+          background: "#1E3A5F", color: "#93C5FD",
+          fontSize: "10px", fontWeight: 700,
+          padding: "2px 8px", borderRadius: "999px",
+          letterSpacing: "0.08em"
+        }}>{format}</span>
       </div>
 
       {/* Tournament + Opponent */}
@@ -278,7 +301,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             title="Open ground in Google Maps"
             style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", textDecoration: "none" }}>
             <MapPinIcon size={22} />
-            <span style={{ fontSize: "9px", color: "#6B7280" }}>Venue</span>
+            <span style={{ fontSize: "9px", color: "#6B7280" }}>Ground</span>
           </a>
         )}
 
@@ -302,31 +325,34 @@ const DEMO_BOOKINGS: BookingProp[] = [
     id: "1", game_date: "2026-04-05", slot_time: "07:30", format: "T30",
     opponent_name: "Royal Challengers XI",
     cricheroes_url: "https://cricheroes.in/match/123456",
-    tournament: { name: "Bengaluru Premier League", ball_type: "red", ground: {
+    tournament: { name: "Bengaluru Premier League", ball_type: "red" },
+    ground: {
       name: "Chinnaswamy Ground 2",
       maps_url: "https://maps.google.com/?q=M.Chinnaswamy+Stadium,Bengaluru",
       hospital_url: "https://maps.google.com/?q=Bowring+Hospital+Bengaluru",
-    }},
+    }
   },
   {
     id: "2", game_date: "2026-04-12", slot_time: "10:30", format: "T20",
     opponent_name: "Thunder Strikers",
     cricheroes_url: "https://cricheroes.in/match/789012",
-    tournament: { name: "Sunday Super League", ball_type: "white", ground: {
+    tournament: { name: "Sunday Super League", ball_type: "white" },
+    ground: {
       name: "KSCA Ground B",
       maps_url: "https://maps.google.com/?q=KSCA+Cricket+Ground+Bengaluru",
       hospital_url: "https://maps.google.com/?q=Victoria+Hospital+Bengaluru",
-    }},
+    }
   },
   {
     id: "3", game_date: "2026-04-19", slot_time: "14:30", format: "T20",
     opponent_name: "Night Owls CC",
     cricheroes_url: null,
-    tournament: { name: "Pink Ball Invitational", ball_type: "pink", ground: {
+    tournament: { name: "Pink Ball Invitational", ball_type: "pink" },
+    ground: {
       name: "Kanteerava Stadium",
       maps_url: "https://maps.google.com/?q=Kanteerava+Stadium+Bengaluru",
       hospital_url: "https://maps.google.com/?q=St+Johns+Hospital+Bengaluru",
-    }},
+    }
   },
 ];
 
