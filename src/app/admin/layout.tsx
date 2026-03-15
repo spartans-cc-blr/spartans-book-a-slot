@@ -34,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         <AdminSidebar />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8 pb-16 md:pb-8">
           {children}
         </main>
       </div>
