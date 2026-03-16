@@ -173,6 +173,8 @@ type BookingProp = {
   game_date: string
   slot_time: string
   format: string
+  // after: format: string
+  match_time?: string | null
   opponent_name?: string | null
   cricheroes_url?: string | null
   tournament?: {
@@ -183,7 +185,7 @@ type BookingProp = {
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
-  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament } = booking;
+  const { game_date, slot_time, match_time, format, opponent_name, cricheroes_url, tournament } = booking;
   const ballType  = tournament?.ball_type || "red";
   const jColour   = jerseyColour(ballType);
   const jLabel    = jerseyLabel(ballType);
@@ -212,7 +214,9 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       {/* Date + Slot + Format row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: "12px", fontWeight: 600, color: "#C9A84C", letterSpacing: "0.05em" }}>
-          {formatDate(game_date)} · {slotLabel(slot_time)}
+          {formatDate(game_date)} · {booking.match_time
+            ? booking.match_time.slice(0, 5).replace(/^0/, '') + ' ' + (parseInt(booking.match_time) < 12 ? 'AM' : 'PM')
+            : slotLabel(slot_time)}
         </span>
         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
           <span style={{
