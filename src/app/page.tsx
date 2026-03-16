@@ -20,7 +20,7 @@ const SLOT_DISPLAY: Record<SlotTime, string> = {
   '14:30': '2:30 PM',
 }
 
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '919900000000'
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WA_NUMBER ?? '919900000000'
 
 function buildWALink(date: string, slot: SlotTime, format: GameFormat): string {
   const text = encodeURIComponent(
