@@ -20,7 +20,7 @@ const SLOT_DISPLAY: Record<SlotTime, string> = {
   '14:30': '2:30 PM',
 }
 
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WA_NUMBER ?? '919900000000'
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '919900000000'
 
 function buildWALink(date: string, slot: SlotTime, format: GameFormat): string {
   const text = encodeURIComponent(
@@ -227,20 +227,22 @@ export default function SchedulePage() {
     formatFilter.T20 && !formatFilter.T30 ? 'T20' :
     !formatFilter.T20 && formatFilter.T30 ? 'T30' : null
 
-  // Filter weeks down to only open slots matching current filters
+  // Filter weeks — skip full weekends entirely, only show truly open slots
   const filteredWeeks = useMemo(() => {
-    return weeks.map(week => ({
-      ...week,
-      days: week.days.map(day => ({
-        ...day,
-        slots: day.slots.filter(slot => {
-          if (slot.status !== 'open') return false
-          if (!slotFilter[slot.time]) return false
-          const formats = ORGANISER_FORMATS[slot.time].filter(f => formatFilter[f])
-          return formats.length > 0
-        }),
-      })).filter(day => day.slots.length > 0),
-    })).filter(week => week.days.some(d => d.slots.length > 0))
+    return weeks
+      .filter(week => !week.weekendFull)
+      .map(week => ({
+        ...week,
+        days: week.days.map(day => ({
+          ...day,
+          slots: day.slots.filter(slot => {
+            if (slot.status !== 'open') return false
+            if (!slotFilter[slot.time]) return false
+            const formats = ORGANISER_FORMATS[slot.time].filter(f => formatFilter[f])
+            return formats.length > 0
+          }),
+        })).filter(day => day.slots.length > 0),
+      })).filter(week => week.days.some(d => d.slots.length > 0))
   }, [weeks, formatFilter, slotFilter])
 
   const totalSlots = filteredWeeks.reduce((acc, w) => acc + w.days.reduce((a, d) => a + d.slots.length, 0), 0)
@@ -269,16 +271,13 @@ export default function SchedulePage() {
 
       {/* Filter bar */}
       <div className="px-5 md:px-8 lg:px-10 py-4 border-b border-ink-4 bg-ink-2">
-        <div className="flex flex-col gap-3">
-          {/* Format filters */}
+        <div className="flex flex-col gap-2">
+          {/* Format + Slot filters in a single scrollable row on mobile */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 w-14">Format</span>
+            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">T20</span>
             <FilterToggle label="T20" checked={formatFilter.T20} onChange={() => setFormatFilter(f => ({ ...f, T20: !f.T20 }))} />
             <FilterToggle label="T30" checked={formatFilter.T30} onChange={() => setFormatFilter(f => ({ ...f, T30: !f.T30 }))} />
-          </div>
-          {/* Slot filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 w-14">Slots</span>
+            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 ml-2">Slots</span>
             {(['07:30', '10:30', '12:30', '14:30'] as SlotTime[]).map(t => (
               <FilterToggle key={t} label={SLOT_DISPLAY[t]} checked={slotFilter[t]}
                 onChange={() => setSlotFilter(f => ({ ...f, [t]: !f[t] }))} />
