@@ -30,6 +30,11 @@ export function getWeekendDates(dateStr: string): string[] {
   ]
 }
 
+function isWeekend(dateStr: string): boolean {
+  const day = parseISO(dateStr).getDay()
+  return day === 0 || day === 6 // 0 = Sunday, 6 = Saturday
+}
+
 function hasT20T30Conflict(
   format: GameFormat,
   slotTime: SlotTime,
@@ -56,29 +61,34 @@ export function validateBooking(
   const active = existingBookings.filter(b => b.status !== 'cancelled')
   const weekend = getWeekendDates(booking.game_date)
   const month   = getYearMonth(booking.game_date)
+  const isWeekendGame = isWeekend(booking.game_date)
 
-  // ── R1: Max 3 games per weekend ──────────────────────────────
-  const weekendGames = active.filter(b =>
-    weekend.includes(b.game_date) && b.status === 'confirmed'
-  )
-  if (weekendGames.length >= 3) {
-    errors.push({
-      rule: 'R1',
-      message: `The club already has 3 confirmed games this weekend. Maximum reached.`,
-    })
+  // ── R1: Max 3 games per weekend (weekends only) ───────────────
+  if (isWeekendGame) {
+    const weekendGames = active.filter(b =>
+      weekend.includes(b.game_date) && b.status === 'confirmed'
+    )
+    if (weekendGames.length >= 3) {
+      errors.push({
+        rule: 'R1',
+        message: `The club already has 3 confirmed games this weekend. Maximum reached.`,
+      })
+    }
   }
 
-  // ── R2: One game per captain per weekend (WARNING only) ──────
-  const captainWeekend = active.filter(b =>
-    weekend.includes(b.game_date) &&
-    b.captain_id === booking.captain_id &&
-    b.status === 'confirmed'
-  )
-  if (captainWeekend.length > 0) {
-    warnings.push({
-      rule: 'R2',
-      message: `${captainName} is already playing this weekend. Confirm only if the captain has agreed to play again.`,
-    })
+  // ── R2: One game per captain per weekend (weekends only, WARNING) ──
+  if (isWeekendGame) {
+    const captainWeekend = active.filter(b =>
+      weekend.includes(b.game_date) &&
+      b.captain_id === booking.captain_id &&
+      b.status === 'confirmed'
+    )
+    if (captainWeekend.length > 0) {
+      warnings.push({
+        rule: 'R2',
+        message: `${captainName} is already playing this weekend. Confirm only if the captain has agreed to play again.`,
+      })
+    }
   }
 
   // ── R3: Max 2 games per tournament per month ─────────────────
