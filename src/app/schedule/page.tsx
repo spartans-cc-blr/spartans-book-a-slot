@@ -87,47 +87,42 @@ function SlotCard({
       {/* Divider */}
       <div style={{ height: '1px', background: '#2D3748' }} />
 
-      {/* Format + WhatsApp side by side */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
-        {/* Format selector */}
-        <div style={{ display: 'flex', gap: '6px', flex: availableFormats.length === 1 ? '0 0 auto' : 1 }}>
-          {availableFormats.map(f => (
-            <button key={f} onClick={() => setSelectedFormat(f)}
-              style={{
-                padding: '8px 14px', borderRadius: '8px', border: '1px solid',
-                borderColor: selectedFormat === f ? '#C9A84C' : '#374151',
-                background: selectedFormat === f ? 'rgba(201,168,76,0.1)' : '#1F2937',
-                color: selectedFormat === f ? '#C9A84C' : '#6B7280',
-                fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s',
-                whiteSpace: 'nowrap',
-              }}>
-              {f}
-            </button>
-          ))}
-        </div>
-
-        {/* WhatsApp button */}
-        <a
-          href={waLink ?? '#'}
-          onClick={e => { if (!waLink) e.preventDefault() }}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-            padding: '8px 12px', borderRadius: '8px',
-            background: waLink ? '#16a34a' : '#1F2937',
-            color: waLink ? 'white' : '#4B5563',
-            fontSize: '12px', fontWeight: 700,
-            textDecoration: 'none', transition: 'all 0.15s',
-            cursor: waLink ? 'pointer' : 'not-allowed',
-            border: waLink ? '1px solid #16a34a' : '1px solid #374151',
-            fontFamily: "'DM Sans', sans-serif",
-            whiteSpace: 'nowrap',
-          }}>
-          📲 {waLink ? 'Enquire on WhatsApp' : availableFormats.length > 1 ? 'Pick format first' : ''}
-        </a>
+      {/* Format selector */}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        {availableFormats.map(f => (
+          <button key={f} onClick={() => setSelectedFormat(f)}
+            style={{
+              flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid',
+              borderColor: selectedFormat === f ? '#C9A84C' : '#374151',
+              background: selectedFormat === f ? 'rgba(201,168,76,0.1)' : '#1F2937',
+              color: selectedFormat === f ? '#C9A84C' : '#6B7280',
+              fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+              fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s',
+            }}>
+            {f}
+          </button>
+        ))}
       </div>
+
+      {/* WhatsApp button — full width below */}
+      <a
+        href={waLink ?? '#'}
+        onClick={e => { if (!waLink) e.preventDefault() }}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          padding: '9px', borderRadius: '8px',
+          background: waLink ? '#16a34a' : '#1F2937',
+          color: waLink ? 'white' : '#4B5563',
+          fontSize: '12px', fontWeight: 700,
+          textDecoration: 'none', transition: 'all 0.15s',
+          cursor: waLink ? 'pointer' : 'not-allowed',
+          border: waLink ? '1px solid #16a34a' : '1px solid #374151',
+          fontFamily: "'DM Sans', sans-serif",
+        }}>
+        📲 {waLink ? 'WhatsApp to Book' : availableFormats.length > 1 ? 'Select a format first' : ''}
+      </a>
     </div>
   )
 }
@@ -224,9 +219,10 @@ export default function SchedulePage() {
     !formatFilter.T20 && formatFilter.T30 ? 'T30' : null
 
   // Filter weeks — skip full weekends entirely, only show truly open slots
+  // Double-check with gamesBooked >= 3 as safety net in case weekendFull flag is stale
   const filteredWeeks = useMemo(() => {
     return weeks
-      .filter(week => !week.weekendFull)
+      .filter(week => !week.weekendFull && week.gamesBooked < 3)
       .map(week => ({
         ...week,
         days: week.days.map(day => ({
@@ -375,8 +371,8 @@ export default function SchedulePage() {
                       {day.label}
                     </p>
 
-                    {/* Cards grid — 1 col mobile, 2 col tablet, 3 col desktop */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Cards grid — 1 col mobile, 2 col desktop */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
                       {day.slots.map(slot => {
                         const availableFormats = ORGANISER_FORMATS[slot.time].filter(f => formatFilter[f])
                         return (
