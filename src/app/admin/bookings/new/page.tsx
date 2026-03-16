@@ -213,7 +213,7 @@ export default function NewBookingPage() {
           <FormCard step={1} title={mode === 'reserved' ? 'Date & Slot' : 'Date & Format'}>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className="form-label">Game Date <span className="text-zinc-700">(Sat/Sun only)</span></label>
+                <label className="form-label">Game Date</label>
                 <input type="date" value={gameDate} onChange={e => { setGameDate(e.target.value); setSlotTime('') }}
                   className="form-input" />
               </div>
