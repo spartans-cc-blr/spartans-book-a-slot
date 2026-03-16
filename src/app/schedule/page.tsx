@@ -87,52 +87,47 @@ function SlotCard({
       {/* Divider */}
       <div style={{ height: '1px', background: '#2D3748' }} />
 
-      {/* Format selector */}
-      <div>
-        <p style={{ fontSize: '10px', color: '#6B7280', marginBottom: '6px', fontFamily: "'DM Sans', sans-serif", letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-          Match Format
-        </p>
-        <div style={{ display: 'flex', gap: '8px' }}>
+      {/* Format + WhatsApp side by side */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+        {/* Format selector */}
+        <div style={{ display: 'flex', gap: '6px', flex: availableFormats.length === 1 ? '0 0 auto' : 1 }}>
           {availableFormats.map(f => (
             <button key={f} onClick={() => setSelectedFormat(f)}
               style={{
-                flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid',
+                padding: '8px 14px', borderRadius: '8px', border: '1px solid',
                 borderColor: selectedFormat === f ? '#C9A84C' : '#374151',
                 background: selectedFormat === f ? 'rgba(201,168,76,0.1)' : '#1F2937',
                 color: selectedFormat === f ? '#C9A84C' : '#6B7280',
                 fontSize: '13px', fontWeight: 700, cursor: 'pointer',
                 fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
               }}>
               {f}
             </button>
           ))}
         </div>
-        {availableFormats.length === 1 && (
-          <p style={{ fontSize: '10px', color: '#4B5563', marginTop: '4px', fontFamily: "'DM Sans', sans-serif" }}>
-            {availableFormats[0] === 'T20' ? 'Only T20 available for this slot' : 'Only T30 available for this slot'}
-          </p>
-        )}
-      </div>
 
-      {/* WhatsApp button */}
-      <a
-        href={waLink ?? '#'}
-        onClick={e => { if (!waLink) e.preventDefault() }}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-          padding: '10px', borderRadius: '8px',
-          background: waLink ? '#16a34a' : '#1F2937',
-          color: waLink ? 'white' : '#4B5563',
-          fontSize: '13px', fontWeight: 700,
-          textDecoration: 'none', transition: 'all 0.15s',
-          cursor: waLink ? 'pointer' : 'not-allowed',
-          border: waLink ? 'none' : '1px solid #374151',
-          fontFamily: "'DM Sans', sans-serif",
-        }}>
-        📲 {waLink ? 'WhatsApp to Book' : 'Select a format first'}
-      </a>
+        {/* WhatsApp button */}
+        <a
+          href={waLink ?? '#'}
+          onClick={e => { if (!waLink) e.preventDefault() }}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            padding: '8px 12px', borderRadius: '8px',
+            background: waLink ? '#16a34a' : '#1F2937',
+            color: waLink ? 'white' : '#4B5563',
+            fontSize: '12px', fontWeight: 700,
+            textDecoration: 'none', transition: 'all 0.15s',
+            cursor: waLink ? 'pointer' : 'not-allowed',
+            border: waLink ? '1px solid #16a34a' : '1px solid #374151',
+            fontFamily: "'DM Sans', sans-serif",
+            whiteSpace: 'nowrap',
+          }}>
+          📲 {waLink ? 'Enquire on WhatsApp' : availableFormats.length > 1 ? 'Pick format first' : ''}
+        </a>
+      </div>
     </div>
   )
 }
@@ -207,6 +202,7 @@ export default function SchedulePage() {
   const [slotFilter,   setSlotFilter]   = useState<Record<SlotTime, boolean>>({
     '07:30': true, '10:30': true, '12:30': true, '14:30': true,
   })
+  const [filterOpen,   setFilterOpen]   = useState(false)
 
   useEffect(() => {
     fetch('/api/availability?weeks=13')
@@ -270,33 +266,68 @@ export default function SchedulePage() {
       </div>
 
       {/* Filter bar */}
-      <div className="px-5 md:px-8 lg:px-10 py-4 border-b border-ink-4 bg-ink-2">
-        <div className="flex flex-col gap-2">
-          {/* Format + Slot filters in a single scrollable row on mobile */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">T20</span>
-            <FilterToggle label="T20" checked={formatFilter.T20} onChange={() => setFormatFilter(f => ({ ...f, T20: !f.T20 }))} />
-            <FilterToggle label="T30" checked={formatFilter.T30} onChange={() => setFormatFilter(f => ({ ...f, T30: !f.T30 }))} />
-            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 ml-2">Slots</span>
-            {(['07:30', '10:30', '12:30', '14:30'] as SlotTime[]).map(t => (
-              <FilterToggle key={t} label={SLOT_DISPLAY[t]} checked={slotFilter[t]}
-                onChange={() => setSlotFilter(f => ({ ...f, [t]: !f[t] }))} />
-            ))}
-          </div>
-          {/* Reset + Download */}
-          <div className="flex items-center gap-3">
-            {!isDefault && (
-              <button onClick={resetFilters}
-                className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 transition-colors underline underline-offset-2">
-                Reset filters
-              </button>
-            )}
-            <button onClick={() => exportCSV(weeks, formatFilter, slotFilter)}
-              className="ml-auto font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold hover:bg-gold/10 px-4 py-2 rounded transition-colors flex items-center gap-2">
-              ⬇ Download CSV
+      <div className="px-5 md:px-8 lg:px-10 py-3 border-b border-ink-4 bg-ink-2 relative">
+        <div className="flex items-center gap-3">
+          {/* Filter button */}
+          <button onClick={() => setFilterOpen(v => !v)}
+            className={`font-rajdhani text-xs font-bold tracking-wide px-4 py-2 rounded border transition-colors flex items-center gap-2
+              ${!isDefault ? 'border-gold text-gold bg-gold/10' : 'border-ink-5 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600'}`}>
+            ⚙ Filters {!isDefault && <span className="bg-gold text-ink text-[9px] font-black px-1.5 py-0.5 rounded-full">ON</span>}
+          </button>
+
+          {/* Reset — only when filters active */}
+          {!isDefault && (
+            <button onClick={resetFilters}
+              className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 transition-colors underline underline-offset-2">
+              Reset
             </button>
-          </div>
+          )}
+
+          {/* Download */}
+          <button onClick={() => exportCSV(weeks, formatFilter, slotFilter)}
+            className="ml-auto font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold hover:bg-gold/10 px-4 py-2 rounded transition-colors flex items-center gap-2">
+            ⬇ Export Available Slots
+          </button>
         </div>
+
+        {/* Dropdown panel */}
+        {filterOpen && (
+          <div className="absolute left-0 right-0 top-full z-40 bg-ink-2 border-b border-ink-5 px-5 md:px-8 lg:px-10 py-4 shadow-lg">
+            <div className="flex flex-col gap-4 max-w-lg">
+              {/* Format */}
+              <div>
+                <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-2">Format</p>
+                <div className="flex gap-2">
+                  <FilterToggle label="T20" checked={formatFilter.T20} onChange={() => setFormatFilter(f => ({ ...f, T20: !f.T20 }))} />
+                  <FilterToggle label="T30" checked={formatFilter.T30} onChange={() => setFormatFilter(f => ({ ...f, T30: !f.T30 }))} />
+                </div>
+              </div>
+              {/* Slots */}
+              <div>
+                <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-2">Time Slots</p>
+                <div className="flex gap-2 flex-wrap">
+                  {(['07:30', '10:30', '12:30', '14:30'] as SlotTime[]).map(t => (
+                    <FilterToggle key={t} label={SLOT_DISPLAY[t]} checked={slotFilter[t]}
+                      onChange={() => setSlotFilter(f => ({ ...f, [t]: !f[t] }))} />
+                  ))}
+                </div>
+              </div>
+              {/* Done button */}
+              <div className="flex items-center gap-3">
+                {!isDefault && (
+                  <button onClick={() => { resetFilters(); setFilterOpen(false) }}
+                    className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 transition-colors underline underline-offset-2">
+                    Reset filters
+                  </button>
+                )}
+                <button onClick={() => setFilterOpen(false)}
+                  className="ml-auto font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold text-gold px-4 py-2 rounded transition-colors">
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Content */}
