@@ -87,42 +87,51 @@ function SlotCard({
       {/* Divider */}
       <div style={{ height: '1px', background: '#2D3748' }} />
 
-      {/* Format selector */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        {availableFormats.map(f => (
-          <button key={f} onClick={() => setSelectedFormat(f)}
-            style={{
-              flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid',
-              borderColor: selectedFormat === f ? '#C9A84C' : '#374151',
-              background: selectedFormat === f ? 'rgba(201,168,76,0.1)' : '#1F2937',
-              color: selectedFormat === f ? '#C9A84C' : '#6B7280',
-              fontSize: '12px', fontWeight: 700, cursor: 'pointer',
-              fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s',
-            }}>
-            {f}
-          </button>
-        ))}
-      </div>
+      {/* Format left + WhatsApp icon right — same row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Format toggles */}
+        <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
+          {availableFormats.map(f => (
+            <button key={f} onClick={() => setSelectedFormat(f)}
+              style={{
+                flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid',
+                borderColor: selectedFormat === f ? '#C9A84C' : '#374151',
+                background: selectedFormat === f ? 'rgba(201,168,76,0.1)' : '#1F2937',
+                color: selectedFormat === f ? '#C9A84C' : '#6B7280',
+                fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s',
+              }}>
+              {f}
+            </button>
+          ))}
+        </div>
 
-      {/* WhatsApp button — full width below */}
-      <a
-        href={waLink ?? '#'}
-        onClick={e => { if (!waLink) e.preventDefault() }}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-          padding: '9px', borderRadius: '8px',
-          background: waLink ? '#16a34a' : '#1F2937',
-          color: waLink ? 'white' : '#4B5563',
-          fontSize: '12px', fontWeight: 700,
-          textDecoration: 'none', transition: 'all 0.15s',
-          cursor: waLink ? 'pointer' : 'not-allowed',
-          border: waLink ? '1px solid #16a34a' : '1px solid #374151',
-          fontFamily: "'DM Sans', sans-serif",
-        }}>
-        📲 {waLink ? 'WhatsApp to Book' : availableFormats.length > 1 ? 'Select a format first' : ''}
-      </a>
+        {/* WhatsApp icon button */}
+        <a
+          href={waLink ?? '#'}
+          onClick={e => { if (!waLink) e.preventDefault() }}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={waLink ? 'WhatsApp to Book' : 'Select a format first'}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            padding: '7px 14px', borderRadius: '8px', flexShrink: 0,
+            background: waLink ? '#16a34a' : '#1F2937',
+            color: waLink ? 'white' : '#4B5563',
+            fontSize: '12px', fontWeight: 700,
+            textDecoration: 'none', transition: 'all 0.15s',
+            cursor: waLink ? 'pointer' : 'not-allowed',
+            border: waLink ? '1px solid #16a34a' : '1px solid #374151',
+            fontFamily: "'DM Sans', sans-serif",
+            whiteSpace: 'nowrap',
+          }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.553 4.116 1.522 5.847L.057 23.882l6.197-1.625A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.368l-.36-.213-3.677.964.981-3.595-.234-.369A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+          </svg>
+          Book
+        </a>
+      </div>
     </div>
   )
 }
