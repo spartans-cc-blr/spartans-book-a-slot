@@ -22,6 +22,8 @@ export default function BookingDetailPage() {
   const [slotTime,      setSlotTime]      = useState<SlotTime | ''>('')
   const [venue,         setVenue]         = useState('')
   const [matchId,       setMatchId]       = useState('')
+  // after: const [matchId, setMatchId] = useState('')
+  const [matchTime, setMatchTime] = useState('')
   const [opponentName,  setOpponentName]  = useState('')
   const [cricheroes,    setCricheroes]    = useState('')
   const [notes,         setNotes]         = useState('')
@@ -45,6 +47,8 @@ export default function BookingDetailPage() {
         setSlotTime(b.slot_time)
         setVenue(b.venue ?? '')
         setMatchId(b.match_id ?? '')
+        // after: setMatchId(b.match_id ?? '')
+        setMatchTime(b.match_time ?? '')
         setOpponentName(b.opponent_name ?? '')
         setCricheroes(b.cricheroes_url ?? '')
         setNotes(b.notes ?? '')
@@ -68,6 +72,8 @@ export default function BookingDetailPage() {
         slot_time:       slotTime,
         venue:           venue || null,
         match_id:        matchId || null,
+        // after: match_id: matchId || null,
+        match_time: matchTime || null,
         opponent_name:   opponentName || null,
         cricheroes_url:  cricheroes || null,
         notes:           notes || null,
@@ -278,6 +284,14 @@ export default function BookingDetailPage() {
                 <label className="form-label">CricHeroes URL</label>
                 <input type="text" value={cricheroes} onChange={e => setCricheroes(e.target.value)}
                   placeholder="e.g. https://cricheroes.in/match/12345678" className="form-input" />
+              </div>
+              <div>
+                <label className="form-label">Match Start Time</label>
+                <input type="time" value={matchTime} onChange={e => setMatchTime(e.target.value)}
+                  className="form-input" />
+                <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                  Organiser's confirmed match start time — may differ from slot time.
+                </p>
               </div>
             </div>
           </FormCard>
