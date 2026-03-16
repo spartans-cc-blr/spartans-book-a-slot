@@ -17,7 +17,7 @@ export default async function PlayersPage() {
   const { data: bookings } = await supabase
     .from('bookings')
     .select(`
-      id, game_date, slot_time, format, opponent_name, cricheroes_url,
+      id, game_date, slot_time, match_time, format, opponent_name, cricheroes_url,
       tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
     `)
     .eq('status', 'confirmed')
