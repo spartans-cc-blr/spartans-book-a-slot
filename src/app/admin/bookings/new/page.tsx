@@ -507,7 +507,7 @@ export default function NewBookingPage() {
               <div className="font-rajdhani text-sm text-zinc-400 space-y-1.5 leading-relaxed">
                 {gameDate      && <p>📅 {gameDate}</p>}
                 {slotTime  && <p>🕐 Slot: {slotTime}{format ? ` — ${format}` : ''}</p>}
-                {matchTime && <p>⏰ Match starts: {matchTime}</p>}}
+                {matchTime && <p>⏰ Match starts: {matchTime}</p>}
                 {mode === 'confirmed' && captainId    && <p>👤 {captains.find(c => c.id === captainId)?.name}</p>}
                 {mode === 'confirmed' && tournamentId && <p>🏆 {tournaments.find(t => t.id === tournamentId)?.name}</p>}
                 {mode === 'confirmed' && venue        && <p>📍 {venue}</p>}
