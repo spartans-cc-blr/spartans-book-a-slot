@@ -36,6 +36,7 @@ export default function NewBookingPage() {
   const [opponentName,  setOpponentName]  = useState('')
   const [matchId,       setMatchId]       = useState('')
   const [cricHeroesUrl, setCricHeroesUrl] = useState('')
+  const [matchTime, setMatchTime] = useState('')
 
   // Reservation-only fields
   const [organiserName,  setOrganiserName]  = useState('')
@@ -70,7 +71,7 @@ export default function NewBookingPage() {
   useEffect(() => {
     setGameDate(''); setSlotTime(''); setFormat(''); setNotes('')
     setCaptainId(''); setTournamentId(''); setVenue('')
-    setOpponentName(''); setMatchId(''); setCricHeroesUrl('')
+    setOpponentName(''); setMatchId(''); setCricHeroesUrl(''); setMatchTime('')
     setOrganiserName(''); setOrganiserPhone('')
     setShowAddTournament(false); setNewTournamentName(''); setNewTournamentOrg('')
     setNewTournamentBall('red'); setNewTournamentGround('')
@@ -78,6 +79,36 @@ export default function NewBookingPage() {
     setRuleChecks(RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' })))
   }, [mode])
 
+  useEffect(() => {
+  if (!cricHeroesUrl) return
+  try {
+    const url = new URL(cricHeroesUrl)
+    const parts = url.pathname.split('/').filter(Boolean)
+    // parts: ['scorecard', '21399873', 'tournament-name', 'team-a-vs-team-b']
+
+    // Extract match ID
+    const idIndex = parts.indexOf('scorecard')
+    if (idIndex !== -1 && parts[idIndex + 1]) {
+      setMatchId(parts[idIndex + 1])
+    }
+
+    // Extract opponent name
+    const matchSegment = parts[parts.length - 1] // 'all-star-vs-spartans-cc-bengaluru'
+    if (matchSegment?.includes('-vs-')) {
+      const [teamA, teamB] = matchSegment.split('-vs-')
+      const opponent = teamA.includes('spartans') ? teamB : teamA
+      // Convert hyphen-case to Title Case
+      const formatted = opponent
+        .split('-')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')
+      setOpponentName(formatted)
+    }
+  } catch {
+    // Invalid URL — ignore
+  }
+}, [cricHeroesUrl])
+  
   const validate = useCallback(async () => {
     if (mode === 'reserved') {
       setRuleChecks(RULES.map(r => ({ ...r, status: 'pass', message: 'N/A for reservations' })))
@@ -154,6 +185,7 @@ export default function NewBookingPage() {
           opponent_name: opponentName || null,
           match_id:      matchId || null,
           cricheroes_url: cricHeroesUrl || null,
+          match_time: matchTime || null,
         }),
       })
       if (res.ok) {
@@ -384,6 +416,14 @@ export default function NewBookingPage() {
                       <p className="font-rajdhani text-xs text-zinc-600 mt-1">Can be added later once organiser creates the match in CricHeroes.</p>
                     </div>
                   </div>
+                  <div>
+                    <label className="form-label">Match Start Time</label>
+                    <input type="time" value={matchTime} onChange={e => setMatchTime(e.target.value)}
+                      className="form-input" />
+                    <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                      Organiser's confirmed start time — may differ from slot time.
+                    </p>
+                  </div>
                 </FormCard>
               )}
             </>
@@ -466,7 +506,8 @@ export default function NewBookingPage() {
               </p>
               <div className="font-rajdhani text-sm text-zinc-400 space-y-1.5 leading-relaxed">
                 {gameDate      && <p>📅 {gameDate}</p>}
-                {slotTime      && <p>🕐 {slotTime}{format ? ` — ${format}` : ''}</p>}
+                {slotTime  && <p>🕐 Slot: {slotTime}{format ? ` — ${format}` : ''}</p>}
+                {matchTime && <p>⏰ Match starts: {matchTime}</p>}>}
                 {mode === 'confirmed' && captainId    && <p>👤 {captains.find(c => c.id === captainId)?.name}</p>}
                 {mode === 'confirmed' && tournamentId && <p>🏆 {tournaments.find(t => t.id === tournamentId)?.name}</p>}
                 {mode === 'confirmed' && venue        && <p>📍 {venue}</p>}
