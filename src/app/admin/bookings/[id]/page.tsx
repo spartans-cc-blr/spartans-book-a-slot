@@ -13,7 +13,6 @@ export default function BookingDetailPage() {
   const [loading,      setLoading]      = useState(true)
   const [saving,       setSaving]       = useState(false)
   const [saveError,    setSaveError]    = useState('')
-  const [saveSuccess,  setSaveSuccess]  = useState(false)
 
   // Editable fields
   const [captainId,     setCaptainId]     = useState('')
@@ -302,11 +301,6 @@ export default function BookingDetailPage() {
           {saveError && (
             <div className="bg-red-950 border border-red-800 text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
               {saveError}
-            </div>
-          )}
-          {saveSuccess && (
-            <div className="bg-emerald-950 border border-emerald-800 text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded">
-              ✓ Saved successfully.
             </div>
           )}
 
