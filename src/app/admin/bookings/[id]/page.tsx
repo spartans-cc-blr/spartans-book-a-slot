@@ -83,10 +83,7 @@ export default function BookingDetailPage() {
       }),
     })
     if (res.ok) {
-      const d = await res.json()
-      setBooking(d.booking)
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
+      router.push('/admin?saved=1')
     } else {
       const d = await res.json()
       setSaveError(d.error ?? 'Something went wrong.')
