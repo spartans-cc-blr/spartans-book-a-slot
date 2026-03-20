@@ -1,5 +1,6 @@
 import NextAuth, { type NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
+import { createServiceClient } from '@/lib/supabase'
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '')
   .split(',')
@@ -14,38 +15,52 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    // Only allow the club Gmail (and any additional admin emails) to sign in
+    // Allow anyone to sign in — player lookup happens in jwt callback
     async signIn({ user }) {
-      const email = user.email?.toLowerCase() ?? ''
-      if (!ADMIN_EMAILS.includes(email)) {
-        // Not an authorised admin — block sign in
-        return false
-      }
       return true
+    },
+
+    async jwt({ token, user }) {
+      // On first sign-in, look up player in DB
+      if (user?.email) {
+        const supabase = createServiceClient()
+        const { data: player } = await supabase
+          .from('players')
+          .select('id, name, is_captain, status, active, photo_url')
+          .eq('gmail_id', user.email.toLowerCase())
+          .single()
+
+        token.playerId    = player?.id ?? null
+        token.playerName  = player?.name ?? null
+        token.isCaptain   = player?.is_captain ?? false
+        token.playerStatus = player?.status ?? null
+        token.isAdmin     = ADMIN_EMAILS.includes(user.email.toLowerCase())
+        token.photoUrl    = player?.photo_url ?? null
+      }
+      return token
     },
 
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).isAdmin = ADMIN_EMAILS.includes(
-          session.user.email?.toLowerCase() ?? ''
-        )
+        (session.user as any).playerId     = token.playerId
+        ;(session.user as any).playerName  = token.playerName
+        ;(session.user as any).isCaptain   = token.isCaptain
+        ;(session.user as any).playerStatus = token.playerStatus
+        ;(session.user as any).isAdmin     = token.isAdmin
+        ;(session.user as any).photoUrl    = token.photoUrl
       }
       return session
-    },
-
-    async jwt({ token, user }) {
-      return token
     },
   },
 
   pages: {
-    signIn:  '/login',
-    error:   '/login',    // Redirect here on auth errors (e.g. unauthorised email)
+    signIn: '/login',
+    error:  '/login',
   },
 
   session: {
     strategy: 'jwt',
-    maxAge:   8 * 60 * 60,    // 8 hours
+    maxAge:   8 * 60 * 60,
   },
 }
 
