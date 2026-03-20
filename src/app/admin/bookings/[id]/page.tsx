@@ -13,7 +13,7 @@ export default function BookingDetailPage() {
   const [loading,      setLoading]      = useState(true)
   const [saving,       setSaving]       = useState(false)
   const [saveError,    setSaveError]    = useState('')
-
+  const [saveSuccess,  setSaveSuccess]  = useState(false)
   // Editable fields
   const [captainId,     setCaptainId]     = useState('')
   const [tournamentId,  setTournamentId]  = useState('')
@@ -82,7 +82,8 @@ export default function BookingDetailPage() {
       }),
     })
     if (res.ok) {
-      router.push('/admin?saved=1')
+      setSaveSuccess(true)
+      setTimeout(() => router.push('/admin?saved=1'), 1500)
     } else {
       const d = await res.json()
       setSaveError(d.error ?? 'Something went wrong.')
@@ -303,7 +304,11 @@ export default function BookingDetailPage() {
               {saveError}
             </div>
           )}
-
+          {saveSuccess && (
+            <div className="bg-emerald-950 border border-emerald-800 text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded">
+              ✓ Saved successfully.
+            </div>
+          )}
           <div className="flex gap-3 justify-between">
             <button onClick={handleCancel}
               className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 px-4 py-2.5 rounded transition-colors">
