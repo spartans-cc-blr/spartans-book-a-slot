@@ -26,6 +26,7 @@ type Player = {
   wallet_balance: number
   active: boolean
   is_captain: boolean
+  status: 'active' | 'inactive' | 'expelled'
   cricheroes_url: string | null
   fee_exemptions?: FeeExemption[]
 }
@@ -52,7 +53,7 @@ export default function AdminPlayersPage() {
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
   const [search,      setSearch]      = useState('')
-  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('active')
+  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive' | 'expelled'>('active')
 
   const [addForm, setAddForm] = useState({
     name: '', gmail_id: '', whatsapp: '', dob: '', jersey_name: '',
@@ -67,7 +68,13 @@ export default function AdminPlayersPage() {
   }, [])
 
   const filtered = players
-    .filter(p => filterActive === 'all' ? true : filterActive === 'active' ? p.active : !p.active)
+    .filter(p => {
+      if (filterActive === 'all') return true
+      if (filterActive === 'expelled') return p.status === 'expelled'
+      if (filterActive === 'active') return p.active && p.status !== 'expelled'
+      if (filterActive === 'inactive') return !p.active && p.status !== 'expelled'
+      return true
+    })
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.whatsapp?.includes(search) || p.gmail_id?.toLowerCase().includes(search.toLowerCase()))
 
@@ -149,6 +156,18 @@ export default function AdminPlayersPage() {
     setSaving(false)
   }
 
+  async function expelPlayer(id: string, name: string) {
+    if (!confirm(`Are you sure you want to expel ${name}? This cannot be undone easily.`)) return
+    const res = await fetch('/api/players', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status: 'expelled', active: false }),
+    })
+    if (res.ok) {
+      setPlayers(prev => prev.map(p => p.id === id ? { ...p, status: 'expelled', active: false } : p))
+    }
+  }
+
   async function endExemption(playerId: string, exemptionId: string) {
     const today = new Date().toISOString().split('T')[0]
     const res = await fetch('/api/players/exemptions', {
@@ -186,7 +205,7 @@ export default function AdminPlayersPage() {
           placeholder="Search name, email or phone..."
           className="form-input flex-1 min-w-[200px]" />
         <div className="flex border border-ink-5 rounded overflow-hidden">
-          {(['active', 'inactive', 'all'] as const).map(f => (
+          {(['active', 'inactive', 'expelled', 'all'] as const).map(f => (
             <button key={f} onClick={() => setFilterActive(f)}
               className={`px-3 py-1.5 font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
                 ${filterActive === f ? 'bg-gold-dim text-gold' : 'bg-ink-4 text-zinc-500 hover:text-zinc-300'}`}>
@@ -432,15 +451,25 @@ export default function AdminPlayersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`font-rajdhani text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm border
-                        ${p.active ? 'bg-emerald-950 border-emerald-800 text-emerald-400' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>
-                        {p.active ? 'Active' : 'Inactive'}
+                        ${p.status === 'expelled' ? 'bg-red-950 border-red-800 text-red-400' :
+                          p.active ? 'bg-emerald-950 border-emerald-800 text-emerald-400' :
+                          'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>
+                        {p.status === 'expelled' ? 'Expelled' : p.active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <button onClick={() => startEdit(p)}
-                        className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
-                        Edit
-                      </button>
+                      <div className="flex gap-1">
+                        <button onClick={() => startEdit(p)}
+                          className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
+                          Edit
+                        </button>
+                        {p.status !== 'expelled' && (
+                          <button onClick={() => expelPlayer(p.id, p.name)}
+                            className="font-rajdhani text-xs text-zinc-600 hover:text-red-400 border border-ink-5 hover:border-red-800 px-2 py-1 rounded transition-colors">
+                            Expel
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
