@@ -275,7 +275,7 @@ export default function AdminPlayersPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-ink-5 bg-ink-4">
-                {['Player', 'Contact', 'Skills', 'Jersey', 'Wallet', 'Status', ''].map(h => (
+                {['Player', 'Contact', 'Skills', 'Blood Grp', 'Wallet', 'Status', ''].map(h => (
                   <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -435,8 +435,8 @@ export default function AdminPlayersPage() {
                       <p className="font-rajdhani text-xs text-zinc-600 truncate max-w-[140px]">{p.gmail_id ?? '—'}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-rajdhani text-xs text-zinc-400">{p.primary_skill ?? '—'}</p>
-                      {p.secondary_skill && <p className="font-rajdhani text-xs text-zinc-600">{p.secondary_skill}</p>}
+                      <p className="font-rajdhani text-xs text-zinc-400 max-w-[120px] truncate">{p.primary_skill ?? '—'}</p>
+                      {p.secondary_skill && <p className="font-rajdhani text-xs text-zinc-600 max-w-[120px] truncate">{p.secondary_skill}</p>}
                     </td>
                     <td className="px-4 py-3 font-rajdhani text-xs text-zinc-400">{p.blood_group ?? '—'}</td>
                     <td className="px-4 py-3">
