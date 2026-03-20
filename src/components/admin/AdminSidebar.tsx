@@ -14,6 +14,7 @@ const NAV = [
   { href: '/admin/grounds',      label: 'Grounds',        icon: '📍' },
   { href: '/schedule',           label: 'Public View',    icon: '🌐', section: 'Views' },
   { href: '/fixtures',           label: 'Fixtures',       icon: '🏏' },
+  { href: '/admin/players',      label: 'Players',        icon: '🏏' },
 ]
 
 export function AdminSidebar() {
