@@ -6,8 +6,13 @@ import { AdminSidebar } from '@/components/admin/AdminSidebar'
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
 
+  // Must be logged in AND be an admin
   if (!session) {
     redirect('/login')
+  }
+
+  if (!(session.user as any).isAdmin) {
+    redirect('/?error=unauthorized')
   }
 
   return (
