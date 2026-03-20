@@ -7,7 +7,11 @@ import type { Booking } from '@/types'
 
 export const revalidate = 0  // Always fresh for admin
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams?: { saved?: string; booked?: string; reserved?: string; blocked?: string }
+}) {
   const session  = await getServerSession(authOptions)
   const supabase = createServiceClient()
   const today    = format(new Date(), 'yyyy-MM-dd')
@@ -47,6 +51,12 @@ export default async function AdminDashboard() {
         </div>
       )}
 
+      {searchParams?.saved && (
+        <div className="bg-emerald-950 border border-emerald-800 text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded mb-5 flex items-center gap-3">
+          ✓ Booking saved successfully.
+        </div>
+      )}
+      
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {[
