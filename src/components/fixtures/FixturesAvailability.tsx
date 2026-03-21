@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 
-type AvailCode = 'Y' | 'O' | 'E' | 'L' | null
+type AvailCode = 'O' | 'Y' | 'E' | 'L' | null
 
 const BUTTONS: {
   code: AvailCode
@@ -15,6 +15,14 @@ const BUTTONS: {
   activeBorder: string
   hint: string
 }[] = [
+  {
+    code: 'O',
+    label: 'O',
+    activeBackground: '#3d2e00',
+    activeColor:      '#fbbf24',
+    activeBorder:     '#d97706',
+    hint: 'One game this weekend only',
+  },
   {
     code: 'Y',
     label: 'Y',
@@ -32,20 +40,12 @@ const BUTTONS: {
     hint: 'Either game today — one only',
   },
   {
-    code: 'O',
-    label: 'O',
-    activeBackground: '#3d2e00',
-    activeColor:      '#fbbf24',
-    activeBorder:     '#d97706',
-    hint: 'One game this weekend only',
-  },
-  {
     code: 'L',
     label: 'L',
     activeBackground: '#2e1a47',
     activeColor:      '#c084fc',
     activeBorder:     '#7e22ce',
-    hint: 'On leave this weekend',
+    hint: 'On leave this slot',
   },
 ]
 
