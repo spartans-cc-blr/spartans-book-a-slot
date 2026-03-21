@@ -70,11 +70,11 @@ export default function BookingDetailPage() {
         format:          format || null,
         slot_time:       slotTime,
         venue:           venue || null,
-        match_id:        matchId || null,
+        match_id:        tournamentId ? (matchId || null) : null,
         // after: match_id: matchId || null,
         match_time: matchTime || null,
-        opponent_name:   opponentName || null,
-        cricheroes_url:  cricheroes || null,
+        opponent_name:   tournamentId ? (opponentName || null) : null,
+        cricheroes_url:  tournamentId ? (cricheroes || null) : null,
         notes:           notes || null,
         organiser_name:  organiserName || null,
         organiser_phone: organiserPhone || null,
@@ -258,46 +258,53 @@ export default function BookingDetailPage() {
             </select>
           </FormCard>
 
-          {/* Match Details */}
-          <FormCard title="Match Details">
+          {/* Venue & Notes */}
+          <FormCard title="Venue & Notes">
             <div className="space-y-3">
-              <div>
-                <label className="form-label">Opponent Name</label>
-                <input type="text" value={opponentName} onChange={e => setOpponentName(e.target.value)}
-                  placeholder="e.g. Challengers CC" className="form-input" />
-              </div>
               <div>
                 <label className="form-label">Venue</label>
                 <input type="text" value={venue} onChange={e => setVenue(e.target.value)}
                   placeholder="e.g. Stellar Cricket Ground, HSR Layout" className="form-input" />
               </div>
               <div>
-                <label className="form-label">CricHeroes Match ID</label>
-                <input type="text" value={matchId} onChange={e => setMatchId(e.target.value)}
-                  placeholder="e.g. 12345678" className="form-input" />
-                <p className="font-rajdhani text-xs text-zinc-600 mt-1">Enter after organiser creates match in CricHeroes</p>
-              </div>
-              <div>
-                <label className="form-label">CricHeroes URL</label>
-                <input type="text" value={cricheroes} onChange={e => setCricheroes(e.target.value)}
-                  placeholder="e.g. https://cricheroes.in/match/12345678" className="form-input" />
-              </div>
-              <div>
-                <label className="form-label">Match Start Time</label>
-                <input type="time" value={matchTime} onChange={e => setMatchTime(e.target.value)}
-                  className="form-input" />
-                <p className="font-rajdhani text-xs text-zinc-600 mt-1">
-                  Organiser's confirmed match start time — may differ from slot time.
-                </p>
+                <label className="form-label">Internal Notes <span className="text-zinc-700">(never shown publicly)</span></label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                  placeholder="Any notes for your reference..." className="form-input resize-none" />
               </div>
             </div>
           </FormCard>
 
-          {/* Notes */}
-          <FormCard title="Internal Notes">
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-              placeholder="Any notes for your reference..." className="form-input resize-none" />
-          </FormCard>
+          {/* Match Details — only visible when a tournament is selected */}
+          {tournamentId && (
+            <FormCard title="Match Details">
+              <div className="space-y-3">
+                <div>
+                  <label className="form-label">Opponent Name</label>
+                  <input type="text" value={opponentName} onChange={e => setOpponentName(e.target.value)}
+                    placeholder="e.g. Challengers CC" className="form-input" />
+                </div>
+                <div>
+                  <label className="form-label">CricHeroes Match ID</label>
+                  <input type="text" value={matchId} onChange={e => setMatchId(e.target.value)}
+                    placeholder="e.g. 12345678" className="form-input" />
+                  <p className="font-rajdhani text-xs text-zinc-600 mt-1">Enter after organiser creates match in CricHeroes</p>
+                </div>
+                <div>
+                  <label className="form-label">CricHeroes URL</label>
+                  <input type="text" value={cricheroes} onChange={e => setCricheroes(e.target.value)}
+                    placeholder="e.g. https://cricheroes.in/match/12345678" className="form-input" />
+                </div>
+                <div>
+                  <label className="form-label">Match Start Time</label>
+                  <input type="time" value={matchTime} onChange={e => setMatchTime(e.target.value)}
+                    className="form-input" />
+                  <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                    Organiser's confirmed match start time — may differ from slot time.
+                  </p>
+                </div>
+              </div>
+            </FormCard>
+          )}
 
           {saveError && (
             <div className="bg-red-950 border border-red-800 text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
@@ -338,7 +345,6 @@ export default function BookingDetailPage() {
               <p className="font-cinzel text-sm text-gold">📲 Notify via WhatsApp</p>
             </div>
             <div className="p-4 space-y-3">
-              {/* Organiser button */}
               {organiserWA ? (
                 <a href={organiserWA} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-2.5 w-full bg-[#25D366] hover:bg-[#1aaa52] text-white font-rajdhani font-bold text-sm tracking-wide px-4 py-3 rounded transition-colors">
@@ -349,7 +355,6 @@ export default function BookingDetailPage() {
                   Add organiser phone to enable WhatsApp notification
                 </div>
               )}
-              {/* Captain button */}
               {captainId ? (
                 <a href={captainWA} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-2.5 w-full bg-[#128C7E] hover:bg-[#0d7a6e] text-white font-rajdhani font-bold text-sm tracking-wide px-4 py-3 rounded transition-colors">
