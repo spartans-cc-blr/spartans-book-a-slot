@@ -1,38 +1,60 @@
 'use client'
-// FixturesAvailability.tsx — Sprint 2 fix
-// Bug fixed: previously called setResponse() before checking res.ok,
-// so the button appeared saved even when the API returned an error.
-// Now: only updates local state on confirmed success, shows the actual error.
+// FixturesAvailability.tsx — Sprint 2
+// Colours matched to Spartans Hub spreadsheet. N removed — blank = no response.
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 
-type AvailCode = 'Y' | 'N' | 'O' | 'E' | 'L' | null
+type AvailCode = 'Y' | 'O' | 'E' | 'L' | null
 
 const BUTTONS: {
   code: AvailCode
   label: string
+  activeBackground: string
   activeColor: string
-  activeText: string
-  borderColor: string
-  hint?: string
+  activeBorder: string
+  hint: string
 }[] = [
-  { code: 'Y', label: 'Y', activeColor: '#14532d', activeText: '#4ade80', borderColor: '#166634' },
-  { code: 'N', label: 'N', activeColor: '#450a0a', activeText: '#f87171', borderColor: '#7f1d1d' },
-  { code: 'O', label: 'O', activeColor: '#431407', activeText: '#fb923c', borderColor: '#9a3412',
-    hint: 'One game this weekend only' },
-  { code: 'E', label: 'E', activeColor: '#422006', activeText: '#fbbf24', borderColor: '#92400e',
-    hint: 'Either game today — one only' },
-  { code: 'L', label: 'L', activeColor: '#18181b', activeText: '#71717a', borderColor: '#3f3f46',
-    hint: 'On leave this weekend' },
+  {
+    code: 'Y',
+    label: 'Y',
+    activeBackground: '#1a4731',
+    activeColor:      '#4ade80',
+    activeBorder:     '#166534',
+    hint: 'Available',
+  },
+  {
+    code: 'E',
+    label: 'E',
+    activeBackground: '#1e3a5f',
+    activeColor:      '#60a5fa',
+    activeBorder:     '#1d4ed8',
+    hint: 'Either game today — one only',
+  },
+  {
+    code: 'O',
+    label: 'O',
+    activeBackground: '#3d2e00',
+    activeColor:      '#fbbf24',
+    activeBorder:     '#d97706',
+    hint: 'One game this weekend only',
+  },
+  {
+    code: 'L',
+    label: 'L',
+    activeBackground: '#2e1a47',
+    activeColor:      '#c084fc',
+    activeBorder:     '#7e22ce',
+    hint: 'On leave this weekend',
+  },
 ]
 
 interface Props {
-  bookingId:        string
-  slotDate?:        string
-  isPlayer:         boolean
-  isCaptain:        boolean
-  initialResponse:  string | null
+  bookingId:       string
+  slotDate?:       string
+  isPlayer:        boolean
+  isCaptain:       boolean
+  initialResponse: string | null
   weekendResponses?: Record<string, string>
   weekendBookings?:  { id: string; game_date: string; slot_time: string }[]
 }
@@ -43,9 +65,12 @@ export function FixturesAvailability({
   isCaptain,
   initialResponse,
 }: Props) {
-  const [response, setResponse] = useState<AvailCode>(initialResponse as AvailCode ?? null)
-  const [saving,   setSaving]   = useState(false)
-  const [error,    setError]    = useState<string | null>(null)
+  const [response, setResponse] = useState<AvailCode>(
+    // Treat any legacy N as null — blank
+    (initialResponse === 'N' ? null : initialResponse) as AvailCode ?? null
+  )
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState<string | null>(null)
 
   async function handleSelect(code: AvailCode) {
     if (!isPlayer || saving) return
@@ -57,7 +82,6 @@ export function FixturesAvailability({
 
     try {
       if (newResponse === null) {
-        // ── DELETE ───────────────────────────────────────────
         const res = await fetch('/api/player-availability', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -70,7 +94,6 @@ export function FixturesAvailability({
           setError(d.error ?? `Save failed (${res.status})`)
         }
       } else {
-        // ── POST / upsert ─────────────────────────────────────
         const res = await fetch('/api/player-availability', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -90,7 +113,7 @@ export function FixturesAvailability({
     }
   }
 
-  // ── Not a player — show sign-in prompt ────────────────────
+  // ── Not a player — sign-in prompt ────────────────────────────
   if (!isPlayer) {
     return (
       <div style={{
@@ -124,7 +147,7 @@ export function FixturesAvailability({
 
   const activeBtn = BUTTONS.find(b => b.code === response)
 
-  // ── Player availability row ────────────────────────────────
+  // ── Player availability row ───────────────────────────────────
   return (
     <div style={{
       marginTop: '-6px',
@@ -137,16 +160,15 @@ export function FixturesAvailability({
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <span style={{
           fontSize: '10px',
-          color: saving ? '#4B5563' : '#6B7280',
+          color: '#4B5563',
           fontFamily: "'DM Sans', sans-serif",
           flexShrink: 0,
-          marginRight: '2px',
-          minWidth: '52px',
+          minWidth: '56px',
         }}>
           {saving ? 'Saving…' : 'Available?'}
         </span>
 
-        <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
+        <div style={{ display: 'flex', gap: '5px', flex: 1 }}>
           {BUTTONS.map(btn => {
             const isActive = response === btn.code
             return (
@@ -154,14 +176,14 @@ export function FixturesAvailability({
                 key={btn.code}
                 onClick={() => handleSelect(btn.code)}
                 disabled={saving}
-                title={btn.hint ?? btn.label!}
+                title={btn.hint}
                 style={{
                   flex: 1,
-                  padding: '6px 4px',
+                  padding: '7px 4px',
                   borderRadius: '6px',
-                  border: `1px solid ${isActive ? btn.borderColor : '#374151'}`,
-                  background: isActive ? btn.activeColor : '#1F2937',
-                  color: isActive ? btn.activeText : '#6B7280',
+                  border: `1px solid ${isActive ? btn.activeBorder : '#374151'}`,
+                  background: isActive ? btn.activeBackground : '#1F2937',
+                  color: isActive ? btn.activeColor : '#4B5563',
                   fontSize: '12px',
                   fontWeight: 700,
                   cursor: saving ? 'wait' : 'pointer',
@@ -169,6 +191,8 @@ export function FixturesAvailability({
                   fontFamily: "'DM Sans', sans-serif",
                   outline: 'none',
                   opacity: saving ? 0.5 : 1,
+                  // Subtle glow on active
+                  boxShadow: isActive ? `0 0 0 1px ${btn.activeBorder}40` : 'none',
                 }}>
                 {btn.label}
               </button>
@@ -177,20 +201,21 @@ export function FixturesAvailability({
         </div>
       </div>
 
-      {/* Contextual hint for the selected code */}
-      {activeBtn?.hint && !error && !saving && (
+      {/* Hint for active code */}
+      {activeBtn && !error && !saving && (
         <p style={{
           fontSize: '10px',
-          color: '#9CA3AF',
+          color: activeBtn.activeColor,
+          opacity: 0.7,
           marginTop: '6px',
           fontFamily: "'DM Sans', sans-serif",
           lineHeight: 1.4,
         }}>
-          ℹ {activeBtn.hint}
+          {activeBtn.hint}
         </p>
       )}
 
-      {/* Actual API / network error — visible to the player */}
+      {/* Error */}
       {error && (
         <p style={{
           fontSize: '10px',
