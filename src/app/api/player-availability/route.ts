@@ -29,13 +29,14 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { booking_id, response } = body
 
-  if (!booking_id || !['Y', 'N', 'O', 'E', 'L'].includes(response)) {
+  // N removed — valid responses are Y, O, E, L only
+  if (!booking_id || !['Y', 'O', 'E', 'L'].includes(response)) {
     return NextResponse.json({ error: 'Invalid request — booking_id and valid response required' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
 
-  // Check if a row already exists for this player + booking
+  // Explicit SELECT then INSERT or UPDATE — avoids upsert/conflict issues
   const { data: existing } = await supabase
     .from('availability')
     .select('id')
@@ -46,7 +47,6 @@ export async function POST(req: NextRequest) {
   let result
 
   if (existing?.id) {
-    // Row exists — UPDATE it
     const { data, error } = await supabase
       .from('availability')
       .update({ response })
@@ -56,7 +56,6 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     result = data
   } else {
-    // No row — INSERT
     const { data, error } = await supabase
       .from('availability')
       .insert({ player_id: player.playerId, booking_id, response })
