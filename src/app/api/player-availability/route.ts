@@ -34,19 +34,39 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
-  const { data, error } = await supabase
+
+  // Check if a row already exists for this player + booking
+  const { data: existing } = await supabase
     .from('availability')
-    .upsert({
-      player_id:  player.playerId,
-      booking_id,
-      response,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'player_id,booking_id' })
-    .select()
+    .select('id')
+    .eq('player_id', player.playerId)
+    .eq('booking_id', booking_id)
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ availability: data })
+  let result
+
+  if (existing?.id) {
+    // Row exists — UPDATE it
+    const { data, error } = await supabase
+      .from('availability')
+      .update({ response })
+      .eq('id', existing.id)
+      .select()
+      .single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    result = data
+  } else {
+    // No row — INSERT
+    const { data, error } = await supabase
+      .from('availability')
+      .insert({ player_id: player.playerId, booking_id, response })
+      .select()
+      .single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    result = data
+  }
+
+  return NextResponse.json({ availability: result })
 }
 
 export async function DELETE(req: NextRequest) {
