@@ -63,6 +63,21 @@ function shortName(player: Player): string {
   return player.name.split(' ')[0]
 }
 
+// Format game_date ("2026-03-28") → "Mar 28, Sat"
+function formatColDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  const mon = d.toLocaleDateString('en-IN', { month: 'short' })
+  const day = d.getDate()
+  const dow = d.toLocaleDateString('en-IN', { weekday: 'short' })
+  return `${mon} ${day}, ${dow}`
+}
+
+// Truncate tournament name to ~10 chars for the rotated header
+function shortTourney(name: string | null | undefined): string {
+  if (!name) return '—'
+  return name.length > 12 ? name.slice(0, 11) + '…' : name
+}
+
 function isSharedPlayer(
   playerId: string,
   bookings: Booking[],
@@ -366,34 +381,61 @@ function MatrixView({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse" style={{ minWidth: Math.max(320, bookings.length * 100 + 112) }}>
-        {/* Header */}
+      <table className="w-full border-collapse" style={{ minWidth: Math.max(240, bookings.length * 48 + 112) }}>
+        {/* Header — rotated text keeps each slot column very narrow */}
         <thead>
           <tr className="bg-ink-4 border-b border-ink-5">
-            {/* Player col — narrower on mobile, wider on sm+ */}
-            <th className="px-2 py-3 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 w-28 sm:w-44 sticky left-0 bg-ink-4 z-10">
+            {/* Player col — sticky */}
+            <th className="px-2 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 w-28 sm:w-44 sticky left-0 bg-ink-4 z-10 align-bottom">
               Player
             </th>
-            {bookings.map(b => (
-              <th key={b.id} className="px-2 py-3 text-center font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600" style={{ minWidth: 90 }}>
-                <div>
-                  <span className="text-gold font-cinzel text-xs font-semibold">
-                    {SLOT_SHORT[b.slot_time]}
-                  </span>
-                  <span className="text-zinc-600 ml-1">{b.format}</span>
-                </div>
-                <div className="font-rajdhani text-[10px] text-zinc-600 font-normal normal-case truncate max-w-[110px]">
-                  {b.tournament?.name ?? '—'}
-                </div>
-                <div className="flex justify-center gap-1 mt-1">
-                  {(['Y', 'O', 'E'] as const).map(code =>
-                    counts[b.id][code] > 0
-                      ? <Chip key={code} code={code} count={counts[b.id][code]} />
-                      : null
-                  )}
-                </div>
-              </th>
-            ))}
+            {bookings.map(b => {
+              const ct = counts[b.id]
+              return (
+                <th key={b.id} className="bg-ink-4 z-10 align-bottom" style={{ width: 48, minWidth: 48, padding: 0 }}>
+                  {/* Count chips — horizontal row at top, always readable */}
+                  <div className="flex flex-col items-center gap-0.5 pt-1.5 pb-1">
+                    {(['Y', 'O', 'E'] as const).map(code =>
+                      ct[code] > 0 ? (
+                        <span
+                          key={code}
+                          className="font-rajdhani text-[9px] font-bold leading-none px-1 py-px rounded-sm"
+                          style={{
+                            background: RESP[code].bg,
+                            color: RESP[code].text,
+                            border: `1px solid ${RESP[code].border}`,
+                          }}>
+                          {ct[code]}{code}
+                        </span>
+                      ) : null
+                    )}
+                  </div>
+                  {/* Rotated text block — 3 lines: date/day · time format · tourney */}
+                  <div style={{
+                    writingMode: 'vertical-rl',
+                    transform: 'rotate(180deg)',
+                    whiteSpace: 'nowrap',
+                    paddingBottom: 8,
+                    paddingTop: 4,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    width: '100%',
+                  }}>
+                    <span className="font-cinzel text-[10px] font-semibold text-gold">
+                      {formatColDate(b.game_date)}
+                    </span>
+                    <span className="font-rajdhani text-[10px] font-bold text-zinc-400">
+                      {SLOT_DISPLAY[b.slot_time]} · {b.format}
+                    </span>
+                    <span className="font-rajdhani text-[10px] text-zinc-600">
+                      {shortTourney(b.tournament?.name)}
+                    </span>
+                  </div>
+                </th>
+              )
+            })}
           </tr>
         </thead>
 
@@ -456,23 +498,7 @@ function MatrixView({
           )}
         </tbody>
 
-        {/* Footer: totals */}
-        {activePlayers.length > 0 && (
-          <tfoot>
-            <tr className="bg-ink-4 border-t border-ink-5">
-              <td className="px-3 py-2 font-rajdhani text-[10px] font-bold tracking-wide uppercase text-zinc-600 sticky left-0 bg-ink-4">
-                Total available
-              </td>
-              {bookings.map(b => (
-                <td key={b.id} className="px-2 py-2 text-center">
-                  <span className="font-rajdhani text-sm font-bold text-emerald-400">
-                    {counts[b.id].total}
-                  </span>
-                </td>
-              ))}
-            </tr>
-          </tfoot>
-        )}
+        {/* No footer row — Y/O/E counts are in the rotated column headers */}
       </table>
     </div>
   )
