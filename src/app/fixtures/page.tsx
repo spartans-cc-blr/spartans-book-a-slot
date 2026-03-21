@@ -1,13 +1,11 @@
 // app/fixtures/page.tsx
-// Lifts weekendResponses into a shared client wrapper so
-// validation updates live across all cards on the same page.
 
 import { createServiceClient } from '@/lib/supabase'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { FixturesCard } from '@/components/fixtures/FixturesCard'
-import { FixturesWeekend } from '@/components/fixtures/FixturesWeekend'
+import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
 import { getISOWeek, getISOWeekYear, parseISO } from 'date-fns'
 import type { Metadata } from 'next'
 
@@ -51,12 +49,30 @@ export default async function FixturesPage() {
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'
   const isCaptain = isPlayer && !!player?.isCaptain
 
-  // Group bookings by ISO weekend
-  const weekendMap: Record<string, { id: string; game_date: string; slot_time: string }[]> = {}
+  // Group bookings by ISO weekend — preserving order
+  const weekendOrder: string[] = []
+  type BookingWithCard = {
+    id:              string
+    game_date:       string
+    slot_time:       string
+    initialResponse: string | null
+    cardData:        any
+  }
+  const weekendMap: Record<string, BookingWithCard[]> = {}
+
   for (const b of bookings ?? []) {
     const wk = weekKey((b as any).game_date)
-    if (!weekendMap[wk]) weekendMap[wk] = []
-    weekendMap[wk].push({ id: b.id, game_date: (b as any).game_date, slot_time: (b as any).slot_time })
+    if (!weekendMap[wk]) {
+      weekendOrder.push(wk)
+      weekendMap[wk] = []
+    }
+    weekendMap[wk].push({
+      id:              b.id,
+      game_date:       (b as any).game_date,
+      slot_time:       (b as any).slot_time,
+      initialResponse: existingResponses[b.id] ?? null,
+      cardData:        b,
+    })
   }
 
   return (
@@ -122,33 +138,26 @@ export default async function FixturesPage() {
       )}
 
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
-        {!bookings || bookings.length === 0 ? (
+        {weekendOrder.length === 0 ? (
           <p className="font-rajdhani text-zinc-500 text-sm">No upcoming fixtures confirmed yet. Check back soon.</p>
         ) : (
-          <div className="flex flex-col gap-4">
-            {(bookings as any[]).map(b => (
-              <div key={b.id}>
-                <FixturesCard booking={b} />
-                {/* FixturesWeekend is a client component that holds shared weekend state */}
-                <FixturesWeekend
-                  bookingId={b.id}
-                  slotDate={b.game_date}
-                  isPlayer={isPlayer}
-                  isCaptain={isCaptain}
-                  initialResponse={existingResponses[b.id] ?? null}
-                  weekendBookings={weekendMap[weekKey(b.game_date)] ?? []}
-                  initialWeekendResponses={
-                    // Pass only the responses for this weekend
-                    Object.fromEntries(
-                      (weekendMap[weekKey(b.game_date)] ?? [])
-                        .filter(wb => existingResponses[wb.id])
-                        .map(wb => [wb.id, existingResponses[wb.id]])
-                    )
-                  }
-                />
-              </div>
-            ))}
-          </div>
+          // FixturesWeekendGroup renders FixturesCard + availability row for every booking
+          // in the weekend. One group per weekend = shared weekendResponses state.
+          weekendOrder.map(wk => (
+            <FixturesWeekendGroup
+              key={wk}
+              isPlayer={isPlayer}
+              isCaptain={isCaptain}
+              bookings={weekendMap[wk]}
+              initialWeekendResponses={
+                Object.fromEntries(
+                  weekendMap[wk]
+                    .filter(b => b.initialResponse)
+                    .map(b => [b.id, b.initialResponse!])
+                )
+              }
+            />
+          ))
         )}
       </div>
 
