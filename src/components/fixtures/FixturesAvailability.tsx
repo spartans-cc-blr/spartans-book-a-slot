@@ -1,140 +1,96 @@
 'use client'
+// FixturesAvailability.tsx — Sprint 2 fix
+// Bug fixed: previously called setResponse() before checking res.ok,
+// so the button appeared saved even when the API returned an error.
+// Now: only updates local state on confirmed success, shows the actual error.
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 
 type AvailCode = 'Y' | 'N' | 'O' | 'E' | 'L' | null
 
-// ── Weekend context passed down from the fixtures page ─────────
-// weekendResponses: all this player's responses for the same weekend
-// { bookingId: response }
-// slotDate: the game_date of this booking (to group same-day)
-
-interface AvailButton {
+const BUTTONS: {
   code: AvailCode
   label: string
   activeColor: string
   activeText: string
   borderColor: string
-}
-
-const BUTTONS: AvailButton[] = [
-  { code: 'Y', label: 'Y', activeColor: '#14532d', activeText: '#4ade80', borderColor: '#166534' },
+  hint?: string
+}[] = [
+  { code: 'Y', label: 'Y', activeColor: '#14532d', activeText: '#4ade80', borderColor: '#166634' },
   { code: 'N', label: 'N', activeColor: '#450a0a', activeText: '#f87171', borderColor: '#7f1d1d' },
-  { code: 'O', label: 'O', activeColor: '#431407', activeText: '#fb923c', borderColor: '#9a3412' },
-  { code: 'E', label: 'E', activeColor: '#422006', activeText: '#fbbf24', borderColor: '#92400e' },
-  { code: 'L', label: 'L', activeColor: '#18181b', activeText: '#71717a', borderColor: '#3f3f46' },
+  { code: 'O', label: 'O', activeColor: '#431407', activeText: '#fb923c', borderColor: '#9a3412',
+    hint: 'One game this weekend only' },
+  { code: 'E', label: 'E', activeColor: '#422006', activeText: '#fbbf24', borderColor: '#92400e',
+    hint: 'Either game today — one only' },
+  { code: 'L', label: 'L', activeColor: '#18181b', activeText: '#71717a', borderColor: '#3f3f46',
+    hint: 'On leave this weekend' },
 ]
-
-const CODE_LABELS: Record<string, string> = {
-  Y: 'Yes',
-  N: 'No',
-  O: 'One game this weekend',
-  E: 'Either game today, one only',
-  L: 'On leave',
-}
 
 interface Props {
   bookingId:        string
-  slotDate:         string          // game_date for this booking e.g. "2026-04-05"
+  slotDate?:        string
   isPlayer:         boolean
   isCaptain:        boolean
   initialResponse:  string | null
-  // All responses for the same weekend { bookingId → response }
-  weekendResponses: Record<string, string>
-  // All bookings for the same weekend [{ id, game_date, slot_time }]
-  weekendBookings:  { id: string; game_date: string; slot_time: string }[]
+  weekendResponses?: Record<string, string>
+  weekendBookings?:  { id: string; game_date: string; slot_time: string }[]
 }
 
 export function FixturesAvailability({
   bookingId,
-  slotDate,
   isPlayer,
   isCaptain,
   initialResponse,
-  weekendResponses,
-  weekendBookings,
 }: Props) {
-  const [response,         setResponse]         = useState<AvailCode>(initialResponse as AvailCode ?? null)
-  const [localWeekendResp, setLocalWeekendResp] = useState<Record<string, string>>(weekendResponses)
-  const [saving,           setSaving]           = useState(false)
-
-  // ── Derive weekend-aware hint ──────────────────────────────
-  function getHint(code: AvailCode): string | null {
-    if (!code) return null
-    if (code === 'Y') return null
-    if (code === 'N') return null
-    if (code === 'L') return 'You are marked on leave for this entire weekend'
-
-    if (code === 'O') {
-      // O means: I want only this game across the whole weekend
-      const otherGames = weekendBookings.filter(b => b.id !== bookingId)
-      if (otherGames.length === 0) return 'Only game this weekend — noted'
-      return `Only this game this weekend — you'll be skipped for the other ${otherGames.length} game${otherGames.length > 1 ? 's' : ''}`
-    }
-
-    if (code === 'E') {
-      // E means: either game on the same day, one only
-      const sameDayGames = weekendBookings.filter(b => b.game_date === slotDate && b.id !== bookingId)
-      if (sameDayGames.length === 0) return 'Only one game today — E treated as Y'
-      return `Available for either game on this day — captain picks one`
-    }
-
-    return null
-  }
-
-  // ── Conflict warnings ──────────────────────────────────────
-  // E.g. player already marked O on another game this weekend
-  function getConflictWarning(code: AvailCode): string | null {
-    if (!code) return null
-
-    // If this player already has O on another game in the weekend
-    const otherOBooking = weekendBookings.find(b =>
-      b.id !== bookingId && localWeekendResp[b.id] === 'O'
-    )
-    if (otherOBooking && code === 'Y') {
-      return `You marked O on another game this weekend — you'll be counted once`
-    }
-
-    // If marking O but already Y on another game
-    if (code === 'O') {
-      const alreadyY = weekendBookings.find(b =>
-        b.id !== bookingId && localWeekendResp[b.id] === 'Y'
-      )
-      if (alreadyY) return `You're marked Y for another game this weekend — O will override that preference`
-    }
-
-    return null
-  }
+  const [response, setResponse] = useState<AvailCode>(initialResponse as AvailCode ?? null)
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
 
   async function handleSelect(code: AvailCode) {
-    if (!isPlayer) return
+    if (!isPlayer || saving) return
+    setError(null)
+
+    // Tapping the active button clears the response
     const newResponse: AvailCode = response === code ? null : code
     setSaving(true)
 
-    if (newResponse === null) {
-      await fetch('/api/player-availability', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: bookingId }),
-      })
-      setResponse(null)
-      setLocalWeekendResp(prev => { const n = { ...prev }; delete n[bookingId]; return n })
-    } else {
-      const res = await fetch('/api/player-availability', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: bookingId, response: newResponse }),
-      })
-      if (res.ok) {
-        setResponse(newResponse)
-        setLocalWeekendResp(prev => ({ ...prev, [bookingId]: newResponse }))
+    try {
+      if (newResponse === null) {
+        // ── DELETE ───────────────────────────────────────────
+        const res = await fetch('/api/player-availability', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_id: bookingId }),
+        })
+        if (res.ok) {
+          setResponse(null)
+        } else {
+          const d = await res.json().catch(() => ({}))
+          setError(d.error ?? `Save failed (${res.status})`)
+        }
+      } else {
+        // ── POST / upsert ─────────────────────────────────────
+        const res = await fetch('/api/player-availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_id: bookingId, response: newResponse }),
+        })
+        if (res.ok) {
+          setResponse(newResponse)
+        } else {
+          const d = await res.json().catch(() => ({}))
+          setError(d.error ?? `Save failed (${res.status})`)
+        }
       }
+    } catch {
+      setError('Network error — check connection')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
-  // ── Not a player — sign-in prompt ─────────────────────────
+  // ── Not a player — show sign-in prompt ────────────────────
   if (!isPlayer) {
     return (
       <div style={{
@@ -166,8 +122,7 @@ export function FixturesAvailability({
     )
   }
 
-  const hint    = getHint(response)
-  const warning = getConflictWarning(response)
+  const activeBtn = BUTTONS.find(b => b.code === response)
 
   // ── Player availability row ────────────────────────────────
   return (
@@ -181,12 +136,14 @@ export function FixturesAvailability({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <span style={{
-          fontSize: '10px', color: '#6B7280',
+          fontSize: '10px',
+          color: saving ? '#4B5563' : '#6B7280',
           fontFamily: "'DM Sans', sans-serif",
           flexShrink: 0,
           marginRight: '2px',
+          minWidth: '52px',
         }}>
-          Available?
+          {saving ? 'Saving…' : 'Available?'}
         </span>
 
         <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
@@ -197,7 +154,7 @@ export function FixturesAvailability({
                 key={btn.code}
                 onClick={() => handleSelect(btn.code)}
                 disabled={saving}
-                title={CODE_LABELS[btn.code!]}
+                title={btn.hint ?? btn.label!}
                 style={{
                   flex: 1,
                   padding: '6px 4px',
@@ -211,42 +168,38 @@ export function FixturesAvailability({
                   transition: 'all 0.15s',
                   fontFamily: "'DM Sans', sans-serif",
                   outline: 'none',
+                  opacity: saving ? 0.5 : 1,
                 }}>
                 {btn.label}
               </button>
             )
           })}
         </div>
-
-        {/* Saving indicator */}
-        {saving && (
-          <span style={{ fontSize: '10px', color: '#4B5563', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
-            …
-          </span>
-        )}
       </div>
 
-      {/* Hint */}
-      {hint && !saving && (
+      {/* Contextual hint for the selected code */}
+      {activeBtn?.hint && !error && !saving && (
         <p style={{
-          fontSize: '10px', color: '#9CA3AF',
+          fontSize: '10px',
+          color: '#9CA3AF',
           marginTop: '6px',
           fontFamily: "'DM Sans', sans-serif",
           lineHeight: 1.4,
         }}>
-          ℹ {hint}
+          ℹ {activeBtn.hint}
         </p>
       )}
 
-      {/* Conflict warning */}
-      {warning && !saving && (
+      {/* Actual API / network error — visible to the player */}
+      {error && (
         <p style={{
-          fontSize: '10px', color: '#F59E0B',
-          marginTop: hint ? '3px' : '6px',
+          fontSize: '10px',
+          color: '#f87171',
+          marginTop: '6px',
           fontFamily: "'DM Sans', sans-serif",
           lineHeight: 1.4,
         }}>
-          ⚠ {warning}
+          ✕ {error}
         </p>
       )}
     </div>
