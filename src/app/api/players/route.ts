@@ -54,12 +54,24 @@ export async function PATCH(request: Request) {
 
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-  // Clean up undefined values
-  Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k])
+  // Strip nested/join fields that aren't real columns on the players table
+  const PLAYER_COLUMNS = new Set([
+    'name', 'gmail_id', 'whatsapp', 'dob', 'jersey_name', 'jersey_number',
+    'blood_group', 'primary_skill', 'secondary_skill', 'referred_by',
+    'inducted_on', 'wallet_balance', 'cricheroes_url', 'active',
+    'is_captain', 'status', 'photo_url',
+  ])
+
+  const safeUpdates: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(updates)) {
+    if (PLAYER_COLUMNS.has(k) && v !== undefined) {
+      safeUpdates[k] = v
+    }
+  }
 
   const { data, error } = await supabase
     .from('players')
-    .update(updates)
+    .update(safeUpdates)
     .eq('id', id)
     .select()
     .single()
