@@ -172,19 +172,15 @@ export function FixturesAvailability({
                   flex: 1, padding: '7px 4px', borderRadius: '6px',
                   fontFamily: "'DM Sans', sans-serif", fontSize: '12px', fontWeight: 700,
                   outline: 'none', transition: 'all 0.15s',
-                  // Active: coloured. Blocked: grey but visible. Idle: dark grey.
                   border: isActive
                     ? `1px solid ${btn.activeBorder}`
-                    : isBlocked
-                    ? '1px solid #374151'
                     : '1px solid #374151',
                   background: isActive ? btn.activeBackground : '#1F2937',
-                  color: isActive ? btn.activeColor : isBlocked ? '#374151' : '#4B5563',
+                  // Active: bright colour. Blocked: visible mid-grey + strikethrough. Idle: softer grey.
+                  color: isActive ? btn.activeColor : isBlocked ? '#9CA3AF' : '#6B7280',
                   cursor: saving ? 'wait' : isBlocked ? 'not-allowed' : 'pointer',
                   opacity: saving ? 0.5 : 1,
                   boxShadow: isActive ? `0 0 0 1px ${btn.activeBorder}40` : 'none',
-                  // Blocked: text and border match so label is invisible — NO.
-                  // Use a visible but clearly inactive style instead:
                   textDecoration: isBlocked ? 'line-through' : 'none',
                 }}>
                 {btn.label}
