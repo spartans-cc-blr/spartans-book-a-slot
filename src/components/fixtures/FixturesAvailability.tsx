@@ -52,17 +52,31 @@ function getBlockReason(
   weekendBookings: WeekendBooking[],
   weekendResponses: Record<string, string>
 ): string | null {
-  // Y and L are never blocked
-  if (candidate === 'Y' || candidate === 'L') return null
+  // L is never blocked
+  if (candidate === 'L') return null
 
-  const others = weekendBookings.filter(b => b.id !== thisBookingId)
+  const others        = weekendBookings.filter(b => b.id !== thisBookingId)
+  const sameDayOthers = others.filter(b => b.game_date === thisDate)
+
+  if (candidate === 'Y') {
+    // Y blocked if any same-day game already has E
+    for (const b of sameDayOthers) {
+      const r = weekendResponses[b.id] as AvailCode
+      if (r === 'E') return `You marked E on another game today — undo that first, or mark E here too`
+    }
+    // Y blocked if any game this weekend has O
+    for (const b of others) {
+      const r = weekendResponses[b.id] as AvailCode
+      if (r === 'O') return `You marked O on another game this weekend — undo that first`
+    }
+  }
 
   if (candidate === 'O') {
     // O blocked if any other game this weekend has Y or E
     for (const b of others) {
       const r = weekendResponses[b.id] as AvailCode
-      if (r === 'Y') return `You marked Y on another game this weekend`
-      if (r === 'E') return `You marked E on another game this weekend`
+      if (r === 'Y') return `You marked Y on another game this weekend — undo that first`
+      if (r === 'E') return `You marked E on another game this weekend — undo that first`
     }
   }
 
@@ -70,13 +84,12 @@ function getBlockReason(
     // E blocked if any game this weekend has O
     for (const b of others) {
       const r = weekendResponses[b.id] as AvailCode
-      if (r === 'O') return `You marked O on another game this weekend`
+      if (r === 'O') return `You marked O on another game this weekend — undo that first`
     }
     // E blocked if another game on the SAME day has Y
-    const sameDayOthers = others.filter(b => b.game_date === thisDate)
     for (const b of sameDayOthers) {
       const r = weekendResponses[b.id] as AvailCode
-      if (r === 'Y') return `You marked Y for another game on the same day`
+      if (r === 'Y') return `You marked Y for another game today — undo that first`
     }
   }
 
