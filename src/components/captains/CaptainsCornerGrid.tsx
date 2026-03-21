@@ -56,6 +56,13 @@ const SLOT_SHORT: Record<string, string> = {
   '14:30': '2:15',
 }
 
+// Short display name for the matrix sticky column on mobile:
+// jersey_name if set, otherwise first word of full name only.
+function shortName(player: Player): string {
+  if (player.jersey_name?.trim()) return player.jersey_name.trim()
+  return player.name.split(' ')[0]
+}
+
 function isSharedPlayer(
   playerId: string,
   bookings: Booking[],
@@ -359,16 +366,16 @@ function MatrixView({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse" style={{ minWidth: Math.max(400, bookings.length * 130 + 180) }}>
+      <table className="w-full border-collapse" style={{ minWidth: Math.max(320, bookings.length * 100 + 112) }}>
         {/* Header */}
         <thead>
           <tr className="bg-ink-4 border-b border-ink-5">
-            {/* Player col */}
-            <th className="px-3 py-3 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 w-44 sticky left-0 bg-ink-4 z-10">
+            {/* Player col — narrower on mobile, wider on sm+ */}
+            <th className="px-2 py-3 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 w-28 sm:w-44 sticky left-0 bg-ink-4 z-10">
               Player
             </th>
             {bookings.map(b => (
-              <th key={b.id} className="px-2 py-3 text-center font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600" style={{ minWidth: 120 }}>
+              <th key={b.id} className="px-2 py-3 text-center font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600" style={{ minWidth: 90 }}>
                 <div>
                   <span className="text-gold font-cinzel text-xs font-semibold">
                     {SLOT_SHORT[b.slot_time]}
@@ -409,30 +416,27 @@ function MatrixView({
                 <tr
                   key={p.id}
                   className={`border-b border-ink-4 transition-colors ${i % 2 === 0 ? 'bg-ink-3' : 'bg-ink-2'} hover:bg-ink-4`}>
-                  {/* Player name cell — sticky */}
-                  <td className={`px-3 py-2 sticky left-0 z-10 ${i % 2 === 0 ? 'bg-ink-3' : 'bg-ink-2'} hover:bg-ink-4 transition-colors`}>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`font-rajdhani text-sm font-semibold leading-none truncate ${
-                        isHighlit ? 'text-amber-400' : hasDues ? 'text-amber-400' : 'text-parchment'
-                      }`}>
-                        {p.name}
+                  {/* Player name cell — sticky, shortName keeps column narrow on mobile */}
+                  <td className={`px-2 py-2 sticky left-0 z-10 ${i % 2 === 0 ? 'bg-ink-3' : 'bg-ink-2'} hover:bg-ink-4 transition-colors`}>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span
+                        className={`font-rajdhani text-xs font-semibold leading-none truncate ${
+                          isHighlit ? 'text-amber-400' : hasDues ? 'text-amber-400' : 'text-parchment'
+                        }`}
+                        title={p.name}>
+                        {shortName(p)}
                       </span>
                       {p.is_captain && (
-                        <span className="font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1 py-px rounded-sm flex-shrink-0">
-                          CAP
+                        <span className="font-rajdhani text-[8px] font-bold bg-gold/10 border border-gold-dim text-gold px-1 py-px rounded-sm flex-shrink-0">
+                          C
                         </span>
                       )}
                       {hasDues && (
-                        <span className="font-rajdhani text-[9px] font-bold bg-amber-950 border border-amber-800 text-amber-500 px-1 py-px rounded-sm flex-shrink-0">
+                        <span className="font-rajdhani text-[8px] font-bold bg-amber-950 border border-amber-800 text-amber-500 px-1 py-px rounded-sm flex-shrink-0">
                           ₹
                         </span>
                       )}
                     </div>
-                    {p.primary_skill && (
-                      <p className="font-rajdhani text-[10px] text-zinc-700 mt-0.5 truncate">
-                        {p.primary_skill}
-                      </p>
-                    )}
                   </td>
 
                   {/* Response per booking */}
