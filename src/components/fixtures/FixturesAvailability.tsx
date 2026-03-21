@@ -6,7 +6,8 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 
-type AvailCode = 'Y' | 'O' | 'E' | 'L' | null
+type AvailKey  = 'Y' | 'O' | 'E' | 'L'
+type AvailCode = AvailKey | null
 
 const BUTTONS: {
   code: AvailCode
@@ -224,11 +225,11 @@ export function FixturesAvailability({
   const activeBtn = BUTTONS.find(b => b.code === response)
 
   // Pre-compute which buttons are blocked so we can dim them
-  const blockedReasons: Partial<Record<AvailCode, string>> = {}
+  const blockedReasons: Partial<Record<AvailKey, string>> = {}
   for (const btn of BUTTONS) {
     if (btn.code === response) continue // never block the currently active button
     const reason = getBlockReason(btn.code, bookingId, slotDate, weekendBookings, weekendResponses)
-    if (reason) blockedReasons[btn.code] = reason
+    if (reason && btn.code) blockedReasons[btn.code as AvailKey] = reason
   }
 
   // ── Player availability row ───────────────────────────────────
@@ -255,14 +256,14 @@ export function FixturesAvailability({
         <div style={{ display: 'flex', gap: '5px', flex: 1 }}>
           {BUTTONS.map(btn => {
             const isActive  = response === btn.code
-            const isBlocked = !isActive && !!blockedReasons[btn.code]
+            const isBlocked = !isActive && !!(btn.code && blockedReasons[btn.code as AvailKey])
 
             return (
               <button
                 key={btn.code}
                 onClick={() => handleSelect(btn.code)}
                 disabled={saving}
-                title={isBlocked ? blockedReasons[btn.code] : btn.hint}
+                title={isBlocked ? btn.code ? blockedReasons[btn.code as AvailKey] : undefined : btn.hint}
                 style={{
                   flex: 1,
                   padding: '7px 4px',
