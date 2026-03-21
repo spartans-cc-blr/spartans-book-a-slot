@@ -1,20 +1,22 @@
-import { SiteNav } from '@/components/ui/SiteNav'
-import { FixturesCard } from '@/components/fixtures/FixturesCard'
-import { FixturesAvailability } from '@/components/fixtures/FixturesAvailability'
+// app/fixtures/page.tsx
+// Lifts weekendResponses into a shared client wrapper so
+// validation updates live across all cards on the same page.
+
 import { createServiceClient } from '@/lib/supabase'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { SiteNav } from '@/components/ui/SiteNav'
+import { FixturesCard } from '@/components/fixtures/FixturesCard'
+import { FixturesWeekend } from '@/components/fixtures/FixturesWeekend'
 import { getISOWeek, getISOWeekYear, parseISO } from 'date-fns'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Upcoming Fixtures — Spartans Cricket Club',
-  description: 'Upcoming match fixtures for Spartans CC players.',
 }
 
 export const revalidate = 60
 
-// Group bookings into weekends using ISO week
 function weekKey(dateStr: string): string {
   const d = parseISO(dateStr)
   return `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, '0')}`
@@ -29,7 +31,7 @@ export default async function FixturesPage() {
   const { data: bookings } = await supabase
     .from('bookings')
     .select(`
-      id, game_date, slot_time, match_time, format, opponent_name, cricheroes_url,
+      id, game_date, slot_time, format, opponent_name, cricheroes_url,
       tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
     `)
     .eq('status', 'confirmed')
@@ -37,7 +39,6 @@ export default async function FixturesPage() {
     .order('game_date', { ascending: true })
     .order('slot_time', { ascending: true })
 
-  // Fetch this player's availability responses
   let existingResponses: Record<string, string> = {}
   if (player?.playerId) {
     const { data: avail } = await supabase
@@ -50,22 +51,12 @@ export default async function FixturesPage() {
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'
   const isCaptain = isPlayer && !!player?.isCaptain
 
-  // Build a weekend → bookings map for cross-match context
-  const weekendBookingsMap: Record<string, { id: string; game_date: string; slot_time: string }[]> = {}
+  // Group bookings by ISO weekend
+  const weekendMap: Record<string, { id: string; game_date: string; slot_time: string }[]> = {}
   for (const b of bookings ?? []) {
     const wk = weekKey((b as any).game_date)
-    if (!weekendBookingsMap[wk]) weekendBookingsMap[wk] = []
-    weekendBookingsMap[wk].push({ id: b.id, game_date: (b as any).game_date, slot_time: (b as any).slot_time })
-  }
-
-  // Build weekend → player responses map
-  const weekendResponsesMap: Record<string, Record<string, string>> = {}
-  for (const b of bookings ?? []) {
-    const wk = weekKey((b as any).game_date)
-    if (!weekendResponsesMap[wk]) weekendResponsesMap[wk] = {}
-    if (existingResponses[b.id]) {
-      weekendResponsesMap[wk][b.id] = existingResponses[b.id]
-    }
+    if (!weekendMap[wk]) weekendMap[wk] = []
+    weekendMap[wk].push({ id: b.id, game_date: (b as any).game_date, slot_time: (b as any).slot_time })
   }
 
   return (
@@ -86,8 +77,6 @@ export default async function FixturesPage() {
         <p className="text-muted text-sm md:text-base max-w-xl leading-relaxed font-rajdhani">
           Confirmed matches for Spartans CC. Mark your availability below each card.
         </p>
-
-        {/* Captain link */}
         {isCaptain && (
           <a href="/captains-corner"
             className="mt-3 inline-flex items-center gap-2 font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold px-4 py-2 rounded hover:bg-gold/20 transition-colors">
@@ -115,15 +104,14 @@ export default async function FixturesPage() {
         </div>
       )}
 
-      {/* Availability legend for logged-in players */}
+      {/* Legend */}
       {isPlayer && (
         <div className="px-5 md:px-8 lg:px-10 py-2 bg-ink-2 border-b border-ink-4 flex gap-4 flex-wrap">
           {[
             { code: 'Y', color: '#4ade80', label: 'Available' },
-            { code: 'N', color: '#f87171', label: 'Not available' },
-            { code: 'O', color: '#fb923c', label: 'One game this weekend' },
-            { code: 'E', color: '#fbbf24', label: 'Either game same day' },
-            { code: 'L', color: '#71717a', label: 'On leave' },
+            { code: 'E', color: '#60a5fa', label: 'Either game same day' },
+            { code: 'O', color: '#fbbf24', label: 'One game this weekend' },
+            { code: 'L', color: '#c084fc', label: 'On leave' },
           ].map(item => (
             <div key={item.code} className="flex items-center gap-1.5">
               <span className="font-rajdhani text-xs font-bold" style={{ color: item.color }}>{item.code}</span>
@@ -138,23 +126,28 @@ export default async function FixturesPage() {
           <p className="font-rajdhani text-zinc-500 text-sm">No upcoming fixtures confirmed yet. Check back soon.</p>
         ) : (
           <div className="flex flex-col gap-4">
-            {bookings.map((b: any) => {
-              const wk = weekKey(b.game_date)
-              return (
-                <div key={b.id}>
-                  <FixturesCard booking={b} />
-                  <FixturesAvailability
-                    bookingId={b.id}
-                    slotDate={b.game_date}
-                    isPlayer={isPlayer}
-                    isCaptain={isCaptain}
-                    initialResponse={existingResponses[b.id] ?? null}
-                    weekendResponses={weekendResponsesMap[wk] ?? {}}
-                    weekendBookings={weekendBookingsMap[wk] ?? []}
-                  />
-                </div>
-              )
-            })}
+            {(bookings as any[]).map(b => (
+              <div key={b.id}>
+                <FixturesCard booking={b} />
+                {/* FixturesWeekend is a client component that holds shared weekend state */}
+                <FixturesWeekend
+                  bookingId={b.id}
+                  slotDate={b.game_date}
+                  isPlayer={isPlayer}
+                  isCaptain={isCaptain}
+                  initialResponse={existingResponses[b.id] ?? null}
+                  weekendBookings={weekendMap[weekKey(b.game_date)] ?? []}
+                  initialWeekendResponses={
+                    // Pass only the responses for this weekend
+                    Object.fromEntries(
+                      (weekendMap[weekKey(b.game_date)] ?? [])
+                        .filter(wb => existingResponses[wb.id])
+                        .map(wb => [wb.id, existingResponses[wb.id]])
+                    )
+                  }
+                />
+              </div>
+            ))}
           </div>
         )}
       </div>
