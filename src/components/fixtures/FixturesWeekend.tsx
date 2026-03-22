@@ -14,7 +14,8 @@ interface BookingEntry {
   game_date:       string
   slot_time:       string
   initialResponse: string | null
-  cardData:        any  // full booking object for FixturesCard
+  matchStatus:     'upcoming' | 'in_progress'   // add this
+  cardData:        any
 }
 
 interface Props {
