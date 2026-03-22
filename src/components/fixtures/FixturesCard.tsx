@@ -186,11 +186,11 @@ type BookingProp = {
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
-  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, ground, matchStatus } = booking;
+  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, matchStatus } = booking;
+  const ground = tournament?.ground;
   const ballType  = tournament?.ball_type || "red";
   const jColour   = jerseyColour(ballType);
   const jLabel    = jerseyLabel(ballType);
-  //const ground    = tournament?.ground;
   const hasGround = ground?.maps_url;
   const hasHosp   = ground?.hospital_url;
 
