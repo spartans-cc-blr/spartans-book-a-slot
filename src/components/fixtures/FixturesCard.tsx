@@ -177,6 +177,7 @@ type BookingProp = {
   match_time?: string | null
   opponent_name?: string | null
   cricheroes_url?: string | null
+  matchStatus?: 'upcoming' | 'in_progress'
   tournament?: {
     name: string
     ball_type: 'red' | 'white' | 'pink'
@@ -185,7 +186,7 @@ type BookingProp = {
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
-  const { game_date, slot_time, match_time, format, opponent_name, cricheroes_url, tournament } = booking;
+  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, ground, matchStatus } = booking;
   const ballType  = tournament?.ball_type || "red";
   const jColour   = jerseyColour(ballType);
   const jLabel    = jerseyLabel(ballType);
@@ -225,7 +226,16 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             padding: "2px 8px", borderRadius: "999px",
             letterSpacing: "0.08em"
           }}>{format}</span>
-        </div>
+      		{matchStatus === 'in_progress' && (
+            <span style={{
+              background: '#1a3d1a', color: '#4ade80',
+              fontSize: '10px', fontWeight: 700,
+              padding: '2px 8px', borderRadius: '999px',
+              letterSpacing: '0.08em', border: '1px solid #166534',
+              animation: 'pulse 2s infinite',
+            }}>● IN PROGRESS</span>
+          )}
+				</div>
       </div>
 
       {/* Tournament + Opponent */}
