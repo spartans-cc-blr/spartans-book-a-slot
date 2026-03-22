@@ -42,6 +42,7 @@ export interface Booking {
   organiser_phone?: string | null
   match_id?: string | null
   //after: match_id?: string | null
+  match_stage?: string | null
   match_time?: string | null
   opponent_name?: string | null
   cricheroes_url?: string | null
