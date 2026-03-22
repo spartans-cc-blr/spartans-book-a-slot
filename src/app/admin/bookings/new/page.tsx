@@ -62,6 +62,8 @@ export default function NewBookingPage() {
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState('')
 
+  const [matchStage, setMatchStage] = useState('')
+  
   useEffect(() => {
     fetch('/api/captains').then(r => r.json()).then(d => setCaptains(d.captains ?? []))
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
@@ -77,6 +79,7 @@ export default function NewBookingPage() {
     setNewTournamentBall('red'); setNewTournamentGround('')
     setSubmitError('')
     setRuleChecks(RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' })))
+    setMatchStage('')
   }, [mode])
 
   useEffect(() => {
@@ -184,6 +187,7 @@ export default function NewBookingPage() {
           notes:         notes || null,
           opponent_name: opponentName || null,
           match_id:      matchId || null,
+          match_stage:   matchStage || null,
           cricheroes_url: cricHeroesUrl || null,
           match_time: matchTime || null,
         }),
@@ -415,6 +419,11 @@ export default function NewBookingPage() {
                         placeholder="e.g. 12345678" className="form-input" />
                       <p className="font-rajdhani text-xs text-zinc-600 mt-1">Can be added later once organiser creates the match in CricHeroes.</p>
                     </div>
+                  </div>
+                  <div>
+                    <label className="form-label">Match Stage <span className="text-zinc-600">(optional)</span></label>
+                    <input type="text" value={matchStage} onChange={e => setMatchStage(e.target.value)}
+                      placeholder="e.g. Quarter Final, Semi Final, Final, Knockout" className="form-input" />
                   </div>
                   <div>
                     <label className="form-label">Match Start Time</label>
