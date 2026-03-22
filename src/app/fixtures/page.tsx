@@ -88,6 +88,7 @@ export default async function FixturesPage() {
     game_date:       string
     slot_time:       string
     initialResponse: string | null
+		matchStatus: 		 string | null
     cardData:        any
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
