@@ -32,6 +32,8 @@ export default function BookingDetailPage() {
   const [captains,    setCaptains]    = useState<Captain[]>([])
   const [tournaments, setTournaments] = useState<Tournament[]>([])
 
+  const [matchStage, setMatchStage] = useState('')
+
   useEffect(() => {
     fetch('/api/captains').then(r => r.json()).then(d => setCaptains(d.captains ?? []))
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
@@ -54,6 +56,7 @@ export default function BookingDetailPage() {
         setOrganiserName(b.organiser_name ?? '')
         setOrganiserPhone(b.organiser_phone ?? '')
         setLoading(false)
+        setMatchStage(b.match_stage ?? '')
       })
   }, [id])
 
@@ -71,6 +74,7 @@ export default function BookingDetailPage() {
         slot_time:       slotTime,
         venue:           venue || null,
         match_id:        tournamentId ? (matchId || null) : null,
+        match_stage:     matchStage || null,
         // after: match_id: matchId || null,
         match_time: matchTime || null,
         opponent_name:   tournamentId ? (opponentName || null) : null,
@@ -288,6 +292,11 @@ export default function BookingDetailPage() {
                   <input type="text" value={matchId} onChange={e => setMatchId(e.target.value)}
                     placeholder="e.g. 12345678" className="form-input" />
                   <p className="font-rajdhani text-xs text-zinc-600 mt-1">Enter after organiser creates match in CricHeroes</p>
+                </div>
+                <div>
+                  <label className="form-label">Match Stage <span className="text-zinc-600">(optional)</span></label>
+                  <input type="text" value={matchStage} onChange={e => setMatchStage(e.target.value)}
+                    placeholder="e.g. Quarter Final, Semi Final, Final, Knockout" className="form-input" />
                 </div>
                 <div>
                   <label className="form-label">CricHeroes URL</label>
