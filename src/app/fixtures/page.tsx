@@ -88,7 +88,7 @@ export default async function FixturesPage() {
     game_date:       string
     slot_time:       string
     initialResponse: string | null
-		matchStatus: 		 string | null
+	matchStatus:     'upcoming' | 'in_progress'
     cardData:        any
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
@@ -100,13 +100,13 @@ export default async function FixturesPage() {
       weekendMap[wk] = []
     }
     
-		weekendMap[wk].push({
+	weekendMap[wk].push({
       id:              b.id,
       game_date:       (b as any).game_date,
       slot_time:       (b as any).slot_time,
       initialResponse: existingResponses[b.id] ?? null,
-      matchStatus:     (b as any).matchStatus,   // 'upcoming' | 'in_progress'
-      cardData:        b,
+      matchStatus: (b as any).matchStatus as 'upcoming' | 'in_progress',
+	  cardData:        b,
     })
 
   }
