@@ -21,6 +21,7 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
     { href: 'https://spartanscricketclub.vercel.app', label: 'Club Site' },
     { href: '/schedule', label: 'Schedule', key: 'schedule' },
     { href: '/fixtures', label: 'Fixtures',  key: 'fixtures' },
+    { href: '/profile', label: 'Profile', key: 'profile' }
   ]
 
   return (
