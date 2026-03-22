@@ -105,6 +105,13 @@ function JerseyIcon({ colour = "gold", size = 20 }: { colour?: 'gold' | 'white';
   );
 }
 
+// Replace the stageIcon function with:
+function stageIcon(stage: string): string {
+  const s = stage.toLowerCase()
+  if (s.includes('final') || s.includes('quarter')) return '🏆'
+  return '🎖️'
+}
+
 // ── CricHeroes Icon ───────────────────────────────────────────────
 function CricHeroesIcon({ size = 20 }: { size?: number }) {
   return (
@@ -175,6 +182,8 @@ type BookingProp = {
   format: string
   // after: format: string
   match_time?: string | null
+  // In the BookingProp type, add after match_time:
+  match_stage?: string | null
   opponent_name?: string | null
   cricheroes_url?: string | null
   matchStatus?: 'upcoming' | 'in_progress'
@@ -186,7 +195,7 @@ type BookingProp = {
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
-  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, matchStatus } = booking;
+  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, matchStatus, match_stage } = booking;
   const ground = tournament?.ground;
   const ballType  = tournament?.ball_type || "red";
   const jColour   = jerseyColour(ballType);
