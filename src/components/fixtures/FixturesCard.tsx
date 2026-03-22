@@ -190,7 +190,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
   const ballType  = tournament?.ball_type || "red";
   const jColour   = jerseyColour(ballType);
   const jLabel    = jerseyLabel(ballType);
-  const ground    = tournament?.ground;
+  //const ground    = tournament?.ground;
   const hasGround = ground?.maps_url;
   const hasHosp   = ground?.hospital_url;
 
