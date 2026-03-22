@@ -228,25 +228,31 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             ? booking.match_time.slice(0, 5).replace(/^0/, '') + ' ' + (parseInt(booking.match_time) < 12 ? 'AM' : 'PM')
             : slotLabel(slot_time)}
         </span>
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+		  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
           <span style={{
             background: "#1E3A5F", color: "#93C5FD",
             fontSize: "10px", fontWeight: 700,
             padding: "2px 8px", borderRadius: "999px",
             letterSpacing: "0.08em"
           }}>{format}</span>
-      		{matchStatus === 'in_progress' && (
+
+          {/* Match stage badge — NEW */}
+          {match_stage && (
             <span style={{
-              background: '#1a3d1a', color: '#4ade80',
+              background: '#2d1f00', color: '#f59e0b',
               fontSize: '10px', fontWeight: 700,
               padding: '2px 8px', borderRadius: '999px',
-              letterSpacing: '0.08em', border: '1px solid #166534',
-              animation: 'pulse 2s infinite',
-            }}>● IN PROGRESS</span>
+              letterSpacing: '0.06em', border: '1px solid #d97706',
+            }}>
+              {stageIcon(match_stage)} {match_stage}
+            </span>
           )}
-				</div>
-      </div>
 
+          {matchStatus === 'in_progress' && (
+            <span style={{...}}>● IN PROGRESS</span>
+          )}
+        </div>
+        
       {/* Tournament + Opponent */}
       <div>
         <div style={{ fontSize: "15px", fontWeight: 700, color: "#F9FAFB", lineHeight: 1.3, marginBottom: "3px" }}>
@@ -256,7 +262,22 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
           vs <span style={{ color: "#D1D5DB", fontWeight: 500 }}>{opponent_name || "TBD"}</span>
         </div>
       </div>
-
+		
+	{/* Ground — NEW */}
+	{ground?.name && (
+	  <div style={{ fontSize: "11px", color: "#6B7280", marginTop: "4px" }}>
+		{'@ '}
+		{ground.maps_url ? (
+		  <a href={ground.maps_url} target="_blank" rel="noopener noreferrer"
+			style={{ color: "#34A853", textDecoration: "none" }}>
+			{ground.name}
+		  </a>
+		) : (
+		  ground.name
+		)}
+	  </div>
+	)}	
+		
       {/* Divider */}
       <div style={{ height: "1px", background: "#2D3748" }} />
 
