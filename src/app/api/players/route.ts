@@ -1,26 +1,37 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 
+async function requireAdmin() {
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
+  return null
+}
+
 export async function GET() {
+  // Admin only — full player list with wallet balances
+  const deny = await requireAdmin()
+  if (deny) return deny
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('players')
     .select(`*, fee_exemptions(id, reason, start_date, end_date, notes)`)
     .order('name', { ascending: true })
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ players: data ?? [] })
 }
 
 export async function POST(request: Request) {
+  const deny = await requireAdmin()
+  if (deny) return deny
   const supabase = createServiceClient()
   const body = await request.json()
   const { name, gmail_id, whatsapp, dob, jersey_name, jersey_number,
     blood_group, primary_skill, secondary_skill, referred_by,
     inducted_on, wallet_balance, cricheroes_url } = body
-
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
-
   const { data, error } = await supabase
     .from('players')
     .insert({
@@ -42,40 +53,24 @@ export async function POST(request: Request) {
     })
     .select()
     .single()
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ player: data })
 }
 
 export async function PATCH(request: Request) {
+  const deny = await requireAdmin()
+  if (deny) return deny
   const supabase = createServiceClient()
   const body = await request.json()
   const { id, ...updates } = body
-
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
-
-  // Strip nested/join fields that aren't real columns on the players table
-  const PLAYER_COLUMNS = new Set([
-    'name', 'gmail_id', 'whatsapp', 'dob', 'jersey_name', 'jersey_number',
-    'blood_group', 'primary_skill', 'secondary_skill', 'referred_by',
-    'inducted_on', 'wallet_balance', 'cricheroes_url', 'active',
-    'is_captain', 'status', 'photo_url',
-  ])
-
-  const safeUpdates: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(updates)) {
-    if (PLAYER_COLUMNS.has(k) && v !== undefined) {
-      safeUpdates[k] = v
-    }
-  }
-
+  Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k])
   const { data, error } = await supabase
     .from('players')
-    .update(safeUpdates)
+    .update(updates)
     .eq('id', id)
     .select()
     .single()
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ player: data })
 }
