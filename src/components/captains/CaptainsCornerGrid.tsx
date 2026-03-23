@@ -56,13 +56,13 @@ const SLOT_SHORT: Record<string, string> = {
   '14:30': '2:15',
 }
 
-// Mobile name: jersey_name if set, else "FirstName L." (first name + last initial)
-// Desktop name: jersey_name if set, else full name
+// Mobile: jersey_name → "Muthukumar R."  (first name + last-word initial + dot)
+// Desktop: jersey_name → full name
 function mobileMatrixName(player: Player): string {
   if (player.jersey_name?.trim()) return player.jersey_name.trim()
-  const parts = player.name.trim().split(/\s+/)
+  const parts = player.name.trim().split(' ').filter(Boolean)
   if (parts.length === 1) return parts[0]
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`
+  return parts[0] + ' ' + parts[parts.length - 1][0] + '.'
 }
 function desktopMatrixName(player: Player): string {
   if (player.jersey_name?.trim()) return player.jersey_name.trim()
@@ -149,13 +149,13 @@ function Chip({ code, count }: { code: string; count?: number }) {
 // ── Response cell (matrix) ────────────────────────────────────────
 function RespCell({ code, isConflict }: { code: string | null; isConflict?: boolean }) {
   if (!code) return (
-    <td className="px-2 py-0 text-center" style={{ minWidth: 48 }}>
+    <td className="py-0 text-center" style={{ width: 48, minWidth: 48 }}>
       <span className="font-rajdhani text-[11px] text-zinc-800">—</span>
     </td>
   )
   const cfg = RESP[code]
   return (
-    <td className="px-2 py-0 text-center" style={{ minWidth: 48 }}>
+    <td className="py-0 text-center" style={{ width: 48, minWidth: 48 }}>
       <span
         className="font-rajdhani text-[11px] font-bold w-8 h-6 inline-flex items-center justify-center rounded-sm"
         style={{
@@ -394,8 +394,10 @@ function MatrixView({
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: 4,
                     width: '100%',
+                    margin: '0 auto',
                   }}>
                     <span className="font-cinzel text-[10px] font-semibold text-gold">
                       {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}
