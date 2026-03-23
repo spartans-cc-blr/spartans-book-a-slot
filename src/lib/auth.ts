@@ -20,8 +20,8 @@ export const authOptions: NextAuthOptions = {
       return true
     },
 
+        // AFTER
     async jwt({ token, user }) {
-      // On first sign-in, look up player in DB
       if (user?.email) {
         const supabase = createServiceClient()
         const { data: player } = await supabase
@@ -29,13 +29,22 @@ export const authOptions: NextAuthOptions = {
           .select('id, name, is_captain, status, active, photo_url')
           .eq('gmail_id', user.email.toLowerCase())
           .single()
-
-        token.playerId    = player?.id ?? null
-        token.playerName  = player?.name ?? null
-        token.isCaptain   = player?.is_captain ?? false
+    
+        token.playerId     = player?.id ?? null
+        token.playerName   = player?.name ?? null
+        token.isCaptain    = player?.is_captain ?? false
         token.playerStatus = player?.status ?? null
-        token.isAdmin     = ADMIN_EMAILS.includes(user.email.toLowerCase())
-        token.photoUrl    = player?.photo_url ?? null
+        token.isAdmin      = ADMIN_EMAILS.includes(user.email.toLowerCase())
+    
+        // Save Google profile photo on first sign-in if not already set
+        const googlePhoto = user.image ?? null
+        if (player?.id && googlePhoto && !player.photo_url) {
+          await supabase
+            .from('players')
+            .update({ photo_url: googlePhoto })
+            .eq('id', player.id)
+        }
+        token.photoUrl = player?.photo_url ?? googlePhoto
       }
       return token
     },
