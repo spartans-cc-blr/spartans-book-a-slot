@@ -56,11 +56,17 @@ const SLOT_SHORT: Record<string, string> = {
   '14:30': '2:15',
 }
 
-// Short display name for the matrix sticky column on mobile:
-// jersey_name if set, otherwise first word of full name only.
-function shortName(player: Player): string {
+// Mobile name: jersey_name if set, else "FirstName L." (first name + last initial)
+// Desktop name: jersey_name if set, else full name
+function mobileMatrixName(player: Player): string {
   if (player.jersey_name?.trim()) return player.jersey_name.trim()
-  return player.name.split(' ')[0]
+  const parts = player.name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0]
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`
+}
+function desktopMatrixName(player: Player): string {
+  if (player.jersey_name?.trim()) return player.jersey_name.trim()
+  return player.name
 }
 
 // Truncate tournament name to ~10 chars for the rotated header
@@ -358,11 +364,7 @@ function MatrixView({
       const r = availMap[b.id]?.[p.id]
       return r === 'Y' || r === 'O' || r === 'E'
     })
-  ).sort((a, b) => {
-    // Captains first, then alphabetical
-    if (a.is_captain !== b.is_captain) return a.is_captain ? -1 : 1
-    return a.name.localeCompare(b.name)
-  })
+  ).sort((a, b) => a.name.localeCompare(b.name))
 
   // Summary counts per booking
   const counts = useMemo(
@@ -381,7 +383,7 @@ function MatrixView({
               Player
             </th>
             {bookings.map(b => (
-                <th key={b.id} className="bg-ink-4 z-10 align-bottom" style={{ width: 48, minWidth: 48, padding: 0 }}>
+                <th key={b.id} className="bg-ink-4 z-10 align-bottom text-center" style={{ width: 48, minWidth: 48, padding: 0 }}>
                   {/* Rotated text block — 3 lines: day · time+format · tourney */}
                   <div style={{
                     writingMode: 'vertical-rl',
@@ -429,15 +431,24 @@ function MatrixView({
                 <tr
                   key={p.id}
                   className={`border-b border-ink-4 transition-colors ${i % 2 === 0 ? 'bg-ink-3' : 'bg-ink-2'} hover:bg-ink-4`}>
-                  {/* Player name cell — sticky, shortName keeps column narrow on mobile */}
+                  {/* Player name cell — sticky; mobile uses "First L.", desktop uses full name */}
                   <td className={`px-2 py-2 sticky left-0 z-10 ${i % 2 === 0 ? 'bg-ink-3' : 'bg-ink-2'} hover:bg-ink-4 transition-colors`}>
                     <div className="flex items-center gap-1 min-w-0">
+                      {/* Mobile: "Muthukumar R." */}
                       <span
-                        className={`font-rajdhani text-xs font-semibold leading-none truncate ${
+                        className={`sm:hidden font-rajdhani text-xs font-semibold leading-none truncate ${
                           isHighlit ? 'text-amber-400' : hasDues ? 'text-amber-400' : 'text-parchment'
                         }`}
                         title={p.name}>
-                        {shortName(p)}
+                        {mobileMatrixName(p)}
+                      </span>
+                      {/* Desktop: full name or jersey name */}
+                      <span
+                        className={`hidden sm:inline font-rajdhani text-sm font-semibold leading-none truncate ${
+                          isHighlit ? 'text-amber-400' : hasDues ? 'text-amber-400' : 'text-parchment'
+                        }`}
+                        title={p.name}>
+                        {desktopMatrixName(p)}
                       </span>
                       {p.is_captain && (
                         <span className="font-rajdhani text-[8px] font-bold bg-gold/10 border border-gold-dim text-gold px-1 py-px rounded-sm flex-shrink-0">
@@ -477,23 +488,22 @@ function MatrixView({
                 Available
               </td>
               {bookings.map(b => (
-                <td key={b.id} className="py-2 text-center" style={{ padding: '6px 2px' }}>
-                  <div className="flex flex-col items-center gap-0.5">
-                    {(['Y', 'O', 'E'] as const).map(code =>
-                      counts[b.id][code] > 0 ? (
-                        <span
-                          key={code}
-                          className="font-rajdhani text-[9px] font-bold leading-none px-1 py-px rounded-sm"
-                          style={{
-                            background: RESP[code].bg,
-                            color: RESP[code].text,
-                            border: `1px solid ${RESP[code].border}`,
-                          }}>
-                          {counts[b.id][code]}{code}
+                <td key={b.id} className="text-center" style={{ padding: '6px 4px' }}>
+                  <p className="font-rajdhani text-[10px] font-bold leading-snug text-center whitespace-nowrap">
+                    {(['Y', 'O', 'E'] as const)
+                      .filter(code => counts[b.id][code] > 0)
+                      .map((code, idx, arr) => (
+                        <span key={code}>
+                          <span style={{ color: RESP[code].text }}>
+                            {counts[b.id][code]}{code}
+                          </span>
+                          {idx < arr.length - 1 && (
+                            <span className="text-zinc-700">, </span>
+                          )}
                         </span>
-                      ) : null
-                    )}
-                  </div>
+                      ))
+                    }
+                  </p>
                 </td>
               ))}
             </tr>
