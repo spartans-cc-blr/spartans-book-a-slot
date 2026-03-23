@@ -15,36 +15,31 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    // Allow anyone to sign in — player lookup happens in jwt callback
     async signIn({ user }) {
       return true
     },
 
-        // AFTER
     async jwt({ token, user }) {
       if (user?.email) {
         const supabase = createServiceClient()
-        const { data: player } = await supabase
+        const { data: player, error: playerErr } = await supabase
           .from('players')
           .select('id, name, is_captain, status, active, photo_url')
           .eq('gmail_id', user.email.toLowerCase())
           .single()
-    
+
+        // PGRST116 = no rows found (valid: user not yet a registered player)
+        // Any other error = schema problem, RLS misconfiguration, etc. — log it clearly
+        if (playerErr && playerErr.code !== 'PGRST116') {
+          console.error('[auth] player lookup error — check that add_player_status.sql has been run and RLS is not blocking service_role:', playerErr.message)
+        }
+
         token.playerId     = player?.id ?? null
         token.playerName   = player?.name ?? null
         token.isCaptain    = player?.is_captain ?? false
         token.playerStatus = player?.status ?? null
         token.isAdmin      = ADMIN_EMAILS.includes(user.email.toLowerCase())
-    
-        // Save Google profile photo on first sign-in if not already set
-        const googlePhoto = user.image ?? null
-        if (player?.id && googlePhoto && !player.photo_url) {
-          await supabase
-            .from('players')
-            .update({ photo_url: googlePhoto })
-            .eq('id', player.id)
-        }
-        token.photoUrl = player?.photo_url ?? googlePhoto
+        token.photoUrl     = player?.photo_url ?? null
       }
       return token
     },
