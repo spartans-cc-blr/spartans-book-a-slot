@@ -56,16 +56,15 @@ const SLOT_SHORT: Record<string, string> = {
   '14:30': '2:15',
 }
 
-// Mobile: jersey_name → "Muthukumar R."  (first name + last-word initial + dot)
-// Desktop: jersey_name → full name
+// Matrix name helpers — always derived from player.name, jersey_name ignored.
+// Mobile:  "Muthukumar R."  (first word + last-word initial + dot)
+// Desktop: "Muthukumar Ramamoorthy" (full name)
 function mobileMatrixName(player: Player): string {
-  if (player.jersey_name?.trim()) return player.jersey_name.trim()
   const parts = player.name.trim().split(' ').filter(Boolean)
   if (parts.length === 1) return parts[0]
   return parts[0] + ' ' + parts[parts.length - 1][0] + '.'
 }
 function desktopMatrixName(player: Player): string {
-  if (player.jersey_name?.trim()) return player.jersey_name.trim()
   return player.name
 }
 
