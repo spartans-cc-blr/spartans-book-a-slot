@@ -15,6 +15,7 @@ const NAV = [
   { href: '/schedule',               label: 'Organiser View',   icon: '🌐', section: 'Views' },
   { href: '/fixtures',               label: 'Upcoming Matches', icon: '🏏' },
   { href: '/admin/players',          label: 'Players',          icon: '🏏' },
+  { href: '/gc-review',              label: 'GC Review',        icon: '⚖️' },
 ]
 
 export function AdminSidebar() {

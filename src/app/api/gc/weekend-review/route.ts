@@ -7,8 +7,8 @@ import { createServiceClient } from '@/lib/supabase'
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
-  if (!user?.isAdmin && !user?.isCaptain) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
+  if (!user?.isAdmin && !user?.isGC) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  
   const weekStart = req.nextUrl.searchParams.get('week_start')
   if (!weekStart) return NextResponse.json({ error: 'week_start required' }, { status: 400 })
 
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
-  if (!user?.isAdmin) return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 })
+  if (!user?.isAdmin && !user?.isGC) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { booking_id, decision } = await req.json()
   if (!booking_id || !['approved', 'returned'].includes(decision))
