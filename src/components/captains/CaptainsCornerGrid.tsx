@@ -135,6 +135,12 @@ function getCounts(
   return counts
 }
 
+// Returns true for Saturday (6) and Sunday (0)
+function isWeekendDate(dateStr: string): boolean {
+  const dow = new Date(dateStr + 'T00:00:00').getDay()
+  return dow === 0 || dow === 6
+}
+
 // ── useCopySquad hook ─────────────────────────────────────────────
 function useCopySquad() {
   const [copied, setCopied] = useState<string | null>(null)
@@ -647,6 +653,10 @@ function Legend() {
 export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {} }: Props) {
   const [view, setView] = useState<'slot' | 'matrix'>('slot')
 
+  // Matrix shows weekend games only (Sat=6, Sun=0).
+  // Per-slot shows all bookings including weekday games.
+  const weekendBookings = bookings.filter(b => isWeekendDate(b.game_date))
+
   return (
     <div>
       {/* Weekend header + view toggle */}
@@ -654,7 +664,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         <div>
           <h2 className="font-cinzel text-base font-semibold text-gold">{weekLabel}</h2>
           <p className="font-rajdhani text-xs text-zinc-600 mt-0.5">
-            {bookings.length} game{bookings.length !== 1 ? 's' : ''} this weekend
+            {bookings.length} game{bookings.length !== 1 ? 's' : ''} this week
           </p>
         </div>
 
@@ -703,7 +713,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         )}
       </div>
 
-      {/* Per-slot view */}
+      {/* Per-slot view — all bookings including weekday */}
       {view === 'slot' && (
         <div className="flex flex-col gap-3">
           {bookings.map((b, i) => (
@@ -720,10 +730,13 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         </div>
       )}
 
-      {/* Matrix view */}
+      {/* Matrix view — weekend games only */}
       {view === 'matrix' && (
         <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
-          <MatrixView bookings={bookings} players={players} availMap={availMap} />
+          {weekendBookings.length > 0
+            ? <MatrixView bookings={weekendBookings} players={players} availMap={availMap} />
+            : <p className="px-4 py-6 font-rajdhani text-sm text-zinc-600 text-center">No weekend games this week.</p>
+          }
         </div>
       )}
     </div>
