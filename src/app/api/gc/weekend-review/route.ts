@@ -1,55 +1,66 @@
-// GET — returns all O/E players and which squads cover them
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { createServiceClient } from '@/lib/supabase'
+
+// GET /api/gc/weekend-review?week_start=YYYY-MM-DD
 export async function GET(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies })
-  // GC members are admins — re-validate
-  const captain = await assertCaptain(supabase)
-  if (!captain) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!user?.isAdmin && !user?.isCaptain) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const weekStart = req.nextUrl.searchParams.get('week_start')
   if (!weekStart) return NextResponse.json({ error: 'week_start required' }, { status: 400 })
 
-  // All bookings this weekend
-  const { data: bookings } = await supabase.from('bookings')
-    .select('id, slot_time, format')
-    .gte('game_date', weekStart)
-    .lt('game_date', new Date(new Date(weekStart).getTime() + 7*86400000).toISOString().slice(0,10))
+  const weekEnd = new Date(new Date(weekStart).getTime() + 7 * 86400000)
+    .toISOString().slice(0, 10)
 
-  // All O/E availability this weekend
-  const { data: avail } = await supabase.from('availability')
+  const supabase = createServiceClient()
+
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('id, slot_time, format, game_date')
+    .gte('game_date', weekStart)
+    .lt('game_date', weekEnd)
+    .eq('status', 'confirmed')
+
+  const bookingIds = (bookings ?? []).map(b => b.id)
+  if (!bookingIds.length) return NextResponse.json({ bookings: [], avail: [], squads: [] })
+
+  const { data: avail } = await supabase
+    .from('availability')
     .select('player_id, booking_id, response, players(name)')
     .in('response', ['O', 'E'])
-    .in('booking_id', bookings?.map(b => b.id) ?? [])
+    .in('booking_id', bookingIds)
 
-  // All squad selections this weekend
-  const { data: squads } = await supabase.from('squad')
+  const { data: squads } = await supabase
+    .from('squad')
     .select('player_id, booking_id, status')
-    .in('booking_id', bookings?.map(b => b.id) ?? [])
+    .in('booking_id', bookingIds)
     .in('status', ['pending_approval', 'approved', 'announced'])
 
   return NextResponse.json({ bookings, avail, squads })
 }
 
-// PATCH — GC approves or returns a squad
+// PATCH /api/gc/weekend-review — approve or return a squad
 export async function PATCH(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies })
-  const captain = await assertCaptain(supabase)
-  if (!captain) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 })
 
-  const { booking_id, decision, note } = await req.json()
-  if (!['approved', 'returned'].includes(decision))
-    return NextResponse.json({ error: 'Invalid decision' }, { status: 400 })
+  const { booking_id, decision } = await req.json()
+  if (!booking_id || !['approved', 'returned'].includes(decision))
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
-  if (decision === 'approved') {
-    await supabase.from('squad')
-      .update({ status: 'approved' })
-      .eq('booking_id', booking_id).eq('status', 'pending_approval')
-  } else {
-    // Return to draft — captain must revise
-    await supabase.from('squad')
-      .update({ status: 'draft' })
-      .eq('booking_id', booking_id).eq('status', 'pending_approval')
-    // Optionally store the note — could be a separate gc_notes table in a future sprint
-  }
+  const supabase = createServiceClient()
 
+  const newStatus = decision === 'approved' ? 'approved' : 'draft'
+  const { error } = await supabase
+    .from('squad')
+    .update({ status: newStatus })
+    .eq('booking_id', booking_id)
+    .eq('status', 'pending_approval')
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
