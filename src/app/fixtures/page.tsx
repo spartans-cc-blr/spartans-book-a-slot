@@ -6,28 +6,8 @@ import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { FixturesCard } from '@/components/fixtures/FixturesCard'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
-import { getISOWeek, getISOWeekYear, parseISO } from 'date-fns'
+import { parseISO, format, startOfDay, addDays, subDays } from 'date-fns'
 import type { Metadata } from 'next'
-
-// Add this helper after the imports
-function getMatchEndTime(gameDate: string, slotTime: string, format: string): Date {
-  const [hours, minutes] = slotTime.split(':').map(Number)
-  const end = new Date(`${gameDate}T${slotTime}:00+05:30`)
-  const durationHours = format === 'T30' ? 5.5 : 3.5
-  end.setTime(end.getTime() + durationHours * 60 * 60 * 1000)
-  return end
-}
-
-function getMatchStatus(gameDate: string, slotTime: string, format: string): 'upcoming' | 'in_progress' | 'ended' {
-  const now = new Date()
-  const [hours, minutes] = slotTime.split(':').map(Number)
-  const start = new Date(`${gameDate}T${slotTime}:00+05:30`)
-  const end = getMatchEndTime(gameDate, slotTime, format)
-  
-  if (now < start) return 'upcoming'
-  if (now >= start && now < end) return 'in_progress'
-  return 'ended'
-}
 
 export const metadata: Metadata = {
   title: 'Upcoming Fixtures — Spartans Cricket Club',
@@ -35,27 +15,34 @@ export const metadata: Metadata = {
 
 export const revalidate = 60
 
-function weekKey(dateStr: string): string {
-  const d = parseISO(dateStr)
-  return `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, '0')}`
+// Returns a grouping key for validation purposes:
+// - Weekend games (Sat=6, Sun=0) share a key — the Saturday date of that weekend.
+//   This is the only group where OYE cross-game validation applies.
+// - Weekday games each get a unique key (their own date) so they are always
+//   isolated and never participate in weekend OYE validation.
+function validationGroupKey(dateStr: string): string {
+  const d   = parseISO(dateStr)
+  const day = d.getDay() // 0=Sun, 1=Mon ... 6=Sat
+
+  if (day === 6) return `weekend-${dateStr}`                           // Saturday — use own date
+  if (day === 0) return `weekend-${format(subDays(d, 1), 'yyyy-MM-dd')}` // Sunday — use Saturday's date
+  return `weekday-${dateStr}`                                          // Mon–Fri — isolated
 }
 
 export default async function FixturesPage() {
   const supabase = createServiceClient()
   const session  = await getServerSession(authOptions)
   const player   = session?.user as any
-    // Fetch from yesterday so we can catch in-progress games that started today
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const today    = new Date().toISOString().split('T')[0]
 
   const { data: bookings } = await supabase
     .from('bookings')
-    // Change the select to:
     .select(`
-      id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time,
+      id, game_date, slot_time, format, opponent_name, cricheroes_url,
       tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
     `)
     .eq('status', 'confirmed')
-    .gte('game_date', yesterday)
+    .gte('game_date', today)
     .order('game_date', { ascending: true })
     .order('slot_time', { ascending: true })
 
@@ -71,17 +58,6 @@ export default async function FixturesPage() {
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'
   const isCaptain = isPlayer && !!player?.isCaptain
 
-  // Filter out ended matches, tag in-progress ones
-  const activeBookings = (bookings ?? []).filter(b => {
-    const status = getMatchStatus((b as any).game_date, (b as any).slot_time, (b as any).format)
-    return status !== 'ended'
-  })
-
-  const bookingsWithStatus = activeBookings.map(b => ({
-    ...b,
-    matchStatus: getMatchStatus((b as any).game_date, (b as any).slot_time, (b as any).format)
-  }))
-
   // Group bookings by ISO weekend — preserving order
   const weekendOrder: string[] = []
   type BookingWithCard = {
@@ -89,27 +65,23 @@ export default async function FixturesPage() {
     game_date:       string
     slot_time:       string
     initialResponse: string | null
-	matchStatus:     'upcoming' | 'in_progress'
     cardData:        any
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
 
-    for (const b of bookingsWithStatus) {
-    const wk = weekKey((b as any).game_date)
+  for (const b of bookings ?? []) {
+    const wk = validationGroupKey((b as any).game_date)
     if (!weekendMap[wk]) {
       weekendOrder.push(wk)
       weekendMap[wk] = []
     }
-    
-	weekendMap[wk].push({
+    weekendMap[wk].push({
       id:              b.id,
       game_date:       (b as any).game_date,
       slot_time:       (b as any).slot_time,
       initialResponse: existingResponses[b.id] ?? null,
-      matchStatus: (b as any).matchStatus as 'upcoming' | 'in_progress',
-	  cardData:        b,
+      cardData:        b,
     })
-
   }
 
   return (
