@@ -73,3 +73,4 @@ export default async function GCReviewPage() {
     </div>
   )
 }
+export { SiteNav }
