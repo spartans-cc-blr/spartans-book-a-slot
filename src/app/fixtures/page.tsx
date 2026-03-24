@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { FixturesCard } from '@/components/fixtures/FixturesCard'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
-import { getISOWeek, getISOWeekYear, parseISO } from 'date-fns'
+import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
 
 // Add this helper after the imports
@@ -35,9 +35,16 @@ export const metadata: Metadata = {
 
 export const revalidate = 60
 
-function weekKey(dateStr: string): string {
-  const d = parseISO(dateStr)
-  return `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, '0')}`
+// Groups bookings for OYE validation purposes:
+// - Sat + Sun of the same weekend share a key → validation applies across them
+// - Weekday games get an isolated key → no cross-game validation
+function validationGroupKey(dateStr: string): string {
+  const d   = parseISO(dateStr)
+  const day = d.getDay() // 0 = Sun, 6 = Sat
+
+  if (day === 6) return `weekend-${dateStr}`                                    // Saturday — anchor
+  if (day === 0) return `weekend-${format(subDays(d, 1), 'yyyy-MM-dd')}`       // Sunday — map to Saturday
+  return `weekday-${dateStr}`                                                   // Mon–Fri — isolated
 }
 
 export default async function FixturesPage() {
@@ -95,7 +102,7 @@ export default async function FixturesPage() {
   const weekendMap: Record<string, BookingWithCard[]> = {}
 
     for (const b of bookingsWithStatus) {
-    const wk = weekKey((b as any).game_date)
+    const wk = validationGroupKey((b as any).game_date)
     if (!weekendMap[wk]) {
       weekendOrder.push(wk)
       weekendMap[wk] = []
