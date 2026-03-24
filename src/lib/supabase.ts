@@ -1,7 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr'
-import { createServerClient } from '@supabase/ssr'
+//import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+//import { cookies } from 'next/headers'
 
 // ── Browser client (for client components) ───────────────────────
 export function createClient() {
@@ -12,7 +12,7 @@ export function createClient() {
 }
 
 // ── Server client (for server components + API routes) ───────────
-export function createServerSupabaseClient() {
+/*export function createServerSupabaseClient() {
   const cookieStore = cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,7 +25,7 @@ export function createServerSupabaseClient() {
       },
     }
   )
-}
+}*/
 
 // ── Service role client (bypasses RLS — server-side only) ─────────
 export function createServiceClient() {
