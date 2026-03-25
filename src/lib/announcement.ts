@@ -25,7 +25,7 @@ interface AnnouncementBooking {
   } | null
 }
 
-function roleSuffix(skill: string | null, isCaptain: boolean, isVC: boolean): string {
+function roleSuffix(skill: string | null, isCaptain: boolean, isVC: boolean, isWK: boolean): string {
   const suffixes: string[] = []
   if (isWK) suffixes.push('WK')
   if (isCaptain) suffixes.push('C')
@@ -67,7 +67,7 @@ export function buildSquadAnnouncement(
   const jersey     = jerseyLabel(ballType)
 
   const playerLines = players
-    .map((p, i) => `${i + 1}. ${p.name}${roleSuffix(p.primary_skill, p.is_captain, p.is_vc)}`)
+    .map((p, i) => `${i + 1}. ${p.name}${roleSuffix(p.primary_skill, p.is_match_captain, p.is_vc, p.is_wk)}`)
     .join('\n')
 
   const lines: string[] = [
