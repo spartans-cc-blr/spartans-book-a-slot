@@ -1,11 +1,14 @@
 'use client'
-// CaptainsCornerGrid.tsx — Squad Selection v3
+// CaptainsCornerGrid.tsx — Squad Selection v4
 // Two views:
 //   Per-slot (default mobile) — one expanded card per game with full player list + squad selection.
 //   Matrix  (default desktop) — rows = players, cols = slots. Read-only availability overview.
 // Squad selection lives in Per-slot view only.
 // priority_pick players auto-checked. Taken-elsewhere players struck through + checkbox disabled.
 // Hard cap at 12 — further checkboxes disabled once reached.
+// Match-specific C / VC / WK role toggles on selected rows.
+// Player names link to CricHeroes profile if set.
+// Post-announcement edit + reshare supported.
 
 import { useState, useMemo, useCallback } from 'react'
 
@@ -27,6 +30,14 @@ interface Player {
   primary_skill: string | null
   is_captain: boolean
   priority_pick: boolean
+  cricheroes_url: string | null
+}
+
+// Match-specific roles assigned per squad selection
+interface MatchRoles {
+  captain: string | null   // player id — one only
+  vc:      string | null   // player id — one only
+  wk:      Set<string>     // player ids — multiple valid (two WKs happens)
 }
 
 interface Props {
@@ -34,17 +45,12 @@ interface Props {
   bookings:  Booking[]
   players:   Player[]
   availMap:  Record<string, Record<string, string>>
-  // squadMap: bookingId → array of playerIds already selected in that slot's draft.
-  // Passed from parent so all SlotCards share cross-slot awareness.
-  // Parent must lift selection state up for this to work across slots.
-  // For now, passed as {} — wired to API in next sprint item.
   squadMap?: Record<string, string[]>
 }
 
 // ── Constants ─────────────────────────────────────────────────────
 const MAX_SQUAD = 12
 
-// Spreadsheet-matched colours
 const RESP: Record<string, { bg: string; text: string; border: string; label: string }> = {
   Y: { bg: '#1a4731', text: '#4ade80', border: '#166534', label: 'Available' },
   E: { bg: '#1e3a5f', text: '#60a5fa', border: '#1d4ed8', label: 'Either game today — one only' },
@@ -135,18 +141,54 @@ function getCounts(
   return counts
 }
 
-// Returns true for Saturday (6) and Sunday (0)
 function isWeekendDate(dateStr: string): boolean {
   const dow = new Date(dateStr + 'T00:00:00').getDay()
   return dow === 0 || dow === 6
 }
 
+// Build WhatsApp-ready announcement text from current selection + roles
+function buildAnnouncementText(
+  booking: Booking,
+  players: Player[],
+  selected: Set<string>,
+  roles: MatchRoles
+): string {
+  const d      = new Date(booking.game_date + 'T00:00:00')
+  const day    = d.getDate()
+  const suffix = [,'st','nd','rd'][((day % 100 - 20) % 10) || day % 100 > 10 ? 0 : day % 10] ?? 'th'
+  const dateStr = `${day}${suffix} ${d.toLocaleDateString('en-IN', { month: 'long' })} (${d.toLocaleDateString('en-IN', { weekday: 'long' })})`
+
+  const squadPlayers = players.filter(p => selected.has(p.id))
+  const playerLines  = squadPlayers.map((p, i) => {
+    const tags: string[] = []
+    if (roles.wk.has(p.id))     tags.push('WK')
+    if (roles.captain === p.id) tags.push('C')
+    if (roles.vc === p.id)      tags.push('VC')
+    return `${i + 1}. ${p.name}${tags.length ? ` (${tags.join(', ')})` : ''}`
+  }).join('\n')
+
+  const ballType = booking.tournament?.ball_type ?? 'red'
+  const jersey   = ballType === 'white' ? 'Colours' : 'Whites'
+
+  return [
+    `📅 *${dateStr}*`,
+    ``,
+    `Format: ${booking.format}`,
+    `Jersey: *${jersey}*`,
+    ``,
+    `*Team*`,
+    playerLines,
+    ``,
+    booking.opponent_name ? `*Opponents:* ${booking.opponent_name}` : null,
+    ``,
+    `*Follow Reporting Time strictly* 🏏`,
+  ].filter((l): l is string => l !== null).join('\n')
+}
+
 // ── useCopySquad hook ─────────────────────────────────────────────
 function useCopySquad() {
   const [copied, setCopied] = useState<string | null>(null)
-  const copy = useCallback((bookingId: string, label: string, names: string[]) => {
-    const text = `Spartans Squad — ${label}\n` +
-      names.map((n, i) => `${i + 1}. ${n}`).join('\n')
+  const copy = useCallback((bookingId: string, text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(bookingId)
       setTimeout(() => setCopied(null), 2000)
@@ -209,17 +251,49 @@ function RespCell({ code, isConflict }: { code: string | null; isConflict?: bool
   )
 }
 
+// ── PlayerName — conditional CricHeroes link ──────────────────────
+function PlayerName({
+  player, isTaken, hasDues,
+}: {
+  player: Player; isTaken: boolean; hasDues: boolean
+}) {
+  const cls = [
+    'font-rajdhani text-sm flex-1 leading-none',
+    isTaken ? 'line-through text-zinc-700' : hasDues ? 'text-amber-400' : 'text-parchment',
+  ].filter(Boolean).join(' ')
+
+  const badge = player.is_captain
+    ? <span className="ml-1.5 font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1 py-px rounded-sm">CAP</span>
+    : null
+
+  if (player.cricheroes_url && !isTaken) {
+    return (
+      <a
+        href={player.cricheroes_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={e => e.stopPropagation()}
+        className={cls + ' hover:underline underline-offset-2'}>
+        {player.name}{badge}
+      </a>
+    )
+  }
+  return <span className={cls}>{player.name}{badge}</span>
+}
+
 // ── SelectablePlayerRow ───────────────────────────────────────────
 function SelectablePlayerRow({
-  player, response, selected, atCap, status, takenLabel, onToggle,
+  player, response, selected, atCap, status, takenLabel, roles, onToggle, onRoleToggle,
 }: {
-  player:     Player
-  response:   string
-  selected:   Set<string>
-  atCap:      boolean
-  status:     'draft' | 'pending' | 'approved' | 'announced'
-  takenLabel: string | null
-  onToggle:   (id: string) => void
+  player:       Player
+  response:     string
+  selected:     Set<string>
+  atCap:        boolean
+  status:       'draft' | 'pending' | 'approved' | 'announced'
+  takenLabel:   string | null
+  roles:        MatchRoles
+  onToggle:     (id: string) => void
+  onRoleToggle: (id: string, role: 'captain' | 'vc' | 'wk') => void
 }) {
   const isTaken    = !!takenLabel
   const isSel      = selected.has(player.id)
@@ -227,55 +301,102 @@ function SelectablePlayerRow({
   const hasDues    = player.wallet_balance < 0
   const cfg        = RESP[response]
 
+  const isMatchCaptain = roles.captain === player.id
+  const isVC           = roles.vc === player.id
+  const isWK           = roles.wk.has(player.id)
+
+  // Badges shown when roles are assigned and status is not draft
+  const activeBadges = [
+    isMatchCaptain && { label: 'C',  cls: 'bg-gold/20 border-gold-dim text-gold' },
+    isVC           && { label: 'VC', cls: 'bg-gold/10 border-gold-dim text-gold' },
+    isWK           && { label: 'WK', cls: 'bg-sky-950/40 border-sky-700 text-sky-400' },
+  ].filter(Boolean) as { label: string; cls: string }[]
+
   return (
-    <div
-      onClick={() => !isDisabled && onToggle(player.id)}
-      className={[
-        'flex items-center gap-2 px-3 py-2.5 border-b border-ink-4 last:border-0 transition-colors',
-        isTaken     ? 'opacity-40'                         : '',
-        isSel       ? 'bg-sky-950/30'                      : '',
-        !isDisabled ? 'cursor-pointer hover:bg-ink-4'      : 'cursor-default',
-      ].filter(Boolean).join(' ')}>
+    <div className={[
+      'border-b border-ink-4 last:border-0 transition-colors',
+      isTaken ? 'opacity-40' : '',
+      isSel   ? 'bg-sky-950/30' : '',
+    ].filter(Boolean).join(' ')}>
 
-      {/* Checkbox */}
-      <span className={[
-        'w-3.5 h-3.5 rounded-sm border flex items-center justify-center flex-shrink-0 transition-all',
-        isSel             ? 'bg-sky-500 border-sky-400'   : '',
-        isTaken           ? 'bg-zinc-800 border-zinc-700' : '',
-        !isSel && !isTaken ? 'border-zinc-600'             : '',
-      ].filter(Boolean).join(' ')}>
-        {isSel && <span className="text-[8px] text-white font-bold leading-none">✓</span>}
-      </span>
+      {/* Main selectable row */}
+      <div
+        onClick={() => !isDisabled && onToggle(player.id)}
+        className={[
+          'flex items-center gap-2 px-3 py-2.5 transition-colors',
+          !isDisabled ? 'cursor-pointer hover:bg-ink-4' : 'cursor-default',
+        ].filter(Boolean).join(' ')}>
 
-      {/* Name */}
-      <span className={[
-        'font-rajdhani text-sm flex-1 leading-none',
-        isTaken ? 'line-through text-zinc-700' : hasDues ? 'text-amber-400' : 'text-parchment',
-      ].filter(Boolean).join(' ')}>
-        {player.name}
-        {player.is_captain && (
-          <span className="ml-1.5 font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1 py-px rounded-sm">
-            CAP
+        {/* Checkbox */}
+        <span className={[
+          'w-3.5 h-3.5 rounded-sm border flex items-center justify-center flex-shrink-0 transition-all',
+          isSel              ? 'bg-sky-500 border-sky-400'   : '',
+          isTaken            ? 'bg-zinc-800 border-zinc-700' : '',
+          !isSel && !isTaken ? 'border-zinc-600'             : '',
+        ].filter(Boolean).join(' ')}>
+          {isSel && <span className="text-[8px] text-white font-bold leading-none">✓</span>}
+        </span>
+
+        <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} />
+
+        {/* Skill abbreviation */}
+        <span className="font-rajdhani text-[10px] text-zinc-700 min-w-[24px] text-right flex-shrink-0">
+          {player.primary_skill?.slice(0, 3).toUpperCase() ?? ''}
+        </span>
+
+        {/* Right-side pill */}
+        {isTaken ? (
+          <span className="font-rajdhani text-[9px] px-1.5 py-0.5 rounded-sm bg-zinc-800 border border-zinc-700 text-zinc-500 whitespace-nowrap">
+            in {takenLabel}
+          </span>
+        ) : isSel && status !== 'draft' && activeBadges.length > 0 ? (
+          <div className="flex gap-1 flex-shrink-0">
+            {activeBadges.map(b => (
+              <span key={b.label} className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border ${b.cls}`}>
+                {b.label}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span
+            className="font-rajdhani text-[10px] font-bold px-1.5 py-0.5 rounded-sm flex-shrink-0"
+            style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
+            {response}
           </span>
         )}
-      </span>
+      </div>
 
-      {/* Role */}
-      <span className="font-rajdhani text-[10px] text-zinc-700 min-w-[24px] text-right flex-shrink-0">
-        {player.primary_skill?.slice(0, 3).toUpperCase() ?? ''}
-      </span>
-
-      {/* Taken pill OR response pill */}
-      {isTaken ? (
-        <span className="font-rajdhani text-[9px] px-1.5 py-0.5 rounded-sm bg-zinc-800 border border-zinc-700 text-zinc-500 whitespace-nowrap">
-          in {takenLabel}
-        </span>
-      ) : (
-        <span
-          className="font-rajdhani text-[10px] font-bold px-1.5 py-0.5 rounded-sm flex-shrink-0"
-          style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
-          {response}
-        </span>
+      {/* Role toggle row — only visible when selected in draft mode */}
+      {isSel && !isTaken && status === 'draft' && (
+        <div
+          className="flex items-center gap-1.5 px-3 pb-2 pt-0"
+          onClick={e => e.stopPropagation()}>
+          <span className="font-rajdhani text-[9px] text-zinc-700 mr-0.5">Role:</span>
+          {([
+            { key: 'captain' as const, label: 'C',  active: isMatchCaptain, title: 'Match captain' },
+            { key: 'vc'      as const, label: 'VC', active: isVC,           title: 'Vice captain' },
+            { key: 'wk'      as const, label: 'WK', active: isWK,           title: 'Wicket keeper' },
+          ]).map(role => (
+            <button
+              key={role.key}
+              title={role.title}
+              onClick={() => onRoleToggle(player.id, role.key)}
+              className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border transition-colors ${
+                role.active
+                  ? role.key === 'wk'
+                    ? 'bg-sky-950/60 border-sky-700 text-sky-400'
+                    : 'bg-gold/20 border-gold-dim text-gold'
+                  : 'bg-ink-4 border-ink-5 text-zinc-600 hover:text-zinc-400 hover:border-zinc-600'
+              }`}>
+              {role.label}
+            </button>
+          ))}
+          {(isMatchCaptain || isVC || isWK) && (
+            <span className="font-rajdhani text-[9px] text-zinc-600 ml-0.5">
+              {[isMatchCaptain && 'Captain', isVC && 'VC', isWK && 'WK'].filter(Boolean).join(' · ')}
+            </span>
+          )}
+        </div>
       )}
     </div>
   )
@@ -292,27 +413,36 @@ function SlotCard({
   squadMap:    Record<string, string[]>
   defaultOpen: boolean
 }) {
-  const [open, setOpen] = useState(defaultOpen)
+  const [open,          setOpen]          = useState(defaultOpen)
+  const [status,        setStatus]        = useState<'draft' | 'pending' | 'approved' | 'announced'>('draft')
+  const [everAnnounced, setEverAnnounced] = useState(false)
+
   const [selected, setSelected] = useState<Set<string>>(() => {
-    // Auto-pick priority_pick players who have responded for this slot
     const auto = new Set<string>()
     players.forEach(p => {
       if (p.priority_pick && availMap[booking.id]?.[p.id]) auto.add(p.id)
     })
     return auto
   })
-  const [status, setStatus] = useState<'draft' | 'pending' | 'approved' | 'announced'>('draft')
+
+  const [roles, setRoles] = useState<MatchRoles>({
+    captain: null,
+    vc:      null,
+    wk:      new Set(),
+  })
+
   const { copy, copied } = useCopySquad()
 
-  const counts         = getCounts(booking.id, players, availMap)
-  const eligible       = getSlotPlayers(booking.id, bookings, players, availMap)
-  const atCap          = selected.size >= MAX_SQUAD
+  const counts          = getCounts(booking.id, players, availMap)
+  const eligible        = getSlotPlayers(booking.id, bookings, players, availMap)
+  const atCap           = selected.size >= MAX_SQUAD
   const priorityPlayers = eligible.filter(e => e.player.priority_pick)
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
-  const selectedNames   = players.filter(p => selected.has(p.id)).map(p => p.name)
   const slotLabel       = `${SLOT_SHORT[booking.slot_time] ?? booking.slot_time} ${booking.format}`
 
-  // Returns the short slot label if this player is already selected in a different booking
+  const announcementText = buildAnnouncementText(booking, players, selected, roles)
+  const waLink           = `https://wa.me/?text=${encodeURIComponent(announcementText)}`
+
   function takenElsewhere(playerId: string): string | null {
     for (const [bId, ids] of Object.entries(squadMap)) {
       if (bId !== booking.id && ids.includes(playerId)) {
@@ -329,12 +459,33 @@ function SlotCard({
       const next = new Set(prev)
       if (next.has(playerId)) {
         next.delete(playerId)
+        // Clear roles when player is removed
+        setRoles(r => ({
+          captain: r.captain === playerId ? null : r.captain,
+          vc:      r.vc      === playerId ? null : r.vc,
+          wk:      new Set([...r.wk].filter(id => id !== playerId)),
+        }))
       } else {
-        if (next.size >= MAX_SQUAD) return prev // hard cap — silently no-op
+        if (next.size >= MAX_SQUAD) return prev
         next.add(playerId)
       }
       return next
     })
+  }
+
+  function handleRoleToggle(playerId: string, role: 'captain' | 'vc' | 'wk') {
+    setRoles(prev => {
+      if (role === 'captain') return { ...prev, captain: prev.captain === playerId ? null : playerId }
+      if (role === 'vc')      return { ...prev, vc:      prev.vc      === playerId ? null : playerId }
+      const nextWK = new Set(prev.wk)
+      nextWK.has(playerId) ? nextWK.delete(playerId) : nextWK.add(playerId)
+      return { ...prev, wk: nextWK }
+    })
+  }
+
+  function handleAnnounce() {
+    setStatus('announced')
+    setEverAnnounced(true)
   }
 
   const pct = Math.min((selected.size / MAX_SQUAD) * 100, 100)
@@ -346,7 +497,6 @@ function SlotCard({
         className="w-full text-left px-4 py-3.5 hover:bg-ink-4 transition-colors"
         onClick={() => setOpen(v => !v)}>
         <div className="flex items-start gap-2">
-          {/* Slot time badge */}
           <div className="flex-shrink-0 text-center w-14">
             <p className="font-cinzel text-base font-bold text-gold leading-none">
               {SLOT_SHORT[booking.slot_time] ?? booking.slot_time}
@@ -354,7 +504,6 @@ function SlotCard({
             <p className="font-rajdhani text-[9px] text-zinc-600 mt-0.5">{booking.format}</p>
           </div>
 
-          {/* Title */}
           <div className="flex-1 min-w-0">
             <p className="font-cinzel text-sm font-semibold text-parchment truncate leading-none">
               {booking.tournament?.name ?? 'Match'}
@@ -366,7 +515,6 @@ function SlotCard({
             )}
           </div>
 
-          {/* Status + count chips */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <StatusBadge status={status} />
             {counts.total === 0 ? (
@@ -385,7 +533,16 @@ function SlotCard({
 
       {open && (
         <div>
-          {/* Available across all slots section */}
+          {/* Hint when in draft with players selected */}
+          {status === 'draft' && selected.size > 0 && (
+            <div className="px-3 py-1.5 bg-ink-4 border-b border-ink-5">
+              <p className="font-rajdhani text-[10px] text-zinc-600">
+                Tap a selected player to assign C / VC / WK for this match.
+              </p>
+            </div>
+          )}
+
+          {/* Available across all slots */}
           {priorityPlayers.length > 0 && (
             <>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-ink-4 border-y border-ink-5">
@@ -402,13 +559,15 @@ function SlotCard({
                   atCap={atCap}
                   status={status}
                   takenLabel={takenElsewhere(player.id)}
+                  roles={roles}
                   onToggle={toggle}
+                  onRoleToggle={handleRoleToggle}
                 />
               ))}
             </>
           )}
 
-          {/* Available section */}
+          {/* Available */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-ink-4 border-y border-ink-5">
             <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-700 flex-1">
               Available
@@ -424,7 +583,7 @@ function SlotCard({
             </p>
           ) : normalPlayers.length === 0 && priorityPlayers.length > 0 ? (
             <p className="px-4 py-3 font-rajdhani text-xs text-zinc-700 text-center">
-              All available players are priority picks above.
+              All available players are in the priority section above.
             </p>
           ) : (
             normalPlayers.map(({ player, response }) => (
@@ -436,12 +595,14 @@ function SlotCard({
                 atCap={atCap}
                 status={status}
                 takenLabel={takenElsewhere(player.id)}
+                roles={roles}
                 onToggle={toggle}
+                onRoleToggle={handleRoleToggle}
               />
             ))
           )}
 
-          {/* Footer — progress bar + actions */}
+          {/* Footer */}
           <div className="px-3 py-2.5 bg-ink-4 border-t border-ink-5 flex items-center gap-3 flex-wrap">
             {/* Progress bar + count */}
             <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -461,32 +622,62 @@ function SlotCard({
               )}
             </div>
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => copy(booking.id, slotLabel, selectedNames)}
-                className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm border border-ink-5 text-zinc-500 hover:text-zinc-300 transition-colors">
-                {copied === booking.id ? 'Copied!' : 'Copy names'}
-              </button>
+            {/* Actions */}
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+
+              {/* Copy — always available once anything selected */}
+              {(selected.size > 0 || everAnnounced) && (
+                <button
+                  onClick={() => copy(booking.id, announcementText)}
+                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm border border-ink-5 text-zinc-500 hover:text-zinc-300 transition-colors">
+                  {copied === booking.id ? 'Copied!' : 'Copy'}
+                </button>
+              )}
+
+              {/* WhatsApp — available once anything selected */}
+              {selected.size > 0 && (
+                <a
+                  href={waLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-emerald-950/20 border border-emerald-800/40 text-emerald-500 hover:bg-emerald-950/40 transition-colors">
+                  WhatsApp
+                </a>
+              )}
 
               {status === 'draft' && (
                 <button
                   onClick={() => setStatus('pending')}
                   disabled={selected.size === 0}
                   className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                  Submit for GC review
+                  {everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
                 </button>
               )}
+
               {status === 'approved' && (
                 <button
-                  onClick={() => setStatus('announced')}
+                  onClick={handleAnnounce}
                   className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-emerald-950/40 border border-emerald-700 text-emerald-400 hover:bg-emerald-950/70 transition-colors">
-                  Announce squad
+                  {everAnnounced ? 'Re-announce' : 'Announce squad'}
                 </button>
               )}
+
               {status === 'announced' && (
-                <span className="font-rajdhani text-[10px] text-emerald-500">
-                  Squad announced
+                <span className="font-rajdhani text-[10px] text-emerald-500">Announced</span>
+              )}
+
+              {/* Edit — available after first announcement regardless of current status */}
+              {everAnnounced && status === 'announced' && (
+                <button
+                  onClick={() => setStatus('draft')}
+                  className="font-rajdhani text-[9px] px-1.5 py-0.5 rounded-sm border border-ink-5 text-zinc-600 hover:text-zinc-400 transition-colors">
+                  Edit
+                </button>
+              )}
+
+              {status === 'pending' && (
+                <span className="font-rajdhani text-[10px] text-amber-400">
+                  Awaiting GC
                 </span>
               )}
             </div>
@@ -570,12 +761,28 @@ function MatrixView({
                 <tr key={p.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
                   <td className="px-2 py-1.5 sticky left-0 bg-ink-3 z-10" style={{ minWidth: 112 }}>
                     <div className="flex items-center gap-1.5">
-                      <span className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
-                        {desktopMatrixName(p)}
-                      </span>
-                      <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
-                        {mobileMatrixName(p)}
-                      </span>
+                      {/* Desktop name */}
+                      {p.cricheroes_url ? (
+                        <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
+                          className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          {desktopMatrixName(p)}
+                        </a>
+                      ) : (
+                        <span className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          {desktopMatrixName(p)}
+                        </span>
+                      )}
+                      {/* Mobile name */}
+                      {p.cricheroes_url ? (
+                        <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
+                          className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          {mobileMatrixName(p)}
+                        </a>
+                      ) : (
+                        <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          {mobileMatrixName(p)}
+                        </span>
+                      )}
                       {p.is_captain && (
                         <span className="font-rajdhani text-[8px] font-bold bg-gold/10 border border-gold-dim text-gold px-0.5 rounded-sm flex-shrink-0">C</span>
                       )}
@@ -585,12 +792,10 @@ function MatrixView({
                     </div>
                   </td>
                   {bookings.map(b => {
-                    const r       = availMap[b.id]?.[p.id]
-                    const display = (r === 'Y' || r === 'O' || r === 'E') ? r : null
+                    const r          = availMap[b.id]?.[p.id]
+                    const display    = (r === 'Y' || r === 'O' || r === 'E') ? r : null
                     const isConflict = display === 'O' || display === 'E'
-                    return (
-                      <RespCell key={b.id} code={display} isConflict={isConflict} />
-                    )
+                    return <RespCell key={b.id} code={display} isConflict={isConflict} />
                   })}
                 </tr>
               )
@@ -611,12 +816,8 @@ function MatrixView({
                       .filter(code => counts[b.id][code] > 0)
                       .map((code, idx, arr) => (
                         <span key={code}>
-                          <span style={{ color: RESP[code].text }}>
-                            {counts[b.id][code]}{code}
-                          </span>
-                          {idx < arr.length - 1 && (
-                            <span className="text-zinc-700">, </span>
-                          )}
+                          <span style={{ color: RESP[code].text }}>{counts[b.id][code]}{code}</span>
+                          {idx < arr.length - 1 && <span className="text-zinc-700">, </span>}
                         </span>
                       ))
                     }
@@ -652,14 +853,10 @@ function Legend() {
 // ── Main export ────────────────────────────────────────────────────
 export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {} }: Props) {
   const [view, setView] = useState<'slot' | 'matrix'>('slot')
-
-  // Matrix shows weekend games only (Sat=6, Sun=0).
-  // Per-slot shows all bookings including weekday games.
   const weekendBookings = bookings.filter(b => isWeekendDate(b.game_date))
 
   return (
     <div>
-      {/* Weekend header + view toggle */}
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
           <h2 className="font-cinzel text-base font-semibold text-gold">{weekLabel}</h2>
@@ -668,7 +865,6 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
           </p>
         </div>
 
-        {/* View toggle */}
         <div className="flex border border-ink-5 rounded overflow-hidden flex-shrink-0">
           <button
             onClick={() => setView('slot')}
@@ -687,16 +883,14 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         </div>
       </div>
 
-      {/* Legend panel — selection legend + response codes */}
       <div className="mb-4 bg-ink-3 border border-ink-5 rounded px-3 py-2.5">
-        {/* Selection legend — only relevant in per-slot view */}
         {view === 'slot' && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-2.5 pb-2.5 border-b border-ink-5">
             {[
-              { dot: 'bg-emerald-900/60 border-emerald-700',    label: 'Available across all slots' },
-              { dot: 'bg-sky-900/40 border-sky-700',            label: 'Selected for this slot' },
-              { dot: 'bg-zinc-800 border-zinc-600 opacity-50',  label: 'Taken — in another slot\'s squad' },
-              { dot: 'bg-amber-900/40 border-amber-700',        label: 'Has outstanding dues' },
+              { dot: 'bg-emerald-900/60 border-emerald-700',   label: 'Available across all slots' },
+              { dot: 'bg-sky-900/40 border-sky-700',           label: 'Selected for this slot' },
+              { dot: 'bg-zinc-800 border-zinc-600 opacity-50', label: 'Taken — in another slot\'s squad' },
+              { dot: 'bg-amber-900/40 border-amber-700',       label: 'Has outstanding dues' },
             ].map(({ dot, label }) => (
               <div key={label} className="flex items-center gap-1.5">
                 <span className={`w-2.5 h-2.5 rounded-sm border flex-shrink-0 ${dot}`} />
@@ -713,7 +907,6 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         )}
       </div>
 
-      {/* Per-slot view — all bookings including weekday */}
       {view === 'slot' && (
         <div className="flex flex-col gap-3">
           {bookings.map((b, i) => (
@@ -730,7 +923,6 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         </div>
       )}
 
-      {/* Matrix view — weekend games only */}
       {view === 'matrix' && (
         <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
           {weekendBookings.length > 0

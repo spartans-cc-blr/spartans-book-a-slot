@@ -55,7 +55,7 @@ export default async function CaptainsCornerPage() {
   // ── Fetch all active players ───────────────────────────────
   const { data: players } = await supabase
     .from('players')
-    .select('id, name, jersey_name, jersey_number, wallet_balance, primary_skill, is_captain, priority_pick')
+    .select('id, name, jersey_name, jersey_number, wallet_balance, primary_skill, is_captain, priority_pick, cricheroes_url')
     .eq('active', true)
     .order('name', { ascending: true })
 

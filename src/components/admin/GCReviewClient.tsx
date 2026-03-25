@@ -260,9 +260,20 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                 )}
 
                 {/* Confirmation messages */}
-                {done[b.id] === 'approved' && (
-                  <div className="px-4 pb-3 font-rajdhani text-xs text-emerald-400">
-                    ✓ Approved — captain can now announce this squad.
+                {done[b.id] === 'approved' && announcementText[b.id] && (
+                  <div className="px-4 pb-4 flex gap-3 flex-wrap">
+                    <button
+                      onClick={() => navigator.clipboard.writeText(announcementText[b.id])}
+                      className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-sm border border-ink-5 text-zinc-400 hover:text-zinc-200 transition-colors">
+                      📋 Copy announcement
+                    </button>
+                    
+                      href={buildAnnouncementWhatsAppLink(announcementText[b.id])}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-sm bg-emerald-950/40 border border-emerald-700 text-emerald-400 hover:bg-emerald-950/70 transition-colors">
+                      📱 Send via WhatsApp
+                    </a>
                   </div>
                 )}
                 {done[b.id] === 'returned' && (
