@@ -572,6 +572,19 @@ function SlotCard({
             <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-700 flex-1">
               Available
             </span>
+            {status === 'draft' && eligible.length > 0 && (
+             <button
+               onClick={() => {
+                 const toAdd = eligible
+                   .filter(e => !takenElsewhere(e.player.id) && !selected.has(e.player.id))
+                   .slice(0, MAX_SQUAD - selected.size)
+                 toAdd.forEach(e => toggle(e.player.id))
+               }}
+               disabled={atCap}
+               className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-ink-5 text-zinc-600 hover:text-zinc-300 hover:border-zinc-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+               {atCap ? 'Full' : 'Select all'}
+             </button>
+           )}
             <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-700">
               {counts.total} responded
             </span>
