@@ -477,7 +477,7 @@ function SlotCard({
     setRoles(prev => {
       if (role === 'captain') return { ...prev, captain: prev.captain === playerId ? null : playerId }
       if (role === 'vc')      return { ...prev, vc:      prev.vc      === playerId ? null : playerId }
-      //const nextWK = new Set(prev.wk)
+      const nextWK = new Set(prev.wk)
       nextWK.has(playerId) ? nextWK.delete(playerId) : nextWK.add(playerId)
       return { ...prev, wk: nextWK }
     })
