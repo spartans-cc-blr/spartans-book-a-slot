@@ -192,25 +192,23 @@ function buildAnnouncementText(
 
   const lines: (string | null)[] = [
     `📅 *${dateStr}*`,
-    ``,
+    `*Reporting Time: ${reportTime}*`,
     `Format: ${booking.format}`,
+    `Jersey: *${jersey}*`,
+    ``,
     ground?.name ? `Ground: ${ground.name}` : null,
     ground?.maps_url ?? null,
-    ``,
-    `*Reporting Time: ${reportTime}*`,
-    ``,
-    `Jersey: *${jersey}*`,
     ``,
     `*Team*`,
     playerLines,
     ``,
-    booking.opponent_name ? `*Opponents:* ${booking.opponent_name}` : null,
+    booking.opponent_name ? `*Opponent:* ${booking.opponent_name}` : null,
     ``,
-    booking.cricheroes_url ? `*Match Details:*\n${booking.cricheroes_url}` : null,
+    booking.cricheroes_url ? `*Match Link:*\n${booking.cricheroes_url}` : null,
     ``,
     ground?.hospital_url ? `*Nearest hospital:*\n${ground.hospital_url}` : null,
     ``,
-    `*Follow Reporting Time strictly* 🏏`,
+    `*Follow Reporting time strictly. Let us warm up. Go well, _Spartans_* 🏏`,
   ]
 
   return lines.filter((l): l is string => l !== null).join('\n')
