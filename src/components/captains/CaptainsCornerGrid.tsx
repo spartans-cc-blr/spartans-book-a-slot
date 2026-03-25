@@ -18,7 +18,13 @@ interface Booking {
   slot_time: string
   format: string
   opponent_name: string | null
-  tournament: { name: string; ball_type: string } | null
+  match_time: string | null
+  cricheroes_url: string | null
+  tournament: {
+     name: string
+     ball_type: string
+     ground: { name: string; maps_url: string; hospital_url: string } | null
+   } | null
 }
 
 interface Player {
@@ -147,6 +153,18 @@ function isWeekendDate(dateStr: string): boolean {
 }
 
 // Build WhatsApp-ready announcement text from current selection + roles
+function formatReportingTime(matchTime: string | null, slotTime: string): string {
+  // Use match_time if set, fall back to slot_time. Reporting = 15 min before.
+  const base = matchTime ?? slotTime
+  const [h, m] = base.split(':').map(Number)
+  const totalMinutes = h * 60 + m - 15
+  const rh = Math.floor(totalMinutes / 60)
+  const rm = totalMinutes % 60
+  const period = rh >= 12 ? 'PM' : 'AM'
+  const hour12 = rh % 12 || 12
+  return `${hour12}${rm > 0 ? `:${String(rm).padStart(2, '0')}` : ''} ${period}`
+}
+
 function buildAnnouncementText(
   booking: Booking,
   players: Player[],
@@ -167,13 +185,20 @@ function buildAnnouncementText(
     return `${i + 1}. ${p.name}${tags.length ? ` (${tags.join(', ')})` : ''}`
   }).join('\n')
 
-  const ballType = booking.tournament?.ball_type ?? 'red'
-  const jersey   = ballType === 'white' ? 'Colours' : 'Whites'
+  const ballType     = booking.tournament?.ball_type ?? 'red'
+  const jersey       = ballType === 'white' ? 'Colours' : 'Whites'
+  const ground       = booking.tournament?.ground
+  const reportTime   = formatReportingTime(booking.match_time, booking.slot_time)
 
-  return [
+  const lines: (string | null)[] = [
     `📅 *${dateStr}*`,
     ``,
     `Format: ${booking.format}`,
+    ground?.name ? `Venue: ${ground.name}` : null,
+    `*Reporting Time: ${reportTime}*`,
+    ``,
+    ground?.maps_url ?? null,
+    ``,
     `Jersey: *${jersey}*`,
     ``,
     `*Team*`,
@@ -181,8 +206,14 @@ function buildAnnouncementText(
     ``,
     booking.opponent_name ? `*Opponents:* ${booking.opponent_name}` : null,
     ``,
+    booking.cricheroes_url ? `*Match Details:*\n${booking.cricheroes_url}` : null,
+    ``,
+    ground?.hospital_url ? `*Nearest hospital:*\n${ground.hospital_url}` : null,
+    ``,
     `*Follow Reporting Time strictly* 🏏`,
-  ].filter((l): l is string => l !== null).join('\n')
+  ]
+
+  return lines.filter((l): l is string => l !== null).join('\n')
 }
 
 // ── useCopySquad hook ─────────────────────────────────────────────
