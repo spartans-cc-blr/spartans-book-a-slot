@@ -70,7 +70,7 @@ export function buildSquadAnnouncement(
     .map((p, i) => `${i + 1}. ${p.name}${roleSuffix(p.primary_skill, p.is_match_captain, p.is_vc, p.is_wk)}`)
     .join('\n')
 
-  const lines: string[] = [
+  const lines: (string | null)[] = [
     `📅 *${dateStr}*`,
     ``,
     `Format: ${booking.format}`,
