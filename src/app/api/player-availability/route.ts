@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (existing?.id) {
     const { data, error } = await supabase
       .from('availability')
-      .update({ response })
+      .update({ response, updated_by: null, update_source: 'player' })
       .eq('id', existing.id)
       .select()
       .single()
@@ -58,12 +58,23 @@ export async function POST(req: NextRequest) {
   } else {
     const { data, error } = await supabase
       .from('availability')
-      .insert({ player_id: player.playerId, booking_id, response })
+      .insert({ player_id: player.playerId, booking_id, response, updated_by: null, update_source: 'player' })
       .select()
       .single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     result = data
   }
+
+  // Auto-reactivate: if this player is inactive, their first availability
+  // submission brings them back — no admin action needed.
+  supabase
+    .from('players')
+    .update({ active: true })
+    .eq('id', player.playerId)
+    .eq('active', false)   // no-op if already active — avoids unnecessary writes
+    .then(({ error }) => {
+      if (error) console.error('Auto-reactivate failed:', error.message)
+    })
 
   return NextResponse.json({ availability: result })
 }
