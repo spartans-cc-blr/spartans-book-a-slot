@@ -79,7 +79,7 @@ export default async function FixturesPage() {
   const bookingIds = (bookings ?? []).map(b => b.id)
   const { data: squadRows } = bookingIds.length ? await supabase
     .from('squad')
-    .select('booking_id, player:players(id, name, jersey_name, jersey_number, primary_skill, is_captain)')
+    .select('booking_id, is_captain, is_vc, is_wk, player:players(id, name, jersey_name, jersey_number, primary_skill)')
     .in('booking_id', bookingIds)
     .eq('status', 'announced')
   : { data: [] }
@@ -87,7 +87,12 @@ export default async function FixturesPage() {
   const squadMap: Record<string, any[]> = {}
   for (const row of squadRows ?? []) {
     if (!squadMap[row.booking_id]) squadMap[row.booking_id] = []
-    if (row.player) squadMap[row.booking_id].push(row.player)
+    if (row.player) squadMap[row.booking_id].push({
+      ...row.player,
+      is_match_captain: row.is_captain,
+      is_vc:            row.is_vc,
+      is_wk:            row.is_wk,
+    })
   }
 
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'

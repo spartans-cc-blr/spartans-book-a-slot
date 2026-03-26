@@ -46,11 +46,18 @@ export default async function MatchCardPage({ params }: { params: { id: string }
   // Fetch announced squad
   const { data: squadRows } = await supabase
     .from('squad')
-    .select('player:players(id, name, jersey_name, jersey_number, primary_skill, is_captain)')
+    .select('is_captain, is_vc, is_wk, player:players(id, name, jersey_name, jersey_number, primary_skill)')
     .eq('booking_id', booking.id)
     .eq('status', 'announced')
 
-  const squad = (squadRows ?? []).map(r => r.player).filter(Boolean) as any[]
+  const squad = (squadRows ?? [])
+    .filter(r => r.player)
+    .map(r => ({
+      ...r.player,
+      is_match_captain: r.is_captain,
+      is_vc:            r.is_vc,
+      is_wk:            r.is_wk,
+    })) as any[]  
 
   // Fetch player's existing response if logged in
   let initialResponse: string | null = null

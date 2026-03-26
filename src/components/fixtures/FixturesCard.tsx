@@ -176,12 +176,14 @@ function formatDate(dateStr: string): string {
 
 // ── Main Card Component ───────────────────────────────────────────
 type SquadPlayer = {
-  id: string
-  name: string
-  jersey_name: string | null
-  jersey_number: number | null
-  primary_skill: string | null
-  is_captain: boolean
+  id:               string
+  name:             string
+  jersey_name:      string | null
+  jersey_number:    number | null
+  primary_skill:    string | null
+  is_match_captain: boolean
+  is_vc:            boolean
+  is_wk:            boolean
 }
 
 type BookingProp = {
@@ -378,13 +380,29 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
                     </span>
                     <span style={{ flex: 1 }}>
                       {p.jersey_name || p.name.split(' ')[0]}
-                      {p.is_captain && (
+                      {p.is_match_captain && (
                         <span style={{
                           marginLeft: '4px', fontSize: '9px', fontWeight: 700,
                           color: '#C9A84C', background: '#2d2400',
                           border: '1px solid #C9A84C', borderRadius: '3px',
                           padding: '0 3px',
                         }}>C</span>
+                      )}
+                      {p.is_vc && (
+                        <span style={{
+                          marginLeft: '3px', fontSize: '9px', fontWeight: 700,
+                          color: '#C9A84C', background: '#2d2400',
+                          border: '1px solid #C9A84C40', borderRadius: '3px',
+                          padding: '0 3px', opacity: 0.8,
+                        }}>VC</span>
+                      )}
+                      {p.is_wk && (
+                        <span style={{
+                          marginLeft: '3px', fontSize: '9px', fontWeight: 700,
+                          color: '#93C5FD', background: '#0c1a2e',
+                          border: '1px solid #1d4ed8', borderRadius: '3px',
+                          padding: '0 3px',
+                        }}>WK</span>
                       )}
                     </span>
                     {p.primary_skill && (
