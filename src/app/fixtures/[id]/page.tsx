@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
-import { ShareMatchButton } from '@/components/fixtures/ShareMatchButton'
 
 export const revalidate = 60
 
@@ -113,10 +112,6 @@ export default async function MatchCardPage({ params }: { params: { id: string }
         />
       </div>
 
-      {/* Share button */}
-      <div style={{ width: '100%', maxWidth: '480px', marginTop: '16px' }}>
-        <ShareMatchButton bookingId={booking.id} />
-      </div>
     </main>
   )
 }

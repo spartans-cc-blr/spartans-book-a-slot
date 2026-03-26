@@ -174,6 +174,19 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 }
 
+function ShareIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+      xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round"/>
+      <polyline points="16 6 12 2 8 6" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round"/>
+      <line x1="12" y1="2" x2="12" y2="15" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
 // ── Main Card Component ───────────────────────────────────────────
 type SquadPlayer = {
   id:               string
@@ -275,6 +288,32 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       <div>
         <div style={{ fontSize: "15px", fontWeight: 700, color: "#F9FAFB", lineHeight: 1.3, marginBottom: "3px" }}>
           {tournament?.name || "—"}
+        </div>
+          <span>{tournament?.name || "—"}</span>
+          {booking.id && (
+            <a href={`/fixtures/${booking.id}`}
+              title="Share this match"
+              onClick={e => {
+                if (navigator.share) {
+                  e.preventDefault()
+                  navigator.share({
+                    title: 'Spartans Match',
+                    url: `${window.location.origin}/fixtures/${booking.id}`,
+                  }).catch(() => {})
+                }
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center',
+                marginLeft: '7px', verticalAlign: 'middle',
+                color: '#4B5563', textDecoration: 'none',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#9CA3AF')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#4B5563')}
+            >
+              <ShareIcon />
+            </a>
+          )}
         </div>
         <div style={{ fontSize: "12px", color: "#9CA3AF" }}>
           vs <span style={{ color: "#D1D5DB", fontWeight: 500 }}>{opponent_name || "TBD"}</span>
@@ -408,18 +447,6 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
           )}
         </div>
       )}  
-
-      {/* Share link */}
-      {booking.id && (
-        <a href={`/fixtures/${booking.id}`}
-          style={{
-            display: 'block', textAlign: 'center',
-            fontSize: '10px', color: '#374151',
-            textDecoration: 'none', letterSpacing: '0.05em',
-          }}>
-          🔗 share match
-        </a>
-      )}
     </div>
   );
 }
