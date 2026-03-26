@@ -85,6 +85,49 @@ export default async function CaptainsCornerPage() {
     availability = avail ?? []
   }
 
+  // ── Fetch existing squad rows ──────────────────────────────
+  type ExistingSquadRow = {
+    booking_id: string
+    player_id:  string
+    status:     string
+    is_captain: boolean
+    is_vc:      boolean
+    is_wk:      boolean
+  }
+  let existingSquads: ExistingSquadRow[] = []
+  if (bookingIds.length > 0) {
+    const { data: squads } = await supabase
+      .from('squad')
+      .select('booking_id, player_id, status, is_captain, is_vc, is_wk')
+      .in('booking_id', bookingIds)
+      .in('status', ['draft', 'pending_approval', 'approved', 'announced'])
+    existingSquads = (squads ?? []) as ExistingSquadRow[]
+  }
+
+  // Build initialSquadMap: bookingId → hydration data for SlotCard
+  type InitialSquad = {
+    status:   'draft' | 'pending' | 'approved' | 'announced'
+    selected: string[]
+    captain:  string | null
+    vc:       string | null
+    wk:       string[]
+  }
+  const initialSquadMap: Record<string, InitialSquad> = {}
+  for (const row of existingSquads) {
+    if (!initialSquadMap[row.booking_id]) {
+      const mapped = row.status === 'pending_approval' ? 'pending'
+                   : row.status === 'announced'        ? 'announced'
+                   : row.status === 'approved'         ? 'approved'
+                   : 'draft'
+      initialSquadMap[row.booking_id] = { status: mapped, selected: [], captain: null, vc: null, wk: [] }
+    }
+    const entry = initialSquadMap[row.booking_id]
+    entry.selected.push(row.player_id)
+    if (row.is_captain) entry.captain = row.player_id
+    if (row.is_vc)      entry.vc      = row.player_id
+    if (row.is_wk)      entry.wk.push(row.player_id)
+  }
+
   // ── Group bookings into weekends ───────────────────────────
   const weekendMap: Record<string, {
     label: string
@@ -167,6 +210,7 @@ export default async function CaptainsCornerPage() {
                 bookings={(weekend.bookings ?? []) as any}
                 players={players ?? []}
                 availMap={availMap}
+                initialSquadMap={initialSquadMap}
               />
             ))}
           </div>
