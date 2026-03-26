@@ -369,17 +369,14 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
               gap: '4px 12px', paddingBottom: '6px',
             }}>
               {squad
-                .sort((a, b) => (a.jersey_number ?? 99) - (b.jersey_number ?? 99))
-                .map((p, i) => (
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((p) => (
                   <div key={p.id} style={{
                     display: 'flex', alignItems: 'center', gap: '6px',
                     fontSize: '11px', color: '#D1D5DB', padding: '3px 0',
                   }}>
-                    <span style={{ color: '#6B7280', minWidth: '14px', fontSize: '10px' }}>
-                      {p.jersey_number ?? i + 1}
-                    </span>
                     <span style={{ flex: 1 }}>
-                      {p.jersey_name || p.name.split(' ')[0]}
+                      {p.name}
                       {p.is_match_captain && (
                         <span style={{
                           marginLeft: '4px', fontSize: '9px', fontWeight: 700,
@@ -405,11 +402,6 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
                         }}>WK</span>
                       )}
                     </span>
-                    {p.primary_skill && (
-                      <span style={{ fontSize: '9px', color: '#6B7280' }}>
-                        {p.primary_skill.slice(0, 3).toUpperCase()}
-                      </span>
-                    )}
                   </div>
                 ))}
             </div>

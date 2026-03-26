@@ -12,10 +12,9 @@ type AvailKey = 'Y' | 'O' | 'E' | 'L'
 interface SquadPlayer {
   id: string
   name: string
-  jersey_name: string | null
-  jersey_number: number | null
-  primary_skill: string | null
-  is_captain: boolean
+  is_match_captain: boolean
+  is_vc: boolean
+  is_wk: boolean
 }
 
 interface BookingEntry {
