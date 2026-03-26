@@ -28,6 +28,17 @@ function weekLabel(dateStr: string): string {
   return `${format(saturday, 'd MMM')} – ${format(sunday, 'd MMM yyyy')}`
 }
 
+function getMatchEndTime(gameDate: string, slotTime: string, format: string): Date {
+  const end = new Date(`${gameDate}T${slotTime}:00+05:30`)
+  const durationHours = format === 'T30' ? 5.5 : 3.5
+  end.setTime(end.getTime() + durationHours * 60 * 60 * 1000)
+  return end
+}
+
+function isMatchExpired(gameDate: string, slotTime: string, format: string): boolean {
+  return new Date() >= getMatchEndTime(gameDate, slotTime, format)
+}
+
 export default async function CaptainsCornerPage() {
   const session = await getServerSession(authOptions)
   const user    = session?.user as any
@@ -37,7 +48,7 @@ export default async function CaptainsCornerPage() {
   if (!user?.isCaptain && !user?.isAdmin) redirect('/fixtures')
 
   const supabase = createServiceClient()
-  const today    = new Date().toISOString().split('T')[0]
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
   // ── Fetch upcoming confirmed bookings ──────────────────────
   const { data: bookings } = await supabase
@@ -48,10 +59,13 @@ export default async function CaptainsCornerPage() {
       tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
     `)
     .eq('status', 'confirmed')
-    .gte('game_date', today)
+    .gte('game_date', yesterday)
     .order('game_date', { ascending: true })
     .order('slot_time', { ascending: true })
     .limit(20) // cap to reasonable window
+  const activeBookings = (bookings ?? []).filter(b =>
+    !isMatchExpired(b.game_date, b.slot_time, b.format ?? 'T20')
+  )    
 
   // ── Fetch all active players ───────────────────────────────
   const { data: players } = await supabase
@@ -61,7 +75,7 @@ export default async function CaptainsCornerPage() {
     .order('name', { ascending: true })
 
   // ── Fetch availability for all upcoming bookings ───────────
-  const bookingIds = (bookings ?? []).map(b => b.id)
+  const bookingIds = (activeBookings ?? []).map(b => b.id)
   let availability: { player_id: string; booking_id: string; response: string }[] = []
   if (bookingIds.length > 0) {
     const { data: avail } = await supabase
@@ -77,7 +91,7 @@ export default async function CaptainsCornerPage() {
     bookings: typeof bookings
   }> = {}
 
-  for (const b of bookings ?? []) {
+  for (const b of activeBookings ?? []) {
     const wk = weekKey(b.game_date)
     if (!weekendMap[wk]) {
       weekendMap[wk] = { label: weekLabel(b.game_date), bookings: [] }

@@ -330,6 +330,18 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
           </a>
         )}
       </div>
+
+      {/* Share link */}
+      {booking.id && (
+        <a href={`/fixtures/${booking.id}`}
+          style={{
+            display: 'block', textAlign: 'center',
+            fontSize: '10px', color: '#374151',
+            textDecoration: 'none', letterSpacing: '0.05em',
+          }}>
+          🔗 share match
+        </a>
+      )}
     </div>
   );
 }
