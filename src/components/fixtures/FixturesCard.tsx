@@ -289,7 +289,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
         <div style={{ fontSize: "15px", fontWeight: 700, color: "#F9FAFB", lineHeight: 1.3, marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
           <span>{tournament?.name || "—"}</span>
           {booking.id && (
-            
+            <a
               href={`/fixtures/${booking.id}`}
               title="Share this match"
               onClick={e => {
