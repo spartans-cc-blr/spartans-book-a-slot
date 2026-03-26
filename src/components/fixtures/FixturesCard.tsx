@@ -175,6 +175,15 @@ function formatDate(dateStr: string): string {
 }
 
 // ── Main Card Component ───────────────────────────────────────────
+type SquadPlayer = {
+  id: string
+  name: string
+  jersey_name: string | null
+  jersey_number: number | null
+  primary_skill: string | null
+  is_captain: boolean
+}
+
 type BookingProp = {
   id: string
   game_date: string
@@ -192,9 +201,13 @@ type BookingProp = {
     ball_type: 'red' | 'white' | 'pink'
     ground?: { name: string; maps_url: string; hospital_url: string } | null
   } | null
+  squad?: SquadPlayer[]
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
+  const [squadOpen, setSquadOpen] = useState(false)
+  const squad = booking.squad ?? []
+  const squadAnnounced = squad.length > 0
   const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, matchStatus, match_stage } = booking;
   const ground = tournament?.ground;
   const ballType  = tournament?.ball_type || "red";
@@ -330,6 +343,61 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
           </a>
         )}
       </div>
+
+      {/* Announced Squad */}
+      {squadAnnounced && (
+        <div>
+          <div style={{ height: "1px", background: "#2D3748" }} />
+          <button
+            onClick={() => setSquadOpen(v => !v)}
+            style={{
+              width: '100%', display: 'flex', justifyContent: 'space-between',
+              alignItems: 'center', background: 'none', border: 'none',
+              cursor: 'pointer', padding: '6px 0',
+            }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#4ade80' }}>
+              ✅ SQUAD ANNOUNCED · {squad.length} players
+            </span>
+            <span style={{ fontSize: '14px', color: '#6B7280' }}>{squadOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {squadOpen && (
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr',
+              gap: '4px 12px', paddingBottom: '6px',
+            }}>
+              {squad
+                .sort((a, b) => (a.jersey_number ?? 99) - (b.jersey_number ?? 99))
+                .map((p, i) => (
+                  <div key={p.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    fontSize: '11px', color: '#D1D5DB', padding: '3px 0',
+                  }}>
+                    <span style={{ color: '#6B7280', minWidth: '14px', fontSize: '10px' }}>
+                      {p.jersey_number ?? i + 1}
+                    </span>
+                    <span style={{ flex: 1 }}>
+                      {p.jersey_name || p.name.split(' ')[0]}
+                      {p.is_captain && (
+                        <span style={{
+                          marginLeft: '4px', fontSize: '9px', fontWeight: 700,
+                          color: '#C9A84C', background: '#2d2400',
+                          border: '1px solid #C9A84C', borderRadius: '3px',
+                          padding: '0 3px',
+                        }}>C</span>
+                      )}
+                    </span>
+                    {p.primary_skill && (
+                      <span style={{ fontSize: '9px', color: '#6B7280' }}>
+                        {p.primary_skill.slice(0, 3).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}  
 
       {/* Share link */}
       {booking.id && (

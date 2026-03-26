@@ -75,6 +75,21 @@ export default async function FixturesPage() {
     existingResponses = Object.fromEntries((avail ?? []).map(r => [r.booking_id, r.response]))
   }
 
+// Fetch announced squads for all active bookings
+  const bookingIds = (bookings ?? []).map(b => b.id)
+  const { data: squadRows } = bookingIds.length ? await supabase
+    .from('squad')
+    .select('booking_id, player:players(id, name, jersey_name, jersey_number, primary_skill, is_captain)')
+    .in('booking_id', bookingIds)
+    .eq('status', 'announced')
+  : { data: [] }
+
+  const squadMap: Record<string, any[]> = {}
+  for (const row of squadRows ?? []) {
+    if (!squadMap[row.booking_id]) squadMap[row.booking_id] = []
+    if (row.player) squadMap[row.booking_id].push(row.player)
+  }
+
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'
   const isCaptain = isPlayer && !!player?.isCaptain
 
@@ -96,7 +111,8 @@ export default async function FixturesPage() {
     game_date:       string
     slot_time:       string
     initialResponse: string | null
-	matchStatus:     'upcoming' | 'in_progress'
+	  matchStatus:     'upcoming' | 'in_progress'
+    squad:           any[]
     cardData:        any
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
@@ -114,7 +130,8 @@ export default async function FixturesPage() {
       slot_time:       (b as any).slot_time,
       initialResponse: existingResponses[b.id] ?? null,
       matchStatus: (b as any).matchStatus as 'upcoming' | 'in_progress',
-	  cardData:        b,
+      squad:           squadMap[b.id] ?? [],
+	    cardData:        b,
     })
 
   }

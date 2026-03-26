@@ -9,12 +9,22 @@ import { FixturesAvailability } from '@/components/fixtures/FixturesAvailability
 
 type AvailKey = 'Y' | 'O' | 'E' | 'L'
 
+interface SquadPlayer {
+  id: string
+  name: string
+  jersey_name: string | null
+  jersey_number: number | null
+  primary_skill: string | null
+  is_captain: boolean
+}
+
 interface BookingEntry {
   id:              string
   game_date:       string
   slot_time:       string
   initialResponse: string | null
   matchStatus:     'upcoming' | 'in_progress'   // add this
+  squad:           SquadPlayer[] 
   cardData:        any
 }
 
@@ -93,7 +103,7 @@ export function FixturesWeekendGroup({
     <>
       {bookings.map(b => (
         <div key={b.id} className="mb-4">
-          <FixturesCard booking={b.cardData} />
+          <FixturesCard booking={{ ...b.cardData, squad: b.squad }} />
           <FixturesAvailability
             bookingId={b.id}
             slotDate={b.game_date}
