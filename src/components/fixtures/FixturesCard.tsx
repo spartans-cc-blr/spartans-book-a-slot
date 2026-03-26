@@ -286,15 +286,14 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
 
       {/* Tournament + Opponent + Ground */}
       <div>
-        <div style={{ fontSize: "15px", fontWeight: 700, color: "#F9FAFB", lineHeight: 1.3, marginBottom: "3px" }}>
-          {tournament?.name || "—"}
-        </div>
+        <div style={{ fontSize: "15px", fontWeight: 700, color: "#F9FAFB", lineHeight: 1.3, marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
           <span>{tournament?.name || "—"}</span>
           {booking.id && (
-            <a href={`/fixtures/${booking.id}`}
+            
+              href={`/fixtures/${booking.id}`}
               title="Share this match"
               onClick={e => {
-                if (navigator.share) {
+                if (typeof navigator !== 'undefined' && navigator.share) {
                   e.preventDefault()
                   navigator.share({
                     title: 'Spartans Match',
@@ -303,10 +302,8 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
                 }
               }}
               style={{
-                display: 'inline-flex', alignItems: 'center',
-                marginLeft: '7px', verticalAlign: 'middle',
+                display: 'inline-flex', alignItems: 'center', flexShrink: 0,
                 color: '#4B5563', textDecoration: 'none',
-                transition: 'color 0.15s',
               }}
               onMouseEnter={e => (e.currentTarget.style.color = '#9CA3AF')}
               onMouseLeave={e => (e.currentTarget.style.color = '#4B5563')}
