@@ -66,11 +66,12 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // Delete existing draft rows, re-insert with roles
+  // Delete all existing rows for this booking regardless of status,
+  // then re-insert fresh. This handles edits to announced squads
+  // without hitting the (player_id, booking_id) unique constraint.
   await supabase.from('squad')
     .delete()
     .eq('booking_id', booking_id)
-    .eq('status', 'draft')
 
   if (player_ids.length > 0) {
     const rows = player_ids.map((pid: string) => ({
