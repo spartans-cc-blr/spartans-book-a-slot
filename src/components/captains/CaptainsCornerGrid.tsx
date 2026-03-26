@@ -45,6 +45,13 @@ interface MatchRoles {
   vc:      string | null   // player id — one only
   wk:      Set<string>     // player ids — multiple valid (two WKs happens)
 }
+interface InitialSquad {
+   status:   'draft' | 'pending' | 'approved' | 'announced'
+   selected: string[]
+   captain:  string | null
+   vc:       string | null
+   wk:       string[]
+ }
 
 interface Props {
   weekLabel: string
@@ -52,6 +59,7 @@ interface Props {
   players:   Player[]
   availMap:  Record<string, Record<string, string>>
   squadMap?: Record<string, string[]>
+  initialSquadMap?: Record<string, InitialSquad>
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -433,7 +441,7 @@ function SelectablePlayerRow({
 
 // ── SlotCard ──────────────────────────────────────────────────────
 function SlotCard({
-  booking, bookings, players, availMap, squadMap, defaultOpen,
+  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad,
 }: {
   booking:     Booking
   bookings:    Booking[]
@@ -441,14 +449,19 @@ function SlotCard({
   availMap:    Record<string, Record<string, string>>
   squadMap:    Record<string, string[]>
   defaultOpen: boolean
+  initialSquad?: InitialSquad
 }) {
   const [open,          setOpen]          = useState(defaultOpen)
-  const [status,        setStatus]        = useState<'draft' | 'pending' | 'approved' | 'announced'>('draft')
-  const [everAnnounced, setEverAnnounced] = useState(false)
+  const [status,        setStatus]        = useState<'draft' | 'pending' | 'approved' | 'announced'>(initialSquad?.status ?? 'draft')
+  const [everAnnounced, setEverAnnounced] = useState(initialSquad?.status === 'announced')
   const [saving,        setSaving]        = useState(false)
   const [saveError,     setSaveError]     = useState<string | null>(null)
 
   const [selected, setSelected] = useState<Set<string>>(() => {
+    // If we have a persisted squad, use it — otherwise auto-pick priority players
+   if (initialSquad?.selected?.length) {
+     return new Set(initialSquad.selected)
+   }
     const auto = new Set<string>()
     players.forEach(p => {
       if (p.priority_pick && availMap[booking.id]?.[p.id]) auto.add(p.id)
@@ -457,9 +470,9 @@ function SlotCard({
   })
 
   const [roles, setRoles] = useState<MatchRoles>({
-    captain: null,
-    vc:      null,
-    wk:      new Set(),
+    captain: initialSquad?.captain ?? null,
+    vc:      initialSquad?.vc ?? null,
+    wk:      new Set(initialSquad?.wk ?? []),
   })
 
   const { copy, copied } = useCopySquad()
@@ -954,7 +967,7 @@ function Legend() {
 }
 
 // ── Main export ────────────────────────────────────────────────────
-export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {} }: Props) {
+export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {}, initialSquadMap = {} }: Props) {  
   const [view, setView] = useState<'slot' | 'matrix'>('slot')
   const weekendBookings = bookings.filter(b => isWeekendDate(b.game_date))
 
@@ -1021,6 +1034,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
               availMap={availMap}
               squadMap={squadMap}
               defaultOpen={i === 0}
+              initialSquad={initialSquadMap[b.id]}
             />
           ))}
         </div>
