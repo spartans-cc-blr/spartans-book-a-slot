@@ -445,6 +445,8 @@ function SlotCard({
   const [open,          setOpen]          = useState(defaultOpen)
   const [status,        setStatus]        = useState<'draft' | 'pending' | 'approved' | 'announced'>('draft')
   const [everAnnounced, setEverAnnounced] = useState(false)
+  const [saving,        setSaving]        = useState(false)
+  const [saveError,     setSaveError]     = useState<string | null>(null)
 
   const [selected, setSelected] = useState<Set<string>>(() => {
     const auto = new Set<string>()
@@ -482,40 +484,96 @@ function SlotCard({
     return null
   }
 
-  function toggle(playerId: string) {
-    if (status !== 'draft') return
-    setSelected(prev => {
-      const next = new Set(prev)
-      if (next.has(playerId)) {
-        next.delete(playerId)
-        // Clear roles when player is removed
-        setRoles(r => ({
-          captain: r.captain === playerId ? null : r.captain,
-          vc:      r.vc      === playerId ? null : r.vc,
-          wk:      new Set(Array.from(r.wk).filter(id => id !== playerId)),
-        }))
-      } else {
-        if (next.size >= MAX_SQUAD) return prev
-        next.add(playerId)
-      }
-      return next
-    })
-  }
+  async function toggle(playerId: string) {
+   if (status !== 'draft') return
+   const next = new Set(selected)
+   if (next.has(playerId)) {
+     next.delete(playerId)
+     setRoles(r => ({
+       captain: r.captain === playerId ? null : r.captain,
+       vc:      r.vc      === playerId ? null : r.vc,
+       wk:      new Set(Array.from(r.wk).filter(id => id !== playerId)),
+     }))
+   } else {
+     if (next.size >= MAX_SQUAD) return
+     next.add(playerId)
+   }
+   setSelected(next)
+   await saveDraft(next, roles)
+ }
 
   function handleRoleToggle(playerId: string, role: 'captain' | 'vc' | 'wk') {
-    setRoles(prev => {
-      if (role === 'captain') return { ...prev, captain: prev.captain === playerId ? null : playerId }
-      if (role === 'vc')      return { ...prev, vc:      prev.vc      === playerId ? null : playerId }
-      const nextWK = new Set(prev.wk)
-      nextWK.has(playerId) ? nextWK.delete(playerId) : nextWK.add(playerId)
-      return { ...prev, wk: nextWK }
-    })
+  let nextRoles: MatchRoles
+  if (role === 'captain') {
+    nextRoles = { ...roles, captain: roles.captain === playerId ? null : playerId }
+  } else if (role === 'vc') {
+    nextRoles = { ...roles, vc: roles.vc === playerId ? null : playerId }
+  } else {
+    const nextWK = new Set(roles.wk)
+    nextWK.has(playerId) ? nextWK.delete(playerId) : nextWK.add(playerId)
+    nextRoles = { ...roles, wk: nextWK }
   }
+  setRoles(nextRoles)
+  saveDraft(selected, nextRoles)
+}
 
-  function handleAnnounce() {
+  async function saveDraft(currentSelected: Set<string>, currentRoles: MatchRoles) {
+  setSaveError(null)
+  const res = await fetch('/api/squad', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      booking_id: booking.id,
+      player_ids: Array.from(currentSelected),
+      roles: {
+        captain: currentRoles.captain,
+        vc:      currentRoles.vc,
+        wk:      Array.from(currentRoles.wk),
+      },
+    }),
+  })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    setSaveError(d.error ?? 'Failed to save squad')
+  }
+}
+
+async function handleSubmit() {
+  setSaving(true)
+  setSaveError(null)
+  // Save current selection first, then submit
+  await saveDraft(selected, roles)
+  const res = await fetch('/api/squad/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ booking_id: booking.id }),
+  })
+  if (res.ok) {
+    setStatus('pending')
+  } else {
+    const d = await res.json().catch(() => ({}))
+    setSaveError(d.error ?? 'Failed to submit for GC review')
+  }
+  setSaving(false)
+}
+
+async function handleAnnounce() {
+  setSaving(true)
+  setSaveError(null)
+  const res = await fetch('/api/squad/announce', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ booking_id: booking.id }),
+  })
+  if (res.ok) {
     setStatus('announced')
     setEverAnnounced(true)
+  } else {
+    const d = await res.json().catch(() => ({}))
+    setSaveError(d.error ?? 'Failed to announce squad')
   }
+  setSaving(false)
+}
 
   const pct = Math.min((selected.size / MAX_SQUAD) * 100, 100)
 
@@ -689,10 +747,10 @@ function SlotCard({
 
               {status === 'draft' && (
                 <button
-                  onClick={() => setStatus('pending')}
+                  onClick={handleSubmit}
                   disabled={selected.size === 0}
                   className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                  {everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
+                  {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
                 </button>
               )}
 
@@ -700,7 +758,7 @@ function SlotCard({
                 <button
                   onClick={handleAnnounce}
                   className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-emerald-950/40 border border-emerald-700 text-emerald-400 hover:bg-emerald-950/70 transition-colors">
-                  {everAnnounced ? 'Re-announce' : 'Announce squad'}
+                  {saving ? 'Announcing…' : everAnnounced ? 'Re-announce' : 'Announce squad'}
                 </button>
               )}
 
@@ -721,6 +779,9 @@ function SlotCard({
                 <span className="font-rajdhani text-[10px] text-amber-400">
                   Awaiting GC
                 </span>
+              )}
+              {saveError && (
+                <p className="w-full font-rajdhani text-[10px] text-red-400 mt-1">{saveError}</p>
               )}
             </div>
           </div>
