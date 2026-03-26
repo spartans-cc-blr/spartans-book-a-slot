@@ -56,8 +56,9 @@ export default async function GCReviewPage() {
   const { data: squads } = bookingIds.length > 0
     ? await supabase
         .from('squad')
-        .select('player_id, booking_id, status, players(id, name, primary_skill, is_captain)')
+        .select('player_id, booking_id, status, is_captain, is_vc, is_wk, players(id, name, primary_skill, is_captain)')
         .in('booking_id', bookingIds)
+        .in('status', ['pending_approval', 'approved', 'announced'])
     : { data: [] }
 
   return (
