@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
 
   const bookingIds = rawIds.split(',').filter(Boolean)
   if (bookingIds.length === 0) return NextResponse.json({ availability: [] })
+  if (bookingIds.length > 20) {
+   return NextResponse.json({ error: 'Too many booking IDs — max 20' }, { status: 400 })
+  }
 
   const supabase = createServiceClient()
 
