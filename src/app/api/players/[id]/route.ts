@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 
 const PLAYER_EDITABLE_FIELDS = new Set([
   'whatsapp',
@@ -63,8 +64,11 @@ export async function PATCH(
 
   // Players can only update their own profile
   if (!user.isAdmin && user.playerId !== params.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+}
+
+  const limited = await rateLimit(req, RATE_LIMITS.playerWrite, user.playerId)
+  if (limited) return limited
 
   const body = await req.json()
 

@@ -1,3 +1,4 @@
+import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -24,6 +25,10 @@ export async function POST(req: NextRequest) {
   const player  = session?.user as any
   if (!player?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   if (player?.playerStatus === 'expelled') return NextResponse.json({ error: 'Account suspended' }, { status: 403 })
+  
+  // Rate limit: 20 writes/min per player
+  const limited = await rateLimit(req, RATE_LIMITS.playerWrite, player.playerId)
+  if (limited) return limited  
 
   const { booking_id, response } = await req.json()
   if (!booking_id || !['Y','N','O','E','L'].includes(response)) {
@@ -51,6 +56,9 @@ export async function DELETE(req: NextRequest) {
   const player  = session?.user as any
   if (!player?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
+  const limited = await rateLimit(req, RATE_LIMITS.playerWrite, player.playerId)
+  if (limited) return limited  
+  
   const { booking_id } = await req.json()
   if (!booking_id) return NextResponse.json({ error: 'booking_id required' }, { status: 400 })
 

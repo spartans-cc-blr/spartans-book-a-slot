@@ -439,6 +439,144 @@ function SelectablePlayerRow({
   )
 }
 
+// ── AddPlayerPanel ────────────────────────────────────────────────
+// Two-step: pick player from unresponded list → tap Y/E/O/L to save.
+function AddPlayerPanel({
+  bookingId,
+  unrespondedPlayers,
+  onSaved,
+  onCancel,
+}: {
+  bookingId:          string
+  unrespondedPlayers: Player[]
+  onSaved:            (playerId: string, response: string) => void
+  onCancel:           () => void
+}) {
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
+  const [saving,         setSaving]         = useState(false)
+  const [error,          setError]          = useState<string | null>(null)
+  const [search,         setSearch]         = useState('')
+
+  const filtered = unrespondedPlayers.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const PROXY_CODES: { code: string; bg: string; text: string; border: string }[] = [
+    { code: 'Y', bg: '#1a4731', text: '#4ade80', border: '#166534' },
+    { code: 'E', bg: '#1e3a5f', text: '#60a5fa', border: '#1d4ed8' },
+    { code: 'O', bg: '#3d2e00', text: '#fbbf24', border: '#d97706' },
+    { code: 'L', bg: '#2e1a47', text: '#c084fc', border: '#7e22ce' },
+  ]
+
+  async function handleCodeSelect(code: string) {
+    if (!selectedPlayer) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/captain-availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          player_id:  selectedPlayer.id,
+          booking_id: bookingId,
+          response:   code,
+          note:       'Added by captain',
+        }),
+      })
+      if (res.ok) {
+        onSaved(selectedPlayer.id, code)
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setError(d.error ?? `Failed (${res.status})`)
+        setSaving(false)
+      }
+    } catch {
+      setError('Network error')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="border-t border-ink-5 bg-ink px-3 py-3">
+      {!selectedPlayer ? (
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">
+              Add player
+            </span>
+            <button onClick={onCancel} className="font-rajdhani text-[11px] text-zinc-600 hover:text-zinc-400">✕</button>
+          </div>
+          {unrespondedPlayers.length === 0 ? (
+            <p className="font-rajdhani text-xs text-zinc-600">All players have responded.</p>
+          ) : (
+            <>
+              <input
+                autoFocus
+                type="text"
+                placeholder="Search player…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full font-rajdhani text-xs bg-ink-3 border border-ink-5 rounded px-2.5 py-1.5 text-zinc-300 placeholder:text-zinc-700 outline-none mb-2"
+              />
+              <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto">
+                {filtered.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedPlayer(p)}
+                    className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-ink-4 transition-colors text-left">
+                    <span className={`font-rajdhani text-sm font-semibold ${p.wallet_balance < 0 ? 'text-amber-400' : 'text-parchment'}`}>
+                      {p.name}
+                    </span>
+                    <span className="font-rajdhani text-[10px] text-zinc-600">
+                      {p.primary_skill ?? ''}
+                    </span>
+                  </button>
+                ))}
+                {filtered.length === 0 && (
+                  <p className="font-rajdhani text-xs text-zinc-600 px-2">No match</p>
+                )}
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">
+                Add player ·{' '}
+              </span>
+              <span className="font-rajdhani text-sm font-semibold text-parchment">
+                {selectedPlayer.name}
+              </span>
+            </div>
+            <button
+              onClick={() => { setSelectedPlayer(null); setSearch('') }}
+              className="font-rajdhani text-[11px] text-zinc-500 hover:text-zinc-300">
+              ← back
+            </button>
+          </div>
+          <div className="flex gap-2">
+            {PROXY_CODES.map(cfg => (
+              <button
+                key={cfg.code}
+                disabled={saving}
+                onClick={() => handleCodeSelect(cfg.code)}
+                style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}
+                className="flex-1 py-2 rounded font-rajdhani text-sm font-bold opacity-100 disabled:opacity-50 transition-opacity">
+                {cfg.code}
+              </button>
+            ))}
+          </div>
+          {error && (
+            <p className="font-rajdhani text-[10px] text-red-400 mt-2">✕ {error}</p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── SlotCard ──────────────────────────────────────────────────────
 function SlotCard({
   booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad,
@@ -456,6 +594,20 @@ function SlotCard({
   const [everAnnounced, setEverAnnounced] = useState(initialSquad?.status === 'announced')
   const [saving,        setSaving]        = useState(false)
   const [saveError,     setSaveError]     = useState<string | null>(null)
+
+  // Live availMap — starts from server data, updated on captain proxy adds
+  const [liveAvailMap, setLiveAvailMap] = useState<Record<string, string>>(
+    availMap[booking.id] ?? {}
+  )
+  const [addingFor, setAddingFor] = useState(false)
+
+  // Players who haven't responded to this booking
+  const unrespondedPlayers = players.filter(p => !liveAvailMap[p.id])
+
+  function handleProxyAdd(playerId: string, response: string) {
+    setLiveAvailMap(prev => ({ ...prev, [playerId]: response }))
+    setAddingFor(false)
+  }
 
   const [selected, setSelected] = useState<Set<string>>(() => {
     // If we have a persisted squad, use it — otherwise auto-pick priority players
@@ -477,8 +629,8 @@ function SlotCard({
 
   const { copy, copied } = useCopySquad()
 
-  const counts          = getCounts(booking.id, players, availMap)
-  const eligible        = getSlotPlayers(booking.id, bookings, players, availMap)
+  const counts   = getCounts(booking.id, players, { ...availMap, [booking.id]: liveAvailMap })
+  const eligible = getSlotPlayers(booking.id, bookings, players, { ...availMap, [booking.id]: liveAvailMap })
   const atCap           = selected.size >= MAX_SQUAD
   const priorityPlayers = eligible.filter(e => e.player.priority_pick)
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
@@ -737,8 +889,6 @@ async function handleAnnounce() {
 
             {/* Actions */}
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-
-              {/* Copy — always available once anything selected */}
               {(selected.size > 0 || everAnnounced) && (
                 <button
                   onClick={() => copy(booking.id, announcementText)}
@@ -746,10 +896,8 @@ async function handleAnnounce() {
                   {copied === booking.id ? 'Copied!' : 'Copy'}
                 </button>
               )}
-
-              {/* WhatsApp — available once anything selected */}
               {selected.size > 0 && (
-                <a
+                
                   href={waLink}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -757,7 +905,6 @@ async function handleAnnounce() {
                   WhatsApp
                 </a>
               )}
-
               {status === 'draft' && (
                 <button
                   onClick={handleSubmit}
@@ -766,7 +913,6 @@ async function handleAnnounce() {
                   {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
                 </button>
               )}
-
               {status === 'approved' && (
                 <button
                   onClick={handleAnnounce}
@@ -774,12 +920,9 @@ async function handleAnnounce() {
                   {saving ? 'Announcing…' : everAnnounced ? 'Re-announce' : 'Announce squad'}
                 </button>
               )}
-
               {status === 'announced' && (
                 <span className="font-rajdhani text-[10px] text-emerald-500">Announced</span>
               )}
-
-              {/* Edit — available after first announcement regardless of current status */}
               {everAnnounced && status === 'announced' && (
                 <button
                   onClick={() => setStatus('draft')}
@@ -787,17 +930,37 @@ async function handleAnnounce() {
                   Edit
                 </button>
               )}
-
               {status === 'pending' && (
-                <span className="font-rajdhani text-[10px] text-amber-400">
-                  Awaiting GC
-                </span>
+                <span className="font-rajdhani text-[10px] text-amber-400">Awaiting GC</span>
               )}
               {saveError && (
                 <p className="w-full font-rajdhani text-[10px] text-red-400 mt-1">{saveError}</p>
               )}
             </div>
           </div>
+
+          {/* Add player button */}
+          {status === 'draft' && unrespondedPlayers.length > 0 && (
+            <div className="px-3 py-2 border-t border-ink-5 flex justify-end">
+              <button
+                onClick={() => setAddingFor(v => !v)}
+                className={`font-rajdhani text-[10px] font-bold tracking-wide transition-colors ${
+                  addingFor ? 'text-zinc-500' : 'text-gold hover:text-gold-dim'
+                }`}>
+                {addingFor ? '✕ Cancel' : '＋ Add player'}
+              </button>
+            </div>
+          )}
+
+          {/* Add player panel */}
+          {addingFor && (
+            <AddPlayerPanel
+              bookingId={booking.id}
+              unrespondedPlayers={unrespondedPlayers}
+              onSaved={handleProxyAdd}
+              onCancel={() => setAddingFor(false)}
+            />
+          )}
         </div>
       )}
     </div>

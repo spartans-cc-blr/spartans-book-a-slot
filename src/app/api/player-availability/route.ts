@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   // Explicit SELECT then INSERT or UPDATE — avoids upsert/conflict issues
   const { data: existing } = await supabase
     .from('availability')
-    .select('id')
+    .select('id, response')
     .eq('player_id', player.playerId)
     .eq('booking_id', booking_id)
     .single()
@@ -65,15 +65,30 @@ export async function POST(req: NextRequest) {
     result = data
   }
 
-  // Auto-reactivate: if this player is inactive, their first availability
-  // submission brings them back — no admin action needed.
+  // Auto-reactivate — fire and forget
   supabase
     .from('players')
     .update({ active: true })
     .eq('id', player.playerId)
-    .eq('active', false)   // no-op if already active — avoids unnecessary writes
+    .eq('active', false)
     .then(({ error }) => {
       if (error) console.error('Auto-reactivate failed:', error.message)
+    })
+
+  // Audit log — fire and forget, never blocks the response
+  supabase
+    .from('availability_audit')
+    .insert({
+      player_id:     player.playerId,
+      booking_id,
+      old_response:  existing?.response ?? null,
+      new_response:  response,
+      updated_by:    player.playerId,
+      update_source: 'player',
+      note:          null,
+    })
+    .then(({ error }) => {
+      if (error) console.error('Audit log insert failed:', error.message)
     })
 
   return NextResponse.json({ availability: result })
@@ -96,5 +111,22 @@ export async function DELETE(req: NextRequest) {
     .eq('booking_id', booking_id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Audit log — fire and forget
+  supabase
+    .from('availability_audit')
+    .insert({
+      player_id:     player.playerId,
+      booking_id,
+      old_response:  null,   // we don't fetch before delete — acceptable for audit purposes
+      new_response:  'CLEARED',
+      updated_by:    player.playerId,
+      update_source: 'player',
+      note:          null,
+    })
+    .then(({ error }) => {
+      if (error) console.error('Audit log insert failed:', error.message)
+    })
+
   return NextResponse.json({ success: true })
 }

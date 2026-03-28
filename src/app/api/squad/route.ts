@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 
 async function requireCaptain() {
   const session = await getServerSession(authOptions)
@@ -36,8 +37,12 @@ export async function GET(req: NextRequest) {
 
 // POST /api/squad — save draft selection with roles
 export async function POST(req: NextRequest) {
-  const { error: authErr } = await requireCaptain()
+    // After
+  const { error: authErr, player } = await requireCaptain()
   if (authErr) return authErr
+
+  const limited = await rateLimit(req, RATE_LIMITS.captainWrite, player!.playerId)
+  if (limited) return limited
 
   const { booking_id, player_ids, roles } = await req.json()
   // player_ids: string[]
