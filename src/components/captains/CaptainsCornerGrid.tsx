@@ -897,7 +897,7 @@ async function handleAnnounce() {
                 </button>
               )}
               {selected.size > 0 && (
-                
+                <a
                   href={waLink}
                   target="_blank"
                   rel="noopener noreferrer"
