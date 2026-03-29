@@ -579,7 +579,7 @@ function AddPlayerPanel({
 
 // ── SlotCard ──────────────────────────────────────────────────────
 function SlotCard({
-  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad,
+  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad, onSelectedChange, 
 }: {
   booking:     Booking
   bookings:    Booking[]
@@ -588,6 +588,7 @@ function SlotCard({
   squadMap:    Record<string, string[]>
   defaultOpen: boolean
   initialSquad?: InitialSquad
+  onSelectedChange: (bookingId: string, selected: Set<string>) => void
 }) {
   const [open,          setOpen]          = useState(defaultOpen)
   const [status,        setStatus]        = useState<'draft' | 'pending' | 'approved' | 'announced'>(initialSquad?.status ?? 'draft')
@@ -664,6 +665,7 @@ function SlotCard({
      next.add(playerId)
    }
    setSelected(next)
+   onSelectedChange(booking.id, next)
    await saveDraft(next, roles)
  }
 
@@ -1134,6 +1136,28 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
   const [view, setView] = useState<'slot' | 'matrix'>('slot')
   const weekendBookings = bookings.filter(b => isWeekendDate(b.game_date))
 
+  // Lift selected state up so all SlotCards share cross-slot awareness
+   // Initialise from initialSquadMap so DB state is reflected on load
+   const [allSelected, setAllSelected] = useState<Record<string, Set<string>>>(() => {
+     const init: Record<string, Set<string>> = {}
+     for (const [bId, squad] of Object.entries(initialSquadMap)) {
+       init[bId] = new Set(squad.selected)
+     }
+     return init
+   })
+
+   // Derived: bookingId → string[] — passed to each SlotCard as squadMap
+   const liveSquadMap = useMemo(() =>
+     Object.fromEntries(
+       Object.entries(allSelected).map(([bId, set]) => [bId, Array.from(set)])
+     ),
+     [allSelected]
+   )
+
+   function updateSelected(bookingId: string, next: Set<string>) {
+     setAllSelected(prev => ({ ...prev, [bookingId]: next }))
+   }
+
   return (
     <div>
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
@@ -1195,9 +1219,10 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
               bookings={bookings}
               players={players}
               availMap={availMap}
-              squadMap={squadMap}
+              squadMap={liveSquadMap}
               defaultOpen={i === 0}
               initialSquad={initialSquadMap[b.id]}
+              onSelectedChange={updateSelected}
             />
           ))}
         </div>
