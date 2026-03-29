@@ -160,6 +160,16 @@ function isWeekendDate(dateStr: string): boolean {
   return dow === 0 || dow === 6
 }
 
+function isoWeekKey(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  const day = d.getDay()
+  // Map Sunday (0) back to Saturday to group Sat+Sun as same weekend
+  const anchor = day === 0
+    ? new Date(d.getTime() - 86400000)  // Sunday → previous Saturday
+    : d
+  return anchor.toISOString().split('T')[0]  // YYYY-MM-DD of the Saturday
+}
+
 // Build WhatsApp-ready announcement text from current selection + roles
 function formatReportingTime(matchTime: string | null, slotTime: string): string {
   // Use match_time if set, fall back to slot_time. Reporting = 15 min before.
@@ -640,15 +650,21 @@ function SlotCard({
   const announcementText = buildAnnouncementText(booking, players, selected, roles)
   const waLink           = `https://wa.me/?text=${encodeURIComponent(announcementText)}`
 
-  function takenElsewhere(playerId: string): string | null {
-    for (const [bId, ids] of Object.entries(squadMap)) {
-      if (bId !== booking.id && ids.includes(playerId)) {
-        const b = bookings.find(x => x.id === bId)
-        return b ? `${SLOT_SHORT[b.slot_time] ?? b.slot_time} ${b.format}` : 'another slot'
-      }
-    }
-    return null
-  }
+   function takenElsewhere(playerId: string): string | null {
+   for (const [bId, ids] of Object.entries(squadMap)) {
+     if (bId === booking.id) continue
+     if (!ids.includes(playerId)) continue
+     const other = bookings.find(x => x.id === bId)
+     if (!other) continue
+     // Only block within the same ISO weekend — different weeks are independent
+     if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
+     // Only block if the player's response constrains them (O or E) — Y players can play multiple
+     const response = availMap[booking.id]?.[playerId]
+     if (response === 'Y') continue
+     return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
+   }
+   return null
+ }
 
   async function toggle(playerId: string) {
    if (status !== 'draft') return
@@ -1140,8 +1156,10 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
    // Initialise from initialSquadMap so DB state is reflected on load
    const [allSelected, setAllSelected] = useState<Record<string, Set<string>>>(() => {
      const init: Record<string, Set<string>> = {}
+     const bookingIdSet = new Set(bookings.map(b => b.id))
      for (const [bId, squad] of Object.entries(initialSquadMap)) {
-       init[bId] = new Set(squad.selected)
+      if (!bookingIdSet.has(bId)) continue  // skip bookings not in this grid 
+      init[bId] = new Set(squad.selected)
      }
      return init
    })
