@@ -57,14 +57,34 @@ export async function POST(request: Request) {
   return NextResponse.json({ player: data })
 }
 
+// new
+const PLAYER_COLUMNS = new Set([
+  'name', 'gmail_id', 'whatsapp', 'dob', 'jersey_name', 'jersey_number',
+  'blood_group', 'primary_skill', 'secondary_skill', 'cricheroes_url',
+  'photo_url', 'wallet_balance', 'inducted_on', 'referred_by',
+  'is_captain', 'is_gc', 'status', 'active',
+])
+
 export async function PATCH(request: Request) {
   const deny = await requireAdmin()
   if (deny) return deny
   const supabase = createServiceClient()
   const body = await request.json()
-  const { id, ...updates } = body
+  const { id, ...rest } = body
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
-  Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k])
+
+  // Strip join data (fee_exemptions etc.) — only real columns pass through
+  const updates: Record<string, any> = {}
+  for (const [key, value] of Object.entries(rest)) {
+    if (PLAYER_COLUMNS.has(key) && value !== undefined) {
+      updates[key] = value
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+  }
+
   const { data, error } = await supabase
     .from('players')
     .update(updates)
