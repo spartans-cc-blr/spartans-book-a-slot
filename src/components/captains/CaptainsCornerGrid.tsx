@@ -656,11 +656,21 @@ function SlotCard({
      if (!ids.includes(playerId)) continue
      const other = bookings.find(x => x.id === bId)
      if (!other) continue
-     // Only block within the same ISO weekend — different weeks are independent
-     if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
-     // Only block if the player's response constrains them (O or E) — Y players can play multiple
      const response = availMap[bId]?.[playerId]
+     // Y: unrestricted — can be selected across all slots in the weekend
      if (response === 'Y') continue
+     // O: one game per weekend — block if the other slot is in the same ISO weekend
+     if (response === 'O') {
+       if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
+       return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
+     }
+     // E: one game per day — block only if the other slot is on the same calendar day
+     if (response === 'E') {
+       if (other.game_date !== booking.game_date) continue
+       return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
+     }
+     // Unknown response: treat conservatively as O (same-weekend block)
+     if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
      return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
    }
    return null
