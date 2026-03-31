@@ -170,6 +170,12 @@ function isoWeekKey(dateStr: string): string {
   return anchor.toISOString().split('T')[0]  // YYYY-MM-DD of the Saturday
 }
 
+function formatSlotDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  // e.g. "5 Apr"
+}
+
 // Build WhatsApp-ready announcement text from current selection + roles
 function formatReportingTime(matchTime: string | null, slotTime: string): string {
   // Use match_time if set, fall back to slot_time. Reporting = 15 min before.
@@ -306,7 +312,7 @@ function PlayerName({
 }) {
   const cls = [
     'font-rajdhani text-sm flex-1 leading-none',
-    isTaken ? 'line-through text-zinc-700' : hasDues ? 'text-amber-400' : 'text-parchment',
+    isTaken ? 'line-through text-zinc-500' : hasDues ? 'text-amber-400' : 'text-parchment',
   ].filter(Boolean).join(' ')
 
   const badge = player.is_captain
@@ -362,7 +368,6 @@ function SelectablePlayerRow({
   return (
     <div className={[
       'border-b border-zinc-800 last:border-0 transition-colors',
-      isTaken ? 'opacity-40' : '',
       isSel   ? 'bg-sky-950/30' : '',
     ].filter(Boolean).join(' ')}>
 
@@ -393,7 +398,7 @@ function SelectablePlayerRow({
 
         {/* Right-side pill */}
         {isTaken ? (
-          <span className="font-rajdhani text-[9px] px-1.5 py-0.5 rounded-sm bg-zinc-800 border border-zinc-700 text-zinc-500 whitespace-nowrap">
+          <span className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-red-950/60 border border-red-800/60 text-red-400 whitespace-nowrap">
             in {takenLabel}
           </span>
         ) : isSel && status !== 'draft' && activeBadges.length > 0 ? (
@@ -801,6 +806,9 @@ async function handleAnnounce() {
         onClick={() => setOpen(v => !v)}>
         <div className="flex items-start gap-2">
           <div className="flex-shrink-0 text-center w-14">
+            <p className="font-rajdhani text-[10px] text-zinc-500 leading-none mb-0.5">
+              {formatSlotDate(booking.game_date)}
+            </p>
             <p className="font-cinzel text-base font-bold text-gold leading-none">
               {SLOT_SHORT[booking.slot_time] ?? booking.slot_time}
             </p>
