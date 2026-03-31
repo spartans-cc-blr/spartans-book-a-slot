@@ -66,10 +66,10 @@ interface Props {
 const MAX_SQUAD = 12
 
 const RESP: Record<string, { bg: string; text: string; border: string; label: string }> = {
-  Y: { bg: '#1a4731', text: '#4ade80', border: '#166534', label: 'Available' },
-  E: { bg: '#1e3a5f', text: '#60a5fa', border: '#1d4ed8', label: 'Either game today — one only' },
-  O: { bg: '#3d2e00', text: '#fbbf24', border: '#d97706', label: 'One game this weekend only' },
-  L: { bg: '#2e1a47', text: '#c084fc', border: '#7e22ce', label: 'On leave' },
+  Y: { bg: '#14532d', text: '#86efac', border: '#22c55e', label: 'Available' },
+  E: { bg: '#1e3a5f', text: '#93c5fd', border: '#3b82f6', label: 'Either game today — one only' },
+  O: { bg: '#431407', text: '#fdba74', border: '#f97316', label: 'One game this weekend only' },
+  L: { bg: '#2e1a47', text: '#d8b4fe', border: '#a855f7', label: 'On leave' },
 }
 
 const SLOT_DISPLAY: Record<string, string> = {
@@ -361,7 +361,7 @@ function SelectablePlayerRow({
 
   return (
     <div className={[
-      'border-b border-ink-4 last:border-0 transition-colors',
+      'border-b border-zinc-800 last:border-0 transition-colors',
       isTaken ? 'opacity-40' : '',
       isSel   ? 'bg-sky-950/30' : '',
     ].filter(Boolean).join(' ')}>
@@ -371,7 +371,7 @@ function SelectablePlayerRow({
         onClick={() => !isDisabled && onToggle(player.id)}
         className={[
           'flex items-center gap-2 px-3 py-2.5 transition-colors',
-          !isDisabled ? 'cursor-pointer hover:bg-ink-4' : 'cursor-default',
+          !isDisabled ? 'cursor-pointer hover:bg-ink-5/60' : 'cursor-default',
         ].filter(Boolean).join(' ')}>
 
         {/* Checkbox */}
@@ -379,7 +379,7 @@ function SelectablePlayerRow({
           'w-3.5 h-3.5 rounded-sm border flex items-center justify-center flex-shrink-0 transition-all',
           isSel              ? 'bg-sky-500 border-sky-400'   : '',
           isTaken            ? 'bg-zinc-800 border-zinc-700' : '',
-          !isSel && !isTaken ? 'border-zinc-600'             : '',
+          !isSel && !isTaken ? 'border-zinc-500'             : '',
         ].filter(Boolean).join(' ')}>
           {isSel && <span className="text-[8px] text-white font-bold leading-none">✓</span>}
         </span>
@@ -387,7 +387,7 @@ function SelectablePlayerRow({
         <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} />
 
         {/* Skill abbreviation */}
-        <span className="font-rajdhani text-[10px] text-zinc-700 min-w-[24px] text-right flex-shrink-0">
+        <span className="font-rajdhani text-[10px] text-zinc-500 min-w-[24px] text-right flex-shrink-0">
           {player.primary_skill?.slice(0, 3).toUpperCase() ?? ''}
         </span>
 
@@ -839,7 +839,7 @@ async function handleAnnounce() {
           {/* Hint when in draft with players selected */}
           {status === 'draft' && selected.size > 0 && (
             <div className="px-3 py-1.5 bg-ink-4 border-b border-ink-5">
-              <p className="font-rajdhani text-[10px] text-zinc-600">
+              <p className="font-rajdhani text-[10px] text-zinc-400">
                 Tap a selected player to assign C / VC / WK for this match.
               </p>
             </div>
@@ -849,7 +849,7 @@ async function handleAnnounce() {
           {priorityPlayers.length > 0 && (
             <>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-ink-4 border-y border-ink-5">
-                <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-700 flex-1">
+                <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-400 flex-1">
                   Available across all slots
                 </span>
               </div>
@@ -872,7 +872,7 @@ async function handleAnnounce() {
 
           {/* Available */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-ink-4 border-y border-ink-5">
-            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-700 flex-1">
+            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-400 flex-1">
               Available
             </span>
             {status === 'draft' && eligible.length > 0 && (
@@ -923,7 +923,7 @@ async function handleAnnounce() {
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <span className={`font-rajdhani text-[11px] ${selected.size === MAX_SQUAD ? 'text-emerald-400' : 'text-zinc-500'}`}>
+              <span className={`font-rajdhani text-[11px] font-bold ${selected.size === MAX_SQUAD ? 'text-emerald-400' : 'text-zinc-500'}`}>
                 {selected.size}/{MAX_SQUAD}
               </span>
               {atCap && (
@@ -938,7 +938,7 @@ async function handleAnnounce() {
               {(selected.size > 0 || everAnnounced) && (
                 <button
                   onClick={() => copy(booking.id, announcementText)}
-                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm border border-ink-5 text-zinc-500 hover:text-zinc-300 transition-colors">
+                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-100 transition-colors">
                   {copied === booking.id ? 'Copied!' : 'Copy'}
                 </button>
               )}
@@ -977,7 +977,7 @@ async function handleAnnounce() {
                 </button>
               )}
               {status === 'pending' && (
-                <span className="font-rajdhani text-[10px] text-amber-400">Awaiting GC</span>
+                <span className="font-rajdhani text-[10px] font-bold text-amber-300">Awaiting GC</span>
               )}
               {saveError && (
                 <p className="w-full font-rajdhani text-[10px] text-red-400 mt-1">{saveError}</p>
@@ -1168,7 +1168,7 @@ function Legend() {
             style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
             {code}
           </span>
-          <span className="font-rajdhani text-[11px] text-zinc-600">{cfg.label}</span>
+          <span className="font-rajdhani text-[11px] text-zinc-400">{cfg.label}</span>
         </div>
       ))}
     </div>
@@ -1250,7 +1250,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         )}
         <Legend />
         {view === 'matrix' && (
-          <p className="font-rajdhani text-[10px] text-zinc-700 mt-2">
+          <p className="font-rajdhani text-[10px] text-zinc-400 mt-2">
             Amber names = players marked O or E (shared across slots). Scroll right if slots overflow.
           </p>
         )}
