@@ -659,7 +659,7 @@ function SlotCard({
      // Only block within the same ISO weekend — different weeks are independent
      if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
      // Only block if the player's response constrains them (O or E) — Y players can play multiple
-     const response = availMap[booking.id]?.[playerId]
+     const response = availMap[bId]?.[playerId]
      if (response === 'Y') continue
      return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
    }
@@ -760,6 +760,29 @@ async function handleAnnounce() {
 
   const pct = Math.min((selected.size / MAX_SQUAD) * 100, 100)
 
+  const selectAllPlayers    = eligible.filter(e => !takenElsewhere(e.player.id))
+  const allEligibleSelected = selectAllPlayers.length > 0 && selectAllPlayers.every(e => selected.has(e.player.id))
+
+  async function handleSelectAll() {
+    const next: Set<string> = new Set(Array.from(selected))
+    if (allEligibleSelected) {
+      selectAllPlayers.forEach(e => next.delete(e.player.id))
+      setRoles((r: MatchRoles) => ({
+        captain: selectAllPlayers.some(e => e.player.id === r.captain) ? null : r.captain,
+        vc:      selectAllPlayers.some(e => e.player.id === r.vc)      ? null : r.vc,
+        wk:      new Set(Array.from(r.wk).filter(id => !selectAllPlayers.some(e => e.player.id === id))),
+      }))
+    } else {
+      selectAllPlayers
+        .filter(e => !selected.has(e.player.id))
+        .slice(0, MAX_SQUAD - selected.size)
+        .forEach(e => next.add(e.player.id))
+    }
+    setSelected(next)
+    onSelectedChange(booking.id, next)
+    await saveDraft(next, roles)
+  }
+
   return (
     <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
       {/* Header */}
@@ -843,18 +866,13 @@ async function handleAnnounce() {
               Available
             </span>
             {status === 'draft' && eligible.length > 0 && (
-             <button
-               onClick={() => {
-                 const toAdd = eligible
-                   .filter(e => !takenElsewhere(e.player.id) && !selected.has(e.player.id))
-                   .slice(0, MAX_SQUAD - selected.size)
-                 toAdd.forEach(e => toggle(e.player.id))
-               }}
-               disabled={atCap}
-               className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-ink-5 text-zinc-600 hover:text-zinc-300 hover:border-zinc-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-               {atCap ? 'Full' : 'Select all'}
-             </button>
-           )}
+              <button
+                onClick={handleSelectAll}
+                disabled={atCap && !allEligibleSelected}
+                className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-ink-5 text-zinc-600 hover:text-zinc-300 hover:border-zinc-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                {atCap && !allEligibleSelected ? 'Full' : allEligibleSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
             <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-700">
               {counts.total} responded
             </span>
