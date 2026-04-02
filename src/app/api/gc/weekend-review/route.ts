@@ -55,11 +55,27 @@ export async function PATCH(req: NextRequest) {
   const supabase = createServiceClient()
 
   const newStatus = decision === 'approved' ? 'approved' : 'draft'
-  const { error } = await supabase
-    .from('squad')
-    .update({ status: newStatus })
-    .eq('booking_id', booking_id)
-    .eq('status', 'pending_approval')
+  let error: any = null
+
+  if (decision === 'approved') {
+    // Approve: flip pending_approval → approved
+    const { error: e } = await supabase
+      .from('squad')
+      .update({ status: 'approved' })
+      .eq('booking_id', booking_id)
+      .eq('status', 'pending_approval')
+    error = e
+  } else {
+    // Return: delete all rows so the captain starts from a clean slate.
+    // The captain's last submitted selection is gone — they must re-select.
+    // This prevents stale player IDs hydrating into selected state on next load.
+    const { error: e } = await supabase
+      .from('squad')
+      .delete()
+      .eq('booking_id', booking_id)
+      .eq('status', 'pending_approval')
+    error = e
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
