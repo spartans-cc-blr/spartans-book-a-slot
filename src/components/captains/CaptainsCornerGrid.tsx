@@ -681,9 +681,9 @@ function SlotCard({
        if (other.game_date !== booking.game_date) continue
        return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
      }
-     // Unknown response: treat conservatively as O (same-weekend block)
-     if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
-     return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
+     // No response or unknown — never block. A player with no availability
+     // response for the other slot cannot be constrained by it.
+     continue
    }
    return null
  }
@@ -1198,7 +1198,17 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
   // Lift selected state up so all SlotCards share cross-slot awareness
    // Initialise from initialSquadMap so DB state is reflected on load
    const [allSelected, setAllSelected] = useState<Record<string, Set<string>>>(() => {
-     return {}
+    const init: Record<string, Set<string>> = {}
+    const bookingIdSet = new Set(bookings.map(b => b.id))
+    for (const [bId, squad] of Object.entries(initialSquadMap)) {
+      if (!bookingIdSet.has(bId)) continue
+     // Don't seed from announced squads — they're final and should not
+     // ghost-block players in sibling slots. Announced slots self-report
+     // via useEffect on mount when the captain is actively working on them.
+     if (squad.status === 'announced') continue
+      init[bId] = new Set(squad.selected)
+     }  
+     return init
    })
 
    // Derived: bookingId → string[] — passed to each SlotCard as squadMap
