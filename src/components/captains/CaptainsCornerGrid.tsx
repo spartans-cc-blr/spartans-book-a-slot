@@ -10,7 +10,7 @@
 // Player names link to CricHeroes profile if set.
 // Post-announcement edit + reshare supported.
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 
 interface Booking {
   id: string
@@ -637,6 +637,13 @@ function SlotCard({
     return auto
   })
 
+  // Register initial selection into parent's allSelected on mount only.
+  // This runs once — subsequent changes go through toggle() → onSelectedChange().
+  useEffect(() => {
+    onSelectedChange(booking.id, selected)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally empty — mount only
+
   const [roles, setRoles] = useState<MatchRoles>({
     captain: initialSquad?.captain ?? null,
     vc:      initialSquad?.vc ?? null,
@@ -1191,13 +1198,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
   // Lift selected state up so all SlotCards share cross-slot awareness
    // Initialise from initialSquadMap so DB state is reflected on load
    const [allSelected, setAllSelected] = useState<Record<string, Set<string>>>(() => {
-     const init: Record<string, Set<string>> = {}
-     const bookingIdSet = new Set(bookings.map(b => b.id))
-     for (const [bId, squad] of Object.entries(initialSquadMap)) {
-      if (!bookingIdSet.has(bId)) continue  // skip bookings not in this grid 
-      init[bId] = new Set(squad.selected)
-     }
-     return init
+     return {}
    })
 
    // Derived: bookingId → string[] — passed to each SlotCard as squadMap
