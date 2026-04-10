@@ -281,16 +281,37 @@ function StatusBadge({ status }: { status: 'draft' | 'pending' | 'approved' | 'a
 }
 
 // ── Response cell (matrix view) ───────────────────────────────────
-function RespCell({ code, isConflict }: { code: string | null; isConflict?: boolean }) {
+ function RespCell({ code, isConflict, squadStatus }: {
+   code:        string | null
+   isConflict?: boolean
+   squadStatus?: 'draft' | 'pending' | 'approved' | 'announced' | null
+ }) {
+   const cellBg =
+     squadStatus === 'announced' ? 'rgba(52,211,153,0.18)' :
+     squadStatus === 'approved'  ? 'rgba(52,211,153,0.10)' :
+     squadStatus === 'pending'   ? 'rgba(56,189,248,0.10)' :
+     squadStatus === 'draft'     ? 'rgba(56,189,248,0.07)' :
+     undefined
+
+   const pip =
+     squadStatus === 'announced' ? { char: '✓', color: '#34d399' } :
+     squadStatus === 'approved'  ? { char: '✓', color: '#34d39970' } :
+     squadStatus === 'pending'   ? { char: '·', color: '#38bdf8' } :
+     squadStatus === 'draft'     ? { char: '·', color: '#38bdf870' } :
+     null
+
   if (!code) return (
-    <td className="py-0 text-center" style={{ width: 48, minWidth: 48 }}>
-      <span className="font-rajdhani text-[11px] text-zinc-800">—</span>
+    <td className="py-0 text-center" style={{ width: 48, minWidth: 48, background: cellBg }}>
+     {pip
+       ? <span className="font-rajdhani text-[11px]" style={{ color: pip.color }}>{pip.char}</span>
+       : <span className="font-rajdhani text-[11px] text-zinc-800">—</span>
+     }
     </td>
   )
   const cfg = RESP[code]
   return (
-    <td className="py-0 text-center" style={{ width: 48, minWidth: 48 }}>
-      <span
+    <td className="py-0 text-center" style={{ width: 48, minWidth: 48, background: cellBg }}>
+     <span
         className="font-rajdhani text-[11px] font-bold w-8 h-6 inline-flex items-center justify-center rounded-sm"
         style={{
           background: cfg.bg,
@@ -300,6 +321,11 @@ function RespCell({ code, isConflict }: { code: string | null; isConflict?: bool
         }}>
         {code}
       </span>
+       {pip && (
+       <div className="font-rajdhani text-[9px] leading-none mt-0.5" style={{ color: pip.color }}>
+         {pip.char}
+       </div>
+     )}
     </td>
   )
 }
@@ -1030,11 +1056,12 @@ async function handleAnnounce() {
 
 // ── Matrix view ───────────────────────────────────────────────────
 function MatrixView({
-  bookings, players, availMap,
+  bookings, players, availMap, initialSquadMap = {},
 }: {
   bookings: Booking[]
   players:  Player[]
   availMap: Record<string, Record<string, string>>
+  initialSquadMap?: Record<string, { status: 'draft' | 'pending' | 'approved' | 'announced'; selected: string[] }>
 }) {
   const activePlayers = players.filter(p =>
     bookings.some(b => {
@@ -1135,7 +1162,11 @@ function MatrixView({
                     const r          = availMap[b.id]?.[p.id]
                     const display    = (r === 'Y' || r === 'O' || r === 'E') ? r : null
                     const isConflict = display === 'O' || display === 'E'
-                    return <RespCell key={b.id} code={display} isConflict={isConflict} />
+                    const squad      = initialSquadMap[b.id]
+                    const squadStatus = squad?.selected.includes(p.id) ? squad.status : null
+                    return (
+                     <RespCell key={b.id} code={display} isConflict={isConflict} squadStatus={squadStatus} />
+                    )
                   })}
                 </tr>
               )
@@ -1269,9 +1300,18 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         )}
         <Legend />
         {view === 'matrix' && (
-          <p className="font-rajdhani text-[10px] text-zinc-400 mt-2">
-            Amber names = players marked O or E (shared across slots). Scroll right if slots overflow.
-          </p>
+           <div className="font-rajdhani text-[10px] text-zinc-700 mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            <span>Amber names = O or E across slots.</span>
+            <span className="flex items-center gap-1">
+              <span style={{ color: '#34d399' }}>✓</span> In announced squad
+            </span>
+            <span className="flex items-center gap-1">
+              <span style={{ color: '#34d39970' }}>✓</span> GC approved
+            </span>
+            <span className="flex items-center gap-1">
+              <span style={{ color: '#38bdf8' }}>·</span> In draft/pending squad
+            </span>
+          </div>
         )}
       </div>
 
@@ -1296,7 +1336,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
       {view === 'matrix' && (
         <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
           {weekendBookings.length > 0
-            ? <MatrixView bookings={weekendBookings} players={players} availMap={availMap} />
+            ? <MatrixView bookings={weekendBookings} players={players} availMap={availMap} initialSquadMap={initialSquadMap} />
             : <p className="px-4 py-6 font-rajdhani text-sm text-zinc-600 text-center">No weekend games this week.</p>
           }
         </div>
