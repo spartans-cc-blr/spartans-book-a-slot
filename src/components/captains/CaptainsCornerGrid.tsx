@@ -1124,14 +1124,26 @@ function MatrixView({
           ) : (
             activePlayers.map(p => {
               const hasDues = p.wallet_balance < 0
+              // Count how many weekend bookings this player has Y/O/E for
+              const gamesCount = bookings.filter(b => {
+                const r = availMap[b.id]?.[p.id]
+                return r === 'Y' || r === 'O' || r === 'E'
+              }).length
+
               return (
                 <tr key={p.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
                   <td className="px-2 py-1.5 sticky left-0 bg-ink-3 z-10" style={{ minWidth: 112 }}>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {/* Games count — left of name, muted, always visible */}
+                      {gamesCount > 1 && (
+                        <span className="font-rajdhani text-[9px] text-zinc-600 flex-shrink-0 tabular-nums">
+                          {gamesCount}×
+                        </span>
+                      )}
                       {/* Desktop name */}
                       {p.cricheroes_url ? (
                         <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                          className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[130px] text-right hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
                           {desktopMatrixName(p)}
                         </a>
                       ) : (
@@ -1142,11 +1154,11 @@ function MatrixView({
                       {/* Mobile name */}
                       {p.cricheroes_url ? (
                         <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                          className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          className={`font-rajdhani text-xs sm:hidden truncate max-w-[72px] text-right hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
                           {mobileMatrixName(p)}
                         </a>
                       ) : (
-                        <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                        <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[72px] text-right ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
                           {mobileMatrixName(p)}
                         </span>
                       )}
