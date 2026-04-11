@@ -309,23 +309,38 @@ function StatusBadge({ status }: { status: 'draft' | 'pending' | 'approved' | 'a
     </td>
   )
   const cfg = RESP[code]
+
+  // In squad → full coloured box with inline pip
+  if (squadStatus) {
+    return (
+      <td className="py-0 text-center" style={{ width: 48, minWidth: 48, background: cellBg }}>
+        <span
+          className="font-rajdhani text-[11px] font-bold w-8 h-6 inline-flex items-center justify-center rounded-sm"
+          style={{
+            background: cfg.bg,
+            color:      cfg.text,
+            border:     `1px solid ${cfg.border}`,
+            outline:    isConflict ? `1px solid ${cfg.text}40` : undefined,
+          }}>
+          {code}
+          {pip && (
+            <span className="ml-px text-[8px] leading-none font-bold" style={{ color: pip.color }}>
+              {pip.char}
+            </span>
+          )}
+        </span>
+      </td>
+    )
+  }
+
+  // Not in squad → plain coloured text, no box
   return (
-    <td className="py-0 text-center" style={{ width: 48, minWidth: 48, background: cellBg }}>
-     <span
-        className="font-rajdhani text-[11px] font-bold w-8 h-6 inline-flex items-center justify-center rounded-sm"
-        style={{
-          background: cfg.bg,
-          color: cfg.text,
-          border: `1px solid ${cfg.border}`,
-          outline: isConflict ? `1px solid ${cfg.text}40` : undefined,
-        }}>
+  <td className="py-0 text-center" style={{ width: 48, minWidth: 48 }}>
+      <span
+        className="font-rajdhani text-[11px] font-semibold"
+        style={{ color: cfg.text }}>
         {code}
       </span>
-       {pip && (
-       <div className="font-rajdhani text-[9px] leading-none mt-0.5" style={{ color: pip.color }}>
-         {pip.char}
-       </div>
-     )}
     </td>
   )
 }
@@ -988,7 +1003,7 @@ async function handleAnnounce() {
                   href={waLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-emerald-950/20 border border-emerald-800/40 text-emerald-500 hover:bg-emerald-950/40 transition-colors">
+                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-emferald-950/20 border border-emerald-800/40 text-emerald-500 hover:bg-emerald-950/40 transition-colors">
                   WhatsApp
                 </a>
               )}
@@ -1083,6 +1098,23 @@ function MatrixView({
             <th className="px-2 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 w-28 sm:w-44 sticky left-0 bg-ink-4 z-10 align-bottom">
               Player
             </th>
+            {/* Squad games count column */}
+            <th className="bg-ink-4 z-10 align-bottom text-center" style={{ width: 28, minWidth: 28, padding: '0 4px' }}>
+              <div style={{
+                writingMode: 'vertical-rl',
+                transform: 'rotate(180deg)',
+                whiteSpace: 'nowrap',
+                paddingBottom: 8,
+                paddingTop: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                margin: '0 auto',
+              }}>
+                <span className="font-rajdhani text-[10px] text-zinc-600">#</span>
+              </div>
+            </th>
             {bookings.map(b => (
               <th key={b.id} className="bg-ink-4 z-10 align-bottom text-center" style={{ width: 48, minWidth: 48, padding: 0 }}>
                 <div style={{
@@ -1117,7 +1149,7 @@ function MatrixView({
         <tbody>
           {activePlayers.length === 0 ? (
             <tr>
-              <td colSpan={bookings.length + 1} className="px-4 py-8 text-center font-rajdhani text-sm text-zinc-600">
+              <td colSpan={bookings.length + 2} className="px-4 py-8 text-center font-rajdhani text-sm text-zinc-600">
                 No availability responses yet.
               </td>
             </tr>
@@ -1133,17 +1165,11 @@ function MatrixView({
               return (
                 <tr key={p.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
                   <td className="px-2 py-1.5 sticky left-0 bg-ink-3 z-10" style={{ minWidth: 112 }}>
-                    <div className="flex items-center justify-end gap-1.5">
-                      {/* Games count — left of name, muted, always visible */}
-                      {gamesCount > 1 && (
-                        <span className="font-rajdhani text-[9px] text-zinc-600 flex-shrink-0 tabular-nums">
-                          {gamesCount}×
-                        </span>
-                      )}
+                    <div className="flex items-center gap-1.5">
                       {/* Desktop name */}
                       {p.cricheroes_url ? (
                         <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                          className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[130px] text-right hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
                           {desktopMatrixName(p)}
                         </a>
                       ) : (
@@ -1154,11 +1180,11 @@ function MatrixView({
                       {/* Mobile name */}
                       {p.cricheroes_url ? (
                         <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                          className={`font-rajdhani text-xs sm:hidden truncate max-w-[72px] text-right hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
                           {mobileMatrixName(p)}
                         </a>
                       ) : (
-                        <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[72px] text-right ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                        <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
                           {mobileMatrixName(p)}
                         </span>
                       )}
@@ -1169,6 +1195,22 @@ function MatrixView({
                         <span className="font-rajdhani text-[8px] font-bold bg-amber-950 border border-amber-800 text-amber-500 px-0.5 rounded-sm flex-shrink-0">₹</span>
                       )}
                     </div>
+                  </td>
+                  {/* Squad games count — how many slots this player is selected in */}
+                  <td className="py-1.5 text-center" style={{ width: 28, minWidth: 28, padding: '0 4px' }}>
+                    {(() => {
+                      const n = bookings.filter(b =>
+                        initialSquadMap[b.id]?.selected.includes(p.id)
+                      ).length
+                      return n > 0 ? (
+                        <span className="font-rajdhani text-[11px] font-bold tabular-nums"
+                          style={{ color: n >= 2 ? '#f97316' : '#34d399' }}>
+                          {n}
+                        </span>
+                      ) : (
+                        <span className="font-rajdhani text-[11px] text-zinc-800">—</span>
+                      )
+                    })()}
                   </td>
                   {bookings.map(b => {
                     const r          = availMap[b.id]?.[p.id]
@@ -1192,6 +1234,7 @@ function MatrixView({
               <td className="px-2 py-2 font-rajdhani text-[9px] font-bold tracking-[2px] uppercase text-zinc-600 sticky left-0 bg-ink-4">
                 Available
               </td>
+              <td />
               {bookings.map(b => (
                 <td key={b.id} className="text-center" style={{ padding: '6px 4px' }}>
                   <p className="font-rajdhani text-[10px] font-bold leading-snug text-center whitespace-nowrap">
