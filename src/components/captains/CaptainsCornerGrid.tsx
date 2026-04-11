@@ -1083,7 +1083,12 @@ function MatrixView({
       const r = availMap[b.id]?.[p.id]
       return r === 'Y' || r === 'O' || r === 'E'
     })
-  ).sort((a, b) => a.name.localeCompare(b.name))
+  ).sort((a, b) => {
+    const aGames = bookings.filter(bk => initialSquadMap[bk.id]?.selected.includes(a.id)).length
+    const bGames = bookings.filter(bk => initialSquadMap[bk.id]?.selected.includes(b.id)).length
+    if (bGames !== aGames) return bGames - aGames          // desc by squad games
+    return a.name.localeCompare(b.name)                    // asc by name within same count
+  })
 
   const counts = useMemo(
     () => Object.fromEntries(bookings.map(b => [b.id, getCounts(b.id, players, availMap)])),
@@ -1112,7 +1117,7 @@ function MatrixView({
                 width: '100%',
                 margin: '0 auto',
               }}>
-                <span className="font-rajdhani text-[10px] text-zinc-600">#</span>
+                <span className="font-rajdhani text-[10px] text-zinc-600"># of games</span>
               </div>
             </th>
             {bookings.map(b => (
