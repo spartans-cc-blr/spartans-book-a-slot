@@ -6,11 +6,12 @@ import { createServiceClient } from '@/lib/supabase'
 // POST { player_id, override: true|false }
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.player) {
+  const player = session?.user as any
+  if (!player?.playerId) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
-  const { isCaptain, isGC, isAdmin } = session.player
+  const { isCaptain, isGC, isAdmin } = player
   if (!isCaptain && !isGC && !isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
