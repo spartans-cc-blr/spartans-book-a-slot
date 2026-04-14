@@ -37,6 +37,9 @@ interface Props {
   response:         AvailCode           // controlled by parent
   saving:           boolean
   error:            string | null
+  weekendResponses: Record<string, string>
+  weekendBookings:  WeekendBooking[]
+  onSelect:         (bookingId: string, code: AvailKey | null) => void
   // New props added to FixturesAvailabilityProps:
   hasDues?: boolean          // wallet_balance < 0 AND no dues_override
   squadAnnounced?: boolean   // squad status === 'announced'
