@@ -91,19 +91,36 @@ export default async function FixturesPage() {
     .from('squad')
     .select('booking_id, status, is_captain, is_vc, is_wk, player:players(id, name)')
     .in('booking_id', bookingIds)
+    .eq('status', 'announced')
+  : { data: [] }
+
+  // Fetch squad status separately for lock checks (any status)
+  const { data: squadStatusRows } = bookingIds.length ? await supabase
+    .from('squad')
+    .select('booking_id, status')
+    .in('booking_id', bookingIds)
   : { data: [] }
 
   const squadMap: Record<string, any[]> = {}
   const squadStatusMap: Record<string, string> = {}
+
   for (const row of squadRows ?? []) {
     if (!squadMap[row.booking_id]) squadMap[row.booking_id] = []
-    squadStatusMap[row.booking_id] = row.status
     if (row.player) squadMap[row.booking_id].push({
       ...row.player,
       is_match_captain: row.is_captain,
       is_vc:            row.is_vc,
       is_wk:            row.is_wk,
     })
+  }
+  
+  for (const row of squadStatusRows ?? []) {
+    // Keep the highest status per booking (announced > approved > pending_approval > draft)
+    const order: Record<string, number> = { draft: 0, pending_approval: 1, approved: 2, announced: 3 }
+    const existing = squadStatusMap[row.booking_id]
+    if (!existing || (order[row.status] ?? 0) > (order[existing] ?? 0)) {
+      squadStatusMap[row.booking_id] = row.status
+    }
   }
 
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'

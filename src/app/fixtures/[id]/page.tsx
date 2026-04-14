@@ -42,11 +42,20 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     return now >= start && now < end ? 'in_progress' : 'upcoming'
   }
 
-  // Fetch announced squad
+  // Fetch announced squad players for display
   const { data: squadRows } = await supabase
     .from('squad')
-    .select('is_captain, status, is_vc, is_wk, player:players(id, name, jersey_name, jersey_number, primary_skill)')
+    .select('is_captain, is_vc, is_wk, player:players(id, name, jersey_name, jersey_number, primary_skill)')
     .eq('booking_id', booking.id)
+    .eq('status', 'announced')
+
+  // Fetch squad status separately for the lock check
+  const { data: allSquadStatuses } = await supabase
+    .from('squad')
+    .select('status')
+    .eq('booking_id', booking.id)
+
+  const squadAnnounced = (allSquadStatuses ?? []).some(r => r.status === 'announced')
 
   const squad = (squadRows ?? [])
     .filter(r => r.player)
@@ -89,7 +98,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     squad,
     cardData:        { ...booking, squad, matchStatus: getMatchStatus(booking.game_date, booking.slot_time, booking.format) },
     hasDues,
-    squadAnnounced:  (squadRows ?? []).some(r => r.status === 'announced'),
+    squadAnnounced,
     slotLocked:      (booking as any).availability_locked ?? false,
   }
 
