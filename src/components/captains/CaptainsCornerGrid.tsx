@@ -33,6 +33,7 @@ interface Player {
   jersey_name: string | null
   jersey_number: number | null
   wallet_balance: number
+  dues_override: boolean
   primary_skill: string | null
   is_captain: boolean
   priority_pick: boolean
