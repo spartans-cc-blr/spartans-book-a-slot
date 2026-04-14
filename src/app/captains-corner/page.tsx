@@ -211,6 +211,7 @@ export default async function CaptainsCornerPage() {
                 players={players ?? []}
                 availMap={availMap}
                 initialSquadMap={initialSquadMap}
+                session={{ isCaptain: !!user?.isCaptain, isGC: !!user?.isGC, isAdmin: !!user?.isAdmin }}
               />
             ))}
           </div>

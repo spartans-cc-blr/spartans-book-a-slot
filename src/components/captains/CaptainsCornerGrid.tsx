@@ -60,11 +60,6 @@ interface Props {
   availMap:  Record<string, Record<string, string>>
   squadMap?: Record<string, string[]>
   initialSquadMap?: Record<string, InitialSquad>
-  // Add to props interface:
-  canOverride:  boolean          // isCaptain || isGC || isAdmin
-  duesOverride: boolean          // player.dues_override
-  onOverride:   (id: string, next: boolean) => void
-
   session?: { isCaptain?: boolean; isGC?: boolean; isAdmin?: boolean }
 }
 
