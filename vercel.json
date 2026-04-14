@@ -17,7 +17,8 @@
   {
     "path": "/api/cron/expire-reservations",
     "schedule": "30 18 * * *"
+    "path": "/api/cron/lock-availability", 
+    "schedule": "30 0 * * 4"
   }
-  { "path": "/api/cron/lock-availability", "schedule": "30 0 * * 4" }
 ]
 }
