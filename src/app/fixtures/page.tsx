@@ -58,7 +58,7 @@ export default async function FixturesPage() {
     .from('bookings')
     // Change the select to:
     .select(`
-      id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time,
+      id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
       tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
     `)
     .eq('status', 'confirmed')
@@ -75,18 +75,29 @@ export default async function FixturesPage() {
     existingResponses = Object.fromEntries((avail ?? []).map(r => [r.booking_id, r.response]))
   }
 
+  let hasDues = false
+    if (player?.playerId) {
+      const { data: playerRow } = await supabase
+        .from('players')
+        .select('wallet_balance, dues_override')
+        .eq('id', player.playerId)
+        .single()
+      hasDues = (playerRow?.wallet_balance ?? 0) < 0 && !playerRow?.dues_override
+    }
+
 // Fetch announced squads for all active bookings
   const bookingIds = (bookings ?? []).map(b => b.id)
   const { data: squadRows } = bookingIds.length ? await supabase
     .from('squad')
-    .select('booking_id, is_captain, is_vc, is_wk, player:players(id, name)')
+    .select('booking_id, status, is_captain, is_vc, is_wk, player:players(id, name)')
     .in('booking_id', bookingIds)
-    .eq('status', 'announced')
   : { data: [] }
 
   const squadMap: Record<string, any[]> = {}
+  const squadStatusMap: Record<string, string> = {}
   for (const row of squadRows ?? []) {
     if (!squadMap[row.booking_id]) squadMap[row.booking_id] = []
+    squadStatusMap[row.booking_id] = row.status
     if (row.player) squadMap[row.booking_id].push({
       ...row.player,
       is_match_captain: row.is_captain,
@@ -119,6 +130,9 @@ export default async function FixturesPage() {
 	  matchStatus:     'upcoming' | 'in_progress'
     squad:           any[]
     cardData:        any
+    hasDues:         boolean
+    squadAnnounced:  boolean
+    slotLocked:      boolean
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
 
@@ -137,6 +151,9 @@ export default async function FixturesPage() {
       matchStatus: (b as any).matchStatus as 'upcoming' | 'in_progress',
       squad:           squadMap[b.id] ?? [],
 	    cardData:        b,
+      hasDues:         hasDues,
+      squadAnnounced:  squadStatusMap[b.id] === 'announced',
+      slotLocked:      (b as any).availability_locked ?? false,
     })
 
   }

@@ -36,6 +36,53 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
+  // ── GUARD 1: wallet balance ───────────────────────────────────────────────
+  const { data: playerRow, error: walletErr } = await supabase
+    .from('players')
+    .select('wallet_balance, dues_override')
+    .eq('id', player.playerId)
+    .single()
+
+  if (walletErr || !playerRow) {
+    return NextResponse.json({ error: 'Player not found' }, { status: 404 })
+  }
+
+  if ((playerRow.wallet_balance ?? 0) < 0 && !playerRow.dues_override) {
+    return NextResponse.json(
+      { error: 'Your account has an outstanding balance. Please clear dues to update availability.' },
+      { status: 403 }
+    )
+  }
+
+  // ── GUARD 2: squad announced ──────────────────────────────────────────────
+  const { data: squadRow } = await supabase
+    .from('squad')
+    .select('status')
+    .eq('booking_id', booking_id)
+    .limit(1)
+    .maybeSingle()
+
+  if (squadRow?.status === 'announced') {
+    return NextResponse.json(
+      { error: 'Squad has been announced. Availability is locked for this match.' },
+      { status: 403 }
+    )
+  }
+
+  // ── GUARD 3: availability_locked (≥12 Y / Thursday auto-lock) ────────────
+  const { data: bookingRow } = await supabase
+    .from('bookings')
+    .select('availability_locked')
+    .eq('id', booking_id)
+    .single()
+
+  if (bookingRow?.availability_locked) {
+    return NextResponse.json(
+      { error: 'Availability is locked for this slot (12 players confirmed).' },
+      { status: 403 }
+    )
+  }
+
   // Explicit SELECT then INSERT or UPDATE — avoids upsert/conflict issues
   const { data: existing } = await supabase
     .from('availability')

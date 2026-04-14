@@ -37,9 +37,10 @@ interface Props {
   response:         AvailCode           // controlled by parent
   saving:           boolean
   error:            string | null
-  weekendResponses: Record<string, string>
-  weekendBookings:  WeekendBooking[]
-  onSelect:         (bookingId: string, code: AvailKey | null) => void
+  // New props added to FixturesAvailabilityProps:
+  hasDues?: boolean          // wallet_balance < 0 AND no dues_override
+  squadAnnounced?: boolean   // squad status === 'announced'
+  slotLocked?: boolean       // bookings.availability_locked === true
 }
 
 // ── Validation ────────────────────────────────────────────────────
@@ -106,6 +107,9 @@ export function FixturesAvailability({
   weekendResponses,
   weekendBookings,
   onSelect,
+  hasDues,
+  squadAnnounced,
+  slotLocked,
 }: Props) {
 
   // ── Not a player — sign-in prompt ────────────────────────────
@@ -132,11 +136,18 @@ export function FixturesAvailability({
     )
   }
 
-  // Pre-compute block reasons for each button
+  // ── Upstream guards (apply to ALL buttons) ────────────────────
+  const upstreamBlock =
+    hasDues        ? 'Your account has outstanding dues — please clear your balance to update availability' :
+    squadAnnounced ? 'Squad has been announced for this match' :
+    slotLocked     ? 'Slot is full — 12 players confirmed for this game' :
+    null
+
+  // ── Pre-compute block reasons for each button ─────────────────
   const blockedReasons: Partial<Record<AvailKey, string>> = {}
   for (const btn of BUTTONS) {
     if (btn.code === response) continue // active button is never blocked
-    const reason = getBlockReason(btn.code, bookingId, slotDate, weekendBookings, weekendResponses)
+    const reason = upstreamBlock ?? getBlockReason(btn.code, bookingId, slotDate, weekendBookings, weekendResponses)
     if (reason) blockedReasons[btn.code] = reason
   }
 

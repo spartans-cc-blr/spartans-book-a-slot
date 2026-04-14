@@ -60,6 +60,12 @@ interface Props {
   availMap:  Record<string, Record<string, string>>
   squadMap?: Record<string, string[]>
   initialSquadMap?: Record<string, InitialSquad>
+  // Add to props interface:
+  canOverride:  boolean          // isCaptain || isGC || isAdmin
+  duesOverride: boolean          // player.dues_override
+  onOverride:   (id: string, next: boolean) => void
+
+  session?: { isCaptain?: boolean; isGC?: boolean; isAdmin?: boolean }
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -432,6 +438,19 @@ function SelectablePlayerRow({
 
         <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} />
 
+        {hasDues && canOverride && (
+          <button
+            onClick={e => { e.stopPropagation(); onOverride(player.id, !duesOverride) }}
+            title={duesOverride ? 'Remove dues override' : 'Allow player to update availability despite dues'}
+            className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border transition-colors flex-shrink-0 ${
+              duesOverride
+                ? 'bg-green-950/40 border-green-700 text-green-400'
+                : 'bg-amber-950/40 border-amber-700 text-amber-400'
+            }`}>
+            {duesOverride ? 'Override ✓' : 'Override'}
+          </button>
+        )}
+
         {/* Skill abbreviation */}
         <span className="font-rajdhani text-[10px] text-zinc-500 min-w-[24px] text-right flex-shrink-0">
           {player.primary_skill?.slice(0, 3).toUpperCase() ?? ''}
@@ -661,9 +680,21 @@ function SlotCard({
   // Players who haven't responded to this booking
   const unrespondedPlayers = players.filter(p => !liveAvailMap[p.id])
 
+  const canOverride = !!(session?.isCaptain || session?.isGC || session?.isAdmin)
+
   function handleProxyAdd(playerId: string, response: string) {
     setLiveAvailMap(prev => ({ ...prev, [playerId]: response }))
     setAddingFor(false)
+  }
+
+  async function handleOverride(playerId: string, next: boolean) {
+    await fetch('/api/players/dues-override', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player_id: playerId, override: next }),
+    })
+    // optimistic local update handled by parent via players prop refresh,
+    // but we can flip locally too if players state is lifted
   }
 
   const [selected, setSelected] = useState<Set<string>>(() => {
@@ -965,6 +996,9 @@ async function handleAnnounce() {
                 roles={roles}
                 onToggle={toggle}
                 onRoleToggle={handleRoleToggle}
+                canOverride={canOverride}
+                duesOverride={player.dues_override ?? false}
+                onOverride={handleOverride}
               />
             ))
           )}
@@ -1042,8 +1076,8 @@ async function handleAnnounce() {
           </div>
 
           {/* Add player button */}
-          {status === 'draft' && unrespondedPlayers.length > 0 && (
-            <div className="px-3 py-2 border-t border-ink-5 flex justify-end">
+          {(status === 'draft' || (status === 'announced' && canOverride)) && unrespondedPlayers.length > 0 && (
+          <div className="px-3 py-2 border-t border-ink-5 flex justify-end">
               <button
                 onClick={() => setAddingFor(v => !v)}
                 className={`font-rajdhani text-[10px] font-bold tracking-wide transition-colors ${

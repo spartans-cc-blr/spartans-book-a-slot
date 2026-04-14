@@ -25,6 +25,9 @@ interface BookingEntry {
   matchStatus:     'upcoming' | 'in_progress'   // add this
   squad:           SquadPlayer[] 
   cardData:        any
+  hasDues:         boolean
+  squadAnnounced:  boolean
+  slotLocked:      boolean
 }
 
 interface Props {
@@ -114,6 +117,9 @@ export function FixturesWeekendGroup({
             weekendResponses={weekendResponses}
             weekendBookings={weekendBookings}
             onSelect={handleSelect}
+            hasDues={b.hasDues}
+            squadAnnounced={b.squadAnnounced}
+            slotLocked={b.slotLocked}
           />
         </div>
       ))}
