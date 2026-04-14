@@ -17,7 +17,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
   const { data: booking, error } = await supabase
     .from('bookings')
     .select(`
-      id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time,
+      id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
       tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
     `)
     .eq('id', params.id)
@@ -45,9 +45,8 @@ export default async function MatchCardPage({ params }: { params: { id: string }
   // Fetch announced squad
   const { data: squadRows } = await supabase
     .from('squad')
-    .select('is_captain, is_vc, is_wk, player:players(id, name, jersey_name, jersey_number, primary_skill)')
+    .select('is_captain, status, is_vc, is_wk, player:players(id, name, jersey_name, jersey_number, primary_skill)')
     .eq('booking_id', booking.id)
-    .eq('status', 'announced')
 
   const squad = (squadRows ?? [])
     .filter(r => r.player)
@@ -70,6 +69,17 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     initialResponse = av?.response ?? null
   }
 
+  // Fetch player dues state
+  let hasDues = false
+  if (isPlayer && user?.playerId) {
+    const { data: playerRow } = await supabase
+      .from('players')
+      .select('wallet_balance, dues_override')
+      .eq('id', user.playerId)
+      .single()
+    hasDues = (playerRow?.wallet_balance ?? 0) < 0 && !playerRow?.dues_override
+  }
+
   const entry = {
     id:              booking.id,
     game_date:       booking.game_date,
@@ -78,6 +88,9 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     matchStatus:     getMatchStatus(booking.game_date, booking.slot_time, booking.format) as 'upcoming' | 'in_progress',
     squad,
     cardData:        { ...booking, squad, matchStatus: getMatchStatus(booking.game_date, booking.slot_time, booking.format) },
+    hasDues,
+    squadAnnounced:  (squadRows ?? []).some(r => r.status === 'announced'),
+    slotLocked:      (booking as any).availability_locked ?? false,
   }
 
   return (
