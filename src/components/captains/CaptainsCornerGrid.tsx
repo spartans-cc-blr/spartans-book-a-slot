@@ -216,7 +216,7 @@ function buildAnnouncementText(
   const reportTime   = formatReportingTime(booking.match_time, booking.slot_time)
 
   const lines: (string | null)[] = [
-    `📅 *${dateStr}*`,
+    `*${dateStr}*`,
     `*Reporting Time: ${reportTime}*`,
     `Format: ${booking.format}`,
     `Jersey: *${jersey}*`,
