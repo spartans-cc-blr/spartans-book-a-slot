@@ -11,8 +11,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
-  const { isCaptain, isGC, isAdmin } = player
-  if (!isCaptain && !isGC && !isAdmin) {
+  const { isGC, isAdmin } = player
+  if (!isGC && !isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

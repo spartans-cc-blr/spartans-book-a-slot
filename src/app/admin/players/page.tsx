@@ -25,6 +25,7 @@ type Player = {
   inducted_on: string | null
   wallet_balance: number
   active: boolean
+  dues_override: boolean
   is_captain: boolean
   status: 'active' | 'inactive' | 'expelled'
   cricheroes_url: string | null
@@ -447,6 +448,30 @@ export default function AdminPlayersPage() {
                         <span className="ml-2 font-rajdhani text-[9px] font-bold bg-amber-950 border border-amber-800 text-amber-400 px-1.5 py-0.5 rounded">
                           EXEMPT · {exempt.reason}
                         </span>
+                      )}
+                      {hasDues && (
+                        <button
+                          onClick={async () => {
+                            const next = !p.dues_override
+                            const res = await fetch('/api/players/dues-override', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ player_id: p.id, override: next }),
+                            })
+                            if (res.ok) {
+                              setPlayers(prev => prev.map(x =>
+                                x.id === p.id ? { ...x, dues_override: next } : x
+                              ))
+                            }
+                          }}
+                          title={p.dues_override ? 'Remove override — player will be blocked from self-updating availability' : 'Allow player to self-update availability despite dues'}
+                          className={`mt-1 block font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded border transition-colors ${
+                            p.dues_override
+                              ? 'bg-green-950/40 border-green-700 text-green-400'
+                              : 'bg-amber-950/40 border-amber-700 text-amber-400'
+                          }`}>
+                          {p.dues_override ? 'Self-update allowed ✓' : 'Allow self-update'}
+                        </button>
                       )}
                     </td>
                     <td className="px-4 py-3">

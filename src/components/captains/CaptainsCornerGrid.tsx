@@ -61,7 +61,6 @@ interface Props {
   availMap:  Record<string, Record<string, string>>
   squadMap?: Record<string, string[]>
   initialSquadMap?: Record<string, InitialSquad>
-  session?: { isCaptain?: boolean; isGC?: boolean; isAdmin?: boolean }
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -379,7 +378,7 @@ function PlayerName({
 
 // ── SelectablePlayerRow ───────────────────────────────────────────
 function SelectablePlayerRow({
-  player, response, selected, atCap, status, takenLabel, roles, onToggle, onRoleToggle, canOverride, duesOverride, onOverride,
+  player, response, selected, atCap, status, takenLabel, roles, onToggle, onRoleToggle,
 }: {
   player:       Player
   response:     string
@@ -390,9 +389,6 @@ function SelectablePlayerRow({
   roles:        MatchRoles
   onToggle:     (id: string) => void
   onRoleToggle: (id: string, role: 'captain' | 'vc' | 'wk') => void
-  canOverride:  boolean
-  duesOverride: boolean
-  onOverride:   (id: string, next: boolean) => void
 }) {
   const isTaken    = !!takenLabel
   const isSel      = selected.has(player.id)
@@ -436,19 +432,6 @@ function SelectablePlayerRow({
         </span>
 
         <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} />
-
-        {hasDues && canOverride && (
-          <button
-            onClick={e => { e.stopPropagation(); onOverride(player.id, !duesOverride) }}
-            title={duesOverride ? 'Remove dues override' : 'Allow player to update availability despite dues'}
-            className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border transition-colors flex-shrink-0 ${
-              duesOverride
-                ? 'bg-green-950/40 border-green-700 text-green-400'
-                : 'bg-amber-950/40 border-amber-700 text-amber-400'
-            }`}>
-            {duesOverride ? 'Override ✓' : 'Override'}
-          </button>
-        )}
 
         {/* Skill abbreviation */}
         <span className="font-rajdhani text-[10px] text-zinc-500 min-w-[24px] text-right flex-shrink-0">
@@ -653,7 +636,7 @@ function AddPlayerPanel({
 
 // ── SlotCard ──────────────────────────────────────────────────────
 function SlotCard({
-  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad, onSelectedChange, session,
+  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad, onSelectedChange,
 }: {
   booking:     Booking
   bookings:    Booking[]
@@ -663,7 +646,6 @@ function SlotCard({
   defaultOpen: boolean
   initialSquad?: InitialSquad
   onSelectedChange: (bookingId: string, selected: Set<string>) => void
-  session?: { isCaptain?: boolean; isGC?: boolean; isAdmin?: boolean }
 }) {
   const [open,          setOpen]          = useState(defaultOpen)
   const [status,        setStatus]        = useState<'draft' | 'pending' | 'approved' | 'announced'>(initialSquad?.status ?? 'draft')
@@ -679,8 +661,6 @@ function SlotCard({
 
   // Players who haven't responded to this booking
   const unrespondedPlayers = players.filter(p => !liveAvailMap[p.id])
-
-  const canOverride = !!(session?.isCaptain || session?.isGC || session?.isAdmin)
 
   function handleProxyAdd(playerId: string, response: string) {
     setLiveAvailMap(prev => ({ ...prev, [playerId]: response }))
@@ -952,9 +932,6 @@ async function handleAnnounce() {
                   roles={roles}
                   onToggle={toggle}
                   onRoleToggle={handleRoleToggle}
-                  canOverride={canOverride}
-                  duesOverride={player.dues_override ?? false}
-                  onOverride={handleOverride}
                 />
               ))}
             </>
@@ -999,9 +976,6 @@ async function handleAnnounce() {
                 roles={roles}
                 onToggle={toggle}
                 onRoleToggle={handleRoleToggle}
-                canOverride={canOverride}
-                duesOverride={player.dues_override ?? false}
-                onOverride={handleOverride}
               />
             ))
           )}
@@ -1319,7 +1293,7 @@ function Legend() {
 }
 
 // ── Main export ────────────────────────────────────────────────────
-export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {}, initialSquadMap = {}, session }: Props) {
+export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {}, initialSquadMap = {} }: Props) {
   
   const [view, setView] = useState<'slot' | 'matrix'>('slot')
   const weekendBookings = bookings.filter(b => isWeekendDate(b.game_date))
@@ -1426,7 +1400,6 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
               defaultOpen={i === 0}
               initialSquad={initialSquadMap[b.id]}
               onSelectedChange={updateSelected}
-              session={session}
             />
           ))}
         </div>
