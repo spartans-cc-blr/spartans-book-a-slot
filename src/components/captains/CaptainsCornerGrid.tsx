@@ -1053,7 +1053,7 @@ async function handleAnnounce() {
           </div>
 
           {/* Add player button */}
-          {(status === 'draft' || (status === 'announced' && canOverride)) && unrespondedPlayers.length > 0 && (
+          {(status === 'draft' || (status === 'announced')) && unrespondedPlayers.length > 0 && (
           <div className="px-3 py-2 border-t border-ink-5 flex justify-end">
               <button
                 onClick={() => setAddingFor(v => !v)}
