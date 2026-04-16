@@ -458,6 +458,8 @@ export default function AdminPlayersPage() {
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ player_id: p.id, override: next }),
                             })
+                            const data = await res.json()
+                            console.log('Override response:', res.status, data)
                             if (res.ok) {
                               setPlayers(prev => prev.map(x =>
                                 x.id === p.id ? { ...x, dues_override: next } : x
