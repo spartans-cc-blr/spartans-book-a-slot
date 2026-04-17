@@ -1116,7 +1116,7 @@ async function handleAnnounce() {
                    <WAIcon size={13} />
                    {saving ? 'Announcing…' : everAnnounced ? 'Re-announce & Share' : 'Announce & Share'}
                  </a>
-                <>
+                </>
               )}
 
               {/* Announced */}
