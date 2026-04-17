@@ -62,7 +62,7 @@ const PLAYER_COLUMNS = new Set([
   'name', 'gmail_id', 'whatsapp', 'dob', 'jersey_name', 'jersey_number',
   'blood_group', 'primary_skill', 'secondary_skill', 'cricheroes_url',
   'photo_url', 'wallet_balance', 'inducted_on', 'referred_by',
-  'is_captain', 'is_gc', 'status', 'active',
+  'is_captain', 'is_gc', 'status', 'active', 'dues_override',
 ])
 
 export async function PATCH(request: Request) {
