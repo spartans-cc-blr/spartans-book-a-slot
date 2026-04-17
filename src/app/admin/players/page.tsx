@@ -456,6 +456,7 @@ export default function AdminPlayersPage() {
                           EXEMPT · {exempt.reason}
                         </span>
                       )}
+<<<<<<< HEAD
                       <button
                         onClick={async () => {
                           const next = !p.dues_override
@@ -479,6 +480,32 @@ export default function AdminPlayersPage() {
                         <span className={`w-2 h-2 rounded-full ${p.dues_override ? 'bg-green-400' : 'bg-zinc-600'}`} />
                         {p.dues_override ? 'Can update' : 'Update blocked'}
                       </button>
+=======
+                    {hasDues && (
+                        <button
+                          onClick={async () => {
+                            const next = !p.dues_override
+                            const res = await fetch('/api/players', {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id: p.id, dues_override: next }),
+                            })
+                            if (res.ok) {
+                              setPlayers(prev => prev.map(x =>
+                                x.id === p.id ? { ...x, dues_override: next } : x
+                              ))
+                            }
+                          }}
+                          title={p.dues_override ? 'Remove override — player will be blocked again' : 'Allow player to self-update availability despite dues'}
+                          className={`mt-1 block font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded border transition-colors ${
+                            p.dues_override
+                              ? 'bg-green-950/40 border-green-700 text-green-400'
+                              : 'bg-amber-950/40 border-amber-700 text-amber-400'
+                          }`}>
+                          {p.dues_override ? 'Self-update ✓' : 'Allow self-update'}
+                        </button>
+                      )}
+>>>>>>> 3afd66fa933fb4ac99856b9fe77af4dba63030f9
                     </td>
                     <td className="px-4 py-3">
                       <span className={`font-rajdhani text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm border
