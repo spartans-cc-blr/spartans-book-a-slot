@@ -353,6 +353,13 @@ export default function AdminPlayersPage() {
                             className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 border border-ink-5 px-4 py-1.5 rounded transition-colors">
                             Cancel
                           </button>
+                          {p.status !== 'expelled' && (
+                            <button
+                              onClick={() => expelPlayer(p.id, p.name)}
+                              className="font-rajdhani text-xs text-zinc-600 hover:text-red-400 border border-ink-5 hover:border-red-800 px-2 py-1.5 rounded transition-colors ml-auto">
+                              Expel player
+                            </button>
+                          )}
                         </div>
 
                         {/* Fee exemptions */}
@@ -449,32 +456,29 @@ export default function AdminPlayersPage() {
                           EXEMPT · {exempt.reason}
                         </span>
                       )}
-                      {hasDues && (
-                        <button
-                          onClick={async () => {
-                            const next = !p.dues_override
-                            const res = await fetch('/api/players/dues-override', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ player_id: p.id, override: next }),
-                            })
-                            const data = await res.json()
-                            console.log('Override response:', res.status, data)
-                            if (res.ok) {
-                              setPlayers(prev => prev.map(x =>
-                                x.id === p.id ? { ...x, dues_override: next } : x
-                              ))
-                            }
-                          }}
-                          title={p.dues_override ? 'Remove override — player will be blocked from self-updating availability' : 'Allow player to self-update availability despite dues'}
-                          className={`mt-1 block font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded border transition-colors ${
-                            p.dues_override
-                              ? 'bg-green-950/40 border-green-700 text-green-400'
-                              : 'bg-amber-950/40 border-amber-700 text-amber-400'
-                          }`}>
-                          {p.dues_override ? 'Self-update allowed ✓' : 'Allow self-update'}
-                        </button>
-                      )}
+                      <button
+                        onClick={async () => {
+                          const next = !p.dues_override
+                          const res = await fetch('/api/players/dues-override', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ player_id: p.id, override: next }),
+                          })
+                          if (res.ok) {
+                            setPlayers(prev => prev.map(x =>
+                              x.id === p.id ? { ...x, dues_override: next } : x
+                            ))
+                          }
+                        }}
+                        title={p.dues_override ? 'Click to block self-update for this player' : 'Click to allow self-update despite dues'}
+                        className={`mt-1 flex items-center gap-1.5 font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded border transition-colors ${
+                          p.dues_override
+                            ? 'bg-green-950/40 border-green-700 text-green-400'
+                            : 'bg-ink-4 border-ink-5 text-zinc-600 hover:border-zinc-600'
+                        }`}>
+                        <span className={`w-2 h-2 rounded-full ${p.dues_override ? 'bg-green-400' : 'bg-zinc-600'}`} />
+                        {p.dues_override ? 'Can update' : 'Update blocked'}
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`font-rajdhani text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm border
@@ -490,12 +494,6 @@ export default function AdminPlayersPage() {
                           className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
                           Edit
                         </button>
-                        {p.status !== 'expelled' && (
-                          <button onClick={() => expelPlayer(p.id, p.name)}
-                            className="font-rajdhani text-xs text-zinc-600 hover:text-red-400 border border-ink-5 hover:border-red-800 px-2 py-1 rounded transition-colors">
-                            Expel
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
