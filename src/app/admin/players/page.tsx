@@ -353,6 +353,13 @@ export default function AdminPlayersPage() {
                             className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 border border-ink-5 px-4 py-1.5 rounded transition-colors">
                             Cancel
                           </button>
+                          {p.status !== 'expelled' && (
+                            <button
+                              onClick={() => expelPlayer(p.id, p.name)}
+                              className="font-rajdhani text-xs text-zinc-600 hover:text-red-400 border border-ink-5 hover:border-red-800 px-2 py-1.5 rounded transition-colors ml-auto">
+                              Expel player
+                            </button>
+                          )}
                         </div>
 
                         {/* Fee exemptions */}
@@ -488,12 +495,6 @@ export default function AdminPlayersPage() {
                           className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
                           Edit
                         </button>
-                        {p.status !== 'expelled' && (
-                          <button onClick={() => expelPlayer(p.id, p.name)}
-                            className="font-rajdhani text-xs text-zinc-600 hover:text-red-400 border border-ink-5 hover:border-red-800 px-2 py-1 rounded transition-colors">
-                            Expel
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
