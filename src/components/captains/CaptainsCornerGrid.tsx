@@ -1086,12 +1086,20 @@ async function handleAnnounce() {
 
               {/* Draft */}
               {status === 'draft' && (
+                <div className="flex items-center gap-2">
+                {selected.size > 0 && !rolesComplete && (
+                  <span className="font-rajdhani text-[9px] text-amber-400 whitespace-nowrap">
+                    Assign {missingRoles.join(', ')}
+                  </span>
+                )}
                 <button
                   onClick={handleSubmit}
-                  disabled={selected.size === 0 || saving}
-                  className="font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                  {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
-                </button>
+                  disabled={selected.size === 0 || !rolesComplete || saving}
+                  title={selected.size > 0 && !rolesComplete ? `Assign ${missingRoles.join(', ')} before submitting` : undefined}
+                    className="font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
+                  </button>
+                  </div>
               )}
 
               {/* Approved — single tap: announce + open WhatsApp */}
@@ -1102,16 +1110,16 @@ async function handleAnnounce() {
                       GC: {gcReturnNote}
                     </span>
                   )}
-                  
-                    href={waLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={handleAnnounce}
-                    className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
-                    <WAIcon size={13} />
-                    {saving ? 'Announcing…' : everAnnounced ? 'Re-announce & Share' : 'Announce & Share'}
-                  </a>
-                </>
+                           
+                   href={waLink}
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   onClick={handleAnnounce}
+                   className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+                   <WAIcon size={13} />
+                   {saving ? 'Announcing…' : everAnnounced ? 'Re-announce & Share' : 'Announce & Share'}
+                 </a>
+                <>
               )}
 
               {/* Announced */}
