@@ -52,6 +52,7 @@ interface InitialSquad {
    captain:  string | null
    vc:       string | null
    wk:       string[]
+   gcReturnNote: string | null
  }
 
 interface Props {
@@ -237,6 +238,28 @@ function buildAnnouncementText(
   ]
 
   return lines.filter((l): l is string => l !== null).join('\n')
+}
+
+function buildSquadCopyText(players: Player[], selected: Set<string>, roles: MatchRoles): string {
+  return players
+    .filter(p => selected.has(p.id))
+    .map((p, i) => {
+      const tags: string[] = []
+      if (roles.wk.has(p.id))     tags.push('WK')
+      if (roles.captain === p.id) tags.push('C')
+      if (roles.vc === p.id)      tags.push('VC')
+      return `${i + 1}. ${p.name}${tags.length ? ` (${tags.join(', ')})` : ''}`
+    })
+    .join('\n')
+}
+
+function WAIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.855L.057 23.082a.75.75 0 00.921.916l5.232-1.471A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.699-.487-5.256-1.342l-.376-.214-3.904 1.097 1.098-3.905-.214-.376A9.96 9.96 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+    </svg>
+  )
 }
 
 // ── useCopySquad hook ─────────────────────────────────────────────
@@ -662,6 +685,25 @@ function SlotCard({
   // Players who haven't responded to this booking
   const unrespondedPlayers = players.filter(p => !liveAvailMap[p.id])
 
+  const [gcReturnNote, setGcReturnNote] = useState<string | null>(initialSquad?.gcReturnNote ?? null)
+
+  async function handleWithdraw() {
+    setSaving(true)
+    setSaveError(null)
+    const res = await fetch('/api/squad/withdraw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: booking.id }),
+    })
+    if (res.ok) {
+      setStatus('draft')
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setSaveError(d.error ?? 'Failed to withdraw')
+    }
+    setSaving(false)
+  }
+
   function handleProxyAdd(playerId: string, response: string) {
     setLiveAvailMap(prev => ({ ...prev, [playerId]: response }))
     setAddingFor(false)
@@ -992,84 +1034,115 @@ async function handleAnnounce() {
           )}
 
           {/* Footer */}
-          <div className="px-3 py-2.5 bg-ink-4 border-t border-ink-5 flex items-center gap-3 flex-wrap">
-            {/* Progress bar + count */}
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="flex-1 h-1 bg-ink-5 rounded-full overflow-hidden max-w-[80px]">
+          <div className="px-3 py-2.5 bg-ink-4 border-t border-ink-5">
+            {/* Row 1 — progress */}
+            <div className="flex items-center gap-2 mb-2.5">
+              <div className="flex-1 h-1.5 bg-ink-5 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${selected.size === MAX_SQUAD ? 'bg-emerald-500' : 'bg-sky-600'}`}
+                  className={`h-full rounded-full transition-all duration-300 ${atCap ? 'bg-emerald-500' : 'bg-sky-600'}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <span className={`font-rajdhani text-[11px] font-bold ${selected.size === MAX_SQUAD ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                {selected.size}/{MAX_SQUAD}
+              <span className={`font-rajdhani text-xs font-bold tabular-nums flex-shrink-0 ${atCap ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                {selected.size}/{MAX_SQUAD}{atCap ? ' ✓' : ''}
               </span>
-              {atCap && (
-                <span className="font-rajdhani text-[9px] px-1.5 py-0.5 rounded-sm bg-emerald-950/40 border border-emerald-800 text-emerald-500 whitespace-nowrap">
-                  Cap reached
-                </span>
-              )}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-              {(selected.size > 0 || everAnnounced) && (
-                <button
-                  onClick={() => copy(booking.id, announcementText)}
-                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-100 transition-colors">
-                  {copied === booking.id ? 'Copied!' : 'Copy'}
-                </button>
-              )}
+            {/* Row 2 — actions */}
+            <div className="flex items-center gap-2">
+              {/* Copy names only */}
               {selected.size > 0 && (
-                <a
-                  href={waLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-emferald-950/20 border border-emerald-800/40 text-emerald-500 hover:bg-emerald-950/40 transition-colors">
-                  WhatsApp
-                </a>
+                <button
+                  onClick={() => copy(booking.id, buildSquadCopyText(players, selected, roles))}
+                  className="flex items-center gap-1 font-rajdhani text-[10px] font-bold px-2 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 transition-colors flex-shrink-0">
+                  {copied === booking.id ? '✓ Copied' : (
+                    <>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                      </svg>
+                      Copy
+                    </>
+                  )}
+                </button>
               )}
-              {status === 'draft' && (
-                <div className="flex items-center gap-2">
-                    {selected.size > 0 && !rolesComplete && (
-                      <span className="font-rajdhani text-[9px] text-amber-400 whitespace-nowrap">
-                        Assign {missingRoles.join(', ')}
-                      </span>
-                    )}
-                    <button
-                      onClick={handleSubmit}
-                      disabled={selected.size === 0 || !rolesComplete || saving}
-                      title={!rolesComplete ? `Assign ${missingRoles.join(', ')} before submitting` : undefined}
-                      className="font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                      {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
-                    </button>
-                  </div>
-                )}
 
-              {status === 'approved' && (
-                <button
-                  onClick={handleAnnounce}
-                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-emerald-950/40 border border-emerald-700 text-emerald-400 hover:bg-emerald-950/70 transition-colors">
-                  {saving ? 'Announcing…' : everAnnounced ? 'Re-announce' : 'Announce squad'}
-                </button>
-              )}
-              {status === 'announced' && (
-                <span className="font-rajdhani text-[10px] text-emerald-500">Announced</span>
-              )}
-              {everAnnounced && status === 'announced' && (
-                <button
-                  onClick={() => setStatus('draft')}
-                  className="font-rajdhani text-[9px] px-1.5 py-0.5 rounded-sm border border-ink-5 text-zinc-600 hover:text-zinc-400 transition-colors">
-                  Edit
-                </button>
-              )}
+              <div className="flex-1" />
+
+              {/* Pending — withdraw button */}
               {status === 'pending' && (
-                <span className="font-rajdhani text-[10px] font-bold text-amber-300">Awaiting GC</span>
+                <>
+                  <span className="font-rajdhani text-[10px] font-bold text-amber-300 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" />
+                    Awaiting GC
+                  </span>
+                  <button
+                    onClick={handleWithdraw}
+                    disabled={saving}
+                    className="font-rajdhani text-[10px] font-bold px-2 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-40">
+                    {saving ? '…' : 'Withdraw'}
+                  </button>
+                </>
               )}
-              {saveError && (
-                <p className="w-full font-rajdhani text-[10px] text-red-400 mt-1">{saveError}</p>
+
+              {/* Draft */}
+              {status === 'draft' && (
+                <button
+                  onClick={handleSubmit}
+                  disabled={selected.size === 0 || saving}
+                  className="font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                  {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
+                </button>
+              )}
+
+              {/* Approved — single tap: announce + open WhatsApp */}
+              {status === 'approved' && (
+                <>
+                  {gcReturnNote && (
+                    <span className="font-rajdhani text-[9px] text-amber-400 truncate max-w-[120px]" title={gcReturnNote}>
+                      GC: {gcReturnNote}
+                    </span>
+                  )}
+                  
+                    href={waLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={handleAnnounce}
+                    className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+                    <WAIcon size={13} />
+                    {saving ? 'Announcing…' : everAnnounced ? 'Re-announce & Share' : 'Announce & Share'}
+                  </a>
+                </>
+              )}
+
+              {/* Announced */}
+              {status === 'announced' && (
+                <>
+                  <span className="font-rajdhani text-[10px] font-bold text-emerald-400">Announced ✓</span>
+                  <a href={waLink} target="_blank" rel="noopener noreferrer" title="Share via WhatsApp"
+                    className="flex items-center justify-center w-7 h-7 rounded-sm bg-emerald-950/40 border border-emerald-800/60 text-emerald-400 hover:bg-emerald-950/70 transition-colors">
+                    <WAIcon size={13} />
+                  </a>
+                  <button
+                    onClick={() => setStatus('draft')}
+                    className="font-rajdhani text-[9px] font-bold px-2 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors">
+                    Edit
+                  </button>
+                </>
               )}
             </div>
+
+            {/* GC return note — shown when captain is back in draft after GC returned */}
+            {status === 'draft' && gcReturnNote && (
+              <div className="mt-2 px-2 py-1.5 rounded-sm bg-amber-950/30 border border-amber-800/50">
+                <p className="font-rajdhani text-[10px] text-amber-400">
+                  <span className="font-bold">GC note:</span> {gcReturnNote}
+                </p>
+              </div>
+            )}
+
+            {saveError && (
+              <p className="font-rajdhani text-[10px] text-red-400 mt-2">{saveError}</p>
+            )}
           </div>
 
           {/* Add player button */}

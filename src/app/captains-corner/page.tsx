@@ -55,7 +55,7 @@ export default async function CaptainsCornerPage() {
     .from('bookings')
     .select(`
       id, game_date, slot_time, format, opponent_name,
-      match_time, cricheroes_url,
+      match_time, cricheroes_url, gc_return_note,
       tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
     `)
     .eq('status', 'confirmed')
@@ -119,7 +119,7 @@ export default async function CaptainsCornerPage() {
                    : row.status === 'announced'        ? 'announced'
                    : row.status === 'approved'         ? 'approved'
                    : 'draft'
-      initialSquadMap[row.booking_id] = { status: mapped, selected: [], captain: null, vc: null, wk: [] }
+      initialSquadMap[row.booking_id] = { status: mapped, selected: [], captain: null, vc: null, wk: [], gcReturnNote: (bookings ?? []).find(b => b.id === row.booking_id)?.gc_return_note ?? null ,}
     }
     const entry = initialSquadMap[row.booking_id]
     entry.selected.push(row.player_id)

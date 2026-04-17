@@ -75,6 +75,14 @@ export async function PATCH(req: NextRequest) {
       .eq('booking_id', booking_id)
       .eq('status', 'pending_approval')
     error = e
+    
+   // Persist the GC note on the booking so the captain sees it on next load
+   if (!error && note) {
+     await supabase
+       .from('bookings')
+       .update({ gc_return_note: note })
+       .eq('id', booking_id)
+   }
   }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

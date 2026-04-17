@@ -42,6 +42,12 @@ export async function POST(req: NextRequest) {
     .eq('booking_id', booking_id)
     .eq('status', 'draft')
 
+ // Clear any previous GC return note — fresh submission
+  await supabase
+   .from('bookings')
+   .update({ gc_return_note: null })
+   .eq('id', booking_id)
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
