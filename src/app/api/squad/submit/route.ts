@@ -15,6 +15,27 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
+  // Fetch the current draft rows to validate roles before submitting
+  const { data: draftRows } = await supabase
+    .from('squad')
+    .select('player_id, is_captain, is_vc, is_wk')
+    .eq('booking_id', booking_id)
+    .eq('status', 'draft')
+
+  if (!draftRows?.length)
+    return NextResponse.json({ error: 'No draft squad found for this booking' }, { status: 400 })
+
+  const hasCaptain = draftRows.some(r => r.is_captain)
+  const hasVC      = draftRows.some(r => r.is_vc)
+  const hasWK      = draftRows.some(r => r.is_wk)
+
+  if (!hasCaptain)
+    return NextResponse.json({ error: 'Assign a match captain (C) before submitting for GC review' }, { status: 400 })
+  if (!hasVC)
+    return NextResponse.json({ error: 'Assign a vice captain (VC) before submitting for GC review' }, { status: 400 })
+  if (!hasWK)
+    return NextResponse.json({ error: 'Assign a wicket keeper (WK) before submitting for GC review' }, { status: 400 })
+
   const { error } = await supabase
     .from('squad')
     .update({ status: 'pending_approval' })

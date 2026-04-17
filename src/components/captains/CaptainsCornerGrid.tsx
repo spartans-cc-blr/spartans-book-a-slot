@@ -711,6 +711,15 @@ function SlotCard({
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
   const slotLabel       = `${SLOT_SHORT[booking.slot_time] ?? booking.slot_time} ${booking.format}`
 
+ 
+  // All three roles must be assigned before GC submission is allowed
+  const rolesComplete = !!roles.captain && !!roles.vc && roles.wk.size > 0
+  const missingRoles  = [
+    !roles.captain  && 'C',
+    !roles.vc       && 'VC',
+    roles.wk.size === 0 && 'WK',
+  ].filter(Boolean) as string[]
+
   const announcementText = buildAnnouncementText(booking, players, selected, roles)
   const waLink           = `https://wa.me/?text=${encodeURIComponent(announcementText)}`
 
@@ -906,8 +915,10 @@ async function handleAnnounce() {
           {/* Hint when in draft with players selected */}
           {status === 'draft' && selected.size > 0 && (
             <div className="px-3 py-1.5 bg-ink-4 border-b border-ink-5">
-              <p className="font-rajdhani text-[10px] text-zinc-400">
-                Tap a selected player to assign C / VC / WK for this match.
+              <p className={`font-rajdhani text-[10px] ${!rolesComplete ? 'text-amber-400' : 'text-zinc-400'}`}>
+                {!rolesComplete
+                  ? `Tap a selected player to assign ${missingRoles.join(', ')} — required before GC submission.`
+                  : 'Tap a selected player to change C / VC / WK roles.'}
               </p>
             </div>
           )}
@@ -1019,13 +1030,22 @@ async function handleAnnounce() {
                 </a>
               )}
               {status === 'draft' && (
-                <button
-                  onClick={handleSubmit}
-                  disabled={selected.size === 0}
-                  className="font-rajdhani text-[10px] font-bold tracking-wide px-2 py-1 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                  {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
-                </button>
-              )}
+                <div className="flex items-center gap-2">
+                    {selected.size > 0 && !rolesComplete && (
+                      <span className="font-rajdhani text-[9px] text-amber-400 whitespace-nowrap">
+                        Assign {missingRoles.join(', ')}
+                      </span>
+                    )}
+                    <button
+                      onClick={handleSubmit}
+                      disabled={selected.size === 0 || !rolesComplete || saving}
+                      title={!rolesComplete ? `Assign ${missingRoles.join(', ')} before submitting` : undefined}
+                      className="font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
+                    </button>
+                  </div>
+                )}
+
               {status === 'approved' && (
                 <button
                   onClick={handleAnnounce}
