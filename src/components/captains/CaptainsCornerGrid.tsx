@@ -1110,7 +1110,7 @@ async function handleAnnounce() {
                       GC: {gcReturnNote}
                     </span>
                   )}
-                           
+                  <a        
                    href={waLink}
                    target="_blank"
                    rel="noopener noreferrer"
