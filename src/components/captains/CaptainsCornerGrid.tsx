@@ -1110,10 +1110,7 @@ async function handleAnnounce() {
                       GC: {gcReturnNote}
                     </span>
                   )}
-                  <a        
-                   href={waLink}
-                   target="_blank"
-                   rel="noopener noreferrer"
+                  <a href={waLink} target="_blank" rel="noopener noreferrer"
                    onClick={handleAnnounce}
                    className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
                    <WAIcon size={13} />
