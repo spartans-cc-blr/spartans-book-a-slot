@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest) {
   const user = session?.user as any
   if (!user?.isAdmin && !user?.isGC) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { booking_id, decision } = await req.json()
+  const { booking_id, decision, note } = await req.json()
   if (!booking_id || !['approved', 'returned'].includes(decision))
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
