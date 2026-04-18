@@ -111,6 +111,7 @@ export default async function CaptainsCornerPage() {
     captain:  string | null
     vc:       string | null
     wk:       string[]
+    gcReturnNote: string | null
   }
   const initialSquadMap: Record<string, InitialSquad> = {}
   for (const row of existingSquads) {
