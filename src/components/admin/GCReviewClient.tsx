@@ -151,18 +151,18 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
     return map
   }, [avail])
 
-  const gamesCount = useMemo(() => {
+   const gamesCount = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const [pid] of allAvailPlayers) {
+    Array.from(allAvailPlayers.keys()).forEach(pid => {
       counts[pid] = bookings.filter(b => squadMap[b.id]?.includes(pid)).length
-    }
+    })
     return counts
   }, [allAvailPlayers, bookings, squadMap])
 
   // Sorted: 2+ games → 1 game → 0 Y-missed → 0 O/E constrained, alpha within each group
-  const matrixRows = useMemo(() => {
+   const matrixRows = useMemo(() => {
     return Array.from(allAvailPlayers.entries())
-      .map(([pid, data]) => ({ pid, ...data, games: gamesCount[pid] ?? 0 }))
+      .map(([pid, data]: [string, { name: string; cricheroes_url: string | null; responses: Record<string, 'Y' | 'O' | 'E'> }]) => ({ pid, ...data, games: gamesCount[pid] ?? 0 }))
       .sort((a, b) => {
         if (b.games !== a.games) return b.games - a.games
         const aYMissed = Object.values(a.responses).includes('Y') && a.games === 0
