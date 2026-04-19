@@ -7,6 +7,24 @@ interface AnnouncementPlayer {
   is_match_captain: boolean  // match-specific, from squad row
   is_vc: boolean             // match-specific, from squad row
   is_wk: boolean             // match-specific, from squad row
+  match_role:       'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null  // ADD
+}
+
+// Extend roleSuffix
+const ROLE_LABEL: Record<string, string> = {
+  bat:     'BAT',
+  bowl:    'BOWL',
+  bat_ar:  'BAT-AR',
+  bowl_ar: 'BOWL-AR',
+}
+
+function roleSuffix(matchRole: string | null, isCaptain: boolean, isVC: boolean, isWK: boolean): string {
+  const suffixes: string[] = []
+  if (matchRole) suffixes.push(ROLE_LABEL[matchRole])
+  if (isWK)      suffixes.push('WK')
+  if (isCaptain) suffixes.push('C')
+  if (isVC)      suffixes.push('VC')
+  return suffixes.length > 0 ? ` (${suffixes.join(', ')})` : ''
 }
 
 interface AnnouncementBooking {
@@ -67,7 +85,7 @@ export function buildSquadAnnouncement(
   const jersey     = jerseyLabel(ballType)
 
   const playerLines = players
-    .map((p, i) => `${i + 1}. ${p.name}${roleSuffix(p.primary_skill, p.is_match_captain, p.is_vc, p.is_wk)}`)
+    .map((p, i) => `${i + 1}. ${p.name}${roleSuffix(p.match_role, p.is_match_captain, p.is_vc, p.is_wk)}`)
     .join('\n')
 
   const lines: (string | null)[] = [

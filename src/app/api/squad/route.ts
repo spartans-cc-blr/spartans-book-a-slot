@@ -86,7 +86,16 @@ export async function POST(req: NextRequest) {
       is_captain: pid === captainId,
       is_vc:      pid === vcId,
       is_wk:      wkIds.includes(pid),
+      match_role: matchRoles?.[pid] ?? null,   // ADD THIS
     }))
+
+    // after building rows, before insert
+    for (const row of rows) {
+      if (row.is_wk && (row.match_role === 'bowl' || row.match_role === 'bowl_ar')) {
+        return NextResponse.json({ error: 'WK cannot be assigned BOWL or BOWL-AR role' }, { status: 422 })
+      }
+    }
+
     const { error } = await supabase.from('squad').insert(rows)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }

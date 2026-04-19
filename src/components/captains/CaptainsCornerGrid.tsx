@@ -7,6 +7,7 @@
 // priority_pick players auto-checked. Taken-elsewhere players struck through + checkbox disabled.
 // Hard cap at 12 — further checkboxes disabled once reached.
 // Match-specific C / VC / WK role toggles on selected rows.
+// Match role badges (BAT / BOWL / BAT-AR / BOWL-AR) on selected rows in draft mode.
 // Player names link to CricHeroes profile if set.
 // Post-announcement edit + reshare supported.
 
@@ -40,21 +41,24 @@ interface Player {
   cricheroes_url: string | null
 }
 
-// Match-specific roles assigned per squad selection
+// FIX 4: matchRoles removed from MatchRoles — it is separate state in SlotCard
 interface MatchRoles {
   captain: string | null   // player id — one only
   vc:      string | null   // player id — one only
   wk:      Set<string>     // player ids — multiple valid (two WKs happens)
 }
+
 interface InitialSquad {
-   status:   'draft' | 'pending' | 'approved' | 'announced'
-   selected: string[]
-   captain:  string | null
-   vc:       string | null
-   wk:       string[]
+   status:      'draft' | 'pending' | 'approved' | 'announced'
+   selected:    string[]
+   captain:     string | null
+   vc:          string | null
+   wk:          string[]
+   matchRoles?: Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>  // persisted from DB
    gcReturnNote: string | null
  }
 
+// FIX 3: matchRole / onMatchRoleToggle removed from Props — they belong on SelectablePlayerRow
 interface Props {
   weekLabel: string
   bookings:  Booking[]
@@ -191,11 +195,19 @@ function formatReportingTime(matchTime: string | null, slotTime: string): string
   return `${hour12}${rm > 0 ? `:${String(rm).padStart(2, '0')}` : ''} ${period}`
 }
 
+const MATCH_ROLE_LABEL: Record<string, string> = {
+  bat:     'BAT',
+  bowl:    'BOWL',
+  bat_ar:  'BAT-AR',
+  bowl_ar: 'BOWL-AR',
+}
+
 function buildAnnouncementText(
   booking: Booking,
   players: Player[],
   selected: Set<string>,
-  roles: MatchRoles
+  roles: MatchRoles,
+  matchRoles: Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>
 ): string {
   const d      = new Date(booking.game_date + 'T00:00:00')
   const day    = d.getDate()
@@ -205,6 +217,8 @@ function buildAnnouncementText(
   const squadPlayers = players.filter(p => selected.has(p.id))
   const playerLines  = squadPlayers.map((p, i) => {
     const tags: string[] = []
+    const mr = matchRoles[p.id]
+    if (mr)                     tags.push(MATCH_ROLE_LABEL[mr])
     if (roles.wk.has(p.id))     tags.push('WK')
     if (roles.captain === p.id) tags.push('C')
     if (roles.vc === p.id)      tags.push('VC')
@@ -240,11 +254,18 @@ function buildAnnouncementText(
   return lines.filter((l): l is string => l !== null).join('\n')
 }
 
-function buildSquadCopyText(players: Player[], selected: Set<string>, roles: MatchRoles): string {
+function buildSquadCopyText(
+  players: Player[],
+  selected: Set<string>,
+  roles: MatchRoles,
+  matchRoles: Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>
+): string {
   return players
     .filter(p => selected.has(p.id))
     .map((p, i) => {
       const tags: string[] = []
+      const mr = matchRoles[p.id]
+      if (mr)                     tags.push(MATCH_ROLE_LABEL[mr])
       if (roles.wk.has(p.id))     tags.push('WK')
       if (roles.captain === p.id) tags.push('C')
       if (roles.vc === p.id)      tags.push('VC')
@@ -399,19 +420,76 @@ function PlayerName({
   return <span className={cls}>{player.name}{badge}</span>
 }
 
+// ── Match Role SVG Icons ──────────────────────────────────────────
+// Ball SVG reused from FixturesCard — same red ball used for bowler icon.
+// Gradient IDs use "role-" prefix to avoid collision with FixturesCard IDs.
+function RoleRedBall({ size = 10 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }}>
+      <defs>
+        <radialGradient id="role-rb" cx="38%" cy="30%" r="62%">
+          <stop offset="0%" stopColor="#E8553A"/>
+          <stop offset="35%" stopColor="#C0392B"/>
+          <stop offset="75%" stopColor="#8B1A0F"/>
+          <stop offset="100%" stopColor="#5C0E08"/>
+        </radialGradient>
+        <clipPath id="role-rc"><circle cx="30" cy="30" r="28"/></clipPath>
+      </defs>
+      <circle cx="30" cy="30" r="28" fill="url(#role-rb)"/>
+      <g transform="rotate(-30 30 30)" clipPath="url(#role-rc)">
+        <line x1="2" y1="30" x2="58" y2="30" stroke="#5C0E08" strokeWidth="3"/>
+        <line x1="2" y1="24" x2="58" y2="24" stroke="#E8C49A" strokeWidth="1" strokeDasharray="3 2.5"/>
+        <line x1="2" y1="36" x2="58" y2="36" stroke="#E8C49A" strokeWidth="1" strokeDasharray="3 2.5"/>
+      </g>
+      <ellipse cx="21" cy="17" rx="9" ry="5" fill="white" opacity="0.13" transform="rotate(-30 21 17)"/>
+    </svg>
+  )
+}
+
+// Bat icon — gold stick-and-blade, sized to match role button line height
+function RoleBatIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }}>
+      <line x1="3" y1="3" x2="21" y2="21" stroke="#C9A84C" strokeWidth="2.5" strokeLinecap="round"/>
+      <path d="M13 11 L21 3 L21 21 Z" fill="#C9A84C" opacity="0.85"/>
+      <rect x="2" y="19" width="4" height="2.5" rx="1" transform="rotate(-45 2 19)" fill="#A07830"/>
+    </svg>
+  )
+}
+
+// BAT      → bat only           (batsman)
+// BOWL     → ball only          (bowler — same red ball SVG as match card)
+// BAT-AR   → bat · ball         (batting all-rounder, bat dominant)
+// BOWL-AR  → ball · bat         (bowling all-rounder, ball dominant)
+function MatchRoleIcon({ role }: { role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' }) {
+  const bat  = <RoleBatIcon size={10} />
+  const ball = <RoleRedBall size={10} />
+  if (role === 'bat')     return <span className="inline-flex items-center gap-px leading-none">{bat}</span>
+  if (role === 'bowl')    return <span className="inline-flex items-center gap-px leading-none">{ball}</span>
+  if (role === 'bat_ar')  return <span className="inline-flex items-center gap-px leading-none">{bat}{ball}</span>
+  if (role === 'bowl_ar') return <span className="inline-flex items-center gap-px leading-none">{ball}{bat}</span>
+  return null
+}
+
 // ── SelectablePlayerRow ───────────────────────────────────────────
+// FIX 5: Added matchRole and onMatchRoleToggle to props
 function SelectablePlayerRow({
-  player, response, selected, atCap, status, takenLabel, roles, onToggle, onRoleToggle,
+  player, response, selected, atCap, status, takenLabel, roles,
+  matchRole, onToggle, onRoleToggle, onMatchRoleToggle,
 }: {
-  player:       Player
-  response:     string
-  selected:     Set<string>
-  atCap:        boolean
-  status:       'draft' | 'pending' | 'approved' | 'announced'
-  takenLabel:   string | null
-  roles:        MatchRoles
-  onToggle:     (id: string) => void
-  onRoleToggle: (id: string, role: 'captain' | 'vc' | 'wk') => void
+  player:             Player
+  response:           string
+  selected:           Set<string>
+  atCap:              boolean
+  status:             'draft' | 'pending' | 'approved' | 'announced'
+  takenLabel:         string | null
+  roles:              MatchRoles
+  matchRole:          'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null   // FIX 5
+  onToggle:           (id: string) => void
+  onRoleToggle:       (id: string, role: 'captain' | 'vc' | 'wk') => void
+  onMatchRoleToggle:  (id: string, role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null) => void  // FIX 5
 }) {
   const isTaken    = !!takenLabel
   const isSel      = selected.has(player.id)
@@ -433,7 +511,7 @@ function SelectablePlayerRow({
   return (
     <div className={[
       'border-b border-zinc-800 last:border-0 transition-colors',
-      isSel   ? 'bg-sky-950/30' : '',
+      isSel ? 'bg-sky-950/30' : '',
     ].filter(Boolean).join(' ')}>
 
       {/* Main selectable row */}
@@ -486,9 +564,11 @@ function SelectablePlayerRow({
       {/* Role toggle row — only visible when selected in draft mode */}
       {isSel && !isTaken && status === 'draft' && (
         <div
-          className="flex items-center gap-1.5 px-3 pb-2 pt-0"
+          className="flex items-center gap-1.5 px-3 pb-2 pt-0 flex-wrap"
           onClick={e => e.stopPropagation()}>
           <span className="font-rajdhani text-[9px] text-zinc-700 mr-0.5">Role:</span>
+
+          {/* C / VC / WK — unchanged */}
           {([
             { key: 'captain' as const, label: 'C',  active: isMatchCaptain, title: 'Match captain' },
             { key: 'vc'      as const, label: 'VC', active: isVC,           title: 'Vice captain' },
@@ -508,6 +588,38 @@ function SelectablePlayerRow({
               {role.label}
             </button>
           ))}
+
+          {/* Separator */}
+          <span className="font-rajdhani text-[9px] text-zinc-700 select-none">·</span>
+
+          {/* Match role badges — BAT / BOWL / BAT-AR / BOWL-AR */}
+          {([
+            { key: 'bat'     as const, title: 'Batsman' },
+            { key: 'bowl'    as const, title: 'Bowler' },
+            { key: 'bat_ar'  as const, title: 'Batting All-rounder' },
+            { key: 'bowl_ar' as const, title: 'Bowling All-rounder' },
+          ]).map(mr => {
+            const isActive = matchRole === mr.key
+            // WK cannot be BOWL or BOWL-AR (enforced both here and in the API)
+            const isDisabledCombo = isWK && (mr.key === 'bowl' || mr.key === 'bowl_ar')
+            return (
+              <button
+                key={mr.key}
+                title={isDisabledCombo ? `WK cannot be ${mr.title}` : mr.title}
+                disabled={isDisabledCombo}
+                onClick={() => onMatchRoleToggle(player.id, isActive ? null : mr.key)}
+                className={`inline-flex items-center gap-px px-1.5 py-0.5 rounded-sm border transition-colors ${
+                  isDisabledCombo
+                    ? 'opacity-25 cursor-not-allowed bg-ink-4 border-ink-5'
+                    : isActive
+                      ? 'bg-emerald-950/60 border-emerald-700'
+                      : 'bg-ink-4 border-ink-5 hover:border-zinc-600'
+                }`}>
+                <MatchRoleIcon role={mr.key} />
+              </button>
+            )
+          })}
+
           {(isMatchCaptain || isVC || isWK) && (
             <span className="font-rajdhani text-[9px] text-zinc-600 ml-0.5">
               {[isMatchCaptain && 'Captain', isVC && 'VC', isWK && 'WK'].filter(Boolean).join(' · ')}
@@ -719,11 +831,12 @@ function SlotCard({
     // but we can flip locally too if players state is lifted
   }
 
+  // FIX 2: selected declared first — matchRoles lazy initialiser reads it below
   const [selected, setSelected] = useState<Set<string>>(() => {
     // If we have a persisted squad, use it — otherwise auto-pick priority players
-   if (initialSquad?.selected?.length) {
-     return new Set(initialSquad.selected)
-   }
+    if (initialSquad?.selected?.length) {
+      return new Set(initialSquad.selected)
+    }
     const auto = new Set<string>()
     players.forEach(p => {
       if (p.priority_pick && availMap[booking.id]?.[p.id]) auto.add(p.id)
@@ -738,10 +851,32 @@ function SlotCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // intentionally empty — mount only
 
+  // FIX 1 + FIX 4: Single roles declaration, no matchRoles inside it
   const [roles, setRoles] = useState<MatchRoles>({
     captain: initialSquad?.captain ?? null,
     vc:      initialSquad?.vc ?? null,
     wk:      new Set(initialSquad?.wk ?? []),
+  })
+
+  // FIX 2: matchRoles declared after selected — lazy initialiser can safely read selected
+  // Seeded from DB (initialSquad.matchRoles) if available; otherwise derived from primary_skill
+  const [matchRoles, setMatchRoles] = useState<Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>>(() => {
+    if (initialSquad?.matchRoles && Object.keys(initialSquad.matchRoles).length > 0) {
+      return initialSquad.matchRoles
+    }
+    const seeded: Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'> = {}
+    for (const p of players) {
+      if (!selected.has(p.id)) continue
+      const sk = (p.primary_skill ?? '').toLowerCase()
+      if (sk.includes('all-rounder') || sk.includes('allrounder')) {
+        seeded[p.id] = sk.includes('bowl') ? 'bowl_ar' : 'bat_ar'
+      } else if (sk.includes('bowl')) {
+        seeded[p.id] = 'bowl'
+      } else {
+        seeded[p.id] = 'bat'  // batsman + WK both default to bat
+      }
+    }
+    return seeded
   })
 
   const { copy, copied } = useCopySquad()
@@ -753,135 +888,174 @@ function SlotCard({
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
   const slotLabel       = `${SLOT_SHORT[booking.slot_time] ?? booking.slot_time} ${booking.format}`
 
- 
   // All three roles must be assigned before GC submission is allowed
   const rolesComplete = !!roles.captain && !!roles.vc && roles.wk.size > 0
   const missingRoles  = [
-    !roles.captain  && 'C',
-    !roles.vc       && 'VC',
-    roles.wk.size === 0 && 'WK',
+    !roles.captain       && 'C',
+    !roles.vc            && 'VC',
+    roles.wk.size === 0  && 'WK',
   ].filter(Boolean) as string[]
 
-  const announcementText = buildAnnouncementText(booking, players, selected, roles)
+  const announcementText = buildAnnouncementText(booking, players, selected, roles, matchRoles)
   const waLink           = `https://wa.me/?text=${encodeURIComponent(announcementText)}`
 
-   function takenElsewhere(playerId: string): string | null {
-   for (const [bId, ids] of Object.entries(squadMap)) {
-     if (bId === booking.id) continue
-     if (!ids.includes(playerId)) continue
-     const other = bookings.find(x => x.id === bId)
-     if (!other) continue
-     const response = availMap[bId]?.[playerId]
-     // Y: unrestricted — can be selected across all slots in the weekend
-     if (response === 'Y') continue
-     // O: one game per weekend — block if the other slot is in the same ISO weekend
-     if (response === 'O') {
-       if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
-       return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
-     }
-     // E: one game per day — block only if the other slot is on the same calendar day
-     if (response === 'E') {
-       if (other.game_date !== booking.game_date) continue
-       return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
-     }
-     // No response or unknown — never block. A player with no availability
-     // response for the other slot cannot be constrained by it.
-     continue
-   }
-   return null
- }
+  function takenElsewhere(playerId: string): string | null {
+    for (const [bId, ids] of Object.entries(squadMap)) {
+      if (bId === booking.id) continue
+      if (!ids.includes(playerId)) continue
+      const other = bookings.find(x => x.id === bId)
+      if (!other) continue
+      const response = availMap[bId]?.[playerId]
+      // Y: unrestricted — can be selected across all slots in the weekend
+      if (response === 'Y') continue
+      // O: one game per weekend — block if the other slot is in the same ISO weekend
+      if (response === 'O') {
+        if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
+        return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
+      }
+      // E: one game per day — block only if the other slot is on the same calendar day
+      if (response === 'E') {
+        if (other.game_date !== booking.game_date) continue
+        return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
+      }
+      // No response or unknown — never block.
+      continue
+    }
+    return null
+  }
 
   async function toggle(playerId: string) {
-   if (status !== 'draft') return
-   const next = new Set(selected)
-   if (next.has(playerId)) {
-     next.delete(playerId)
-     setRoles(r => ({
-       captain: r.captain === playerId ? null : r.captain,
-       vc:      r.vc      === playerId ? null : r.vc,
-       wk:      new Set(Array.from(r.wk).filter(id => id !== playerId)),
-     }))
-   } else {
-     if (next.size >= MAX_SQUAD) return
-     next.add(playerId)
-   }
-   setSelected(next)
-   onSelectedChange(booking.id, next)
-   await saveDraft(next, roles)
- }
+    if (status !== 'draft') return
+    const next = new Set(selected)
+    if (next.has(playerId)) {
+      next.delete(playerId)
+      setRoles(r => ({
+        captain: r.captain === playerId ? null : r.captain,
+        vc:      r.vc      === playerId ? null : r.vc,
+        wk:      new Set(Array.from(r.wk).filter(id => id !== playerId)),
+      }))
+      // FIX 7: clear matchRole when player is unchecked
+      setMatchRoles(prev => {
+        const next = { ...prev }
+        delete next[playerId]
+        return next
+      })
+    } else {
+      if (next.size >= MAX_SQUAD) return
+      next.add(playerId)
+      // Seed matchRole from primary_skill when player is freshly checked
+      const p = players.find(pl => pl.id === playerId)
+      if (p && !matchRoles[playerId]) {
+        const sk = (p.primary_skill ?? '').toLowerCase()
+        const inferred: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' =
+          (sk.includes('all-rounder') || sk.includes('allrounder'))
+            ? (sk.includes('bowl') ? 'bowl_ar' : 'bat_ar')
+            : sk.includes('bowl') ? 'bowl' : 'bat'
+        setMatchRoles(prev => ({ ...prev, [playerId]: inferred }))
+      }
+    }
+    setSelected(next)
+    onSelectedChange(booking.id, next)
+    await saveDraft(next, roles, matchRoles)
+  }
 
   function handleRoleToggle(playerId: string, role: 'captain' | 'vc' | 'wk') {
-  let nextRoles: MatchRoles
-  if (role === 'captain') {
-    nextRoles = { ...roles, captain: roles.captain === playerId ? null : playerId }
-  } else if (role === 'vc') {
-    nextRoles = { ...roles, vc: roles.vc === playerId ? null : playerId }
-  } else {
-    const nextWK = new Set(roles.wk)
-    nextWK.has(playerId) ? nextWK.delete(playerId) : nextWK.add(playerId)
-    nextRoles = { ...roles, wk: nextWK }
+    let nextRoles: MatchRoles
+    if (role === 'captain') {
+      nextRoles = { ...roles, captain: roles.captain === playerId ? null : playerId }
+    } else if (role === 'vc') {
+      nextRoles = { ...roles, vc: roles.vc === playerId ? null : playerId }
+    } else {
+      const nextWK = new Set(roles.wk)
+      nextWK.has(playerId) ? nextWK.delete(playerId) : nextWK.add(playerId)
+      nextRoles = { ...roles, wk: nextWK }
+    }
+    setRoles(nextRoles)
+    saveDraft(selected, nextRoles, matchRoles)
   }
-  setRoles(nextRoles)
-  saveDraft(selected, nextRoles)
-}
 
-  async function saveDraft(currentSelected: Set<string>, currentRoles: MatchRoles) {
-  setSaveError(null)
-  const res = await fetch('/api/squad', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      booking_id: booking.id,
-      player_ids: Array.from(currentSelected),
-      roles: {
-        captain: currentRoles.captain,
-        vc:      currentRoles.vc,
-        wk:      Array.from(currentRoles.wk),
-      },
-    }),
-  })
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}))
-    setSaveError(d.error ?? 'Failed to save squad')
+  // FIX 6: handleMatchRoleToggle defined in SlotCard
+  function handleMatchRoleToggle(
+    playerId: string,
+    role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null
+  ) {
+    setMatchRoles(prev => {
+      const next = { ...prev }
+      if (role === null) delete next[playerId]
+      else next[playerId] = role
+      return next
+    })
+    // Compute next immediately to avoid stale closure (same pattern as handleRoleToggle)
+    const nextMatchRoles = { ...matchRoles }
+    if (role === null) delete nextMatchRoles[playerId]
+    else nextMatchRoles[playerId] = role
+    saveDraft(selected, roles, nextMatchRoles)
   }
-}
 
-async function handleSubmit() {
-  setSaving(true)
-  setSaveError(null)
-  // Save current selection first, then submit
-  await saveDraft(selected, roles)
-  const res = await fetch('/api/squad/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ booking_id: booking.id }),
-  })
-  if (res.ok) {
-    setStatus('pending')
-  } else {
-    const d = await res.json().catch(() => ({}))
-    setSaveError(d.error ?? 'Failed to submit for GC review')
+  // FIX 8: saveDraft accepts and sends matchRoles
+  // match_roles is included in the body now; the API ignores it until the
+  // squad.match_role column migration (U-18) has been applied.
+  async function saveDraft(
+    currentSelected: Set<string>,
+    currentRoles: MatchRoles,
+    currentMatchRoles: Record<string, string> = {}
+  ) {
+    setSaveError(null)
+    const res = await fetch('/api/squad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        booking_id: booking.id,
+        player_ids: Array.from(currentSelected),
+        roles: {
+          captain: currentRoles.captain,
+          vc:      currentRoles.vc,
+          wk:      Array.from(currentRoles.wk),
+        },
+        match_roles: currentMatchRoles,  // ignored by API until DB migration runs
+      }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      setSaveError(d.error ?? 'Failed to save squad')
+    }
   }
-  setSaving(false)
-}
 
-async function handleAnnounce() {
-  setSaving(true)
-  setSaveError(null)
-  const res = await fetch('/api/squad/announce', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ booking_id: booking.id }),
-  })
-  if (res.ok) {
-    setStatus('announced')
-    setEverAnnounced(true)
-  } else {
-    const d = await res.json().catch(() => ({}))
-    setSaveError(d.error ?? 'Failed to announce squad')
+  async function handleSubmit() {
+    setSaving(true)
+    setSaveError(null)
+    await saveDraft(selected, roles, matchRoles)
+    const res = await fetch('/api/squad/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: booking.id }),
+    })
+    if (res.ok) {
+      setStatus('pending')
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setSaveError(d.error ?? 'Failed to submit for GC review')
+    }
+    setSaving(false)
   }
-  setSaving(false)
-}
+
+  async function handleAnnounce() {
+    setSaving(true)
+    setSaveError(null)
+    const res = await fetch('/api/squad/announce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: booking.id }),
+    })
+    if (res.ok) {
+      setStatus('announced')
+      setEverAnnounced(true)
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setSaveError(d.error ?? 'Failed to announce squad')
+    }
+    setSaving(false)
+  }
 
   const pct = Math.min((selected.size / MAX_SQUAD) * 100, 100)
 
@@ -897,15 +1071,32 @@ async function handleAnnounce() {
         vc:      selectAllPlayers.some(e => e.player.id === r.vc)      ? null : r.vc,
         wk:      new Set(Array.from(r.wk).filter(id => !selectAllPlayers.some(e => e.player.id === id))),
       }))
+      // Clear matchRoles for deselected players
+      setMatchRoles(prev => {
+        const next = { ...prev }
+        selectAllPlayers.forEach(e => delete next[e.player.id])
+        return next
+      })
     } else {
       selectAllPlayers
         .filter(e => !selected.has(e.player.id))
         .slice(0, MAX_SQUAD - selected.size)
-        .forEach(e => next.add(e.player.id))
+        .forEach(e => {
+          next.add(e.player.id)
+          // Seed matchRole for newly added players if not already set
+          if (!matchRoles[e.player.id]) {
+            const sk = (e.player.primary_skill ?? '').toLowerCase()
+            const inferred: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' =
+              (sk.includes('all-rounder') || sk.includes('allrounder'))
+                ? (sk.includes('bowl') ? 'bowl_ar' : 'bat_ar')
+                : sk.includes('bowl') ? 'bowl' : 'bat'
+            setMatchRoles(prev => ({ ...prev, [e.player.id]: inferred }))
+          }
+        })
     }
     setSelected(next)
     onSelectedChange(booking.id, next)
-    await saveDraft(next, roles)
+    await saveDraft(next, roles, matchRoles)
   }
 
   return (
@@ -983,8 +1174,10 @@ async function handleAnnounce() {
                   status={status}
                   takenLabel={takenElsewhere(player.id)}
                   roles={roles}
+                  matchRole={matchRoles[player.id] ?? null}
                   onToggle={toggle}
                   onRoleToggle={handleRoleToggle}
+                  onMatchRoleToggle={handleMatchRoleToggle}
                 />
               ))}
             </>
@@ -1027,8 +1220,10 @@ async function handleAnnounce() {
                 status={status}
                 takenLabel={takenElsewhere(player.id)}
                 roles={roles}
+                matchRole={matchRoles[player.id] ?? null}
                 onToggle={toggle}
                 onRoleToggle={handleRoleToggle}
+                onMatchRoleToggle={handleMatchRoleToggle}
               />
             ))
           )}
@@ -1053,7 +1248,7 @@ async function handleAnnounce() {
               {/* Copy names only */}
               {selected.size > 0 && (
                 <button
-                  onClick={() => copy(booking.id, buildSquadCopyText(players, selected, roles))}
+                  onClick={() => copy(booking.id, buildSquadCopyText(players, selected, roles, matchRoles))}
                   className="flex items-center gap-1 font-rajdhani text-[10px] font-bold px-2 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 transition-colors flex-shrink-0">
                   {copied === booking.id ? '✓ Copied' : (
                     <>
@@ -1087,19 +1282,19 @@ async function handleAnnounce() {
               {/* Draft */}
               {status === 'draft' && (
                 <div className="flex items-center gap-2">
-                {selected.size > 0 && !rolesComplete && (
-                  <span className="font-rajdhani text-[9px] text-amber-400 whitespace-nowrap">
-                    Assign {missingRoles.join(', ')}
-                  </span>
-                )}
-                <button
-                  onClick={handleSubmit}
-                  disabled={selected.size === 0 || !rolesComplete || saving}
-                  title={selected.size > 0 && !rolesComplete ? `Assign ${missingRoles.join(', ')} before submitting` : undefined}
+                  {selected.size > 0 && !rolesComplete && (
+                    <span className="font-rajdhani text-[9px] text-amber-400 whitespace-nowrap">
+                      Assign {missingRoles.join(', ')}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleSubmit}
+                    disabled={selected.size === 0 || !rolesComplete || saving}
+                    title={selected.size > 0 && !rolesComplete ? `Assign ${missingRoles.join(', ')} before submitting` : undefined}
                     className="font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                     {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
                   </button>
-                  </div>
+                </div>
               )}
 
               {/* Approved — single tap: announce + open WhatsApp */}
@@ -1111,11 +1306,11 @@ async function handleAnnounce() {
                     </span>
                   )}
                   <a href={waLink} target="_blank" rel="noopener noreferrer"
-                   onClick={handleAnnounce}
-                   className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
-                   <WAIcon size={13} />
-                   {saving ? 'Announcing…' : everAnnounced ? 'Re-announce & Share' : 'Announce & Share'}
-                 </a>
+                    onClick={handleAnnounce}
+                    className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+                    <WAIcon size={13} />
+                    {saving ? 'Announcing…' : everAnnounced ? 'Re-announce & Share' : 'Announce & Share'}
+                  </a>
                 </>
               )}
 
@@ -1152,7 +1347,7 @@ async function handleAnnounce() {
 
           {/* Add player button */}
           {(status === 'draft' || (status === 'announced')) && unrespondedPlayers.length > 0 && (
-          <div className="px-3 py-2 border-t border-ink-5 flex justify-end">
+            <div className="px-3 py-2 border-t border-ink-5 flex justify-end">
               <button
                 onClick={() => setAddingFor(v => !v)}
                 className={`font-rajdhani text-[10px] font-bold tracking-wide transition-colors ${
@@ -1270,11 +1465,6 @@ function MatrixView({
           ) : (
             activePlayers.map(p => {
               const hasDues = p.wallet_balance < 0
-              // Count how many weekend bookings this player has Y/O/E for
-              const gamesCount = bookings.filter(b => {
-                const r = availMap[b.id]?.[p.id]
-                return r === 'Y' || r === 'O' || r === 'E'
-              }).length
 
               return (
                 <tr key={p.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
@@ -1333,7 +1523,7 @@ function MatrixView({
                     const squad      = initialSquadMap[b.id]
                     const squadStatus = squad?.selected.includes(p.id) ? squad.status : null
                     return (
-                     <RespCell key={b.id} code={display} isConflict={isConflict} squadStatus={squadStatus} />
+                      <RespCell key={b.id} code={display} isConflict={isConflict} squadStatus={squadStatus} />
                     )
                   })}
                 </tr>
@@ -1392,37 +1582,37 @@ function Legend() {
 
 // ── Main export ────────────────────────────────────────────────────
 export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {}, initialSquadMap = {} }: Props) {
-  
+
   const [view, setView] = useState<'slot' | 'matrix'>('slot')
   const weekendBookings = bookings.filter(b => isWeekendDate(b.game_date))
 
   // Lift selected state up so all SlotCards share cross-slot awareness
-   // Initialise from initialSquadMap so DB state is reflected on load
-   const [allSelected, setAllSelected] = useState<Record<string, Set<string>>>(() => {
+  // Initialise from initialSquadMap so DB state is reflected on load
+  const [allSelected, setAllSelected] = useState<Record<string, Set<string>>>(() => {
     const init: Record<string, Set<string>> = {}
     const bookingIdSet = new Set(bookings.map(b => b.id))
     for (const [bId, squad] of Object.entries(initialSquadMap)) {
       if (!bookingIdSet.has(bId)) continue
-     // Don't seed from announced squads — they're final and should not
-     // ghost-block players in sibling slots. Announced slots self-report
-     // via useEffect on mount when the captain is actively working on them.
-     if (squad.status === 'announced') continue
+      // Don't seed from announced squads — they're final and should not
+      // ghost-block players in sibling slots. Announced slots self-report
+      // via useEffect on mount when the captain is actively working on them.
+      if (squad.status === 'announced') continue
       init[bId] = new Set(squad.selected)
-     }  
-     return init
-   })
+    }
+    return init
+  })
 
-   // Derived: bookingId → string[] — passed to each SlotCard as squadMap
-   const liveSquadMap = useMemo(() =>
-     Object.fromEntries(
-       Object.entries(allSelected).map(([bId, set]) => [bId, Array.from(set)])
-     ),
-     [allSelected]
-   )
+  // Derived: bookingId → string[] — passed to each SlotCard as squadMap
+  const liveSquadMap = useMemo(() =>
+    Object.fromEntries(
+      Object.entries(allSelected).map(([bId, set]) => [bId, Array.from(set)])
+    ),
+    [allSelected]
+  )
 
-   function updateSelected(bookingId: string, next: Set<string>) {
-     setAllSelected(prev => ({ ...prev, [bookingId]: next }))
-   }
+  function updateSelected(bookingId: string, next: Set<string>) {
+    setAllSelected(prev => ({ ...prev, [bookingId]: next }))
+  }
 
   return (
     <div>
@@ -1458,7 +1648,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
             {[
               { dot: 'bg-emerald-900/60 border-emerald-700',   label: 'Available across all slots' },
               { dot: 'bg-sky-900/40 border-sky-700',           label: 'Selected for this slot' },
-              { dot: 'bg-zinc-800 border-zinc-600 opacity-50', label: 'Taken — in another slot\'s squad' },
+              { dot: 'bg-zinc-800 border-zinc-600 opacity-50', label: "Taken — in another slot's squad" },
               { dot: 'bg-amber-900/40 border-amber-700',       label: 'Has outstanding dues' },
             ].map(({ dot, label }) => (
               <div key={label} className="flex items-center gap-1.5">
@@ -1470,7 +1660,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         )}
         <Legend />
         {view === 'matrix' && (
-           <div className="font-rajdhani text-[10px] text-zinc-700 mt-2 flex flex-wrap gap-x-4 gap-y-1">
+          <div className="font-rajdhani text-[10px] text-zinc-700 mt-2 flex flex-wrap gap-x-4 gap-y-1">
             <span>Amber names = O or E across slots.</span>
             <span className="flex items-center gap-1">
               <span style={{ color: '#34d399' }}>✓</span> In announced squad

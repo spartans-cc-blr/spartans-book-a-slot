@@ -93,12 +93,14 @@ export default async function CaptainsCornerPage() {
     is_captain: boolean
     is_vc:      boolean
     is_wk:      boolean
+    match_role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null  // ADD
+
   }
   let existingSquads: ExistingSquadRow[] = []
   if (bookingIds.length > 0) {
     const { data: squads } = await supabase
       .from('squad')
-      .select('booking_id, player_id, status, is_captain, is_vc, is_wk')
+      .select('booking_id, player_id, status, is_captain, is_vc, is_wk, match_role')
       .in('booking_id', bookingIds)
       .in('status', ['draft', 'pending_approval', 'approved', 'announced'])
     existingSquads = (squads ?? []) as ExistingSquadRow[]
@@ -111,6 +113,7 @@ export default async function CaptainsCornerPage() {
     captain:  string | null
     vc:       string | null
     wk:       string[]
+    matchRoles:  Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>  // ADD
     gcReturnNote: string | null
   }
   const initialSquadMap: Record<string, InitialSquad> = {}
@@ -120,13 +123,15 @@ export default async function CaptainsCornerPage() {
                    : row.status === 'announced'        ? 'announced'
                    : row.status === 'approved'         ? 'approved'
                    : 'draft'
-      initialSquadMap[row.booking_id] = { status: mapped, selected: [], captain: null, vc: null, wk: [], gcReturnNote: (bookings ?? []).find(b => b.id === row.booking_id)?.gc_return_note ?? null ,}
+      initialSquadMap[row.booking_id] = { status: mapped, selected: [], captain: null, vc: null, wk: [],matchRoles: {}, gcReturnNote: (bookings ?? []).find(b => b.id === row.booking_id)?.gc_return_note ?? null ,}
     }
     const entry = initialSquadMap[row.booking_id]
     entry.selected.push(row.player_id)
     if (row.is_captain) entry.captain = row.player_id
     if (row.is_vc)      entry.vc      = row.player_id
     if (row.is_wk)      entry.wk.push(row.player_id)
+    if (row.match_role) entry.matchRoles[row.player_id] = row.match_role
+
   }
 
   // ── Group bookings into weekends ───────────────────────────

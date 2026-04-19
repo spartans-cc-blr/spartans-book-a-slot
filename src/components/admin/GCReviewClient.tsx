@@ -242,8 +242,15 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                 ) : (
                   <div className="px-4 py-3 flex flex-wrap gap-2">
                     {slotSquads.map(s => {
-                      const matchRoles = [s.is_wk && 'WK', s.is_captain && 'C', s.is_vc && 'VC']
-                        .filter(Boolean).join('/')
+                      const MATCH_ROLE_LABEL: Record<string, string> = {
+                        bat: 'BAT', bowl: 'BOWL', bat_ar: 'BAT-AR', bowl_ar: 'BOWL-AR',
+                      }
+                      const matchRoles = [
+                        s.match_role && MATCH_ROLE_LABEL[s.match_role],
+                        s.is_wk      && 'WK',
+                        s.is_captain && 'C',
+                        s.is_vc      && 'VC',
+                      ].filter(Boolean).join('/')
                       return (
                         <span key={s.player_id}
                           className={`font-rajdhani text-xs px-2 py-1 rounded-sm border ${
