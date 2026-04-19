@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   const limited = await rateLimit(req, RATE_LIMITS.captainWrite, player!.playerId)
   if (limited) return limited
 
-  const { booking_id, player_ids, roles } = await req.json()
+  const { booking_id, player_ids, roles, match_roles: matchRoles } = await req.json()
   // player_ids: string[]
   // roles: { captain: string | null, vc: string | null, wk: string[] }
 
