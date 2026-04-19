@@ -450,19 +450,20 @@ function RoleRedBall({ size = 10 }: { size?: number }) {
 // Bat icon — gold stick-and-blade, sized to match role button line height
 function RoleBatIcon({ size = 14 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, transform: 'rotate(135deg)'  }}>
-      {/* Blade — wide flat body of the bat */}
-      <rect x="10" y="2" width="6" height="14" rx="1.5" fill="#C9A84C" />
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, transform: 'rotate(135deg)' }}>
+      {/* Blade — fills most of the 60×60 canvas */}
+      <rect x="22" y="4" width="16" height="38" rx="4" fill="#C9A84C" />
       {/* Splice taper */}
-      <path d="M10 14 L13 18 L16 14Z" fill="#A07830" />
+      <path d="M22 36 L30 46 L38 36Z" fill="#A07830" />
       {/* Handle */}
-      <rect x="12" y="18" width="2" height="5" rx="1" fill="#7A5520" />
+      <rect x="27" y="46" width="6" height="12" rx="3" fill="#7A5520" />
       {/* Toe edge highlight */}
-      <rect x="10" y="2" width="1.5" height="14" rx="0.5" fill="#E8C87A" opacity="0.5" />
+      <rect x="22" y="4" width="4" height="38" rx="2" fill="#E8C87A" opacity="0.4" />
     </svg>
   )
 }
+
 
 // REPLACE RoleRedBall with RoleBall supporting all three colours:
 function RoleBall({ type = 'red', size = 14 }: { type?: 'red' | 'white' | 'pink'; size?: number }) {
