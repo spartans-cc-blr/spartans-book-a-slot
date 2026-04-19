@@ -225,7 +225,7 @@ function buildAnnouncementText(
     return `${i + 1}. ${p.name}${tags.length ? ` (${tags.join(', ')})` : ''}`
   }).join('\n')
 
-  const ballType     = booking.tournament?.ball_type ?? 'red'
+  const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
   const jersey       = ballType === 'white' ? 'Colours' : 'Whites'
   const ground       = booking.tournament?.ground
   const reportTime   = formatReportingTime(booking.match_time, booking.slot_time)
@@ -448,13 +448,61 @@ function RoleRedBall({ size = 10 }: { size?: number }) {
 }
 
 // Bat icon — gold stick-and-blade, sized to match role button line height
-function RoleBatIcon({ size = 10 }: { size?: number }) {
+function RoleBatIcon({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }}>
-      <line x1="3" y1="3" x2="21" y2="21" stroke="#C9A84C" strokeWidth="2.5" strokeLinecap="round"/>
-      <path d="M13 11 L21 3 L21 21 Z" fill="#C9A84C" opacity="0.85"/>
-      <rect x="2" y="19" width="4" height="2.5" rx="1" transform="rotate(-45 2 19)" fill="#A07830"/>
+      {/* Blade — wide flat body of the bat */}
+      <rect x="10" y="2" width="6" height="14" rx="1.5" fill="#C9A84C" />
+      {/* Splice taper */}
+      <path d="M10 14 L13 18 L16 14Z" fill="#A07830" />
+      {/* Handle */}
+      <rect x="12" y="18" width="2" height="5" rx="1" fill="#7A5520" />
+      {/* Toe edge highlight */}
+      <rect x="10" y="2" width="1.5" height="14" rx="0.5" fill="#E8C87A" opacity="0.5" />
+    </svg>
+  )
+}
+
+// REPLACE RoleRedBall with RoleBall supporting all three colours:
+function RoleBall({ type = 'red', size = 14 }: { type?: 'red' | 'white' | 'pink'; size?: number }) {
+  const configs = {
+    red: {
+      gradId: 'role-rb', clipId: 'role-rc',
+      stops: [['#E8553A','0%'],['#C0392B','35%'],['#8B1A0F','75%'],['#5C0E08','100%']],
+      seam: '#5C0E08', stitch: '#E8C49A',
+    },
+    white: {
+      gradId: 'role-wb', clipId: 'role-wc',
+      stops: [['#FFFFFF','0%'],['#EDE9DF','45%'],['#C8C2B0','80%'],['#A09880','100%']],
+      seam: '#9A9080', stitch: '#707060',
+    },
+    pink: {
+      gradId: 'role-pb', clipId: 'role-pc',
+      stops: [['#F780B8','0%'],['#EC4899','35%'],['#9D1A5C','75%'],['#6B0D3A','100%']],
+      seam: '#7A0A3C', stitch: '#C9956B',
+    },
+  }
+  const c = configs[type]
+  return (
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }}>
+      <defs>
+        <radialGradient id={c.gradId} cx="38%" cy="30%" r="62%">
+          {c.stops.map(([color, offset]) => (
+            <stop key={offset} offset={offset} stopColor={color} />
+          ))}
+        </radialGradient>
+        <clipPath id={c.clipId}><circle cx="30" cy="30" r="28"/></clipPath>
+      </defs>
+      <circle cx="30" cy="30" r="28" fill={`url(#${c.gradId})`}
+        stroke={type === 'white' ? '#C0BAA8' : 'none'} strokeWidth={type === 'white' ? 0.5 : 0}/>
+      <g transform="rotate(-30 30 30)" clipPath={`url(#${c.clipId})`}>
+        <line x1="2" y1="30" x2="58" y2="30" stroke={c.seam} strokeWidth="3"/>
+        <line x1="2" y1="24" x2="58" y2="24" stroke={c.stitch} strokeWidth="1" strokeDasharray="3 2.5"/>
+        <line x1="2" y1="36" x2="58" y2="36" stroke={c.stitch} strokeWidth="1" strokeDasharray="3 2.5"/>
+      </g>
+      <ellipse cx="21" cy="17" rx="9" ry="5" fill="white" opacity="0.13" transform="rotate(-30 21 17)"/>
     </svg>
   )
 }
@@ -463,9 +511,13 @@ function RoleBatIcon({ size = 10 }: { size?: number }) {
 // BOWL     → ball only          (bowler — same red ball SVG as match card)
 // BAT-AR   → bat · ball         (batting all-rounder, bat dominant)
 // BOWL-AR  → ball · bat         (bowling all-rounder, ball dominant)
-function MatchRoleIcon({ role }: { role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' }) {
-  const bat  = <RoleBatIcon size={10} />
-  const ball = <RoleRedBall size={10} />
+// REPLACE MatchRoleIcon to accept ballType:
+function MatchRoleIcon({ role, ballType = 'red' }: {
+  role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'
+  ballType?: 'red' | 'white' | 'pink'
+}) {
+  const bat  = <RoleBatIcon size={14} />
+  const ball = <RoleBall type={ballType} size={14} />
   if (role === 'bat')     return <span className="inline-flex items-center gap-px leading-none">{bat}</span>
   if (role === 'bowl')    return <span className="inline-flex items-center gap-px leading-none">{ball}</span>
   if (role === 'bat_ar')  return <span className="inline-flex items-center gap-px leading-none">{bat}{ball}</span>
@@ -487,6 +539,7 @@ function SelectablePlayerRow({
   takenLabel:         string | null
   roles:              MatchRoles
   matchRole:          'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null   // FIX 5
+  ballType: 'red' | 'white' | 'pink'   // ADD
   onToggle:           (id: string) => void
   onRoleToggle:       (id: string, role: 'captain' | 'vc' | 'wk') => void
   onMatchRoleToggle:  (id: string, role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null) => void  // FIX 5
@@ -615,7 +668,7 @@ function SelectablePlayerRow({
                       ? 'bg-emerald-950/60 border-emerald-700'
                       : 'bg-ink-4 border-ink-5 hover:border-zinc-600'
                 }`}>
-                <MatchRoleIcon role={mr.key} />
+                 <MatchRoleIcon role={mr.key} ballType={ballType} />
               </button>
             )
           })}
@@ -1175,6 +1228,7 @@ function SlotCard({
                   takenLabel={takenElsewhere(player.id)}
                   roles={roles}
                   matchRole={matchRoles[player.id] ?? null}
+                  ballType={ballType}
                   onToggle={toggle}
                   onRoleToggle={handleRoleToggle}
                   onMatchRoleToggle={handleMatchRoleToggle}
