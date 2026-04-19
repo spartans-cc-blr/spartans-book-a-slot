@@ -529,7 +529,7 @@ function MatchRoleIcon({ role, ballType = 'red' }: {
 // FIX 5: Added matchRole and onMatchRoleToggle to props
 function SelectablePlayerRow({
   player, response, selected, atCap, status, takenLabel, roles,
-  matchRole, onToggle, onRoleToggle, onMatchRoleToggle,
+  matchRole, ballType, onToggle, onRoleToggle, onMatchRoleToggle,
 }: {
   player:             Player
   response:           string
