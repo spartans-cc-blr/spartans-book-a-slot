@@ -23,7 +23,6 @@ export default async function GCReviewPage() {
 
   const supabase  = createServiceClient()
   const today     = new Date()
-  // Find the Saturday of the current ISO week
   const monday    = startOfISOWeek(today)
   const saturday  = addDays(monday, 5)
   const sunday    = addDays(monday, 6)
@@ -43,16 +42,19 @@ export default async function GCReviewPage() {
 
   const bookingIds = (bookings ?? []).map(b => b.id)
 
-  // ── Fetch O/E availability for these bookings ──────────────
+  // ── Fetch Y/O/E availability (all three, not just O/E) ────
+  // Y included so the matrix can show all available players and
+  // flag anyone who responded Y but was not selected in any squad.
   const { data: avail } = bookingIds.length > 0
     ? await supabase
         .from('availability')
-        .select('player_id, booking_id, response, players(id, name)')
-        .in('response', ['O', 'E'])
+        .select('player_id, booking_id, response, players(id, name, cricheroes_url)')
+        .in('response', ['Y', 'O', 'E'])
         .in('booking_id', bookingIds)
     : { data: [] }
 
   // ── Fetch all squads for these bookings ────────────────────
+  // match_role included for role composition display in the matrix and approval panels.
   const { data: squads } = bookingIds.length > 0
     ? await supabase
         .from('squad')
@@ -66,7 +68,7 @@ export default async function GCReviewPage() {
       <SiteNav />
       <div className="flex flex-1">
         <AdminSidebar />
-        <main className="flex-1 px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
+        <main className="flex-1 px-5 md:px-8 lg:px-10 py-8 max-w-5xl">
           <div className="mb-6">
             <h1 className="font-cinzel text-xl font-bold text-gold">GC Review</h1>
             <p className="font-rajdhani text-sm text-zinc-500 mt-1">

@@ -1085,6 +1085,15 @@ function SlotCard({
     })
     if (res.ok) {
       setStatus('pending')
+      // U-3: open pre-filled WhatsApp for GC notification
+      // Destination-free (wa.me/?text=) — captain picks the recipient (GC group or individual)
+      const date    = new Date(booking.game_date + 'T00:00:00').toLocaleDateString('en-IN', {
+        weekday: 'short', day: 'numeric', month: 'short',
+      })
+      const slot    = `${SLOT_SHORT[booking.slot_time] ?? booking.slot_time} ${booking.format}`
+      const tourney = booking.tournament?.name ? ` · ${booking.tournament.name}` : ''
+      const msg     = `🏏 *Squad submitted for GC review*\n${date} · ${slot}${tourney}\n\nPlease review and approve on the Hub:\nhttps://hub.spartanscricketclub.in/gc-review`
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
     } else {
       const d = await res.json().catch(() => ({}))
       setSaveError(d.error ?? 'Failed to submit for GC review')
