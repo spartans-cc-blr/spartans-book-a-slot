@@ -25,6 +25,7 @@ interface SquadRow {
   is_captain: boolean
   is_vc:      boolean
   is_wk:      boolean
+  match_role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null  // ADD THIS
   players: { id: string; name: string; primary_skill: string | null; is_captain: boolean } | null
 }
 
