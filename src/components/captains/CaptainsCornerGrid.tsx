@@ -1275,6 +1275,7 @@ function SlotCard({
                 takenLabel={takenElsewhere(player.id)}
                 roles={roles}
                 matchRole={matchRoles[player.id] ?? null}
+                ballType={ballType}
                 onToggle={toggle}
                 onRoleToggle={handleRoleToggle}
                 onMatchRoleToggle={handleMatchRoleToggle}
