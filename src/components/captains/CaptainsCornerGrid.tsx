@@ -937,9 +937,9 @@ function SlotCard({
   const counts   = getCounts(booking.id, players, { ...availMap, [booking.id]: liveAvailMap })
   const eligible = getSlotPlayers(booking.id, bookings, players, { ...availMap, [booking.id]: liveAvailMap })
   const atCap           = selected.size >= MAX_SQUAD
+  const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
   const priorityPlayers = eligible.filter(e => e.player.priority_pick)
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
-  const slotLabel       = `${SLOT_SHORT[booking.slot_time] ?? booking.slot_time} ${booking.format}`
 
   // All three roles must be assigned before GC submission is allowed
   const rolesComplete = !!roles.captain && !!roles.vc && roles.wk.size > 0
