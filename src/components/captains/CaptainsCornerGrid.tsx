@@ -588,11 +588,6 @@ function SelectablePlayerRow({
 
         <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} />
 
-        {/* Skill abbreviation */}
-        <span className="font-rajdhani text-[10px] text-zinc-500 min-w-[24px] text-right flex-shrink-0">
-          {player.primary_skill?.slice(0, 3).toUpperCase() ?? ''}
-        </span>
-
         {/* Right-side pill */}
         {isTaken ? (
           <span className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-red-950/60 border border-red-800/60 text-red-400 whitespace-nowrap">
@@ -772,9 +767,6 @@ function AddPlayerPanel({
                     className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-ink-4 transition-colors text-left">
                     <span className={`font-rajdhani text-sm font-semibold ${p.wallet_balance < 0 ? 'text-amber-400' : 'text-parchment'}`}>
                       {p.name}
-                    </span>
-                    <span className="font-rajdhani text-[10px] text-zinc-600">
-                      {p.primary_skill ?? ''}
                     </span>
                   </button>
                 ))}
