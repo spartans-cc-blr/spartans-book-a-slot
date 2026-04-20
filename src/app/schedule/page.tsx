@@ -166,9 +166,11 @@ function exportCSV(
   slotFilter: Record<SlotTime, boolean>
 ) {
   const rows: string[][] = [['Date', 'Day', 'Slot Time', 'Format', 'WhatsApp Link']]
+  const todayStr = new Date().toISOString().split('T')[0]  // 'YYYY-MM-DD'
 
   weeks.forEach(week => {
     week.days.forEach(day => {
+		if (day.date < todayStr) return   // skip past dates
       day.slots.forEach(slot => {
         if (slot.status !== 'open') return
         if (!slotFilter[slot.time]) return
