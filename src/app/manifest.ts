@@ -5,7 +5,16 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Spartans Hub',
     short_name: 'Spartans',
     description: 'Spartans CC BLR — Fixtures, Availability & Squad Hub',
-    start_url: '/fixtures',
+    manifest: '/manifest.webmanifest',
+  icons: {
+    apple: '/icons/icon-192.png',   // ← this is what Safari reads
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Spartans Hub',
+  },
+   start_url: '/fixtures',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#0D0F14',
