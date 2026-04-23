@@ -881,8 +881,11 @@ function SlotCard({
   const [selected, setSelected] = useState<Set<string>>(() => {
     // If we have a persisted squad, use it — otherwise auto-pick priority players
     if (initialSquad?.selected?.length) {
-      return new Set(initialSquad.selected)
-    }
+     // A player may have withdrawn availability since the draft was saved.
+     // Their ID stays in the DB squad rows but they're no longer in availMap.
+     // Filter them out so the count matches what's visible and the cap is accurate.
+     const responded = new Set(Object.keys(availMap[booking.id] ?? {}))
+     return new Set(initialSquad.selected.filter(id => responded.has(id)))    }
     const auto = new Set<string>()
     players.forEach(p => {
       if (p.priority_pick && availMap[booking.id]?.[p.id]) auto.add(p.id)
@@ -1047,18 +1050,21 @@ function SlotCard({
     currentMatchRoles: Record<string, string> = {}
   ) {
     setSaveError(null)
+    const responded = new Set(Object.keys(liveAvailMap))
+    const cleanSelected = new Set(Array.from(currentSelected).filter(id => responded.has(id)))
+    const cleanRoles = {
+      captain: currentRoles.captain && responded.has(currentRoles.captain) ? currentRoles.captain : null,
+      vc:      currentRoles.vc      && responded.has(currentRoles.vc)      ? currentRoles.vc      : null,
+     wk:      Array.from(currentRoles.wk).filter(id => responded.has(id)),
+   }
     const res = await fetch('/api/squad', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         booking_id: booking.id,
-        player_ids: Array.from(currentSelected),
-        roles: {
-          captain: currentRoles.captain,
-          vc:      currentRoles.vc,
-          wk:      Array.from(currentRoles.wk),
-        },
-        match_roles: currentMatchRoles,  // ignored by API until DB migration runs
+         player_ids: Array.from(cleanSelected),
+         roles:      cleanRoles,
+         match_roles: currentMatchRoles,
       }),
     })
     if (!res.ok) {
