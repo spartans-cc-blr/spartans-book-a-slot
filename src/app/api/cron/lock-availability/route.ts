@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     yCountByBooking[row.booking_id] = (yCountByBooking[row.booking_id] ?? 0) + 1
   }
 
-  const toLock = bookingIds.filter((id) => (yCountByBooking[id] ?? 0) >= 12)
+  const toLock = bookingIds.filter((id) => (yCountByBooking[id] ?? 0) >= 13)
 
   if (toLock.length === 0) {
     return NextResponse.json({ locked: 0 })
