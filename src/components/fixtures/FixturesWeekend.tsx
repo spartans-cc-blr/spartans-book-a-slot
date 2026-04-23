@@ -115,7 +115,7 @@ export function FixturesWeekendGroup({
               <p style={{ fontSize: '11px', color: '#6B7280', fontFamily: "'DM Sans', sans-serif" }}>
                 {b.squadAnnounced
                   ? '✓ Squad announced — availability closed'
-                  : '🔒 Slot frozen — 13 players confirmed'}
+                  : '🔒 Slot frozen for squad selection'}
              </p>
            </div>
           ) : b.hasDues ? (
