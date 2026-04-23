@@ -207,7 +207,7 @@ function buildAnnouncementText(
   players: Player[],
   selected: Set<string>,
   roles: MatchRoles,
-  matchRoles: Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>
+  matchRoles: Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>,
   includeMatchRoles: boolean = false
 ): string {
   const d      = new Date(booking.game_date + 'T00:00:00')
