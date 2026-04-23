@@ -106,6 +106,29 @@ export function FixturesWeekendGroup({
       {bookings.map(b => (
         <div key={b.id} className="mb-4">
           <FixturesCard booking={{ ...b.cardData, squad: b.squad }} />
+                    {b.slotLocked || b.squadAnnounced ? (
+            <div style={{
+              marginTop: '-6px', padding: '10px 16px',
+              background: '#111827', border: '1px solid #2D3748',
+              borderTop: 'none', borderRadius: '0 0 12px 12px',
+            }}>
+              <p style={{ fontSize: '11px', color: '#6B7280', fontFamily: "'DM Sans', sans-serif" }}>
+                {b.squadAnnounced
+                  ? '✓ Squad announced — availability closed'
+                  : '🔒 Slot frozen — 13 players confirmed'}
+             </p>
+           </div>
+          ) : b.hasDues ? (
+            <div style={{
+              marginTop: '-6px', padding: '10px 16px',
+             background: '#111827', border: '1px solid #2D3748',
+              borderTop: 'none', borderRadius: '0 0 12px 12px',
+            }}>
+              <p style={{ fontSize: '11px', color: '#92400e', fontFamily: "'DM Sans', sans-serif" }}>
+                ⚠ Outstanding dues — contact admin to update availability
+              </p>
+            </div>
+          ) : (
           <FixturesAvailability
             bookingId={b.id}
             slotDate={b.game_date}
@@ -121,6 +144,7 @@ export function FixturesWeekendGroup({
             squadAnnounced={b.squadAnnounced}
             slotLocked={b.slotLocked}
           />
+)}
         </div>
       ))}
     </>
