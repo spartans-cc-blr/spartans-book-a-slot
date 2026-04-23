@@ -208,6 +208,7 @@ function buildAnnouncementText(
   selected: Set<string>,
   roles: MatchRoles,
   matchRoles: Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>
+  includeMatchRoles: boolean = false
 ): string {
   const d      = new Date(booking.game_date + 'T00:00:00')
   const day    = d.getDate()
@@ -218,10 +219,10 @@ function buildAnnouncementText(
   const playerLines  = squadPlayers.map((p, i) => {
     const tags: string[] = []
     const mr = matchRoles[p.id]
-    if (mr)                     tags.push(MATCH_ROLE_LABEL[mr])
-    if (roles.wk.has(p.id))     tags.push('WK')
-    if (roles.captain === p.id) tags.push('C')
-    if (roles.vc === p.id)      tags.push('VC')
+    if (mr && includeMatchRoles) tags.push(MATCH_ROLE_LABEL[mr])
+    if (roles.wk.has(p.id))      tags.push('WK')
+    if (roles.captain === p.id)  tags.push('C')
+    if (roles.vc === p.id)       tags.push('VC')
     return `${i + 1}. ${p.name}${tags.length ? ` (${tags.join(', ')})` : ''}`
   }).join('\n')
 
@@ -928,6 +929,8 @@ function SlotCard({
     return seeded
   })
 
+  const [includeRolesInAnnouncement, setIncludeRolesInAnnouncement] = useState(false)
+  
   const { copy, copied } = useCopySquad()
 
   const counts   = getCounts(booking.id, players, { ...availMap, [booking.id]: liveAvailMap })
@@ -945,7 +948,7 @@ function SlotCard({
     roles.wk.size === 0  && 'WK',
   ].filter(Boolean) as string[]
 
-  const announcementText = buildAnnouncementText(booking, players, selected, roles, matchRoles)
+  const announcementText = buildAnnouncementText(booking, players, selected, roles, matchRoles, includeRolesInAnnouncement)
   const waLink           = `https://wa.me/?text=${encodeURIComponent(announcementText)}`
 
   function takenElsewhere(playerId: string): string | null {
@@ -1367,6 +1370,20 @@ function SlotCard({
                     <span className="font-rajdhani text-[9px] text-amber-400 truncate max-w-[120px]" title={gcReturnNote}>
                       GC: {gcReturnNote}
                     </span>
+                  )}
+                  {/* Roles in announcement toggle — shown when status is approved or announced */}
+                  {(status === 'approved' || status === 'announced') && (
+                    <label className="flex items-center gap-1.5 cursor-pointer flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={includeRolesInAnnouncement}
+                        onChange={e => setIncludeRolesInAnnouncement(e.target.checked)}
+                        className="w-3 h-3 accent-emerald-500"
+                      />
+                      <span className="font-rajdhani text-[9px] text-zinc-500 select-none">
+                        Include roles
+                      </span>
+                    </label>
                   )}
                   <a href={waLink} target="_blank" rel="noopener noreferrer"
                     onClick={handleAnnounce}
