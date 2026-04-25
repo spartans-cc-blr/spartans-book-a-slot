@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { format, parseISO, startOfDay, addDays } from 'date-fns'
 import type { Booking } from '@/types'
+import NLPBookingBar from ‘@/components/admin/NLPBookingBar’
 
 export const revalidate = 0  // Always fresh for admin
 
@@ -25,6 +26,10 @@ export default async function AdminDashboard({
     .order('game_date')
     .order('slot_time')
     .limit(100) as { data: Booking[] | null }
+
+  const { data: captains }     = await supabase.from(‘captains’).select(‘id, name’).eq(‘active’, true).order(‘name’)
+  const { data: grounds }      = await supabase.from(‘grounds’).select(‘id, name’).order(‘name’)
+  const { data: tournamentsMd } = await supabase.from(‘tournaments’).select(‘id, name’).eq(‘active’, true).order(‘name’)
 
   // This weekend games count
   const day = new Date().getDay()
@@ -74,21 +79,41 @@ export default async function AdminDashboard({
       </div>
 
       {/* Upcoming bookings */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-cinzel text-sm font-semibold text-gold flex items-center gap-2">
-          <span className="w-1 h-4 bg-crimson rounded-sm inline-block" /> Upcoming Bookings
-        </h2>
-        <div className="flex gap-2">
-          <Link href="/admin/soft-blocks/new"
-            className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold px-3 py-1.5 rounded hover:bg-gold/10 transition-colors">
-            🔒 Soft Block
-          </Link>
-          <Link href="/admin/bookings/new"
-            className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark text-white px-3 py-1.5 rounded transition-colors">
-            ＋ New Booking
-          </Link>
-        </div>
-      </div>
+        {/* NLP Command Bar */}
+  <div className="mb-5">
+    <NLPBookingBar
+      captains={captains ?? []}
+      grounds={grounds ?? []}
+      tournaments={tournamentsMd ?? []}
+      upcomingBookings={(bookings ?? [])
+        .filter(b => b.status !== 'cancelled')
+        .map(b => ({
+          id: b.id,
+          game_date: b.game_date,
+          slot_time: b.slot_time,
+          format: b.format ?? null,
+          status: b.status,
+          captain_name: (b as any).captain?.name ?? null,
+          tournament_name: (b as any).tournament?.name ?? null,
+        }))}
+    />
+  </div>
+
+  <div className="flex items-center justify-between mb-3">
+    <h2 className="font-cinzel text-sm font-semibold text-gold flex items-center gap-2">
+      <span className="w-1 h-4 bg-crimson rounded-sm inline-block" /> Upcoming Bookings
+    </h2>
+    <div className="flex gap-2">
+      <Link href="/admin/soft-blocks/new"
+        className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold px-3 py-1.5 rounded hover:bg-gold/10 transition-colors">
+        🔒 Soft Block
+      </Link>
+      <Link href="/admin/bookings/new"
+        className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark text-white px-3 py-1.5 rounded transition-colors">
+        ＋ New Booking
+      </Link>
+    </div>
+  </div>
 
       <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
         <div className="overflow-x-auto">
