@@ -27,9 +27,9 @@ export default async function AdminDashboard({
     .order('slot_time')
     .limit(100) as { data: Booking[] | null }
 
-  const { data: captains }     = await supabase.from(‘captains’).select(‘id, name’).eq(‘active’, true).order(‘name’)
-  const { data: grounds }      = await supabase.from(‘grounds’).select(‘id, name’).order(‘name’)
-  const { data: tournamentsMd } = await supabase.from(‘tournaments’).select(‘id, name’).eq(‘active’, true).order(‘name’)
+  const { data: captains }     = await supabase.from('captains').select('id, name').eq('active', true).order('name')
+const { data: grounds }      = await supabase.from('grounds').select('id, name').order('name')
+const { data: tournamentsMd } = await supabase.from('tournaments').select('id, name').eq('active', true).order('name')
 
   // This weekend games count
   const day = new Date().getDay()
