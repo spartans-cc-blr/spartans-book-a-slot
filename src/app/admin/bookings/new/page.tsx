@@ -82,35 +82,68 @@ export default function NewBookingPage() {
     setMatchStage('')
   }, [mode])
 
-  useEffect(() => {
+  // AFTER
+useEffect(() => {
   if (!cricHeroesUrl) return
   try {
     const url = new URL(cricHeroesUrl)
     const parts = url.pathname.split('/').filter(Boolean)
-    // parts: ['scorecard', '21399873', 'tournament-name', 'team-a-vs-team-b']
+    // parts: ['scorecard', '22711244', 'lakeview-rcg-edition-10-(t30-white-ball)', 'spartans-cc-bengaluru-vs-demigods-cricket-club']
 
-    // Extract match ID
+    // 1. Match ID
     const idIndex = parts.indexOf('scorecard')
     if (idIndex !== -1 && parts[idIndex + 1]) {
       setMatchId(parts[idIndex + 1])
     }
 
-    // Extract opponent name
-    const matchSegment = parts[parts.length - 1] // 'all-star-vs-spartans-cc-bengaluru'
+    // 2. Opponent name — from last segment
+    const matchSegment = parts[parts.length - 1]
     if (matchSegment?.includes('-vs-')) {
       const [teamA, teamB] = matchSegment.split('-vs-')
       const opponent = teamA.includes('spartans') ? teamB : teamA
-      // Convert hyphen-case to Title Case
       const formatted = opponent
         .split('-')
         .map(w => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ')
-      setOpponentName(formatted)
+      setOpponentName(prev => prev || formatted) // don't overwrite if already set
     }
+
+    // 3. Tournament name — from slug segment (index 2), strip format suffix & parens
+    const tournamentSlug = parts[2] ?? ''
+    if (tournamentSlug) {
+      // Strip parenthetical format hints: "(t30-white-ball)", "(t20)"
+      const withoutParens = tournamentSlug.replace(/\([^)]*\)/g, '').trim().replace(/-+$/, '')
+      const tournamentGuess = withoutParens
+        .split('-')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')
+
+      // Fuzzy match against loaded tournaments list
+      const lower = withoutParens.toLowerCase()
+      const matched = tournaments.find(t =>
+        t.name.toLowerCase().includes(lower.split('-').slice(0, 3).join(' ')) ||
+        lower.includes(t.name.toLowerCase().replace(/\s+/g, '-'))
+      )
+      if (matched) {
+        setTournamentId(prev => prev || matched.id)
+      }
+      // Store the guess in notes if no match found, so admin sees it
+      if (!matched && tournamentGuess) {
+        setNotes(prev => prev || `Tournament from URL: ${tournamentGuess}`)
+      }
+    }
+
+    // 4. Format hint — from tournament slug parenthetical
+    const formatHint = tournamentSlug.match(/\((t20|t30)[^)]*\)/i)?.[1]?.toUpperCase()
+    if (formatHint === 'T20' || formatHint === 'T30') {
+      setFormat(prev => prev || formatHint)
+    }
+
   } catch {
     // Invalid URL — ignore
   }
-}, [cricHeroesUrl])
+}, [cricHeroesUrl, tournaments]) // add `tournaments` to dep array
+
   
   const validate = useCallback(async () => {
     if (mode === 'reserved') {
