@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { format, parseISO, startOfDay, addDays } from 'date-fns'
 import type { Booking } from '@/types'
-import NLPBookingBar from ‘@/components/admin/NLPBookingBar’
+import NLPBookingBar from '@/components/admin/NLPBookingBar'
 
 export const revalidate = 0  // Always fresh for admin
 
