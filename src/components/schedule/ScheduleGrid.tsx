@@ -26,27 +26,40 @@ const STATUS_CONFIG = {
   na:         { label: '',                  gridLabel: '',                  icon: '—',  pill: '',               gridCls: 'bg-transparent border-transparent cursor-default' },
 }
 
-// Returns the SlotTime that causes a clash for the given slotTime, based on the day's slots
 function getClashSource(
   slotTime: SlotTime,
-  daySlots: { time: SlotTime; status: string }[]
+  daySlots: { time: SlotTime; status: string; format?: string | null }[]
 ): SlotTime | null {
-  const slotMap = Object.fromEntries(daySlots.map(s => [s.time, s.status]))
-
+  const slotMap   = Object.fromEntries(daySlots.map(s => [s.time, s.status]))
+  const formatMap = Object.fromEntries(daySlots.map(s => [s.time, s.format]))
+ 
+  // NEW: T20 at 10:30 blocks the entire day — every other slot points at 10:30
+  if (slotTime !== '10:30' && slotMap['10:30'] === 'booked' && formatMap['10:30'] === 'T20') {
+    return '10:30'
+  }
+ 
   if (slotTime === '10:30') {
-    // Blocked by T30 at 07:30 or any game at 12:30
+    // NEW: T20 at 07:30 blocks 10:30 (back-to-back T20s)
+    if (slotMap['07:30'] === 'booked' && formatMap['07:30'] === 'T20') return '07:30'
+    // Pre-existing: T30 at 07:30 blocks 10:30
     if (slotMap['07:30'] === 'booked') return '07:30'
+    // Pre-existing: any game at 12:30 blocks 10:30
     if (slotMap['12:30'] === 'booked') return '12:30'
   }
+ 
   if (slotTime === '12:30') {
-    // Blocked by T20 at 10:30 or T20 at 14:30
+    // Pre-existing: T20 at 10:30 — already handled by whole-day rule above
     if (slotMap['10:30'] === 'booked') return '10:30'
+    // Pre-existing: T20 at 14:30 blocks 12:30
     if (slotMap['14:30'] === 'booked') return '14:30'
   }
+ 
   if (slotTime === '14:30') {
-    // Blocked by any game at 12:30
+    // Pre-existing: any game at 12:30 blocks 14:30
     if (slotMap['12:30'] === 'booked') return '12:30'
+    // NEW: T20 at 10:30 whole-day block — already handled at the top
   }
+ 
   return null
 }
 

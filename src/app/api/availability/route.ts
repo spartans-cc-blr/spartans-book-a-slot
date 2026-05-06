@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
             slotInfo.reserved_until  = booking.reserved_until ?? null
             slotInfo.organiser_name  = booking.organiser_name ?? null
             slotInfo.tournament_name = booking.tournament?.name ?? null
-          }
+            }
         }
 
         if (status === 'booked') {
@@ -111,6 +111,7 @@ export async function GET(req: NextRequest) {
             slotInfo.cricheroes_url  = booking.cricheroes_url
             slotInfo.tournament_name = booking.tournament?.name ?? null
             slotInfo.opponent_name   = booking.opponent_name ?? null
+            slotInfo.format          = booking.format ?? null
           }
         }
 

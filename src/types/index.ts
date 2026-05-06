@@ -59,6 +59,7 @@ export interface SlotInfo {
   opponent_name?:   string | null
   cricheroes_url?:  string | null
   tournament_name?: string | null
+  format?: GameFormat | null
 }
 
 export interface DayAvailability {
