@@ -202,14 +202,28 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
   const playingMultiple = matrixRows.filter(r => r.games >= 2)
   const slotCounts      = bookings.map(b => ({ b, count: squadMap[b.id]?.length ?? 0 }))
 
-  const yNotSelected = matrixRows.filter(r =>
+   // Group 1: Completely unselected — Y for at least one submitted slot, in no squad at all
+  const totallyUnselected = matrixRows.filter(r =>
+    r.games === 0 &&
+    bookings.some(b =>
+      submittedBookingIds.has(b.id) &&
+      r.responses[b.id] === 'Y'
+    )
+  )
+
+  // Group 2: Left out of a specific slot — selected in at least one squad,
+  // but also Y for another submitted slot where they weren't picked
+  const leftOutOfSlot = matrixRows.filter(r =>
+    r.games > 0 &&
     bookings.some(b =>
       submittedBookingIds.has(b.id) &&
       r.responses[b.id] === 'Y' &&
-      !(squadMap[b.id] ?? []).includes(r.pid) 
+      !(squadMap[b.id] ?? []).includes(r.pid)
     )
   )
-  const allYCovered = yNotSelected.length === 0
+ 
+  const allYCovered = totallyUnselected.length === 0
+
 
   async function decide(bookingId: string, decision: 'approved' | 'returned') {
     setSaving(p => ({ ...p, [bookingId]: true }))
@@ -300,56 +314,86 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
           </div>
 
           {/* Y not selected */}
-          <div className="flex flex-col gap-1.5">
-            <button
-              onClick={() => yNotSelected.length > 0 && setExpand(e => ({ ...e, ymissed: !e.ymissed }))}
-              className={`flex items-center gap-2 font-rajdhani text-xs font-bold transition-colors ${
-                unsubmittedCount > 0        ? 'text-zinc-500 cursor-default'
-                : yNotSelected.length > 0  ? 'text-red-400 hover:text-red-300'
-                :                            'text-emerald-400 cursor-default'
-              }`}>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                unsubmittedCount > 0       ? 'bg-zinc-500'
-                : yNotSelected.length > 0 ? 'bg-red-400'
-                :                           'bg-emerald-500'
-              }`} />
-              {unsubmittedCount > 0
-                ? `${unsubmittedCount} slot${unsubmittedCount > 1 ? 's' : ''} not yet submitted — fairness check partial`
-                : allYCovered
-                  ? 'All Y-available players covered ✓'
-                  : `${yNotSelected.length} Y-available not selected ⚠`
-              }
-              {unsubmittedCount === 0 && yNotSelected.length > 0 && (
-                <span className="text-[10px] font-normal opacity-60">{expand.ymissed ? '▴' : '▾'}</span>
+            {/* Fairness summary — partial check warning */}
+            {unsubmittedCount > 0 && (
+              <div className="flex items-center gap-2 font-rajdhani text-xs font-bold text-zinc-500">
+                <span className="w-2 h-2 rounded-full bg-zinc-500 flex-shrink-0" />
+                {unsubmittedCount} slot{unsubmittedCount > 1 ? 's' : ''} not yet submitted — fairness check partial
+              </div>
+            )}
+           
+            {/* Totally unselected — alarming */}
+            <div className="flex flex-col gap-1.5">
+              <button
+                onClick={() => totallyUnselected.length > 0 && setExpand(e => ({ ...e, unselected: !e.unselected }))}
+                className={`flex items-center gap-2 font-rajdhani text-xs font-bold transition-colors ${
+                  totallyUnselected.length > 0 ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 cursor-default'
+                }`}>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${totallyUnselected.length > 0 ? 'bg-red-400' : 'bg-emerald-500'}`} />
+                {totallyUnselected.length === 0 ? 'All Y-available players selected ✓' : `${totallyUnselected.length} not selected for any game ⚠`}
+                {totallyUnselected.length > 0 && <span className="text-[10px] font-normal opacity-60">{expand.unselected ? '▴' : '▾'}</span>}
+              </button>
+              {expand.unselected && totallyUnselected.length > 0 && (
+                <div className="ml-4 flex flex-col gap-1">
+                  {totallyUnselected.map(r => (
+                    <div key={r.pid} className="flex items-center gap-2">
+                      {r.cricheroes_url
+                        ? <a href={r.cricheroes_url} target="_blank" rel="noopener noreferrer" className="font-rajdhani text-xs text-red-300 hover:underline underline-offset-2">{r.name}</a>
+                        : <span className="font-rajdhani text-xs text-red-300">{r.name}</span>
+                      }
+                      <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm"
+                        style={{ background: RESP_STYLE.Y.bg, color: RESP_STYLE.Y.text, border: `1px solid ${RESP_STYLE.Y.border}` }}>Y</span>
+                      <span className="font-rajdhani text-[10px] text-zinc-600">
+                        {bookings
+                          .filter(b => r.responses[b.id] === 'Y' && submittedBookingIds.has(b.id))
+                          .map(b => `${SLOT_SHORT[b.slot_time]} ${b.format}`)
+                          .join(', ')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
-            </button>
-            {expand.ymissed && yNotSelected.length > 0 && (
-              <div className="ml-4 flex flex-col gap-1">
-                {yNotSelected.map(r => (
-                  <div key={r.pid} className="flex items-center gap-2">
-                    {r.cricheroes_url
-                      ? <a href={r.cricheroes_url} target="_blank" rel="noopener noreferrer" className="font-rajdhani text-xs text-red-300 hover:underline underline-offset-2">{r.name}</a>
-                      : <span className="font-rajdhani text-xs text-red-300">{r.name}</span>
-                    }
-                    <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm"
-                      style={{ background: RESP_STYLE.Y.bg, color: RESP_STYLE.Y.text, border: `1px solid ${RESP_STYLE.Y.border}` }}>Y</span>
-                    <span className="font-rajdhani text-[10px] text-zinc-600">
-                      {bookings
-                        .filter(b =>
-                          r.responses[b.id] === 'Y' &&
-                          submittedBookingIds.has(b.id) &&
-                          !(squadMap[b.id] ?? []).includes(r.pid)
-                        )
-                        .map(b => `${SLOT_SHORT[b.slot_time]} ${b.format}`)
-                        .join(', ')}
-                    </span>
+            </div>
+           
+            {/* Left out of a specific slot — informational */}
+            {leftOutOfSlot.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <button
+                  onClick={() => setExpand(e => ({ ...e, leftout: !e.leftout }))}
+                  className="flex items-center gap-2 font-rajdhani text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                  {leftOutOfSlot.length} selected for one game, left out of another
+                  <span className="text-[10px] font-normal opacity-60">{expand.leftout ? '▴' : '▾'}</span>
+                </button>
+                {expand.leftout && (
+                  <div className="ml-4 flex flex-col gap-1">
+                    {leftOutOfSlot.map(r => (
+                      <div key={r.pid} className="flex items-center gap-2">
+                        {r.cricheroes_url
+                          ? <a href={r.cricheroes_url} target="_blank" rel="noopener noreferrer" className="font-rajdhani text-xs text-amber-400 hover:underline underline-offset-2">{r.name}</a>
+                          : <span className="font-rajdhani text-xs text-amber-400">{r.name}</span>
+                        }
+                        <span className="font-rajdhani text-[10px] text-zinc-600">
+                          {/* Show which slots they're in vs left out of */}
+                          {bookings
+                            .filter(b => submittedBookingIds.has(b.id) && squadMap[b.id]?.includes(r.pid))
+                            .map(b => `✓ ${SLOT_SHORT[b.slot_time]} ${b.format}`)
+                            .join(' · ')}
+                        </span>
+                        <span className="font-rajdhani text-[10px] text-zinc-700">
+                          {bookings
+                            .filter(b => submittedBookingIds.has(b.id) && r.responses[b.id] === 'Y' && !squadMap[b.id]?.includes(r.pid))
+                            .map(b => `— ${SLOT_SHORT[b.slot_time]} ${b.format}`)
+                            .join(' · ')}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
-        </div>
-      </section>
+        </section>
 
       {/* ── 2. Weekend Player Matrix ─────────────────────────────── */}
       <section className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
