@@ -176,10 +176,21 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
       }))
       .sort((a, b) => {
         if (b.games !== a.games) return b.games - a.games
-        // Only flag as Y-missed if they had Y for a submitted slot and weren't picked
-        const aYMissed = a.games === 0 && Object.entries(a.responses).some(([bid, r]) => r === 'Y' && submittedBookingIds.has(bid))
-        const bYMissed = b.games === 0 && Object.entries(b.responses).some(([bid, r]) => r === 'Y' && submittedBookingIds.has(bid))
-        if (aYMissed !== bYMissed) return aYMissed ? -1 : 1
+            if (a.games !== 0 || b.games !== 0) return 0 // already sorted by games desc above
+         
+            // Both have games === 0 — sub-sort by urgency
+            const yMissed    = (r: typeof a) => Object.entries(r.responses).some(([bid, resp]) => resp === 'Y' && submittedBookingIds.has(bid))
+            const inDraft    = (r: typeof a) => Object.keys(r.responses).some(bid => !submittedBookingIds.has(bid) && draftSquadMap[bid]?.includes(r.pid))
+            const availNoDraft = (r: typeof a) => Object.entries(r.responses).some(([bid, resp]) => resp === 'Y' && !submittedBookingIds.has(bid) && !draftSquadMap[bid]?.includes(r.pid))
+         
+            const rank = (r: typeof a) =>
+              yMissed(r)    ? 0 :  // red — missed submitted squad
+              inDraft(r)    ? 1 :  // grey — captain considering
+              availNoDraft(r) ? 2 : // grey — captain overlooked
+              3                     // O/E constrained, no Y
+        
+            const rankDiff = rank(a) - rank(b)
+            if (rankDiff !== 0) return rankDiff
         return a.name.localeCompare(b.name)
       })
   // submittedBookingIds is a plain Set computed outside — intentionally omitted from deps
