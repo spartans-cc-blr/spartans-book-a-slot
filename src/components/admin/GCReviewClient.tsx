@@ -416,6 +416,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
         {matrixRows.length === 0 ? (
           <p className="px-4 py-6 font-rajdhani text-sm text-zinc-600">No availability responses this weekend.</p>
         ) : (
+          <>
             <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '70vh' }}>
               <table className="border-collapse" style={{ minWidth: Math.max(320, bookings.length * 120 + 160) }}>
                 <thead className="sticky top-0 z-20">
@@ -540,6 +541,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
               </button>
             </div>
           )}
+          </>
         )}
       </section>
 
