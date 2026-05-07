@@ -402,7 +402,6 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                 )}
               </div>
             )}
-          </div>
         </section>
 
       {/* ── 2. Weekend Player Matrix ─────────────────────────────── */}
