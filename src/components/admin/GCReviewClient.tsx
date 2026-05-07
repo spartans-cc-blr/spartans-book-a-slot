@@ -173,8 +173,22 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
   }, [allAvailPlayers, gamesCount])
 
   const playingMultiple = matrixRows.filter(r => r.games >= 2)
-  const yNotSelected    = matrixRows.filter(r => r.games === 0 && Object.values(r.responses).includes('Y'))
   const slotCounts      = bookings.map(b => ({ b, count: squadMap[b.id]?.length ?? 0 }))
+ 
+  // Only slots with submitted squads (pending/approved/announced) count toward fairness.
+  // Draft slots are invisible to the GC — exclude them from the Y-coverage check.
+  const submittedBookingIds = new Set(
+    bookings.filter(b => squads.some(s => s.booking_id === b.id)).map(b => b.id)
+  )
+  const unsubmittedCount = bookings.length - submittedBookingIds.size
+  const yNotSelected = matrixRows.filter(r =>
+    bookings.some(b =>
+      submittedBookingIds.has(b.id) &&
+      r.responses[b.id] === 'Y' &&
+      !(squadMap[b.id] ?? []).includes(r.pid)
+    )
+  )
+  const allYCovered = yNotSelected.length === 0
 
   async function decide(bookingId: string, decision: 'approved' | 'returned') {
     setSaving(p => ({ ...p, [bookingId]: true }))
@@ -268,11 +282,18 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
             <button
               onClick={() => yNotSelected.length > 0 && setExpand(e => ({ ...e, ymissed: !e.ymissed }))}
               className={`flex items-center gap-2 font-rajdhani text-xs font-bold transition-colors ${
-                yNotSelected.length > 0 ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 cursor-default'
+                unsubmittedCount > 0 ? 'text-zinc-500 cursor-default'
+                : yNotSelected.length > 0 ? 'text-red-400 hover:text-red-300'
+                : 'text-emerald-400 cursor-default'
               }`}>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${yNotSelected.length > 0 ? 'bg-red-400' : 'bg-emerald-500'}`} />
-              {yNotSelected.length === 0 ? 'All Y-available players covered ✓' : `${yNotSelected.length} Y-available not selected ⚠`}
-              {yNotSelected.length > 0 && <span className="text-[10px] font-normal opacity-60">{expand.ymissed ? '▴' : '▾'}</span>}
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${unsubmittedCount > 0 ? 'bg-zinc-500' : yNotSelected.length > 0 ? 'bg-red-400' : 'bg-emerald-500'}`} />
+              {unsubmittedCount > 0
+                ? `${unsubmittedCount} slot${unsubmittedCount > 1 ? 's' : ''} not yet submitted — fairness check partial`
+                : allYCovered
+                  ? 'All Y-available players covered ✓'
+                  : `${yNotSelected.length} Y-available not selected ⚠`
+              }
+              {unsubmittedCount === 0 && yNotSelected.length > 0 && <span className="text-[10px] font-normal opacity-60">{expand.ymissed ? '▴' : '▾'}</span>}
             </button>
             {expand.ymissed && yNotSelected.length > 0 && (
               <div className="ml-4 flex flex-col gap-1">
