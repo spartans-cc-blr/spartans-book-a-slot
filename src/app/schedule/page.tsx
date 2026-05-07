@@ -175,7 +175,7 @@ function exportCSV(
         if (slot.status !== 'open' && slot.status !== 't20only') return
         if (!slotFilter[slot.time]) return
 
-        const availableFormats = slot.status === 't20only' ? ['T20'] : ORGANISER_FORMATS[slot.time]
+        const availableFormats = slot.status === 't20only' ? (['T20'] as GameFormat[]) : ORGANISER_FORMATS[slot.time]
 		const formats = availableFormats.filter(f => formatFilter[f])  
         if (formats.length === 0) return
 
