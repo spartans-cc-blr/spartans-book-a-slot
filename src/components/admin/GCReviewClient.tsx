@@ -40,6 +40,7 @@ interface Props {
   bookings:  Booking[]
   avail:     AvailRow[]
   squads:    SquadRow[]
+  draftSquadMap: Record<string, string[]>
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ function WAIcon({ size = 13 }: { size?: number }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────
-export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSquads }: Props) {
+export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSquads, draftSquadMap }: Props) {
   const [squads,  setSquads]  = useState(initialSquads)
   const [notes,   setNotes]   = useState<Record<string, string>>({})
   const [saving,  setSaving]  = useState<Record<string, boolean>>({})
@@ -439,7 +440,9 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                               {isConstrained
                                 ? `— (${resp})`
                                 : isDraftSlot
-                                  ? 'Available (draft)'
+                                  ? draftSquadMap[b.id]?.includes(row.pid)
+                                      ? '— (in draft squad)'
+                                      : 'Available (not in draft)'
                                   : resp === 'Y' ? 'Available' : `Available (${resp})`
                               }
                             </span>
