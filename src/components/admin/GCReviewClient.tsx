@@ -165,8 +165,9 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
       .map(([pid, data]: [string, { name: string; cricheroes_url: string | null; responses: Record<string, 'Y' | 'O' | 'E'> }]) => ({ pid, ...data, games: gamesCount[pid] ?? 0 }))
       .sort((a, b) => {
         if (b.games !== a.games) return b.games - a.games
-        const aYMissed = Object.values(a.responses).includes('Y') && a.games === 0
-        const bYMissed = Object.values(b.responses).includes('Y') && b.games === 0
+         // Only flag as Y-missed if they had Y for a *submitted* slot and weren't picked
+        const aYMissed = a.games === 0 && Object.entries(a.responses).some(([bid, r]) => r === 'Y' && submittedBookingIds.has(bid))
+        const bYMissed = b.games === 0 && Object.entries(b.responses).some(([bid, r]) => r === 'Y' && submittedBookingIds.has(bid))
         if (aYMissed !== bYMissed) return aYMissed ? -1 : 1
         return a.name.localeCompare(b.name)
       })
@@ -345,7 +346,12 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
               <tbody>
                 {matrixRows.map(row => {
                   const isMultiple = row.games >= 2
-                  const isYMissed  = row.games === 0 && Object.values(row.responses).includes('Y')
+                  // Only red if they had Y for a submitted slot and weren't selected
+                  const isYMissed  = row.games === 0 && Object.entries(row.responses).some(
+                    ([bid, r]) => r === 'Y' && submittedBookingIds.has(bid)
+                  )
+                  // Grey if they only have Y for unsubmitted (draft) slots
+                  const isYPending = row.games === 0 && !isYMissed && Object.values(row.responses).includes('Y')
                   const nameColour = isMultiple ? 'text-amber-400' : isYMissed ? 'text-red-400' : 'text-parchment'
                   const respCodes  = Object.values(row.responses)
                   const dominant   = respCodes.includes('Y') ? 'Y' : respCodes.includes('O') ? 'O' : 'E'
@@ -399,10 +405,16 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                         const rs2           = RESP_STYLE[resp]
                         const isConstrained = (resp === 'O' || resp === 'E') &&
                           bookings.some(ob => ob.id !== b.id && squadMap[ob.id]?.includes(row.pid))
+                        const isDraftSlot   = !submittedBookingIds.has(b.id)
                         return (
                           <td key={b.id} className="px-3 py-2">
                             <span className="font-rajdhani text-[10px]" style={{ color: isConstrained ? '#52525b' : rs2.text }}>
-                              {isConstrained ? `— (${resp})` : resp === 'Y' ? 'Available' : `Available (${resp})`}
+                              {isConstrained
+                                 ? `— (${resp})`
+                                 : isDraftSlot
+                                   ? <span style={{ color: '#52525b' }}>Available (draft)</span>
+                                   : resp === 'Y' ? 'Available' : `Available (${resp})`
+                               }
                             </span>
                           </td>
                         )
@@ -412,6 +424,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                           isMultiple      ? 'bg-amber-950/40 border-amber-700 text-amber-400' :
                           row.games === 1 ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400' :
                           isYMissed       ? 'bg-red-950/40 border-red-800 text-red-400' :
+                          isYPending      ? 'bg-zinc-900 border-zinc-700 text-zinc-500' :
                                             'bg-zinc-900 border-zinc-800 text-zinc-600'
                         }`}>{row.games}</span>
                       </td>
