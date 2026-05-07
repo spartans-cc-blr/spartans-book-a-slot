@@ -175,22 +175,23 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
         pid, ...data, games: gamesCount[pid] ?? 0,
       }))
       .sort((a, b) => {
-        if (b.games !== a.games) return b.games - a.games
-            if (a.games !== 0 || b.games !== 0) return 0 // already sorted by games desc above
-         
-            // Both have games === 0 — sub-sort by urgency
-            const yMissed    = (r: typeof a) => Object.entries(r.responses).some(([bid, resp]) => resp === 'Y' && submittedBookingIds.has(bid))
-            const inDraft    = (r: typeof a) => Object.keys(r.responses).some(bid => !submittedBookingIds.has(bid) && draftSquadMap[bid]?.includes(r.pid))
-            const availNoDraft = (r: typeof a) => Object.entries(r.responses).some(([bid, resp]) => resp === 'Y' && !submittedBookingIds.has(bid) && !draftSquadMap[bid]?.includes(r.pid))
-         
-            const rank = (r: typeof a) =>
-              yMissed(r)    ? 0 :  // red — missed submitted squad
-              inDraft(r)    ? 1 :  // grey — captain considering
-              availNoDraft(r) ? 2 : // grey — captain overlooked
-              3                     // O/E constrained, no Y
-        
-            const rankDiff = rank(a) - rank(b)
-            if (rankDiff !== 0) return rankDiff
+        const getGroup = (r: { pid: string; responses: Record<string, string> }): number => {
+          if (bookings.some(bk => squads.find(s => s.booking_id === bk.id && s.player_id === r.pid)?.status?.match(/^(approved|announced)$/))) return 1
+          if (bookings.some(bk => squads.find(s => s.booking_id === bk.id && s.player_id === r.pid)?.status === 'pending_approval')) return 2
+          if (bookings.some(bk => draftSquadMap[bk.id]?.includes(r.pid))) return 3
+          return 4
+        }
+        const earliestSlot = (r: { responses: Record<string, string> }): string => {
+          const slots = bookings
+            .filter(bk => r.responses[bk.id])
+            .map(bk => `${bk.game_date}T${bk.slot_time}`)
+            .sort()
+          return slots[0] ?? '9999'
+        }
+        const groupDiff = getGroup(a) - getGroup(b)
+        if (groupDiff !== 0) return groupDiff
+        const slotDiff = earliestSlot(a).localeCompare(earliestSlot(b))
+        if (slotDiff !== 0) return slotDiff
         return a.name.localeCompare(b.name)
       })
   // submittedBookingIds is a plain Set computed outside — intentionally omitted from deps
@@ -351,7 +352,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
         <div className="px-4 py-3 bg-ink-4 border-b border-ink-5">
           <h2 className="font-cinzel text-sm font-semibold text-gold">Player Matrix</h2>
           <p className="font-rajdhani text-[10px] text-zinc-500 mt-0.5">
-            All Y / O / E players · sorted by games played (desc) · roles shown are match-assigned only
+            All Y / O / E players · sorted by squad status then earliest slot · roles shown are match-assigned only
           </p>
         </div>
 
@@ -377,14 +378,17 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
               </thead>
               <tbody>
                 {matrixRows.map(row => {
-                  const isMultiple = row.games >= 2
-                  // Red only if they had Y for a submitted slot and weren't selected
-                  const isYMissed  = row.games === 0 && Object.entries(row.responses).some(
-                    ([bid, r]) => r === 'Y' && submittedBookingIds.has(bid)
-                  )
-                  // Grey if they only have Y for draft (unsubmitted) slots
-                  const isYPending = row.games === 0 && !isYMissed && Object.values(row.responses).includes('Y')
-                  const nameColour = isMultiple ? 'text-amber-400' : isYMissed ? 'text-red-400' : 'text-parchment'
+                  const playerGroup = (() => {
+                    if (bookings.some(bk => squads.find(s => s.booking_id === bk.id && s.player_id === row.pid)?.status?.match(/^(approved|announced)$/))) return 1
+                    if (bookings.some(bk => squads.find(s => s.booking_id === bk.id && s.player_id === row.pid)?.status === 'pending_approval')) return 2
+                    if (bookings.some(bk => draftSquadMap[bk.id]?.includes(row.pid))) return 3
+                    return 4
+                  })()
+                  const nameColour =
+                    playerGroup === 1 ? 'text-parchment' :
+                    playerGroup === 2 ? 'text-parchment' :
+                    playerGroup === 3 ? 'text-zinc-400'  :
+                    'text-red-400'
                   const respCodes  = Object.values(row.responses)
                   const dominant   = respCodes.includes('Y') ? 'Y' : respCodes.includes('O') ? 'O' : 'E'
                   const rs         = RESP_STYLE[dominant]
@@ -462,11 +466,12 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                       })}
                       <td className="px-3 py-2 text-center">
                         <span className={`font-rajdhani text-xs font-bold tabular-nums px-2 py-0.5 rounded-sm border ${
-                          isMultiple      ? 'bg-amber-950/40 border-amber-700 text-amber-400' :
-                          row.games === 1 ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400' :
-                          isYMissed       ? 'bg-red-950/40 border-red-800 text-red-400' :
-                          isYPending      ? 'bg-zinc-900 border-zinc-700 text-zinc-500' :
-                                            'bg-zinc-900 border-zinc-800 text-zinc-600'
+                          playerGroup === 1 ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400' :
+                          playerGroup === 2 ? 'bg-sky-950/40 border-sky-700 text-sky-400' :
+                          playerGroup === 3 ? 'bg-zinc-900 border-zinc-700 text-zinc-500' :
+                          Object.values(row.responses).includes('Y')
+                            ? 'bg-red-950/40 border-red-800 text-red-400'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-600'
                         }`}>{row.games}</span>
                       </td>
                     </tr>
