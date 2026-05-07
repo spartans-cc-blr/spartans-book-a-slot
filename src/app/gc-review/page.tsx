@@ -63,6 +63,24 @@ export default async function GCReviewPage() {
         .in('status', ['pending_approval', 'approved', 'announced'])
     : { data: [] }
 
+  // ── Fetch draft squad player IDs (read-only, for matrix context) ──
+  // GC cannot approve/return draft squads — this data is used only to show
+  // whether an available player is already in the captain's draft selection.
+  const { data: draftSquads } = bookingIds.length > 0
+    ? await supabase
+        .from('squad')
+        .select('player_id, booking_id')
+        .in('booking_id', bookingIds)
+        .eq('status', 'draft')
+    : { data: [] }
+ 
+  // Build draftSquadMap: bookingId → player_id[]
+  const draftSquadMap: Record<string, string[]> = {}
+  for (const row of draftSquads ?? []) {
+    if (!draftSquadMap[row.booking_id]) draftSquadMap[row.booking_id] = []
+    draftSquadMap[row.booking_id].push(row.player_id)
+  }
+
   return (
     <div className="min-h-screen bg-ink flex flex-col">
       <SiteNav />
@@ -81,6 +99,7 @@ export default async function GCReviewPage() {
             bookings={(bookings ?? []) as any}
             avail={(avail ?? []) as any}
             squads={(squads ?? []) as any}
+            draftSquadMap={draftSquadMap}
           />
         </main>
       </div>
