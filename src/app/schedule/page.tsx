@@ -172,10 +172,11 @@ function exportCSV(
     week.days.forEach(day => {
 		if (day.date < todayStr) return   // skip past dates
       day.slots.forEach(slot => {
-        if (slot.status !== 'open') return
+        if (slot.status !== 'open' && slot.status !== 't20only') return
         if (!slotFilter[slot.time]) return
 
-        const formats = ORGANISER_FORMATS[slot.time].filter(f => formatFilter[f])
+        const availableFormats = slot.status === 't20only' ? ['T20'] : ORGANISER_FORMATS[slot.time]
+		const formats = availableFormats.filter(f => formatFilter[f])  
         if (formats.length === 0) return
 
         const dayLabel = new Date(day.date).toLocaleDateString('en-IN', { weekday: 'long' })
