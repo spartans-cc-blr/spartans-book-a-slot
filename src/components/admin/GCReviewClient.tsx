@@ -207,7 +207,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
     r.games === 0 &&
     bookings.some(b =>
       submittedBookingIds.has(b.id) &&
-      r.responses[b.id] === undefined
+      Object.keys(r.responses).length > 0
     )
   )
 
@@ -428,8 +428,8 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     </th>
                     {/* Slot columns — vertical headers */}
                     {bookings.map(b => (
-                      <th key={b.id} className="bg-ink-4 z-20 align-bottom text-center" style={{ width: 90, minWidth: 90, padding: 0, verticalAlign: 'bottom' }}>
-                        <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                      <th key={b.id} className="bg-ink-4 z-20" style={{ width: 90, minWidth: 90, padding: 0, verticalAlign: 'bottom' }}>
+                        <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, margin: '0 auto' }}>
                           <span className="font-cinzel text-[10px] font-semibold text-gold">
                             {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                           </span>
@@ -444,8 +444,8 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     ))}
 
                     {/* Games column — vertical */}
-                    <th className="bg-ink-4 z-20 align-bottom text-center" style={{ width: 44, minWidth: 44, padding: 0 }}>
-                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8 }}>
+                    <th className="bg-ink-4 z-20" style={{ width: 44, minWidth: 44, padding: 0 }}>
+                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8, margin: '0 auto' }}>
                         <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">Games</span>
                       </div>
                     </th>
