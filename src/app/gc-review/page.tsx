@@ -48,7 +48,7 @@ export default async function GCReviewPage() {
   const { data: avail } = bookingIds.length > 0
     ? await supabase
         .from('availability')
-        .select('player_id, booking_id, response, players(id, name, cricheroes_url)')
+        .select('player_id, booking_id, response, players!availability_player_id_fkey(id, name, cricheroes_url)')
         .in('response', ['Y', 'O', 'E'])
         .in('booking_id', bookingIds)
     : { data: [] }
