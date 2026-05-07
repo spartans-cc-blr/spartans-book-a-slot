@@ -69,7 +69,6 @@ function formatDate(dateStr: string) {
 }
 
 // Pre-filled WA message for GC → captain notification (U-4)
-// Destination-free (wa.me/?text=) — GC picks the recipient (group or individual)
 function buildCaptainWaMessage(booking: Booking, decision: 'approved' | 'returned', note: string): string {
   const label = slotLabel(booking)
   const date  = formatDate(booking.game_date)
@@ -123,7 +122,8 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
   const [done,    setDone]    = useState<Record<string, 'approved' | 'returned'>>({})
   const [expand,  setExpand]  = useState<Record<string, boolean>>({})
 
-  // ── Derived data ─────────────────────────────────────────────
+  // ── Derived data — order matters: submittedBookingIds must come before matrixRows ──
+
   const squadMap = useMemo(() => Object.fromEntries(
     bookings.map(b => [b.id, squads.filter(s => s.booking_id === b.id).map(s => s.player_id)])
   ), [bookings, squads])
@@ -151,7 +151,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
     return map
   }, [avail])
 
-   const gamesCount = useMemo(() => {
+  const gamesCount = useMemo(() => {
     const counts: Record<string, number> = {}
     Array.from(allAvailPlayers.keys()).forEach(pid => {
       counts[pid] = bookings.filter(b => squadMap[b.id]?.includes(pid)).length
@@ -159,29 +159,36 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
     return counts
   }, [allAvailPlayers, bookings, squadMap])
 
-  // Sorted: 2+ games → 1 game → 0 Y-missed → 0 O/E constrained, alpha within each group
-   const matrixRows = useMemo(() => {
+  // Only slots with submitted squads (pending/approved/announced) count toward fairness.
+  // Draft slots are invisible to the GC — exclude from Y-coverage check and matrix colouring.
+  // MUST be declared before matrixRows useMemo — referenced inside its sort comparator.
+  const submittedBookingIds = new Set(
+    bookings.filter(b => squads.some(s => s.booking_id === b.id)).map(b => b.id)
+  )
+  const unsubmittedCount = bookings.length - submittedBookingIds.size
+
+  // Sorted: 2+ games → 1 game → 0 Y-missed (submitted slot) → 0 Y-pending (draft only) → alpha
+  const matrixRows = useMemo(() => {
     return Array.from(allAvailPlayers.entries())
-      .map(([pid, data]: [string, { name: string; cricheroes_url: string | null; responses: Record<string, 'Y' | 'O' | 'E'> }]) => ({ pid, ...data, games: gamesCount[pid] ?? 0 }))
+      .map(([pid, data]: [string, { name: string; cricheroes_url: string | null; responses: Record<string, 'Y' | 'O' | 'E'> }]) => ({
+        pid, ...data, games: gamesCount[pid] ?? 0,
+      }))
       .sort((a, b) => {
         if (b.games !== a.games) return b.games - a.games
-         // Only flag as Y-missed if they had Y for a *submitted* slot and weren't picked
+        // Only flag as Y-missed if they had Y for a submitted slot and weren't picked
         const aYMissed = a.games === 0 && Object.entries(a.responses).some(([bid, r]) => r === 'Y' && submittedBookingIds.has(bid))
         const bYMissed = b.games === 0 && Object.entries(b.responses).some(([bid, r]) => r === 'Y' && submittedBookingIds.has(bid))
         if (aYMissed !== bYMissed) return aYMissed ? -1 : 1
         return a.name.localeCompare(b.name)
       })
+  // submittedBookingIds is a plain Set computed outside — intentionally omitted from deps
+  // to avoid unnecessary re-sorts (it changes only when squads prop changes, covered by gamesCount)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allAvailPlayers, gamesCount])
 
   const playingMultiple = matrixRows.filter(r => r.games >= 2)
   const slotCounts      = bookings.map(b => ({ b, count: squadMap[b.id]?.length ?? 0 }))
- 
-  // Only slots with submitted squads (pending/approved/announced) count toward fairness.
-  // Draft slots are invisible to the GC — exclude them from the Y-coverage check.
-  const submittedBookingIds = new Set(
-    bookings.filter(b => squads.some(s => s.booking_id === b.id)).map(b => b.id)
-  )
-  const unsubmittedCount = bookings.length - submittedBookingIds.size
+
   const yNotSelected = matrixRows.filter(r =>
     bookings.some(b =>
       submittedBookingIds.has(b.id) &&
@@ -206,7 +213,6 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
             ? { ...s, status: decision === 'approved' ? 'approved' : 'draft' }
             : s
         ))
-        // U-4: open pre-filled WhatsApp — GC picks destination (group or captain directly)
         const booking = bookings.find(b => b.id === bookingId)
         if (booking) {
           window.open(buildWaLink(buildCaptainWaMessage(booking, decision, notes[bookingId] ?? '')), '_blank')
@@ -248,9 +254,10 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
           ))}
         </div>
 
-        {/* Flag rows — playing multiple + Y not selected */}
+        {/* Flag rows */}
         <div className="px-4 py-3 flex flex-wrap gap-6">
 
+          {/* Playing multiple */}
           <div className="flex flex-col gap-1.5">
             <button
               onClick={() => playingMultiple.length > 0 && setExpand(e => ({ ...e, both: !e.both }))}
@@ -279,22 +286,29 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
             )}
           </div>
 
+          {/* Y not selected */}
           <div className="flex flex-col gap-1.5">
             <button
               onClick={() => yNotSelected.length > 0 && setExpand(e => ({ ...e, ymissed: !e.ymissed }))}
               className={`flex items-center gap-2 font-rajdhani text-xs font-bold transition-colors ${
-                unsubmittedCount > 0 ? 'text-zinc-500 cursor-default'
-                : yNotSelected.length > 0 ? 'text-red-400 hover:text-red-300'
-                : 'text-emerald-400 cursor-default'
+                unsubmittedCount > 0        ? 'text-zinc-500 cursor-default'
+                : yNotSelected.length > 0  ? 'text-red-400 hover:text-red-300'
+                :                            'text-emerald-400 cursor-default'
               }`}>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${unsubmittedCount > 0 ? 'bg-zinc-500' : yNotSelected.length > 0 ? 'bg-red-400' : 'bg-emerald-500'}`} />
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                unsubmittedCount > 0       ? 'bg-zinc-500'
+                : yNotSelected.length > 0 ? 'bg-red-400'
+                :                           'bg-emerald-500'
+              }`} />
               {unsubmittedCount > 0
                 ? `${unsubmittedCount} slot${unsubmittedCount > 1 ? 's' : ''} not yet submitted — fairness check partial`
                 : allYCovered
                   ? 'All Y-available players covered ✓'
                   : `${yNotSelected.length} Y-available not selected ⚠`
               }
-              {unsubmittedCount === 0 && yNotSelected.length > 0 && <span className="text-[10px] font-normal opacity-60">{expand.ymissed ? '▴' : '▾'}</span>}
+              {unsubmittedCount === 0 && yNotSelected.length > 0 && (
+                <span className="text-[10px] font-normal opacity-60">{expand.ymissed ? '▴' : '▾'}</span>
+              )}
             </button>
             {expand.ymissed && yNotSelected.length > 0 && (
               <div className="ml-4 flex flex-col gap-1">
@@ -307,7 +321,10 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm"
                       style={{ background: RESP_STYLE.Y.bg, color: RESP_STYLE.Y.text, border: `1px solid ${RESP_STYLE.Y.border}` }}>Y</span>
                     <span className="font-rajdhani text-[10px] text-zinc-600">
-                      {bookings.filter(b => r.responses[b.id] === 'Y').map(b => `${SLOT_SHORT[b.slot_time]} ${b.format}`).join(', ')}
+                      {bookings
+                        .filter(b => r.responses[b.id] === 'Y' && submittedBookingIds.has(b.id))
+                        .map(b => `${SLOT_SHORT[b.slot_time]} ${b.format}`)
+                        .join(', ')}
                     </span>
                   </div>
                 ))}
@@ -338,6 +355,9 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                   {bookings.map(b => (
                     <th key={b.id} className="px-3 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600" style={{ minWidth: 180 }}>
                       {formatDate(b.game_date)} · {SLOT_SHORT[b.slot_time]} {b.format}
+                      {!submittedBookingIds.has(b.id) && (
+                        <span className="ml-1.5 font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm bg-zinc-800 border border-zinc-700 text-zinc-500 normal-case tracking-normal">draft</span>
+                      )}
                     </th>
                   ))}
                   <th className="px-3 py-2 text-center font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600" style={{ width: 60 }}>Games</th>
@@ -346,11 +366,11 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
               <tbody>
                 {matrixRows.map(row => {
                   const isMultiple = row.games >= 2
-                  // Only red if they had Y for a submitted slot and weren't selected
+                  // Red only if they had Y for a submitted slot and weren't selected
                   const isYMissed  = row.games === 0 && Object.entries(row.responses).some(
                     ([bid, r]) => r === 'Y' && submittedBookingIds.has(bid)
                   )
-                  // Grey if they only have Y for unsubmitted (draft) slots
+                  // Grey if they only have Y for draft (unsubmitted) slots
                   const isYPending = row.games === 0 && !isYMissed && Object.values(row.responses).includes('Y')
                   const nameColour = isMultiple ? 'text-amber-400' : isYMissed ? 'text-red-400' : 'text-parchment'
                   const respCodes  = Object.values(row.responses)
@@ -372,11 +392,16 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                         </span>
                       </td>
                       {bookings.map(b => {
-                        const resp     = row.responses[b.id]
-                        const inSquad  = squadMap[b.id]?.includes(row.pid)
-                        const squadRow = squads.find(s => s.booking_id === b.id && s.player_id === row.pid)
+                        const resp      = row.responses[b.id]
+                        const inSquad   = squadMap[b.id]?.includes(row.pid)
+                        const squadRow  = squads.find(s => s.booking_id === b.id && s.player_id === row.pid)
+                        const isDraftSlot = !submittedBookingIds.has(b.id)
 
-                        if (!resp) return <td key={b.id} className="px-3 py-2"><span className="font-rajdhani text-[10px] text-zinc-700">—</span></td>
+                        if (!resp) return (
+                          <td key={b.id} className="px-3 py-2">
+                            <span className="font-rajdhani text-[10px] text-zinc-700">—</span>
+                          </td>
+                        )
 
                         if (inSquad && squadRow) {
                           const roleTags = [
@@ -405,16 +430,18 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                         const rs2           = RESP_STYLE[resp]
                         const isConstrained = (resp === 'O' || resp === 'E') &&
                           bookings.some(ob => ob.id !== b.id && squadMap[ob.id]?.includes(row.pid))
-                        const isDraftSlot   = !submittedBookingIds.has(b.id)
+
                         return (
                           <td key={b.id} className="px-3 py-2">
-                            <span className="font-rajdhani text-[10px]" style={{ color: isConstrained ? '#52525b' : rs2.text }}>
+                            <span
+                              className="font-rajdhani text-[10px]"
+                              style={{ color: isConstrained || isDraftSlot ? '#52525b' : rs2.text }}>
                               {isConstrained
-                                 ? `— (${resp})`
-                                 : isDraftSlot
-                                   ? <span style={{ color: '#52525b' }}>Available (draft)</span>
-                                   : resp === 'Y' ? 'Available' : `Available (${resp})`
-                               }
+                                ? `— (${resp})`
+                                : isDraftSlot
+                                  ? 'Available (draft)'
+                                  : resp === 'Y' ? 'Available' : `Available (${resp})`
+                              }
                             </span>
                           </td>
                         )
@@ -578,7 +605,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                   </div>
                 )}
 
-                {/* Post-decision status + re-notify button */}
+                {/* Post-decision: approved this session */}
                 {done[b.id] === 'approved' && (
                   <div className="px-4 py-3 border-t border-ink-5 flex items-center gap-3 flex-wrap">
                     <span className="font-rajdhani text-xs text-emerald-400">✓ Approved — captain can now announce</span>
@@ -589,6 +616,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                   </div>
                 )}
 
+                {/* Post-decision: returned this session */}
                 {done[b.id] === 'returned' && (
                   <div className="px-4 py-3 border-t border-ink-5 flex items-center gap-3 flex-wrap">
                     <span className="font-rajdhani text-xs text-amber-400">↩ Returned to captain for revision</span>
@@ -599,6 +627,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                   </div>
                 )}
 
+                {/* Already approved from previous session — re-notify option */}
                 {isApproved && !done[b.id] && slotSquads.length > 0 && (
                   <div className="px-4 py-2.5 border-t border-ink-5 flex items-center gap-3 flex-wrap">
                     <span className="font-rajdhani text-[10px] text-emerald-400">GC approved — captain can announce</span>
