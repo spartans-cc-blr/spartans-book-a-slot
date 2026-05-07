@@ -67,11 +67,11 @@ export default async function CaptainsCornerPage() {
     !isMatchExpired(b.game_date, b.slot_time, b.format ?? 'T20')
   )    
 
-  // ── Fetch all active players ───────────────────────────────
+  // ── Fetch all non expelled players ───────────────────────────────
   const { data: players } = await supabase
     .from('players')
     .select('id, name, jersey_name, jersey_number, wallet_balance, dues_override, primary_skill, is_captain, priority_pick, cricheroes_url')
-    .eq('active', true)
+    .neq('status', 'expelled')
     .order('name', { ascending: true })
 
   // ── Fetch availability for all upcoming bookings ───────────
