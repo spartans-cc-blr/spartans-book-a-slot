@@ -359,23 +359,45 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
         {matrixRows.length === 0 ? (
           <p className="px-4 py-6 font-rajdhani text-sm text-zinc-600">No availability responses this weekend.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse" style={{ minWidth: Math.max(360, bookings.length * 200 + 200) }}>
-              <thead>
-                <tr className="border-b border-ink-5 bg-ink-4">
-                  <th className="px-3 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 sticky left-0 bg-ink-4 z-10" style={{ minWidth: 160 }}>Player</th>
-                  <th className="px-2 py-2 text-center font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600" style={{ width: 44 }}>Resp</th>
-                  {bookings.map(b => (
-                    <th key={b.id} className="px-3 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600" style={{ minWidth: 180 }}>
-                      {formatDate(b.game_date)} · {SLOT_SHORT[b.slot_time]} {b.format}
-                      {!submittedBookingIds.has(b.id) && (
-                        <span className="ml-1.5 font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm bg-zinc-800 border border-zinc-700 text-zinc-500 normal-case tracking-normal">draft</span>
-                      )}
+            <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '70vh' }}>
+              <table className="border-collapse" style={{ minWidth: Math.max(320, bookings.length * 120 + 160) }}>
+                <thead className="sticky top-0 z-20">
+                  <tr className="border-b border-ink-5 bg-ink-4">
+                    {/* Frozen player name header — sticky left AND top */}
+                    <th className="px-3 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 sticky left-0 bg-ink-4 z-30 align-bottom" style={{ minWidth: 130 }}>
+                      Player
                     </th>
-                  ))}
-                  <th className="px-3 py-2 text-center font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600" style={{ width: 60 }}>Games</th>
-                </tr>
-              </thead>
+                    {/* Resp column — vertical */}
+                    <th className="bg-ink-4 z-20 align-bottom text-center" style={{ width: 36, minWidth: 36, padding: 0 }}>
+                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8 }}>
+                        <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">Resp</span>
+                      </div>
+                    </th>
+                    {/* Slot columns — vertical headers */}
+                    {bookings.map(b => (
+                      <th key={b.id} className="bg-ink-4 z-20 align-bottom text-center" style={{ width: 100, minWidth: 100, padding: 0 }}>
+                        <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                          <span className="font-cinzel text-[10px] font-semibold text-gold">
+                            {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </span>
+                          <span className="font-rajdhani text-[10px] font-bold text-zinc-400">
+                            {SLOT_SHORT[b.slot_time]} {b.format}
+                          </span>
+                          {!submittedBookingIds.has(b.id) && (
+                            <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm bg-zinc-800 border border-zinc-700 text-zinc-500">draft</span>
+                          )}
+                        </div>
+                      </th>
+                    ))}
+
+                    {/* Games column — vertical */}
+                    <th className="bg-ink-4 z-20 align-bottom text-center" style={{ width: 44, minWidth: 44, padding: 0 }}>
+                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8 }}>
+                        <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">Games</span>
+                      </div>
+                    </th>
+                  </tr>
+               </thead>
               <tbody>
                 {matrixRows.map(row => {
                   const playerGroup = (() => {
@@ -395,7 +417,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
 
                   return (
                     <tr key={row.pid} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
-                      <td className="px-3 py-2 sticky left-0 bg-ink-3 z-10">
+                      <td className="px-2 py-2 sticky left-0 bg-ink-3 z-10" style={{ minWidth: 130 }}>
                         {row.cricheroes_url
                           ? <a href={row.cricheroes_url} target="_blank" rel="noopener noreferrer" className={`font-rajdhani text-xs hover:underline underline-offset-2 ${nameColour}`}>{row.name}</a>
                           : <span className={`font-rajdhani text-xs ${nameColour}`}>{row.name}</span>
@@ -414,7 +436,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                         const isDraftSlot = !submittedBookingIds.has(b.id)
 
                         if (!resp) return (
-                          <td key={b.id} className="px-3 py-2">
+                          <td key={b.id} className="px-2 py-2 text-center">
                             <span className="font-rajdhani text-[10px] text-zinc-700">—</span>
                           </td>
                         )
@@ -448,7 +470,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                           bookings.some(ob => ob.id !== b.id && squadMap[ob.id]?.includes(row.pid))
 
                         return (
-                          <td key={b.id} className="px-3 py-2">
+                          <td key={b.id} className="px-3 py-2 text-center">
                             <span
                               className="font-rajdhani text-[10px]"
                               style={{ color: isConstrained || isDraftSlot ? '#52525b' : rs2.text }}>
@@ -456,8 +478,8 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                                 ? `— (${resp})`
                                 : isDraftSlot
                                   ? draftSquadMap[b.id]?.includes(row.pid)
-                                      ? '— (in draft squad)'
-                                      : 'Available (not in draft)'
+                                      ? 'In draft'
+                                      : 'Not in draft'
                                   : resp === 'Y' ? 'Available' : `Available (${resp})`
                               }
                             </span>
