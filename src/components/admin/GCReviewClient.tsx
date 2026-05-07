@@ -6,7 +6,7 @@
 //   3. Per-slot Approval Panels — numbered squad table + role composition footer
 // U-4: WhatsApp nudge to captain after approve/return (destination-free — GC picks recipient)
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 
 interface Booking {
   id:            string
@@ -250,6 +250,16 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
     }
   }
 
+  const [copied, setCopied] = useState(false)
+
+  const copyUnselected = useCallback(() => {
+    const names = totallyUnselected.map(r => r.name).sort().join('\n')
+    navigator.clipboard.writeText(names).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [totallyUnselected])
+
   if (bookings.length === 0) {
     return <p className="font-rajdhani text-zinc-500 text-sm">No confirmed fixtures found for this weekend.</p>
   }
@@ -282,7 +292,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
         </div>
 
         {/* Flag rows */}
-        <div className="px-4 py-3 flex flex-wrap gap-6">
+        <div className="px-4 py-3 flex flex-col gap-3">
 
           {/* Playing multiple */}
           <div className="flex flex-col gap-1.5">
@@ -417,7 +427,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     </th>
                     {/* Slot columns — vertical headers */}
                     {bookings.map(b => (
-                      <th key={b.id} className="bg-ink-4 z-20 align-bottom text-center" style={{ width: 100, minWidth: 100, padding: 0 }}>
+                      <th key={b.id} className="bg-ink-4 z-20 align-bottom text-center" style={{ width: 90, minWidth: 90, padding: 0, verticalAlign: 'bottom' }}>
                         <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                           <span className="font-cinzel text-[10px] font-semibold text-gold">
                             {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -453,9 +463,6 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     playerGroup === 2 ? 'text-parchment' :
                     playerGroup === 3 ? 'text-zinc-400'  :
                     'text-red-400'
-                  const respCodes  = Object.values(row.responses)
-                  const dominant   = respCodes.includes('Y') ? 'Y' : respCodes.includes('O') ? 'O' : 'E'
-                  const rs         = RESP_STYLE[dominant]
 
                   return (
                     <tr key={row.pid} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
@@ -504,15 +511,12 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                             </td>
                           )
                         })}
-                      <td className="px-3 py-2 text-center">
-                        <span className={`font-rajdhani text-xs font-bold tabular-nums px-2 py-0.5 rounded-sm border ${
-                          playerGroup === 1 ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400' :
-                          playerGroup === 2 ? 'bg-sky-950/40 border-sky-700 text-sky-400' :
-                          playerGroup === 3 ? 'bg-zinc-900 border-zinc-700 text-zinc-500' :
-                          Object.values(row.responses).includes('Y')
-                            ? 'bg-red-950/40 border-red-800 text-red-400'
-                            : 'bg-zinc-900 border-zinc-800 text-zinc-600'
-                        }`}>{row.games}</span>
+                      <td className="px-2 py-2 text-center">
+                        <span className={`font-rajdhani text-xs font-bold tabular-nums ${
+                          row.games >= 1 ? 'text-emerald-400' : 'text-red-400'
+                        }`}>
+                          {row.games}
+                        </span>
                       </td>
                     </tr>
                   )
@@ -520,6 +524,23 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
               </tbody>
             </table>
           </div>
+          
+          {/* Copy unselected names button */}
+          {totallyUnselected.length > 0 && (
+            <div className="px-4 py-2.5 border-t border-ink-5 bg-ink-4 flex items-center justify-between">
+              <span className="font-rajdhani text-[10px] text-zinc-500">
+                {totallyUnselected.length} player{totallyUnselected.length > 1 ? 's' : ''} not selected for any game this weekend
+              </span>
+              <button
+                onClick={copyUnselected}
+                className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-2.5 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 transition-colors">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                </svg>
+                {copied ? '✓ Copied' : 'Copy names'}
+              </button>
+            </div>
+          )}
         )}
       </section>
 
