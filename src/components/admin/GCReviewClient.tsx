@@ -415,12 +415,6 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     <th className="px-3 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 sticky left-0 bg-ink-4 z-30 align-bottom" style={{ minWidth: 130 }}>
                       Player
                     </th>
-                    {/* Resp column — vertical */}
-                    <th className="bg-ink-4 z-20 align-bottom text-center" style={{ width: 36, minWidth: 36, padding: 0 }}>
-                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8 }}>
-                        <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">Resp</span>
-                      </div>
-                    </th>
                     {/* Slot columns — vertical headers */}
                     {bookings.map(b => (
                       <th key={b.id} className="bg-ink-4 z-20 align-bottom text-center" style={{ width: 100, minWidth: 100, padding: 0 }}>
@@ -471,69 +465,45 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                           : <span className={`font-rajdhani text-xs ${nameColour}`}>{row.name}</span>
                         }
                       </td>
-                      <td className="px-2 py-2 text-center">
-                        <span className="font-rajdhani text-[10px] font-bold px-1.5 py-0.5 rounded-sm"
-                          style={{ background: rs.bg, color: rs.text, border: `1px solid ${rs.border}` }}>
-                          {dominant}
-                        </span>
-                      </td>
                       {bookings.map(b => {
-                        const resp      = row.responses[b.id]
-                        const inSquad   = squadMap[b.id]?.includes(row.pid)
-                        const squadRow  = squads.find(s => s.booking_id === b.id && s.player_id === row.pid)
-                        const isDraftSlot = !submittedBookingIds.has(b.id)
-
-                        if (!resp) return (
-                          <td key={b.id} className="px-2 py-2 text-center">
-                            <span className="font-rajdhani text-[10px] text-zinc-700">—</span>
-                          </td>
-                        )
-
-                        if (inSquad && squadRow) {
-                          const roleTags = [
-                            squadRow.match_role && MATCH_ROLE_LABEL[squadRow.match_role],
-                            squadRow.is_wk      && 'WK',
-                            squadRow.is_captain && 'C',
-                            squadRow.is_vc      && 'VC',
-                          ].filter(Boolean) as string[]
-                          return (
-                            <td key={b.id} className="px-3 py-2">
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <span className="font-rajdhani text-[10px] text-emerald-400 font-bold">✓</span>
-                                {roleTags.map(tag => (
-                                  <span key={tag} className={`font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm border ${
-                                    tag === 'C'  ? 'bg-gold/20 border-gold-dim text-gold' :
-                                    tag === 'VC' ? 'bg-gold/10 border-gold-dim text-gold' :
-                                    tag === 'WK' ? 'bg-sky-950/40 border-sky-700 text-sky-400' :
-                                                   'bg-emerald-950/40 border-emerald-700 text-emerald-400'
-                                  }`}>{tag}</span>
-                                ))}
-                              </div>
+                          const resp        = row.responses[b.id]
+                          const inSquad     = squadMap[b.id]?.includes(row.pid)
+                          const isDraftSlot = !submittedBookingIds.has(b.id)
+                          const isConstrained = resp && (resp === 'O' || resp === 'E') &&
+                            bookings.some(ob => ob.id !== b.id && squadMap[ob.id]?.includes(row.pid))
+ 
+                          // No response for this slot
+                          if (!resp) return (
+                            <td key={b.id} className="px-2 py-2 text-center">
+                              <span className="font-rajdhani text-[10px] text-zinc-700">—</span>
                             </td>
                           )
-                        }
-
-                        const rs2           = RESP_STYLE[resp]
-                        const isConstrained = (resp === 'O' || resp === 'E') &&
-                          bookings.some(ob => ob.id !== b.id && squadMap[ob.id]?.includes(row.pid))
-
-                        return (
-                          <td key={b.id} className="px-3 py-2 text-center">
-                            <span
-                              className="font-rajdhani text-[10px]"
-                              style={{ color: isConstrained || isDraftSlot ? '#52525b' : rs2.text }}>
-                              {isConstrained
-                                ? `— (${resp})`
-                                : isDraftSlot
-                                  ? draftSquadMap[b.id]?.includes(row.pid)
-                                      ? 'In draft'
-                                      : 'Not in draft'
-                                  : resp === 'Y' ? 'Available' : `Available (${resp})`
-                              }
-                            </span>
-                          </td>
-                        )
-                      })}
+ 
+                          const rs2 = RESP_STYLE[resp]
+ 
+                          // Selected in this slot — show green ✓
+                          if (inSquad) return (
+                            <td key={b.id} className="px-2 py-2 text-center">
+                              <span className="font-rajdhani text-[11px] font-bold text-emerald-400">✓</span>
+                            </td>
+                          )
+ 
+                          // Not selected — show response code pill, muted if constrained or draft
+                          const muted = isConstrained || isDraftSlot
+                          return (
+                            <td key={b.id} className="px-2 py-2 text-center">
+                              <span
+                                className="font-rajdhani text-[10px] font-bold px-1.5 py-0.5 rounded-sm"
+                                style={{
+                                  background: muted ? '#1c1c1e' : rs2.bg,
+                                  color:      muted ? '#52525b' : rs2.text,
+                                  border:     `1px solid ${muted ? '#3f3f46' : rs2.border}`,
+                                }}>
+                                {resp}
+                              </span>
+                            </td>
+                          )
+                        })}
                       <td className="px-3 py-2 text-center">
                         <span className={`font-rajdhani text-xs font-bold tabular-nums px-2 py-0.5 rounded-sm border ${
                           playerGroup === 1 ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400' :
