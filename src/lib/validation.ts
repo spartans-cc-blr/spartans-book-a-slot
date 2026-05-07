@@ -222,12 +222,10 @@ export function computeSlotStatus(
 
   const confirmed = active.filter(b => b.status === 'confirmed')
 
-  // ── T20 at 10:30 blocks 12:30 and 14:30 (not 07:30 — independent slot) ──
-  // 07:30 is always an independent slot; a 10:30 game cannot affect it.
-  if (slotTime === '12:30' || slotTime === '14:30') {
-    const t20at1030 = confirmed.find(b => b.slot_time === '10:30' && b.format === 'T20')
-    if (t20at1030) return 'clash'
-  }
+  // ── T20 at 10:30 blocks all other slots — 07:30, 12:30, 14:30 ──
+  // No other game can be booked on a day with a T20 at 10:30.
+  const t20at1030 = confirmed.find(b => b.slot_time === '10:30' && b.format === 'T20')
+  if (t20at1030) return 'clash'
 
   // ── T20 at 07:30 blocks T20 at 10:30 (back-to-back T20s) ────
   if (slotTime === '10:30') {
