@@ -209,7 +209,7 @@ export function computeSlotStatus(
   date: string,
   slotTime: SlotTime,
   bookings: Booking[]
-): 'open' | 'booked' | 'soft_block' | 'clash' {
+): 'open' | 'booked' | 'soft_block' | 'clash' | 't20only' {
   const active = bookings.filter(
     b => b.game_date === date && b.status !== 'cancelled'
   )
@@ -222,41 +222,40 @@ export function computeSlotStatus(
 
   const confirmed = active.filter(b => b.status === 'confirmed')
 
-  // ── NEW: T20 at 10:30 blocks entire day ──────────────────────
-  const t20at1030 = confirmed.find(b => b.slot_time === '10:30' && b.format === 'T20')
-  if (t20at1030) return 'clash'
+  // ── T20 at 10:30 blocks 12:30 and 14:30 (not 07:30 — independent slot) ──
+  // 07:30 is always an independent slot; a 10:30 game cannot affect it.
+  if (slotTime === '12:30' || slotTime === '14:30') {
+    const t20at1030 = confirmed.find(b => b.slot_time === '10:30' && b.format === 'T20')
+    if (t20at1030) return 'clash'
+  }
 
-  // ── NEW: T20 at 07:30 blocks 10:30 ───────────────────────────
+  // ── T20 at 07:30 blocks T20 at 10:30 (back-to-back T20s) ────
   if (slotTime === '10:30') {
     const t20at0730 = confirmed.find(b => b.slot_time === '07:30' && b.format === 'T20')
     if (t20at0730) return 'clash'
   }
 
-  // ── NEW: Second T30 on same day is blocked ───────────────────
-  // Only block the other T30-eligible slot (07:30 ↔ 12:30).
-  // A T30 at 12:30 does NOT block 07:30 for a T20 — only for another T30.
-  if (slotTime === '12:30') {
+  // ── T30 at 07:30 blocks 10:30 and 12:30 ─────────────────────
+  // 10:30: game overruns. 12:30: second T30 not allowed.
+  if (slotTime === '10:30' || slotTime === '12:30') {
     const t30at0730 = confirmed.find(b => b.slot_time === '07:30' && b.format === 'T30')
     if (t30at0730) return 'clash'
   }
+
+  // ── T30 at 12:30 blocks 07:30 for T30, but T20 is still allowed ──
+  // Return 't20only' so the grid can show the slot as partially available.
   if (slotTime === '07:30') {
     const t30at1230 = confirmed.find(b => b.slot_time === '12:30' && b.format === 'T30')
-    if (t30at1230) return 'clash'
+    if (t30at1230) return 't20only'
   }
 
-  // ── Pre-existing: T30 at 07:30 blocks 10:30 ─────────────────
-  if (slotTime === '10:30') {
-    const t30at0730 = confirmed.find(b => b.slot_time === '07:30' && b.format === 'T30')
-    if (t30at0730) return 'clash'
-  }
-
-  // ── Pre-existing: Any game at 12:30 blocks 10:30 and 14:30 ──
+  // ── Any game at 12:30 blocks 10:30 and 14:30 ────────────────
   if (slotTime === '10:30' || slotTime === '14:30') {
     const gameat1230 = confirmed.find(b => b.slot_time === '12:30')
     if (gameat1230) return 'clash'
   }
 
-  // ── Pre-existing: T20 at 14:30 blocks 12:30 ─────────────────
+  // ── T20 at 14:30 blocks 12:30 ───────────────────────────────
   if (slotTime === '12:30') {
     const t20at1430 = confirmed.find(b => b.slot_time === '14:30' && b.format === 'T20')
     if (t20at1430) return 'clash'

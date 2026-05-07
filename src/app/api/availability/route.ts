@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
         const status = computeSlotStatus(dateStr, time, bookings ?? [])
         const slotInfo: SlotInfo = { time, status }
 
-        if (status === 'open') {
+        if (status === 'open' || status === 't20only') {
           slotInfo.waLink = buildWhatsAppLink({
             date:   dayLabel,
             time,

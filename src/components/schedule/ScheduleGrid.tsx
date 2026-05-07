@@ -19,11 +19,12 @@ const SLOT_INDEX: Record<SlotTime, number> = {
 }
 
 const STATUS_CONFIG = {
-  open:       { label: 'Open',              gridLabel: 'Open',              icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
-  booked:     { label: 'Booked',            gridLabel: 'Booked',            icon: '🔴', pill: 'slot-booked',    gridCls: 'bg-red-950 border border-red-900 cursor-default' },
-  soft_block: { label: 'Reserved',          gridLabel: 'Reserved',          icon: '🟡', pill: 'slot-softblock', gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
-  clash:      { label: 'Play in progress',  gridLabel: 'Play in progress',  icon: '⛔', pill: 'slot-clash',     gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
-  na:         { label: '',                  gridLabel: '',                  icon: '—',  pill: '',               gridCls: 'bg-transparent border-transparent cursor-default' },
+  open:       { label: 'Open',         gridLabel: 'Open',         icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
+  t20only:    { label: 'T20 only',     gridLabel: 'T20 only',     icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer' },
+  booked:     { label: 'Booked',       gridLabel: 'Booked',       icon: '🔴', pill: 'slot-booked',    gridCls: 'bg-red-950 border border-red-900 cursor-default' },
+  soft_block: { label: 'Reserved',     gridLabel: 'Reserved',     icon: '🟡', pill: 'slot-softblock', gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
+  clash:      { label: 'Unavailable',  gridLabel: 'Unavailable',  icon: '⛔', pill: 'slot-clash',     gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
+  na:         { label: '',             gridLabel: '',             icon: '—',  pill: '',               gridCls: 'bg-transparent border-transparent cursor-default' },
 }
 
 function getClashSource(
@@ -33,31 +34,33 @@ function getClashSource(
   const slotMap   = Object.fromEntries(daySlots.map(s => [s.time, s.status]))
   const formatMap = Object.fromEntries(daySlots.map(s => [s.time, s.format]))
  
-  // NEW: T20 at 10:30 blocks the entire day — every other slot points at 10:30
-  if (slotTime !== '10:30' && slotMap['10:30'] === 'booked' && formatMap['10:30'] === 'T20') {
+  // T20 at 10:30 → clashes 12:30 and 14:30 (not 07:30)
+  if ((slotTime === '12:30' || slotTime === '14:30') &&
+      slotMap['10:30'] === 'booked' && formatMap['10:30'] === 'T20') {
     return '10:30'
   }
  
   if (slotTime === '10:30') {
-    // NEW: T20 at 07:30 blocks 10:30 (back-to-back T20s)
+    // T20 at 07:30 blocks 10:30
     if (slotMap['07:30'] === 'booked' && formatMap['07:30'] === 'T20') return '07:30'
-    // Pre-existing: T30 at 07:30 blocks 10:30
+    // T30 at 07:30 blocks 10:30
     if (slotMap['07:30'] === 'booked') return '07:30'
-    // Pre-existing: any game at 12:30 blocks 10:30
+    // Any game at 12:30 blocks 10:30
     if (slotMap['12:30'] === 'booked') return '12:30'
   }
  
   if (slotTime === '12:30') {
-    // Pre-existing: T20 at 10:30 — already handled by whole-day rule above
+    // T30 at 07:30 blocks 12:30
+    if (slotMap['07:30'] === 'booked' && formatMap['07:30'] === 'T30') return '07:30'
+    // T20 at 10:30 (already handled above)
     if (slotMap['10:30'] === 'booked') return '10:30'
-    // Pre-existing: T20 at 14:30 blocks 12:30
+    // T20 at 14:30 blocks 12:30
     if (slotMap['14:30'] === 'booked') return '14:30'
   }
  
   if (slotTime === '14:30') {
-    // Pre-existing: any game at 12:30 blocks 14:30
+    // Any game at 12:30 blocks 14:30
     if (slotMap['12:30'] === 'booked') return '12:30'
-    // NEW: T20 at 10:30 whole-day block — already handled at the top
   }
  
   return null
