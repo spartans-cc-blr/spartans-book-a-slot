@@ -233,10 +233,15 @@ export function computeSlotStatus(
   }
 
   // ── NEW: Second T30 on same day is blocked ───────────────────
-  if (slotTime === '07:30' || slotTime === '12:30') {
-    // These are the T30-eligible slots — if one T30 already exists, mark the other as clash
-    const t30exists = confirmed.find(b => b.format === 'T30')
-    if (t30exists) return 'clash'
+  // Only block the other T30-eligible slot (07:30 ↔ 12:30).
+  // A T30 at 12:30 does NOT block 07:30 for a T20 — only for another T30.
+  if (slotTime === '12:30') {
+    const t30at0730 = confirmed.find(b => b.slot_time === '07:30' && b.format === 'T30')
+    if (t30at0730) return 'clash'
+  }
+  if (slotTime === '07:30') {
+    const t30at1230 = confirmed.find(b => b.slot_time === '12:30' && b.format === 'T30')
+    if (t30at1230) return 'clash'
   }
 
   // ── Pre-existing: T30 at 07:30 blocks 10:30 ─────────────────
