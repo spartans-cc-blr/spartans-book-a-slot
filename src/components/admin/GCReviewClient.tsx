@@ -206,8 +206,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
     bookings.some(b =>
       submittedBookingIds.has(b.id) &&
       r.responses[b.id] === 'Y' &&
-      !(squadMap[b.id] ?? []).includes(r.pid) &&
-      (squadMap[b.id]?.length ?? 0) < 11        // only flag if squad isn't full
+      !(squadMap[b.id] ?? []).includes(r.pid) 
     )
   )
   const allYCovered = yNotSelected.length === 0
@@ -339,8 +338,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                         .filter(b =>
                           r.responses[b.id] === 'Y' &&
                           submittedBookingIds.has(b.id) &&
-                          !(squadMap[b.id] ?? []).includes(r.pid) &&
-                          (squadMap[b.id]?.length ?? 0) < 11
+                          !(squadMap[b.id] ?? []).includes(r.pid)
                         )
                         .map(b => `${SLOT_SHORT[b.slot_time]} ${b.format}`)
                         .join(', ')}
