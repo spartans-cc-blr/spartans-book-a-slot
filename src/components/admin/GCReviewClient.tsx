@@ -207,7 +207,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
     r.games === 0 &&
     bookings.some(b =>
       submittedBookingIds.has(b.id) &&
-      r.responses[b.id] === 'Y'
+      r.responses[b.id] === undefined
     )
   )
 
@@ -496,21 +496,14 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                             </td>
                           )
  
-                          // Not selected — show response code pill, muted if constrained or draft
-                          const muted = isConstrained || isDraftSlot
-                          return (
-                            <td key={b.id} className="px-2 py-2 text-center">
-                              <span
-                                className="font-rajdhani text-[10px] font-bold px-1.5 py-0.5 rounded-sm"
-                                style={{
-                                  background: muted ? '#1c1c1e' : rs2.bg,
-                                  color:      muted ? '#52525b' : rs2.text,
-                                  border:     `1px solid ${muted ? '#3f3f46' : rs2.border}`,
-                                }}>
-                                {resp}
-                              </span>
-                            </td>
-                          )
+                           // Not selected — plain text, greyed out always (no box)
+                           return (
+                              <td key={b.id} className="px-2 py-2 text-center">
+                                <span className="font-rajdhani text-[10px] font-bold" style={{ color: '#52525b' }}>
+                                  {resp}
+                                </span>
+                              </td>
+                            )
                         })}
                       <td className="px-2 py-2 text-center">
                         <span className={`font-rajdhani text-xs font-bold tabular-nums ${
@@ -538,7 +531,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
                 </svg>
-                {copied ? '✓ Copied' : 'Copy names'}
+                {copied ? '✓ Copied' : 'Players not in any squad'}
               </button>
             </div>
           )}
