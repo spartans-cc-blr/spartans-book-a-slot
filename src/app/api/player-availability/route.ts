@@ -76,12 +76,24 @@ export async function POST(req: NextRequest) {
     .eq('id', booking_id)
     .single()
 
-  if (bookingRow?.availability_locked) {
-    return NextResponse.json(
-      { error: 'Availability is locked for this slot (12 players confirmed).' },
-      { status: 403 }
-    )
-  }
+  const { data: existingRow } = await supabase
+    .from('availability')
+    .select('response')
+    .eq('booking_id', booking_id)
+    .eq('player_id', player.playerId)
+    .maybeSingle()
+
+  const existingResponse = existingRow?.response ?? null
+
+   if (bookingRow?.availability_locked) {
+     const isWithdrawing = existingResponse === 'Y' && (response === 'L' || response === 'O')
+     if (!isWithdrawing) {
+       return NextResponse.json(
+         { error: 'Slot is frozen — only withdrawals are allowed at this stage.' },
+         { status: 403 }
+       )
+     }
+    }  
 
   // Explicit SELECT then INSERT or UPDATE — avoids upsert/conflict issues
   const { data: existing } = await supabase
@@ -137,6 +149,22 @@ export async function POST(req: NextRequest) {
     .then(({ error }) => {
       if (error) console.error('Audit log insert failed:', error.message)
     })
+
+  // ── Auto-unlock if Y count drops below 13 after a withdrawal ─────
+  if (bookingRow?.availability_locked && existingResponse === 'Y' && (response === 'L' || response === 'O')) {
+    const { count } = await supabase
+      .from('availability')
+      .select('*', { count: 'exact', head: true })
+      .eq('booking_id', booking_id)
+      .eq('response', 'Y')
+
+    if ((count ?? 0) < 13) {
+      await supabase
+        .from('bookings')
+        .update({ availability_locked: false })
+        .eq('id', booking_id)
+    }
+  }
 
   return NextResponse.json({ availability: result })
 }

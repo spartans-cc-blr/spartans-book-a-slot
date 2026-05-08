@@ -140,19 +140,29 @@ export function FixturesAvailability({
   }
 
   // ── Upstream guards (apply to ALL buttons) ────────────────────
-  const upstreamBlock =
-    hasDues        ? 'Your account has outstanding dues — please clear your balance to update availability' :
-    squadAnnounced ? 'Squad has been announced for this match' :
-    slotLocked     ? 'Slot is full — 12 players confirmed for this game' :
-    null
-
-  // ── Pre-compute block reasons for each button ─────────────────
-  const blockedReasons: Partial<Record<AvailKey, string>> = {}
-  for (const btn of BUTTONS) {
-    if (btn.code === response) continue // active button is never blocked
-    const reason = upstreamBlock ?? getBlockReason(btn.code, bookingId, slotDate, weekendBookings, weekendResponses)
-    if (reason) blockedReasons[btn.code] = reason
-  }
+   const playerHasY = response === 'Y'
+   const frozenMsg  = 'Slot is frozen — only withdrawals allowed'
+ 
+   const upstreamBlock =
+     hasDues        ? 'Your account has outstanding dues — please clear your balance to update availability' :
+     squadAnnounced ? 'Squad has been announced for this match' :
+     null
+ 
+   const blockedReasons: Partial<Record<AvailKey, string>> = {}
+   for (const btn of BUTTONS) {
+     if (btn.code === response) continue
+     // Slot locked: only L and O allowed if player currently has Y
+     if (slotLocked) {
+       if (playerHasY && (btn.code === 'L' || btn.code === 'O')) {
+         // allowed — fall through to cross-game validation
+       } else if (btn.code === 'Y' || btn.code === 'E' || (slotLocked && !playerHasY)) {
+         blockedReasons[btn.code] = frozenMsg
+         continue
+       }
+     }
+     const reason = upstreamBlock ?? getBlockReason(btn.code, bookingId, slotDate, weekendBookings, weekendResponses)
+     if (reason) blockedReasons[btn.code] = reason
+   }
 
   const activeBtn = BUTTONS.find(b => b.code === response)
 
