@@ -224,6 +224,16 @@ export function FixturesAvailability({
         </p>
       )}
 
+      {/* Frozen slot notice */}
+       {slotLocked && !squadAnnounced && (
+         <p style={{
+           fontSize: '10px', color: '#6B7280',
+           marginTop: '6px', fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4,
+         }}>
+           🔒 Slot frozen — {playerHasY ? 'you can still withdraw via L or O' : '13 players confirmed'}
+         </p>
+       )}
+
       {/* Error / validation message */}
       {error && (
         <p style={{
