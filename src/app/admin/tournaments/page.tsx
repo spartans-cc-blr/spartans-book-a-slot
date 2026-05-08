@@ -12,6 +12,7 @@ type Tournament = {
   ground_id: string | null
   active: boolean
   created_at: string
+  total_league_games: number | null
 }
 
 const BALL_LABELS = { red: '🔴 Red', white: '⚪ White', pink: '🩷 Pink' }
@@ -40,7 +41,7 @@ export default function AdminTournamentsPage() {
 
   function startEdit(t: Tournament) {
     setEditingId(t.id)
-    setEditForm({ name: t.name, organiser_name: t.organiser_name ?? '', organiser_contact: t.organiser_contact ?? '', ball_type: t.ball_type, ground_id: t.ground_id ?? '', active: t.active })
+    setEditForm({ name: t.name, organiser_name: t.organiser_name ?? '', organiser_contact: t.organiser_contact ?? '', ball_type: t.ball_type, ground_id: t.ground_id ?? '', active: t.active, total_league_games: t.total_league_games?.toString() ?? '' })
     setError('')
   }
 
