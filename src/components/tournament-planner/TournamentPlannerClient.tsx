@@ -452,40 +452,60 @@ function TournamentBlock({
         <div className="border-t border-ink-5">
 
           {/* Stat bar */}
-          <div className="grid grid-cols-5 border-b border-ink-5">
-            {[
-               {
-                label: 'Total',
-                val: totalLeague.toString(),
-                sub: 'league games',
-                col: 'text-parchment',
-                editNode: isAdmin ? (
-                <InlineGameCountEditor
-                    tournamentId={tournament.id}
-                    currentValue={totalLeagueGames}
-                    onSaved={setTotalLeagueGames}
-                />
-                ) : undefined,
-               },
-              { label: 'Completed', val: completed.length.toString(), sub: 'announced + past', col: 'text-emerald-400' },
-              { label: 'Scheduled', val: scheduled.length.toString(), sub: 'booked, upcoming', col: 'text-amber-400' },
-              { label: 'Unbooked', val: unbooked.toString(), sub: 'games remaining', col: 'text-zinc-400' },
-              {
-                label: 'Avg gap', val: gap !== null ? `${gap}w` : '—', sub:
-                  gap === null ? 'not enough games' :
-                  gap <= 1 ? '⚠ very frequent' :
-                  gap >= 3 ? 'slow pace' : 'good pace',
-                col: gap === null ? 'text-zinc-500' : gap <= 1 ? 'text-red-400' : gap >= 3 ? 'text-amber-400' : 'text-emerald-400'
-              },
-              {[...].map(({ label, val, sub, col, editNode }, i) => (
-                <div key={label} className={`px-3 py-2.5 text-center ${i > 0 ? 'border-l border-ink-5' : ''}`}>
-                  <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">{label}</p>
-                  {editNode ?? <p className={`font-cinzel text-lg font-bold ${col}`}>{val}</p>}
-                  <p className="font-rajdhani text-[9px] text-zinc-600">{sub}</p>
-                </div>
-              ))}
+        <div className="grid grid-cols-5 border-b border-ink-5">
 
-          </div>
+        {/* Total — editable by admin */}
+        <div className="px-3 py-2.5 text-center">
+            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Total</p>
+            {isAdmin ? (
+            <InlineGameCountEditor
+                tournamentId={tournament.id}
+                currentValue={totalLeagueGames}
+                onSaved={setTotalLeagueGames}
+            />
+            ) : (
+            <p className="font-cinzel text-lg font-bold text-parchment">{totalLeague}</p>
+            )}
+            <p className="font-rajdhani text-[9px] text-zinc-600">league games</p>
+        </div>
+
+        {/* Completed */}
+        <div className="px-3 py-2.5 text-center border-l border-ink-5">
+            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Completed</p>
+            <p className="font-cinzel text-lg font-bold text-emerald-400">{completed.length}</p>
+            <p className="font-rajdhani text-[9px] text-zinc-600">announced + past</p>
+        </div>
+
+        {/* Scheduled */}
+        <div className="px-3 py-2.5 text-center border-l border-ink-5">
+            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Scheduled</p>
+            <p className="font-cinzel text-lg font-bold text-amber-400">{scheduled.length}</p>
+            <p className="font-rajdhani text-[9px] text-zinc-600">booked, upcoming</p>
+        </div>
+
+        {/* Unbooked */}
+        <div className="px-3 py-2.5 text-center border-l border-ink-5">
+            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Unbooked</p>
+            <p className="font-cinzel text-lg font-bold text-zinc-400">{unbooked}</p>
+            <p className="font-rajdhani text-[9px] text-zinc-600">games remaining</p>
+        </div>
+
+        {/* Avg gap */}
+        <div className="px-3 py-2.5 text-center border-l border-ink-5">
+            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Avg gap</p>
+            <p className={`font-cinzel text-lg font-bold ${
+            gap === null    ? 'text-zinc-500' :
+            gap <= 1        ? 'text-red-400'  :
+            gap >= 3        ? 'text-amber-400': 'text-emerald-400'
+            }`}>
+            {gap !== null ? `${gap}w` : '—'}
+            </p>
+            <p className="font-rajdhani text-[9px] text-zinc-600">
+            {gap === null ? 'not enough games' : gap <= 1 ? '⚠ very frequent' : gap >= 3 ? 'slow pace' : 'good pace'}
+            </p>
+        </div>
+
+        </div>
 
           {/* WhatsApp nudge button */}
           {whatsappLink && (
