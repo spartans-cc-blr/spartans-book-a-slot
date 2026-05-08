@@ -14,6 +14,7 @@ const NAV = [
   { href: '/admin/grounds',          label: 'Grounds',          icon: '📍' },
   { href: '/schedule',               label: 'Organiser View',   icon: '🌐', section: 'Views' },
   { href: '/fixtures',               label: 'Upcoming Matches', icon: '🏏' },
+  { href: '/tournament-planner', label: 'Tournament Planner',   icon: '📊' },
   { href: '/admin/players',          label: 'Players',          icon: '🏏' },
   { href: '/gc-review',              label: 'GC Review',        icon: '⚖️' },
 ]

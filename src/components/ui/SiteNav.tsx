@@ -60,6 +60,13 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
             </Link>
           )}
 
+          {(player?.isCaptain || player?.isGC || isAdmin) && (
+            <Link href="/tournament-planner"
+              className="ml-3 font-rajdhani text-xs font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 px-4 py-2 rounded transition-colors">
+              Planner 📊
+            </Link>
+          )}
+
           {/* Auth button — desktop */}
           <div className="ml-4 relative">
             {!isLoggedIn ? (

@@ -23,7 +23,7 @@ export default function AdminTournamentsPage() {
   const [editingId,   setEditingId]   = useState<string | null>(null)
   const [editForm,    setEditForm]    = useState<Partial<Tournament>>({})
   const [showAdd,     setShowAdd]     = useState(false)
-  const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '' })
+  const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '', total_league_games: '' as string })
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
@@ -50,8 +50,14 @@ export default function AdminTournamentsPage() {
     const res = await fetch('/api/tournaments', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, ...editForm, ground_id: editForm.ground_id || null }),
-    })
+      body: JSON.stringify({
+      id, ...editForm,
+      ground_id: editForm.ground_id || null,
+      total_league_games: editForm.total_league_games
+        ? parseInt(editForm.total_league_games as string, 10)
+        : null,
+    }),
+    }
     if (res.ok) {
       const d = await res.json()
       setTournaments(prev => prev.map(t => t.id === id ? d.tournament : t))
@@ -128,6 +134,19 @@ export default function AdminTournamentsPage() {
               <label className="form-label">Organiser WhatsApp</label>
               <input value={addForm.organiser_contact} onChange={e => setAddForm(f => ({ ...f, organiser_contact: e.target.value }))}
                 placeholder="e.g. 919876543210" className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Total League Games</label>
+              <input
+                type="number" min="1" max="30"
+                value={addForm.total_league_games}
+                onChange={e => setAddForm(f => ({ ...f, total_league_games: e.target.value }))}
+                placeholder="e.g. 9"
+                className="form-input w-24"
+              />
+              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                League games only — knockouts added separately if Spartans qualify.
+              </p>
             </div>
             <div>
               <label className="form-label">Ground</label>
