@@ -55,7 +55,7 @@ export default function AdminTournamentsPage() {
       id, ...editForm,
       ground_id: editForm.ground_id || null,
       total_league_games: editForm.total_league_games
-        ? parseInt(editForm.total_league_games as string, 10)
+        ? parseInt(editForm.total_league_games as unknown as string, 10)
         : null,
     }),
     })
