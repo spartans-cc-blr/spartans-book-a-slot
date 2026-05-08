@@ -510,7 +510,7 @@ function TournamentBlock({
           {/* WhatsApp nudge button */}
           {whatsappLink && (
             <div className="px-4 py-2 bg-ink-4 border-b border-ink-5">
-              
+              <a
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
