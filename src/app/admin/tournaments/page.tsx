@@ -57,7 +57,7 @@ export default function AdminTournamentsPage() {
         ? parseInt(editForm.total_league_games as string, 10)
         : null,
     }),
-    }
+    })
     if (res.ok) {
       const d = await res.json()
       setTournaments(prev => prev.map(t => t.id === id ? d.tournament : t))
@@ -87,13 +87,13 @@ export default function AdminTournamentsPage() {
     const res = await fetch('/api/tournaments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...addForm, ground_id: addForm.ground_id || null }),
+      body: JSON.stringify({ ...addForm, ground_id: addForm.ground_id || null, total_league_games: addForm.total_league_games ? parseInt(addForm.total_league_games, 10) : null }),
     })
     if (res.ok) {
       const d = await res.json()
       setTournaments(prev => [d.tournament, ...prev])
       setShowAdd(false)
-      setAddForm({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white', ground_id: '' })
+      setAddForm({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white', ground_id: '', total_league_games: '' })
     } else {
       setError('Failed to add tournament.')
     }
