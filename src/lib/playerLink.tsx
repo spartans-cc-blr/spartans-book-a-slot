@@ -11,7 +11,7 @@ interface PlayerNameLinkProps {
 export function PlayerNameLink({ name, cricHeroesUrl, className }: PlayerNameLinkProps) {
   if (!cricHeroesUrl) return <span className={className}>{name}</span>
   return (
-    
+    <a
       href={cricHeroesUrl}
       target="_blank"
       rel="noopener noreferrer"
