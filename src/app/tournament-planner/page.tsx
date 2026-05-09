@@ -57,7 +57,7 @@ export default async function TournamentPlannerPage() {
     .eq('active', true)
     .order('name')
 
-  const announcedBookingIds = new Set((squads ?? []).map(s => s.booking_id))
+  const announcedBookingIds = (squads ?? []).map(s => s.booking_id)
   const today = new Date().toISOString().split('T')[0]
 
   return (
@@ -66,7 +66,7 @@ export default async function TournamentPlannerPage() {
       <main className="min-h-screen bg-ink-1 px-4 md:px-8 py-8 max-w-4xl mx-auto">
         <TournamentPlannerClient
           bookings={bookings}
-          announcedBookingIds={[...announcedBookingIds]}
+          announcedBookingIds={announcedBookingIds}
           captains={captains ?? []}
           today={today}
           viewerRole={{
