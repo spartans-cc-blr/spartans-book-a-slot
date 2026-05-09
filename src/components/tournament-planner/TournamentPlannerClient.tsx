@@ -549,7 +549,7 @@ function TournamentBlock({
           {(whatsappLink || isAdmin || isGC)  && (
             <div className="px-4 py-2 bg-ink-4 border-b border-ink-5 flex items-center gap-4 flex-wrap">
               <a
-                href={whatsappLink}
+                href={whatsappLink ?? undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-rajdhani text-xs font-bold text-emerald-400 hover:text-emerald-300"
