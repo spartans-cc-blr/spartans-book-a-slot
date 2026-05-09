@@ -125,7 +125,7 @@ function BandwidthSection({
       <div className="flex flex-col gap-4">
         {captains.map(captain => {
           const mine = tourneyBookings.filter(b => b.captain_id === captain.id)
-          const completed = mine.filter(b => b.game_date < today && announcedSet.has(b.id))
+          const completed = mine.filter(b => b.game_date < today)
           const scheduled = mine.filter(b => b.game_date >= today)
           // Unbooked = total league games across all their tournaments minus booked
           const totalLeague = Array.from(new Set(mine.map(b => b.tournament!.id)))
@@ -344,7 +344,7 @@ function TournamentBlock({
   const [open, setOpen] = useState(false)
   const [completedOpen, setCompletedOpen] = useState(false)
 
-  const completed = games.filter(g => g.game_date < today && announcedSet.has(g.id))
+  const completed = games.filter(g => g.game_date < today)
   const scheduled = games.filter(g => g.game_date >= today)
   const [totalLeagueGames, setTotalLeagueGames] = useState<number | null>(
     tournament.total_league_games ?? null
@@ -433,7 +433,7 @@ function TournamentBlock({
               <div
                 key={g.id}
                 className={`flex-1 ${
-                  g.game_date < today && announcedSet.has(g.id)
+                  g.game_date < today 
                     ? 'bg-emerald-600'
                     : g.game_date >= today
                     ? 'bg-amber-600'
@@ -534,7 +534,7 @@ function TournamentBlock({
                 <div
                   key={g.id}
                   className={`flex-1 ${
-                    g.game_date < today && announcedSet.has(g.id)
+                    g.game_date < today
                       ? 'bg-emerald-600' : 'bg-amber-600'
                   }`}
                   title={g.game_date}

@@ -57,7 +57,7 @@ export default async function TournamentPlannerPage() {
     .eq('active', true)
     .order('name')
 
-  const announcedBookingIds = (squads ?? []).map(s => s.booking_id)
+  const announcedBookingIds: string[] = []
   const today = new Date().toISOString().split('T')[0]
 
   return (
