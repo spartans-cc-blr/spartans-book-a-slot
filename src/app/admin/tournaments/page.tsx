@@ -58,9 +58,10 @@ export default function AdminTournamentsPage() {
       body: JSON.stringify({
       id, ...editForm,
       ground_id: editForm.ground_id || null,
-      total_league_games: editForm.total_league_games
+      total_league_games: editForm.
         ? parseInt(editForm.total_league_games as unknown as string, 10)
         : null,
+      vc_captain_id: editForm.vc_captain_id || null,
     }),
     })
     if (res.ok) {
@@ -92,7 +93,7 @@ export default function AdminTournamentsPage() {
     const res = await fetch('/api/tournaments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...addForm, ground_id: addForm.ground_id || null, total_league_games: addForm.total_league_games ? parseInt(addForm.total_league_games, 10) : null }),
+      body: JSON.stringify({ ...addForm, ground_id: addForm.ground_id || null, total_league_games: addForm.total_league_games ? parseInt(addForm.total_league_games, 10) : null, vc_captain_id: addForm.vc_captain_id || null }),
     })
     if (res.ok) {
       const d = await res.json()
@@ -144,7 +145,7 @@ export default function AdminTournamentsPage() {
               <label className="form-label">Vice Captain</label>
               <select
                 value={addForm.vc_captain_id ?? ''}
-                onChange={e => setAddForm(f => ({ ...f, vc_captain_id: e.target.value || null }))}
+                onChange={e => setAddForm(f => ({ ...f, vc_captain_id: e.target.value }))}
                 className="form-input"
               >
                 <option value="">None</option>
