@@ -9,13 +9,6 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Tournament Planner — Spartans CC' }
 export const revalidate = 0
 
-const session = await getServerSession(authOptions)
-const user    = session?.user as any
-
-// vibe-security: server component guard — same pattern as captains-corner + gc-review
-if (!session) redirect('/login')
-if (!user?.isCaptain && !user?.isGC && !user?.isAdmin) redirect('/fixtures')
-
 export default async function TournamentPlannerPage() {
   const session = await getServerSession(authOptions)
   const user    = session?.user as any
