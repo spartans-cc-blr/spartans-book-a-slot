@@ -17,6 +17,7 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
   const isLoggedIn = status === 'authenticated'
   const isExpelled = player?.playerStatus === 'expelled'
   const isGC       = !!player?.isGC || !!player?.isAdmin
+  const isCaptain  = !!player?.isCaptain
 
   const links = [
     { href: 'https://spartanscricketclub.vercel.app', label: 'Club Site' },
