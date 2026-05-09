@@ -97,12 +97,125 @@ function BandwidthSection({
   today: string
   viewerCaptainId: string | null
 }) {
-  // Only bookings with a tournament assigned
   const tourneyBookings = bookings.filter(b => b.tournament)
+  const isCaptainView   = !!viewerCaptainId
+  const myCaptain       = isCaptainView ? captains.find(c => c.id === viewerCaptainId) : null
+  const otherCaptains   = isCaptainView ? captains.filter(c => c.id !== viewerCaptainId) : captains
 
-  const isCaptainView = !!viewerCaptainId
-  const myCaptain     = isCaptainView ? captains.find(c => c.id === viewerCaptainId) : null
-  const otherCaptains = isCaptainView ? captains.filter(c => c.id !== viewerCaptainId) : captains
+  function renderCaptainCard(captain: Captain, isOwn: boolean) {
+    const mine      = tourneyBookings.filter(b => b.captain_id === captain.id)
+    const completed = mine.filter(b => b.game_date < today)
+    const scheduled = mine.filter(b => b.game_date >= today)
+
+    const totalLeague = Array.from(new Set(mine.map(b => b.tournament!.id)))
+      .reduce((sum, tid) => {
+        const t = mine.find(b => b.tournament!.id === tid)?.tournament
+        return sum + (t?.total_league_games ?? mine.filter(b => b.tournament!.id === tid).length)
+      }, 0)
+    const unbooked = Math.max(0, totalLeague - mine.length)
+    const total    = mine.length + unbooked
+
+    const slotCounts = Object.fromEntries(
+      ALL_SLOTS.map(s => [`${s.day}-${s.time}`, 0])
+    ) as Record<SlotKey, number>
+    mine.forEach(b => {
+      const k = slotKey(b.game_date, b.slot_time)
+      if (slotCounts[k] !== undefined) slotCounts[k]++
+    })
+
+    const maxSlot      = Math.max(...Object.values(slotCounts), 1)
+    const dominantSlot = Object.entries(slotCounts).find(([, v]) => v === maxSlot)?.[0]
+    const isImbalanced = maxSlot > Math.ceil(mine.length / 2) && mine.length >= 3
+
+    const doneW  = total > 0 ? (completed.length / total) * 100 : 0
+    const schedW = total > 0 ? (scheduled.length / total) * 100 : 0
+    const pendW  = total > 0 ? (unbooked / total) * 100 : 0
+    const isLowLoad = total <= 4 && unbooked <= 1
+
+    return (
+      <div
+        key={captain.id}
+        className={`bg-ink-3 rounded-lg border p-4 transition-opacity ${
+          isOwn
+            ? 'border-gold-dim ring-1 ring-gold/20'
+            : isCaptainView
+            ? `${isLowLoad ? 'border-emerald-800' : 'border-ink-5'} opacity-60`
+            : isLowLoad ? 'border-emerald-800' : 'border-ink-5'
+        }`}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center font-cinzel text-gold text-sm font-bold flex-shrink-0">
+            {captain.name.slice(0, 2).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-cinzel text-sm font-bold text-parchment">{captain.name}</span>
+              {isLowLoad && (
+                <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-800">
+                  Bandwidth available — can take new tournament
+                </span>
+              )}
+            </div>
+            <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
+              <span className="text-parchment font-semibold">{total}</span> total &nbsp;·&nbsp;
+              <span className="text-emerald-400 font-semibold">{completed.length}</span> completed &nbsp;·&nbsp;
+              <span className="text-amber-400 font-semibold">{scheduled.length}</span> scheduled &nbsp;·&nbsp;
+              <span className="text-zinc-400 font-semibold">{unbooked}</span> unbooked
+            </p>
+          </div>
+        </div>
+
+        {/* Bandwidth bar */}
+        <div className="h-3 rounded-full bg-zinc-800 overflow-hidden flex mb-2">
+          {doneW  > 0 && <div className="h-full bg-emerald-600 transition-all" style={{ width: `${doneW}%` }} />}
+          {schedW > 0 && <div className="h-full bg-amber-600 transition-all"   style={{ width: `${schedW}%` }} />}
+          {pendW  > 0 && <div className="h-full bg-zinc-600 transition-all"    style={{ width: `${pendW}%` }} />}
+        </div>
+
+        {/* Slot fairness grid */}
+        {mine.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-ink-5">
+            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-3">
+              Games by slot &amp; day
+            </p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {ALL_SLOTS.map(s => {
+                const k: SlotKey = `${s.day}-${s.time}`
+                const count = slotCounts[k]
+                const barH  = count > 0 ? Math.round((count / maxSlot) * 100) : 0
+                const isSat = s.day === 'Sat'
+                return (
+                  <div key={k} className="bg-ink-4 border border-ink-5 rounded p-1.5 flex flex-col items-center">
+                    <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
+                      isSat ? 'bg-blue-900/50 text-blue-400' : 'bg-pink-900/40 text-pink-400'
+                    }`}>{s.day}</span>
+                    <span className="font-rajdhani text-[10px] text-zinc-500 mb-1.5">{s.time}</span>
+                    <div className="w-full h-8 bg-zinc-800 rounded overflow-hidden flex flex-col-reverse mb-1">
+                      {count > 0 && (
+                        <div
+                          className="w-full rounded bg-amber-600 transition-all"
+                          style={{ height: `${barH}%` }}
+                        />
+                      )}
+                    </div>
+                    <span className={`font-cinzel text-xs font-bold ${count > 0 ? 'text-amber-400' : 'text-zinc-700'}`}>
+                      {count > 0 ? count : '—'}
+                    </span>
+                    <span className="font-rajdhani text-[8px] text-zinc-700 mt-0.5">{s.formats}</span>
+                  </div>
+                )
+              })}
+            </div>
+            {isImbalanced && (
+              <p className="font-rajdhani text-xs text-blue-400 mt-2">
+                ↗ Heavy on {dominantSlot} — route unbooked games to other slots for balance
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <section className="mb-10">
@@ -110,19 +223,16 @@ function BandwidthSection({
         Tournament Planner
       </p>
       <h1 className="font-cinzel text-xl font-bold text-gold mb-1">Captain Bandwidth</h1>
-      {isCaptainView && (
-        <p className="font-rajdhani text-sm text-zinc-500 mb-5">
-          Your tournament load — followed by other captains.
-        </p>
-      )}
       <p className="font-rajdhani text-sm text-zinc-500 mb-5">
-        Total tournament game load per captain — completed, scheduled, and unbooked.
+        {isCaptainView
+          ? 'Your tournament load — followed by other captains.'
+          : 'Total tournament game load per captain — completed, scheduled, and unbooked.'}
       </p>
 
       {/* Legend */}
       <div className="flex gap-5 mb-4 flex-wrap">
         {[
-          { color: 'bg-emerald-600', label: 'Completed (squad announced + past date)' },
+          { color: 'bg-emerald-600', label: 'Completed (past date)' },
           { color: 'bg-amber-600',   label: 'Scheduled (upcoming booked)' },
           { color: 'bg-zinc-600',    label: 'Unbooked (remaining league games)' },
         ].map(({ color, label }) => (
@@ -134,140 +244,19 @@ function BandwidthSection({
       </div>
 
       <div className="flex flex-col gap-4">
-        {/* Own bandwidth card — pinned to top for captain view */}
         {isCaptainView && myCaptain && (
           <>
             <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-500">Your bandwidth</p>
             {renderCaptainCard(myCaptain, true)}
-            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-2">Other captains</p>
+            {otherCaptains.length > 0 && (
+              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-2">Other captains</p>
+            )}
           </>
         )}
         {(isCaptainView ? otherCaptains : captains).map(captain => renderCaptainCard(captain, false))}
-          </div>
-     </section>
-   )
-        
-        function renderCaptainCard(captain: Captain, isOwn: boolean) {
-
-          const mine = tourneyBookings.filter(b => b.captain_id === captain.id)
-          const completed = mine.filter(b => b.game_date < today)
-          const scheduled = mine.filter(b => b.game_date >= today)
-          // Unbooked = total league games across all their tournaments minus booked
-          const totalLeague = Array.from(new Set(mine.map(b => b.tournament!.id)))
-            .reduce((sum, tid) => {
-              const t = mine.find(b => b.tournament!.id === tid)?.tournament
-              return sum + (t?.total_league_games ?? mine.filter(b => b.tournament!.id === tid).length)
-            }, 0)
-          const unbooked = Math.max(0, totalLeague - mine.length)
-          const total = mine.length + unbooked
-
-          // Slot breakdown
-          const slotCounts = Object.fromEntries(
-            ALL_SLOTS.map(s => [`${s.day}-${s.time}`, 0])
-          ) as Record<SlotKey, number>
-          mine.forEach(b => {
-            const k = slotKey(b.game_date, b.slot_time)
-            if (slotCounts[k] !== undefined) slotCounts[k]++
-          })
-
-          const maxSlot = Math.max(...Object.values(slotCounts), 1)
-          const dominantSlot = Object.entries(slotCounts).find(([, v]) => v === maxSlot)?.[0]
-          const isImbalanced = maxSlot > Math.ceil(mine.length / 2) && mine.length >= 3
-
-          const doneW  = total > 0 ? (completed.length / total) * 100 : 0
-          const schedW = total > 0 ? (scheduled.length / total) * 100 : 0
-          const pendW  = total > 0 ? (unbooked / total) * 100 : 0
-          const isLowLoad = total <= 4 && unbooked <= 1
-
-          return (
-            <div
-              key={captain.id}
-              className={`bg-ink-3 rounded-lg border p-4 transition-opacity ${
-              isOwn
-                ? 'border-gold-dim ring-1 ring-gold/20'                          // own card — gold highlight
-                : isCaptainView
-                ? `${isLowLoad ? 'border-emerald-800' : 'border-ink-5'} opacity-60` // others — dimmed
-                : isLowLoad ? 'border-emerald-800' : 'border-ink-5'              // GC/Admin — full opacity
-            }`}
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center font-cinzel text-gold text-sm font-bold flex-shrink-0">
-                  {captain.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-cinzel text-sm font-bold text-parchment">{captain.name}</span>
-                    {isLowLoad && (
-                      <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-800">
-                        Bandwidth available — can take new tournament
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
-                    <span className="text-parchment font-semibold">{total}</span> total &nbsp;·&nbsp;
-                    <span className="text-emerald-400 font-semibold">{completed.length}</span> completed &nbsp;·&nbsp;
-                    <span className="text-amber-400 font-semibold">{scheduled.length}</span> scheduled &nbsp;·&nbsp;
-                    <span className="text-zinc-400 font-semibold">{unbooked}</span> unbooked
-                  </p>
-                </div>
-              </div>
-            
-              {/* Bandwidth bar */}
-              <div className="h-3 rounded-full bg-zinc-800 overflow-hidden flex mb-2">
-                {doneW  > 0 && <div className="h-full bg-emerald-600 transition-all" style={{ width: `${doneW}%` }} />}
-                {schedW > 0 && <div className="h-full bg-amber-600 transition-all"   style={{ width: `${schedW}%` }} />}
-                {pendW  > 0 && <div className="h-full bg-zinc-600 transition-all"    style={{ width: `${pendW}%` }} />}
-              </div>
-
-              {/* Slot fairness grid */}
-              {mine.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-ink-5">
-                  <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-3">
-                    Games by slot &amp; day
-                  </p>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {ALL_SLOTS.map(s => {
-                      const k: SlotKey = `${s.day}-${s.time}`
-                      const count = slotCounts[k]
-                      const barH = count > 0 ? Math.round((count / maxSlot) * 100) : 0
-                      const isSat = s.day === 'Sat'
-                      return (
-                        <div key={k} className="bg-ink-4 border border-ink-5 rounded p-1.5 flex flex-col items-center">
-                          <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
-                            isSat ? 'bg-blue-900/50 text-blue-400' : 'bg-pink-900/40 text-pink-400'
-                          }`}>{s.day}</span>
-                          <span className="font-rajdhani text-[10px] text-zinc-500 mb-1.5">{s.time}</span>
-                          {/* mini bar */}
-                          <div className="w-full h-8 bg-zinc-800 rounded overflow-hidden flex flex-col-reverse mb-1">
-                            {count > 0 && (
-                              <div
-                                className="w-full rounded bg-amber-600 transition-all"
-                                style={{ height: `${barH}%` }}
-                              />
-                            )}
-                          </div>
-                          <span className={`font-cinzel text-xs font-bold ${count > 0 ? 'text-amber-400' : 'text-zinc-700'}`}>
-                            {count > 0 ? count : '—'}
-                          </span>
-                          <span className="font-rajdhani text-[8px] text-zinc-700 mt-0.5">{s.formats}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {isImbalanced && (
-                    <p className="font-rajdhani text-xs text-blue-400 mt-2">
-                      ↗ Heavy on {dominantSlot} — route unbooked games to other slots for balance
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
       </div>
     </section>
   )
-}
 }
 
 // ── Inline game count editor — admin only ─────────────────────────
@@ -804,13 +793,19 @@ export function TournamentPlannerClient({
   const [showOngoing,   setShowOngoing]   = useState(true)
   const [showCompleted, setShowCompleted] = useState(false)
 
-  const isCaptainView   = viewerRole.isCaptain && !!viewerRole.captainId
-  const myTournaments   = isCaptainView
-    ? sortedTournaments.filter(t => t.games.some(g => g.captain_id === viewerRole.captainId))
-    : sortedTournaments
-  const otherTournaments = isCaptainView
-    ? sortedTournaments.filter(t => t.games.every(g => g.captain_id !== viewerRole.captainId))
-    : []
+   // Group bookings by tournament
+   const tournamentMap = useMemo(...)
+
+   // Sort tournaments
+   const sortedTournaments = useMemo(...)
+
+   const isCaptainView    = viewerRole.isCaptain && !!viewerRole.captainId
+   const myTournaments    = isCaptainView
+     ? sortedTournaments.filter(t => t.games.some(g => g.captain_id === viewerRole.captainId))
+     : sortedTournaments
+   const otherTournaments = isCaptainView
+     ? sortedTournaments.filter(t => t.games.every(g => g.captain_id !== viewerRole.captainId))
+     : []
 
   // Group bookings by tournament
   const tournamentMap = useMemo(() => {
