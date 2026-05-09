@@ -333,13 +333,14 @@ function InlineGameCountEditor({
 
 // ── Tournament block ───────────────────────────────────────────────
 function TournamentBlock({
-  tournament, games, announcedSet, today, isAdmin,
+  tournament, games, announcedSet, today, isAdmin, isGC,
 }: {
   tournament: NonNullable<Booking['tournament']>
   games: Booking[]
   announcedSet: Set<string>
   today: string
   isAdmin: boolean
+  isGC: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [completedOpen, setCompletedOpen] = useState(false)
@@ -381,6 +382,43 @@ function TournamentBlock({
 
   const whatsappLink = pace.waLabel
     ? `https://wa.me/${tournament.organiser_contact?.replace(/\D/g, '') ?? ''}?text=${encodeURIComponent(pace.waLabel)}`
+    : null
+
+    // Share card — summary message for organiser
+  const shareMessage = useMemo(() => {
+    const totalLeague = tournament.total_league_games ?? games.length
+    const completedCount = games.filter(g => g.game_date < today).length
+    const scheduledCount = games.filter(g => g.game_date >= today).length
+    const unbookedCount  = Math.max(0, totalLeague - games.length)
+
+    const slotLines = ALL_SLOTS
+      .map(s => {
+        const k: SlotKey = `${s.day}-${s.time}`
+        const count = slotCounts[k]
+        return count > 0 ? `  ${s.day} ${s.time}: ${count} game${count > 1 ? 's' : ''}` : null
+      })
+      .filter(Boolean)
+      .join('\n')
+
+    return [
+      `*${tournament.name} — Spartans CC Update*`,
+      ``,
+      `📊 Status: ${completedCount} completed · ${scheduledCount} scheduled · ${unbookedCount} unbooked`,
+      `⏱ Avg gap between games: ${gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}`,
+      ``,
+      `🗓 Slot breakdown so far:`,
+      slotLines,
+      ``,
+      isSlotImbalanced
+        ? `⚠️ Slot balance is skewed — would appreciate spreading remaining ${unbookedCount} game${unbookedCount !== 1 ? 's' : ''} across other slots.`
+        : `✅ Slot balance looks good across the tournament.`,
+      ``,
+      `Could you help schedule the remaining games? Happy to discuss slots that work for both sides.`,
+    ].join('\n')
+  }, [tournament, games, today, gap, slotCounts, isSlotImbalanced])
+
+  const shareLink = tournament.organiser_contact
+    ? `https://wa.me/${tournament.organiser_contact.replace(/\D/g, '')}?text=${encodeURIComponent(shareMessage)}`
     : null
 
   return (
@@ -508,8 +546,8 @@ function TournamentBlock({
         </div>
 
           {/* WhatsApp nudge button */}
-          {whatsappLink && (
-            <div className="px-4 py-2 bg-ink-4 border-b border-ink-5">
+          {(whatsappLink || isAdmin || isGC)  && (
+            <div className="px-4 py-2 bg-ink-4 border-b border-ink-5 flex items-center gap-4 flex-wrap">
               <a
                 href={whatsappLink}
                 target="_blank"
@@ -518,6 +556,17 @@ function TournamentBlock({
               >
                 📲 WhatsApp {tournament.organiser_name ?? 'organiser'} — {pace.label}
               </a>
+             {(isAdmin || isGC) && shareLink && (
+              <a href={shareLink} target="_blank" rel="noopener noreferrer"
+                className="font-rajdhani text-xs font-bold text-blue-400 hover:text-blue-300">
+                📤 Share slot & pace summary with organiser
+              </a>
+            )}
+            {(isAdmin || isGC) && !shareLink && (
+              <span className="font-rajdhani text-[10px] text-zinc-700">
+                Add organiser WhatsApp in /admin/tournaments to enable sharing
+              </span>
+            )}
             </div>
           )}
 
@@ -719,6 +768,7 @@ export function TournamentPlannerClient({
   bookings, announcedBookingIds, captains, today, viewerRole,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
+  const [filter, setFilter] = useState<'ongoing' | 'upcoming' | 'completed' | 'all'>('ongoing')
 
   // Group bookings by tournament
   const tournamentMap = useMemo(() => {
@@ -734,8 +784,24 @@ export function TournamentPlannerClient({
 
   // Sort tournaments: most games first
   const sortedTournaments = useMemo(() =>
-    Array.from(tournamentMap.values()).sort((a, b) => b.games.length - a.games.length),
-    [tournamentMap]
+      Array.from(tournamentMap.values())
+       .map(({ tournament, games }) => {
+         const totalLeague = tournament.total_league_games ?? games.length
+         const completedGames = games.filter(g => g.game_date < today)
+         const scheduledGames = games.filter(g => g.game_date >= today)
+         const isCompleted = completedGames.length >= totalLeague && scheduledGames.length === 0
+         const isUpcoming  = completedGames.length === 0
+         const isOngoing   = !isCompleted && !isUpcoming
+         return { tournament, games, isCompleted, isUpcoming, isOngoing }
+       })
+       .filter(t => {
+         if (filter === 'ongoing')   return t.isOngoing
+         if (filter === 'upcoming')  return t.isUpcoming
+         if (filter === 'completed') return t.isCompleted
+         return true // 'all'
+       })
+       .sort((a, b) => b.games.length - a.games.length),
+     [tournamentMap, today, filter]
   )
 
   return (
@@ -748,6 +814,29 @@ export function TournamentPlannerClient({
         today={today}
       />
 
+      {/* Tournament filter */}
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
+        <span className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600">Show:</span>
+        {([
+          { key: 'ongoing',   label: 'Ongoing'   },
+          { key: 'upcoming',  label: 'Upcoming'  },
+          { key: 'completed', label: 'Completed' },
+          { key: 'all',       label: 'All'       },
+        ] as const).map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`font-rajdhani text-xs font-bold px-3 py-1 rounded-full border transition-colors ${
+              filter === f.key
+                ? 'bg-gold/10 border-gold-dim text-gold'
+                : 'border-ink-5 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* Section 2 — By Tournament */}
       <section>
         <h2 className="font-cinzel text-xl font-bold text-gold mb-1">By Tournament</h2>
@@ -755,7 +844,12 @@ export function TournamentPlannerClient({
           Organiser pace, game scheduling frequency, and slot balance per tournament.
         </p>
         {sortedTournaments.length === 0 ? (
-          <p className="font-rajdhani text-sm text-zinc-600">No tournament bookings found.</p>
+           <p className="font-rajdhani text-sm text-zinc-600">
+             No {filter === 'all' ? '' : filter} tournaments found.{' '}
+             {filter !== 'all' && (
+               <button onClick={() => setFilter('all')} className="text-gold underline">Show all</button>
+             )}
+           </p>
         ) : (
             sortedTournaments.map(({ tournament, games }) => (
                 <TournamentBlock
@@ -765,6 +859,7 @@ export function TournamentPlannerClient({
                 announcedSet={announcedSet}
                 today={today}
                 isAdmin={viewerRole.isAdmin}
+                isGC={viewerRole.isGC}
                 />
             ))
         )}
