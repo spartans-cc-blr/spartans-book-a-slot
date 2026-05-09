@@ -793,20 +793,6 @@ export function TournamentPlannerClient({
   const [showOngoing,   setShowOngoing]   = useState(true)
   const [showCompleted, setShowCompleted] = useState(false)
 
-   // Group bookings by tournament
-   const tournamentMap = useMemo(...)
-
-   // Sort tournaments
-   const sortedTournaments = useMemo(...)
-
-   const isCaptainView    = viewerRole.isCaptain && !!viewerRole.captainId
-   const myTournaments    = isCaptainView
-     ? sortedTournaments.filter(t => t.games.some(g => g.captain_id === viewerRole.captainId))
-     : sortedTournaments
-   const otherTournaments = isCaptainView
-     ? sortedTournaments.filter(t => t.games.every(g => g.captain_id !== viewerRole.captainId))
-     : []
-
   // Group bookings by tournament
   const tournamentMap = useMemo(() => {
     const map = new Map<string, { tournament: NonNullable<Booking['tournament']>; games: Booking[] }>()
@@ -840,6 +826,14 @@ export function TournamentPlannerClient({
        .sort((a, b) => b.games.length - a.games.length),
      [tournamentMap, today, showUpcoming, showOngoing, showCompleted]
   )
+
+  const isCaptainView   = viewerRole.isCaptain && !!viewerRole.captainId
+  const myTournaments   = isCaptainView
+    ? sortedTournaments.filter(t => t.games.some(g => g.captain_id === viewerRole.captainId))
+    : sortedTournaments
+  const otherTournaments = isCaptainView
+    ? sortedTournaments.filter(t => t.games.every(g => g.captain_id !== viewerRole.captainId))
+    : []
 
   return (
     <div>
