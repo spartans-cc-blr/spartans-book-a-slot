@@ -10,7 +10,13 @@ export const metadata: Metadata = { title: 'Tournament Planner — Spartans CC' 
 export const revalidate = 0
 
 export default async function TournamentPlannerPage() {
-
+   const session = await getServerSession(authOptions)
+   const user    = session?.user as any
+ 
+   // vibe-security: role check before any data fetch
+   if (!session) redirect('/login')
+   if (!user?.isCaptain && !user?.isGC && !user?.isAdmin) redirect('/fixtures')
+ 
   const supabase = createServiceClient()
 
   // 1. All confirmed bookings with tournament + captain joins
