@@ -58,7 +58,7 @@ export default function AdminTournamentsPage() {
       body: JSON.stringify({
       id, ...editForm,
       ground_id: editForm.ground_id || null,
-      total_league_games: editForm.
+      total_league_games: editForm.total_league_games
         ? parseInt(editForm.total_league_games as unknown as string, 10)
         : null,
       vc_captain_id: editForm.vc_captain_id || null,
