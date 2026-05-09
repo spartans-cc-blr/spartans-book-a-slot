@@ -128,7 +128,7 @@ function BandwidthSection({
           const completed = mine.filter(b => b.game_date < today && announcedSet.has(b.id))
           const scheduled = mine.filter(b => b.game_date >= today)
           // Unbooked = total league games across all their tournaments minus booked
-          const totalLeague = [...new Set(mine.map(b => b.tournament!.id))]
+          const totalLeague = Array.from(new Set(mine.map(b => b.tournament!.id)))
             .reduce((sum, tid) => {
               const t = mine.find(b => b.tournament!.id === tid)?.tournament
               return sum + (t?.total_league_games ?? mine.filter(b => b.tournament!.id === tid).length)
