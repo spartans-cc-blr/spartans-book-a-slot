@@ -213,6 +213,16 @@ export default function AdminTournamentsPage() {
                           <input value={editForm.organiser_contact ?? ''} onChange={e => setEditForm(f => ({ ...f, organiser_contact: e.target.value }))} className="form-input" />
                         </div>
                         <div>
+                          <label className="form-label">Total League Games</label>
+                          <input
+                            type="number" min="1" max="30"
+                            value={editForm.total_league_games ?? ''}
+                            onChange={e => setEditForm(f => ({ ...f, total_league_games: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                             placeholder="e.g. 9"
+                             className="form-input w-24"
+                           />
+                         </div>
+                        <div>
                           <label className="form-label">Ground</label>
                           <select value={editForm.ground_id ?? ''} onChange={e => setEditForm(f => ({ ...f, ground_id: e.target.value }))} className="form-input">
                             <option value="">None</option>
