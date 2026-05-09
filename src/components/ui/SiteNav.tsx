@@ -22,6 +22,9 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
     { href: 'https://spartanscricketclub.vercel.app', label: 'Club Site' },
     { href: '/schedule', label: 'Schedule', key: 'schedule' },
     { href: '/fixtures', label: 'Fixtures',  key: 'fixtures' },
+    ...(isCaptain || isGC || isAdmin
+     ? [{ href: '/tournament-planner', label: 'Tournaments', key: 'planner' }]
+     : []),
     { href: '/profile', label: 'Profile', key: 'profile' }
   ]
 
@@ -57,13 +60,6 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
             <Link href="/gc-review"
               className="ml-3 font-rajdhani text-xs font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 px-4 py-2 rounded transition-colors">
               GC Review
-            </Link>
-          )}
-
-          {(player?.isCaptain || player?.isGC || isAdmin) && (
-            <Link href="/tournament-planner"
-              className="ml-3 font-rajdhani text-xs font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 px-4 py-2 rounded transition-colors">
-              Planner 📊
             </Link>
           )}
 
