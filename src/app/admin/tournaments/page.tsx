@@ -27,14 +27,17 @@ export default function AdminTournamentsPage() {
   const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '', total_league_games: '' as string })
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
+  const [captains, setCaptains] = useState<{ id: string; name: string }[]>([])
 
   useEffect(() => {
     Promise.all([
       fetch('/api/tournaments').then(r => r.json()),
       fetch('/api/grounds').then(r => r.json()),
+      fetch('/api/captains').then(r => r.json()),
     ]).then(([t, g]) => {
       setTournaments(t.tournaments ?? [])
       setGrounds(g.grounds ?? [])
+      setCaptains(c.captains ?? [])
       setLoading(false)
     })
   }, [])
@@ -135,6 +138,22 @@ export default function AdminTournamentsPage() {
               <label className="form-label">Organiser WhatsApp</label>
               <input value={addForm.organiser_contact} onChange={e => setAddForm(f => ({ ...f, organiser_contact: e.target.value }))}
                 placeholder="e.g. 919876543210" className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Vice Captain</label>
+              <select
+                value={addForm.vc_captain_id ?? ''}
+                onChange={e => setAddForm(f => ({ ...f, vc_captain_id: e.target.value || null }))}
+                className="form-input"
+              >
+                <option value="">None</option>
+                {captains.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                VC sees the full tournament planner view alongside the captain.
+              </p>
             </div>
             <div>
               <label className="form-label">Total League Games</label>

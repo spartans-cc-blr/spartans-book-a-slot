@@ -11,6 +11,7 @@ interface Booking {
   slot_time: string
   format: string | null
   captain_id: string | null
+  vc_captain_id: string | null
   tournament: {
     id: string
     name: string
@@ -23,7 +24,7 @@ interface Booking {
 
 interface Captain { id: string; name: string }
 
-interface ViewerRole { isCaptain: boolean; isGC: boolean; isAdmin: boolean }
+interface ViewerRole { isCaptain: boolean; isGC: boolean; isAdmin: boolean; captainId: string | null; isVC: boolean }
 
 interface Props {
   bookings: Booking[]
@@ -88,15 +89,20 @@ function paceSignal(weeks: number | null): {
 
 // ── Captain bandwidth section ──────────────────────────────────────
 function BandwidthSection({
-  captains, bookings, announcedSet, today,
+  captains, bookings, announcedSet, today, viewerCaptainId,
 }: {
   captains: Captain[]
   bookings: Booking[]
   announcedSet: Set<string>
   today: string
+  viewerCaptainId: string | null
 }) {
   // Only bookings with a tournament assigned
   const tourneyBookings = bookings.filter(b => b.tournament)
+
+  const isCaptainView = !!viewerCaptainId
+  const myCaptain     = isCaptainView ? captains.find(c => c.id === viewerCaptainId) : null
+  const otherCaptains = isCaptainView ? captains.filter(c => c.id !== viewerCaptainId) : captains
 
   return (
     <section className="mb-10">
@@ -104,6 +110,11 @@ function BandwidthSection({
         Tournament Planner
       </p>
       <h1 className="font-cinzel text-xl font-bold text-gold mb-1">Captain Bandwidth</h1>
+      {isCaptainView && (
+        <p className="font-rajdhani text-sm text-zinc-500 mb-5">
+          Your tournament load — followed by other captains.
+        </p>
+      )}
       <p className="font-rajdhani text-sm text-zinc-500 mb-5">
         Total tournament game load per captain — completed, scheduled, and unbooked.
       </p>
@@ -123,7 +134,21 @@ function BandwidthSection({
       </div>
 
       <div className="flex flex-col gap-4">
-        {captains.map(captain => {
+        {/* Own bandwidth card — pinned to top for captain view */}
+        {isCaptainView && myCaptain && (
+          <>
+            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-500">Your bandwidth</p>
+            {renderCaptainCard(myCaptain, true)}
+            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-2">Other captains</p>
+          </>
+        )}
+        {(isCaptainView ? otherCaptains : captains).map(captain => renderCaptainCard(captain, false))}
+          </div>
+     </section>
+   )
+        
+        function renderCaptainCard(captain: Captain, isOwn: boolean) {
+
           const mine = tourneyBookings.filter(b => b.captain_id === captain.id)
           const completed = mine.filter(b => b.game_date < today)
           const scheduled = mine.filter(b => b.game_date >= today)
@@ -157,7 +182,13 @@ function BandwidthSection({
           return (
             <div
               key={captain.id}
-              className={`bg-ink-3 rounded-lg border ${isLowLoad ? 'border-emerald-800' : 'border-ink-5'} p-4`}
+              className={`bg-ink-3 rounded-lg border p-4 transition-opacity ${
+              isOwn
+                ? 'border-gold-dim ring-1 ring-gold/20'                          // own card — gold highlight
+                : isCaptainView
+                ? `${isLowLoad ? 'border-emerald-800' : 'border-ink-5'} opacity-60` // others — dimmed
+                : isLowLoad ? 'border-emerald-800' : 'border-ink-5'              // GC/Admin — full opacity
+            }`}
             >
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center font-cinzel text-gold text-sm font-bold flex-shrink-0">
@@ -180,7 +211,7 @@ function BandwidthSection({
                   </p>
                 </div>
               </div>
-
+            
               {/* Bandwidth bar */}
               <div className="h-3 rounded-full bg-zinc-800 overflow-hidden flex mb-2">
                 {doneW  > 0 && <div className="h-full bg-emerald-600 transition-all" style={{ width: `${doneW}%` }} />}
@@ -236,6 +267,7 @@ function BandwidthSection({
       </div>
     </section>
   )
+}
 }
 
 // ── Inline game count editor — admin only ─────────────────────────
@@ -772,6 +804,14 @@ export function TournamentPlannerClient({
   const [showOngoing,   setShowOngoing]   = useState(true)
   const [showCompleted, setShowCompleted] = useState(false)
 
+  const isCaptainView   = viewerRole.isCaptain && !!viewerRole.captainId
+  const myTournaments   = isCaptainView
+    ? sortedTournaments.filter(t => t.games.some(g => g.captain_id === viewerRole.captainId))
+    : sortedTournaments
+  const otherTournaments = isCaptainView
+    ? sortedTournaments.filter(t => t.games.every(g => g.captain_id !== viewerRole.captainId))
+    : []
+
   // Group bookings by tournament
   const tournamentMap = useMemo(() => {
     const map = new Map<string, { tournament: NonNullable<Booking['tournament']>; games: Booking[] }>()
@@ -814,6 +854,7 @@ export function TournamentPlannerClient({
         bookings={bookings}
         announcedSet={announcedSet}
         today={today}
+        viewerCaptainId={viewerRole.captainId}
       />
 
       {/* Tournament filter */}
@@ -857,19 +898,32 @@ export function TournamentPlannerClient({
            </button>
          </p>
         ) : (
-            sortedTournaments.map(({ tournament, games }) => (
-                <TournamentBlock
-                key={tournament.id}
-                tournament={tournament}
-                games={games}
-                announcedSet={announcedSet}
-                today={today}
-                isAdmin={viewerRole.isAdmin}
-                isGC={viewerRole.isGC}
-                />
-            ))
-        )}
-      </section>
-    </div>
-  )
-}
+              <>
+                {isCaptainView && myTournaments.length > 0 && (
+                  <>
+                    <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
+                      Your tournaments
+                    </p>
+                    {myTournaments.map(({ tournament, games }) => (
+                      <TournamentBlock key={tournament.id} tournament={tournament} games={games}
+                        announcedSet={announcedSet} today={today}
+                        isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC} />
+                    ))}
+                    {otherTournaments.length > 0 && (
+                      <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-6 mb-3">
+                        Other tournaments
+                      </p>
+                    )}
+                  </>
+                )}
+                {(isCaptainView ? otherTournaments : sortedTournaments).map(({ tournament, games }) => (
+                  <TournamentBlock key={tournament.id} tournament={tournament} games={games}
+                    announcedSet={announcedSet} today={today}
+                    isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC} />
+                ))}
+              </>
+            )}
+          </section>
+        </div>
+      )
+    }
