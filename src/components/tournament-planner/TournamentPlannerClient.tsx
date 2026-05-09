@@ -768,7 +768,9 @@ export function TournamentPlannerClient({
   bookings, announcedBookingIds, captains, today, viewerRole,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
-  const [filter, setFilter] = useState<'ongoing' | 'upcoming' | 'completed' | 'all'>('ongoing')
+  const [showUpcoming,  setShowUpcoming]  = useState(true)
+  const [showOngoing,   setShowOngoing]   = useState(true)
+  const [showCompleted, setShowCompleted] = useState(false)
 
   // Group bookings by tournament
   const tournamentMap = useMemo(() => {
@@ -795,13 +797,13 @@ export function TournamentPlannerClient({
          return { tournament, games, isCompleted, isUpcoming, isOngoing }
        })
        .filter(t => {
-         if (filter === 'ongoing')   return t.isOngoing
-         if (filter === 'upcoming')  return t.isUpcoming
-         if (filter === 'completed') return t.isCompleted
-         return true // 'all'
+         if (t.isCompleted) return showCompleted
+         if (t.isUpcoming)  return showUpcoming
+         if (t.isOngoing)   return showOngoing
+         return true
        })
        .sort((a, b) => b.games.length - a.games.length),
-     [tournamentMap, today, filter]
+     [tournamentMap, today, showUpcoming, showOngoing, showCompleted]
   )
 
   return (
@@ -815,27 +817,28 @@ export function TournamentPlannerClient({
       />
 
       {/* Tournament filter */}
-      <div className="flex items-center gap-2 mb-5 flex-wrap">
-        <span className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600">Show:</span>
-        {([
-          { key: 'ongoing',   label: 'Ongoing'   },
-          { key: 'upcoming',  label: 'Upcoming'  },
-          { key: 'completed', label: 'Completed' },
-          { key: 'all',       label: 'All'       },
-        ] as const).map(f => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`font-rajdhani text-xs font-bold px-3 py-1 rounded-full border transition-colors ${
-              filter === f.key
-                ? 'bg-gold/10 border-gold-dim text-gold'
-                : 'border-ink-5 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+       <div className="flex items-center gap-5 mb-5 flex-wrap">
+         <span className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600">Show:</span>
+         {([
+           { label: 'Upcoming',  checked: showUpcoming,  set: setShowUpcoming  },
+           { label: 'Ongoing',   checked: showOngoing,   set: setShowOngoing   },
+           { label: 'Completed', checked: showCompleted, set: setShowCompleted },
+         ]).map(({ label, checked, set }) => (
+           <label key={label} className="flex items-center gap-2 cursor-pointer group">
+             <input
+               type="checkbox"
+               checked={checked}
+               onChange={e => set(e.target.checked)}
+               className="accent-gold w-3.5 h-3.5 cursor-pointer"
+             />
+             <span className={`font-rajdhani text-xs font-semibold tracking-wide transition-colors ${
+               checked ? 'text-zinc-300' : 'text-zinc-600'
+             }`}>
+               {label}
+             </span>
+           </label>
+         ))}
+       </div>
 
       {/* Section 2 — By Tournament */}
       <section>
@@ -844,12 +847,15 @@ export function TournamentPlannerClient({
           Organiser pace, game scheduling frequency, and slot balance per tournament.
         </p>
         {sortedTournaments.length === 0 ? (
-           <p className="font-rajdhani text-sm text-zinc-600">
-             No {filter === 'all' ? '' : filter} tournaments found.{' '}
-             {filter !== 'all' && (
-               <button onClick={() => setFilter('all')} className="text-gold underline">Show all</button>
-             )}
-           </p>
+         <p className="font-rajdhani text-sm text-zinc-600">
+           No tournaments match the selected filters.{' '}
+           <button
+             onClick={() => { setShowUpcoming(true); setShowOngoing(true); setShowCompleted(true) }}
+             className="text-gold underline"
+           >
+             Show all
+           </button>
+         </p>
         ) : (
             sortedTournaments.map(({ tournament, games }) => (
                 <TournamentBlock
