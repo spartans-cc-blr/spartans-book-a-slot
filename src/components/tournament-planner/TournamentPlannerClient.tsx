@@ -734,7 +734,7 @@ export function TournamentPlannerClient({
 
   // Sort tournaments: most games first
   const sortedTournaments = useMemo(() =>
-    [...tournamentMap.values()].sort((a, b) => b.games.length - a.games.length),
+    Array.from(tournamentMap.values()).sort((a, b) => b.games.length - a.games.length),
     [tournamentMap]
   )
 
