@@ -13,6 +13,7 @@ type Tournament = {
   active: boolean
   created_at: string
   total_league_games: number | null
+  vc_captain_id: string | null
 }
 
 const BALL_LABELS = { red: '🔴 Red', white: '⚪ White', pink: '🩷 Pink' }
@@ -24,7 +25,7 @@ export default function AdminTournamentsPage() {
   const [editingId,   setEditingId]   = useState<string | null>(null)
   const [editForm,    setEditForm]    = useState<Partial<Tournament>>({})
   const [showAdd,     setShowAdd]     = useState(false)
-  const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '', total_league_games: '' as string })
+  const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '', total_league_games: '' as string, vc_captain_id: '' as string })
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
   const [captains, setCaptains] = useState<{ id: string; name: string }[]>([])
@@ -34,7 +35,7 @@ export default function AdminTournamentsPage() {
       fetch('/api/tournaments').then(r => r.json()),
       fetch('/api/grounds').then(r => r.json()),
       fetch('/api/captains').then(r => r.json()),
-    ]).then(([t, g]) => {
+    ]).then(([t, g, c]) => {
       setTournaments(t.tournaments ?? [])
       setGrounds(g.grounds ?? [])
       setCaptains(c.captains ?? [])
@@ -44,7 +45,7 @@ export default function AdminTournamentsPage() {
 
   function startEdit(t: Tournament) {
     setEditingId(t.id)
-    setEditForm({ name: t.name, organiser_name: t.organiser_name ?? '', organiser_contact: t.organiser_contact ?? '', ball_type: t.ball_type, ground_id: t.ground_id ?? '', active: t.active, total_league_games: t.total_league_games, })
+    setEditForm({ name: t.name, organiser_name: t.organiser_name ?? '', organiser_contact: t.organiser_contact ?? '', ball_type: t.ball_type, ground_id: t.ground_id ?? '', active: t.active, total_league_games: t.total_league_games, vc_captain_id: t.vc_captain_id ?? '' })
     setError('')
   }
 
@@ -97,7 +98,7 @@ export default function AdminTournamentsPage() {
       const d = await res.json()
       setTournaments(prev => [d.tournament, ...prev])
       setShowAdd(false)
-      setAddForm({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white', ground_id: '', total_league_games: '' })
+      setAddForm({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white', ground_id: '', total_league_games: '', vc_captain_id: '' })
     } else {
       setError('Failed to add tournament.')
     }
