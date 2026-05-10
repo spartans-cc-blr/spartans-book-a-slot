@@ -487,7 +487,7 @@ function TournamentBlock({
         /* Collapsed: just show stat bar + pace timeline */
         <div className="px-4 pb-3">
           {/* mini timeline bar */}
-          <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-zinc-800 mt-1">
+        <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-parchment-3 mt-1">
             {sortedGames.map((g, i) => (
               <div
                 key={g.id}
@@ -515,7 +515,7 @@ function TournamentBlock({
 
         {/* Total — editable by admin */}
         <div className="px-3 py-2.5 text-center">
-            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Total</p>
+            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-stone-500">Total</p>
             {isAdmin ? (
             <InlineGameCountEditor
                 tournamentId={tournament.id}
@@ -525,28 +525,28 @@ function TournamentBlock({
             ) : (
             <p className="font-cinzel text-lg font-bold text-parchment">{totalLeague}</p>
             )}
-            <p className="font-rajdhani text-[9px] text-zinc-600">league games</p>
+            <p className="font-rajdhani text-[9px] text-stone-500">league games</p>
         </div>
 
         {/* Completed */}
         <div className="px-3 py-2.5 text-center border-l border-ink-5">
             <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Completed</p>
-            <p className="font-cinzel text-lg font-bold text-emerald-400">{completed.length}</p>
-            <p className="font-rajdhani text-[9px] text-zinc-600">announced + past</p>
+<p className="font-cinzel text-lg font-bold text-emerald-700">{completed.length}</p>
+            <p className="font-rajdhani text-[9px] text-stone-500">announced + past</p>
         </div>
 
         {/* Scheduled */}
         <div className="px-3 py-2.5 text-center border-l border-ink-5">
             <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Scheduled</p>
-            <p className="font-cinzel text-lg font-bold text-amber-400">{scheduled.length}</p>
-            <p className="font-rajdhani text-[9px] text-zinc-600">booked, upcoming</p>
+            <p className="font-cinzel text-lg font-bold text-amber-700">{scheduled.length}</p>
+            <p className="font-rajdhani text-[9px] text-stone-500">booked, upcoming</p>
         </div>
 
         {/* Unbooked */}
         <div className="px-3 py-2.5 text-center border-l border-ink-5">
             <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Unbooked</p>
-            <p className="font-cinzel text-lg font-bold text-zinc-400">{unbooked}</p>
-            <p className="font-rajdhani text-[9px] text-zinc-600">games remaining</p>
+            <p className="font-cinzel text-lg font-bold text-stone-500">{unbooked}</p>
+            <p className="font-rajdhani text-[9px] text-stone-500">games remaining</p>
         </div>
 
         {/* Avg gap */}
@@ -559,7 +559,7 @@ function TournamentBlock({
             }`}>
             {gap !== null ? `${gap}w` : '—'}
             </p>
-            <p className="font-rajdhani text-[9px] text-zinc-600">
+            <p className="font-rajdhani text-[9px] text-stone-500">
             {gap === null ? 'not enough games' : gap <= 1 ? '⚠ very frequent' : gap >= 3 ? 'slow pace' : 'good pace'}
             </p>
         </div>
@@ -599,7 +599,7 @@ function TournamentBlock({
               </p>
               <p className="font-rajdhani text-[10px] text-zinc-700">each block = 1 game</p>
             </div>
-            <div className="flex gap-0.5 h-4 rounded overflow-hidden bg-zinc-800">
+            <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-parchment-3 mt-1">
               {sortedGames.map(g => (
                 <div
                   key={g.id}
@@ -738,16 +738,17 @@ function GameRow({ game, gap, isDone = false }: { game: Booking; gap: string; is
   const dayName = d.getDay() === 6 ? 'Sat' : 'Sun'
   const isSat = dayName === 'Sat'
   const gapNum = parseInt(gap)
-  const gapColor = isNaN(gapNum) ? 'text-zinc-600'
-    : gapNum <= 1 ? 'text-red-400'
-    : gapNum >= 3 ? 'text-amber-400'
-    : 'text-emerald-400'
+  const gapColor = isNaN(gapNum) ? 'text-stone-400'
+  : gapNum <= 1 ? 'text-red-600'
+  : gapNum >= 3 ? 'text-amber-600'
+  : 'text-emerald-700'
+
 
   return (
     <div className={`grid grid-cols-[44px_1fr_auto] gap-0 border border-ink-5 rounded overflow-hidden ${isDone ? 'opacity-55' : ''}`}>
       {/* Date block */}
-      <div className="bg-ink-4 flex flex-col items-center justify-center py-2 border-r border-ink-5">
-        <span className="font-cinzel text-base font-bold text-parchment leading-none">
+      <div className="bg-parchment-3 flex flex-col items-center justify-center py-2 border-r border-ink-5">       
+        <span className="font-cinzel text-base font-bold text-ink leading-none">
           {format(d, 'd')}
         </span>
         <span className="font-rajdhani text-[9px] text-zinc-500 uppercase">
@@ -759,18 +760,18 @@ function GameRow({ game, gap, isDone = false }: { game: Booking; gap: string; is
       <div className="px-2.5 py-2 flex flex-col gap-0.5">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-            isSat ? 'bg-blue-900/40 text-blue-400' : 'bg-pink-900/30 text-pink-400'
+            isSat ? 'bg-blue-100 text-blue-700 border border-blue-300' : 'bg-pink-100 text-pink-700 border border-pink-300'
           }`}>{dayName}</span>
-          <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
+          <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">
             {game.slot_time}
           </span>
-          <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
+          <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">
             {game.format}
           </span>
         </div>
-        <div className="font-rajdhani text-xs text-zinc-400">
+        <div className="font-rajdhani text-xs text-ink-3">
           Captain: {game.captain
-            ? <PlayerNameLink name={game.captain.name} className="text-blue-400" />
+            ? <PlayerNameLink name={game.captain.name} className="text-amber-700 font-semibold" />
             : <span className="text-zinc-600">Unassigned</span>
           }
         </div>
