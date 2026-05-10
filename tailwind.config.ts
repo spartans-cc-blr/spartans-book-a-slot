@@ -10,22 +10,27 @@ const config: Config = {
     extend: {
       colors: {
         gold: {
-          DEFAULT: '#C9A84C',
-          light: '#E8C97A',
-          dim: '#7A6030',
-          glow: 'rgba(201,168,76,0.15)',
+          DEFAULT: '#8B5E1A',
+          light: '#B07D2A',
+          dim: '#C9A84C',
+          glow: 'rgba(139,94,26,0.12)',
         },
         crimson: {
-          DEFAULT: '#C0132C',
-          dark: '#8B0000',
+          DEFAULT: '#B01020',
+          dark: '#7A0010',
         },
         ink: {
-          DEFAULT: '#080808',
-          2: '#111111',
-          3: '#1A1A1A',
-          4: '#242424',
-          5: '#2E2E2E',
+          DEFAULT: '#1A1208',
+          2: '#2C2010',
+          3: '#3D3018',
+          4: '#EDE0C4',
+          5: '#D6C8A8',
         },
+parchment: {
+    DEFAULT: '#F5EDD8',     // page background
+    2: '#EDE0C4',           // card surface
+    3: '#E0CFA8',           // slightly deeper card
+},
       },
       fontFamily: {
         cinzel: ['Cinzel', 'serif'],
