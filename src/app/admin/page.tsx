@@ -25,8 +25,7 @@ export default async function AdminDashboard({
     .gte('game_date', today)
     .order('game_date')
     .order('slot_time')
-    .limit(100) as { data: Booking[] | null }
-
+    .limit(100)
 
    console.log('[admin] today:', today)
    console.log('[admin] bookings length:', bookings?.length ?? 'NULL')
