@@ -28,7 +28,9 @@ export default async function AdminDashboard({
     .limit(100) as { data: Booking[] | null }
 
 
-  console.log('[admin dashboard] today:', today, '| bookings count:', bookings?.length)
+   console.log('[admin] today:', today)
+   console.log('[admin] bookings length:', bookings?.length ?? 'NULL')
+   console.log('[admin] first booking:', JSON.stringify(bookings?.[0] ?? null))
 
   const { data: captains }     = await supabase.from('captains').select('id, name').eq('active', true).order('name')
 const { data: grounds }      = await supabase.from('grounds').select('id, name').order('name')
