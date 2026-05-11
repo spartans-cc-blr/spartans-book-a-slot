@@ -70,9 +70,12 @@ export const authOptions: NextAuthOptions = {
   },
 
   session: {
-    strategy: 'jwt',
-    maxAge:   8 * 60 * 60,
-  },
+     strategy: 'jwt',
+     maxAge:   30 * 24 * 60 * 60,  // 30 days
+   },
+   jwt: {
+     maxAge:   30 * 24 * 60 * 60,  // must match session — if jwt expires first, session appears valid but requests fail
+   },
 }
 
 export default NextAuth(authOptions)
