@@ -20,7 +20,7 @@ export default async function AdminDashboard({
   // Upcoming confirmed bookings + soft blocks
   const { data: bookings } = await supabase
     .from('bookings')
-    .select('*, captain:captains(*), tournament:tournaments(*)')
+    .select('*, captain:captains(id, name), tournament:tournaments(id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id)')
     .neq('status', 'cancelled')
     .gte('game_date', today)
     .order('game_date')
