@@ -8,7 +8,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { format, parseISO } from 'date-fns'
 
 const SKILLS = [
   'Right Hand Opening Batsman',
@@ -197,87 +196,6 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-ink grain">
         <SiteNav activePage="profile" />
-        {/* ── Dashboard Stats ── */}
-        {dashboard && (
-          <div className="bg-ink-1 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-5">
-            <div className="max-w-2xl space-y-3">
-
-              <div className="grid grid-cols-3 gap-3">
-                {/* Wallet */}
-                <div className={`rounded-lg border px-4 py-3 ${
-                  (profile?.wallet_balance ?? 0) < 0 ? 'bg-amber-950/30 border-amber-800/60' : 'bg-ink-2 border-ink-5'
-                }`}>
-                  <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Wallet</p>
-                  <p className={`font-cinzel text-lg font-bold ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    ₹{profile?.wallet_balance ?? 0}
-                  </p>
-                  {(profile?.wallet_balance ?? 0) < 0 && (
-                    <p className="font-rajdhani text-[9px] text-amber-500 mt-0.5">Dues outstanding</p>
-                  )}
-                </div>
-
-                {/* Pending availability */}
-                <div className={`rounded-lg border px-4 py-3 ${
-                  dashboard.pendingCount > 0 ? 'bg-amber-950/30 border-amber-800/60' : 'bg-ink-2 border-ink-5'
-                }`}>
-                  <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Pending</p>
-                  <p className={`font-cinzel text-lg font-bold ${dashboard.pendingCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {dashboard.pendingCount}
-                  </p>
-                  <p className="font-rajdhani text-[9px] text-zinc-500 mt-0.5">
-                    {dashboard.pendingCount > 0 ? 'Need response' : 'All marked ✓'}
-                  </p>
-                </div>
-
-                {/* Upcoming fixtures */}
-                <div className="rounded-lg border bg-ink-2 border-ink-5 px-4 py-3">
-                  <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Fixtures</p>
-                  <p className="font-cinzel text-lg font-bold text-parchment">{dashboard.upcomingCount}</p>
-                  <p className="font-rajdhani text-[9px] text-zinc-500 mt-0.5">Upcoming</p>
-                </div>
-              </div>
-
-              {/* Next match */}
-              {dashboard.nextMatch && (
-                <a href={`/fixtures/${dashboard.nextMatch.id}`}
-                  className="block rounded-lg border border-ink-5 bg-ink-2 px-4 py-3 hover:border-gold/40 transition-colors">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Next Match</p>
-                      <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
-                        {dashboard.nextMatch.opponent_name
-                          ? `vs ${dashboard.nextMatch.opponent_name}`
-                          : dashboard.nextMatch.tournament?.name ?? 'TBD'}
-                      </p>
-                      <p className="font-rajdhani text-xs text-zinc-500">
-                        {new Date(dashboard.nextMatch.game_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        {' · '}{dashboard.nextMatch.slot_time}
-                      </p>
-                    </div>
-                    <div className="flex-shrink-0">
-                      {dashboard.nextMatchResponse ? (
-                        <span className={`font-rajdhani text-xs font-bold px-2.5 py-1 rounded border ${
-                          dashboard.nextMatchResponse === 'Y' ? 'bg-emerald-950/50 border-emerald-700 text-emerald-400' :
-                          dashboard.nextMatchResponse === 'N' ? 'bg-red-950/50 border-red-800 text-red-400' :
-                          dashboard.nextMatchResponse === 'O' ? 'bg-blue-950/50 border-blue-800 text-blue-400' :
-                          dashboard.nextMatchResponse === 'E' ? 'bg-purple-950/50 border-purple-800 text-purple-400' :
-                          'bg-zinc-900 border-zinc-700 text-zinc-400'
-                        }`}>
-                          {dashboard.nextMatchResponse}
-                        </span>
-                      ) : (
-                        <span className="font-rajdhani text-[10px] font-bold px-2.5 py-1 rounded border bg-amber-950/40 border-amber-700 text-amber-400">
-                          Mark →
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </a>
-              )}
-
-            </div>
-          </div>
-        )}
         <div className="px-5 py-8 space-y-3 animate-pulse max-w-2xl mx-auto mt-8">
           {[0, 1, 2].map(i => <div key={i} className="h-16 bg-ink-3 rounded border border-ink-5" />)}
         </div>
@@ -301,7 +219,87 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-ink grain">
       <SiteNav activePage="profile" />
+      {/* ── Dashboard Stats ── */}
+              {dashboard && (
+                <div className="bg-ink-1 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-5">
+                  <div className="max-w-2xl space-y-3">
 
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* Wallet */}
+                      <div className={`rounded-lg border px-4 py-3 ${
+                        (profile?.wallet_balance ?? 0) < 0 ? 'bg-amber-950/30 border-amber-800/60' : 'bg-ink-2 border-ink-5'
+                      }`}>
+                        <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Wallet</p>
+                        <p className={`font-cinzel text-lg font-bold ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          ₹{profile?.wallet_balance ?? 0}
+                        </p>
+                        {(profile?.wallet_balance ?? 0) < 0 && (
+                          <p className="font-rajdhani text-[9px] text-amber-500 mt-0.5">Dues outstanding</p>
+                        )}
+                      </div>
+
+                      {/* Pending availability */}
+                      <div className={`rounded-lg border px-4 py-3 ${
+                        dashboard.pendingCount > 0 ? 'bg-amber-950/30 border-amber-800/60' : 'bg-ink-2 border-ink-5'
+                      }`}>
+                        <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Pending</p>
+                        <p className={`font-cinzel text-lg font-bold ${dashboard.pendingCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {dashboard.pendingCount}
+                        </p>
+                        <p className="font-rajdhani text-[9px] text-zinc-500 mt-0.5">
+                          {dashboard.pendingCount > 0 ? 'Need response' : 'All marked ✓'}
+                        </p>
+                      </div>
+
+                      {/* Upcoming fixtures */}
+                      <div className="rounded-lg border bg-ink-2 border-ink-5 px-4 py-3">
+                        <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Fixtures</p>
+                        <p className="font-cinzel text-lg font-bold text-parchment">{dashboard.upcomingCount}</p>
+                        <p className="font-rajdhani text-[9px] text-zinc-500 mt-0.5">Upcoming</p>
+                      </div>
+                    </div>
+
+                    {/* Next match */}
+                    {dashboard.nextMatch && (
+                      <a href={`/fixtures/${dashboard.nextMatch.id}`}
+                        className="block rounded-lg border border-ink-5 bg-ink-2 px-4 py-3 hover:border-gold/40 transition-colors">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Next Match</p>
+                            <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
+                              {dashboard.nextMatch.opponent_name
+                                ? `vs ${dashboard.nextMatch.opponent_name}`
+                                : dashboard.nextMatch.tournament?.name ?? 'TBD'}
+                            </p>
+                            <p className="font-rajdhani text-xs text-zinc-500">
+                              {new Date(dashboard.nextMatch.game_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {' · '}{dashboard.nextMatch.slot_time}
+                            </p>
+                          </div>
+                          <div className="flex-shrink-0">
+                            {dashboard.nextMatchResponse ? (
+                              <span className={`font-rajdhani text-xs font-bold px-2.5 py-1 rounded border ${
+                                dashboard.nextMatchResponse === 'Y' ? 'bg-emerald-950/50 border-emerald-700 text-emerald-400' :
+                                dashboard.nextMatchResponse === 'N' ? 'bg-red-950/50 border-red-800 text-red-400' :
+                                dashboard.nextMatchResponse === 'O' ? 'bg-blue-950/50 border-blue-800 text-blue-400' :
+                                dashboard.nextMatchResponse === 'E' ? 'bg-purple-950/50 border-purple-800 text-purple-400' :
+                                'bg-zinc-900 border-zinc-700 text-zinc-400'
+                              }`}>
+                                {dashboard.nextMatchResponse}
+                              </span>
+                            ) : (
+                              <span className="font-rajdhani text-[10px] font-bold px-2.5 py-1 rounded border bg-amber-950/40 border-amber-700 text-amber-400">
+                                Mark →
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </a>
+                    )}
+
+                  </div>
+                </div>
+              )}
       {/* Hero */}
       <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
