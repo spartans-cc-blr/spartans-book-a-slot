@@ -9,33 +9,36 @@
 
 @layer base {
   body {
-    background-color: #F8F4EE;
-    color: #1C1917;
+    background-color: #080808;
+    color: #F0E8D0;
   }
 
+  /* Scrollbar */
   ::-webkit-scrollbar       { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: #EEEAE2; }
-  ::-webkit-scrollbar-thumb { background: #D97706; border-radius: 2px; }
+  ::-webkit-scrollbar-track { background: #111; }
+  ::-webkit-scrollbar-thumb { background: #7A6030; border-radius: 2px; }
 }
-
 
 @layer components {
-  .form-label { @apply font-rajdhani text-xs font-bold tracking-wide uppercase text-stone-500 mb-1.5 block; }
-  .form-input { @apply w-full bg-parchment-3 border border-ink-5 text-ink font-rajdhani text-sm px-3 py-2.5 rounded focus:outline-none focus:border-gold transition-colors placeholder:text-stone-400; }
+  /* Form inputs */
+  .form-label { @apply font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500 mb-1.5 block; }
+  .form-input { @apply w-full bg-zinc-900 border border-zinc-700 text-zinc-100 font-rajdhani text-sm px-3 py-2.5 rounded focus:outline-none focus:border-yellow-700 transition-colors placeholder:text-zinc-600; }
 }
 
-
 @layer utilities {
+  .font-cinzel   { font-family: var(--font-cinzel); }
+  .font-rajdhani { font-family: var(--font-rajdhani); }
+
   /* Slot status colours */
-  .slot-open      { @apply bg-emerald-50  border border-emerald-500 text-emerald-800; }
-  .slot-booked    { @apply bg-red-50      border border-red-400     text-red-800; }
-  .slot-softblock { @apply bg-amber-50    border border-amber-400   text-amber-800; }
-  .slot-clash     { @apply bg-parchment-3 border border-ink-5       text-stone-400; }
+  .slot-open      { @apply bg-emerald-950 border border-emerald-800 text-emerald-400; }
+  .slot-booked    { @apply bg-red-950     border border-red-900     text-red-400; }
+  .slot-softblock { @apply bg-yellow-950  border border-yellow-800  text-yellow-500; }
+  .slot-clash     { @apply bg-ink-3       border border-ink-5       text-zinc-600; }
 
   /* Gold divider */
   .gold-divider {
     height: 1px;
-    background: linear-gradient(90deg, transparent, #D97706, transparent);
+    background: linear-gradient(90deg, transparent, #7A6030, transparent);
   }
 
   /* Grain texture overlay */
@@ -61,16 +64,3 @@
   50%       { box-shadow: 0 0 0 3px rgba(52,212,100,0.12); }
 }
 .animate-pulse-open { animation: pulseOpen 3s ease infinite; }
-
-/* Light theme zinc overrides */
-.text-zinc-100 { color: #1C1917; }
-.text-zinc-200 { color: #292524; }
-.text-zinc-300 { color: #44403C; }
-.text-zinc-400 { color: #57534E; }
-.text-zinc-500 { color: #78716C; }
-.text-zinc-600 { color: #57534E; }
-.bg-zinc-900   { background-color: #EEEAE2; }
-.bg-zinc-800   { background-color: #E2DACE; }
-.border-zinc-700 { border-color: #D4C9B0; }
-.border-zinc-800 { border-color: #D4C9B0; }
-
