@@ -23,8 +23,8 @@ export default async function TournamentPlannerPage() {
   const { data: rawBookings } = await supabase
     .from('bookings')
     .select(`
-      id, game_date, slot_time, format, captain_id,vc_captain_id,
-      tournament:tournaments!bookings_tournament_id_fkey(id, name, organiser_name, organiser_contact, total_league_games),
+      id, game_date, slot_time, format, captain_id,
+      tournament:tournaments!bookings_tournament_id_fkey(id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id),
       captain:captains!bookings_captain_id_fkey(id, name)
     `)
     .eq('status', 'confirmed')

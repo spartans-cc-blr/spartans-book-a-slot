@@ -17,6 +17,7 @@ interface Booking {
     organiser_name: string | null
     organiser_contact: string | null
     total_league_games: number | null
+    vc_captain_id: string | null
   } | null
   captain: { id: string; name: string } | null
 }
