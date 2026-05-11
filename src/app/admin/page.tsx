@@ -18,19 +18,15 @@ export default async function AdminDashboard({
   const today    = format(new Date(), 'yyyy-MM-dd')
 
   // Upcoming confirmed bookings + soft blocks
-  const { data: bookings, error: bookingsError } = await supabase
+  const { data: bookings } = await supabase
     .from('bookings')
-    .select('*, captain:captains(id, name), tournament:tournaments(id, name)')
+    .select('*, captain:captains!bookings_captain_id_fkey(id, name), tournament:tournaments(id, name)')
     .neq('status', 'cancelled')
     .gte('game_date', today)
     .order('game_date')
     .order('slot_time')
-    .limit(100)
-
-   console.log('[admin] today:', today)
-   console.log('[admin] bookings length:', bookings?.length ?? 'NULL')
-   console.log('[admin] first booking:', JSON.stringify(bookings?.[0] ?? null))
-   console.log('[admin] bookings error:', bookingsError)
+    .limit(100) as { data: Booking[] | null }
+)
 
   const { data: captains }     = await supabase.from('captains').select('id, name').eq('active', true).order('name')
 const { data: grounds }      = await supabase.from('grounds').select('id, name').order('name')
