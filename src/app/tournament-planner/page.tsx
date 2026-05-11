@@ -24,7 +24,7 @@ export default async function TournamentPlannerPage() {
     .from('bookings')
     .select(`
       id, game_date, slot_time, format, captain_id,vc_captain_id,
-      tournament:tournaments!bookings_tournament_id_fkey(id, name, organiser_name, organiser_contact, total_league_games,vc_captain_id),
+      tournament:tournaments!bookings_tournament_id_fkey(id, name, organiser_name, organiser_contact, total_league_games),
       captain:captains!bookings_captain_id_fkey(id, name)
     `)
     .eq('status', 'confirmed')
@@ -53,7 +53,7 @@ export default async function TournamentPlannerPage() {
   // 3. All active captains
   const { data: captains } = await supabase
     .from('captains')
-    .select('id, name, vc_player_id')
+    .select('id, name')
     .eq('active', true)
     .order('name')
 

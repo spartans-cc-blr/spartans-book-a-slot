@@ -11,7 +11,6 @@ interface Booking {
   slot_time: string
   format: string | null
   captain_id: string | null
-  vc_captain_id: string | null
   tournament: {
     id: string
     name: string
