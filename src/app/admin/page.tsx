@@ -26,7 +26,7 @@ export default async function AdminDashboard({
     .order('game_date')
     .order('slot_time')
     .limit(100) as { data: Booking[] | null }
-)
+
 
   const { data: captains }     = await supabase.from('captains').select('id, name').eq('active', true).order('name')
 const { data: grounds }      = await supabase.from('grounds').select('id, name').order('name')
