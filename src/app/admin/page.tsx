@@ -40,6 +40,9 @@ const { data: tournamentsMd } = await supabase.from('tournaments').select('id, n
   )
   const softBlocks = (bookings ?? []).filter(b => b.status === 'soft_block')
 
+  const today = format(new Date(), 'yyyy-MM-dd')
+  console.log('[admin dashboard] today:', today, '| bookings count:', bookings?.length)
+
   return (
     <div>
       <div className="mb-6">
