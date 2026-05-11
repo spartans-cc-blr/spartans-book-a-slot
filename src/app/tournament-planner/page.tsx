@@ -36,7 +36,7 @@ export default async function TournamentPlannerPage() {
      ...b,
      tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
      captain:    Array.isArray(b.captain)    ? b.captain[0]    ?? null : b.captain,
-    })) as Array<{
+    })) as unknown as Array<{
      id: string
      game_date: string
      slot_time: string
