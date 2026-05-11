@@ -36,7 +36,22 @@ export default async function TournamentPlannerPage() {
      ...b,
      tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
      captain:    Array.isArray(b.captain)    ? b.captain[0]    ?? null : b.captain,
-   }))
+    })) as Array<{
+     id: string
+     game_date: string
+     slot_time: string
+     format: string | null
+     captain_id: string | null
+     tournament: {
+       id: string
+       name: string
+       organiser_name: string | null
+       organiser_contact: string | null
+       total_league_games: number | null
+       vc_captain_id: string | null
+     } | null
+     captain: { id: string; name: string } | null
+   }>
 
   // 2. Squad status per booking — only need announced rows to determine "completed"
   //    A game is "completed" when game_date < today AND squad status = announced.
