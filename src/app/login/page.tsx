@@ -34,7 +34,7 @@ function LoginForm() {
           )}
 
           <button
-            onClick={() => signIn('google', { callbackUrl: '/admin' })}
+            onClick={() => signIn('google', { callbackUrl: '/profile' })}
             className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-800 font-rajdhani font-bold text-sm tracking-wide py-3 px-4 rounded transition-colors">
             <GoogleIcon />
             Continue with Google
