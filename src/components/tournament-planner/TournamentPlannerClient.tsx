@@ -582,8 +582,6 @@ function TournamentBlock({
 
   const allDates = games.map(g => g.game_date).sort()
   const gap = avgGapWeeks(allDates)
-
-  const pace = paceSignal(gap, unbooked, lastGameDate, today)
   
   // Slot balance counts
   const slotCounts = Object.fromEntries(
