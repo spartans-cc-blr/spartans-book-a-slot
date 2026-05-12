@@ -352,6 +352,196 @@ function InlineGameCountEditor({
   )
 }
 
+// ── Pace timeline ──────────────────────────────────────────────────
+function PaceTimeline({ sortedGames, avgGap, today }: {
+  sortedGames: Booking[]
+  avgGap: number | null
+  today: string
+}) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+
+  if (sortedGames.length < 2) return null
+
+  const start   = parseISO(sortedGames[0].game_date).getTime()
+  const end     = parseISO(sortedGames[sortedGames.length - 1].game_date).getTime()
+  const totalMs = end - start || 1
+
+  // Per-game gap in weeks
+  const gameGaps = sortedGames.map((g, i) => {
+    if (i === 0) return null
+    return Math.round(
+      differenceInDays(parseISO(g.game_date), parseISO(sortedGames[i - 1].game_date)) / 7
+    )
+  })
+
+  const allGaps    = gameGaps.filter((g): g is number => g !== null)
+  const fastestGap = allGaps.length ? Math.min(...allGaps) : null
+  const slowestGap = allGaps.length ? Math.max(...allGaps) : null
+  const isUneven   = allGaps.length > 1 && (slowestGap! - fastestGap! > 2)
+
+  function gapColor(gap: number | null, avg: number | null): string {
+    if (gap === null) return '#6B6B66'
+    if (gap <= 1)     return '#E24B4A'
+    if (avg !== null && gap > avg + 2) return '#BA7517'
+    return '#639922'
+  }
+
+  function gapRelLabel(gap: number | null, avg: number | null): string {
+    if (gap === null) return 'first game'
+    if (avg === null) return `${gap}w`
+    if (gap <= 1)     return `${gap}w — too fast`
+    if (gap < avg)    return `${gap}w ↑ faster than avg`
+    if (gap > avg)    return `${gap}w ↓ slower than avg`
+    return `${gap}w ✓ on pace`
+  }
+
+  // Expected cadence tick positions (evenly spaced)
+  const expectedPcts = sortedGames.map((_, i) =>
+    sortedGames.length > 1 ? (i / (sortedGames.length - 1)) * 100 : 0
+  )
+
+  // Actual positions by date
+  const actualPcts = sortedGames.map(g =>
+    ((parseISO(g.game_date).getTime() - start) / totalMs) * 100
+  )
+
+  return (
+    <div className="px-4 py-3 border-b border-ink-5">
+      {/* Header + legend */}
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600">
+          Game timeline — pace view
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          {[
+            { col: '#E24B4A', label: '≤1w (too fast)' },
+            { col: '#639922', label: 'On / ahead of avg' },
+            { col: '#BA7517', label: 'Behind avg' },
+          ].map(({ col, label }) => (
+            <div key={label} className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full" style={{ background: col }} />
+              <span className="font-rajdhani text-[9px] text-zinc-600">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Timeline */}
+      <div className="relative h-14 mb-1">
+        {/* Track */}
+        <div className="absolute top-5 left-0 right-0 h-2 bg-zinc-800 rounded-full" />
+
+        {/* Expected cadence dashes */}
+        {expectedPcts.map((pct, i) => (
+          <div
+            key={`exp-${i}`}
+            className="absolute top-3 w-px h-6"
+            style={{
+              left: `${pct}%`,
+              transform: 'translateX(-50%)',
+              borderLeft: '1px dashed #3A3A2A',
+            }}
+          />
+        ))}
+
+        {/* Actual game dots */}
+        {sortedGames.map((g, i) => {
+          const col     = gapColor(gameGaps[i], avgGap)
+          const pct     = actualPcts[i]
+          const isHover = hoveredIdx === i
+          const isDone  = g.game_date < today
+
+          return (
+            <div
+              key={g.id}
+              className="absolute"
+              style={{ left: `${pct}%`, top: 0, transform: 'translateX(-50%)', zIndex: 2 }}
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
+            >
+              {/* Dot */}
+              <div
+                className="rounded-full border-2 transition-all duration-150 cursor-pointer"
+                style={{
+                  width:       isHover ? 20 : 16,
+                  height:      isHover ? 20 : 16,
+                  marginTop:   isHover ? 2 : 4,
+                  background:  isDone ? '#2A2A1E' : col,
+                  borderColor: col,
+                  boxShadow:   isHover ? `0 0 8px ${col}` : 'none',
+                  opacity:     isDone ? 0.6 : 1,
+                }}
+              />
+
+              {/* Tooltip */}
+              {isHover && (
+                <div
+                  className="absolute bg-ink-2 border border-ink-5 rounded-lg shadow-xl z-10 pointer-events-none"
+                  style={{
+                    bottom: 28,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    minWidth: 130,
+                    padding: '6px 10px',
+                  }}
+                >
+                  <p className="font-cinzel text-xs font-bold text-parchment">
+                    {format(parseISO(g.game_date), 'd MMM')}
+                  </p>
+                  <p className="font-rajdhani text-[10px] mt-0.5" style={{ color: col }}>
+                    {gapRelLabel(gameGaps[i], avgGap)}
+                  </p>
+                  <p className="font-rajdhani text-[9px] text-zinc-600">
+                    Game {i + 1} of {sortedGames.length}
+                    {isDone ? ' · completed' : ''}
+                  </p>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Date axis */}
+      <div className="relative h-4 mb-3">
+        {sortedGames.map((g, i) => (
+          <div
+            key={g.id}
+            className="absolute font-rajdhani text-[9px] text-zinc-700 whitespace-nowrap"
+            style={{ left: `${actualPcts[i]}%`, transform: 'translateX(-50%)' }}
+          >
+            {format(parseISO(g.game_date), 'd MMM')}
+          </div>
+        ))}
+      </div>
+
+      {/* Summary strip */}
+      <div className="bg-ink-4 border border-ink-5 rounded-lg px-3 py-2 flex items-center gap-4 flex-wrap">
+        {[
+          { label: 'Avg gap',    val: avgGap !== null ? `${avgGap}w` : '—',
+            col: avgGap === null ? 'text-zinc-500' : avgGap <= 1 ? 'text-red-400' : avgGap >= 3 ? 'text-amber-400' : 'text-emerald-400' },
+          { label: 'Fastest',   val: fastestGap !== null ? `${fastestGap}w` : '—', col: 'text-red-400' },
+          { label: 'Slowest',   val: slowestGap !== null ? `${slowestGap}w` : '—', col: 'text-amber-400' },
+        ].map(({ label, val, col }, i) => (
+          <div key={label} className={`flex items-center gap-2 ${i > 0 ? 'border-l border-ink-5 pl-4' : ''}`}>
+            <div>
+              <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">{label}</p>
+              <p className={`font-cinzel text-lg font-bold ${col}`}>{val}</p>
+            </div>
+          </div>
+        ))}
+        {isUneven && avgGap !== null && (
+          <p className="font-rajdhani text-[10px] text-zinc-500 border-l border-ink-5 pl-4 flex-1">
+            Games unevenly spaced ({fastestGap}w–{slowestGap}w) — ask organiser to smooth scheduling around the {avgGap}w average.
+          </p>
+        )}
+      </div>
+
+      {/* Per-game gap bars in game rows — passed as render prop via gapBarData */}
+    </div>
+  )
+}
+
 // ── Tournament block ───────────────────────────────────────────────
 function TournamentBlock({
   tournament, games, announcedSet, today, isAdmin, isGC,
@@ -591,30 +781,9 @@ function TournamentBlock({
             </div>
           )}
 
-          {/* Game timeline pace bar */}
-          <div className="px-4 py-3 border-b border-ink-5">
-            <div className="flex justify-between mb-1.5">
-              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600">
-                Game timeline — pace view
-              </p>
-              <p className="font-rajdhani text-[10px] text-zinc-700">each block = 1 game</p>
-            </div>
-            <div className="flex gap-0.5 h-4 rounded overflow-hidden bg-zinc-800">
-              {sortedGames.map(g => (
-                <div
-                  key={g.id}
-                  className={`flex-1 ${
-                    g.game_date < today
-                      ? 'bg-emerald-600' : 'bg-amber-600'
-                  }`}
-                  title={g.game_date}
-                />
-              ))}
-              {Array.from({ length: unbooked }).map((_, i) => (
-                <div key={`u${i}`} className="flex-1 bg-zinc-700 opacity-50" />
-              ))}
-            </div>
-            {/* date labels */}
+          <PaceTimeline sortedGames={sortedGames} avgGap={gap} today={today} />
+
+          {/* date labels */}
             <div className="flex mt-1">
               {sortedGames.map(g => (
                 <div key={g.id} className="flex-1 font-rajdhani text-[8px] text-zinc-700 text-center truncate">
@@ -644,7 +813,7 @@ function TournamentBlock({
                   <div className="flex flex-col gap-1.5 opacity-60">
                     {completed.map((g, i) => {
                       const idx = sortedGames.findIndex(x => x.id === g.id)
-                      return <GameRow key={g.id} game={g} gap={gapLabel(idx, sortedGames)} isDone />
+                      return <GameRow key={g.id} game={g} gap={gapLabel(idx, sortedGames)} avgGapRef={gap ?? 2} isDone />
                     })}
                   </div>
                 )}
@@ -660,7 +829,7 @@ function TournamentBlock({
                 <div className="flex flex-col gap-1.5">
                   {scheduled.map((g, i) => {
                     const idx = sortedGames.findIndex(x => x.id === g.id)
-                    return <GameRow key={g.id} game={g} gap={gapLabel(idx, sortedGames)} />
+                    return <GameRow key={g.id} game={g} gap={gapLabel(idx, sortedGames)} avgGapRef={gap ?? 2} />
                   })}
                 </div>
               </div>
@@ -733,7 +902,9 @@ function TournamentBlock({
 }
 
 // ── Game row ───────────────────────────────────────────────────────
-function GameRow({ game, gap, isDone = false }: { game: Booking; gap: string; isDone?: boolean }) {
+function GameRow({ game, gap, avgGapRef, isDone = false }: {
+   game: Booking; gap: string; avgGapRef: number; isDone?: boolean
+ }) {  
   const d = parseISO(game.game_date)
   const dayName = d.getDay() === 6 ? 'Sat' : 'Sun'
   const isSat = dayName === 'Sat'
@@ -777,8 +948,30 @@ function GameRow({ game, gap, isDone = false }: { game: Booking; gap: string; is
       </div>
       {/* Gap */}
       <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-ink-5 min-w-[52px]">
-        <span className={`font-cinzel text-sm font-bold ${gapColor}`}>{gap}</span>
-        <span className="font-rajdhani text-[9px] text-zinc-700">from prev</span>
+         {gap !== '—' ? (
+           <>
+             <span className={`font-cinzel text-sm font-bold ${gapColor}`}>{gap}</span>
+             <div className="w-full mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden relative">
+               {/* avg marker at 2w = 25% of 8w max */}
+               <div
+                 className="absolute top-0 h-full w-px bg-zinc-600"
+                 style={{ left: `${Math.min((avgGapRef / 8) * 100, 100)}%` }}
+               />
+               <div
+                 className="h-full rounded-full transition-all"
+                 style={{
+                   width: `${Math.min((gapNum / 8) * 100, 100)}%`,
+                   background: gapNum <= 1 ? '#E24B4A' : gapNum >= 3 ? '#BA7517' : '#639922',
+                 }}
+               />
+             </div>
+             <span className="font-rajdhani text-[9px] text-zinc-600">
+               {gapNum < 2 ? '↑ faster' : gapNum > 2 ? '↓ slower' : '✓ on pace'}
+             </span>
+           </>
+         ) : (
+           <span className="font-rajdhani text-[9px] text-zinc-600">first game</span>
+         )}
       </div>
     </div>
   )
