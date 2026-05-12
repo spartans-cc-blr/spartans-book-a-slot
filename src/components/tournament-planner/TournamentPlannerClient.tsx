@@ -575,9 +575,15 @@ function TournamentBlock({
   )
   const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
 
-  const whatsappLink = pace.waLabel
-    ? `https://wa.me/${tournament.organiser_contact?.replace(/\D/g, '') ?? ''}?text=${encodeURIComponent(pace.waLabel)}`
-    : null
+   const cardUrl = typeof window !== 'undefined'
+     ? `${window.location.origin}/tournament-planner/share/${tournament.id}`
+     : `https://hub.spartanscricketclub.in/tournament-planner/share/${tournament.id}`
+ 
+   const whatsappLink = pace.waLabel && tournament.organiser_contact
+     ? `https://wa.me/${tournament.organiser_contact.replace(/\D/g, '')}?text=${encodeURIComponent(
+         `${pace.waLabel}\n\nHere's a summary of where we stand on slots and scheduling:\n${cardUrl}`
+       )}`
+     : null
 
   const shareMessage = useMemo(() => {
     const tl           = tournament.total_league_games ?? games.length
