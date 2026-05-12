@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { parseISO, differenceInDays, format, isPast } from 'date-fns'
+import { parseISO, differenceInDays, format } from 'date-fns'
 import { PlayerNameLink } from '@/lib/playerLink'
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -24,7 +24,13 @@ interface Booking {
 
 interface Captain { id: string; name: string }
 
-interface ViewerRole { isCaptain: boolean; isGC: boolean; isAdmin: boolean; captainId: string | null; isVC: boolean }
+interface ViewerRole {
+  isCaptain: boolean
+  isGC: boolean
+  isAdmin: boolean
+  captainId: string | null
+  isVC: boolean
+}
 
 interface Props {
   bookings: Booking[]
@@ -35,18 +41,17 @@ interface Props {
 }
 
 // ── Slot definitions ───────────────────────────────────────────────
-// All valid slots across T20 + T30. Used for the balance grid.
 const ALL_SLOTS = [
-   { day: 'Sat', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
-   { day: 'Sat', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
-   { day: 'Sat', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
-   { day: 'Sun', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
-   { day: 'Sun', time: '10:30', formats: 'T20 only',  validFor: ['T20']        },
-   { day: 'Sun', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
-   { day: 'Sun', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
- ] as const
+  { day: 'Sat', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
+  { day: 'Sat', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
+  { day: 'Sat', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
+  { day: 'Sun', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
+  { day: 'Sun', time: '10:30', formats: 'T20 only',  validFor: ['T20']        },
+  { day: 'Sun', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
+  { day: 'Sun', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
+] as const
 
-type SlotKey = `${'Sat'|'Sun'}-${'07:30'|'10:30'|'12:30'|'14:30'}`
+type SlotKey = `${'Sat' | 'Sun'}-${'07:30' | '10:30' | '12:30' | '14:30'}`
 
 function slotKey(game_date: string, slot_time: string): SlotKey {
   const d = parseISO(game_date)
@@ -65,49 +70,43 @@ function avgGapWeeks(dates: string[]): number | null {
   return Math.round(totalDays / 7 / (sorted.length - 1))
 }
 
- function paceSignal(weeks: number | null, unbooked: number, lastGameDate: string, today: string): {
-   label: string; bg: string; txt: string; waLabel: string
- } {
-   // No games at all
-   if (weeks === null) return {
-     label: 'Not enough data', bg: 'bg-zinc-800', txt: 'text-zinc-400', waLabel: ''
-   }
- 
-   // Tournament is effectively done (0–1 games unbooked) — no action needed regardless of gap
-   if (unbooked <= 1) return {
-     label: 'Good pace',
-     bg: 'bg-emerald-900/30', txt: 'text-emerald-400', waLabel: ''
-   }
- 
-   // Too fast — games within 1 week of each other
-   if (weeks <= 1) return {
-     label: 'Ask to slow down',
-     bg: 'bg-crimson/20', txt: 'text-red-400',
-     waLabel: `Hi! We've been playing every week for this tournament — could we space the remaining games out a bit more? Ideally 2 games a month works well for us.`
-   }
- 
-   // Nudge only if: 2+ games still unbooked AND last scheduled game is already in the past
-   // (organiser has gone quiet — hasn't booked next game after most recent one was played)
-   const daysSinceLastGame = Math.round(
-     differenceInDays(parseISO(today), parseISO(lastGameDate))
-   )
-   const hasGoneQuiet = lastGameDate < today && daysSinceLastGame > 21 // 3+ weeks since last game, nothing booked
- 
-   if (hasGoneQuiet && unbooked >= 2) return {
-     label: 'Nudge to schedule',
-     bg: 'bg-amber-900/40', txt: 'text-amber-400',
-     waLabel: `Hi! It's been a few weeks since our last game in this tournament. Could we get the next couple of fixtures on the calendar? We're targeting 2 games a month.`
-   }
- 
-   return {
-     label: 'Good pace',
-     bg: 'bg-emerald-900/30', txt: 'text-emerald-400', waLabel: ''
-   }
- }
+function paceSignal(
+  weeks: number | null,
+  unbooked: number,
+  lastGameDate: string,
+  today: string
+): { label: string; bg: string; txt: string; waLabel: string } {
+  if (weeks === null) return {
+    label: 'Not enough data', bg: 'bg-zinc-800', txt: 'text-zinc-400', waLabel: '',
+  }
+  // Nearly done — no action needed regardless of gap
+  if (unbooked <= 1) return {
+    label: 'Good pace', bg: 'bg-emerald-900/30', txt: 'text-emerald-400', waLabel: '',
+  }
+  // Too fast
+  if (weeks <= 1) return {
+    label: 'Ask to slow down',
+    bg: 'bg-crimson/20', txt: 'text-red-400',
+    waLabel: `Hi! We've been playing every week for this tournament — could we space the remaining games out a bit more? Ideally 2 games a month works well for us.`,
+  }
+  // Nudge only if organiser has gone quiet (last game is past and >21 days ago, 2+ unbooked)
+  const daysSinceLastGame = Math.round(
+    differenceInDays(parseISO(today), parseISO(lastGameDate))
+  )
+  const hasGoneQuiet = lastGameDate < today && daysSinceLastGame > 21
+  if (hasGoneQuiet && unbooked >= 2) return {
+    label: 'Nudge to schedule',
+    bg: 'bg-amber-900/40', txt: 'text-amber-400',
+    waLabel: `Hi! It's been a few weeks since our last game in this tournament. Could we get the next couple of fixtures on the calendar? We're targeting 2 games a month.`,
+  }
+  return {
+    label: 'Good pace', bg: 'bg-emerald-900/30', txt: 'text-emerald-400', waLabel: '',
+  }
+}
 
 // ── Captain bandwidth section ──────────────────────────────────────
 function BandwidthSection({
-  captains, bookings, announcedSet, today, viewerCaptainId,
+  captains, bookings, today, viewerCaptainId,
 }: {
   captains: Captain[]
   bookings: Booking[]
@@ -130,8 +129,8 @@ function BandwidthSection({
         const t = mine.find(b => b.tournament!.id === tid)?.tournament
         return sum + (t?.total_league_games ?? mine.filter(b => b.tournament!.id === tid).length)
       }, 0)
-    const unbooked = Math.max(0, totalLeague - mine.length)
-    const total    = mine.length + unbooked
+    const unbooked  = Math.max(0, totalLeague - mine.length)
+    const total     = mine.length + unbooked
 
     const slotCounts = Object.fromEntries(
       ALL_SLOTS.map(s => [`${s.day}-${s.time}`, 0])
@@ -149,6 +148,10 @@ function BandwidthSection({
     const schedW = total > 0 ? (scheduled.length / total) * 100 : 0
     const pendW  = total > 0 ? (unbooked / total) * 100 : 0
     const isLowLoad = total <= 4 && unbooked <= 1
+
+    // Format mix for this captain's bookings
+    const captainFormats = Array.from(new Set(mine.map(b => b.format).filter((f): f is string => !!f)))
+    const captainActiveFormats = captainFormats.length === 0 ? ['T20', 'T30'] : captainFormats
 
     return (
       <div
@@ -196,17 +199,13 @@ function BandwidthSection({
             <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-3">
               Games by slot &amp; day
             </p>
-            <div className="grid grid-cols-5 gap-1.5">
-              {ALL_SLOTS.filter(s => {
-                // Hide slots that have no games in this tournament at all
-                const k: SlotKey = `${s.day}-${s.time}`
-                // Always show if count > 0; hide zero-count slots that no game uses
-                return slotCounts[k] > 0 || mine.some(b => slotKey(b.game_date, b.slot_time) === k)
-              }).map(s => {
+            <div className="grid grid-cols-7 gap-1.5">
+              {ALL_SLOTS.map(s => {
                 const k: SlotKey = `${s.day}-${s.time}`
                 const count = slotCounts[k]
                 const barH  = count > 0 ? Math.round((count / maxSlot) * 100) : 0
                 const isSat = s.day === 'Sat'
+                const isApplicable = s.validFor.some(f => captainActiveFormats.includes(f))
                 return (
                   <div key={k} className="bg-ink-4 border border-ink-5 rounded p-1.5 flex flex-col items-center">
                     <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
@@ -214,15 +213,18 @@ function BandwidthSection({
                     }`}>{s.day}</span>
                     <span className="font-rajdhani text-[10px] text-zinc-500 mb-1.5">{s.time}</span>
                     <div className="w-full h-8 bg-zinc-800 rounded overflow-hidden flex flex-col-reverse mb-1">
-                      {count > 0 && (
+                      {count > 0 && isApplicable && (
                         <div
                           className="w-full rounded bg-amber-600 transition-all"
                           style={{ height: `${barH}%` }}
                         />
                       )}
                     </div>
-                    <span className={`font-cinzel text-xs font-bold ${count > 0 ? 'text-amber-400' : 'text-zinc-700'}`}>
-                      {count > 0 ? count : '—'}
+                    <span className={`font-cinzel text-xs font-bold ${
+                      !isApplicable ? 'text-zinc-800' :
+                      count > 0 ? 'text-amber-400' : 'text-zinc-600'
+                    }`}>
+                      {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
                     </span>
                     <span className="font-rajdhani text-[8px] text-zinc-700 mt-0.5">{s.formats}</span>
                   </div>
@@ -283,12 +285,8 @@ function BandwidthSection({
 }
 
 // ── Inline game count editor — admin only ─────────────────────────
-// Shown in the Total stat cell inside the tournament block.
-// Calls PATCH /api/tournaments — same endpoint as admin tournaments page.
 function InlineGameCountEditor({
-  tournamentId,
-  currentValue,
-  onSaved,
+  tournamentId, currentValue, onSaved,
 }: {
   tournamentId: string
   currentValue: number | null
@@ -302,27 +300,21 @@ function InlineGameCountEditor({
   async function handleSave() {
     const parsed = parseInt(val, 10)
     if (isNaN(parsed) || parsed < 1 || parsed > 99) {
-      setError('Enter a number between 1–99')
-      return
+      setError('Enter a number between 1–99'); return
     }
-    setSaving(true)
-    setError('')
+    setSaving(true); setError('')
     const res = await fetch('/api/tournaments', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: tournamentId, total_league_games: parsed }),
     })
-    if (res.ok) {
-      onSaved(parsed)
-      setEditing(false)
-    } else {
-      setError('Save failed — try again')
-    }
+    if (res.ok) { onSaved(parsed); setEditing(false) }
+    else setError('Save failed — try again')
     setSaving(false)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Enter')  handleSave()
     if (e.key === 'Escape') { setEditing(false); setError('') }
   }
 
@@ -334,9 +326,7 @@ function InlineGameCountEditor({
         title="Edit total league games"
       >
         {currentValue ?? '?'}
-        <span className="text-zinc-700 group-hover:text-gold text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-          ✎
-        </span>
+        <span className="text-zinc-700 group-hover:text-gold text-xs opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
       </button>
     )
   }
@@ -345,32 +335,19 @@ function InlineGameCountEditor({
     <div className="flex flex-col items-center gap-1">
       <div className="flex items-center gap-1">
         <input
-          type="number"
-          min={1}
-          max={99}
-          value={val}
+          type="number" min={1} max={99} value={val} autoFocus
           onChange={e => setVal(e.target.value)}
           onKeyDown={handleKeyDown}
-          autoFocus
           className="w-14 bg-ink-4 border border-gold text-gold font-cinzel text-sm font-bold text-center rounded px-1 py-0.5 focus:outline-none"
         />
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="font-rajdhani text-[10px] font-bold text-emerald-400 hover:text-emerald-300 px-1.5 py-0.5 border border-emerald-800 rounded disabled:opacity-50"
-        >
+        <button onClick={handleSave} disabled={saving}
+          className="font-rajdhani text-[10px] font-bold text-emerald-400 hover:text-emerald-300 px-1.5 py-0.5 border border-emerald-800 rounded disabled:opacity-50">
           {saving ? '…' : '✓'}
         </button>
-        <button
-          onClick={() => { setEditing(false); setError('') }}
-          className="font-rajdhani text-[10px] text-zinc-600 hover:text-zinc-400 px-1 py-0.5"
-        >
-          ✕
-        </button>
+        <button onClick={() => { setEditing(false); setError('') }}
+          className="font-rajdhani text-[10px] text-zinc-600 hover:text-zinc-400 px-1 py-0.5">✕</button>
       </div>
-      {error && (
-        <span className="font-rajdhani text-[9px] text-red-400">{error}</span>
-      )}
+      {error && <span className="font-rajdhani text-[9px] text-red-400">{error}</span>}
     </div>
   )
 }
@@ -389,7 +366,6 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
   const end     = parseISO(sortedGames[sortedGames.length - 1].game_date).getTime()
   const totalMs = end - start || 1
 
-  // Per-game gap in weeks
   const gameGaps = sortedGames.map((g, i) => {
     if (i === 0) return null
     return Math.round(
@@ -400,12 +376,12 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
   const allGaps    = gameGaps.filter((g): g is number => g !== null)
   const fastestGap = allGaps.length ? Math.min(...allGaps) : null
   const slowestGap = allGaps.length ? Math.max(...allGaps) : null
-  const isUneven   = allGaps.length > 1 && (slowestGap! - fastestGap! > 2)
+  const isUneven   = allGaps.length > 1 && slowestGap! - fastestGap! > 2
 
   function gapColor(gap: number | null, avg: number | null): string {
-    if (gap === null) return '#6B6B66'
-    if (gap <= 1)     return '#E24B4A'
-    if (avg !== null && gap > avg + 2) return '#BA7517'
+    if (gap === null)                           return '#6B6B66'
+    if (gap <= 1)                               return '#E24B4A'
+    if (avg !== null && gap > avg + 2)          return '#BA7517'
     return '#639922'
   }
 
@@ -418,12 +394,9 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
     return `${gap}w ✓ on pace`
   }
 
-  // Expected cadence tick positions (evenly spaced)
   const expectedPcts = sortedGames.map((_, i) =>
     sortedGames.length > 1 ? (i / (sortedGames.length - 1)) * 100 : 0
   )
-
-  // Actual positions by date
   const actualPcts = sortedGames.map(g =>
     ((parseISO(g.game_date).getTime() - start) / totalMs) * 100
   )
@@ -449,74 +422,41 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
         </div>
       </div>
 
-      {/* Timeline */}
+      {/* Timeline dots */}
       <div className="relative h-14 mb-1">
-        {/* Track */}
         <div className="absolute top-5 left-0 right-0 h-2 bg-zinc-800 rounded-full" />
-
-        {/* Expected cadence dashes */}
         {expectedPcts.map((pct, i) => (
-          <div
-            key={`exp-${i}`}
-            className="absolute top-3 w-px h-6"
-            style={{
-              left: `${pct}%`,
-              transform: 'translateX(-50%)',
-              borderLeft: '1px dashed #3A3A2A',
-            }}
-          />
+          <div key={`exp-${i}`} className="absolute top-3 w-px h-6"
+            style={{ left: `${pct}%`, transform: 'translateX(-50%)', borderLeft: '1px dashed #3A3A2A' }} />
         ))}
-
-        {/* Actual game dots */}
         {sortedGames.map((g, i) => {
           const col     = gapColor(gameGaps[i], avgGap)
           const pct     = actualPcts[i]
           const isHover = hoveredIdx === i
           const isDone  = g.game_date < today
-
           return (
-            <div
-              key={g.id}
-              className="absolute"
+            <div key={g.id} className="absolute"
               style={{ left: `${pct}%`, top: 0, transform: 'translateX(-50%)', zIndex: 2 }}
               onMouseEnter={() => setHoveredIdx(i)}
               onMouseLeave={() => setHoveredIdx(null)}
             >
-              {/* Dot */}
-              <div
-                className="rounded-full border-2 transition-all duration-150 cursor-pointer"
+              <div className="rounded-full border-2 transition-all duration-150 cursor-pointer"
                 style={{
-                  width:       isHover ? 20 : 16,
-                  height:      isHover ? 20 : 16,
-                  marginTop:   isHover ? 2 : 4,
-                  background:  isDone ? '#2A2A1E' : col,
+                  width: isHover ? 20 : 16, height: isHover ? 20 : 16,
+                  marginTop: isHover ? 2 : 4,
+                  background: isDone ? '#2A2A1E' : col,
                   borderColor: col,
-                  boxShadow:   isHover ? `0 0 8px ${col}` : 'none',
-                  opacity:     isDone ? 0.6 : 1,
+                  boxShadow: isHover ? `0 0 8px ${col}` : 'none',
+                  opacity: isDone ? 0.6 : 1,
                 }}
               />
-
-              {/* Tooltip */}
               {isHover && (
-                <div
-                  className="absolute bg-ink-2 border border-ink-5 rounded-lg shadow-xl z-10 pointer-events-none"
-                  style={{
-                    bottom: 28,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    minWidth: 130,
-                    padding: '6px 10px',
-                  }}
-                >
-                  <p className="font-cinzel text-xs font-bold text-parchment">
-                    {format(parseISO(g.game_date), 'd MMM')}
-                  </p>
-                  <p className="font-rajdhani text-[10px] mt-0.5" style={{ color: col }}>
-                    {gapRelLabel(gameGaps[i], avgGap)}
-                  </p>
+                <div className="absolute bg-ink-2 border border-ink-5 rounded-lg shadow-xl z-10 pointer-events-none"
+                  style={{ bottom: 28, left: '50%', transform: 'translateX(-50%)', minWidth: 130, padding: '6px 10px' }}>
+                  <p className="font-cinzel text-xs font-bold text-parchment">{format(parseISO(g.game_date), 'd MMM')}</p>
+                  <p className="font-rajdhani text-[10px] mt-0.5" style={{ color: col }}>{gapRelLabel(gameGaps[i], avgGap)}</p>
                   <p className="font-rajdhani text-[9px] text-zinc-600">
-                    Game {i + 1} of {sortedGames.length}
-                    {isDone ? ' · completed' : ''}
+                    Game {i + 1} of {sortedGames.length}{isDone ? ' · completed' : ''}
                   </p>
                 </div>
               )}
@@ -528,11 +468,8 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
       {/* Date axis */}
       <div className="relative h-4 mb-3">
         {sortedGames.map((g, i) => (
-          <div
-            key={g.id}
-            className="absolute font-rajdhani text-[9px] text-zinc-700 whitespace-nowrap"
-            style={{ left: `${actualPcts[i]}%`, transform: 'translateX(-50%)' }}
-          >
+          <div key={g.id} className="absolute font-rajdhani text-[9px] text-zinc-700 whitespace-nowrap"
+            style={{ left: `${actualPcts[i]}%`, transform: 'translateX(-50%)' }}>
             {format(parseISO(g.game_date), 'd MMM')}
           </div>
         ))}
@@ -541,10 +478,12 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
       {/* Summary strip */}
       <div className="bg-ink-4 border border-ink-5 rounded-lg px-3 py-2 flex items-center gap-4 flex-wrap">
         {[
-          { label: 'Avg gap',    val: avgGap !== null ? `${avgGap}w` : '—',
-            col: avgGap === null ? 'text-zinc-500' : avgGap <= 1 ? 'text-red-400' : avgGap >= 3 ? 'text-amber-400' : 'text-emerald-400' },
-          { label: 'Fastest',   val: fastestGap !== null ? `${fastestGap}w` : '—', col: 'text-red-400' },
-          { label: 'Slowest',   val: slowestGap !== null ? `${slowestGap}w` : '—', col: 'text-amber-400' },
+          {
+            label: 'Avg gap', val: avgGap !== null ? `${avgGap}w` : '—',
+            col: avgGap === null ? 'text-zinc-500' : avgGap <= 1 ? 'text-red-400' : avgGap >= 3 ? 'text-amber-400' : 'text-emerald-400',
+          },
+          { label: 'Fastest', val: fastestGap !== null ? `${fastestGap}w` : '—', col: 'text-red-400' },
+          { label: 'Slowest', val: slowestGap !== null ? `${slowestGap}w` : '—', col: 'text-amber-400' },
         ].map(({ label, val, col }, i) => (
           <div key={label} className={`flex items-center gap-2 ${i > 0 ? 'border-l border-ink-5 pl-4' : ''}`}>
             <div>
@@ -559,8 +498,6 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
           </p>
         )}
       </div>
-
-      {/* Per-game gap bars in game rows — passed as render prop via gapBarData */}
     </div>
   )
 }
@@ -576,15 +513,7 @@ function TournamentBlock({
   isAdmin: boolean
   isGC: boolean
 }) {
- 
-  // Determine which formats this tournament uses
-  const tournamentFormats = [...new Set(games.map(g => g.format).filter(Boolean))] as string[]
-  const hasT20 = tournamentFormats.includes('T20')
-  const hasT30 = tournamentFormats.includes('T30')
-  // If no games yet, assume both formats possible
-  const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
-  
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]               = useState(false)
   const [completedOpen, setCompletedOpen] = useState(false)
 
   const completed = games.filter(g => g.game_date < today)
@@ -593,11 +522,11 @@ function TournamentBlock({
     tournament.total_league_games ?? null
   )
   const totalLeague = totalLeagueGames ?? games.length
-  const unbooked = Math.max(0, totalLeague - games.length)
+  const unbooked    = Math.max(0, totalLeague - games.length)
 
-  const allDates = games.map(g => g.game_date).sort()
-  const gap = avgGapWeeks(allDates)
-  
+  const allDates    = games.map(g => g.game_date).sort()
+  const gap         = avgGapWeeks(allDates)
+
   // Slot balance counts
   const slotCounts = Object.fromEntries(
     ALL_SLOTS.map(s => [`${s.day}-${s.time}`, 0])
@@ -606,61 +535,53 @@ function TournamentBlock({
     const k = slotKey(g.game_date, g.slot_time)
     if (slotCounts[k] !== undefined) slotCounts[k]++
   })
-  const maxSlotCount = Math.max(...Object.values(slotCounts), 1)
-  const dominantSlot = Object.entries(slotCounts).reduce((a, b) => b[1] > a[1] ? b : a, ['', 0])[0]
+  const maxSlotCount  = Math.max(...Object.values(slotCounts), 1)
+  const dominantSlot  = Object.entries(slotCounts).reduce((a, b) => b[1] > a[1] ? b : a, ['', 0])[0]
   const isSlotImbalanced = maxSlotCount > Math.ceil(games.length / 2) && games.length >= 3
 
-  // Per-game gap labels
+  // Per-game gap label
   const gapLabel = (i: number, sorted: Booking[]): string => {
     if (i === 0) return '—'
-    const weeks = Math.round(
+    return `${Math.round(
       differenceInDays(parseISO(sorted[i].game_date), parseISO(sorted[i - 1].game_date)) / 7
-    )
-    return `${weeks}w`
+    )}w`
   }
 
   const sortedGames = [...games].sort((a, b) => a.game_date.localeCompare(b.game_date))
-  
+
   const lastGameDate = sortedGames.length > 0
-     ? sortedGames[sortedGames.length - 1].game_date
-     : today
-  
+    ? sortedGames[sortedGames.length - 1].game_date
+    : today
+
   const pace = paceSignal(gap, unbooked, lastGameDate, today)
-  
+
+  // Tournament format mix — use Array.from instead of spread on Set (downlevel compat)
+  const tournamentFormats = Array.from(
+    new Set(games.map(g => g.format).filter((f): f is string => !!f))
+  )
+  const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
+
   const whatsappLink = pace.waLabel
     ? `https://wa.me/${tournament.organiser_contact?.replace(/\D/g, '') ?? ''}?text=${encodeURIComponent(pace.waLabel)}`
     : null
 
-    // Share card — summary message for organiser
   const shareMessage = useMemo(() => {
-    const totalLeague = tournament.total_league_games ?? games.length
-    const completedCount = games.filter(g => g.game_date < today).length
-    const scheduledCount = games.filter(g => g.game_date >= today).length
-    const unbookedCount  = Math.max(0, totalLeague - games.length)
-
-    const slotLines = ALL_SLOTS
-      .map(s => {
-        const k: SlotKey = `${s.day}-${s.time}`
-        const count = slotCounts[k]
-        return count > 0 ? `  ${s.day} ${s.time}: ${count} game${count > 1 ? 's' : ''}` : null
-      })
-      .filter(Boolean)
-      .join('\n')
-
+    const tl           = tournament.total_league_games ?? games.length
+    const completedCnt = games.filter(g => g.game_date < today).length
+    const scheduledCnt = games.filter(g => g.game_date >= today).length
+    const unbookedCnt  = Math.max(0, tl - games.length)
+    const slotLines    = ALL_SLOTS
+      .map(s => { const k: SlotKey = `${s.day}-${s.time}`; const c = slotCounts[k]; return c > 0 ? `  ${s.day} ${s.time}: ${c} game${c > 1 ? 's' : ''}` : null })
+      .filter(Boolean).join('\n')
     return [
-      `*${tournament.name} — Spartans CC Update*`,
-      ``,
-      `📊 Status: ${completedCount} completed · ${scheduledCount} scheduled · ${unbookedCount} unbooked`,
-      `⏱ Avg gap between games: ${gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}`,
-      ``,
-      `🗓 Slot breakdown so far:`,
-      slotLines,
-      ``,
+      `*${tournament.name} — Spartans CC Update*`, ``,
+      `📊 Status: ${completedCnt} completed · ${scheduledCnt} scheduled · ${unbookedCnt} unbooked`,
+      `⏱ Avg gap between games: ${gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}`, ``,
+      `🗓 Slot breakdown so far:`, slotLines, ``,
       isSlotImbalanced
-        ? `⚠️ Slot balance is skewed — would appreciate spreading remaining ${unbookedCount} game${unbookedCount !== 1 ? 's' : ''} across other slots.`
+        ? `⚠️ Slot balance is skewed — would appreciate spreading remaining ${unbookedCnt} game${unbookedCnt !== 1 ? 's' : ''} across other slots.`
         : `✅ Slot balance looks good across the tournament.`,
-      ``,
-      `Could you help schedule the remaining games? Happy to discuss slots that work for both sides.`,
+      ``, `Could you help schedule the remaining games? Happy to discuss slots that work for both sides.`,
     ].join('\n')
   }, [tournament, games, today, gap, slotCounts, isSlotImbalanced])
 
@@ -672,59 +593,36 @@ function TournamentBlock({
     <div className="bg-ink-3 border border-ink-5 rounded-lg mb-4 overflow-hidden">
 
       {/* Header */}
-      <button
-        className="w-full text-left px-4 py-3 hover:bg-ink-4 transition-colors"
-        onClick={() => setOpen(v => !v)}
-      >
+      <button className="w-full text-left px-4 py-3 hover:bg-ink-4 transition-colors" onClick={() => setOpen(v => !v)}>
         <div className="flex items-start gap-3">
           <span className="text-amber-500 mt-0.5">🏆</span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-cinzel text-sm font-bold text-parchment">{tournament.name}</span>
-              <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${pace.bg} ${pace.txt}`}>
-                {pace.label}
-              </span>
+              <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${pace.bg} ${pace.txt}`}>{pace.label}</span>
             </div>
             <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
               {tournament.organiser_name && <>Organiser: <span className="text-zinc-400">{tournament.organiser_name}</span> &nbsp;·&nbsp;</>}
               Avg gap: <span className="text-zinc-300 font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
             </p>
           </div>
-
-          {/* Stat pills */}
           <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
-            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400">
-              {completed.length} done
-            </span>
-            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-400">
-              {scheduled.length} sched
-            </span>
+            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400">{completed.length} done</span>
+            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-400">{scheduled.length} sched</span>
             {unbooked > 0 && (
-              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-zinc-700/60 text-zinc-400">
-                {unbooked} unbooked
-              </span>
+              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-zinc-700/60 text-zinc-400">{unbooked} unbooked</span>
             )}
             <span className="text-zinc-600 ml-1 self-center">{open ? '▲' : '▼'}</span>
           </div>
         </div>
       </button>
 
+      {/* Collapsed mini bar */}
       {!open && (
-        /* Collapsed: just show stat bar + pace timeline */
         <div className="px-4 pb-3">
-          {/* mini timeline bar */}
           <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-zinc-800 mt-1">
-            {sortedGames.map((g, i) => (
-              <div
-                key={g.id}
-                className={`flex-1 ${
-                  g.game_date < today 
-                    ? 'bg-emerald-600'
-                    : g.game_date >= today
-                    ? 'bg-amber-600'
-                    : 'bg-zinc-600'
-                }`}
-              />
+            {sortedGames.map(g => (
+              <div key={g.id} className={`flex-1 ${g.game_date < today ? 'bg-emerald-600' : 'bg-amber-600'}`} />
             ))}
             {Array.from({ length: unbooked }).map((_, i) => (
               <div key={`u${i}`} className="flex-1 bg-zinc-700 opacity-40" />
@@ -737,86 +635,65 @@ function TournamentBlock({
         <div className="border-t border-ink-5">
 
           {/* Stat bar */}
-        <div className="grid grid-cols-5 border-b border-ink-5">
+          <div className="grid grid-cols-5 border-b border-ink-5">
+            <div className="px-3 py-2.5 text-center">
+              <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Total</p>
+              {isAdmin
+                ? <InlineGameCountEditor tournamentId={tournament.id} currentValue={totalLeagueGames} onSaved={setTotalLeagueGames} />
+                : <p className="font-cinzel text-lg font-bold text-parchment">{totalLeague}</p>
+              }
+              <p className="font-rajdhani text-[9px] text-zinc-600">league games</p>
+            </div>
+            <div className="px-3 py-2.5 text-center border-l border-ink-5">
+              <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Completed</p>
+              <p className="font-cinzel text-lg font-bold text-emerald-400">{completed.length}</p>
+              <p className="font-rajdhani text-[9px] text-zinc-600">past date</p>
+            </div>
+            <div className="px-3 py-2.5 text-center border-l border-ink-5">
+              <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Scheduled</p>
+              <p className="font-cinzel text-lg font-bold text-amber-400">{scheduled.length}</p>
+              <p className="font-rajdhani text-[9px] text-zinc-600">booked, upcoming</p>
+            </div>
+            <div className="px-3 py-2.5 text-center border-l border-ink-5">
+              <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Unbooked</p>
+              <p className="font-cinzel text-lg font-bold text-zinc-400">{unbooked}</p>
+              <p className="font-rajdhani text-[9px] text-zinc-600">games remaining</p>
+            </div>
+            <div className="px-3 py-2.5 text-center border-l border-ink-5">
+              <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Avg gap</p>
+              <p className={`font-cinzel text-lg font-bold ${
+                gap === null ? 'text-zinc-500' : gap <= 1 ? 'text-red-400' : gap >= 3 ? 'text-amber-400' : 'text-emerald-400'
+              }`}>{gap !== null ? `${gap}w` : '—'}</p>
+              <p className="font-rajdhani text-[9px] text-zinc-600">
+                {gap === null ? 'not enough games' : gap <= 1 ? '⚠ very frequent' : gap >= 3 ? 'slow pace' : 'good pace'}
+              </p>
+            </div>
+          </div>
 
-        {/* Total — editable by admin */}
-        <div className="px-3 py-2.5 text-center">
-            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Total</p>
-            {isAdmin ? (
-            <InlineGameCountEditor
-                tournamentId={tournament.id}
-                currentValue={totalLeagueGames}
-                onSaved={setTotalLeagueGames}
-            />
-            ) : (
-            <p className="font-cinzel text-lg font-bold text-parchment">{totalLeague}</p>
-            )}
-            <p className="font-rajdhani text-[9px] text-zinc-600">league games</p>
-        </div>
-
-        {/* Completed */}
-        <div className="px-3 py-2.5 text-center border-l border-ink-5">
-            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Completed</p>
-            <p className="font-cinzel text-lg font-bold text-emerald-400">{completed.length}</p>
-            <p className="font-rajdhani text-[9px] text-zinc-600">announced + past</p>
-        </div>
-
-        {/* Scheduled */}
-        <div className="px-3 py-2.5 text-center border-l border-ink-5">
-            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Scheduled</p>
-            <p className="font-cinzel text-lg font-bold text-amber-400">{scheduled.length}</p>
-            <p className="font-rajdhani text-[9px] text-zinc-600">booked, upcoming</p>
-        </div>
-
-        {/* Unbooked */}
-        <div className="px-3 py-2.5 text-center border-l border-ink-5">
-            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Unbooked</p>
-            <p className="font-cinzel text-lg font-bold text-zinc-400">{unbooked}</p>
-            <p className="font-rajdhani text-[9px] text-zinc-600">games remaining</p>
-        </div>
-
-        {/* Avg gap */}
-        <div className="px-3 py-2.5 text-center border-l border-ink-5">
-            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">Avg gap</p>
-            <p className={`font-cinzel text-lg font-bold ${
-            gap === null    ? 'text-zinc-500' :
-            gap <= 1        ? 'text-red-400'  :
-            gap >= 3        ? 'text-amber-400': 'text-emerald-400'
-            }`}>
-            {gap !== null ? `${gap}w` : '—'}
-            </p>
-            <p className="font-rajdhani text-[9px] text-zinc-600">
-            {gap === null ? 'not enough games' : gap <= 1 ? '⚠ very frequent' : gap >= 3 ? 'slow pace' : 'good pace'}
-            </p>
-        </div>
-
-        </div>
-
-          {/* WhatsApp nudge button */}
-          {(whatsappLink || isAdmin || isGC)  && (
+          {/* WhatsApp / share */}
+          {(whatsappLink || isAdmin || isGC) && (
             <div className="px-4 py-2 bg-ink-4 border-b border-ink-5 flex items-center gap-4 flex-wrap">
-              <a
-                href={whatsappLink ?? undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-rajdhani text-xs font-bold text-emerald-400 hover:text-emerald-300"
-              >
-                📲 WhatsApp {tournament.organiser_name ?? 'organiser'} — {pace.label}
-              </a>
-             {(isAdmin || isGC) && shareLink && (
-              <a href={shareLink} target="_blank" rel="noopener noreferrer"
-                className="font-rajdhani text-xs font-bold text-blue-400 hover:text-blue-300">
-                📤 Share slot & pace summary with organiser
-              </a>
-            )}
-            {(isAdmin || isGC) && !shareLink && (
-              <span className="font-rajdhani text-[10px] text-zinc-700">
-                Add organiser WhatsApp in /admin/tournaments to enable sharing
-              </span>
-            )}
+              {whatsappLink && (
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                  className="font-rajdhani text-xs font-bold text-emerald-400 hover:text-emerald-300">
+                  📲 WhatsApp {tournament.organiser_name ?? 'organiser'} — {pace.label}
+                </a>
+              )}
+              {(isAdmin || isGC) && shareLink && (
+                <a href={shareLink} target="_blank" rel="noopener noreferrer"
+                  className="font-rajdhani text-xs font-bold text-blue-400 hover:text-blue-300">
+                  📤 Share slot &amp; pace summary with organiser
+                </a>
+              )}
+              {(isAdmin || isGC) && !shareLink && (
+                <span className="font-rajdhani text-[10px] text-zinc-700">
+                  Add organiser WhatsApp in /admin/tournaments to enable sharing
+                </span>
+              )}
             </div>
           )}
 
+          {/* Pace timeline */}
           <PaceTimeline sortedGames={sortedGames} avgGap={gap} today={today} />
 
           {/* Game list */}
@@ -834,7 +711,7 @@ function TournamentBlock({
                 </button>
                 {completedOpen && (
                   <div className="flex flex-col gap-1.5 opacity-60">
-                    {completed.map((g, i) => {
+                    {completed.map((g) => {
                       const idx = sortedGames.findIndex(x => x.id === g.id)
                       return <GameRow key={g.id} game={g} gap={gapLabel(idx, sortedGames)} avgGapRef={gap ?? 2} isDone />
                     })}
@@ -850,7 +727,7 @@ function TournamentBlock({
                   Scheduled — {scheduled.length} games
                 </p>
                 <div className="flex flex-col gap-1.5">
-                  {scheduled.map((g, i) => {
+                  {scheduled.map((g) => {
                     const idx = sortedGames.findIndex(x => x.id === g.id)
                     return <GameRow key={g.id} game={g} gap={gapLabel(idx, sortedGames)} avgGapRef={gap ?? 2} />
                   })}
@@ -882,13 +759,13 @@ function TournamentBlock({
             <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-3">
               Slot balance across this tournament
             </p>
-              <div className="grid grid-cols-7 gap-1.5">
-                {ALL_SLOTS.map(s => {
-                const k: SlotKey = `${s.day}-${s.time}`
-                const count = slotCounts[k]
-                const barH = count > 0 ? Math.round((count / maxSlotCount) * 100) : 0
-                const isSat = s.day === 'Sat'
-                const isApplicable = s.validFor.some(f => activeFormats.includes(f))
+            <div className="grid grid-cols-7 gap-1.5">
+              {ALL_SLOTS.map(s => {
+                const k: SlotKey    = `${s.day}-${s.time}`
+                const count         = slotCounts[k]
+                const barH          = count > 0 ? Math.round((count / maxSlotCount) * 100) : 0
+                const isSat         = s.day === 'Sat'
+                const isApplicable  = s.validFor.some(f => activeFormats.includes(f))
                 return (
                   <div key={k} className="bg-ink-4 border border-ink-5 rounded p-1.5 flex flex-col items-center">
                     <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
@@ -898,18 +775,15 @@ function TournamentBlock({
                     <div className="w-full h-8 bg-zinc-800 rounded overflow-hidden flex flex-col-reverse mb-1">
                       {count > 0 && isApplicable && (
                         <div
-                          className={`w-full rounded transition-all ${
-                            count === maxSlotCount ? 'bg-emerald-600' : 'bg-amber-600'
-                          }`}
+                          className={`w-full rounded transition-all ${count === maxSlotCount ? 'bg-emerald-600' : 'bg-amber-600'}`}
                           style={{ height: `${barH}%` }}
                         />
                       )}
                     </div>
                     <span className={`font-cinzel text-xs font-bold ${
-                      !isApplicable ? 'text-zinc-800' :
-                      count > 0 ? 'text-amber-400' : 'text-zinc-600'
-                     }`}>
-                        {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
+                      !isApplicable ? 'text-zinc-800' : count > 0 ? 'text-amber-400' : 'text-zinc-600'
+                    }`}>
+                      {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
                     </span>
                     <span className="font-rajdhani text-[8px] text-zinc-700 mt-0.5">{s.formats}</span>
                   </div>
@@ -930,12 +804,12 @@ function TournamentBlock({
 
 // ── Game row ───────────────────────────────────────────────────────
 function GameRow({ game, gap, avgGapRef, isDone = false }: {
-   game: Booking; gap: string; avgGapRef: number; isDone?: boolean
- }) {  
-  const d = parseISO(game.game_date)
+  game: Booking; gap: string; avgGapRef: number; isDone?: boolean
+}) {
+  const d       = parseISO(game.game_date)
   const dayName = d.getDay() === 6 ? 'Sat' : 'Sun'
-  const isSat = dayName === 'Sat'
-  const gapNum = parseInt(gap)
+  const isSat   = dayName === 'Sat'
+  const gapNum  = parseInt(gap)
   const gapColor = isNaN(gapNum) ? 'text-zinc-600'
     : gapNum <= 1 ? 'text-red-400'
     : gapNum >= 3 ? 'text-amber-400'
@@ -943,28 +817,18 @@ function GameRow({ game, gap, avgGapRef, isDone = false }: {
 
   return (
     <div className={`grid grid-cols-[44px_1fr_auto] gap-0 border border-ink-5 rounded overflow-hidden ${isDone ? 'opacity-55' : ''}`}>
-      {/* Date block */}
       <div className="bg-ink-4 flex flex-col items-center justify-center py-2 border-r border-ink-5">
-        <span className="font-cinzel text-base font-bold text-parchment leading-none">
-          {format(d, 'd')}
-        </span>
-        <span className="font-rajdhani text-[9px] text-zinc-500 uppercase">
-          {format(d, 'MMM')}
-        </span>
+        <span className="font-cinzel text-base font-bold text-parchment leading-none">{format(d, 'd')}</span>
+        <span className="font-rajdhani text-[9px] text-zinc-500 uppercase">{format(d, 'MMM')}</span>
         <span className="font-rajdhani text-[9px] text-zinc-600">{dayName}</span>
       </div>
-      {/* Body */}
       <div className="px-2.5 py-2 flex flex-col gap-0.5">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
             isSat ? 'bg-blue-900/40 text-blue-400' : 'bg-pink-900/30 text-pink-400'
           }`}>{dayName}</span>
-          <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
-            {game.slot_time}
-          </span>
-          <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
-            {game.format}
-          </span>
+          <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">{game.slot_time}</span>
+          <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">{game.format}</span>
         </div>
         <div className="font-rajdhani text-xs text-zinc-400">
           Captain: {game.captain
@@ -973,32 +837,25 @@ function GameRow({ game, gap, avgGapRef, isDone = false }: {
           }
         </div>
       </div>
-      {/* Gap */}
-      <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-ink-5 min-w-[52px]">
-         {gap !== '—' ? (
-           <>
-             <span className={`font-cinzel text-sm font-bold ${gapColor}`}>{gap}</span>
-             <div className="w-full mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden relative">
-               {/* avg marker at 2w = 25% of 8w max */}
-               <div
-                 className="absolute top-0 h-full w-px bg-zinc-600"
-                 style={{ left: `${Math.min((avgGapRef / 8) * 100, 100)}%` }}
-               />
-               <div
-                 className="h-full rounded-full transition-all"
-                 style={{
-                   width: `${Math.min((gapNum / 8) * 100, 100)}%`,
-                   background: gapNum <= 1 ? '#E24B4A' : gapNum >= 3 ? '#BA7517' : '#639922',
-                 }}
-               />
-             </div>
-             <span className="font-rajdhani text-[9px] text-zinc-600">
-               {gapNum < 2 ? '↑ faster' : gapNum > 2 ? '↓ slower' : '✓ on pace'}
-             </span>
-           </>
-         ) : (
-           <span className="font-rajdhani text-[9px] text-zinc-600">first game</span>
-         )}
+      <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-ink-5 min-w-[60px]">
+        {gap !== '—' ? (
+          <>
+            <span className={`font-cinzel text-sm font-bold ${gapColor}`}>{gap}</span>
+            <div className="w-full mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden relative">
+              <div className="absolute top-0 h-full w-px bg-zinc-600"
+                style={{ left: `${Math.min((avgGapRef / 8) * 100, 100)}%` }} />
+              <div className="h-full rounded-full transition-all" style={{
+                width: `${Math.min((gapNum / 8) * 100, 100)}%`,
+                background: gapNum <= 1 ? '#E24B4A' : gapNum >= 3 ? '#BA7517' : '#639922',
+              }} />
+            </div>
+            <span className="font-rajdhani text-[9px] text-zinc-600">
+              {gapNum < 2 ? '↑ faster' : gapNum > 2 ? '↓ slower' : '✓ on pace'}
+            </span>
+          </>
+        ) : (
+          <span className="font-rajdhani text-[9px] text-zinc-600">first game</span>
+        )}
       </div>
     </div>
   )
@@ -1013,7 +870,6 @@ export function TournamentPlannerClient({
   const [showOngoing,   setShowOngoing]   = useState(true)
   const [showCompleted, setShowCompleted] = useState(false)
 
-  // Group bookings by tournament
   const tournamentMap = useMemo(() => {
     const map = new Map<string, { tournament: NonNullable<Booking['tournament']>; games: Booking[] }>()
     bookings.forEach(b => {
@@ -1025,30 +881,29 @@ export function TournamentPlannerClient({
     return map
   }, [bookings])
 
-  // Sort tournaments: most games first
   const sortedTournaments = useMemo(() =>
-      Array.from(tournamentMap.values())
-       .map(({ tournament, games }) => {
-         const totalLeague = tournament.total_league_games ?? games.length
-         const completedGames = games.filter(g => g.game_date < today)
-         const scheduledGames = games.filter(g => g.game_date >= today)
-         const isCompleted = completedGames.length >= totalLeague && scheduledGames.length === 0
-         const isUpcoming  = completedGames.length === 0
-         const isOngoing   = !isCompleted && !isUpcoming
-         return { tournament, games, isCompleted, isUpcoming, isOngoing }
-       })
-       .filter(t => {
-         if (t.isCompleted) return showCompleted
-         if (t.isUpcoming)  return showUpcoming
-         if (t.isOngoing)   return showOngoing
-         return true
-       })
-       .sort((a, b) => b.games.length - a.games.length),
-     [tournamentMap, today, showUpcoming, showOngoing, showCompleted]
+    Array.from(tournamentMap.values())
+      .map(({ tournament, games }) => {
+        const totalLeague    = tournament.total_league_games ?? games.length
+        const completedGames = games.filter(g => g.game_date < today)
+        const scheduledGames = games.filter(g => g.game_date >= today)
+        const isCompleted    = completedGames.length >= totalLeague && scheduledGames.length === 0
+        const isUpcoming     = completedGames.length === 0
+        const isOngoing      = !isCompleted && !isUpcoming
+        return { tournament, games, isCompleted, isUpcoming, isOngoing }
+      })
+      .filter(t => {
+        if (t.isCompleted) return showCompleted
+        if (t.isUpcoming)  return showUpcoming
+        if (t.isOngoing)   return showOngoing
+        return true
+      })
+      .sort((a, b) => b.games.length - a.games.length),
+    [tournamentMap, today, showUpcoming, showOngoing, showCompleted]
   )
 
-  const isCaptainView   = viewerRole.isCaptain && !!viewerRole.captainId
-  const myTournaments   = isCaptainView
+  const isCaptainView    = viewerRole.isCaptain && !!viewerRole.captainId
+  const myTournaments    = isCaptainView
     ? sortedTournaments.filter(t => t.games.some(g => g.captain_id === viewerRole.captainId))
     : sortedTournaments
   const otherTournaments = isCaptainView
@@ -1057,7 +912,6 @@ export function TournamentPlannerClient({
 
   return (
     <div>
-      {/* Section 1 — Captain Bandwidth */}
       <BandwidthSection
         captains={captains}
         bookings={bookings}
@@ -1067,72 +921,59 @@ export function TournamentPlannerClient({
       />
 
       {/* Tournament filter */}
-       <div className="flex items-center gap-5 mb-5 flex-wrap">
-         <span className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600">Show:</span>
-         {([
-           { label: 'Upcoming',  checked: showUpcoming,  set: setShowUpcoming  },
-           { label: 'Ongoing',   checked: showOngoing,   set: setShowOngoing   },
-           { label: 'Completed', checked: showCompleted, set: setShowCompleted },
-         ]).map(({ label, checked, set }) => (
-           <label key={label} className="flex items-center gap-2 cursor-pointer group">
-             <input
-               type="checkbox"
-               checked={checked}
-               onChange={e => set(e.target.checked)}
-               className="accent-gold w-3.5 h-3.5 cursor-pointer"
-             />
-             <span className={`font-rajdhani text-xs font-semibold tracking-wide transition-colors ${
-               checked ? 'text-zinc-300' : 'text-zinc-600'
-             }`}>
-               {label}
-             </span>
-           </label>
-         ))}
-       </div>
+      <div className="flex items-center gap-5 mb-5 flex-wrap">
+        <span className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600">Show:</span>
+        {([
+          { label: 'Upcoming',  checked: showUpcoming,  set: setShowUpcoming  },
+          { label: 'Ongoing',   checked: showOngoing,   set: setShowOngoing   },
+          { label: 'Completed', checked: showCompleted, set: setShowCompleted },
+        ]).map(({ label, checked, set }) => (
+          <label key={label} className="flex items-center gap-2 cursor-pointer group">
+            <input type="checkbox" checked={checked} onChange={e => set(e.target.checked)}
+              className="accent-gold w-3.5 h-3.5 cursor-pointer" />
+            <span className={`font-rajdhani text-xs font-semibold tracking-wide transition-colors ${
+              checked ? 'text-zinc-300' : 'text-zinc-600'
+            }`}>{label}</span>
+          </label>
+        ))}
+      </div>
 
-      {/* Section 2 — By Tournament */}
       <section>
         <h2 className="font-cinzel text-xl font-bold text-gold mb-1">By Tournament</h2>
         <p className="font-rajdhani text-sm text-zinc-500 mb-5">
           Organiser pace, game scheduling frequency, and slot balance per tournament.
         </p>
         {sortedTournaments.length === 0 ? (
-         <p className="font-rajdhani text-sm text-zinc-600">
-           No tournaments match the selected filters.{' '}
-           <button
-             onClick={() => { setShowUpcoming(true); setShowOngoing(true); setShowCompleted(true) }}
-             className="text-gold underline"
-           >
-             Show all
-           </button>
-         </p>
+          <p className="font-rajdhani text-sm text-zinc-600">
+            No tournaments match the selected filters.{' '}
+            <button
+              onClick={() => { setShowUpcoming(true); setShowOngoing(true); setShowCompleted(true) }}
+              className="text-gold underline"
+            >Show all</button>
+          </p>
         ) : (
+          <>
+            {isCaptainView && myTournaments.length > 0 && (
               <>
-                {isCaptainView && myTournaments.length > 0 && (
-                  <>
-                    <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
-                      Your tournaments
-                    </p>
-                    {myTournaments.map(({ tournament, games }) => (
-                      <TournamentBlock key={tournament.id} tournament={tournament} games={games}
-                        announcedSet={announcedSet} today={today}
-                        isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC} />
-                    ))}
-                    {otherTournaments.length > 0 && (
-                      <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-6 mb-3">
-                        Other tournaments
-                      </p>
-                    )}
-                  </>
-                )}
-                {(isCaptainView ? otherTournaments : sortedTournaments).map(({ tournament, games }) => (
+                <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Your tournaments</p>
+                {myTournaments.map(({ tournament, games }) => (
                   <TournamentBlock key={tournament.id} tournament={tournament} games={games}
                     announcedSet={announcedSet} today={today}
                     isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC} />
                 ))}
+                {otherTournaments.length > 0 && (
+                  <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-6 mb-3">Other tournaments</p>
+                )}
               </>
             )}
-          </section>
-        </div>
-      )
-    }
+            {(isCaptainView ? otherTournaments : sortedTournaments).map(({ tournament, games }) => (
+              <TournamentBlock key={tournament.id} tournament={tournament} games={games}
+                announcedSet={announcedSet} today={today}
+                isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC} />
+            ))}
+          </>
+        )}
+      </section>
+    </div>
+  )
+}
