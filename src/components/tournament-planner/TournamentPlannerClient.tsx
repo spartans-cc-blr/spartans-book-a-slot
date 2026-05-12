@@ -610,6 +610,8 @@ function TournamentBlock({
      ? sortedGames[sortedGames.length - 1].game_date
      : today
   
+  const pace = paceSignal(gap, unbooked, lastGameDate, today)
+  
   const whatsappLink = pace.waLabel
     ? `https://wa.me/${tournament.organiser_contact?.replace(/\D/g, '') ?? ''}?text=${encodeURIComponent(pace.waLabel)}`
     : null
