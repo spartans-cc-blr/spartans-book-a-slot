@@ -63,29 +63,45 @@ function avgGapWeeks(dates: string[]): number | null {
   return Math.round(totalDays / 7 / (sorted.length - 1))
 }
 
-function paceSignal(weeks: number | null): {
-  label: string; bg: string; txt: string; waLabel: string
-} {
-  if (weeks === null) return {
-    label: 'Not enough games', bg: 'bg-zinc-800', txt: 'text-zinc-400',
-    waLabel: ''
-  }
-  if (weeks <= 1) return {
-    label: 'Ask to slow down',
-    bg: 'bg-crimson/20', txt: 'text-red-400',
-    waLabel: `Hi! We're playing every week for this tournament — can we space out the next few games a bit more?`
-  }
-  if (weeks >= 3) return {
-    label: 'Nudge to schedule',
-    bg: 'bg-amber-900/40', txt: 'text-amber-400',
-    waLabel: `Hi! We haven't had a game in a while — can we schedule the next one soon?`
-  }
-  return {
-    label: 'Good pace',
-    bg: 'bg-emerald-900/30', txt: 'text-emerald-400',
-    waLabel: ''
-  }
-}
+ function paceSignal(weeks: number | null, unbooked: number, lastGameDate: string, today: string): {
+   label: string; bg: string; txt: string; waLabel: string
+ } {
+   // No games at all
+   if (weeks === null) return {
+     label: 'Not enough data', bg: 'bg-zinc-800', txt: 'text-zinc-400', waLabel: ''
+   }
+ 
+   // Tournament is effectively done (0–1 games unbooked) — no action needed regardless of gap
+   if (unbooked <= 1) return {
+     label: 'Good pace',
+     bg: 'bg-emerald-900/30', txt: 'text-emerald-400', waLabel: ''
+   }
+ 
+   // Too fast — games within 1 week of each other
+   if (weeks <= 1) return {
+     label: 'Ask to slow down',
+     bg: 'bg-crimson/20', txt: 'text-red-400',
+     waLabel: `Hi! We've been playing every week for this tournament — could we space the remaining games out a bit more? Ideally 2 games a month works well for us.`
+   }
+ 
+   // Nudge only if: 2+ games still unbooked AND last scheduled game is already in the past
+   // (organiser has gone quiet — hasn't booked next game after most recent one was played)
+   const daysSinceLastGame = Math.round(
+     differenceInDays(parseISO(today), parseISO(lastGameDate))
+   )
+   const hasGoneQuiet = lastGameDate < today && daysSinceLastGame > 21 // 3+ weeks since last game, nothing booked
+ 
+   if (hasGoneQuiet && unbooked >= 2) return {
+     label: 'Nudge to schedule',
+     bg: 'bg-amber-900/40', txt: 'text-amber-400',
+     waLabel: `Hi! It's been a few weeks since our last game in this tournament. Could we get the next couple of fixtures on the calendar? We're targeting 2 games a month.`
+   }
+ 
+   return {
+     label: 'Good pace',
+     bg: 'bg-emerald-900/30', txt: 'text-emerald-400', waLabel: ''
+   }
+ }
 
 // ── Captain bandwidth section ──────────────────────────────────────
 function BandwidthSection({
@@ -566,8 +582,13 @@ function TournamentBlock({
 
   const allDates = games.map(g => g.game_date).sort()
   const gap = avgGapWeeks(allDates)
-  const pace = paceSignal(gap)
 
+  const lastGameDate = sortedGames.length > 0
+     ? sortedGames[sortedGames.length - 1].game_date
+     : today
+
+  const pace = paceSignal(gap, unbooked, lastGameDate, today)
+  
   // Slot balance counts
   const slotCounts = Object.fromEntries(
     ALL_SLOTS.map(s => [`${s.day}-${s.time}`, 0])
