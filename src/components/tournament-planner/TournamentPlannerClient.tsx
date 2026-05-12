@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { parseISO, differenceInDays, format } from 'date-fns'
 import { PlayerNameLink } from '@/lib/playerLink'
+import { TournamentShareButton } from './TournamentShareButton'
 
 // ── Types ──────────────────────────────────────────────────────────
 interface Booking {
@@ -693,10 +694,7 @@ function TournamentBlock({
                 </a>
               )}
               {(isAdmin || isGC) && shareLink && (
-                <a href={shareLink} target="_blank" rel="noopener noreferrer"
-                  className="font-rajdhani text-xs font-bold text-blue-400 hover:text-blue-300">
-                  📤 Share slot &amp; pace summary with organiser
-                </a>
+                <TournamentShareButton tournamentId={tournament.id} />
               )}
               {(isAdmin || isGC) && !shareLink && (
                 <span className="font-rajdhani text-[10px] text-zinc-700">
