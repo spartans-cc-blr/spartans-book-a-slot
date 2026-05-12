@@ -452,8 +452,20 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
                 }}
               />
               {isHover && (
-                <div className="absolute bg-ink-2 border border-ink-5 rounded-lg shadow-xl z-10 pointer-events-none"
-                  style={{ bottom: 28, left: '50%', transform: 'translateX(-50%)', minWidth: 130, padding: '6px 10px' }}>
+               <div
+                 className="absolute bg-ink-2 border border-ink-5 rounded-lg shadow-xl z-10 pointer-events-none"
+                 style={{
+                   bottom: 28,
+                   // First dot: anchor left. Last dot: anchor right. Others: center.
+                   ...(i === 0
+                     ? { left: 0, transform: 'none' }
+                     : i === sortedGames.length - 1
+                     ? { right: 0, transform: 'none' }
+                     : { left: '50%', transform: 'translateX(-50%)' }),
+                   minWidth: 130,
+                   padding: '6px 10px',
+                 }}
+               >
                   <p className="font-cinzel text-xs font-bold text-parchment">{format(parseISO(g.game_date), 'd MMM')}</p>
                   <p className="font-rajdhani text-[10px] mt-0.5" style={{ color: col }}>{gapRelLabel(gameGaps[i], avgGap)}</p>
                   <p className="font-rajdhani text-[9px] text-zinc-600">
