@@ -583,10 +583,6 @@ function TournamentBlock({
   const allDates = games.map(g => g.game_date).sort()
   const gap = avgGapWeeks(allDates)
 
-  const lastGameDate = sortedGames.length > 0
-     ? sortedGames[sortedGames.length - 1].game_date
-     : today
-
   const pace = paceSignal(gap, unbooked, lastGameDate, today)
   
   // Slot balance counts
@@ -611,7 +607,11 @@ function TournamentBlock({
   }
 
   const sortedGames = [...games].sort((a, b) => a.game_date.localeCompare(b.game_date))
-
+  
+  const lastGameDate = sortedGames.length > 0
+     ? sortedGames[sortedGames.length - 1].game_date
+     : today
+  
   const whatsappLink = pace.waLabel
     ? `https://wa.me/${tournament.organiser_contact?.replace(/\D/g, '') ?? ''}?text=${encodeURIComponent(pace.waLabel)}`
     : null
