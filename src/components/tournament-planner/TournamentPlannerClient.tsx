@@ -783,19 +783,6 @@ function TournamentBlock({
 
           <PaceTimeline sortedGames={sortedGames} avgGap={gap} today={today} />
 
-          {/* date labels */}
-            <div className="flex mt-1">
-              {sortedGames.map(g => (
-                <div key={g.id} className="flex-1 font-rajdhani text-[8px] text-zinc-700 text-center truncate">
-                  {format(parseISO(g.game_date), 'd MMM')}
-                </div>
-              ))}
-              {Array.from({ length: unbooked }).map((_, i) => (
-                <div key={`u${i}`} className="flex-1 font-rajdhani text-[8px] text-zinc-700 text-center">TBD</div>
-              ))}
-            </div>
-          </div>
-
           {/* Game list */}
           <div className="px-4 py-3 border-b border-ink-5">
 
