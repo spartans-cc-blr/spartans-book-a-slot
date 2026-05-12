@@ -42,14 +42,15 @@ interface Props {
 
 // ── Slot definitions ───────────────────────────────────────────────
 const ALL_SLOTS = [
-  { day: 'Sat', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
-  { day: 'Sat', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
-  { day: 'Sat', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
-  { day: 'Sun', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
-  { day: 'Sun', time: '10:30', formats: 'T20 only',  validFor: ['T20']        },
-  { day: 'Sun', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
-  { day: 'Sun', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
-] as const
+   { day: 'Sat', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
+   { day: 'Sat', time: '10:30', formats: 'T20 only',  validFor: ['T20']        },
+   { day: 'Sat', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
+   { day: 'Sat', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
+   { day: 'Sun', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
+   { day: 'Sun', time: '10:30', formats: 'T20 only',  validFor: ['T20']        },
+   { day: 'Sun', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
+   { day: 'Sun', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
+ ] as const
 
 type SlotKey = `${'Sat' | 'Sun'}-${'07:30' | '10:30' | '12:30' | '14:30'}`
 
@@ -199,7 +200,7 @@ function BandwidthSection({
             <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-3">
               Games by slot &amp; day
             </p>
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-8 gap-1.5">
               {ALL_SLOTS.map(s => {
                 const k: SlotKey = `${s.day}-${s.time}`
                 const count = slotCounts[k]
@@ -759,7 +760,7 @@ function TournamentBlock({
             <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-3">
               Slot balance across this tournament
             </p>
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-8 gap-1.5">
               {ALL_SLOTS.map(s => {
                 const k: SlotKey    = `${s.day}-${s.time}`
                 const count         = slotCounts[k]
