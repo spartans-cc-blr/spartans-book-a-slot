@@ -37,13 +37,14 @@ interface Props {
 // ── Slot definitions ───────────────────────────────────────────────
 // All valid slots across T20 + T30. Used for the balance grid.
 const ALL_SLOTS = [
-  { day: 'Sat', time: '07:30', formats: 'T20 / T30' },
-  { day: 'Sat', time: '14:30', formats: 'T20 only'  },
-  { day: 'Sun', time: '07:30', formats: 'T20 / T30' },
-  { day: 'Sun', time: '10:30', formats: 'T20 only'  },
-  { day: 'Sun', time: '12:30', formats: 'T20 / T30' },
-  { day: 'Sun', time: '14:30', formats: 'T20 only'  },
-] as const
+   { day: 'Sat', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
+   { day: 'Sat', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
+   { day: 'Sat', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
+   { day: 'Sun', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
+   { day: 'Sun', time: '10:30', formats: 'T20 only',  validFor: ['T20']        },
+   { day: 'Sun', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
+   { day: 'Sun', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
+ ] as const
 
 type SlotKey = `${'Sat'|'Sun'}-${'07:30'|'10:30'|'12:30'|'14:30'}`
 
@@ -575,6 +576,14 @@ function TournamentBlock({
   isAdmin: boolean
   isGC: boolean
 }) {
+ 
+  // Determine which formats this tournament uses
+  const tournamentFormats = [...new Set(games.map(g => g.format).filter(Boolean))] as string[]
+  const hasT20 = tournamentFormats.includes('T20')
+  const hasT30 = tournamentFormats.includes('T30')
+  // If no games yet, assume both formats possible
+  const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
+  
   const [open, setOpen] = useState(false)
   const [completedOpen, setCompletedOpen] = useState(false)
 
@@ -873,15 +882,13 @@ function TournamentBlock({
             <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-3">
               Slot balance across this tournament
             </p>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5">
-                 {ALL_SLOTS.filter(s => {
-                   const k: SlotKey = `${s.day}-${s.time}`
-                   return slotCounts[k] > 0
-                 }).map(s => {
+              <div className="grid grid-cols-7 gap-1.5">
+                {ALL_SLOTS.map(s => {
                 const k: SlotKey = `${s.day}-${s.time}`
                 const count = slotCounts[k]
                 const barH = count > 0 ? Math.round((count / maxSlotCount) * 100) : 0
                 const isSat = s.day === 'Sat'
+                const isApplicable = s.validFor.some(f => activeFormats.includes(f))
                 return (
                   <div key={k} className="bg-ink-4 border border-ink-5 rounded p-1.5 flex flex-col items-center">
                     <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
@@ -889,7 +896,7 @@ function TournamentBlock({
                     }`}>{s.day}</span>
                     <span className="font-rajdhani text-[10px] text-zinc-500 mb-1.5">{s.time}</span>
                     <div className="w-full h-8 bg-zinc-800 rounded overflow-hidden flex flex-col-reverse mb-1">
-                      {count > 0 && (
+                      {count > 0 && isApplicable && (
                         <div
                           className={`w-full rounded transition-all ${
                             count === maxSlotCount ? 'bg-emerald-600' : 'bg-amber-600'
@@ -898,8 +905,11 @@ function TournamentBlock({
                         />
                       )}
                     </div>
-                    <span className={`font-cinzel text-xs font-bold ${count > 0 ? 'text-amber-400' : 'text-zinc-700'}`}>
-                      {count > 0 ? count : '—'}
+                    <span className={`font-cinzel text-xs font-bold ${
+                      !isApplicable ? 'text-zinc-800' :
+                      count > 0 ? 'text-amber-400' : 'text-zinc-600'
+                     }`}>
+                        {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
                     </span>
                     <span className="font-rajdhani text-[8px] text-zinc-700 mt-0.5">{s.formats}</span>
                   </div>
