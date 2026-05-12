@@ -42,6 +42,7 @@ const ALL_SLOTS = [
   { day: 'Sun', time: '07:30', formats: 'T20 / T30' },
   { day: 'Sun', time: '10:30', formats: 'T20 only'  },
   { day: 'Sun', time: '12:30', formats: 'T20 / T30' },
+  { day: 'Sun', time: '14:30', formats: 'T20 only'  },
 ] as const
 
 type SlotKey = `${'Sat'|'Sun'}-${'07:30'|'10:30'|'12:30'|'14:30'}`
@@ -195,7 +196,12 @@ function BandwidthSection({
               Games by slot &amp; day
             </p>
             <div className="grid grid-cols-5 gap-1.5">
-              {ALL_SLOTS.map(s => {
+              {ALL_SLOTS.filter(s => {
+                // Hide slots that have no games in this tournament at all
+                const k: SlotKey = `${s.day}-${s.time}`
+                // Always show if count > 0; hide zero-count slots that no game uses
+                return slotCounts[k] > 0 || mine.some(b => slotKey(b.game_date, b.slot_time) === k)
+              }).map(s => {
                 const k: SlotKey = `${s.day}-${s.time}`
                 const count = slotCounts[k]
                 const barH  = count > 0 ? Math.round((count / maxSlot) * 100) : 0
@@ -867,8 +873,11 @@ function TournamentBlock({
             <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-3">
               Slot balance across this tournament
             </p>
-            <div className="grid grid-cols-5 gap-1.5">
-              {ALL_SLOTS.map(s => {
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5">
+                 {ALL_SLOTS.filter(s => {
+                   const k: SlotKey = `${s.day}-${s.time}`
+                   return slotCounts[k] > 0
+                 }).map(s => {
                 const k: SlotKey = `${s.day}-${s.time}`
                 const count = slotCounts[k]
                 const barH = count > 0 ? Math.round((count / maxSlotCount) * 100) : 0
