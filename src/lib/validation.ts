@@ -254,7 +254,7 @@ export function computeSlotStatus(
   }
 
   // ── T20 at 14:30 blocks 12:30 ───────────────────────────────
-  if (slotTime === '12:30') {
+  if (slotTime === '10:30' || slotTime === '12:30') {
     const t20at1430 = confirmed.find(b => b.slot_time === '14:30' && b.format === 'T20')
     if (t20at1430) return 'clash'
   }
