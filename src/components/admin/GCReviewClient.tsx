@@ -83,6 +83,12 @@ function buildWaLink(msg: string) {
   return `https://wa.me/?text=${encodeURIComponent(msg)}`
 }
 
+function shortName(name: string): string {
+  const parts = name.trim().split(' ').filter(Boolean)
+  if (parts.length === 1) return parts[0]
+  return parts[0] + ' ' + parts[parts.length - 1][0] + '.'
+}
+
 // ── Sub-components ────────────────────────────────────────────────
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -167,6 +173,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
     bookings.filter(b => squads.some(s => s.booking_id === b.id)).map(b => b.id)
   )
   const unsubmittedCount = bookings.length - submittedBookingIds.size
+  const anySubmitted = submittedBookingIds.size > 0
 
   // Sorted: 2+ games → 1 game → 0 Y-missed (submitted slot) → 0 Y-pending (draft only) → alpha
   const matrixRows = useMemo(() => {
@@ -324,23 +331,24 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
           </div>
 
           {/* Y not selected */}
-            {/* Fairness summary — partial check warning */}
-            {unsubmittedCount > 0 && (
-              <div className="flex items-center gap-2 font-rajdhani text-xs font-bold text-zinc-500">
-                <span className="w-2 h-2 rounded-full bg-zinc-500 flex-shrink-0" />
-                {unsubmittedCount} slot{unsubmittedCount > 1 ? 's' : ''} not yet submitted — fairness check partial
-              </div>
-            )}
+             {/* Partial check warning — only show if at least one slot IS submitted */}
+                {anySubmitted && unsubmittedCount > 0 && (
+                  <div className="flex items-center gap-2 font-rajdhani text-xs font-bold text-zinc-500">
+                    <span className="w-2 h-2 rounded-full bg-zinc-500 flex-shrink-0" />
+                    {unsubmittedCount} slot{unsubmittedCount > 1 ? 's' : ''} not yet submitted — fairness check partial
+                  </div>
+                )}
            
-            {/* Totally unselected — alarming */}
-            <div className="flex flex-col gap-1.5">
-              <button
-                onClick={() => totallyUnselected.length > 0 && setExpand(e => ({ ...e, unselected: !e.unselected }))}
-                className={`flex items-center gap-2 font-rajdhani text-xs font-bold transition-colors ${
-                  totallyUnselected.length > 0 ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 cursor-default'
-                }`}>
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${totallyUnselected.length > 0 ? 'bg-red-400' : 'bg-emerald-500'}`} />
-                {totallyUnselected.length === 0 ? 'All Y-available players selected ✓' : `${totallyUnselected.length} not selected for any game ⚠`}
+              {/* Totally unselected — only show when at least one squad is submitted */}
+              {anySubmitted && (
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    onClick={() => totallyUnselected.length > 0 && setExpand(e => ({ ...e, unselected: !e.unselected }))}
+                    className={`flex items-center gap-2 font-rajdhani text-xs font-bold transition-colors ${
+                      totallyUnselected.length > 0 ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 cursor-default'
+                    }`}>
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${totallyUnselected.length > 0 ? 'bg-red-400' : 'bg-emerald-500'}`} />
+                    {totallyUnselected.length === 0 ? 'All Y-available players selected ✓' : `${totallyUnselected.length} not selected for any game ⚠`}
                 {totallyUnselected.length > 0 && <span className="text-[10px] font-normal opacity-60">{expand.unselected ? '▴' : '▾'}</span>}
               </button>
               {expand.unselected && totallyUnselected.length > 0 && (
@@ -364,9 +372,9 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                 </div>
               )}
             </div>
-           
+              )}
             {/* Left out of a specific slot — informational */}
-            {leftOutOfSlot.length > 0 && (
+             {anySubmitted && leftOutOfSlot.length > 0 && (
               <div className="flex flex-col gap-1.5">
                 <button
                   onClick={() => setExpand(e => ({ ...e, leftout: !e.leftout }))}
@@ -467,10 +475,16 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
 
                   return (
                     <tr key={row.pid} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
-                      <td className="px-2 py-2 sticky left-0 bg-ink-3 z-10" style={{ minWidth: 130 }}>
+                     <td className="px-2 py-2 sticky left-0 bg-ink-3 z-10 text-right" style={{ minWidth: 130 }}>
                         {row.cricheroes_url
-                          ? <a href={row.cricheroes_url} target="_blank" rel="noopener noreferrer" className={`font-rajdhani text-xs hover:underline underline-offset-2 ${nameColour}`}>{row.name}</a>
-                          : <span className={`font-rajdhani text-xs ${nameColour}`}>{row.name}</span>
+                          ? <a href={row.cricheroes_url} target="_blank" rel="noopener noreferrer" className={`font-rajdhani text-xs hover:underline underline-offset-2 ${nameColour}`}>
+                              <span className="sm:hidden">{shortName(row.name)}</span>
+                              <span className="hidden sm:inline">{row.name}</span>
+                            </a>
+                          : <span className={`font-rajdhani text-xs ${nameColour}`}>
+                              <span className="sm:hidden">{shortName(row.name)}</span>
+                              <span className="hidden sm:inline">{row.name}</span>
+                            </span>
                         }
                       </td>
                       {bookings.map(b => {
