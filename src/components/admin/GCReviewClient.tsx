@@ -426,17 +426,17 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
           <p className="px-4 py-6 font-rajdhani text-sm text-zinc-600">No availability responses this weekend.</p>
         ) : (
           <>
-            <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '70vh' }}>
-              <table className="border-collapse" style={{ minWidth: Math.max(320, bookings.length * 120 + 160) }}>
-                <thead className="sticky top-0 z-20">
+             <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '70vh', maxWidth: '100vw' }}>
+<table className="border-collapse" style={{ minWidth: Math.max(240, bookings.length * 80 + 110) }}>
+<thead className="sticky top-0 z-20">
                   <tr className="border-b border-ink-5 bg-ink-4">
                     {/* Frozen player name header — sticky left AND top */}
-                    <th className="px-3 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 sticky left-0 bg-ink-4 z-30 align-bottom" style={{ minWidth: 130 }}>
+                    <th className="px-2 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 sticky left-0 bg-ink-4 z-30 align-bottom" style={{ minWidth: 100 }}>
                       Player
                     </th>
                     {/* Slot columns — vertical headers */}
                     {bookings.map(b => (
-                      <th key={b.id} className="bg-ink-4 z-20" style={{ width: 90, minWidth: 90, padding: 0, verticalAlign: 'bottom' }}>
+                      <th key={b.id} className="bg-ink-4 z-20" style={{ width: 70, minWidth: 70, padding: 0, verticalAlign: 'bottom' }}>
                         <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, margin: '0 auto' }}>
                           <span className="font-cinzel text-[10px] font-semibold text-gold">
                             {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -452,7 +452,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     ))}
 
                     {/* Games column — vertical */}
-                    <th className="bg-ink-4 z-20" style={{ width: 44, minWidth: 44, padding: 0 }}>
+                    <th className="bg-ink-4 z-20" style={{ width: 36, minWidth: 36, padding: 0 }}>
                       <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8, margin: '0 auto' }}>
                         <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">Games</span>
                       </div>
@@ -475,7 +475,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
 
                   return (
                     <tr key={row.pid} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
-                     <td className="px-2 py-2 sticky left-0 bg-ink-3 z-10 text-right" style={{ minWidth: 130 }}>
+                     <td className="px-2 py-2 sticky left-0 bg-ink-3 z-10 text-right" style={{ minWidth: 100 }}>
                         {row.cricheroes_url
                           ? <a href={row.cricheroes_url} target="_blank" rel="noopener noreferrer" className={`font-rajdhani text-xs hover:underline underline-offset-2 ${nameColour}`}>
                               <span className="sm:hidden">{shortName(row.name)}</span>
@@ -505,22 +505,22 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
  
                           // Selected in this slot — show green ✓
                           if (inSquad) return (
-                            <td key={b.id} className="px-2 py-2 text-center">
+                            <td key={b.id} className="px-1 py-2 text-center">
                               <span className="font-rajdhani text-[11px] font-bold text-emerald-400">✓</span>
                             </td>
                           )
  
                            // Not selected — plain text, greyed out always (no box)
                            return (
-                              <td key={b.id} className="px-2 py-2 text-center">
+                              <td key={b.id} className="px-1 py-2 text-center">
                                 <span className="font-rajdhani text-[10px] font-bold" style={{ color: '#52525b' }}>
                                   {resp}
                                 </span>
                               </td>
                             )
                         })}
-                      <td className="px-2 py-2 text-center">
-                        <span className={`font-rajdhani text-xs font-bold tabular-nums ${
+                      <td className="px-1 py-2 text-center">
+                        <span className={`font-rajdhani text-[11px] font-bold tabular-nums ${
                           row.games >= 1 ? 'text-emerald-400' : 'text-red-400'
                         }`}>
                           {row.games}
