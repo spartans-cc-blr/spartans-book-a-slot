@@ -45,7 +45,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
   // Fetch announced squad players for display
   const { data: squadRows } = await supabase
     .from('squad')
-    .select('is_captain, is_vc, is_wk, player:players(id, name, jersey_name, jersey_number, primary_skill)')
+    .select('is_captain, is_vc, is_wk, player:players(id, name, jersey_name, jersey_number, primary_skill, cricheroes_url)')
     .eq('booking_id', booking.id)
     .eq('status', 'announced')
 
