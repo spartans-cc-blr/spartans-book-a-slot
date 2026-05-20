@@ -22,6 +22,8 @@ interface AnnouncementBooking {
   match_time: string | null  // 'HH:MM' — reporting time
   opponent_name: string | null
   cricheroes_url: string | null
+  captain_name?: string | null         // for logistics block
+  captain_whatsapp?: string | null     // for logistics block
   tournament: {
     ball_type: 'red' | 'white' | 'pink'
     ground: {
