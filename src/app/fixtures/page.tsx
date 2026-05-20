@@ -89,7 +89,7 @@ export default async function FixturesPage() {
   const bookingIds = (bookings ?? []).map(b => b.id)
   const { data: squadRows } = bookingIds.length ? await supabase
     .from('squad')
-    .select('booking_id, status, is_captain, is_vc, is_wk, player:players(id, name)')
+    .select('booking_id, status, is_captain, is_vc, is_wk, player:players(id, name, cricheroes_url)')
     .in('booking_id', bookingIds)
     .eq('status', 'announced')
   : { data: [] }
