@@ -33,7 +33,7 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
     <nav className="bg-ink-2 border-b border-gold-dim sticky top-0 z-50">
       <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
         {/* Logo */}
-        <Link href="/schedule" className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5">
           <img src="/Transparent High Resolution.png" alt="Spartans CC" className="w-8 h-8 object-contain" />
           <span className="font-cinzel font-bold text-gold tracking-[2px] text-[13px] hidden sm:block">
             SPARTANS CC
