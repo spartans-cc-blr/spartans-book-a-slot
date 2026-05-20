@@ -4,7 +4,10 @@ import { useState } from 'react'
 export function ShareMatchButton({ bookingId }: { bookingId: string }) {
   const [copied, setCopied] = useState(false)
 
-  const url = `${typeof window !== 'undefined' ? window.location.origin : 'https://hub.spartanscricketclub.in'}/fixtures/${bookingId}`
+  const base = typeof window !== 'undefined'
+  ? window.location.origin
+  : (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://hub.spartanscricketclub.in')
+const url = `${base}/fixtures/${bookingId}`
 
   async function handleShare() {
     if (navigator.share) {
