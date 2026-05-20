@@ -194,6 +194,7 @@ type SquadPlayer = {
   jersey_name:      string | null
   jersey_number:    number | null
   primary_skill:    string | null
+	cricheroes_url:   string | null
   is_match_captain: boolean
   is_vc:            boolean
   is_wk:            boolean
@@ -412,7 +413,17 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
                     fontSize: '11px', color: '#D1D5DB', padding: '3px 0',
                   }}>
                     <span style={{ flex: 1 }}>
-                      {p.name}
+                      {p.cricheroes_url ? (
+    										<a
+                          href={p.cricheroes_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: '#C9A84C55' }}
+                        >
+                          {p.name}
+                        </a>
+                      ) : p.name}
                       {p.is_match_captain && (
                         <span style={{
                           marginLeft: '4px', fontSize: '9px', fontWeight: 700,
