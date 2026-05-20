@@ -12,7 +12,7 @@ export default async function JoinPage() {
   if (player?.playerId) redirect('/')
 
   const userEmail = player?.email ?? null
-  const waNumber  = process.env.NEXT_PUBLIC_COORDINATOR_WHATSAPP ?? '919XXXXXXXXXX'
+  const waNumber  = process.env.NEXT_PUBLIC_WA_NUMBER ?? '919XXXXXXXXXX'
   const waLink    = `https://wa.me/${waNumber}?text=${encodeURIComponent('Hi Muthu, my Gmail is not linked to a Spartans profile — can you help me get access?')}`
 
   return (
