@@ -24,6 +24,7 @@ interface AnnouncementBooking {
   cricheroes_url: string | null
   captain_name?: string | null         // for logistics block
   captain_whatsapp?: string | null     // for logistics block
+  id?: string  // for match card link in logistics block
   tournament: {
     ball_type: 'red' | 'white' | 'pink'
     ground: {
@@ -98,6 +99,11 @@ export function buildSquadAnnouncement(
     booking.cricheroes_url ? `*Match Details:*\n${booking.cricheroes_url}` : null,
     ``,
     ground?.hospital_url ? `*Nearest hospital:*\n${ground.hospital_url}` : null,
+    ``,
+    booking.captain_name || booking.captain_whatsapp
+      ? `📞 Captain: ${[booking.captain_name, booking.captain_whatsapp].filter(Boolean).join(' · ')}`
+      : null,
+    `🔗 Match card: ${process.env.NEXT_PUBLIC_BASE_URL ?? 'https://hub.spartanscricketclub.in'}/fixtures/${booking.id ?? ''}`,
     ``,
     `*Follow Reporting Time strictly* 🏏`,
   ]
