@@ -114,6 +114,7 @@ export default async function GCReviewPage() {
             avail={(avail ?? []) as any}
             squads={(squads ?? []) as any}
             draftSquadMap={draftSquadMap}
+            captainMap={captainMap}
           />
         </main>
       </div>
