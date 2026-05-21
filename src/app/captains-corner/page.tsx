@@ -47,8 +47,8 @@ export default async function CaptainsCornerPage() {
   if (!session) redirect('/login')
   if (!user?.isCaptain && !user?.isAdmin) redirect('/fixtures')
 
-  const captainName     = session.user.name ?? null
-  const captainWhatsapp = (session.user as any).whatsapp ?? null
+  const captainName     = user?.name ?? null
+  const captainWhatsapp = user?.whatsapp ?? null
 
   const supabase = createServiceClient()
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
