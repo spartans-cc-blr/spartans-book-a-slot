@@ -43,6 +43,9 @@ export default async function CaptainsCornerPage() {
   const session = await getServerSession(authOptions)
   const user    = session?.user as any
 
+  const captainName     = session.user.name ?? null
+  const captainWhatsapp = (session.user as any).whatsapp ?? null
+
   // Must be a captain or admin
   if (!session) redirect('/login')
   if (!user?.isCaptain && !user?.isAdmin) redirect('/fixtures')
