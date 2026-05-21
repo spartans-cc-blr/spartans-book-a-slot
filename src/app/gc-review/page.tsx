@@ -33,7 +33,7 @@ export default async function GCReviewPage() {
   // ── Fetch this weekend's confirmed bookings ────────────────
   const { data: bookings } = await supabase
     .from('bookings')
-	  .select('id, game_date, slot_time, format, opponent_name, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url)), captain:players!bookings_captain_id_fkey!left(name, whatsapp)') 
+		.select('id, game_date, slot_time, format, opponent_name, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))')
 		.eq('status', 'confirmed')
     .gte('game_date', weekStart)
     .lt('game_date', weekEnd)
@@ -42,6 +42,20 @@ export default async function GCReviewPage() {
 
   const bookingIds = (bookings ?? []).map(b => b.id)
 
+  // ADD — after const bookingIds = ...
+  const { data: captains } = bookingIds.length > 0
+    ? await supabase
+        .from('bookings')
+        .select('id, captain:players!bookings_captain_id_fkey(name, whatsapp)')
+        .in('id', bookingIds)
+    : { data: [] }
+  
+  // Build captainMap: bookingId → { name, whatsapp }
+  const captainMap: Record<string, { name: string; whatsapp: string | null }> = {}
+  for (const row of captains ?? []) {
+    if (row.captain) captainMap[row.id] = row.captain as any
+  }
+  
   // ── Fetch Y/O/E availability (all three, not just O/E) ────
   // Y included so the matrix can show all available players and
   // flag anyone who responded Y but was not selected in any squad.
