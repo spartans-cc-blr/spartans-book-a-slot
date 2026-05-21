@@ -43,12 +43,12 @@ export default async function CaptainsCornerPage() {
   const session = await getServerSession(authOptions)
   const user    = session?.user as any
 
-  const captainName     = session.user.name ?? null
-  const captainWhatsapp = (session.user as any).whatsapp ?? null
-
   // Must be a captain or admin
   if (!session) redirect('/login')
   if (!user?.isCaptain && !user?.isAdmin) redirect('/fixtures')
+
+  const captainName     = session.user.name ?? null
+  const captainWhatsapp = (session.user as any).whatsapp ?? null
 
   const supabase = createServiceClient()
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -216,7 +216,11 @@ export default async function CaptainsCornerPage() {
               <CaptainsCornerGrid
                 key={wk}
                 weekLabel={weekend.label}
-                bookings={(weekend.bookings ?? []) as any}
+                bookings={(weekend.bookings ?? []).map(b => ({
+                  ...b,
+                  captain_name:     captainName,
+                  captain_whatsapp: captainWhatsapp,
+                })) as any}
                 players={players ?? []}
                 availMap={availMap}
                 initialSquadMap={initialSquadMap}
