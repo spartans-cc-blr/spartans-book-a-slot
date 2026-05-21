@@ -41,6 +41,7 @@ interface Props {
   avail:     AvailRow[]
   squads:    SquadRow[]
   draftSquadMap: Record<string, string[]>
+  captainMap:    Record<string, { name: string; whatsapp: string | null }>
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -122,7 +123,7 @@ function WAIcon({ size = 13 }: { size?: number }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────
-export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSquads, draftSquadMap }: Props) {
+export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSquads, draftSquadMap, captainMap }: Props) {
   const [squads,  setSquads]  = useState(initialSquads)
   const [notes,   setNotes]   = useState<Record<string, string>>({})
   const [saving,  setSaving]  = useState<Record<string, boolean>>({})
