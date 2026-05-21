@@ -21,6 +21,8 @@ interface Booking {
   opponent_name: string | null
   match_time: string | null
   cricheroes_url: string | null
+  captain_name: string | null      // ADD
+  captain_whatsapp: string | null  // ADD
   tournament: {
      name: string
      ball_type: string
@@ -250,6 +252,11 @@ function buildAnnouncementText(
     booking.cricheroes_url ? `*Match Link:*\n${booking.cricheroes_url}` : null,
     ``,
     ground?.hospital_url ? `*Nearest hospital:*\n${ground.hospital_url}` : null,
+    ``,
+    booking.captain_name || booking.captain_whatsapp
+      ? `📞 Captain: ${[booking.captain_name, booking.captain_whatsapp].filter(Boolean).join(' · ')}`
+      : null,
+    `🔗 Match card: ${process.env.NEXT_PUBLIC_BASE_URL ?? 'https://hub.spartanscricketclub.in'}/fixtures/${booking.id}`,
     ``,
     `*Follow Reporting time strictly. Let us warm up. Go well, _Spartans_* 🏏`,
   ]
