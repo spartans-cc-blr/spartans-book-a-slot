@@ -88,6 +88,7 @@ export default async function HomePage() {
   const isPlayer    = isLoggedIn && !!player?.playerId && player?.playerStatus !== 'expelled'
   const isCaptain   = isPlayer && !!player?.isCaptain
   const isAdmin     = isLoggedIn && !!player?.isAdmin
+  if (isAdmin) redirect('/admin')
   const isExpelled  = isLoggedIn && player?.playerStatus === 'expelled'
   const isUnmatched = isLoggedIn && !player?.playerId && !isExpelled
 

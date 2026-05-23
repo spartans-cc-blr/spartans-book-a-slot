@@ -16,8 +16,6 @@ export default async function AdminDashboard({
   const session  = await getServerSession(authOptions)
   const supabase = createServiceClient()
   const today    = format(new Date(), 'yyyy-MM-dd')
-
-  if (isAdmin) redirect('/admin')
     
   // Upcoming confirmed bookings + soft blocks
   const { data: bookings } = await supabase
