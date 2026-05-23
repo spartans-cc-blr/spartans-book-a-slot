@@ -97,7 +97,7 @@ export default async function GCReviewPage() {
 
   return (
     <div className="min-h-screen bg-ink flex flex-col">
-      <SiteNav />
+      <SiteNav activePage="gc" />
       <div className="flex flex-1">
         <AdminSidebar />
         <main className="flex-1 px-5 md:px-8 lg:px-10 py-8 max-w-5xl">

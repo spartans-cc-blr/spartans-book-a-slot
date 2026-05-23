@@ -21,12 +21,28 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
 
   const links = [
     { href: 'https://spartanscricketclub.vercel.app', label: 'Club Site' },
-    { href: '/schedule', label: 'Schedule', key: 'schedule' },
-    { href: '/fixtures', label: 'Fixtures',  key: 'fixtures' },
+    // Schedule only for public (signed-out) or admin — players use Fixtures
+    ...(!isLoggedIn || isAdmin
+      ? [{ href: '/schedule', label: 'Schedule', key: 'schedule' }]
+      : []),
+    ...(isLoggedIn && !isExpelled
+      ? [{ href: '/fixtures', label: 'Fixtures', key: 'fixtures' }]
+      : []),
+    // Captains' Corner — direct top-level link for captains & admin
+    ...(isCaptain || isAdmin
+      ? [{ href: '/captains-corner', label: "Captains' Corner", key: 'captains' }]
+      : []),
+    // GC Review — direct link for GC members & admin
+    ...(isGC
+      ? [{ href: '/gc-review', label: 'GC Review', key: 'gc' }]
+      : []),
+    // Tournament Planner — captains, GC, admin
     ...(isCaptain || isGC || isAdmin
-     ? [{ href: '/tournament-planner', label: 'Tournaments', key: 'planner' }]
-     : []),
-    { href: '/profile', label: 'Profile', key: 'profile' }
+      ? [{ href: '/tournament-planner', label: 'Tournaments', key: 'planner' }]
+      : []),
+    ...(isLoggedIn && !isExpelled
+      ? [{ href: '/profile', label: 'My Profile', key: 'profile' }]
+      : []),
   ]
 
   return (
@@ -54,13 +70,6 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
             <Link href="/admin"
               className="ml-3 font-rajdhani text-xs font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark text-white px-4 py-2 rounded transition-colors">
               Admin ⚙
-            </Link>
-          )}
-
-          {isGC && !isAdmin && (
-            <Link href="/gc-review"
-              className="ml-3 font-rajdhani text-xs font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 px-4 py-2 rounded transition-colors">
-              GC Review
             </Link>
           )}
 

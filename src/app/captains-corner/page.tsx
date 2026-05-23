@@ -162,7 +162,7 @@ export default async function CaptainsCornerPage() {
 
   return (
     <div className="min-h-screen bg-ink grain">
-      <SiteNav activePage="fixtures" />
+      <SiteNav activePage="captains" />
 
       {/* Hero */}
       <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden">

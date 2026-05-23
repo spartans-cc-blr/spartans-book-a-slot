@@ -8,7 +8,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Must be logged in AND be an admin
   if (!session) {
-    redirect('/login')
+    redirect('/admin/login')
   }
 
   if (!(session.user as any).isAdmin) {
