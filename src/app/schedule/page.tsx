@@ -23,6 +23,13 @@ function buildWALink(dayLabel: string, slot: SlotTime, fmt: GameFormat) {
   return `https://wa.me/${WA_NUMBER}?text=${text}`
 }
 
+const ORGANISER_FORMATS: Record<SlotTime, GameFormat[]> = {
+  '07:30': ['T20', 'T30'],
+  '10:30': ['T20'],
+  '12:30': ['T30'],
+  '14:30': ['T20'],
+}
+
 function MatrixSkeleton() {
   return (
     <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
