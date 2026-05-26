@@ -52,6 +52,20 @@ function buildWALink(dateLabel: string, dayLabel: string, slot: SlotTime, format
   return `https://wa.me/${WA_NUMBER}?text=${text}`
 }
 
+function MatrixSkeleton() {
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      {[...Array(5)].map((_, i) => (
+        <div key={i} style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+          <div style={{ height: '40px', width: '64px', borderRadius: '6px', background: '#1F2937', flexShrink: 0 }} />
+          {[...Array(8)].map((_, j) => (
+            <div key={j} style={{ height: '40px', width: '72px', borderRadius: '6px', background: '#1F2937' }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SchedulePage() {
