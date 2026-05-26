@@ -226,10 +226,20 @@ function MatrixCell({
 }) {
   const formats = ORGANISER_FORMATS[slot]
 
-  // Booked / blocked / soft_block — show as unavailable (no detail leaked publicly)
+  // Booked / blocked / soft_block — show as unavailable
   if (slotData && slotData.status !== 'open') {
     return (
-      <span className="block w-full text-center font-cinzel text-[10px] text-zinc-700 select-none py-1">
+      <span
+        style={{
+          display: 'block',
+          textAlign: 'center',
+          fontFamily: "'DM Sans', sans-serif",
+          fontSize: '11px',
+          color: '#374151',
+          padding: '4px 0',
+          userSelect: 'none',
+        }}
+      >
         —
       </span>
     )
@@ -237,39 +247,37 @@ function MatrixCell({
 
   // Open — show each valid format as a WhatsApp tap target
   return (
-    <div className="flex flex-col gap-0.5 items-center">
-      {formats.map(fmt => (
-        
-          key={fmt}
-          href={buildWALink(day.dateLabel, day.dayLabel, slot, fmt)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`block w-full rounded px-1 py-0.5 text-center font-cinzel font-bold text-[11px]
-            border transition-all active:scale-95
-            ${fmt === 'T20'
-              ? 'border-gold-dim text-gold bg-gold/5 hover:bg-gold/20'
-              : 'border-orange-800 text-orange-400 bg-orange-950/20 hover:bg-orange-900/40'}`}
-        >
-          {fmt}
-        </a>
-      ))}
-    </div>
-  )
-}
-
-// ── Skeleton ──────────────────────────────────────────────────────────────────
-
-function MatrixSkeleton() {
-  return (
-    <div className="overflow-x-auto animate-pulse space-y-1">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="flex gap-1">
-          <div className="h-10 w-16 rounded bg-ink-4 flex-shrink-0" />
-          {[...Array(8)].map((_, j) => (
-            <div key={j} className="h-10 w-[72px] rounded bg-ink-4" />
-          ))}
-        </div>
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center' }}>
+      {formats.map(fmt => {
+        const href = buildWALink(day.dateLabel, day.dayLabel, slot, fmt)
+        const isT20 = fmt === 'T20'
+        return (
+          <a
+            key={fmt}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'center',
+              padding: '3px 4px',
+              borderRadius: '6px',
+              border: `1px solid ${isT20 ? '#C9A84C' : '#9a3412'}`,
+              background: isT20 ? 'rgba(201,168,76,0.08)' : 'rgba(154,52,18,0.12)',
+              color: isT20 ? '#C9A84C' : '#fb923c',
+              fontSize: '11px',
+              fontWeight: 700,
+              fontFamily: "'DM Sans', sans-serif",
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s',
+            }}
+          >
+            {fmt}
+          </a>
+        )
+      })}
     </div>
   )
 }
