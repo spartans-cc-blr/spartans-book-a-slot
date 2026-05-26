@@ -25,7 +25,8 @@ function formatExpiryLabel(reserved_until: string): string {
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const fromParam = searchParams.get('from')
-  const weeksParam = parseInt(searchParams.get('weeks') ?? '15')
+  // If ?weeks is passed use it; otherwise auto-extend to cover last booked game's month
+  let weeksParam = parseInt(searchParams.get('weeks') ?? '0')
 
   let from: Date
   if (fromParam) {
@@ -65,6 +66,22 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Auto-compute weeks if not explicitly passed — extend to end of last booked month
+  if (!searchParams.get('weeks')) {
+    const lastBooking = [...(bookings ?? [])]
+      .filter((b: any) => b.status === 'confirmed')
+      .sort((a: any, b: any) => b.game_date.localeCompare(a.game_date))[0]
+    if (lastBooking) {
+      const lastDate  = parseISO(lastBooking.game_date)
+      const monthEnd  = new Date(lastDate.getFullYear(), lastDate.getMonth() + 1, 0)
+      const diffMs    = monthEnd.getTime() - from.getTime()
+      const diffWeeks = Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1
+      weeksParam      = Math.max(diffWeeks, 4)
+    } else {
+      weeksParam = 15
+    }
   }
 
   const weeks: WeekAvailability[] = []
