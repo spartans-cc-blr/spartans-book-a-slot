@@ -104,163 +104,202 @@ export default function SchedulePage() {
           <span className="w-4 h-px bg-gold inline-block" />
           Spartans Cricket Club · Bengaluru
         </p>
+        <h1 className="font-cinzreturn (
+    <div className="min-h-screen bg-ink grain">
+      <SiteNav activePage="schedule" />
+
+      {/* Hero */}
+      <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden">
+        <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)' }} />
+        <p className="text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
+          <span className="w-4 h-px bg-gold inline-block" />
+          Spartans Cricket Club · Bengaluru
+        </p>
         <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-parchment mb-2 tracking-wide">
           Available Slots
         </h1>
         <p className="text-muted text-sm md:text-base max-w-xl leading-relaxed font-rajdhani">
-          Open slots{lastBookedMonth ? ` through ${lastBookedMonth}` : ''}. Tap a format to enquire via WhatsApp.
+          Open slots for the next 3 months. Tap a format to enquire via WhatsApp.
         </p>
       </div>
 
       {/* Legend */}
-      <div className="px-5 md:px-8 lg:px-10 py-3 border-b border-ink-4 flex items-center gap-5 font-rajdhani text-xs text-zinc-500 overflow-x-auto">
-        <span className="flex items-center gap-1.5 whitespace-nowrap">
-          <span style={{ display: 'inline-block', width: '36px', textAlign: 'center', padding: '2px 0', borderRadius: '4px', border: '1px solid #C9A84C', background: 'rgba(201,168,76,0.08)', color: '#C9A84C', fontSize: '10px', fontWeight: 700 }}>T20</span>
-          Tap to book
-        </span>
-        <span className="flex items-center gap-1.5 whitespace-nowrap">
-          <span style={{ display: 'inline-block', width: '36px', textAlign: 'center', padding: '2px 0', borderRadius: '4px', border: '1px solid #9a3412', background: 'rgba(154,52,18,0.12)', color: '#fb923c', fontSize: '10px', fontWeight: 700 }}>T30</span>
-          Tap to book
-        </span>
-        <span className="flex items-center gap-1.5 whitespace-nowrap">
-          <span style={{ display: 'inline-block', width: '36px', textAlign: 'center', padding: '2px 0', borderRadius: '4px', border: '1px solid #374151', background: '#111827', color: '#4B5563', fontSize: '10px', fontWeight: 700 }}>—</span>
+      <div style={{ padding: '10px 20px', borderBottom: '1px solid #1F2937', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {(['T20', 'T30', 'Any'] as const).map(lbl => {
+          const color = lbl === 'T20' ? '#C9A84C' : lbl === 'T30' ? '#fb923c' : '#34d399'
+          const border = lbl === 'T20' ? '#C9A84C' : lbl === 'T30' ? '#9a3412' : '#065f46'
+          const bg     = lbl === 'T20' ? 'rgba(201,168,76,0.08)' : lbl === 'T30' ? 'rgba(154,52,18,0.12)' : 'rgba(52,211,153,0.08)'
+          return (
+            <span key={lbl} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+              <span style={{ padding: '1px 8px', borderRadius: '4px', border: `1px solid ${border}`, background: bg, color, fontSize: '11px', fontWeight: 700 }}>{lbl}</span>
+              {lbl === 'Any' ? 'Both T20 & T30 available — tap preferred' : `Only ${lbl} available`}
+            </span>
+          )
+        })}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+          <span style={{ padding: '1px 8px', borderRadius: '4px', border: '1px solid #1F2937', background: '#111827', color: '#374151', fontSize: '11px', fontWeight: 700 }}>—</span>
           Taken / N/A
         </span>
       </div>
 
-      {/* Matrix */}
-      <div className="px-4 md:px-8 lg:px-10 py-6">
+      {/* Matrix — dates as rows, slots as columns */}
+      <div style={{ overflowY: 'auto' }}>
         {loading ? (
           <MatrixSkeleton />
-        ) : days.length === 0 ? (
-          <p className="font-rajdhani text-zinc-500 text-sm py-8 text-center">No open slots at the moment.</p>
         ) : (
-          <div style={{ overflowX: 'auto', marginLeft: '-1rem', marginRight: '-1rem', paddingLeft: '1rem', paddingRight: '1rem' }}>
-            <table style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '360px', width: '100%' }}>
-              <thead>
-                <tr>
-                  {/* Slot column header */}
-                  <th style={{
-                    position: 'sticky', left: 0, zIndex: 20,
-                    background: '#0D1117',
-                    borderBottom: '1px solid #1F2937',
-                    borderRight: '1px solid #1F2937',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    minWidth: '56px',
+          <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: '320px' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 20 }}>
+              <tr>
+                {/* Date column header */}
+                <th style={{
+                  background: '#0D1117', borderBottom: '1px solid #1F2937', borderRight: '1px solid #1F2937',
+                  padding: '8px 12px', textAlign: 'left', minWidth: '100px', whiteSpace: 'nowrap',
+                }}>
+                  <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#374151' }}>Date</span>
+                </th>
+                {/* One column per slot */}
+                {(['07:30', '10:30', '12:30', '14:30'] as SlotTime[]).map(slot => (
+                  <th key={slot} style={{
+                    background: '#0D1117', borderBottom: '1px solid #1F2937', borderRight: '1px solid #1F2937',
+                    padding: '8px 10px', textAlign: 'center', minWidth: '72px', whiteSpace: 'nowrap',
                   }}>
-                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#374151' }}>Slot</span>
+                    <span style={{ display: 'block', fontFamily: "'Cinzel',serif", fontSize: '11px', fontWeight: 700, color: '#8B7340' }}>{slot}</span>
+                    <span style={{ display: 'block', fontFamily: "'DM Sans',sans-serif", fontSize: '9px', color: '#374151', marginTop: '1px' }}>
+                      {ORGANISER_FORMATS[slot].join('/')}
+                    </span>
                   </th>
-                  {monthGroups.flatMap(group =>
-                    group.days.map((day, di) => {
-                      // Parse label e.g. "Saturday 9 Aug" → "SAT" + "9 Aug"
-                      const parts = day.label.split(' ')
-                      const dayAbbr = parts[0]?.slice(0, 3).toUpperCase() ?? ''
-                      const dateShort = parts.slice(1).join(' ')
-                      return (
-                        <th key={day.date} style={{
-                          borderBottom: '1px solid #1F2937',
-                          borderRight: '1px solid #1F2937',
-                          padding: '6px 6px 8px',
-                          textAlign: 'center',
-                          minWidth: '68px',
-                          verticalAlign: 'bottom',
-                        }}>
-                          {di === 0 && (
-                            <span style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '8px', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#C9A84C', marginBottom: '2px' }}>
-                              {group.month}
-                            </span>
-                          )}
-                          <span style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '9px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                            {dayAbbr}
-                          </span>
-                          <span style={{ display: 'block', fontFamily: "'Cinzel', serif", fontSize: '11px', fontWeight: 700, color: '#F9FAFB' }}>
-                            {dateShort}
-                          </span>
-                        </th>
-                      )
-                    })
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {SLOTS.map((slot, si) => (
-                  <tr key={slot} style={{ background: si % 2 === 0 ? '#0D1117' : '#111827' }}>
-                    {/* Slot label */}
-                    <td style={{
-                      position: 'sticky', left: 0, zIndex: 10,
-                      background: si % 2 === 0 ? '#0D1117' : '#111827',
-                      borderBottom: '1px solid #1F2937',
-                      borderRight: '1px solid #1F2937',
-                      padding: '6px 12px',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      <span style={{ fontFamily: "'Cinzel', serif", fontSize: '11px', fontWeight: 700, color: '#8B7340' }}>{slot}</span>
-                    </td>
-                    {days.map(day => {
-                      const status = slotMap.get(day.date)?.get(slot) ?? 'na'
-                      const isOpen = status === 'open'
-                      const isT20Only = status === 't20only'
-                      const availableFmts = isOpen
-                        ? SLOT_FORMATS[slot]
-                        : isT20Only
-                        ? (['T20'] as GameFormat[]).filter(f => SLOT_FORMATS[slot].includes(f))
-                        : []
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {weeks.flatMap(week =>
+                week.days.map((day, dayIdx) => {
+                  // Parse label: "Saturday 9 Aug" → abbrev + short date
+                  const parts   = day.label.split(' ')
+                  const dayAbbr = parts[0]?.slice(0, 3).toUpperCase() ?? ''
+                  const dateStr = parts.slice(1).join(' ') // "9 Aug"
 
-                      const parts = day.label.split(' ')
-                      const dayAbbr = parts[0]?.slice(0, 3).toUpperCase() ?? ''
-                      const dateShort = parts.slice(1).join(' ')
-                      const labelForWA = `${dayAbbr} ${dateShort}`
+                  // Month separator row — show when day is Saturday (first of weekend)
+                  const showMonth = dayIdx === 0 || (dayIdx === 0 && week.days[0]?.date === day.date)
+                  const monthLabel = new Date(day.date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 
-                      return (
-                        <td key={day.date} style={{
+                  // Build slot status lookup for this day
+                  const slotStatus: Record<SlotTime, string> = {
+                    '07:30': 'na', '10:30': 'na', '12:30': 'na', '14:30': 'na',
+                  }
+                  day.slots.forEach(s => { slotStatus[s.time] = s.status })
+
+                  const isSat = new Date(day.date).getDay() === 6
+                  const rowBg = isSat ? '#0D1117' : '#111827'
+
+                  return [
+                    // Month header row — only on first day of each month
+                    dayIdx === 0 ? (
+                      <tr key={`month-${week.weekStart}`}>
+                        <td colSpan={5} style={{
+                          background: '#0a0e17',
                           borderBottom: '1px solid #1F2937',
-                          borderRight: '1px solid #1F2937',
-                          padding: '5px 4px',
-                          textAlign: 'center',
-                          verticalAlign: 'middle',
+                          padding: '4px 12px',
+                          fontFamily: "'DM Sans',sans-serif",
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          letterSpacing: '0.15em',
+                          textTransform: 'uppercase',
+                          color: '#C9A84C',
                         }}>
-                          {availableFmts.length === 0 ? (
-                            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '11px', color: '#1F2937' }}>—</span>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center' }}>
-                              {availableFmts.map(fmt => (
-                                <a
-                                  key={fmt}
-                                  href={buildWALink(labelForWA, slot, fmt)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                          {monthLabel}
+                        </td>
+                      </tr>
+                    ) : null,
+
+                    // Data row
+                    <tr key={day.date} style={{ background: rowBg }}>
+                      {/* Date cell */}
+                      <td style={{
+                        borderBottom: '1px solid #1F2937', borderRight: '1px solid #1F2937',
+                        padding: '7px 12px', whiteSpace: 'nowrap', verticalAlign: 'middle',
+                      }}>
+                        <span style={{ display: 'block', fontFamily: "'DM Sans',sans-serif", fontSize: '9px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{dayAbbr}</span>
+                        <span style={{ display: 'block', fontFamily: "'Cinzel',serif", fontSize: '12px', fontWeight: 700, color: '#F9FAFB' }}>{dateStr}</span>
+                      </td>
+
+                      {/* Slot cells */}
+                      {(['07:30', '10:30', '12:30', '14:30'] as SlotTime[]).map(slot => {
+                        const status   = slotStatus[slot]
+                        const isOpen   = status === 'open'
+                        const isT20Only = status === 't20only'
+                        const fmts     = ORGANISER_FORMATS[slot]
+
+                        // Determine what to show
+                        let cell: React.ReactNode
+
+                        if (isOpen && fmts.length > 1) {
+                          // Both T20 and T30 available — show "Any"
+                          cell = (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              {fmts.map(fmt => (
+                                <a key={fmt} href={buildWALink(day.label, slot, fmt)} target="_blank" rel="noopener noreferrer"
                                   style={{
-                                    display: 'block',
-                                    width: '100%',
-                                    textAlign: 'center',
-                                    padding: '3px 6px',
-                                    borderRadius: '5px',
+                                    display: 'block', textAlign: 'center', padding: '2px 6px', borderRadius: '4px', textDecoration: 'none',
                                     border: `1px solid ${fmt === 'T20' ? '#C9A84C' : '#9a3412'}`,
                                     background: fmt === 'T20' ? 'rgba(201,168,76,0.08)' : 'rgba(154,52,18,0.12)',
                                     color: fmt === 'T20' ? '#C9A84C' : '#fb923c',
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    fontFamily: "'DM Sans', sans-serif",
-                                    textDecoration: 'none',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
+                                    fontSize: '11px', fontWeight: 700, fontFamily: "'DM Sans',sans-serif",
+                                  }}>
                                   {fmt}
                                 </a>
                               ))}
                             </div>
-                          )}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          )
+                        } else if (isOpen && fmts.length === 1) {
+                          // Single format open
+                          const fmt = fmts[0]
+                          cell = (
+                            <a href={buildWALink(day.label, slot, fmt)} target="_blank" rel="noopener noreferrer"
+                              style={{
+                                display: 'block', textAlign: 'center', padding: '4px 6px', borderRadius: '4px', textDecoration: 'none',
+                                border: `1px solid ${fmt === 'T20' ? '#C9A84C' : '#9a3412'}`,
+                                background: fmt === 'T20' ? 'rgba(201,168,76,0.08)' : 'rgba(154,52,18,0.12)',
+                                color: fmt === 'T20' ? '#C9A84C' : '#fb923c',
+                                fontSize: '11px', fontWeight: 700, fontFamily: "'DM Sans',sans-serif",
+                              }}>
+                              {fmt}
+                            </a>
+                          )
+                        } else if (isT20Only) {
+                          // Clash reduced it to T20 only
+                          cell = (
+                            <a href={buildWALink(day.label, slot, 'T20')} target="_blank" rel="noopener noreferrer"
+                              style={{
+                                display: 'block', textAlign: 'center', padding: '4px 6px', borderRadius: '4px', textDecoration: 'none',
+                                border: '1px solid #C9A84C', background: 'rgba(201,168,76,0.08)', color: '#C9A84C',
+                                fontSize: '11px', fontWeight: 700, fontFamily: "'DM Sans',sans-serif",
+                              }}>
+                              T20
+                            </a>
+                          )
+                        } else {
+                          // Taken / clash / na
+                          cell = <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12px', color: '#1F2937' }}>—</span>
+                        }
+
+                        return (
+                          <td key={slot} style={{
+                            borderBottom: '1px solid #1F2937', borderRight: '1px solid #1F2937',
+                            padding: '5px 6px', textAlign: 'center', verticalAlign: 'middle',
+                          }}>
+                            {cell}
+                          </td>
+                        )
+                      })}
+                    </tr>,
+                  ]
+                })
+              )}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
   )
-}
