@@ -26,9 +26,9 @@ export default async function GCReviewPage() {
   const monday    = startOfISOWeek(today)
   const saturday  = addDays(monday, 5)
   const sunday    = addDays(monday, 6)
-  const weekStart = format(saturday, 'yyyy-MM-dd')
-  const weekEnd   = format(addDays(sunday, 1), 'yyyy-MM-dd')
-  const weekLabel = `${format(saturday, 'd MMM')} – ${format(sunday, 'd MMM yyyy')}`
+  const weekStart = format(monday, 'yyyy-MM-dd')
+  const weekEnd   = format(addDays(monday, 7), 'yyyy-MM-dd')
+  const weekLabel = `${format(monday, 'd MMM')} – ${format(sunday, 'd MMM yyyy')}`
 
   // ── Fetch this weekend's confirmed bookings ────────────────
   const { data: bookings } = await supabase
