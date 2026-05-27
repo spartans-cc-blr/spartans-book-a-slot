@@ -16,9 +16,9 @@ const SLOT_FORMATS: Record<SlotTime, GameFormat[]> = {
 
 const WA_NUMBER = '919972009777'
 
-function buildWALink(dayLabel: string, slot: SlotTime, fmt: GameFormat) {
+function buildWALink(dayLabel: string, slot: SlotTime, fmt: GameFormat | 'T20 or T30') {
   const text = encodeURIComponent(
-    `Hi Spartans! I'd like to book the *${slot} ${fmt}* slot on *${dayLabel}*. Please confirm availability.`
+    `Hi Spartans! I'd like to enquire about booking the ${SLOT_DISPLAY[slot]} slot on ${date} for a ${formatText} match. Please confirm availability. Thank you!`
   )
   return `https://wa.me/${WA_NUMBER}?text=${text}`
 }
@@ -175,12 +175,8 @@ export default function SchedulePage() {
                         return (
                           <td key={slot} style={{ borderBottom: '1px solid #1F2937', borderRight: '1px solid #1F2937', padding: '4px 4px', textAlign: 'center', verticalAlign: 'middle' }}>
                             {isOpen && fmts.length > 1 ? (
-                              // Both formats — stack two WA links
-                              <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                {fmts.map(fmt => (
-                                  <WACell key={fmt} href={buildWALink(day.label, slot, fmt)} label={fmt} />
-                                ))}
-                              </div>
+                               // Both T20 & T30 available — single enquiry, organiser specifies format in chat
+                               <WACell href={buildWALink(day.label, slot, 'T20 or T30')} label="T20 · T30" />
                             ) : isOpen && fmts.length === 1 ? (
                               <WACell href={buildWALink(day.label, slot, fmts[0])} label={fmts[0]} />
                             ) : isT20Only ? (
