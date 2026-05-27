@@ -18,7 +18,7 @@ const WA_NUMBER = '919972009777'
 
 function buildWALink(dayLabel: string, slot: SlotTime, fmt: GameFormat | 'T20 or T30') {
   const text = encodeURIComponent(
-    `Hi Spartans! I'd like to enquire about booking the ${SLOT_DISPLAY[slot]} slot on ${date} for a ${formatText} match. Please confirm availability. Thank you!`
+    `Hi Spartans! I'd like to enquire about booking the ${slot} slot on ${dayLabel} for a ${fmt} match. Please confirm availability. Thank you!`
   )
   return `https://wa.me/${WA_NUMBER}?text=${text}`
 }
