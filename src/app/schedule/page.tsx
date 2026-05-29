@@ -80,10 +80,15 @@ export default function SchedulePage() {
 
   // Only show days that have at least one open or t20only slot
   const visibleDays = useMemo(() =>
-    weeks.flatMap(w => w.days).filter(day =>
-      day.slots.some(s => s.status === 'open' || s.status === 't20only')
+    weeks.flatMap(w =>
+      w.weekendFull
+        ? []  // entire weekend at capacity — show nothing
+        : w.days.filter(day =>
+            day.slots.some(s => s.status === 'open' || s.status === 't20only') &&
+            (!activeMonth || new Date(day.date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) === activeMonth)
+          )
     ),
-  [weeks])
+  [weeks, activeMonth])
 
   return (
     <div className="min-h-screen bg-ink grain">
