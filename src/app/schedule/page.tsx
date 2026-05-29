@@ -90,7 +90,7 @@ export default function SchedulePage() {
     [weeks])
 
   return (
-    <div className="min-h-screen bg-ink grain">
+    <div className="min-h-screen bg-ink grain" style={{ display: 'flex', flexDirection: 'column' }}>
       <SiteNav activePage="schedule" />
 
       {/* Hero */}
@@ -119,7 +119,7 @@ export default function SchedulePage() {
       </div>
 
       {/* Matrix */}
-      <div style={{ overflowY: 'auto' }}>
+      <div style={{ overflowY: 'auto', height: 'calc(100vh - 220px)' }}>
         {loading ? <MatrixSkeleton /> : visibleDays.length === 0 ? (
           <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '14px', color: '#6B7280', padding: '48px', textAlign: 'center' }}>
             No open slots at the moment.
