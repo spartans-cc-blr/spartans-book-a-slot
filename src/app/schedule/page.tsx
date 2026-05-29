@@ -82,13 +82,12 @@ export default function SchedulePage() {
   const visibleDays = useMemo(() =>
     weeks.flatMap(w =>
       w.weekendFull
-        ? []  // entire weekend at capacity — show nothing
+        ? []
         : w.days.filter(day =>
-            day.slots.some(s => s.status === 'open' || s.status === 't20only') &&
-            (!activeMonth || new Date(day.date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) === activeMonth)
+            day.slots.some(s => s.status === 'open' || s.status === 't20only')
           )
     ),
-  [weeks, activeMonth])
+    [weeks])
 
   return (
     <div className="min-h-screen bg-ink grain">
