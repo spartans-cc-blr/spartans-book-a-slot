@@ -85,7 +85,7 @@ export default function SchedulePage() {
   [weeks])
 
   return (
-    <div style={{ height: '100dvh', background: '#F8F4EE', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}></div>
+    <div style={{ height: '100dvh', background: '#F8F4EE', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <SiteNav activePage="schedule" />
 
       {/* Hero */}
