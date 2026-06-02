@@ -13,7 +13,7 @@ import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 async function requireGCOrAdmin() {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
-  if (!user?.playerId) {
+  if (!user?.email) {
     return { error: NextResponse.json({ error: 'Unauthorised' }, { status: 401 }), user: null }
   }
   if (!user?.isGC && !user?.isAdmin) {
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   // created_by is the only field we supply — taken from session, never from body.
   const { data, error } = await supabase
     .from('invite_tokens')
-    .insert({ created_by: user!.playerId })
+    .insert({ created_by: user!.playerId ?? null })
     .select('token, expires_at')
     .single()
 
