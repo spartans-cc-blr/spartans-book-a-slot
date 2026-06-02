@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { InviteLinkButton } from '@/components/ui/InviteLinkButton'
 
 type FeeExemption = {
   id: string
@@ -198,6 +199,7 @@ export default function AdminPlayersPage() {
           className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark text-white px-3 py-1.5 rounded transition-colors">
           {showAdd ? '✕ Cancel' : '＋ Add Player'}
         </button>
+        <InviteLinkButton />
       </div>
 
       {/* Search + filter */}

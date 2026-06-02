@@ -7,6 +7,7 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import { GCReviewClient } from '@/components/admin/GCReviewClient'
 import { startOfISOWeek, addDays, format, parseISO } from 'date-fns'
 import type { Metadata } from 'next'
+import { InviteLinkButton } from '@/components/ui/InviteLinkButton'
 
 export const metadata: Metadata = {
   title: 'GC Review — Spartans CC',
@@ -107,7 +108,7 @@ export default async function GCReviewPage() {
               {weekLabel} · Review squad fairness and approve or return each slot before captains announce.
             </p>
           </div>
-
+          <InviteLinkButton />
           <GCReviewClient
             weekLabel={weekLabel}
             bookings={(bookings ?? []) as any}
