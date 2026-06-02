@@ -8,12 +8,10 @@
 //  3. Token missing/bad    → show "you need a valid invite link" message
 //  4. Token present + unregistered → show registration form
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSession, signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { useState, useEffect, Suspense } from 'react'
-
 
 const SKILLS = [
   'Right Hand Opening Batsman',
