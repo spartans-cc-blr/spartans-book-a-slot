@@ -12,6 +12,8 @@ import { useState, useEffect } from 'react'
 import { useSession, signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SiteNav } from '@/components/ui/SiteNav'
+import { useState, useEffect, Suspense } from 'react'
+
 
 const SKILLS = [
   'Right Hand Opening Batsman',
@@ -33,7 +35,7 @@ const SKILLS = [
   'Left Arm Leg Break Bowler',
 ]
 
-export default function JoinPage() {
+ function JoinPageInner() {
   const { data: session, status } = useSession()
   const router       = useRouter()
   const searchParams = useSearchParams()
@@ -299,6 +301,18 @@ export default function JoinPage() {
         </div>
       </main>
     </>
+  )
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-ink-1 flex items-center justify-center">
+        <p className="font-rajdhani text-zinc-600 text-sm">Loading…</p>
+      </div>
+    }>
+      <JoinPageInner />
+    </Suspense>
   )
 }
 
