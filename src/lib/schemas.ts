@@ -106,7 +106,7 @@ export const playerRegisterSchema = z.object({
 export const availabilitySchema = z.object({
   booking_id: z.string().uuid('booking_id must be a valid UUID'),
   response:   z.enum(['Y', 'E', 'O', 'L'], {
-    errorMap: () => ({ message: 'response must be Y, E, O, or L' }),
+    message: 'response must be Y, E, O, or L',
   }),
 })
 
