@@ -11,6 +11,7 @@ interface SiteNavProps {
 export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
   const [open,        setOpen]        = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [gcOpen, setGcOpen] = useState(false)
   const { data: session, status }     = useSession()
 
   const player     = session?.user as any
@@ -31,10 +32,6 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
     // Captains' Corner — direct top-level link for captains & admin
     ...(isCaptain || isAdmin
       ? [{ href: '/captains-corner', label: "Captains' Corner", key: 'captains' }]
-      : []),
-    // GC Review — direct link for GC members & admin
-    ...(isGC
-      ? [{ href: '/gc-review', label: 'GC Review', key: 'gc' }]
       : []),
     // Tournament Planner — captains, GC, admin
     ...(isCaptain || isGC || isAdmin
@@ -65,6 +62,31 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
               {item.label}
             </Link>
           ))}
+
+          {/* GC submenu — desktop */}
+          {isGC && (
+            <div className="relative ml-1"
+              onMouseEnter={() => setGcOpen(true)}
+              onMouseLeave={() => setGcOpen(false)}>
+              <button
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                  ${activePage === 'gc' || activePage === 'invite'
+                    ? 'text-gold border-gold'
+                    : 'text-zinc-500 border-transparent hover:text-gold'}`}>
+                Council ⚖ <span className="text-[8px] mt-0.5">▾</span>
+              </button>
+              {gcOpen && (
+                <div className="absolute top-14 left-0 w-52 bg-ink-2 border border-ink-5 rounded-b shadow-xl z-50">
+                  <Link href="/gc-review"
+                    onClick={() => setGcOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors border-b border-ink-5">
+                    ⚖ Squad Review
+                  </Link>
+                  <GenerateInviteItem />
+                </div>
+              )}
+            </div>
+          )}
 
           {isAdmin && (
             <Link href="/admin"
@@ -209,15 +231,89 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
               Admin ⚙
             </Link>
           )}
-          {isGC && !isAdmin && (
-            <Link href="/gc-review" onClick={() => setOpen(false)}
-              className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 text-gold border-b border-ink-4">
-              GC Review
-            </Link>
+          {isGC && (
+            <>
+              <Link href="/gc-review" onClick={() => setOpen(false)}
+                className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 text-gold border-b border-ink-4">
+                ⚖ Squad Review
+              </Link>
+              <GenerateInviteItem mobile onClose={() => setOpen(false)} />
+            </>
           )}
         </div>
       )}
     </nav>
+  )
+}
+
+function GenerateInviteItem({ mobile, onClose }: { mobile?: boolean, onClose?: () => void }) {
+  const [loading,   setLoading]   = useState(false)
+  const [inviteUrl, setInviteUrl] = useState('')
+  const [copied,    setCopied]    = useState(false)
+  const [error,     setError]     = useState('')
+
+  async function generate() {
+    setLoading(true); setError(''); setInviteUrl(''); setCopied(false)
+    try {
+      const res  = await fetch('/api/invite-tokens', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Failed'); return }
+      setInviteUrl(data.url)
+    } catch { setError('Network error') }
+    finally { setLoading(false) }
+  }
+
+  async function copy() {
+    await navigator.clipboard.writeText(inviteUrl)
+    setCopied(true); setTimeout(() => setCopied(false), 2500)
+  }
+
+  const waText = encodeURIComponent(`Hi! Here's your invite link to join Spartans Hub:\n${inviteUrl}\n\n(Valid 72 hrs)`)
+
+  if (mobile) {
+    return (
+      <div className="py-2.5 border-b border-ink-4">
+        <button onClick={generate} disabled={loading}
+          className="font-rajdhani text-sm font-bold tracking-wide uppercase text-gold disabled:opacity-40">
+          {loading ? 'Generating…' : '🔗 Generate Invite Link'}
+        </button>
+        {inviteUrl && (
+          <div className="mt-2 flex gap-2">
+            <button onClick={copy}
+              className="font-rajdhani text-xs text-zinc-400 border border-zinc-700 px-2 py-1 rounded">
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+            <a href={`https://wa.me/?text=${waText}`} target="_blank" rel="noopener noreferrer"
+              className="font-rajdhani text-xs text-emerald-400 border border-emerald-700 px-2 py-1 rounded">
+              WhatsApp
+            </a>
+          </div>
+        )}
+        {error && <p className="font-rajdhani text-[10px] text-red-400 mt-1">{error}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-4 py-3">
+      <button onClick={generate} disabled={loading}
+        className="w-full font-rajdhani text-xs font-semibold tracking-wide uppercase text-left text-zinc-400 hover:text-gold transition-colors flex items-center gap-2 disabled:opacity-40">
+        🔗 {loading ? 'Generating…' : 'Generate Invite Link'}
+      </button>
+      {inviteUrl && (
+        <div className="mt-2 flex gap-2">
+          <button onClick={copy}
+            className="font-rajdhani text-[10px] text-zinc-500 border border-zinc-700 px-2 py-1 rounded hover:text-zinc-300">
+            {copied ? '✓ Copied' : 'Copy link'}
+          </button>
+          <a href={`https://wa.me/?text=${waText}`} target="_blank" rel="noopener noreferrer"
+            className="font-rajdhani text-[10px] text-emerald-400 border border-emerald-700 px-2 py-1 rounded hover:bg-emerald-950/40">
+            WhatsApp
+          </a>
+        </div>
+      )}
+      {error && <p className="font-rajdhani text-[10px] text-red-400 mt-1">{error}</p>}
+    </div>
   )
 }
 
