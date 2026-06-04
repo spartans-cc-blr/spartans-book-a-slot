@@ -93,6 +93,7 @@ export function buildSquadAnnouncement(
     ``,
     `*Team*`,
     playerLines,
+players.length === 11 ? `12. _OPEN — one slot available_` : null,
     ``,
     booking.opponent_name ? `*Opponents:* ${booking.opponent_name}` : null,
     ``,
