@@ -417,7 +417,13 @@ function PlayerName({
     : null
 
   const exemptBadge = player.is_fee_exempt
-    ? <span className="ml-1 font-rajdhani text-[9px] font-bold bg-violet-950/40 border border-violet-700 text-violet-400 px-1 py-px rounded-sm" title="Fee exempted">EX</span>
+    ? (
+      <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      </span>
+    )
     : null
 
   if (player.cricheroes_url && !isTaken) {
@@ -1452,8 +1458,11 @@ function SlotCard({
               <p className="font-rajdhani text-[10px] text-red-400 mt-2">{saveError}</p>
             )}
             {exemptWarning && (
-              <p className="font-rajdhani text-[10px] text-violet-400 mt-1.5">
-                ⚠ {exemptInSquad} fee-exempted players in squad — others share higher match fees
+              <p className="font-rajdhani text-[10px] text-rose-400 mt-1.5 flex items-center gap-1">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="flex-shrink-0">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+                {exemptInSquad} solidarity players in squad — others share higher match fees
               </p>
             )}
           </div>
