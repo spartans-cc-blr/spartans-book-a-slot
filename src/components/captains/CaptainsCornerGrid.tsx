@@ -247,6 +247,7 @@ function buildAnnouncementText(
     ``,
     `*Team*`,
     playerLines,
+squadPlayers.length === 11 ? `12. _OPEN — one slot available_` : null,
     ``,
     booking.opponent_name ? `*Opponent:* ${booking.opponent_name}` : null,
     ``,
