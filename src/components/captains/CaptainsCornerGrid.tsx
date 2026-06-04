@@ -43,6 +43,7 @@ interface Player {
   cricheroes_url: string | null
   active: boolean
   status: string
+  is_fee_exempt: boolean
 }
 
 // FIX 4: matchRoles removed from MatchRoles — it is separate state in SlotCard
@@ -415,6 +416,10 @@ function PlayerName({
     ? <span className="ml-1.5 font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1 py-px rounded-sm">CAP</span>
     : null
 
+  const exemptBadge = player.is_fee_exempt
+    ? <span className="ml-1 font-rajdhani text-[9px] font-bold bg-violet-950/40 border border-violet-700 text-violet-400 px-1 py-px rounded-sm" title="Fee exempted">EX</span>
+    : null
+
   if (player.cricheroes_url && !isTaken) {
     return (
       <a
@@ -423,11 +428,11 @@ function PlayerName({
         rel="noopener noreferrer"
         onClick={e => e.stopPropagation()}
         className={cls + ' hover:underline underline-offset-2'}>
-        {player.name}{badge}
+        {player.name}{badge}{exemptBadge}
       </a>
     )
   }
-  return <span className={cls}>{player.name}{badge}</span>
+  return <span className={cls}>{player.name}{badge}{exemptBadge}</span>
 }
 
 // ── Match Role SVG Icons ──────────────────────────────────────────
@@ -960,6 +965,8 @@ function SlotCard({
   const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
   const priorityPlayers = eligible.filter(e => e.player.priority_pick)
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
+  const exemptInSquad   = players.filter(p => selected.has(p.id) && p.is_fee_exempt).length
+  const exemptWarning   = exemptInSquad >= 2
 
   // All three roles must be assigned before GC submission is allowed
   const rolesComplete = !!roles.captain && !!roles.vc && roles.wk.size > 0
@@ -1443,6 +1450,11 @@ function SlotCard({
 
             {saveError && (
               <p className="font-rajdhani text-[10px] text-red-400 mt-2">{saveError}</p>
+            )}
+            {exemptWarning && (
+              <p className="font-rajdhani text-[10px] text-violet-400 mt-1.5">
+                ⚠ {exemptInSquad} fee-exempted players in squad — others share higher match fees
+              </p>
             )}
           </div>
 

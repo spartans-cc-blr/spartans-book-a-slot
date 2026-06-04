@@ -73,7 +73,7 @@ export default async function CaptainsCornerPage() {
   // ── Fetch all non expelled players ───────────────────────────────
   const { data: players } = await supabase
     .from('players')
-    .select('id, name, jersey_name, jersey_number, wallet_balance, dues_override, primary_skill, is_captain, priority_pick, cricheroes_url, active, status')
+    .select('id, name, jersey_name, jersey_number, wallet_balance, dues_override, primary_skill, is_captain, priority_pick, cricheroes_url, active, status, fee_exemptions(start_date, end_date)')
     .neq('status', 'expelled')
     .order('name', { ascending: true })
 
@@ -87,6 +87,15 @@ export default async function CaptainsCornerPage() {
       .in('booking_id', bookingIds)
     availability = avail ?? []
   }
+
+  const today = new Date().toISOString().split('T')[0]
+  const playersWithExempt = (players ?? []).map(p => ({
+   ...p,
+   is_fee_exempt: (p.fee_exemptions ?? []).some(
+     (e: { start_date: string; end_date: string | null }) =>
+       e.start_date <= today && (e.end_date === null || e.end_date >= today)
+   ),
+ }))
 
   // ── Fetch existing squad rows ──────────────────────────────
   type ExistingSquadRow = {
@@ -221,7 +230,7 @@ export default async function CaptainsCornerPage() {
                   captain_name:     captainName,
                   captain_whatsapp: captainWhatsapp,
                 })) as any}
-                players={players ?? []}
+                players={playerswithExempt as any}
                 availMap={availMap}
                 initialSquadMap={initialSquadMap}
               />

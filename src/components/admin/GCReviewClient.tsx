@@ -32,7 +32,13 @@ interface SquadRow {
   is_vc:      boolean
   is_wk:      boolean
   match_role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null
-  players:    { id: string; name: string; primary_skill: string | null; is_captain: boolean } | null
+  players: {
+  id: string
+  name: string
+  primary_skill: string | null
+  is_captain: boolean
+   fee_exemptions?: { start_date: string; end_date: string | null }[]
+  } | null
 }
 
 interface Props {
@@ -615,6 +621,10 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                             s.is_vc      && 'VC',
                           ].filter(Boolean) as string[]
 
+                          const today2 = new Date().toISOString().split('T')[0]
+                          const isExempt = (s.players?.fee_exemptions ?? []).some(
+                            e => e.start_date <= today2 && (e.end_date === null || e.end_date >= today2)
+                          )
                           const inOtherSlot = bookings.some(ob => ob.id !== b.id && squadMap[ob.id]?.includes(s.player_id))
 
                           return (
@@ -627,6 +637,9 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                                   <span className={`font-rajdhani text-sm ${s.is_captain ? 'text-gold font-semibold' : 'text-parchment'}`}>
                                     {s.players?.name ?? '—'}
                                   </span>
+                                  {isExempt && (
+                                     <span className="font-rajdhani text-[8px] font-bold px-1 py-px rounded-sm bg-violet-950/40 border border-violet-700 text-violet-400">EX</span>
+                                  )}
                                   {inOtherSlot && (
                                     <span className="font-rajdhani text-[8px] font-bold px-1 py-px rounded-sm bg-amber-950/60 border border-amber-800 text-amber-500">both</span>
                                   )}
@@ -668,6 +681,19 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                         WK: <span className="font-bold">{slotSquads.filter(s => s.is_wk).length}</span>
                       </span>
                       <span className="font-rajdhani text-[10px] text-zinc-600 ml-auto">{slotSquads.length} selected</span>
+                      {(() => {
+                         const today3 = new Date().toISOString().split('T')[0]
+                         const exemptCount = slotSquads.filter(s =>
+                           (s.players?.fee_exemptions ?? []).some(
+                             e => e.start_date <= today3 && (e.end_date === null || e.end_date >= today3)
+                           )
+                         ).length
+                         return exemptCount > 0 ? (
+                           <span className={`font-rajdhani text-[10px] font-bold ${exemptCount >= 2 ? 'text-violet-400' : 'text-zinc-500'}`}>
+                             EX: {exemptCount}{exemptCount >= 2 ? ' ⚠' : ''}
+                           </span>
+                         ) : null
+                       })()}
                     </div>
                   </>
                 )}
