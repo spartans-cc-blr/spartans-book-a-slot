@@ -230,7 +230,7 @@ export default async function CaptainsCornerPage() {
                   captain_name:     captainName,
                   captain_whatsapp: captainWhatsapp,
                 })) as any}
-                players={playerswithExempt as any}
+                players={playersWithExempt as any}
                 availMap={availMap}
                 initialSquadMap={initialSquadMap}
               />
