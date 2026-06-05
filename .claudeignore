@@ -1,0 +1,27 @@
+# Lock files and generated files
+package-lock.json
+package.json
+tsconfig.json
+next.config.js
+postcss.config.js
+tailwind.config.ts
+.eslintrc.json
+
+# Config and boilerplate
+src/app/layout.tsx
+src/app/providers.tsx
+src/app/manifest.ts
+src/app/globals.css
+src/app/api/auth/[...nextauth]/route.ts
+public/
+.next/
+node_modules/
+
+# Source code — paste into chat instead
+src/app/**/*.tsx
+src/app/**/*.ts
+src/components/**/*.tsx
+src/lib/**/*.ts
+src/middleware.ts
+src/types/
+supabase/migrations/
