@@ -12,6 +12,7 @@
 // Post-announcement edit + reshare supported.
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { HeartHandshake } from 'lucide-react'
 
 interface Booking {
   id: string
@@ -417,15 +418,9 @@ function PlayerName({
     ? <span className="ml-1.5 font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1 py-px rounded-sm">CAP</span>
     : null
 
-  const exemptBadge = player.is_fee_exempt
-    ? (
-      <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
-      </span>
-    )
-    : null
+const exemptBadge = player.is_fee_exempt
+   ? <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted"><HeartHandshake size={12} strokeWidth={1.75} /></span>
+   : null
 
   if (player.cricheroes_url && !isTaken) {
     return (
@@ -1459,13 +1454,11 @@ function SlotCard({
               <p className="font-rajdhani text-[10px] text-red-400 mt-2">{saveError}</p>
             )}
             {exemptWarning && (
-              <p className="font-rajdhani text-[10px] text-rose-400 mt-1.5 flex items-center gap-1">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="flex-shrink-0">
-                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                </svg>
-                {exemptInSquad} solidarity players in squad — others share higher match fees
-              </p>
-            )}
+<p className="font-rajdhani text-[10px] text-rose-400 mt-1.5 flex items-center gap-1">
+     <HeartHandshake size={11} strokeWidth={1.75} className="flex-shrink-0" />
+     {exemptInSquad} solidarity players in squad — others share higher match fees
+   </p>
+ )}
           </div>
 
           {/* Add player button */}
@@ -1622,12 +1615,10 @@ function MatrixView({
                         <span className="font-rajdhani text-[8px] font-bold bg-amber-950 border border-amber-800 text-amber-500 px-0.5 rounded-sm flex-shrink-0">₹</span>
                       )}
                       {p.is_fee_exempt && (
-                        <span className="inline-flex items-center justify-center text-rose-400 flex-shrink-0" title="Club solidarity — fee exempted">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                          </svg>
-                        </span>
-                      )}
+   <span className="inline-flex items-center justify-center text-rose-400 flex-shrink-0" title="Club solidarity — fee exempted">
+     <HeartHandshake size={11} strokeWidth={1.75} />
+   </span>
+ )}
                     </div>
                   </td>
                   {/* Squad games count — how many slots this player is selected in */}
