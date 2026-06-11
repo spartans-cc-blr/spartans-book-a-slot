@@ -19,6 +19,7 @@ interface Booking {
     organiser_contact: string | null
     total_league_games: number | null
     vc_captain_id: string | null
+    cricheroes_points_table_url: string | null
   } | null
   captain: { id: string; name: string } | null
 }
