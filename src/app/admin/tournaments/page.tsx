@@ -250,6 +250,16 @@ export default function AdminTournamentsPage() {
                           <input value={editForm.organiser_contact ?? ''} onChange={e => setEditForm(f => ({ ...f, organiser_contact: e.target.value }))} className="form-input" />
                         </div>
                         <div>
+                         <label className="form-label">CricHeroes Points Table URL</label>
+                           <input
+                            type="url"
+                            value={editForm.cricheroes_points_table_url ?? ''}
+                            onChange={e => setEditForm(f => ({ ...f, cricheroes_points_table_url: e.target.value }))}
+                            placeholder="https://cricheroes.in/tournament/..."
+                            className="form-input"
+                          />
+                        </div>
+                        <div>
                           <label className="form-label">Total League Games</label>
                           <input
                             type="number" min="1" max="30"
