@@ -14,6 +14,7 @@ type Tournament = {
   created_at: string
   total_league_games: number | null
   vc_captain_id: string | null
+  cricheroes_points_table_url: string | null
 }
 
 const BALL_LABELS = { red: '🔴 Red', white: '⚪ White', pink: '🩷 Pink' }
@@ -25,7 +26,7 @@ export default function AdminTournamentsPage() {
   const [editingId,   setEditingId]   = useState<string | null>(null)
   const [editForm,    setEditForm]    = useState<Partial<Tournament>>({})
   const [showAdd,     setShowAdd]     = useState(false)
-  const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '', total_league_games: '' as string, vc_captain_id: '' as string })
+  const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', cricheroes_points_table_url: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '', total_league_games: '' as string, vc_captain_id: '' as string })
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
   const [captains, setCaptains] = useState<{ id: string; name: string }[]>([])
@@ -45,7 +46,7 @@ export default function AdminTournamentsPage() {
 
   function startEdit(t: Tournament) {
     setEditingId(t.id)
-    setEditForm({ name: t.name, organiser_name: t.organiser_name ?? '', organiser_contact: t.organiser_contact ?? '', ball_type: t.ball_type, ground_id: t.ground_id ?? '', active: t.active, total_league_games: t.total_league_games, vc_captain_id: t.vc_captain_id ?? '' })
+    setEditForm({ name: t.name, organiser_name: t.organiser_name ?? '', organiser_contact: t.organiser_contact ?? '', cricheroes_points_table_url: t.cricheroes_points_table_url ?? '', ball_type: t.ball_type, ground_id: t.ground_id ?? '', active: t.active, total_league_games: t.total_league_games, vc_captain_id: t.vc_captain_id ?? '' })
     setError('')
   }
 
@@ -99,7 +100,7 @@ export default function AdminTournamentsPage() {
       const d = await res.json()
       setTournaments(prev => [d.tournament, ...prev])
       setShowAdd(false)
-      setAddForm({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white', ground_id: '', total_league_games: '', vc_captain_id: '' })
+      setAddForm({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white', ground_id: '', total_league_games: '',cricheroes_points_table_url: '', vc_captain_id: '' })
     } else {
       setError('Failed to add tournament.')
     }
@@ -142,16 +143,16 @@ export default function AdminTournamentsPage() {
                 placeholder="e.g. 919876543210" className="form-input" />
             </div>
 						<div>
-  						<label className="block text-sm font-medium text-zinc-300 mb-1">
+  						<label className="form-label">
     						CricHeroes Points Table URL
   						</label>
-  						<input
-								type="url"
-								name="cricheroes_points_table_url"
-								defaultValue={tournament?.cricheroes_points_table_url ?? ''}
-								placeholder="https://cricheroes.in/tournament/..."
-								className="w-full bg-ink-2 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100"
-							/>
+  						 <input
+                  type="url"
+                  value={addForm.cricheroes_points_table_url}
+                  onChange={e => setAddForm(f => ({ ...f, cricheroes_points_table_url: e.target.value }))}
+                  placeholder="https://cricheroes.in/tournament/..."
+                  className="form-input"
+                />
 							<p className="text-xs text-zinc-500 mt-1">
     						Players will see this as a link on the fixture card tournament name.
   						</p>
