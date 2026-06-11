@@ -429,7 +429,7 @@ function PlayerName({
     : null
 
 const exemptBadge = player.is_fee_exempt
-   ? <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted"><HeartHandshake size={12} /></span>
+   ? <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted"><HeartHandshakeIcon size={12} /></span>
    : null
 
   if (player.cricheroes_url && !isTaken) {
@@ -1465,7 +1465,7 @@ function SlotCard({
             )}
             {exemptWarning && (
 <p className="font-rajdhani text-[10px] text-rose-400 mt-1.5 flex items-center gap-1">
-     <HeartHandshake size={11} />
+     <HeartHandshakeIcon size={11} />
      {exemptInSquad} solidarity players in squad — others share higher match fees
    </p>
  )}
@@ -1626,7 +1626,7 @@ function MatrixView({
                       )}
                       {p.is_fee_exempt && (
    <span className="inline-flex items-center justify-center text-rose-400 flex-shrink-0" title="Club solidarity — fee exempted">
-     <HeartHandshake size={11} />
+     <HeartHandshakeIcon size={11} />
    </span>
  )}
                     </div>
