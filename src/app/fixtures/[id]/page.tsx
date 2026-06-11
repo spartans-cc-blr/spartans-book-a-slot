@@ -18,7 +18,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     .from('bookings')
     .select(`
       id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
-      tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
+      tournament:tournaments(name, ball_type, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url))
     `)
     .eq('id', params.id)
     .eq('status', 'confirmed')
