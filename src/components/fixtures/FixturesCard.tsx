@@ -215,6 +215,7 @@ type BookingProp = {
   tournament?: {
     name: string
     ball_type: 'red' | 'white' | 'pink'
+		cricheroes_points_table_url?: string | null
     ground?: { name: string; maps_url: string; hospital_url: string } | null
   } | null
   squad?: SquadPlayer[]
@@ -288,7 +289,18 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       {/* Tournament + Opponent + Ground */}
       <div>
         <div style={{ fontSize: "15px", fontWeight: 700, color: "#F9FAFB", lineHeight: 1.3, marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
-          <span>{tournament?.name || "—"}</span>
+          {tournament?.cricheroes_points_table_url ? (
+				    <a
+							href={tournament.cricheroes_points_table_url}
+							target="_blank"
+							rel="noopener noreferrer"
+							style={{ fontWeight: 700, color: '#F5F5F5', textDecoration: 'underline', textDecorationColor: '#C9A84C', textUnderlineOffset: '3px' }}
+						>
+						{tournament.name}
+					</a>
+					) : (
+					<span style={{ fontWeight: 700, color: '#F5F5F5' }}>{tournament?.name}</span>
+					)}
           {booking.id && (
             <a
               href={`/fixtures/${booking.id}`}
