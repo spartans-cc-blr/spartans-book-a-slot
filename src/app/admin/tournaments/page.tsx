@@ -141,6 +141,21 @@ export default function AdminTournamentsPage() {
               <input value={addForm.organiser_contact} onChange={e => setAddForm(f => ({ ...f, organiser_contact: e.target.value }))}
                 placeholder="e.g. 919876543210" className="form-input" />
             </div>
+						<div>
+  						<label className="block text-sm font-medium text-zinc-300 mb-1">
+    						CricHeroes Points Table URL
+  						</label>
+  						<input
+								type="url"
+								name="cricheroes_points_table_url"
+								defaultValue={tournament?.cricheroes_points_table_url ?? ''}
+								placeholder="https://cricheroes.in/tournament/..."
+								className="w-full bg-ink-2 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100"
+							/>
+							<p className="text-xs text-zinc-500 mt-1">
+    						Players will see this as a link on the fixture card tournament name.
+  						</p>
+						</div>
             <div>
               <label className="form-label">Vice Captain</label>
               <select
