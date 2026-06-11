@@ -618,7 +618,18 @@ function TournamentBlock({
           <span className="text-amber-500 mt-0.5">🏆</span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-cinzel text-sm font-bold text-parchment">{tournament.name}</span>
+           			{tournament.cricheroes_points_table_url ? (
+									<a
+										href={tournament.cricheroes_points_table_url}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="font-cinzel text-sm font-bold text-parchment underline decoration-gold underline-offset-2"
+									>
+										{tournament.name}
+									</a>
+									) : (
+									<span className="font-cinzel text-sm font-bold text-parchment">{tournament.name}</span>
+								)}
               <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${pace.bg} ${pace.txt}`}>{pace.label}</span>
             </div>
             <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
