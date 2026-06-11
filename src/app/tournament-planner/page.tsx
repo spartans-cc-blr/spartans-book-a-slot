@@ -24,7 +24,7 @@ export default async function TournamentPlannerPage() {
     .from('bookings')
     .select(`
       id, game_date, slot_time, format, captain_id,
-      tournament:tournaments!bookings_tournament_id_fkey(id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id),
+      tournament:tournaments!bookings_tournament_id_fkey(id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, cricheroes_points_table_url),
       captain:captains!bookings_captain_id_fkey(id, name)
     `)
     .eq('status', 'confirmed')
@@ -49,6 +49,7 @@ export default async function TournamentPlannerPage() {
        organiser_contact: string | null
        total_league_games: number | null
        vc_captain_id: string | null
+       cricheroes_points_table_url: string | null
      } | null
      captain: { id: string; name: string } | null
    }>
