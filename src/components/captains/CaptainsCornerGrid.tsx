@@ -12,7 +12,6 @@
 // Post-announcement edit + reshare supported.
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import { HeartHandshake } from 'lucide-react'
 
 interface Booking {
   id: string
@@ -296,6 +295,17 @@ function WAIcon({ size = 14 }: { size?: number }) {
   )
 }
 
+function HeartHandshakeIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+      <path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0l2.96 2.66"/>
+      <path d="m18 15-2-2"/>
+      <path d="m15 18-2-2"/>
+    </svg>
+  )
+}
+
 // ── useCopySquad hook ─────────────────────────────────────────────
 function useCopySquad() {
   const [copied, setCopied] = useState<string | null>(null)
@@ -419,7 +429,7 @@ function PlayerName({
     : null
 
 const exemptBadge = player.is_fee_exempt
-   ? <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted"><HeartHandshake size={12} strokeWidth={1.75} /></span>
+   ? <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted"><HeartHandshake size={12} /></span>
    : null
 
   if (player.cricheroes_url && !isTaken) {
@@ -1455,7 +1465,7 @@ function SlotCard({
             )}
             {exemptWarning && (
 <p className="font-rajdhani text-[10px] text-rose-400 mt-1.5 flex items-center gap-1">
-     <HeartHandshake size={11} strokeWidth={1.75} className="flex-shrink-0" />
+     <HeartHandshake size={11} />
      {exemptInSquad} solidarity players in squad — others share higher match fees
    </p>
  )}
@@ -1616,7 +1626,7 @@ function MatrixView({
                       )}
                       {p.is_fee_exempt && (
    <span className="inline-flex items-center justify-center text-rose-400 flex-shrink-0" title="Club solidarity — fee exempted">
-     <HeartHandshake size={11} strokeWidth={1.75} />
+     <HeartHandshake size={11} />
    </span>
  )}
                     </div>
