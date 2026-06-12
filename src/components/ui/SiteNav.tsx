@@ -82,6 +82,11 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors border-b border-ink-5">
                     ⚖ Squad Review
                   </Link>
+                  <Link href="/gc-players"
+                    onClick={() => setGcOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors border-b border-ink-5">
+                    👤 Players
+                  </Link>
                   <GenerateInviteItem />
                 </div>
               )}
