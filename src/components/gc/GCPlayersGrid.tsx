@@ -69,6 +69,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 export function GCPlayersGrid({ players }: { players: Player[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active')
   const [letterFilter, setLetterFilter] = useState<string | null>(null)
+  const [duesOnly,     setDuesOnly]     = useState(false)
 
   // Mirror admin page status logic exactly
   const counts = useMemo(() => ({
@@ -86,7 +87,9 @@ export function GCPlayersGrid({ players }: { players: Player[] }) {
       if (statusFilter === 'expelled') return isExpelledPlayer(p)
       return true
     })
-    return new Set(statusFiltered.map(p => p.name[0]?.toUpperCase()).filter(Boolean))
+    const duesFiltered = duesOnly ? statusFiltered.filter(p => p.wallet_balance < 0) : statusFiltered
+    return new Set(duesFiltered.map(p => p.name[0]?.toUpperCase()).filter(Boolean))
+
   }, [players, statusFilter])
 
   const filtered = useMemo(() => players.filter(p => {
@@ -99,12 +102,19 @@ export function GCPlayersGrid({ players }: { players: Player[] }) {
     const matchesLetter = !letterFilter
       || p.name[0]?.toUpperCase() === letterFilter
 
-    return matchesStatus && matchesLetter
-  }), [players, statusFilter, letterFilter])
+    const matchesDues   = !duesOnly || p.wallet_balance < 0
+  
+    return matchesStatus && matchesLetter && matchesDues
+  }), [players, statusFilter, letterFilter, duesOnly])
 
   // Reset letter when status changes if that letter has no players in new filter
   function handleStatusChange(val: StatusFilter) {
     setStatusFilter(val)
+    setLetterFilter(null)
+  }
+
+  function handleDuesToggle() {
+    setDuesOnly(v => !v)
     setLetterFilter(null)
   }
 
@@ -113,6 +123,7 @@ export function GCPlayersGrid({ players }: { players: Player[] }) {
 
       {/* ── Status radio pills ─────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 pb-4 mb-0 border-b border-[#CBD5DC]">
+        {/* dues count for context */}
         {STATUS_OPTIONS.map(opt => {
           const isActive = statusFilter === opt.value
           return (
@@ -138,6 +149,25 @@ export function GCPlayersGrid({ players }: { players: Player[] }) {
             </label>
           )
         })}
+        {/* Dues toggle — right side of the same row */}
+        <button
+          onClick={handleDuesToggle}
+          className={`ml-auto flex items-center gap-2 px-3 py-1.5 rounded-lg border
+                      font-rajdhani text-xs font-semibold transition-colors ${
+                        duesOnly
+                          ? 'bg-amber-50 border-amber-400 text-amber-700'
+                          : 'bg-white border-[#CBD5DC] text-slate-500 hover:border-amber-300 hover:text-amber-600'
+          }`}
+          aria-pressed={duesOnly}
+        >
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${duesOnly ? 'bg-amber-500' : 'bg-slate-300'}`} />
+          Dues outstanding
+          {duesOnly && (
+            <span className="ml-1 font-normal text-amber-500">
+              ({filtered.length})
+            </span>
+          )}
+        </button>
       </div>
 
       {/* ── A–Z alphabet bar ───────────────────────────────────────────── */}
@@ -179,6 +209,7 @@ export function GCPlayersGrid({ players }: { players: Player[] }) {
       {/* ── Result count eyebrow ───────────────────────────────────────── */}
       <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-slate-400 mb-4">
         {filtered.length} player{filtered.length !== 1 ? 's' : ''}
+        {duesOnly && <span className="normal-case font-normal tracking-normal ml-1 text-amber-500">with dues outstanding</span>}
         {letterFilter && <span className="normal-case font-normal tracking-normal ml-1">starting with &ldquo;{letterFilter}&rdquo;</span>}
       </p>
 
@@ -279,6 +310,7 @@ export function GCPlayersGrid({ players }: { players: Player[] }) {
           <span className="text-4xl mb-3 opacity-30">🏏</span>
           <p className="font-rajdhani text-sm text-slate-500">
             No {statusFilter === 'all' ? '' : statusFilter + ' '}players
+            {duesOnly ? ' with dues outstanding' : ''}
             {letterFilter && ` starting with "${letterFilter}"`}
           </p>
           {letterFilter && (
