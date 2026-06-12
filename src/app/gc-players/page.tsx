@@ -43,7 +43,7 @@ export default async function GCPlayersPage() {
 
   return (
     <div className="min-h-screen bg-[#F0F4F5] flex flex-col">
-      <SiteNav activePage="gc" />
+      <SiteNav activePage="gc-players" />
       <div className="flex flex-1">
         <AdminSidebar />
         <main className="flex-1 px-5 md:px-8 lg:px-10 py-8 max-w-6xl">

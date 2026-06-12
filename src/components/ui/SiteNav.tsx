@@ -242,6 +242,11 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                 className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 text-gold border-b border-ink-4">
                 ⚖ Squad Review
               </Link>
+              <Link href="/gc-players" onClick={() => setOpen(false)}
+                className={`font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4
+                  ${activePage === 'gc-players' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
+                👤 Players
+              </Link>
               <GenerateInviteItem mobile onClose={() => setOpen(false)} />
             </>
           )}
@@ -258,6 +263,7 @@ function GenerateInviteItem({ mobile, onClose }: { mobile?: boolean, onClose?: (
   const [error,     setError]     = useState('')
 
   async function generate() {
+    onClose?.()
     setLoading(true); setError(''); setInviteUrl(''); setCopied(false)
     try {
       const res  = await fetch('/api/invite-tokens', { method: 'POST' })
