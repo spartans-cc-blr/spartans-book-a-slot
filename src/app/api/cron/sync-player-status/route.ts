@@ -17,13 +17,13 @@ export async function GET(req: NextRequest) {
   const cutoff = thirtyDaysAgo.toISOString().split('T')[0]
   const today  = new Date().toISOString().split('T')[0]
 
-  // Players who have played ≥ 1 announced game in the last 30 days
-  const { data: activePlayers, error: aErr } = await supabase
-    .from('squad')
-    .select('player_id, bookings!inner(game_date)')
-    .eq('status', 'announced')
-    .gte('bookings.game_date', cutoff)
-    .lte('bookings.game_date', today)
+  // NEW — any meaningful availability signal in last 30 days
+const { data: activePlayers } = await supabase
+  .from('availability')
+  .select('player_id, bookings!inner(game_date)')
+  .in('response', ['Y', 'O', 'E'])
+  .gte('bookings.game_date', cutoff)
+  .lte('bookings.game_date', today)
 
   if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 })
 
