@@ -30,7 +30,7 @@ export const authOptions: NextAuthOptions = {
         const supabase = createServiceClient()
         const { data: player, error: playerErr } = await supabase
           .from('players')
-          .select('id, name, is_captain, is_gc, status, active, photo_url')
+          .select('id, name, is_captain, is_gc, status, photo_url')
           .eq('gmail_id', email.toLowerCase())
           .single()
 
