@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
     .from('gear_listings')
     .select(`
       id,
+      player_id,
       type,
       condition,
       title,
@@ -69,7 +70,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ listings: data ?? [] })
+const sanitised = (data ?? []).map((item: any) => ({
+  id:                    item.id,
+  poster_id:             item.player_id,
+  type:                  item.type,
+  condition:             item.condition,
+  title:                 item.title,
+  description:           item.description,
+  created_at:            item.created_at,
+  poster_name:           item.players?.name ?? '',
+  poster_cricheroes_url: item.players?.cricheroes_url ?? null,
+}))
+return NextResponse.json({ listings: sanitised })
 }
 
 // POST /api/dugout/gear
