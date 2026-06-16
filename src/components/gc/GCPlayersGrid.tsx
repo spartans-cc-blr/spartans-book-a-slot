@@ -52,9 +52,8 @@ function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 }
 
-// Matches admin players page logic: active means status='active' AND active=true
-function isActivePlayer(p: Player) { return p.status === 'active' && p.active }
-function isInactivePlayer(p: Player) { return p.status === 'inactive' || (!p.active && p.status !== 'expelled') }
+function isActivePlayer(p: Player)   { return p.status === 'active'   }
+function isInactivePlayer(p: Player) { return p.status === 'inactive' }
 function isExpelledPlayer(p: Player) { return p.status === 'expelled' }
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [

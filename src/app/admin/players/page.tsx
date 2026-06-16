@@ -72,9 +72,9 @@ export default function AdminPlayersPage() {
   const filtered = players
     .filter(p => {
       if (filterActive === 'all') return true
+      if (filterActive === 'active')   return p.status === 'active'
+      if (filterActive === 'inactive') return p.status === 'inactive'
       if (filterActive === 'expelled') return p.status === 'expelled'
-      if (filterActive === 'active') return p.active && p.status !== 'expelled'
-      if (filterActive === 'inactive') return !p.active && p.status !== 'expelled'
       return true
     })
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -488,7 +488,7 @@ export default function AdminPlayersPage() {
                         ${p.status === 'expelled' ? 'bg-red-950 border-red-800 text-red-400' :
                           p.active ? 'bg-emerald-950 border-emerald-800 text-emerald-400' :
                           'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>
-                        {p.status === 'expelled' ? 'Expelled' : p.active ? 'Active' : 'Inactive'}
+                        {p.status === 'expelled' ? 'Expelled' : p.status === 'active' ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
