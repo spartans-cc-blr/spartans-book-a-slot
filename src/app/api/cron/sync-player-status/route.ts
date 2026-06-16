@@ -25,7 +25,7 @@ const { data: activePlayers, error:activeErr } = await supabase
   .gte('bookings.game_date', cutoff)
   .lte('bookings.game_date', today)
 
-  if (activeErr) return NextResponse.json({ error: aErr.message }, { status: 500 })
+  if (activeErr) return NextResponse.json({ error: activeErr.message }, { status: 500 })
 
   const activeIds = Array.from(new Set((activePlayers ?? []).map(r => r.player_id)))
 
