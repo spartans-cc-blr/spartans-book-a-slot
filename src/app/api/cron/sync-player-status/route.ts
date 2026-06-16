@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 })
 
-  const activeIds = [...new Set((activePlayers ?? []).map(r => r.player_id))]
+  const activeIds = Array.from(new Set((activePlayers ?? []).map(r => r.player_id)))
 
   // Set active — never touch expelled
   const { error: setActive } = await supabase
