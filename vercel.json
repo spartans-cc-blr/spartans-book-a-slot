@@ -21,6 +21,7 @@
     {
       "path": "/api/cron/lock-availability",
       "schedule": "30 0 * * 4"
-    }
+    },
+    { "path": "/api/cron/sync-player-status",   "schedule": "30 20 * * *" }   
 ]
 }
