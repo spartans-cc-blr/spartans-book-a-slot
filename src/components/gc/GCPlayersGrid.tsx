@@ -52,9 +52,9 @@ function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 }
 
-function isActivePlayer(p)   { return p.status === 'active'   }
-function isInactivePlayer(p) { return p.status === 'inactive' }
-function isExpelledPlayer(p) { return p.status === 'expelled' }
+function isActivePlayer(p: Player)   { return p.status === 'active'   }
+function isInactivePlayer(p: Player) { return p.status === 'inactive' }
+function isExpelledPlayer(p: Player) { return p.status === 'expelled' }
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: 'active',   label: 'Active'   },
