@@ -263,7 +263,6 @@ function GenerateInviteItem({ mobile, onClose }: { mobile?: boolean, onClose?: (
   const [error,     setError]     = useState('')
 
   async function generate() {
-    onClose?.()
     setLoading(true); setError(''); setInviteUrl(''); setCopied(false)
     try {
       const res  = await fetch('/api/invite-tokens', { method: 'POST' })
