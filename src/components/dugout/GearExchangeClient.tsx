@@ -8,14 +8,14 @@ type GearCondition = 'new' | 'good' | 'fair'
 
 interface GearListing {
   id: string
-  poster_id?: string
   type: GearType
   condition: GearCondition | null
   title: string
   description: string
   created_at: string
-  poster_name: string                    // was: players.name
-  poster_cricheroes_url: string | null   // was: players.cricheroes_url
+  poster_id?: string
+  poster_name: string
+  poster_cricheroes_url: string | null
 }
 
 interface Props {
@@ -107,7 +107,6 @@ function GearCard({
   onDeactivate: (id: string) => void
 }) {
   const canRemove = isAdmin || (listing.poster_id != null && listing.poster_id === playerId)
-  const poster = listing.players
 
   return (
     <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4 flex flex-col gap-2">
