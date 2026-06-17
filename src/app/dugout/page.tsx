@@ -34,9 +34,9 @@ export default async function DugoutPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Link href="/dugout/kit-room"
                 className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-6 hover:border-amber-300 hover:bg-amber-50 transition-colors block">
-                <p className="font-cinzel font-semibold text-stone-900 mb-2">Kit Room</p>
+                <p className="font-cinzel font-semibold text-stone-900 mb-2">Spartans Store</p>
                 <p className="font-rajdhani text-sm text-stone-600 mb-4">
-                  Order your Spartans jersey — track your order from batch to delivery.
+                  Order jerseys, tracks, and Spartans gear — tracked from batch to delivery
                 </p>
                 <span className="font-rajdhani text-sm font-semibold text-amber-600">Explore →</span>
               </Link>
