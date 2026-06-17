@@ -9,7 +9,11 @@ type Order = {
   id: string
   jersey_name: string
   jersey_number: number
-  jersey_size: string
+  jersey_size: string | null
+  jersey_half_sleeve_size: string | null
+  jersey_full_sleeve_size: string | null
+  tracks_size: string | null
+  jersey_name_override: string | null
   notes: string | null
   status: OrderStatus
   created_at: string
@@ -44,15 +48,60 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function OrderItems({ order }: { order: Order }) {
+  const isLegacy = order.jersey_size !== null && order.jersey_size !== undefined
+
+  if (isLegacy) {
+    return (
+      <p className="font-rajdhani text-stone-700 text-sm">
+        Jersey: <span className="font-semibold">{order.jersey_size}</span>{' '}
+        <span className="text-stone-400">(legacy)</span>
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {order.jersey_half_sleeve_size && (
+        <p className="font-rajdhani text-stone-700 text-sm">
+          Half Sleeve: <span className="font-semibold">{order.jersey_half_sleeve_size}</span>
+        </p>
+      )}
+      {order.jersey_full_sleeve_size && (
+        <p className="font-rajdhani text-stone-700 text-sm">
+          Full Sleeve: <span className="font-semibold">{order.jersey_full_sleeve_size}</span>
+        </p>
+      )}
+      {order.tracks_size && (
+        <p className="font-rajdhani text-stone-700 text-sm">
+          Tracks: <span className="font-semibold">{order.tracks_size}</span>
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isExpelled }: Props) {
   const router = useRouter()
 
-  const [size, setSize]               = useState<string>('M')
-  const [notes, setNotes]             = useState<string>('')
-  const [submitting, setSubmitting]   = useState(false)
-  const [formError, setFormError]     = useState<string | null>(null)
-  const [marking, setMarking]         = useState(false)
-  const [pastOpen, setPastOpen]       = useState(false)
+  const [nameInput, setNameInput]         = useState<string>(jerseyName ?? '')
+  const [updateProfileName, setUpdateProfileName] = useState(false)
+
+  const [halfSleeve, setHalfSleeve]       = useState(false)
+  const [fullSleeve, setFullSleeve]       = useState(false)
+  const [sleeveSize, setSleeveSize]       = useState<string>('M')
+
+  const [addTracks, setAddTracks]         = useState(false)
+  const [tracksSize, setTracksSize]       = useState<string>('M')
+
+  const [notes, setNotes]                 = useState<string>('')
+  const [submitting, setSubmitting]       = useState(false)
+  const [formError, setFormError]         = useState<string | null>(null)
+  const [marking, setMarking]             = useState(false)
+  const [pastOpen, setPastOpen]           = useState(false)
+
+  const nameChanged = nameInput.trim().toLowerCase() !== (jerseyName ?? '').toLowerCase()
+  const anySleeveChecked = halfSleeve || fullSleeve
 
   const activeOrder = orders.find(o =>
     o.status === 'pending' || o.status === 'submitted' || o.status === 'delivered'
@@ -84,12 +133,31 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
   async function handleSubmitOrder(e: React.FormEvent) {
     e.preventDefault()
     setFormError(null)
+
+    if (!halfSleeve && !fullSleeve && !addTracks) {
+      setFormError('Select at least one item to order')
+      return
+    }
+
     setSubmitting(true)
     try {
+      const payload: Record<string, unknown> = {
+        half_sleeve:         halfSleeve,
+        full_sleeve:         fullSleeve,
+        tracks:              addTracks,
+        jersey_name_input:   nameInput.trim(),
+        update_profile_name: updateProfileName,
+        notes:               notes.trim() || undefined,
+      }
+
+      if (anySleeveChecked) {
+        payload.jersey_size_selected = sleeveSize
+      }
+
       const res = await fetch('/api/dugout/kit-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jersey_size: size, notes: notes.trim() || undefined }),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
@@ -107,7 +175,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
   return (
     <div className="flex flex-col gap-5">
 
-      {/* Section A — Batch date notice */}
+      {/* Batch date notice */}
       {batchDate && (
         <div className="bg-amber-50 border border-amber-200 text-amber-700 font-rajdhani text-sm rounded px-4 py-2">
           Next order tentatively submits around {formatDate(batchDate)}
@@ -123,7 +191,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
         </div>
       )}
 
-      {/* Section B — Active order status card */}
+      {/* Active order status card */}
       {activeOrder && (
         <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4 flex flex-col gap-3">
           <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
@@ -132,15 +200,13 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
           <div className="flex flex-col gap-1">
             <div className="flex items-baseline gap-2">
               <span className="font-cinzel font-bold text-lg text-stone-900">
-                {activeOrder.jersey_name}
+                {activeOrder.jersey_name_override ?? activeOrder.jersey_name}
               </span>
               <span className="font-rajdhani text-stone-500 text-sm">
                 #{activeOrder.jersey_number}
               </span>
             </div>
-            <p className="font-rajdhani text-stone-700 text-sm">
-              Size: <span className="font-semibold">{activeOrder.jersey_size}</span>
-            </p>
+            <OrderItems order={activeOrder} />
             {activeOrder.notes && (
               <p className="font-rajdhani text-stone-500 text-sm">
                 Notes: {activeOrder.notes}
@@ -164,7 +230,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
         </div>
       )}
 
-      {/* Section C — Place new order form */}
+      {/* Place new order form */}
       {!isExpelled && !activeOrder && (
         <>
           {(!jerseyName || jerseyNumber === null || jerseyNumber === undefined) ? (
@@ -182,28 +248,116 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                 Place a Kit Order
               </p>
               <form onSubmit={handleSubmitOrder} className="flex flex-col gap-4">
+
+                {/* Jersey Name input */}
                 <div className="flex flex-col gap-1">
-                  <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">Jersey Name</span>
-                  <span className="font-rajdhani text-stone-900 text-sm font-semibold">{jerseyName}</span>
+                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                    Jersey Name
+                  </label>
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={e => {
+                      setNameInput(e.target.value)
+                      if (!e.target.value.trim() || e.target.value.trim().toLowerCase() === (jerseyName ?? '').toLowerCase()) {
+                        setUpdateProfileName(false)
+                      }
+                    }}
+                    maxLength={10}
+                    className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
+                  />
+                  <span className="font-rajdhani text-xs text-stone-400">
+                    {nameInput.length}/10
+                  </span>
+                  {nameChanged && (
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer mt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={updateProfileName}
+                        onChange={e => setUpdateProfileName(e.target.checked)}
+                        className="rounded"
+                      />
+                      Also update my profile with this name
+                    </label>
+                  )}
                 </div>
+
+                {/* Jersey Number (read-only) */}
                 <div className="flex flex-col gap-1">
                   <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">Jersey Number</span>
                   <span className="font-rajdhani text-stone-900 text-sm font-semibold">#{jerseyNumber}</span>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
-                    Jersey Size
+
+                {/* Sleeve selection */}
+                <div className="flex flex-col gap-2">
+                  <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">Jersey</span>
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={halfSleeve}
+                      onChange={e => setHalfSleeve(e.target.checked)}
+                      className="rounded"
+                    />
+                    Half Sleeve
                   </label>
-                  <select
-                    value={size}
-                    onChange={e => setSize(e.target.value)}
-                    className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
-                  >
-                    {JERSEY_SIZES.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={fullSleeve}
+                      onChange={e => setFullSleeve(e.target.checked)}
+                      className="rounded"
+                    />
+                    Full Sleeve
+                  </label>
+                  {anySleeveChecked && (
+                    <div className="flex flex-col gap-1 mt-1">
+                      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                        Sleeve Size
+                      </label>
+                      <select
+                        value={sleeveSize}
+                        onChange={e => setSleeveSize(e.target.value)}
+                        className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
+                      >
+                        {JERSEY_SIZES.map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
+
+                {/* Tracks section */}
+                <div className="flex flex-col gap-2">
+                  <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">Tracks</span>
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={addTracks}
+                      onChange={e => setAddTracks(e.target.checked)}
+                      className="rounded"
+                    />
+                    Add Tracks
+                  </label>
+                  {addTracks && (
+                    <div className="flex flex-col gap-1 mt-1">
+                      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                        Tracks Size
+                      </label>
+                      <select
+                        value={tracksSize}
+                        onChange={e => setTracksSize(e.target.value)}
+                        className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
+                      >
+                        {JERSEY_SIZES.map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
                 <div className="flex flex-col gap-1">
                   <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
                     Notes <span className="normal-case font-normal">(optional)</span>
@@ -217,9 +371,11 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                     className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none resize-none placeholder:text-stone-400"
                   />
                 </div>
+
                 {formError && (
                   <p className="font-rajdhani text-sm text-red-600">{formError}</p>
                 )}
+
                 <button
                   type="submit"
                   disabled={submitting}
@@ -233,7 +389,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
         </>
       )}
 
-      {/* Section D — Past orders */}
+      {/* Past orders */}
       {pastOrders.length > 0 && (
         <div>
           <button
@@ -243,11 +399,14 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
             {pastOpen ? 'Hide past orders' : `View past orders (${pastOrders.length})`}
           </button>
           {pastOpen && (
-            <div className="mt-3 flex flex-col gap-1.5">
+            <div className="mt-3 flex flex-col gap-2">
               {pastOrders.map(o => (
-                <p key={o.id} className="text-stone-500 font-rajdhani text-sm">
-                  {o.jersey_name} · #{o.jersey_number} · {o.jersey_size} · {formatDate(o.created_at)}
-                </p>
+                <div key={o.id} className="flex flex-col gap-0.5">
+                  <p className="font-rajdhani text-stone-600 text-sm font-semibold">
+                    {o.jersey_name_override ?? o.jersey_name} · #{o.jersey_number} · {formatDate(o.created_at)}
+                  </p>
+                  <OrderItems order={o} />
+                </div>
               ))}
             </div>
           )}

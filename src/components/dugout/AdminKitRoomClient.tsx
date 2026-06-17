@@ -9,7 +9,11 @@ type AdminOrder = {
   id: string
   jersey_name: string
   jersey_number: number
-  jersey_size: string
+  jersey_size: string | null
+  jersey_half_sleeve_size: string | null
+  jersey_full_sleeve_size: string | null
+  tracks_size: string | null
+  jersey_name_override: string | null
   notes: string | null
   status: OrderStatus
   created_at: string
@@ -52,6 +56,16 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function formatSummaryDate(): string {
+  const d = new Date()
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function formatCsvDate(): string {
+  const d = new Date()
+  return d.toISOString().slice(0, 10)
+}
+
 function PlayerLink({ name, cricHeroesUrl }: { name: string; cricHeroesUrl: string | null }) {
   if (cricHeroesUrl) {
     return (
@@ -68,18 +82,32 @@ function PlayerLink({ name, cricHeroesUrl }: { name: string; cricHeroesUrl: stri
   return <span className="font-rajdhani text-sm text-stone-700 font-semibold">{name}</span>
 }
 
+function sizeCounts(orders: AdminOrder[], field: 'jersey_half_sleeve_size' | 'jersey_full_sleeve_size' | 'tracks_size'): string {
+  const counts: Record<string, number> = {}
+  for (const o of orders) {
+    const val = o[field]
+    if (val) counts[val] = (counts[val] ?? 0) + 1
+  }
+  const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
+  const parts = sizes.filter(s => counts[s]).map(s => `${s}×${counts[s]}`)
+  return parts.length > 0 ? parts.join(', ') : 'None'
+}
+
 export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
   const router = useRouter()
 
-  const [activeTab, setActiveTab]       = useState<FilterTab>('all')
-  const [batchInput, setBatchInput]     = useState<string>(batchDate ?? '')
-  const [savingBatch, setSavingBatch]   = useState(false)
-  const [batchError, setBatchError]     = useState<string | null>(null)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [activeTab, setActiveTab]           = useState<FilterTab>('all')
+  const [batchInput, setBatchInput]         = useState<string>(batchDate ?? '')
+  const [savingBatch, setSavingBatch]       = useState(false)
+  const [batchError, setBatchError]         = useState<string | null>(null)
+  const [actionLoading, setActionLoading]   = useState<string | null>(null)
+  const [copied, setCopied]                 = useState(false)
 
   const filtered = activeTab === 'all'
     ? orders
     : orders.filter(o => o.status === activeTab)
+
+  const actionableOrders = orders.filter(o => o.status === 'pending' || o.status === 'submitted')
 
   async function handleBatchSave() {
     setSavingBatch(true)
@@ -147,10 +175,60 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
     }
   }
 
+  function handleDownloadCsv() {
+    const header = ['Player Name', 'Jersey Name', 'Jersey Number', 'Half Sleeve', 'Full Sleeve', 'Tracks', 'Notes']
+    const rows = actionableOrders.map(o => [
+      o.player_name,
+      o.jersey_name_override ?? o.jersey_name,
+      String(o.jersey_number),
+      o.jersey_half_sleeve_size ?? '',
+      o.jersey_full_sleeve_size ?? '',
+      o.tracks_size ?? '',
+      o.notes ?? '',
+    ])
+
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const csvContent = [header, ...rows].map(row => row.map(escape).join(',')).join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `spartans-kit-order-${formatCsvDate()}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleCopySummary() {
+    const total = actionableOrders.length
+    const halfLine  = sizeCounts(actionableOrders, 'jersey_half_sleeve_size')
+    const fullLine  = sizeCounts(actionableOrders, 'jersey_full_sleeve_size')
+    const tracksLine = sizeCounts(actionableOrders, 'tracks_size')
+
+    const text = [
+      `Spartans Kit Order — ${formatSummaryDate()}`,
+      `Total orders: ${total}`,
+      '',
+      'Jerseys:',
+      `  Half Sleeve: ${halfLine}`,
+      `  Full Sleeve: ${fullLine}`,
+      '',
+      `Tracks: ${tracksLine}`,
+    ].join('\n')
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      console.error('Failed to copy')
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
 
-      {/* Section A — Batch date control (admin only) */}
+      {/* Batch date control (admin only) */}
       {isAdmin && (
         <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4">
           <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-3">
@@ -184,7 +262,25 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
         </div>
       )}
 
-      {/* Section B — Filter tabs */}
+      {/* CSV + Summary actions (admin only) */}
+      {isAdmin && (
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleDownloadCsv}
+            className="bg-parchment-3 border border-[#D4C9B0] text-stone-700 font-rajdhani font-bold px-4 py-2 rounded text-sm hover:bg-[#D4C9B0] transition-colors"
+          >
+            Download CSV
+          </button>
+          <button
+            onClick={handleCopySummary}
+            className="bg-parchment-3 border border-[#D4C9B0] text-stone-700 font-rajdhani font-bold px-4 py-2 rounded text-sm hover:bg-[#D4C9B0] transition-colors"
+          >
+            {copied ? 'Copied!' : 'Copy Summary'}
+          </button>
+        </div>
+      )}
+
+      {/* Filter tabs */}
       <div className="flex flex-wrap gap-2">
         {TABS.map(tab => (
           <button
@@ -201,13 +297,24 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
         ))}
       </div>
 
-      {/* Section C — Orders table */}
+      {/* Orders table */}
       <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px]">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr className="bg-parchment-3">
-                {['Player', 'Jersey Name', '#', 'Size', 'Notes', 'Status', 'Date', ...(isAdmin ? ['Actions'] : [])].map(col => (
+                {[
+                  'Player',
+                  'Jersey Name',
+                  '#',
+                  'Half',
+                  'Full',
+                  'Tracks',
+                  'Notes',
+                  'Status',
+                  'Date',
+                  ...(isAdmin ? ['Actions'] : []),
+                ].map(col => (
                   <th
                     key={col}
                     className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap"
@@ -221,68 +328,89 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 8 : 7}
+                    colSpan={isAdmin ? 10 : 9}
                     className="font-rajdhani text-stone-500 text-sm px-4 py-6 text-center"
                   >
                     No orders found.
                   </td>
                 </tr>
               ) : (
-                filtered.map((order, i) => (
-                  <tr
-                    key={order.id}
-                    className={`border-t border-[#D4C9B0] ${i % 2 === 1 ? 'bg-parchment' : ''}`}
-                  >
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <PlayerLink
-                        name={order.player_name}
-                        cricHeroesUrl={order.player_cricheroes_url}
-                      />
-                    </td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-stone-900 whitespace-nowrap">
-                      {order.jersey_name}
-                    </td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
-                      {order.jersey_number}
-                    </td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
-                      {order.jersey_size}
-                    </td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-stone-500 max-w-[180px] truncate">
-                      {order.notes ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`font-rajdhani text-xs font-semibold px-2.5 py-0.5 rounded ${STATUS_BADGE[order.status]}`}>
-                        {STATUS_LABELS[order.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-stone-500 whitespace-nowrap">
-                      {formatDate(order.created_at)}
-                    </td>
-                    {isAdmin && (
+                filtered.map((order, i) => {
+                  const isLegacy = order.jersey_size !== null && order.jersey_size !== undefined
+                  return (
+                    <tr
+                      key={order.id}
+                      className={`border-t border-[#D4C9B0] ${i % 2 === 1 ? 'bg-parchment' : ''}`}
+                    >
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {order.status === 'pending' && (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'submitted')}
-                            disabled={actionLoading === order.id}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-rajdhani font-bold text-xs px-3 py-1.5 rounded disabled:opacity-60 transition-colors"
-                          >
-                            {actionLoading === order.id ? '…' : 'Submit'}
-                          </button>
-                        )}
-                        {order.status === 'submitted' && (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'delivered')}
-                            disabled={actionLoading === order.id}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-rajdhani font-bold text-xs px-3 py-1.5 rounded disabled:opacity-60 transition-colors"
-                          >
-                            {actionLoading === order.id ? '…' : 'Delivered'}
-                          </button>
-                        )}
+                        <PlayerLink
+                          name={order.player_name}
+                          cricHeroesUrl={order.player_cricheroes_url}
+                        />
                       </td>
-                    )}
-                  </tr>
-                ))
+                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-900 whitespace-nowrap">
+                        {order.jersey_name_override ?? order.jersey_name}
+                      </td>
+                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
+                        {order.jersey_number}
+                      </td>
+                      {isLegacy ? (
+                        <td
+                          colSpan={3}
+                          className="px-4 py-3 font-rajdhani text-sm text-stone-500 whitespace-nowrap"
+                        >
+                          {order.jersey_size}{' '}
+                          <span className="text-stone-400 text-xs">Size†</span>
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
+                            {order.jersey_half_sleeve_size ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
+                            {order.jersey_full_sleeve_size ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
+                            {order.tracks_size ?? '—'}
+                          </td>
+                        </>
+                      )}
+                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-500 max-w-[180px] truncate">
+                        {order.notes ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`font-rajdhani text-xs font-semibold px-2.5 py-0.5 rounded ${STATUS_BADGE[order.status]}`}>
+                          {STATUS_LABELS[order.status]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-500 whitespace-nowrap">
+                        {formatDate(order.created_at)}
+                      </td>
+                      {isAdmin && (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {order.status === 'pending' && (
+                            <button
+                              onClick={() => handleStatusChange(order.id, 'submitted')}
+                              disabled={actionLoading === order.id}
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-rajdhani font-bold text-xs px-3 py-1.5 rounded disabled:opacity-60 transition-colors"
+                            >
+                              {actionLoading === order.id ? '…' : 'Submit'}
+                            </button>
+                          )}
+                          {order.status === 'submitted' && (
+                            <button
+                              onClick={() => handleStatusChange(order.id, 'delivered')}
+                              disabled={actionLoading === order.id}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-rajdhani font-bold text-xs px-3 py-1.5 rounded disabled:opacity-60 transition-colors"
+                            >
+                              {actionLoading === order.id ? '…' : 'Delivered'}
+                            </button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>

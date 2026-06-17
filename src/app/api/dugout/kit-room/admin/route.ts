@@ -1,17 +1,16 @@
-import { redirect } from 'next/navigation'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { SiteNav } from '@/components/ui/SiteNav'
-import { AdminKitRoomClient } from '@/components/dugout/AdminKitRoomClient'
 
-export const revalidate = 0
-
-export default async function AdminKitRoomPage() {
+// GET /api/dugout/kit-room/admin
+// Admin/GC fetches all jersey orders with player details
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
-
-  if (!user?.isAdmin && !user?.isGC) redirect('/')
+  if (!user?.isAdmin && !user?.isGC) {
+    return NextResponse.json({ error: 'Not authorised' }, { status: 403 })
+  }
 
   const supabase = createServiceClient()
 
@@ -40,7 +39,10 @@ export default async function AdminKitRoomPage() {
       .maybeSingle(),
   ])
 
-  // Strip any sensitive player fields — expose only name and cricheroes_url
+  if (ordersResult.error) {
+    return NextResponse.json({ error: ordersResult.error.message }, { status: 500 })
+  }
+
   const rawOrders = ordersResult.data ?? []
   const orders = rawOrders.map((o: any) => ({
     id:                      o.id,
@@ -58,21 +60,8 @@ export default async function AdminKitRoomPage() {
     player_cricheroes_url:   o.player?.cricheroes_url ?? null,
   }))
 
-  const batchDate = settingsResult.data?.kit_room_batch_date ?? null
-
-  return (
-    <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
-      <SiteNav activePage="dugout" isAdmin={user.isAdmin} />
-      <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
-        <div className="max-w-5xl mx-auto">
-          <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Kit Room — Admin</h1>
-          <AdminKitRoomClient
-            orders={orders}
-            batchDate={batchDate}
-            isAdmin={Boolean(user.isAdmin)}
-          />
-        </div>
-      </main>
-    </div>
-  )
+  return NextResponse.json({
+    orders,
+    batch_date: settingsResult.data?.kit_room_batch_date ?? null,
+  })
 }

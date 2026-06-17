@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/dugout/kit-room
-// Player places a new jersey order
+// Player places a new jersey order (v2)
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const player  = session?.user as any
@@ -59,12 +59,50 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
 
-  // Validate jersey_size from request body (the only field we accept from client)
-  const { jersey_size, notes } = body
+  const {
+    half_sleeve,
+    full_sleeve,
+    tracks,
+    jersey_size_selected,
+    jersey_name_input,
+    update_profile_name,
+    notes,
+  } = body
 
-  if (!isValidJerseySize(jersey_size)) {
+  const halfSleeve        = Boolean(half_sleeve)
+  const fullSleeve        = Boolean(full_sleeve)
+  const addTracks         = Boolean(tracks)
+  const doUpdateName      = Boolean(update_profile_name)
+
+  // At least one item must be selected
+  if (!halfSleeve && !fullSleeve && !addTracks) {
     return NextResponse.json(
-      { error: `jersey_size is required and must be one of: ${VALID_JERSEY_SIZES.join(', ')}` },
+      { error: 'Select at least one item — half sleeve, full sleeve, or tracks' },
+      { status: 400 }
+    )
+  }
+
+  // Size required when any sleeve is selected
+  if ((halfSleeve || fullSleeve) && !isValidJerseySize(jersey_size_selected)) {
+    return NextResponse.json(
+      { error: `jersey_size_selected is required and must be one of: ${VALID_JERSEY_SIZES.join(', ')}` },
+      { status: 400 }
+    )
+  }
+
+  // Validate jersey_name_input if provided
+  const trimmedNameInput: string | null =
+    typeof jersey_name_input === 'string' && jersey_name_input.trim().length > 0
+      ? jersey_name_input.trim().slice(0, 10)
+      : null
+
+  if (
+    typeof jersey_name_input === 'string' &&
+    jersey_name_input.trim().length > 0 &&
+    jersey_name_input.trim().length > 10
+  ) {
+    return NextResponse.json(
+      { error: 'jersey_name_input must be 10 characters or fewer' },
       { status: 400 }
     )
   }
@@ -116,15 +154,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'You already have an active order' }, { status: 409 })
   }
 
+  // Derive jersey_name_override: set only when input differs from profile name (case-insensitive)
+  const profileName = String(playerRow.jersey_name).trim()
+  const nameOverride: string | null =
+    trimmedNameInput !== null &&
+    trimmedNameInput.toLowerCase() !== profileName.toLowerCase()
+      ? trimmedNameInput
+      : null
+
+  // If player requested profile name update and name differs, PATCH players first
+  if (doUpdateName && trimmedNameInput !== null && trimmedNameInput.toLowerCase() !== profileName.toLowerCase()) {
+    const { error: patchErr } = await supabase
+      .from('players')
+      .update({ jersey_name: trimmedNameInput })
+      .eq('id', player.playerId)
+
+    if (patchErr) {
+      return NextResponse.json(
+        { error: 'Failed to update profile name — order not placed' },
+        { status: 500 }
+      )
+    }
+  }
+
+  // Derive per-item sizes
+  const jerseyHalfSleeveSize: string | null = halfSleeve ? (jersey_size_selected as string) : null
+  const jerseyFullSleeveSize: string | null = fullSleeve ? (jersey_size_selected as string) : null
+  const tracksSize: string | null           = addTracks  ? (jersey_size_selected as string) : null
+
   const { data: order, error: insertErr } = await supabase
     .from('jersey_orders')
     .insert({
-      player_id:     player.playerId,
-      jersey_name:   playerRow.jersey_name,
-      jersey_number: playerRow.jersey_number,
-      jersey_size,
-      notes:         sanitisedNotes,
-      status:        'pending',
+      player_id:                player.playerId,
+      jersey_name:              playerRow.jersey_name,
+      jersey_number:            playerRow.jersey_number,
+      jersey_size:              null,
+      jersey_half_sleeve_size:  jerseyHalfSleeveSize,
+      jersey_full_sleeve_size:  jerseyFullSleeveSize,
+      tracks_size:              tracksSize,
+      jersey_name_override:     nameOverride,
+      notes:                    sanitisedNotes,
+      status:                   'pending',
     })
     .select()
     .single()
