@@ -3,18 +3,19 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 
-type OrderStatus = 'pending' | 'submitted' | 'delivered' | 'received'
+type OrderStatus = 'pending' | 'submitted' | 'delivered' | 'received' | 'cancelled'
 
-const ALL_STATUSES: OrderStatus[] = ['pending', 'submitted', 'delivered', 'received']
+const ALL_STATUSES: OrderStatus[] = ['pending', 'submitted', 'delivered', 'received', 'cancelled']
 
 // Allowed transitions per role: [from] → [to]
 const PLAYER_ALLOWED_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  pending:   ['cancelled'],
   delivered: ['received'],
 }
 
 const ADMIN_GC_ALLOWED_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
-  pending:   ['submitted'],
-  submitted: ['delivered'],
+  pending:   ['submitted', 'cancelled'],
+  submitted: ['delivered', 'cancelled'],
 }
 
 function isValidStatus(value: unknown): value is OrderStatus {
@@ -75,7 +76,6 @@ export async function PATCH(
 
   // Determine allowed transitions based on role
   if (isOwner && !isAdminOrGC) {
-    // Player can only set received, and only from delivered
     const allowed = PLAYER_ALLOWED_TRANSITIONS[currentStatus] ?? []
     if (!allowed.includes(newStatus)) {
       return NextResponse.json(
@@ -84,7 +84,6 @@ export async function PATCH(
       )
     }
   } else if (isAdminOrGC) {
-    // Admin/GC can set submitted or delivered only via their allowlist
     const allowed = ADMIN_GC_ALLOWED_TRANSITIONS[currentStatus] ?? []
     if (!allowed.includes(newStatus)) {
       return NextResponse.json(

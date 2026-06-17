@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-type OrderStatus = 'pending' | 'submitted' | 'delivered' | 'received'
+type OrderStatus = 'pending' | 'submitted' | 'delivered' | 'received' | 'cancelled'
 
 type AdminOrder = {
   id: string
@@ -42,6 +42,7 @@ const STATUS_BADGE: Record<OrderStatus, string> = {
   submitted: 'bg-blue-50 text-blue-700 border border-blue-200',
   delivered: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   received:  'bg-stone-100 text-stone-500 border border-stone-200',
+  cancelled: 'bg-stone-100 text-stone-400 border border-stone-200',
 }
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -49,6 +50,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   submitted: 'Submitted',
   delivered: 'Delivered',
   received:  'Received',
+  cancelled: 'Cancelled',
 }
 
 function formatDate(dateStr: string): string {
@@ -96,16 +98,20 @@ function sizeCounts(orders: AdminOrder[], field: 'jersey_half_sleeve_size' | 'je
 export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
   const router = useRouter()
 
-  const [activeTab, setActiveTab]           = useState<FilterTab>('all')
-  const [batchInput, setBatchInput]         = useState<string>(batchDate ?? '')
-  const [savingBatch, setSavingBatch]       = useState(false)
-  const [batchError, setBatchError]         = useState<string | null>(null)
-  const [actionLoading, setActionLoading]   = useState<string | null>(null)
-  const [copied, setCopied]                 = useState(false)
+  const [activeTab, setActiveTab]               = useState<FilterTab>('all')
+  const [batchInput, setBatchInput]             = useState<string>(batchDate ?? '')
+  const [savingBatch, setSavingBatch]           = useState(false)
+  const [batchError, setBatchError]             = useState<string | null>(null)
+  const [actionLoading, setActionLoading]       = useState<string | null>(null)
+  const [copied, setCopied]                     = useState(false)
+  const [confirmCancelId, setConfirmCancelId]   = useState<string | null>(null)
 
   const filtered = activeTab === 'all'
     ? orders
     : orders.filter(o => o.status === activeTab)
+
+  // Cancelled orders are hidden from admin view entirely
+  const visibleOrders = filtered.filter(o => o.status !== 'cancelled')
 
   const actionableOrders = orders.filter(o => o.status === 'pending' || o.status === 'submitted')
 
@@ -167,6 +173,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
         console.error(d.error ?? 'Failed to update status')
         return
       }
+      setConfirmCancelId(null)
       router.refresh()
     } catch {
       console.error('Network error')
@@ -201,8 +208,8 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
 
   async function handleCopySummary() {
     const total = actionableOrders.length
-    const halfLine  = sizeCounts(actionableOrders, 'jersey_half_sleeve_size')
-    const fullLine  = sizeCounts(actionableOrders, 'jersey_full_sleeve_size')
+    const halfLine   = sizeCounts(actionableOrders, 'jersey_half_sleeve_size')
+    const fullLine   = sizeCounts(actionableOrders, 'jersey_full_sleeve_size')
     const tracksLine = sizeCounts(actionableOrders, 'tracks_size')
 
     const text = [
@@ -325,7 +332,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {visibleOrders.length === 0 ? (
                 <tr>
                   <td
                     colSpan={isAdmin ? 10 : 9}
@@ -335,7 +342,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                   </td>
                 </tr>
               ) : (
-                filtered.map((order, i) => {
+                visibleOrders.map((order, i) => {
                   const isLegacy = order.jersey_size !== null && order.jersey_size !== undefined
                   return (
                     <tr
@@ -388,24 +395,54 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                       </td>
                       {isAdmin && (
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {order.status === 'pending' && (
-                            <button
-                              onClick={() => handleStatusChange(order.id, 'submitted')}
-                              disabled={actionLoading === order.id}
-                              className="bg-blue-600 hover:bg-blue-700 text-white font-rajdhani font-bold text-xs px-3 py-1.5 rounded disabled:opacity-60 transition-colors"
-                            >
-                              {actionLoading === order.id ? '…' : 'Submit'}
-                            </button>
-                          )}
-                          {order.status === 'submitted' && (
-                            <button
-                              onClick={() => handleStatusChange(order.id, 'delivered')}
-                              disabled={actionLoading === order.id}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-rajdhani font-bold text-xs px-3 py-1.5 rounded disabled:opacity-60 transition-colors"
-                            >
-                              {actionLoading === order.id ? '…' : 'Delivered'}
-                            </button>
-                          )}
+                          <div className="flex flex-col gap-1.5">
+                            {order.status === 'pending' && (
+                              <button
+                                onClick={() => handleStatusChange(order.id, 'submitted')}
+                                disabled={actionLoading === order.id}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-rajdhani font-bold text-xs px-3 py-1.5 rounded disabled:opacity-60 transition-colors"
+                              >
+                                {actionLoading === order.id ? '…' : 'Submit'}
+                              </button>
+                            )}
+                            {order.status === 'submitted' && (
+                              <button
+                                onClick={() => handleStatusChange(order.id, 'delivered')}
+                                disabled={actionLoading === order.id}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-rajdhani font-bold text-xs px-3 py-1.5 rounded disabled:opacity-60 transition-colors"
+                              >
+                                {actionLoading === order.id ? '…' : 'Delivered'}
+                              </button>
+                            )}
+                            {(order.status === 'pending' || order.status === 'submitted') && (
+                              confirmCancelId === order.id ? (
+                                <span className="font-rajdhani text-xs text-stone-600">
+                                  Sure?{' '}
+                                  <button
+                                    onClick={() => handleStatusChange(order.id, 'cancelled')}
+                                    disabled={actionLoading === order.id}
+                                    className="text-red-600 font-semibold hover:underline disabled:opacity-60"
+                                  >
+                                    Yes
+                                  </button>
+                                  {' '}
+                                  <button
+                                    onClick={() => setConfirmCancelId(null)}
+                                    className="text-stone-500 hover:underline"
+                                  >
+                                    No
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => setConfirmCancelId(order.id)}
+                                  className="font-rajdhani text-xs text-red-500 hover:underline text-left"
+                                >
+                                  Cancel
+                                </button>
+                              )
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>

@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-type OrderStatus = 'pending' | 'submitted' | 'delivered' | 'received'
+type OrderStatus = 'pending' | 'submitted' | 'delivered' | 'received' | 'cancelled'
 
 type Order = {
   id: string
@@ -34,6 +34,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   submitted: 'Submitted',
   delivered: 'Delivered',
   received:  'Received',
+  cancelled: 'Cancelled',
 }
 
 const STATUS_BADGE: Record<OrderStatus, string> = {
@@ -41,6 +42,7 @@ const STATUS_BADGE: Record<OrderStatus, string> = {
   submitted: 'bg-blue-50 text-blue-700 border border-blue-200',
   delivered: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   received:  'bg-stone-100 text-stone-500 border border-stone-200',
+  cancelled: 'bg-stone-100 text-stone-400 border border-stone-200',
 }
 
 function formatDate(dateStr: string): string {
@@ -99,6 +101,8 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
   const [formError, setFormError]         = useState<string | null>(null)
   const [marking, setMarking]             = useState(false)
   const [pastOpen, setPastOpen]           = useState(false)
+  const [cancelledOpen, setCancelledOpen] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
 
   const nameChanged = nameInput.trim().toLowerCase() !== (jerseyName ?? '').toLowerCase()
   const anySleeveChecked = halfSleeve || fullSleeve
@@ -107,7 +111,13 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
     o.status === 'pending' || o.status === 'submitted' || o.status === 'delivered'
   ) ?? null
 
-  const pastOrders = orders.filter(o => o.status === 'received')
+  const pastOrders      = orders.filter(o => o.status === 'received')
+  const cancelledOrders = orders.filter(o => o.status === 'cancelled')
+
+  // Reset confirmation state whenever the active order changes
+  useEffect(() => {
+    setConfirmCancel(false)
+  }, [activeOrder?.id])
 
   async function handleMarkReceived(orderId: string) {
     setMarking(true)
@@ -127,6 +137,24 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
       console.error('Network error')
     } finally {
       setMarking(false)
+    }
+  }
+
+  async function handleCancelOrder(orderId: string) {
+    try {
+      const res = await fetch(`/api/dugout/kit-room/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        console.error(d.error ?? 'Failed to cancel order')
+        return
+      }
+      router.refresh()
+    } catch {
+      console.error('Network error')
     }
   }
 
@@ -227,22 +255,50 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
               </button>
             )}
           </div>
-{/* Status context message — add this block below */}
-{activeOrder.status === 'pending' && (
-  <p className="font-rajdhani text-xs text-stone-400">
-    Your order has been received. The coordinator will review and submit it in the next batch.
-  </p>
-)}
-{activeOrder.status === 'submitted' && (
-  <p className="font-rajdhani text-xs text-stone-400">
-    Your order has been submitted to the vendor. We'll notify you once it's ready for collection.
-  </p>
-)}
-{activeOrder.status === 'delivered' && (
-  <p className="font-rajdhani text-xs text-stone-400">
-    Your kit has arrived! Please confirm receipt once you've collected it.
-  </p>
-)}
+          {activeOrder.status === 'pending' && (
+            <p className="font-rajdhani text-xs text-stone-400">
+              Your order has been received. The coordinator will review and submit it in the next batch.
+            </p>
+          )}
+          {activeOrder.status === 'submitted' && (
+            <p className="font-rajdhani text-xs text-stone-400">
+              Your order has been submitted to the vendor. We'll notify you once it's ready for collection.
+            </p>
+          )}
+          {activeOrder.status === 'delivered' && (
+            <p className="font-rajdhani text-xs text-stone-400">
+              Your kit has arrived! Please confirm receipt once you've collected it.
+            </p>
+          )}
+          {/* Cancel order — only available while pending */}
+          {activeOrder.status === 'pending' && (
+            <div>
+              {confirmCancel ? (
+                <span className="font-rajdhani text-xs text-stone-600">
+                  Are you sure?{' '}
+                  <button
+                    onClick={() => handleCancelOrder(activeOrder.id)}
+                    className="text-red-600 font-semibold hover:underline"
+                  >
+                    Yes, cancel
+                  </button>
+                  <button
+                    onClick={() => setConfirmCancel(false)}
+                    className="text-stone-500 hover:underline ml-3"
+                  >
+                    Keep order
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => setConfirmCancel(true)}
+                  className="font-rajdhani text-xs text-red-500 hover:text-red-700 hover:underline"
+                >
+                  Cancel order
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -428,6 +484,36 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
           )}
         </div>
       )}
+
+      {/* Cancelled orders */}
+      {cancelledOrders.length > 0 && (
+        <div>
+          <button
+            onClick={() => setCancelledOpen(v => !v)}
+            className="text-red-400 text-sm font-rajdhani hover:text-red-600 transition-colors"
+          >
+            {cancelledOpen ? 'Hide cancelled orders' : `View cancelled orders (${cancelledOrders.length})`}
+          </button>
+          {cancelledOpen && (
+            <div className="mt-3 flex flex-col gap-2">
+              {cancelledOrders.map(o => (
+                <div key={o.id} className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-rajdhani text-stone-500 text-sm">
+                      {o.jersey_name_override ?? o.jersey_name} · #{o.jersey_number} · {formatDate(o.created_at)}
+                    </p>
+                    <span className={`font-rajdhani text-xs font-semibold px-2.5 py-0.5 rounded ${STATUS_BADGE.cancelled}`}>
+                      {STATUS_LABELS.cancelled}
+                    </span>
+                  </div>
+                  <OrderItems order={o} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   )
 }
