@@ -18,7 +18,7 @@ export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const user    = session?.user as any
 
-  if (!user?.playerId) {
+if (!user?.playerId && !user?.isAdmin) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
