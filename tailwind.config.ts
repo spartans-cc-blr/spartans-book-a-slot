@@ -26,6 +26,11 @@ const config: Config = {
           4: '#242424',
           5: '#2E2E2E',
         },
+        parchment: {
+          DEFAULT: '#F8F4EE',
+          2: '#EEEAE2',
+          3: '#E2DACE',
+        },
       },
       fontFamily: {
         cinzel: ['Cinzel', 'serif'],

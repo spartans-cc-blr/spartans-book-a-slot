@@ -15,9 +15,9 @@ export default async function DugoutPage() {
   const isExpelled = player.playerStatus === 'expelled'
 
   return (
-    <>
+    <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
       <SiteNav activePage="dugout" />
-      <main className="min-h-screen bg-parchment px-4 py-8">
+      <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
         <div className="max-w-3xl mx-auto">
           <h1 className="font-cinzel font-bold text-3xl text-stone-900 mb-1">The Dugout</h1>
           <p className="font-rajdhani text-stone-500 mb-8">Your club utility space.</p>
@@ -53,6 +53,6 @@ export default async function DugoutPage() {
           )}
         </div>
       </main>
-    </>
+    </div>
   )
 }

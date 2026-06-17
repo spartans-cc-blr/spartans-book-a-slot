@@ -53,9 +53,9 @@ export default async function AdminKitRoomPage() {
   const batchDate = settingsResult.data?.kit_room_batch_date ?? null
 
   return (
-    <div className="min-h-screen bg-parchment">
+    <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
       <SiteNav activePage="dugout" isAdmin={user.isAdmin} />
-      <main className="min-h-screen bg-parchment px-4 py-8">
+      <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
         <div className="max-w-5xl mx-auto">
           <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Kit Room — Admin</h1>
           <AdminKitRoomClient

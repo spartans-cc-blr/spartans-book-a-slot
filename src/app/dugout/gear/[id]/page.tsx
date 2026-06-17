@@ -98,9 +98,9 @@ export default async function GearDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-parchment">
+    <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
       <SiteNav activePage="dugout" />
-      <main className="min-h-screen bg-parchment px-4 py-8">
+      <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
         <div className="max-w-2xl mx-auto">
           <Link
             href="/dugout/gear"
