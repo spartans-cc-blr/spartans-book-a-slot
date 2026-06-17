@@ -360,72 +360,58 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                   <span className="font-rajdhani text-stone-900 text-sm font-semibold">#{jerseyNumber}</span>
                 </div>
 
-                {/* Sleeve selection */}
+                {/* Apparel selection */}
                 <div className="flex flex-col gap-2">
-                {/* Kit selection header with size guide */}
-// Remove the separate Tracks section wrapper and its label entirely
-// Replace the two separate divs (Jersey section + Tracks section) with one:
-
-<div className="flex flex-col gap-2">
-  <div className="flex items-center justify-between">
-    <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
-      Apparel Selection
-    </span>
-    <button
-      type="button"
-      onClick={() => window.open('https://www.tyka.com/sizechart', '_blank', 'noopener,noreferrer')}
-      className="font-rajdhani text-xs text-amber-600 hover:text-amber-700 hover:underline underline-offset-2"
-    >
-      Size guide ↗
-    </button>
-  </div>
-
-  {/* Jersey checkboxes */}
-  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
-    <input type="checkbox" checked={halfSleeve}
-      onChange={e => setHalfSleeve(e.target.checked)} className="rounded" />
-    Half Sleeve Jersey
-  </label>
-  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
-    <input type="checkbox" checked={fullSleeve}
-      onChange={e => setFullSleeve(e.target.checked)} className="rounded" />
-    Full Sleeve Jersey
-  </label>
-
-  {/* Tracks — no separate label, flows directly */}
-  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
-    <input type="checkbox" checked={addTracks}
-      onChange={e => setAddTracks(e.target.checked)} className="rounded" />
-    Tracks
-  </label>
-
-  {/* Shared size dropdown — shown when any sleeve checked */}
-  {anySleeveChecked && (
-    <div className="flex flex-col gap-1 mt-1">
-      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
-        Jersey Size
-      </label>
-      <select value={sleeveSize} onChange={e => setSleeveSize(e.target.value)}
-        className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
-        {JERSEY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-    </div>
-  )}
-
-  {/* Tracks size — shown when tracks checked */}
-  {addTracks && (
-    <div className="flex flex-col gap-1 mt-1">
-      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
-        Tracks Size
-      </label>
-      <select value={tracksSize} onChange={e => setTracksSize(e.target.value)}
-        className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
-        {JERSEY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-    </div>
-  )}
-</div>
-
+                  <div className="flex items-center justify-between">
+                    <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                      Apparel Selection
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => window.open('https://www.tyka.com/sizechart', '_blank', 'noopener,noreferrer')}
+                      className="font-rajdhani text-xs text-amber-600 hover:text-amber-700 hover:underline underline-offset-2"
+                    >
+                      Size guide ↗
+                    </button>
+                  </div>
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <input type="checkbox" checked={halfSleeve}
+                      onChange={e => setHalfSleeve(e.target.checked)} className="rounded" />
+                    Half Sleeve Jersey
+                  </label>
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <input type="checkbox" checked={fullSleeve}
+                      onChange={e => setFullSleeve(e.target.checked)} className="rounded" />
+                    Full Sleeve Jersey
+                  </label>
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <input type="checkbox" checked={addTracks}
+                      onChange={e => setAddTracks(e.target.checked)} className="rounded" />
+                    Tracks
+                  </label>
+                  {anySleeveChecked && (
+                    <div className="flex flex-col gap-1 mt-1">
+                      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                        Jersey Size
+                      </label>
+                      <select value={sleeveSize} onChange={e => setSleeveSize(e.target.value)}
+                        className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
+                        {JERSEY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {addTracks && (
+                    <div className="flex flex-col gap-1 mt-1">
+                      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                        Tracks Size
+                      </label>
+                      <select value={tracksSize} onChange={e => setTracksSize(e.target.value)}
+                        className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
+                        {JERSEY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
                 {/* Notes */}
                 <div className="flex flex-col gap-1">
                   <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
