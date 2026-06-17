@@ -415,7 +415,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
                 {/* Tracks section */}
                 <div className="flex flex-col gap-2">
-                  <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">Tracks</span>
+                  //<span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">Tracks</span>
                   <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
                     <input
                       type="checkbox"
