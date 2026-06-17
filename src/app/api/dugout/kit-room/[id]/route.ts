@@ -30,7 +30,7 @@ export async function PATCH(
 ) {
   const session = await getServerSession(authOptions)
   const user    = session?.user as any
-  if (!user?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (!user?.playerId && !user?.isAdmin && !user?.isGC) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const orderId = params.id
   if (!orderId || typeof orderId !== 'string' || orderId.trim() === '') {
