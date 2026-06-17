@@ -227,6 +227,22 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
               </button>
             )}
           </div>
+{/* Status context message — add this block below */}
+{activeOrder.status === 'pending' && (
+  <p className="font-rajdhani text-xs text-stone-400">
+    Your order has been received. The coordinator will review and submit it in the next batch.
+  </p>
+)}
+{activeOrder.status === 'submitted' && (
+  <p className="font-rajdhani text-xs text-stone-400">
+    Your order has been submitted to the vendor. We'll notify you once it's ready for collection.
+  </p>
+)}
+{activeOrder.status === 'delivered' && (
+  <p className="font-rajdhani text-xs text-stone-400">
+    Your kit has arrived! Please confirm receipt once you've collected it.
+  </p>
+)}
         </div>
       )}
 
