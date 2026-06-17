@@ -45,7 +45,7 @@ export default async function KitRoomPage() {
       <SiteNav activePage="dugout" />
       <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
         <div className="max-w-2xl mx-auto">
-          <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Kit Room</h1>
+          <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Spartans Store</h1>
           <KitRoomClient
             orders={orders}
             batchDate={batchDate}
