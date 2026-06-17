@@ -317,7 +317,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
           ) : (
             <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4">
               <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-4">
-                Place an Apparel Order
+                Place an Order
               </p>
               <form onSubmit={handleSubmitOrder} className="flex flex-col gap-4">
 
