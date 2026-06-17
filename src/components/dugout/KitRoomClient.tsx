@@ -367,14 +367,14 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
   <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
     Kit Selection
   </span>
-  <a
-    href="https://www.tyka.com/sizechart"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="font-rajdhani text-xs text-amber-600 hover:text-amber-700 hover:underline underline-offset-2"
-  >
-    Size guide ↗
-  </a>
+<button
+  type="button"
+  onClick={() => window.open('https://www.tyka.com/sizechart', '_blank', 'noopener,noreferrer')}
+  className="font-rajdhani text-xs text-amber-600 hover:text-amber-700 hover:underline underline-offset-2"
+>
+  Size guide ↗
+</button>
+
 </div>
 
                   <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
