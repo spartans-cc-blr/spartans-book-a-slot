@@ -25,7 +25,7 @@ export default async function KitRoomPage() {
       .single(),
     supabase
       .from('jersey_orders')
-      .select('id, jersey_name, jersey_number, jersey_size, notes, status, created_at')
+      .select('id, jersey_name, jersey_number, jersey_size, jersey_half_sleeve_size, jersey_full_sleeve_size, tracks_size, jersey_name_override, notes, status, created_at')
       .eq('player_id', player.playerId)
       .order('created_at', { ascending: false }),
     supabase
