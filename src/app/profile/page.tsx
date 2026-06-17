@@ -452,7 +452,20 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-
+        {/* Spartans Store nudge */}
+        {jerseyName && jerseyNumber !== '' && jerseyNumber !== null && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center justify-between mb-4">
+            <p className="font-rajdhani text-sm text-amber-700">
+              Your jersey details are set — ready to order?
+            </p>
+            <a
+              href="/dugout/kit-room"
+              className="font-rajdhani text-sm font-semibold text-amber-600 hover:text-amber-700 hover:underline underline-offset-2 whitespace-nowrap ml-4"
+            >
+              Spartans Store →
+            </a>
+          </div>
+        )}
         {/* ── SKILLS ── */}
         <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
           <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">Playing Skills</h2>
