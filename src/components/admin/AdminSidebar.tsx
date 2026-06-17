@@ -17,7 +17,7 @@ const NAV = [
   { href: '/tournament-planner',     label: 'Tournament Planner',   icon: '📊' },
   { href: '/admin/players',          label: 'Players',          icon: '🏏' },
   { href: '/gc-review',              label: 'GC Review',        icon: '⚖️' },
-  { href: '/admin/dugout/kit-room',  label: 'Kit Room Orders',  icon: '🥎', section: 'The Dugout' },
+  { href: '/admin/dugout/kit-room',  label: 'Store Orders',  icon: '🥎', section: 'The Dugout' },
 ]
 
 export function AdminSidebar() {
