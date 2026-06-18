@@ -1,10 +1,42 @@
-// app/api/player-availability/route.ts
+// src/app/api/player-availability/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 
+const LOCK_MSG = 'Availability locked — Squad selection in progress'
+
+// ── Shared freeze check ───────────────────────────────────────────────────────
+// Returns LOCK_MSG if the slot is frozen for any reason, null otherwise.
+// Vibe-security: always evaluated server-side — never trust client flags.
+async function checkFreeze(
+  supabase: ReturnType<typeof createServiceClient>,
+  booking_id: string
+): Promise<string | null> {
+  // Single query: booking lock flag + any non-draft squad status in one round-trip
+  const [{ data: booking }, { data: squad }] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select('availability_locked')
+      .eq('id', booking_id)
+      .single(),
+    supabase
+      .from('squad')
+      .select('status')
+      .eq('booking_id', booking_id)
+      .in('status', ['pending_approval', 'approved', 'announced'])
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  if (booking?.availability_locked) return LOCK_MSG
+  if (squad?.status)                return LOCK_MSG
+  return null
+}
+
+// ── GET — own responses ───────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const player  = session?.user as any
@@ -20,11 +52,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ responses })
 }
 
+// ── POST — self-update ────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const player  = session?.user as any
   if (!player?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   if (player?.playerStatus === 'expelled') return NextResponse.json({ error: 'Account suspended' }, { status: 403 })
+
+  // Rate limit: 20 writes/min per player
+  const limited = await rateLimit(req, RATE_LIMITS.playerWrite, player.playerId)
+  if (limited) return limited
 
   const body = await req.json()
   const { booking_id, response } = body
@@ -36,10 +73,10 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // ── GUARD 1: wallet balance ───────────────────────────────────────────────
+  // ── GUARD 1: wallet dues ──────────────────────────────────────────────────
   const { data: playerRow, error: walletErr } = await supabase
     .from('players')
-    .select('wallet_balance, dues_override')
+    .select('wallet_balance, dues_override, active')
     .eq('id', player.playerId)
     .single()
 
@@ -54,56 +91,23 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── GUARD 2: squad announced ──────────────────────────────────────────────
-  const { data: squadRow } = await supabase
-    .from('squad')
-    .select('status')
-    .eq('booking_id', booking_id)
-    .limit(1)
-    .maybeSingle()
-
-  if (squadRow?.status === 'announced') {
-    return NextResponse.json(
-      { error: 'Squad has been announced. Availability is locked for this match.' },
-      { status: 403 }
-    )
+  // ── GUARD 2: availability_locked OR squad pending_approval/approved/announced ──
+  // Captains, GC, and admins bypass this guard — they manage the pool directly.
+  if (!player.isCaptain && !player.isGC && !player.isAdmin) {
+    const freezeMsg = await checkFreeze(supabase, booking_id)
+    if (freezeMsg) return NextResponse.json({ error: freezeMsg }, { status: 403 })
   }
 
-  // ── GUARD 3: availability_locked (≥12 Y / Thursday auto-lock) ────────────
-  const { data: bookingRow } = await supabase
-    .from('bookings')
-    .select('availability_locked')
-    .eq('id', booking_id)
-    .single()
-
-  const { data: existingRow } = await supabase
-    .from('availability')
-    .select('response')
-    .eq('booking_id', booking_id)
-    .eq('player_id', player.playerId)
-    .maybeSingle()
-
-  const existingResponse = existingRow?.response ?? null
-
-   if (bookingRow?.availability_locked) {
-     const isWithdrawing = existingResponse === 'Y' && (response === 'L' || response === 'O')
-     if (!isWithdrawing) {
-       return NextResponse.json(
-         { error: 'Slot is frozen — only withdrawals are allowed at this stage.' },
-         { status: 403 }
-       )
-     }
-    }  
-
-  // Explicit SELECT then INSERT or UPDATE — avoids upsert/conflict issues
+  // ── Explicit SELECT → INSERT or UPDATE (no upsert) ────────────────────────
   const { data: existing } = await supabase
     .from('availability')
     .select('id, response')
-    .eq('player_id', player.playerId)
     .eq('booking_id', booking_id)
-    .single()
+    .eq('player_id', player.playerId)
+    .maybeSingle()
 
-  let result
+  const oldResponse = existing?.response ?? null
+  let result: any
 
   if (existing?.id) {
     const { data, error } = await supabase
@@ -117,68 +121,61 @@ export async function POST(req: NextRequest) {
   } else {
     const { data, error } = await supabase
       .from('availability')
-      .insert({ player_id: player.playerId, booking_id, response, updated_by: null, update_source: 'player' })
+      .insert({ player_id: player.playerId, booking_id, response, update_source: 'player' })
       .select()
       .single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     result = data
   }
 
-  // Auto-reactivate — fire and forget
-  supabase
-    .from('players')
-    .update({ active: true })
-    .eq('id', player.playerId)
-    .eq('active', false)
-    .then(({ error }) => {
-      if (error) console.error('Auto-reactivate failed:', error.message)
-    })
+  // Auto-reactivate inactive players — fire and forget
+  if (!playerRow.active) {
+    supabase.from('players').update({ active: true }).eq('id', player.playerId).then(() => {})
+  }
 
-  // Audit log — fire and forget, never blocks the response
+  // Audit log — fire and forget
   supabase
     .from('availability_audit')
     .insert({
-      player_id:     player.playerId,
+      availability_id: result.id,
+      player_id:       player.playerId,
       booking_id,
-      old_response:  existing?.response ?? null,
-      new_response:  response,
-      updated_by:    player.playerId,
-      update_source: 'player',
-      note:          null,
+      old_response:    oldResponse,
+      new_response:    response,
+      updated_by:      player.playerId,
+      update_source:   'player',
+      note:            null,
     })
     .then(({ error }) => {
-      if (error) console.error('Audit log insert failed:', error.message)
+      if (error) console.error('[audit] insert failed:', error.message)
     })
-
-  // ── Auto-unlock if Y count drops below 13 after a withdrawal ─────
-  if (bookingRow?.availability_locked && existingResponse === 'Y' && (response === 'L' || response === 'O')) {
-    const { count } = await supabase
-      .from('availability')
-      .select('*', { count: 'exact', head: true })
-      .eq('booking_id', booking_id)
-      .eq('response', 'Y')
-
-    if ((count ?? 0) < 13) {
-      await supabase
-        .from('bookings')
-        .update({ availability_locked: false })
-        .eq('id', booking_id)
-    }
-  }
 
   return NextResponse.json({ availability: result })
 }
 
+// ── DELETE — clear response ───────────────────────────────────────────────────
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const player  = session?.user as any
   if (!player?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (player?.playerStatus === 'expelled') return NextResponse.json({ error: 'Account suspended' }, { status: 403 })
+
+  const limited = await rateLimit(req, RATE_LIMITS.playerWrite, player.playerId)
+  if (limited) return limited
 
   const body = await req.json()
   const { booking_id } = body
   if (!booking_id) return NextResponse.json({ error: 'booking_id required' }, { status: 400 })
 
   const supabase = createServiceClient()
+
+  // ── GUARD: availability_locked OR squad pending_approval/approved/announced ──
+  // Captains, GC, and admins bypass — they can always override via captain-availability route.
+  if (!player.isCaptain && !player.isGC && !player.isAdmin) {
+    const freezeMsg = await checkFreeze(supabase, booking_id)
+    if (freezeMsg) return NextResponse.json({ error: freezeMsg }, { status: 403 })
+  }
+
   const { error } = await supabase
     .from('availability')
     .delete()
@@ -193,14 +190,14 @@ export async function DELETE(req: NextRequest) {
     .insert({
       player_id:     player.playerId,
       booking_id,
-      old_response:  null,   // we don't fetch before delete — acceptable for audit purposes
+      old_response:  null,
       new_response:  'CLEARED',
       updated_by:    player.playerId,
       update_source: 'player',
       note:          null,
     })
     .then(({ error }) => {
-      if (error) console.error('Audit log insert failed:', error.message)
+      if (error) console.error('[audit] insert failed:', error.message)
     })
 
   return NextResponse.json({ success: true })
