@@ -140,29 +140,19 @@ export function FixturesAvailability({
   }
 
   // ── Upstream guards (apply to ALL buttons) ────────────────────
-   const playerHasY = response === 'Y'
-   const frozenMsg  = 'Slot is frozen — only withdrawals allowed'
  
    const upstreamBlock =
-     hasDues        ? 'Your account has outstanding dues — please clear your balance to update availability' :
-     squadAnnounced ? 'Squad has been announced for this match' :
-     null
+    hasDues        ? 'Your account has outstanding dues — please clear your balance to update availability' :
+    slotLocked     ? 'Availability locked — Squad selection in progress' :
+    squadAnnounced ? 'Availability locked — Squad selection in progress' :
+    null
  
    const blockedReasons: Partial<Record<AvailKey, string>> = {}
    for (const btn of BUTTONS) {
-     if (btn.code === response) continue
-     // Slot locked: only L and O allowed if player currently has Y
-     if (slotLocked) {
-       if (playerHasY && (btn.code === 'L' || btn.code === 'O')) {
-         // allowed — fall through to cross-game validation
-       } else if (btn.code === 'Y' || btn.code === 'E' || (slotLocked && !playerHasY)) {
-         blockedReasons[btn.code] = frozenMsg
-         continue
-       }
-     }
-     const reason = upstreamBlock ?? getBlockReason(btn.code, bookingId, slotDate, weekendBookings, weekendResponses)
-     if (reason) blockedReasons[btn.code] = reason
-   }
+    if (btn.code === response) continue
+    const reason = upstreamBlock ?? getBlockReason(btn.code, bookingId, slotDate, weekendBookings, weekendResponses)
+    if (reason) blockedReasons[btn.code] = reason
+  }
 
   const activeBtn = BUTTONS.find(b => b.code === response)
 
@@ -225,14 +215,12 @@ export function FixturesAvailability({
       )}
 
       {/* Frozen slot notice */}
-       {slotLocked && !squadAnnounced && (
-         <p style={{
-           fontSize: '10px', color: '#6B7280',
-           marginTop: '6px', fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4,
-         }}>
-           🔒 Slot frozen — {playerHasY ? 'you can still withdraw via L or O' : '13 players confirmed'}
-         </p>
-       )}
+       {(slotLocked || squadAnnounced) && (
+    <p style={{ fontSize: '10px', color: '#6B7280', marginTop: '6px',
+      fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4 }}>
+      🔒 Availability locked — Squad selection in progress
+    </p>
+  )}
 
       {/* Error / validation message */}
       {error && (
