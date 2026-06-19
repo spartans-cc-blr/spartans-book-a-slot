@@ -66,15 +66,17 @@ function QtyCounter({
       <button
         type="button"
         onClick={() => onChange(Math.max(1, value - 1))}
-        className="font-rajdhani text-sm border border-[#D4C9B0] rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] transition-colors"
+        className="font-rajdhani text-sm font-bold text-stone-600 border border-[#D4C9B0] rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] hover:text-stone-900 transition-colors"
       >
         −
       </button>
-      <span className="font-rajdhani text-sm w-4 text-center">{value}</span>
+      <span className="font-rajdhani text-sm font-bold text-stone-800 w-4 text-center">
+        {value}
+      </span>
       <button
         type="button"
         onClick={() => onChange(Math.min(3, value + 1))}
-        className="font-rajdhani text-sm border border-[#D4C9B0] rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] transition-colors"
+        className="font-rajdhani text-sm font-bold text-stone-600 border border-[#D4C9B0] rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] hover:text-stone-900 transition-colors"
       >
         +
       </button>
