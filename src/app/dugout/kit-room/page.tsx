@@ -49,7 +49,7 @@ export default async function KitRoomPage() {
           {/* Jersey collage hero */}
           <div className="w-full rounded-xl mb-6 overflow-hidden" style={{ height: '220px' }}>
             <Image
-              src="/images/jersey-collage.png"
+              src="/images/jersey-collage.webp"
               alt="OUR HERITAGE. OUR PRIDE. — The 2024 Spartans Club Collection"
               width={1200}
               height={220}
