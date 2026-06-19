@@ -454,7 +454,7 @@ export default function ProfilePage() {
           </div>
         </div>
         {/* Spartans Store nudge */}
-        {jerseyName && jerseyNumber !== '' && jerseyNumber !== null && (
+        {profile?.jersey_name && profile?.jersey_number && profile.jersey_number.trim() !== '' && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center justify-between mb-4">
             <p className="font-rajdhani text-sm text-amber-700">
               Your jersey details are set — ready to order?

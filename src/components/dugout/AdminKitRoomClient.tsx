@@ -238,7 +238,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
   }
 
   function handleDownloadCsv() {
-    const header = ['Player Name', 'Jersey Name', 'Jersey Number', 'Half Sleeve', 'Full Sleeve', 'Tracks', 'Notes']
+    const header = ['S.No', 'Player Name', 'Jersey Name', 'Jersey Number', 'Half Sleeve', 'Full Sleeve', 'Tracks', 'Notes']
     const rows = actionableOrders.map(o => [
       o.player_name,
       o.jersey_name_override ?? o.jersey_name,
@@ -385,8 +385,15 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
               {['Player','Jersey Name','#','Half','Full','Tracks','Notes','Status','Date','Actions']
                 .filter(col => isAdmin || col !== 'Actions')
                 .map(col => (
-                  <th key={col}
-                    className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap">
+                  {col === 'Player' ? (
+                      <th key={col} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap sticky left-0 bg-parchment-3 z-10">
+                        {col}
+                      </th>
+                    ) : (
+                      <th key={col} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap">
+                        {col}
+                      </th>
+                    )}
                     {col}
                   </th>
                 ))
@@ -397,7 +404,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
               {visibleOrders.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 11 : 9}
+                    colSpan={isAdmin ? 12 : 10}
                     className="font-rajdhani text-stone-500 text-sm px-4 py-6 text-center"
                   >
                     No orders found.
@@ -411,6 +418,9 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                       key={order.id}
                       className={`border-t border-[#D4C9B0] ${i % 2 === 1 ? 'bg-parchment' : ''}`}
                     >
+                      <td className="px-4 py-3 font-rajdhani text-xs text-stone-400 whitespace-nowrap">
+                        {i + 1}
+                      </td>
                       {isAdmin && (
                         <td className="px-4 py-3 w-8">
                           {order.status === 'pending' && (
@@ -423,7 +433,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                           )}
                         </td>
                       )}
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-parchment z-10 border-r border-[#D4C9B0]">
                         <PlayerLink
                           name={order.player_name}
                           cricHeroesUrl={order.player_cricheroes_url}

@@ -322,8 +322,8 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
               {/* Jersey Name input */}
               <div className="flex flex-col gap-1">
-                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
-                  Jersey Name
+                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 flex items-center gap-1">
+                  Jersey Name <span className="text-stone-400 normal-case font-normal tracking-normal">✏️</span>
                 </label>
                 <input
                   type="text"
@@ -551,8 +551,8 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
                 {/* Jersey Name input */}
                 <div className="flex flex-col gap-1">
-                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
-                    Jersey Name
+                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 flex items-center gap-1">
+                    Jersey Name <span className="text-stone-400 normal-case font-normal tracking-normal">✏️</span>
                   </label>
                   <input
                     type="text"
