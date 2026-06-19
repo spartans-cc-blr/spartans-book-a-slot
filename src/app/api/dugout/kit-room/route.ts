@@ -60,13 +60,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
 
   const {
-    half_sleeve,
-    full_sleeve,
-    tracks,
-    jersey_size_selected,
-    jersey_name_input,
-    update_profile_name,
-    notes,
+  half_sleeve, full_sleeve, tracks,
+  jersey_size_selected,
+  tracks_size,
+  jersey_name_input, update_profile_name, notes,
   } = body
 
   const halfSleeve        = Boolean(half_sleeve)
@@ -180,7 +177,9 @@ export async function POST(req: NextRequest) {
   // Derive per-item sizes
   const jerseyHalfSleeveSize: string | null = halfSleeve ? (jersey_size_selected as string) : null
   const jerseyFullSleeveSize: string | null = fullSleeve ? (jersey_size_selected as string) : null
-  const tracksSize: string | null           = addTracks  ? (jersey_size_selected as string) : null
+  const tracksSize: string | null = addTracks
+  ? (isValidJerseySize(tracks_size) ? tracks_size : isValidJerseySize(jersey_size_selected) ? jersey_size_selected : null)
+  : null
 
   const { data: order, error: insertErr } = await supabase
     .from('jersey_orders')

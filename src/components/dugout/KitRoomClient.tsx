@@ -181,7 +181,11 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
       if (anySleeveChecked) {
         payload.jersey_size_selected = sleeveSize
       }
-
+       
+      if (addTracks) {
+        payload.tracks_size = tracksSize
+      }
+      
       const res = await fetch('/api/dugout/kit-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
