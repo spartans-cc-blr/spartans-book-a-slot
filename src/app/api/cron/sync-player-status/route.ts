@@ -12,12 +12,12 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const cutoff = thirtyDaysAgo.toISOString().split('T')[0]
+  const sixWeeksAgo = new Date()
+  sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42)
+  const cutoff = sixWeeksAgo.toISOString().split('T')[0]
   const today  = new Date().toISOString().split('T')[0]
 
-  // NEW — any meaningful availability signal in last 30 days
+  // NEW — any meaningful availability signal in last 6 weeks (42 days)
 const { data: activePlayers, error:activeErr } = await supabase
   .from('availability')
   .select('player_id, bookings!inner(game_date)')
