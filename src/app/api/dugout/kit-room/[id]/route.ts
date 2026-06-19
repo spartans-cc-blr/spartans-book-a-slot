@@ -29,6 +29,13 @@ function isValidStatus(value: unknown): value is OrderStatus {
   return typeof value === 'string' && (ALL_STATUSES as string[]).includes(value)
 }
 
+function clampQty(value: unknown, defaultVal = 1): number {
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10)
+  if (!Number.isInteger(n) || n < 1) return defaultVal
+  if (n > 3) return 3
+  return n
+}
+
 // PATCH /api/dugout/kit-room/[id]
 // Status transitions only — field allowlist enforced
 export async function PATCH(
@@ -160,12 +167,15 @@ export async function PUT(
     jersey_size_selected,
     tracks_size,
     jersey_name_input, update_profile_name, notes,
+    jersey_number_input, update_profile_number,
+    half_sleeve_qty, full_sleeve_qty, tracks_qty,
   } = body
 
-  const halfSleeve   = Boolean(half_sleeve)
-  const fullSleeve   = Boolean(full_sleeve)
-  const addTracks    = Boolean(tracks)
-  const doUpdateName = Boolean(update_profile_name)
+  const halfSleeve      = Boolean(half_sleeve)
+  const fullSleeve      = Boolean(full_sleeve)
+  const addTracks       = Boolean(tracks)
+  const doUpdateName    = Boolean(update_profile_name)
+  const doUpdateNumber  = Boolean(update_profile_number)
 
   // At least one item must be selected
   if (!halfSleeve && !fullSleeve && !addTracks) {
@@ -197,6 +207,19 @@ export async function PUT(
       ? jersey_name_input.trim().slice(0, 10)
       : null
 
+  // Validate jersey_number_input if provided
+  const trimmedNumberInput: string | null =
+    typeof jersey_number_input === 'string' && jersey_number_input.trim().length > 0
+      ? jersey_number_input.trim()
+      : null
+
+  if (trimmedNumberInput !== null && !/^[0-9]{1,3}$/.test(trimmedNumberInput)) {
+    return NextResponse.json(
+      { error: 'jersey_number_input must be 1–3 digits (leading zeros allowed)' },
+      { status: 400 }
+    )
+  }
+
   if (notes !== undefined && notes !== null && typeof notes !== 'string') {
     return NextResponse.json({ error: 'notes must be a string' }, { status: 400 })
   }
@@ -205,12 +228,24 @@ export async function PUT(
     ? notes.trim().slice(0, 500)
     : null
 
+  // Validate quantity fields (clamp 1–3)
+  const halfSleeveQty = clampQty(half_sleeve_qty)
+  const fullSleeveQty = clampQty(full_sleeve_qty)
+  const tracksQtyVal  = clampQty(tracks_qty)
+
   // Derive jersey_name_override: set only when input differs from order's jersey_name (case-insensitive)
   const orderName = String(existingOrder.jersey_name).trim()
   const nameOverride: string | null =
     trimmedNameInput !== null &&
     trimmedNameInput.toLowerCase() !== orderName.toLowerCase()
       ? trimmedNameInput
+      : null
+
+  // Derive jersey_number_override: set only when input differs from order's jersey_number
+  const orderNumber = String(existingOrder.jersey_number).trim()
+  const numberOverride: string | null =
+    trimmedNumberInput !== null && trimmedNumberInput !== orderNumber
+      ? trimmedNumberInput
       : null
 
   // If player requested profile name update and name differs, PATCH players first
@@ -228,6 +263,21 @@ export async function PUT(
     }
   }
 
+  // If player requested profile number update and number differs, PATCH players first
+  if (doUpdateNumber && trimmedNumberInput !== null && trimmedNumberInput !== orderNumber) {
+    const { error: patchErr } = await supabase
+      .from('players')
+      .update({ jersey_number: trimmedNumberInput })
+      .eq('id', user.playerId)
+
+    if (patchErr) {
+      return NextResponse.json(
+        { error: 'Failed to update profile number — order not updated' },
+        { status: 500 }
+      )
+    }
+  }
+
   // Derive per-item sizes
   const jerseyHalfSleeveSize: string | null = halfSleeve ? (jersey_size_selected as string) : null
   const jerseyFullSleeveSize: string | null = fullSleeve ? (jersey_size_selected as string) : null
@@ -236,12 +286,16 @@ export async function PUT(
   const { data: updated, error: updateErr } = await supabase
     .from('jersey_orders')
     .update({
-      jersey_size:             null,
-      jersey_half_sleeve_size: jerseyHalfSleeveSize,
-      jersey_full_sleeve_size: jerseyFullSleeveSize,
-      tracks_size:             derivedTracksSize,
-      jersey_name_override:    nameOverride,
-      notes:                   sanitisedNotes,
+      jersey_size:              null,
+      jersey_half_sleeve_size:  jerseyHalfSleeveSize,
+      jersey_full_sleeve_size:  jerseyFullSleeveSize,
+      tracks_size:              derivedTracksSize,
+      jersey_name_override:     nameOverride,
+      jersey_number_override:   numberOverride,
+      jersey_half_sleeve_qty:   halfSleeve ? halfSleeveQty : 1,
+      jersey_full_sleeve_qty:   fullSleeve ? fullSleeveQty : 1,
+      tracks_qty:               addTracks  ? tracksQtyVal  : 1,
+      notes:                    sanitisedNotes,
     })
     .eq('id', orderId)
     .select()

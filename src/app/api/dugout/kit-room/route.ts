@@ -13,6 +13,13 @@ function isValidJerseySize(value: unknown): value is JerseySize {
   return typeof value === 'string' && (VALID_JERSEY_SIZES as readonly string[]).includes(value)
 }
 
+function clampQty(value: unknown, defaultVal = 1): number {
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10)
+  if (!Number.isInteger(n) || n < 1) return defaultVal
+  if (n > 3) return 3
+  return n
+}
+
 // GET /api/dugout/kit-room
 // Player fetches their own jersey orders + current batch date
 export async function GET(req: NextRequest) {
@@ -60,16 +67,19 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
 
   const {
-  half_sleeve, full_sleeve, tracks,
-  jersey_size_selected,
-  tracks_size,
-  jersey_name_input, update_profile_name, notes,
+    half_sleeve, full_sleeve, tracks,
+    jersey_size_selected,
+    tracks_size,
+    jersey_name_input, update_profile_name, notes,
+    jersey_number_input, update_profile_number,
+    half_sleeve_qty, full_sleeve_qty, tracks_qty,
   } = body
 
-  const halfSleeve        = Boolean(half_sleeve)
-  const fullSleeve        = Boolean(full_sleeve)
-  const addTracks         = Boolean(tracks)
-  const doUpdateName      = Boolean(update_profile_name)
+  const halfSleeve          = Boolean(half_sleeve)
+  const fullSleeve          = Boolean(full_sleeve)
+  const addTracks           = Boolean(tracks)
+  const doUpdateName        = Boolean(update_profile_name)
+  const doUpdateNumber      = Boolean(update_profile_number)
 
   // At least one item must be selected
   if (!halfSleeve && !fullSleeve && !addTracks) {
@@ -104,6 +114,19 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // Validate jersey_number_input if provided
+  const trimmedNumberInput: string | null =
+    typeof jersey_number_input === 'string' && jersey_number_input.trim().length > 0
+      ? jersey_number_input.trim()
+      : null
+
+  if (trimmedNumberInput !== null && !/^[0-9]{1,3}$/.test(trimmedNumberInput)) {
+    return NextResponse.json(
+      { error: 'jersey_number_input must be 1–3 digits (leading zeros allowed)' },
+      { status: 400 }
+    )
+  }
+
   if (notes !== undefined && notes !== null && typeof notes !== 'string') {
     return NextResponse.json({ error: 'notes must be a string' }, { status: 400 })
   }
@@ -111,6 +134,11 @@ export async function POST(req: NextRequest) {
   const sanitisedNotes: string | null = typeof notes === 'string' && notes.trim().length > 0
     ? notes.trim().slice(0, 500)
     : null
+
+  // Validate quantity fields (clamp 1–3)
+  const halfSleeveQty = clampQty(half_sleeve_qty)
+  const fullSleeveQty = clampQty(full_sleeve_qty)
+  const tracksQtyVal  = clampQty(tracks_qty)
 
   const supabase = createServiceClient()
 
@@ -159,6 +187,13 @@ export async function POST(req: NextRequest) {
       ? trimmedNameInput
       : null
 
+  // Derive jersey_number_override: set only when input differs from profile number
+  const profileNumber = String(playerRow.jersey_number).trim()
+  const numberOverride: string | null =
+    trimmedNumberInput !== null && trimmedNumberInput !== profileNumber
+      ? trimmedNumberInput
+      : null
+
   // If player requested profile name update and name differs, PATCH players first
   if (doUpdateName && trimmedNameInput !== null && trimmedNameInput.toLowerCase() !== profileName.toLowerCase()) {
     const { error: patchErr } = await supabase
@@ -169,6 +204,21 @@ export async function POST(req: NextRequest) {
     if (patchErr) {
       return NextResponse.json(
         { error: 'Failed to update profile name — order not placed' },
+        { status: 500 }
+      )
+    }
+  }
+
+  // If player requested profile number update and number differs, PATCH players first
+  if (doUpdateNumber && trimmedNumberInput !== null && trimmedNumberInput !== profileNumber) {
+    const { error: patchErr } = await supabase
+      .from('players')
+      .update({ jersey_number: trimmedNumberInput })
+      .eq('id', player.playerId)
+
+    if (patchErr) {
+      return NextResponse.json(
+        { error: 'Failed to update profile number — order not placed' },
         { status: 500 }
       )
     }
@@ -192,6 +242,10 @@ export async function POST(req: NextRequest) {
       jersey_full_sleeve_size:  jerseyFullSleeveSize,
       tracks_size:              tracksSize,
       jersey_name_override:     nameOverride,
+      jersey_number_override:   numberOverride,
+      jersey_half_sleeve_qty:   halfSleeve ? halfSleeveQty : 1,
+      jersey_full_sleeve_qty:   fullSleeve ? fullSleeveQty : 1,
+      tracks_qty:               addTracks  ? tracksQtyVal  : 1,
       notes:                    sanitisedNotes,
       status:                   'pending',
     })

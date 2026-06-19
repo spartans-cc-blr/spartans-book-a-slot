@@ -14,6 +14,10 @@ type Order = {
   jersey_full_sleeve_size: string | null
   tracks_size: string | null
   jersey_name_override: string | null
+  jersey_number_override: string | null
+  jersey_half_sleeve_qty: number
+  jersey_full_sleeve_qty: number
+  tracks_qty: number
   notes: string | null
   status: OrderStatus
   created_at: string
@@ -50,6 +54,34 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function QtyCounter({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 ml-2">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(1, value - 1))}
+        className="font-rajdhani text-sm border border-[#D4C9B0] rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] transition-colors"
+      >
+        −
+      </button>
+      <span className="font-rajdhani text-sm w-4 text-center">{value}</span>
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(3, value + 1))}
+        className="font-rajdhani text-sm border border-[#D4C9B0] rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] transition-colors"
+      >
+        +
+      </button>
+    </span>
+  )
+}
+
 function OrderItems({ order }: { order: Order }) {
   const isLegacy = order.jersey_size !== null && order.jersey_size !== undefined
 
@@ -66,17 +98,29 @@ function OrderItems({ order }: { order: Order }) {
     <div className="flex flex-col gap-0.5">
       {order.jersey_half_sleeve_size && (
         <p className="font-rajdhani text-stone-700 text-sm">
-          Half Sleeve: <span className="font-semibold">{order.jersey_half_sleeve_size}</span>
+          Half Sleeve:{' '}
+          <span className="font-semibold">
+            {order.jersey_half_sleeve_size}
+            {(order.jersey_half_sleeve_qty ?? 1) > 1 ? ` × ${order.jersey_half_sleeve_qty}` : ''}
+          </span>
         </p>
       )}
       {order.jersey_full_sleeve_size && (
         <p className="font-rajdhani text-stone-700 text-sm">
-          Full Sleeve: <span className="font-semibold">{order.jersey_full_sleeve_size}</span>
+          Full Sleeve:{' '}
+          <span className="font-semibold">
+            {order.jersey_full_sleeve_size}
+            {(order.jersey_full_sleeve_qty ?? 1) > 1 ? ` × ${order.jersey_full_sleeve_qty}` : ''}
+          </span>
         </p>
       )}
       {order.tracks_size && (
         <p className="font-rajdhani text-stone-700 text-sm">
-          Tracks: <span className="font-semibold">{order.tracks_size}</span>
+          Tracks:{' '}
+          <span className="font-semibold">
+            {order.tracks_size}
+            {(order.tracks_qty ?? 1) > 1 ? ` × ${order.tracks_qty}` : ''}
+          </span>
         </p>
       )}
     </div>
@@ -86,8 +130,10 @@ function OrderItems({ order }: { order: Order }) {
 export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isExpelled }: Props) {
   const router = useRouter()
 
-  const [nameInput, setNameInput]         = useState<string>(jerseyName ?? '')
+  const [nameInput, setNameInput]                 = useState<string>(jerseyName ?? '')
   const [updateProfileName, setUpdateProfileName] = useState(false)
+  const [numberInput, setNumberInput]             = useState<string>(jerseyNumber ?? '')
+  const [updateProfileNumber, setUpdateProfileNumber] = useState(false)
 
   const [halfSleeve, setHalfSleeve]       = useState(false)
   const [fullSleeve, setFullSleeve]       = useState(false)
@@ -95,6 +141,10 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
   const [addTracks, setAddTracks]         = useState(false)
   const [tracksSize, setTracksSize]       = useState<string>('M')
+
+  const [halfSleeveQty, setHalfSleeveQty] = useState(1)
+  const [fullSleeveQty, setFullSleeveQty] = useState(1)
+  const [tracksQty, setTracksQty]         = useState(1)
 
   const [notes, setNotes]                 = useState<string>('')
   const [submitting, setSubmitting]       = useState(false)
@@ -105,19 +155,25 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
   const [confirmCancel, setConfirmCancel] = useState(false)
 
   // Edit mode state
-  const [editMode, setEditMode]               = useState(false)
-  const [editHalf, setEditHalf]               = useState(false)
-  const [editFull, setEditFull]               = useState(false)
-  const [editTracks, setEditTracks]           = useState(false)
-  const [editSleeveSize, setEditSleeveSize]   = useState('M')
-  const [editTracksSize, setEditTracksSize]   = useState('M')
-  const [editName, setEditName]               = useState('')
+  const [editMode, setEditMode]                   = useState(false)
+  const [editHalf, setEditHalf]                   = useState(false)
+  const [editFull, setEditFull]                   = useState(false)
+  const [editTracks, setEditTracks]               = useState(false)
+  const [editSleeveSize, setEditSleeveSize]       = useState('M')
+  const [editTracksSize, setEditTracksSize]       = useState('M')
+  const [editName, setEditName]                   = useState('')
   const [editUpdateProfile, setEditUpdateProfile] = useState(false)
-  const [editNotes, setEditNotes]             = useState('')
-  const [editSubmitting, setEditSubmitting]   = useState(false)
-  const [editError, setEditError]             = useState<string | null>(null)
+  const [editNumber, setEditNumber]               = useState('')
+  const [editUpdateProfileNumber, setEditUpdateProfileNumber] = useState(false)
+  const [editHalfQty, setEditHalfQty]             = useState(1)
+  const [editFullQty, setEditFullQty]             = useState(1)
+  const [editTracksQty, setEditTracksQty]         = useState(1)
+  const [editNotes, setEditNotes]                 = useState('')
+  const [editSubmitting, setEditSubmitting]       = useState(false)
+  const [editError, setEditError]                 = useState<string | null>(null)
 
-  const nameChanged = nameInput.trim().toLowerCase() !== (jerseyName ?? '').toLowerCase()
+  const nameChanged   = nameInput.trim().toLowerCase() !== (jerseyName ?? '').toLowerCase()
+  const numberChanged = numberInput.trim() !== (jerseyNumber ?? '')
   const anySleeveChecked = halfSleeve || fullSleeve
 
   const editAnySleeveChecked = editHalf || editFull
@@ -129,9 +185,13 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
   const pastOrders      = orders.filter(o => o.status === 'received')
   const cancelledOrders = orders.filter(o => o.status === 'cancelled')
 
-  const editNameChanged = editName.trim().toLowerCase() !== (
+  const editNameChanged   = editName.trim().toLowerCase() !== (
     activeOrder?.jersey_name_override ?? activeOrder?.jersey_name ?? ''
   ).toLowerCase()
+
+  const editNumberChanged = editNumber.trim() !== (
+    activeOrder?.jersey_number_override ?? activeOrder?.jersey_number ?? ''
+  )
 
   // Reset confirmation and edit state whenever the active order changes
   useEffect(() => {
@@ -150,8 +210,13 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
     )
     setEditTracksSize(activeOrder.tracks_size ?? 'M')
     setEditName(activeOrder.jersey_name_override ?? activeOrder.jersey_name ?? '')
+    setEditNumber(activeOrder.jersey_number_override ?? activeOrder.jersey_number ?? '')
+    setEditHalfQty(activeOrder.jersey_half_sleeve_qty ?? 1)
+    setEditFullQty(activeOrder.jersey_full_sleeve_qty ?? 1)
+    setEditTracksQty(activeOrder.tracks_qty ?? 1)
     setEditNotes(activeOrder.notes ?? '')
     setEditUpdateProfile(false)
+    setEditUpdateProfileNumber(false)
     setEditError(null)
     setEditMode(true)
   }
@@ -207,12 +272,17 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
     setSubmitting(true)
     try {
       const payload: Record<string, unknown> = {
-        half_sleeve:         halfSleeve,
-        full_sleeve:         fullSleeve,
-        tracks:              addTracks,
-        jersey_name_input:   nameInput.trim(),
-        update_profile_name: updateProfileName,
-        notes:               notes.trim() || undefined,
+        half_sleeve:            halfSleeve,
+        full_sleeve:            fullSleeve,
+        tracks:                 addTracks,
+        jersey_name_input:      nameInput.trim(),
+        update_profile_name:    updateProfileName,
+        jersey_number_input:    numberInput.trim(),
+        update_profile_number:  updateProfileNumber,
+        half_sleeve_qty:        halfSleeve ? halfSleeveQty : 1,
+        full_sleeve_qty:        fullSleeve ? fullSleeveQty : 1,
+        tracks_qty:             addTracks  ? tracksQty     : 1,
+        notes:                  notes.trim() || undefined,
       }
 
       if (anySleeveChecked) {
@@ -255,12 +325,17 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
     setEditSubmitting(true)
     try {
       const payload: Record<string, unknown> = {
-        half_sleeve:         editHalf,
-        full_sleeve:         editFull,
-        tracks:              editTracks,
-        jersey_name_input:   editName.trim(),
-        update_profile_name: editUpdateProfile,
-        notes:               editNotes.trim() || null,
+        half_sleeve:            editHalf,
+        full_sleeve:            editFull,
+        tracks:                 editTracks,
+        jersey_name_input:      editName.trim(),
+        update_profile_name:    editUpdateProfile,
+        jersey_number_input:    editNumber.trim(),
+        update_profile_number:  editUpdateProfileNumber,
+        half_sleeve_qty:        editHalf   ? editHalfQty   : 1,
+        full_sleeve_qty:        editFull   ? editFullQty   : 1,
+        tracks_qty:             editTracks ? editTracksQty : 1,
+        notes:                  editNotes.trim() || null,
       }
 
       if (editAnySleeveChecked) {
@@ -353,6 +428,42 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                 )}
               </div>
 
+              {/* Jersey Number input */}
+              <div className="flex flex-col gap-1">
+                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 flex items-center gap-1">
+                  Jersey Number <span className="text-stone-400 normal-case font-normal tracking-normal">✏️</span>
+                </label>
+                <input
+                  type="text"
+                  value={editNumber}
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3)
+                    setEditNumber(v)
+                    if (!v || v === (activeOrder.jersey_number ?? '')) {
+                      setEditUpdateProfileNumber(false)
+                    }
+                  }}
+                  pattern="[0-9]{1,3}"
+                  maxLength={3}
+                  inputMode="numeric"
+                  className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none w-28"
+                />
+                <span className="font-rajdhani text-xs text-stone-400">
+                  1–3 digits, leading zeros allowed (e.g. 07)
+                </span>
+                {editNumberChanged && (
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={editUpdateProfileNumber}
+                      onChange={e => setEditUpdateProfileNumber(e.target.checked)}
+                      className="rounded"
+                    />
+                    Also update my profile with this number
+                  </label>
+                )}
+              </div>
+
               {/* Apparel selection */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
@@ -367,21 +478,45 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                     Size guide ↗
                   </button>
                 </div>
-                <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
-                  <input type="checkbox" checked={editHalf}
-                    onChange={e => setEditHalf(e.target.checked)} className="rounded" />
-                  Half Sleeve Jersey
-                </label>
-                <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
-                  <input type="checkbox" checked={editFull}
-                    onChange={e => setEditFull(e.target.checked)} className="rounded" />
-                  Full Sleeve Jersey
-                </label>
-                <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
-                  <input type="checkbox" checked={editTracks}
-                    onChange={e => setEditTracks(e.target.checked)} className="rounded" />
-                  Tracks
-                </label>
+                <div className="flex items-center gap-1">
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <input type="checkbox" checked={editHalf}
+                      onChange={e => {
+                        setEditHalf(e.target.checked)
+                        if (!e.target.checked) setEditHalfQty(1)
+                      }} className="rounded" />
+                    Half Sleeve Jersey
+                  </label>
+                  {editHalf && (
+                    <QtyCounter value={editHalfQty} onChange={setEditHalfQty} />
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <input type="checkbox" checked={editFull}
+                      onChange={e => {
+                        setEditFull(e.target.checked)
+                        if (!e.target.checked) setEditFullQty(1)
+                      }} className="rounded" />
+                    Full Sleeve Jersey
+                  </label>
+                  {editFull && (
+                    <QtyCounter value={editFullQty} onChange={setEditFullQty} />
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <input type="checkbox" checked={editTracks}
+                      onChange={e => {
+                        setEditTracks(e.target.checked)
+                        if (!e.target.checked) setEditTracksQty(1)
+                      }} className="rounded" />
+                    Tracks
+                  </label>
+                  {editTracks && (
+                    <QtyCounter value={editTracksQty} onChange={setEditTracksQty} />
+                  )}
+                </div>
                 {editAnySleeveChecked && (
                   <div className="flex flex-col gap-1 mt-1">
                     <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
@@ -451,7 +586,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                     {activeOrder.jersey_name_override ?? activeOrder.jersey_name}
                   </span>
                   <span className="font-rajdhani text-stone-500 text-sm">
-                    #{activeOrder.jersey_number}
+                    #{activeOrder.jersey_number_override ?? activeOrder.jersey_number}
                   </span>
                 </div>
                 <OrderItems order={activeOrder} />
@@ -582,10 +717,40 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                   )}
                 </div>
 
-                {/* Jersey Number (read-only) */}
+                {/* Jersey Number input */}
                 <div className="flex flex-col gap-1">
-                  <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">Jersey Number</span>
-                  <span className="font-rajdhani text-stone-900 text-sm font-semibold">#{jerseyNumber}</span>
+                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 flex items-center gap-1">
+                    Jersey Number <span className="text-stone-400 normal-case font-normal tracking-normal">✏️</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={numberInput}
+                    onChange={e => {
+                      const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3)
+                      setNumberInput(v)
+                      if (!v || v === (jerseyNumber ?? '')) {
+                        setUpdateProfileNumber(false)
+                      }
+                    }}
+                    pattern="[0-9]{1,3}"
+                    maxLength={3}
+                    inputMode="numeric"
+                    className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none w-28"
+                  />
+                  <span className="font-rajdhani text-xs text-stone-400">
+                    1–3 digits, leading zeros allowed (e.g. 07)
+                  </span>
+                  {numberChanged && (
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer mt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={updateProfileNumber}
+                        onChange={e => setUpdateProfileNumber(e.target.checked)}
+                        className="rounded"
+                      />
+                      Also update my profile with this number
+                    </label>
+                  )}
                 </div>
 
                 {/* Apparel selection */}
@@ -602,21 +767,45 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                       Size guide ↗
                     </button>
                   </div>
-                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
-                    <input type="checkbox" checked={halfSleeve}
-                      onChange={e => setHalfSleeve(e.target.checked)} className="rounded" />
-                    Half Sleeve Jersey
-                  </label>
-                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
-                    <input type="checkbox" checked={fullSleeve}
-                      onChange={e => setFullSleeve(e.target.checked)} className="rounded" />
-                    Full Sleeve Jersey
-                  </label>
-                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
-                    <input type="checkbox" checked={addTracks}
-                      onChange={e => setAddTracks(e.target.checked)} className="rounded" />
-                    Tracks
-                  </label>
+                  <div className="flex items-center gap-1">
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                      <input type="checkbox" checked={halfSleeve}
+                        onChange={e => {
+                          setHalfSleeve(e.target.checked)
+                          if (!e.target.checked) setHalfSleeveQty(1)
+                        }} className="rounded" />
+                      Half Sleeve Jersey
+                    </label>
+                    {halfSleeve && (
+                      <QtyCounter value={halfSleeveQty} onChange={setHalfSleeveQty} />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                      <input type="checkbox" checked={fullSleeve}
+                        onChange={e => {
+                          setFullSleeve(e.target.checked)
+                          if (!e.target.checked) setFullSleeveQty(1)
+                        }} className="rounded" />
+                      Full Sleeve Jersey
+                    </label>
+                    {fullSleeve && (
+                      <QtyCounter value={fullSleeveQty} onChange={setFullSleeveQty} />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                      <input type="checkbox" checked={addTracks}
+                        onChange={e => {
+                          setAddTracks(e.target.checked)
+                          if (!e.target.checked) setTracksQty(1)
+                        }} className="rounded" />
+                      Tracks
+                    </label>
+                    {addTracks && (
+                      <QtyCounter value={tracksQty} onChange={setTracksQty} />
+                    )}
+                  </div>
                   {anySleeveChecked && (
                     <div className="flex flex-col gap-1 mt-1">
                       <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
@@ -686,7 +875,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
               {pastOrders.map(o => (
                 <div key={o.id} className="flex flex-col gap-0.5">
                   <p className="font-rajdhani text-stone-600 text-sm font-semibold">
-                    {o.jersey_name_override ?? o.jersey_name} · #{o.jersey_number} · {formatDate(o.created_at)}
+                    {o.jersey_name_override ?? o.jersey_name} · #{o.jersey_number_override ?? o.jersey_number} · {formatDate(o.created_at)}
                   </p>
                   <OrderItems order={o} />
                 </div>
@@ -711,7 +900,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                 <div key={o.id} className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-rajdhani text-stone-500 text-sm">
-                      {o.jersey_name_override ?? o.jersey_name} · #{o.jersey_number} · {formatDate(o.created_at)}
+                      {o.jersey_name_override ?? o.jersey_name} · #{o.jersey_number_override ?? o.jersey_number} · {formatDate(o.created_at)}
                     </p>
                     <span className={`font-rajdhani text-xs font-semibold px-2.5 py-0.5 rounded ${STATUS_BADGE.cancelled}`}>
                       {STATUS_LABELS.cancelled}

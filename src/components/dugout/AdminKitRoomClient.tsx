@@ -14,6 +14,10 @@ type AdminOrder = {
   jersey_full_sleeve_size: string | null
   tracks_size: string | null
   jersey_name_override: string | null
+  jersey_number_override: string | null
+  jersey_half_sleeve_qty: number
+  jersey_full_sleeve_qty: number
+  tracks_qty: number
   notes: string | null
   status: OrderStatus
   created_at: string
@@ -84,15 +88,30 @@ function PlayerLink({ name, cricHeroesUrl }: { name: string; cricHeroesUrl: stri
   return <span className="font-rajdhani text-sm text-stone-700 font-semibold">{name}</span>
 }
 
-function sizeCounts(orders: AdminOrder[], field: 'jersey_half_sleeve_size' | 'jersey_full_sleeve_size' | 'tracks_size'): string {
+// Returns size×qty counts accounting for qty field
+function sizeCountsWithQty(
+  orders: AdminOrder[],
+  sizeField: 'jersey_half_sleeve_size' | 'jersey_full_sleeve_size' | 'tracks_size',
+  qtyField: 'jersey_half_sleeve_qty' | 'jersey_full_sleeve_qty' | 'tracks_qty'
+): { parts: string[]; total: number } {
   const counts: Record<string, number> = {}
+  let total = 0
   for (const o of orders) {
-    const val = o[field]
-    if (val) counts[val] = (counts[val] ?? 0) + 1
+    const val = o[sizeField]
+    if (val) {
+      const qty = o[qtyField] ?? 1
+      counts[val] = (counts[val] ?? 0) + qty
+      total += qty
+    }
   }
   const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
   const parts = sizes.filter(s => counts[s]).map(s => `${s}×${counts[s]}`)
-  return parts.length > 0 ? parts.join(', ') : 'None'
+  return { parts, total }
+}
+
+function formatSizeCell(size: string | null, qty: number): string {
+  if (!size) return '—'
+  return qty > 1 ? `${size} × ${qty}` : size
 }
 
 export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
@@ -105,7 +124,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
   const [actionLoading, setActionLoading]       = useState<string | null>(null)
   const [copied, setCopied]                     = useState(false)
   const [confirmCancelId, setConfirmCancelId]   = useState<string | null>(null)
-  
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
   () => new Set(orders.filter(o => o.status === 'pending').map(o => o.id))
   )
@@ -238,14 +257,22 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
   }
 
   function handleDownloadCsv() {
-    const header = ['S.No', 'Player Name', 'Jersey Name', 'Jersey Number', 'Half Sleeve', 'Full Sleeve', 'Tracks', 'Notes']
-    const rows = actionableOrders.map(o => [
+    const header = [
+      'S.No', 'Player Name', 'Jersey Name', 'Jersey Number',
+      'Half Sleeve', 'Half Qty', 'Full Sleeve', 'Full Qty',
+      'Tracks', 'Tracks Qty', 'Notes',
+    ]
+    const rows = actionableOrders.map((o, i) => [
+      String(i + 1),
       o.player_name,
       o.jersey_name_override ?? o.jersey_name,
-      o.jersey_number,
+      o.jersey_number_override ?? o.jersey_number,
       o.jersey_half_sleeve_size ?? '',
+      o.jersey_half_sleeve_size ? String(o.jersey_half_sleeve_qty ?? 1) : '',
       o.jersey_full_sleeve_size ?? '',
+      o.jersey_full_sleeve_size ? String(o.jersey_full_sleeve_qty ?? 1) : '',
       o.tracks_size ?? '',
+      o.tracks_size ? String(o.tracks_qty ?? 1) : '',
       o.notes ?? '',
     ])
 
@@ -262,14 +289,17 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
   }
 
   async function handleCopySummary() {
-    const total = actionableOrders.length
-    const halfLine   = sizeCounts(actionableOrders, 'jersey_half_sleeve_size')
-    const fullLine   = sizeCounts(actionableOrders, 'jersey_full_sleeve_size')
-    const tracksLine = sizeCounts(actionableOrders, 'tracks_size')
+    const half   = sizeCountsWithQty(actionableOrders, 'jersey_half_sleeve_size', 'jersey_half_sleeve_qty')
+    const full   = sizeCountsWithQty(actionableOrders, 'jersey_full_sleeve_size', 'jersey_full_sleeve_qty')
+    const tracks = sizeCountsWithQty(actionableOrders, 'tracks_size', 'tracks_qty')
+
+    const halfLine   = half.parts.length   > 0 ? `${half.parts.join(', ')} (${half.total} total)`   : 'None'
+    const fullLine   = full.parts.length   > 0 ? `${full.parts.join(', ')} (${full.total} total)`   : 'None'
+    const tracksLine = tracks.parts.length > 0 ? `${tracks.parts.join(', ')} (${tracks.total} total)` : 'None'
 
     const text = [
       `Spartans Kit Order — ${formatSummaryDate()}`,
-      `Total orders: ${total}`,
+      `Total orders: ${actionableOrders.length}`,
       '',
       'Jerseys:',
       `  Half Sleeve: ${halfLine}`,
@@ -348,7 +378,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
           </button>
         </div>
       )}
-      
+
       {/* Filter tabs */}
       <div className="flex flex-wrap gap-2">
         {TABS.map(tab => (
@@ -441,7 +471,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                         {order.jersey_name_override ?? order.jersey_name}
                       </td>
                       <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
-                        {order.jersey_number}
+                        {order.jersey_number_override ?? order.jersey_number}
                       </td>
                       {isLegacy ? (
                         <td
@@ -454,13 +484,13 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                       ) : (
                         <>
                           <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
-                            {order.jersey_half_sleeve_size ?? '—'}
+                            {formatSizeCell(order.jersey_half_sleeve_size, order.jersey_half_sleeve_qty ?? 1)}
                           </td>
                           <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
-                            {order.jersey_full_sleeve_size ?? '—'}
+                            {formatSizeCell(order.jersey_full_sleeve_size, order.jersey_full_sleeve_qty ?? 1)}
                           </td>
                           <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
-                            {order.tracks_size ?? '—'}
+                            {formatSizeCell(order.tracks_size, order.tracks_qty ?? 1)}
                           </td>
                         </>
                       )}
