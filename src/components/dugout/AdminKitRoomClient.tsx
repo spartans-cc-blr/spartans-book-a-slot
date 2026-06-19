@@ -105,6 +105,11 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
   const [actionLoading, setActionLoading]       = useState<string | null>(null)
   const [copied, setCopied]                     = useState(false)
   const [confirmCancelId, setConfirmCancelId]   = useState<string | null>(null)
+  
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+  () => new Set(orders.filter(o => o.status === 'pending').map(o => o.id))
+  )
+  const [bulkSubmitting, setBulkSubmitting] = useState(false)
 
   const filtered = activeTab === 'all'
     ? orders
@@ -112,6 +117,11 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
 
   // Cancelled orders are hidden from admin view entirely
   const visibleOrders = filtered.filter(o => o.status !== 'cancelled')
+
+  const pendingOrders = visibleOrders.filter(o => o.status === 'pending')
+  const allPendingSelected = pendingOrders.length > 0 &&
+    pendingOrders.every(o => selectedIds.has(o.id))
+  const selectedCount = pendingOrders.filter(o => selectedIds.has(o.id)).length
 
   const actionableOrders = orders.filter(o => o.status === 'pending' || o.status === 'submitted')
 
@@ -180,6 +190,51 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
     } finally {
       setActionLoading(null)
     }
+  }
+
+  async function handleBulkSubmit() {
+  const toSubmit = pendingOrders.filter(o => selectedIds.has(o.id))
+  if (toSubmit.length === 0) return
+  setBulkSubmitting(true)
+  try {
+    await Promise.all(toSubmit.map(o =>
+      fetch(`/api/dugout/kit-room/${o.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'submitted' }),
+      })
+    ))
+    setSelectedIds(new Set())
+    router.refresh()
+  } catch {
+    console.error('Bulk submit failed')
+  } finally {
+    setBulkSubmitting(false)
+  }
+}
+
+  function toggleSelectAll() {
+    if (allPendingSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        pendingOrders.forEach(o => next.delete(o.id))
+        return next
+      })
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        pendingOrders.forEach(o => next.add(o.id))
+        return next
+      })
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
   function handleDownloadCsv() {
@@ -269,9 +324,16 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
         </div>
       )}
 
-      {/* CSV + Summary actions (admin only) */}
+      {/* CSV + Summary + Bulk Submit actions (admin only) */}
       {isAdmin && (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          <button
+            onClick={handleBulkSubmit}
+            disabled={bulkSubmitting || selectedCount === 0}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-rajdhani font-bold px-4 py-2 rounded text-sm disabled:opacity-60 transition-colors"
+          >
+            {bulkSubmitting ? 'Submitting…' : `Submit Selected (${selectedCount})`}
+          </button>
           <button
             onClick={handleDownloadCsv}
             className="bg-parchment-3 border border-[#D4C9B0] text-stone-700 font-rajdhani font-bold px-4 py-2 rounded text-sm hover:bg-[#D4C9B0] transition-colors"
@@ -286,7 +348,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
           </button>
         </div>
       )}
-
+      
       {/* Filter tabs */}
       <div className="flex flex-wrap gap-2">
         {TABS.map(tab => (
@@ -310,32 +372,32 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
           <table className="w-full min-w-[800px]">
             <thead>
               <tr className="bg-parchment-3">
-                {[
-                  'Player',
-                  'Jersey Name',
-                  '#',
-                  'Half',
-                  'Full',
-                  'Tracks',
-                  'Notes',
-                  'Status',
-                  'Date',
-                  ...(isAdmin ? ['Actions'] : []),
-                ].map(col => (
-                  <th
-                    key={col}
-                    className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap"
-                  >
+              {isAdmin && (
+                <th className="px-4 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allPendingSelected}
+                    onChange={toggleSelectAll}
+                    className="rounded accent-amber-600"
+                  />
+                </th>
+              )}
+              {['Player','Jersey Name','#','Half','Full','Tracks','Notes','Status','Date','Actions']
+                .filter(col => isAdmin || col !== 'Actions')
+                .map(col => (
+                  <th key={col}
+                    className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap">
                     {col}
                   </th>
-                ))}
-              </tr>
+                ))
+              }
+            </tr>
             </thead>
             <tbody>
               {visibleOrders.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 10 : 9}
+                    colSpan={isAdmin ? 11 : 9}
                     className="font-rajdhani text-stone-500 text-sm px-4 py-6 text-center"
                   >
                     No orders found.
@@ -349,6 +411,18 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                       key={order.id}
                       className={`border-t border-[#D4C9B0] ${i % 2 === 1 ? 'bg-parchment' : ''}`}
                     >
+                      {isAdmin && (
+                        <td className="px-4 py-3 w-8">
+                          {order.status === 'pending' && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(order.id)}
+                              onChange={() => toggleSelect(order.id)}
+                              className="rounded accent-amber-600"
+                            />
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <PlayerLink
                           name={order.player_name}
@@ -396,15 +470,6 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                       {isAdmin && (
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex flex-col gap-1.5">
-                            {order.status === 'pending' && (
-                              <button
-                                onClick={() => handleStatusChange(order.id, 'submitted')}
-                                disabled={actionLoading === order.id}
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-rajdhani font-bold text-xs px-3 py-1.5 rounded disabled:opacity-60 transition-colors"
-                              >
-                                {actionLoading === order.id ? '…' : 'Submit'}
-                              </button>
-                            )}
                             {order.status === 'submitted' && (
                               <button
                                 onClick={() => handleStatusChange(order.id, 'delivered')}
@@ -418,26 +483,20 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                               confirmCancelId === order.id ? (
                                 <span className="font-rajdhani text-xs text-stone-600">
                                   Sure?{' '}
-                                  <button
-                                    onClick={() => handleStatusChange(order.id, 'cancelled')}
+                                  <button onClick={() => handleStatusChange(order.id, 'cancelled')}
                                     disabled={actionLoading === order.id}
-                                    className="text-red-600 font-semibold hover:underline disabled:opacity-60"
-                                  >
+                                    className="text-red-600 font-semibold hover:underline disabled:opacity-60">
                                     Yes
                                   </button>
                                   {' '}
-                                  <button
-                                    onClick={() => setConfirmCancelId(null)}
-                                    className="text-stone-500 hover:underline"
-                                  >
+                                  <button onClick={() => setConfirmCancelId(null)}
+                                    className="text-stone-500 hover:underline">
                                     No
                                   </button>
                                 </span>
                               ) : (
-                                <button
-                                  onClick={() => setConfirmCancelId(order.id)}
-                                  className="font-rajdhani text-xs text-red-500 hover:underline text-left"
-                                >
+                                <button onClick={() => setConfirmCancelId(order.id)}
+                                  className="font-rajdhani text-xs text-red-500 hover:underline text-left">
                                   Cancel
                                 </button>
                               )
