@@ -382,21 +382,19 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                   />
                 </th>
               )}
-              {['Player','Jersey Name','#','Half','Full','Tracks','Notes','Status','Date','Actions']
+              {['S.No', 'Player', 'Jersey Name', '#', 'Half', 'Full', 'Tracks', 'Notes', 'Status', 'Date', 'Actions']
                 .filter(col => isAdmin || col !== 'Actions')
-                .map(col => (
-                  {col === 'Player' ? (
-                      <th key={col} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap sticky left-0 bg-parchment-3 z-10">
-                        {col}
-                      </th>
-                    ) : (
-                      <th key={col} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap">
-                        {col}
-                      </th>
-                    )}
-                    {col}
-                  </th>
-                ))
+                .map(col =>
+                  col === 'Player' ? (
+                    <th key={col} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap sticky left-0 bg-parchment-3 z-10">
+                      {col}
+                    </th>
+                  ) : (
+                    <th key={col} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap">
+                      {col}
+                    </th>
+                  )
+                )
               }
             </tr>
             </thead>
