@@ -8,7 +8,7 @@ type OrderStatus = 'pending' | 'submitted' | 'delivered' | 'received' | 'cancell
 type Order = {
   id: string
   jersey_name: string
-  jersey_number: number
+  jersey_number: string
   jersey_size: string | null
   jersey_half_sleeve_size: string | null
   jersey_full_sleeve_size: string | null
@@ -23,7 +23,7 @@ type Props = {
   orders: Order[]
   batchDate: string | null
   jerseyName: string | null
-  jerseyNumber: number | null
+  jerseyNumber: string | null
   isExpelled: boolean
 }
 
@@ -309,7 +309,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
       {/* Place new order form */}
       {!isExpelled && !activeOrder && (
         <>
-          {(!jerseyName || jerseyNumber === null || jerseyNumber === undefined) ? (
+          {(!jerseyName || !jerseyNumber || jerseyNumber.trim() === '') ? (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="font-rajdhani text-stone-700 text-sm">
                 Complete your jersey details on your profile before placing an order.{' '}

@@ -72,6 +72,18 @@ export async function PATCH(
 
   const body = await req.json()
 
+  // Validate jersey_number if present — must be 1–3 digits string, leading zeros allowed
+  if (body.jersey_number !== undefined && body.jersey_number !== null) {
+    const jn = String(body.jersey_number)
+    if (!/^[0-9]{1,3}$/.test(jn)) {
+      return NextResponse.json(
+        { error: 'Jersey number must be 1–3 digits (e.g. 1, 01, 007)' },
+        { status: 400 }
+      )
+    }
+    body.jersey_number = jn
+  }
+
   // If not admin, strip any fields not in the allowed set
   const updates: Record<string, any> = {}
   for (const [key, value] of Object.entries(body)) {

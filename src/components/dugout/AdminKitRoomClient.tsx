@@ -8,7 +8,7 @@ type OrderStatus = 'pending' | 'submitted' | 'delivered' | 'received' | 'cancell
 type AdminOrder = {
   id: string
   jersey_name: string
-  jersey_number: number
+  jersey_number: string
   jersey_size: string | null
   jersey_half_sleeve_size: string | null
   jersey_full_sleeve_size: string | null
@@ -242,7 +242,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
     const rows = actionableOrders.map(o => [
       o.player_name,
       o.jersey_name_override ?? o.jersey_name,
-      String(o.jersey_number),
+      o.jersey_number,
       o.jersey_half_sleeve_size ?? '',
       o.jersey_full_sleeve_size ?? '',
       o.tracks_size ?? '',

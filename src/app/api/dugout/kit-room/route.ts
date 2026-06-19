@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  if (playerRow.jersey_number === null || playerRow.jersey_number === undefined) {
+  if (!playerRow.jersey_number || String(playerRow.jersey_number).trim() === '') {
     return NextResponse.json(
       { error: 'Complete your jersey details on your profile before placing an order' },
       { status: 400 }

@@ -38,7 +38,7 @@ type PlayerProfile = {
   whatsapp: string | null
   dob: string | null
   jersey_name: string | null
-  jersey_number: number | null
+  jersey_number: string | null
   blood_group: string | null
   primary_skill: string | null
   secondary_skill: string | null
@@ -99,7 +99,7 @@ export default function ProfilePage() {
         setWhatsapp(p.whatsapp ?? '')
         setDob(p.dob ?? '')
         setJerseyName(p.jersey_name ?? '')
-        setJerseyNumber(p.jersey_number?.toString() ?? '')
+        setJerseyNumber(p.jersey_number ?? '')
         setBloodGroup(p.blood_group ?? '')
         setPrimarySkill(p.primary_skill ?? '')
         setSecondarySkill(p.secondary_skill ?? '')
@@ -156,7 +156,7 @@ export default function ProfilePage() {
         whatsapp:        whatsapp.trim() || null,
         dob:             dob || null,
         jersey_name:     jerseyName.trim() || null,
-        jersey_number:   jerseyNumber ? parseInt(jerseyNumber) : null,
+        jersey_number:   jerseyNumber.trim() || null,
         blood_group:     bloodGroup || null,
         primary_skill:   primarySkill || null,
         secondary_skill: secondarySkill || null,
@@ -441,12 +441,13 @@ export default function ProfilePage() {
             <div>
               <label className="form-label">Jersey Number</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]{1,3}"
+                maxLength={3}
                 value={jerseyNumber}
                 onChange={e => setJerseyNumber(e.target.value)}
-                placeholder="e.g. 7"
-                min={0}
-                max={999}
+                placeholder="e.g. 7, 07, or 007"
                 className="form-input"
               />
             </div>
