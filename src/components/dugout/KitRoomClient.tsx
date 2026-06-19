@@ -433,7 +433,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || (!halfSleeve && !fullSleeve && !addTracks)}
                   className="self-start bg-amber-600 hover:bg-amber-700 text-white font-rajdhani font-bold px-6 py-2 rounded disabled:opacity-60 transition-colors"
                 >
                   {submitting ? 'Placing Order…' : 'Place Order'}
