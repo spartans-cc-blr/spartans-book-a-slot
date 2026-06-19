@@ -90,6 +90,11 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors border-b border-ink-5">
                     👤 Players
                   </Link>
+                  <Link href="/admin/dugout/kit-room"
+                    onClick={() => setGcOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors border-b border-ink-5">
+                    🥎 Store Orders
+                  </Link>
                   <GenerateInviteItem />
                 </div>
               )}
@@ -249,6 +254,11 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                 className={`font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4
                   ${activePage === 'gc-players' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
                 👤 Players
+              </Link>
+              <Link href="/admin/dugout/kit-room" onClick={() => setOpen(false)}
+                className={`font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4
+                  ${activePage === 'dugout' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
+                🥎 Store Orders
               </Link>
               <GenerateInviteItem mobile onClose={() => setOpen(false)} />
             </>
