@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { KitRoomClient } from '@/components/dugout/KitRoomClient'
+import Image from 'next/image'
 
 export const revalidate = 0
 
@@ -45,20 +46,17 @@ export default async function KitRoomPage() {
       <SiteNav activePage="dugout" />
       <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
         <div className="max-w-2xl mx-auto">
-          <div className="w-full rounded-xl mb-6 overflow-hidden" style={{ height: '210px' }}>
-          <img
-            src="/images/jersey-collage.png"
-            alt="OUR HERITAGE. OUR PRIDE. — The 2024 Spartans Club Collection"
-            className="w-full h-full object-cover"
-            style={{ objectPosition: 'center 30%' }}
-          />
-        </div>
-            <div className="absolute inset-0 bg-black/20 rounded-xl" />
-            <div className="absolute bottom-0 left-0 right-0 px-5 py-4">
-              <h1 className="font-cinzel font-bold text-2xl text-white drop-shadow-md">
-                Spartans Store
-              </h1>
-            </div>
+          {/* Jersey collage hero */}
+          <div className="w-full rounded-xl mb-6 overflow-hidden" style={{ height: '220px' }}>
+            <Image
+              src="/images/jersey-collage.png"
+              alt="OUR HERITAGE. OUR PRIDE. — The 2024 Spartans Club Collection"
+              width={1200}
+              height={220}
+              className="w-full h-full object-cover"
+              style={{ objectPosition: 'center 30%' }}
+              priority
+            />
           </div>
           <KitRoomClient
             orders={orders}
