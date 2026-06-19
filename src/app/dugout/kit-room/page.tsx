@@ -54,7 +54,7 @@ export default async function KitRoomPage() {
               width={1200}
               height={220}
               className="w-full h-full object-cover"
-              style={{ objectPosition: 'center 30%' }}
+              style={{ objectPosition: 'center 20%' }}
               priority
             />
           </div>
