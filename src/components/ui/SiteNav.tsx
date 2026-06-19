@@ -91,7 +91,7 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors border-b border-ink-5">
                     👤 Players
                   </Link>
-                  <Link href="/admin/dugout/kit-room"
+                  <Link href="/dugout/store-orders"
                     onClick={() => setGcOpen(false)}
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors border-b border-ink-5">
                     <JerseyIcon colour="gold" size={16} />
@@ -257,7 +257,7 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                   ${activePage === 'gc-players' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
                 👤 Players
               </Link>
-              <Link href="/admin/dugout/kit-room" onClick={() => setOpen(false)}
+              <Link href="/dugout/store-orders" onClick={() => setOpen(false)}
                 className={`flex items-center gap-2 font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4
                   ${activePage === 'dugout' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
                 <JerseyIcon colour="gold" size={16} />
