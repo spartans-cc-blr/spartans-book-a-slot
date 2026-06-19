@@ -45,7 +45,20 @@ export default async function KitRoomPage() {
       <SiteNav activePage="dugout" />
       <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
         <div className="max-w-2xl mx-auto">
-          <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Spartans Store</h1>
+          {/* Jersey collage hero */}
+          <div className="w-full rounded-xl mb-6 overflow-hidden relative" style={{ height: '200px' }}>
+            <img
+              src="/images/jersey-collage.webp"
+              alt="Spartans players in jersey"
+              className="w-full h-full object-cover object-bottom"
+            />
+            <div className="absolute inset-0 bg-black/20 rounded-xl" />
+            <div className="absolute bottom-0 left-0 right-0 px-5 py-4">
+              <h1 className="font-cinzel font-bold text-2xl text-white drop-shadow-md">
+                Spartans Store
+              </h1>
+            </div>
+          </div>
           <KitRoomClient
             orders={orders}
             batchDate={batchDate}
