@@ -446,21 +446,14 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                       key={order.id}
                       className={`border-t border-[#D4C9B0] ${i % 2 === 1 ? 'bg-parchment' : ''}`}
                     >
-                      <td className="px-4 py-3 font-rajdhani text-xs text-stone-400 whitespace-nowrap">
-                        {i + 1}
-                      </td>
                       {isAdmin && (
-                        <td className="px-4 py-3 w-8">
-                          {order.status === 'pending' && (
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(order.id)}
-                              onChange={() => toggleSelect(order.id)}
-                              className="rounded accent-amber-600"
-                            />
-                          )}
-                        </td>
-                      )}
+  <td className="px-4 py-3 w-8">
+    <input type="checkbox" ... />
+  </td>
+)}
+<td className="px-4 py-3 font-rajdhani text-xs text-stone-400 whitespace-nowrap w-10">
+  {i + 1}
+</td>
                       <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-parchment z-10 border-r border-[#D4C9B0]">
                         <PlayerLink
                           name={order.player_name}
