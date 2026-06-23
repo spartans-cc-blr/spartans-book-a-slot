@@ -448,7 +448,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                   return (
                     <tr
                       key={order.id}
-                      className={`border-t border-[#D4C9B0] ${i % 2 === 1 ? 'bg-parchment' : ''}`}
+                      className={`border-t border-[#D4C9B0] ${i % 2 === 1 ? 'bg-parchment' : 'bg-white'}`}
                     >
                       {isAdmin && (
                         <td className="px-4 py-3 w-8">
@@ -469,7 +469,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                         className="px-4 py-3 whitespace-nowrap sticky z-10 border-r border-[#D4C9B0]"
                         style={{
                           left: isAdmin ? '80px' : '40px',
-                          backgroundColor: i % 2 === 1 ? '#EEEAE2' : '#F8F4EE',
+                          backgroundColor: i % 2 === 1 ? '#F8F4EE' : '#ffffff',
                         }}
                       >
                         <PlayerLink
