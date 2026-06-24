@@ -34,12 +34,26 @@ export async function PATCH(
   const body = await req.json()
   const supabase = createServiceClient()
 
+  const { data: existing } = await supabase
+  .from('bookings')
+  .select('game_date, slot_time')
+  .eq('id', params.id)
+  .single()
+
+  const dateOrSlotChanged =
+    (body.game_date && body.game_date !== existing?.game_date) ||
+    (body.slot_time && body.slot_time !== existing?.slot_time)
+
   const { data, error } = await supabase
     .from('bookings')
     .update({ ...body, updated_at: new Date().toISOString() })
     .eq('id', params.id)
     .select(`*, captain:captains(*), tournament:tournaments(*)`)
     .single()
+
+  if (dateOrSlotChanged) {
+    await supabase.from('availability').delete().eq('booking_id', params.id)
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ booking: data })
