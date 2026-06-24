@@ -25,7 +25,7 @@ export default function BookingDetailPage() {
   const [saveSuccess,  setSaveSuccess]  = useState(false)
 	const [ruleChecks, setRuleChecks] = useState(
   RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Waiting for input...' }))
-	)
+)
   // Editable fields
   const [captainId,     setCaptainId]     = useState('')
   const [tournamentId,  setTournamentId]  = useState('')
