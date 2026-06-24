@@ -20,13 +20,13 @@ export default function BookingDetailPage() {
 
   const [booking,      setBooking]      = useState<Booking | null>(null)
   const [loading,      setLoading]      = useState(true)
-  const [saving,       setSaving]       = useState(false)
+	const [saving,       setSaving]       = useState(false)
   const [saveError,    setSaveError]    = useState('')
   const [saveSuccess,  setSaveSuccess]  = useState(false)
-	const [ruleChecks, setRuleChecks] = useState(
-  RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Waiting for input...' }))
-)
-  // Editable fields
+  const [ruleChecks,   setRuleChecks]   = useState(
+    RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Waiting for input...' }))
+  )
+  // Editable fields  // Editable fields
   const [captainId,     setCaptainId]     = useState('')
   const [tournamentId,  setTournamentId]  = useState('')
   const [format,        setFormat]        = useState<GameFormat | ''>('')
