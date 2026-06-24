@@ -79,13 +79,19 @@ export interface WeekAvailability {
 // ── API request/response types ────────────────────────────────────
 
 export interface CreateBookingRequest {
-  game_date:     string
-  slot_time:     SlotTime
-  format:        GameFormat
-  captain_id:    string
-  tournament_id: string
-  venue?:        string
-  notes?:        string
+  game_date:      string
+  slot_time:      SlotTime
+  format:         GameFormat
+  captain_id:     string
+  tournament_id:  string
+  venue?:         string | null
+  notes?:         string | null
+  opponent_name?: string | null
+  match_id?:      string | null
+  match_stage?:   string | null
+  match_time?:    string | null
+  cricheroes_url?: string | null
+  exclude_id?:    string
 }
 
 export interface CreateSoftBlockRequest {
