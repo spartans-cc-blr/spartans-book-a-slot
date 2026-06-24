@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const body: Partial<CreateBookingRequest> = await req.json()
-  const { game_date, slot_time, format, captain_id, tournament_id } = body
+  const { game_date, slot_time, format, captain_id, tournament_id, exclude_id } = body
 
   if (!game_date || !slot_time || !format || !captain_id || !tournament_id) {
     return NextResponse.json({ valid: false, errors: [], incomplete: true })
@@ -24,7 +24,9 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   const [{ data: existing }, { data: captain }, { data: tournament }] =
     await Promise.all([
-      supabase.from('bookings').select('*').neq('status', 'cancelled'),
+      exclude_id
+  		? supabase.from('bookings').select('*').neq('status', 'cancelled').neq('id', exclude_id)
+  		: supabase.from('bookings').select('*').neq('status', 'cancelled'),
       supabase.from('captains').select('name').eq('id', captain_id).single(),
       supabase.from('tournaments').select('name').eq('id', tournament_id).single(),
     ])
