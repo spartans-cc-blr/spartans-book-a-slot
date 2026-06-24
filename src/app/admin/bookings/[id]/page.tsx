@@ -78,6 +78,47 @@ export default function BookingDetailPage() {
       })
   }, [id])
 
+  useEffect(() => {
+  if (!cricheroes) return
+  try {
+    const url  = new URL(cricheroes)
+    const parts = url.pathname.split('/').filter(Boolean)
+
+    // Extract match ID from URL path e.g. /match/scorecard/12345678/...
+    const scoreIdx = parts.indexOf('scorecard')
+    if (scoreIdx !== -1 && parts[scoreIdx + 1]) {
+      setMatchId(parts[scoreIdx + 1])
+    } else {
+      // fallback: last numeric segment
+      const numeric = parts.filter(p => /^\d+$/.test(p))
+      if (numeric.length) setMatchId(numeric[numeric.length - 1])
+    }
+
+    // Extract opponent from slug e.g. spartans-cc-vs-game-changers-cc
+    const slug = parts[parts.length - 1] ?? ''
+    if (slug.includes('-vs-')) {
+      const [teamA, teamB] = slug.split('-vs-')
+      const opponent = teamA.toLowerCase().includes('spartan') ? teamB : teamA
+      const formatted = opponent.split('-')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')
+      setOpponentName(formatted)
+    }
+  } catch { /* invalid URL — ignore */ }
+}, [cricheroes])
+
+useEffect(() => {
+  if (!slotTime) return
+  setMatchTime(prev => {
+    if (prev) return prev   // don't overwrite if already set
+    const [h, m] = slotTime.split(':').map(Number)
+    const total  = h * 60 + m - 15
+    const hh     = String(Math.floor(total / 60)).padStart(2, '0')
+    const mm     = String(total % 60).padStart(2, '0')
+    return `${hh}:${mm}`
+  })
+}, [slotTime])
+
 const validate = useCallback(async () => {
   if (!gameDate || !format || !slotTime || !captainId || !tournamentId) {
     setRuleChecks(RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Fill all fields to check.' })))
@@ -117,6 +158,7 @@ const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'war
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        game_date:       gameDate,
         captain_id:      captainId || null,
         tournament_id:   tournamentId || null,
         format:          format || null,
