@@ -1,9 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import type { Booking, Captain, Tournament, GameFormat, SlotTime } from '@/types'
 import { SLOT_TIMES, SLOT_FORMATS } from '@/types'
+
+const RULES = [
+  { rule: 'R1', label: 'Weekend capacity (max 3)' },
+  { rule: 'R2', label: 'Captain conflict' },
+  { rule: 'R3', label: 'Tournament monthly limit' },
+  { rule: 'R4', label: 'Slot not already taken' },
+  { rule: 'R5', label: 'Format/time clash' },
+  { rule: 'R6', label: '12:30 overlap' },
+]
 
 export default function BookingDetailPage() {
   const router = useRouter()
@@ -14,6 +23,9 @@ export default function BookingDetailPage() {
   const [saving,       setSaving]       = useState(false)
   const [saveError,    setSaveError]    = useState('')
   const [saveSuccess,  setSaveSuccess]  = useState(false)
+	const [ruleChecks, setRuleChecks] = useState(
+  RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Waiting for input...' }))
+	)
   // Editable fields
   const [captainId,     setCaptainId]     = useState('')
   const [tournamentId,  setTournamentId]  = useState('')
@@ -59,6 +71,37 @@ export default function BookingDetailPage() {
         setMatchStage(b.match_stage ?? '')
       })
   }, [id])
+
+const validate = useCallback(async () => {
+  if (!gameDate || !format || !slotTime || !captainId || !tournamentId) {
+    setRuleChecks(RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Fill all fields to check.' })))
+    return
+  }
+  const res = await fetch('/api/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      game_date:     gameDate,
+      format,
+      slot_time:     slotTime,
+      captain_id:    captainId,
+      tournament_id: tournamentId,
+      exclude_id:    id,          // ← excludes THIS booking from the conflict check
+    }),
+  })
+  const result = await res.json()
+  const errorMap   = Object.fromEntries(result.errors?.map((e: any) => [e.rule, e.message]) ?? [])
+  const warningMap = Object.fromEntries(result.warnings?.map((e: any) => [e.rule, e.message]) ?? [])
+  setRuleChecks(RULES.map(r => ({
+    ...r,
+    status:  errorMap[r.rule] ? 'fail' : warningMap[r.rule] ? 'warn' : 'pass',
+    message: errorMap[r.rule] ?? warningMap[r.rule] ?? '✓ Passed',
+  })))
+}, [gameDate, format, slotTime, captainId, tournamentId, id])
+
+useEffect(() => { validate() }, [validate])
+
+const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'warn')
 
   async function handleSave(extraFields?: Record<string, any>) {
     setSaving(true)
@@ -208,7 +251,7 @@ export default function BookingDetailPage() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Game Date</label>
-                <input type="text" value={booking.game_date} disabled className="form-input opacity-50 cursor-not-allowed" />
+								<input type="date" value={gameDate} onChange={e => setGameDate(e.target.value)} className="form-input">
               </div>
               <div>
                 <label className="form-label">Format</label>
@@ -277,7 +320,24 @@ export default function BookingDetailPage() {
               </div>
             </div>
           </FormCard>
-
+					
+					<div className="bg-ink-3 border border-ink-5 rounded p-4">
+  <p className="font-cinzel text-xs text-gold mb-3">Rule Checks</p>
+  <div className="space-y-1.5">
+    {ruleChecks.map(r => (
+      <div key={r.rule} className="flex items-start gap-2 font-rajdhani text-xs">
+        <span className={r.status === 'fail' ? 'text-red-400' : r.status === 'warn' ? 'text-yellow-400' : r.status === 'pass' ? 'text-emerald-400' : 'text-zinc-600'}>
+          {r.status === 'fail' ? '✗' : r.status === 'warn' ? '⚠' : r.status === 'pass' ? '✓' : '·'}
+        </span>
+        <span className="text-zinc-500">{r.label}</span>
+        {(r.status === 'fail' || r.status === 'warn') && (
+          <span className={r.status === 'fail' ? 'text-red-400' : 'text-yellow-400'}>— {r.message}</span>
+        )}
+      </div>
+    ))}
+  </div>
+</div>
+	
           {/* Match Details — only visible when a tournament is selected */}
           {tournamentId && (
             <FormCard title="Match Details">
@@ -331,7 +391,7 @@ export default function BookingDetailPage() {
               Cancel Booking
             </button>
             <div className="flex gap-3">
-              <button onClick={() => handleSave()} disabled={saving}
+              <button onClick={() => handleSave()} disabled={saving || !allPassed}
                 className="font-rajdhani text-sm font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
