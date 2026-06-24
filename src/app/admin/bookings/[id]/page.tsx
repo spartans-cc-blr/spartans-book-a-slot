@@ -23,9 +23,13 @@ export default function BookingDetailPage() {
 	const [saving,       setSaving]       = useState(false)
   const [saveError,    setSaveError]    = useState('')
   const [saveSuccess,  setSaveSuccess]  = useState(false)
-  const [ruleChecks,   setRuleChecks]   = useState(
-    RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Waiting for input...' }))
+  type RuleStatus = 'pending' | 'pass' | 'warn' | 'fail'
+  type RuleCheck  = { rule: string; label: string; status: RuleStatus; message: string }
+
+  const [ruleChecks, setRuleChecks] = useState<RuleCheck[]>(
+    RULES.map(r => ({ ...r, status: 'pending' as RuleStatus, message: 'Waiting for input...' }))
   )
+
   // Editable fields  // Editable fields
   const [captainId,     setCaptainId]     = useState('')
   const [tournamentId,  setTournamentId]  = useState('')
@@ -45,6 +49,7 @@ export default function BookingDetailPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([])
 
   const [matchStage, setMatchStage] = useState('')
+  const [gameDate, setGameDate] = useState('')
 
   useEffect(() => {
     fetch('/api/captains').then(r => r.json()).then(d => setCaptains(d.captains ?? []))
@@ -67,6 +72,7 @@ export default function BookingDetailPage() {
         setNotes(b.notes ?? '')
         setOrganiserName(b.organiser_name ?? '')
         setOrganiserPhone(b.organiser_phone ?? '')
+        setGameDate(b.game_date ?? '')
         setLoading(false)
         setMatchStage(b.match_stage ?? '')
       })
@@ -251,7 +257,7 @@ const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'war
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Game Date</label>
-								<input type="date" value={gameDate} onChange={e => setGameDate(e.target.value)} className="form-input">
+								<input type="date" value={gameDate} onChange={e => setGameDate(e.target.value)} className="form-input" />
               </div>
               <div>
                 <label className="form-label">Format</label>
@@ -322,21 +328,21 @@ const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'war
           </FormCard>
 					
 					<div className="bg-ink-3 border border-ink-5 rounded p-4">
-  <p className="font-cinzel text-xs text-gold mb-3">Rule Checks</p>
-  <div className="space-y-1.5">
-    {ruleChecks.map(r => (
-      <div key={r.rule} className="flex items-start gap-2 font-rajdhani text-xs">
-        <span className={r.status === 'fail' ? 'text-red-400' : r.status === 'warn' ? 'text-yellow-400' : r.status === 'pass' ? 'text-emerald-400' : 'text-zinc-600'}>
-          {r.status === 'fail' ? '✗' : r.status === 'warn' ? '⚠' : r.status === 'pass' ? '✓' : '·'}
-        </span>
-        <span className="text-zinc-500">{r.label}</span>
-        {(r.status === 'fail' || r.status === 'warn') && (
-          <span className={r.status === 'fail' ? 'text-red-400' : 'text-yellow-400'}>— {r.message}</span>
-        )}
-      </div>
-    ))}
-  </div>
-</div>
+          <p className="font-cinzel text-xs text-gold mb-3">Rule Checks</p>
+          <div className="space-y-1.5">
+            {ruleChecks.map(r => (
+              <div key={r.rule} className="flex items-start gap-2 font-rajdhani text-xs">
+                <span className={r.status === 'fail' ? 'text-red-400' : r.status === 'warn' ? 'text-yellow-400' : r.status === 'pass' ? 'text-emerald-400' : 'text-zinc-600'}>
+                  {r.status === 'fail' ? '✗' : r.status === 'warn' ? '⚠' : r.status === 'pass' ? '✓' : '·'}
+                </span>
+                <span className="text-zinc-500">{r.label}</span>
+                {(r.status === 'fail' || r.status === 'warn') && (
+                  <span className={r.status === 'fail' ? 'text-red-400' : 'text-yellow-400'}>— {r.message}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 	
           {/* Match Details — only visible when a tournament is selected */}
           {tournamentId && (
