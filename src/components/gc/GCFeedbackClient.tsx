@@ -567,7 +567,7 @@ export function GCFeedbackClient({
               ))}
               <div className="border-t border-[#D4C9B0] pt-4">
                 <label className="block font-rajdhani text-xs font-bold tracking-wide text-stone-500 mb-1.5">
-                  GC Notes <span className="font-normal">(private — not visible to player)</span>
+                  GC Collector Notes <span className="font-normal">(internal memo — not part of player's response)</span>
                 </label>
                 <textarea
                   rows={2}
