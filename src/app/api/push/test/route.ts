@@ -6,8 +6,7 @@ import { sendPushToPlayer } from '@/lib/webpush'
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
-  if (!user?.isAdmin && !user?.isGC) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
+if (!user?.playerId) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const result = await sendPushToPlayer(user.playerId, {
     title: '🧪 Test Notification',
     body: 'Push notifications are working!',
