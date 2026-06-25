@@ -9,6 +9,8 @@ import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
 import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
 
+export const dynamic = 'force-dynamic'
+
 // Add this helper after the imports
 function getMatchEndTime(gameDate: string, slotTime: string, format: string): Date {
   const [hours, minutes] = slotTime.split(':').map(Number)
