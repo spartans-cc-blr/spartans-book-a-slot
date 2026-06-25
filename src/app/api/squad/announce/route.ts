@@ -48,10 +48,10 @@ export async function POST(req: NextRequest) {
   ;(async () => {
     const [{ data: squadRows }, { data: booking }] = await Promise.all([
       supabase.from('squad').select('player_id').eq('booking_id', booking_id).eq('status', 'announced'),
-      supabase.from('bookings').select('game_date, slot_time, format, opponent_name, tournament:tournaments(name)').eq('id', booking_id).single()
+			supabase.from('bookings').select('id, game_date, slot_time, format, opponent_name, tournament:tournaments(name)').eq('id', booking_id).single()
     ])
 
-		console.log('[announce] booking fetched:', booking?.id, 'squad players:', squadPlayers?.length)
+		console.log('[announce] booking fetched:', booking?.game_date, 'squad players:', squadPlayers?.length)
 
     if (!squadRows?.length || !booking) return
 
