@@ -62,6 +62,40 @@ export default function ProfilePage() {
   const [success,  setSuccess]  = useState(false)
   const [error,    setError]    = useState('')
 
+  const [pushSubscribed, setPushSubscribed] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
+  const [pushSuccess, setPushSuccess] = useState(false)
+
+  async function subscribeToPush() {
+    if (!('serviceWorker' in navigator)) {
+      alert('Push notifications not supported in this browser')
+      return
+    }
+    setPushLoading(true)
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js')
+      await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      })
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub.toJSON()),
+      })
+      if (res.ok) {
+        setPushSubscribed(true)
+        setPushSuccess(true)
+        setTimeout(() => setPushSuccess(false), 3000)
+      }
+    } catch {
+      // silently ignore — user may have denied permission
+    } finally {
+      setPushLoading(false)
+    }
+  }
+
   const [dashboard, setDashboard] = useState<{
   pendingCount: number
   upcomingCount: number
@@ -382,6 +416,18 @@ export default function ProfilePage() {
             </div>
             {profile?.inducted_on && (
               <ReadOnlyField label="Inducted On" value={new Date(profile.inducted_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} />
+            )}
+          </div>
+          <div className="mt-4">
+            <button
+              onClick={subscribeToPush}
+              disabled={pushSubscribed || pushLoading}
+              className="font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded transition-colors"
+            >
+              {pushLoading ? 'Enabling...' : pushSubscribed ? '✓ Notifications enabled' : '🔔 Enable match notifications'}
+            </button>
+            {pushSuccess && (
+              <p className="font-rajdhani text-[11px] text-emerald-400 mt-1.5">You'll be notified when you're selected in a squad.</p>
             )}
           </div>
           <p className="font-rajdhani text-[10px] text-zinc-700 mt-3 italic">

@@ -45,3 +45,21 @@ self.addEventListener('fetch', e => {
     })
   )
 })
+
+// ── Push notifications ──────────────────────────────────────────────
+self.addEventListener('push', (event) => {
+  const data = event.data ? event.data.json() : {}
+  const title = data.title ?? 'Spartans CC'
+  const options = {
+    body: data.body ?? '',
+    icon: '/favicon.ico',
+    data: { url: data.url ?? '/fixtures' },
+  }
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = event.notification.data?.url ?? '/fixtures'
+  event.waitUntil(clients.openWindow(url))
+})
