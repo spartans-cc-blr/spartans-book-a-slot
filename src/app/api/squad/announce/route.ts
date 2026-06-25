@@ -46,16 +46,26 @@ export async function POST(req: NextRequest) {
   ;(async () => {
     const [{ data: squadRows }, { data: booking }] = await Promise.all([
       supabase.from('squad').select('player_id').eq('booking_id', booking_id).eq('status', 'announced'),
-      supabase.from('bookings').select('game_date, format, opponent_name').eq('id', booking_id).single(),
+      supabase.from('bookings').select('game_date, slot_time, format, opponent_name, tournament:tournaments(name)').eq('id', booking_id).single()
     ])
 
     if (!squadRows?.length || !booking) return
 
-    const body = `Selected for ${booking.format} vs ${booking.opponent_name ?? 'opponents'} on ${booking.game_date}`
+    const tournamentName = (booking.tournament as any)?.name
+    const congratulations = [
+      "You're in! 🏏",
+      "Pads on! 🏏",
+      "Time to shine! ⭐",
+      "Let's go! 🔥",
+      "Game day beckons! 🏆",
+    ]
+    const congrats = congratulations[Math.floor(Math.random() * congratulations.length)]
+
+    const body = `${congrats} ${tournamentName ? tournamentName + ' · ' : ''}${booking.format} vs ${booking.opponent_name ?? 'opponents'} · ${new Date(booking.game_date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} ${booking.slot_time}`
     await Promise.allSettled(
       squadRows.map(row =>
         sendPushToPlayer(row.player_id, {
-          title: "🏏 You're in the squad!",
+          title: "🏏 Squad Announced — You're Selected!",
           body,
           url: `/fixtures/${booking_id}`,
         })
