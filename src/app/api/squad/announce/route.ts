@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   if (!rows?.length)
     return NextResponse.json({ error: 'No squad found for this booking' }, { status: 404 })
 
-  if (rows[0].status !== 'approved')
+	if (!['approved', 'announced'].includes(rows[0].status))
     return NextResponse.json({ error: 'Squad must be approved by GC before announcement' }, { status: 400 })
 
   // Flip all approved rows to announced
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     .from('squad')
     .update({ status: 'announced' })
     .eq('booking_id', booking_id)
-    .eq('status', 'approved')
+    .in('status', ['approved', 'announced'])
 
 	console.log('[announce] squad flipped, attempting push for booking:', booking_id)
 
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 			supabase.from('bookings').select('id, game_date, slot_time, format, opponent_name, tournament:tournaments(name)').eq('id', booking_id).single()
     ])
 
-		console.log('[announce] booking fetched:', booking?.game_date, 'squad players:', squadPlayers?.length)
+		console.log('[announce] booking fetched:', booking?.game_date, 'squad players:', squadRows?.length)
 
     if (!squadRows?.length || !booking) return
 
