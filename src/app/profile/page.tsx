@@ -67,35 +67,43 @@ export default function ProfilePage() {
   const [pushSuccess, setPushSuccess] = useState(false)
 
   async function subscribeToPush() {
-    if (!('serviceWorker' in navigator)) {
-      alert('Push notifications not supported in this browser')
-      return
-    }
+  try {
+    alert('Step 1: starting')
+    if (!('serviceWorker' in navigator)) return alert('SW not supported')
+    if (!('PushManager' in window)) return alert('PushManager not supported — iOS PWA required')
+
     setPushLoading(true)
-    try {
-      const reg = await navigator.serviceWorker.register('/sw.js')
-      await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-      })
-      const res = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub.toJSON()),
-      })
-      if (res.ok) {
-        setPushSubscribed(true)
-        setPushSuccess(true)
-        setTimeout(() => setPushSuccess(false), 3000)
-      }
-    } catch (err: any) {
-      console.error('Push subscription error:', err)
-      alert(`Notification setup failed: ${err?.message ?? err}`)
-    } finally {
-      setPushLoading(false)
+    alert('Step 2: registering SW')
+    const reg = await navigator.serviceWorker.register('/sw.js')
+    alert('Step 3: SW registered — waiting for ready')
+    const readyReg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('SW ready timeout')), 8000))
+    ])
+    alert('Step 4: SW ready — subscribing to push')
+    const sub = await (readyReg as ServiceWorkerRegistration).pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    })
+    alert('Step 5: subscribed — saving to server')
+    const res = await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub.toJSON()),
+    })
+    alert(`Step 6: server responded ${res.status}`)
+    if (res.ok) {
+      setPushSubscribed(true)
+      setPushSuccess(true)
+      setTimeout(() => setPushSuccess(false), 3000)
     }
+  } catch (err: any) {
+    alert(`FAILED: ${err?.message ?? String(err)}`)
+  } finally {
+    setPushLoading(false)
   }
+}
+
 
   const [dashboard, setDashboard] = useState<{
   pendingCount: number
