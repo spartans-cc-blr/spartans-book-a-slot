@@ -60,6 +60,26 @@ export async function POST(req: NextRequest) {
       )
     )
   }
+	
+	// Notify GC members (and admin if they happen to be in players table)
+  const { data: gcPlayers } = await supabase
+    .from('players')
+    .select('id')
+    .eq('is_gc', true)
+    .eq('status', 'active')
+  
+  if (gcPlayers?.length && booking) {
+    const gcBody = `Squad announced for ${booking.format} vs ${booking.opponent_name ?? 'opponents'} · ${new Date(booking.game_date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} ${booking.slot_time}`
+    await Promise.allSettled(
+      gcPlayers.map(p =>
+        sendPushToPlayer(p.id, {
+          title: '📋 Squad Announced',
+          body: gcBody,
+          url: `/fixtures/${booking_id}`,
+        })
+      )
+    )
+  }
 
   return NextResponse.json({ ok: true })
 }
