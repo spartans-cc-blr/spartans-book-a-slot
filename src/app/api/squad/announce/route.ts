@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
     .eq('booking_id', booking_id)
     .eq('status', 'approved')
 
+	console.log('[announce] squad flipped, attempting push for booking:', booking_id)
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Fire push notifications to all squad members — non-blocking
