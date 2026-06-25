@@ -12,13 +12,11 @@ export async function sendPushToPlayer(playerId: string, payload: PushPayload) {
     process.env.VAPID_PRIVATE_KEY!
     )
     const supabase = createServiceClient()
-console.log('[webpush] fetching subs for player:', playerId)
-  const { data: subs, error: subError } = await supabase
+  const { data: subs } = await supabase
   .from('push_subscriptions')
   .select('endpoint, p256dh, auth')
   .eq('player_id', playerId)
 
-console.log('[webpush] subs found:', subs?.length ?? 0, 'error:', subError?.message ?? 'none')
 
   if (!subs?.length) return
 
@@ -30,7 +28,6 @@ console.log('[webpush] subs found:', subs?.length ?? 0, 'error:', subError?.mess
           JSON.stringify(payload)
         )
       } catch (err: any) {
-    		 console.error('[webpush] send error:', err.statusCode, err.message, sub.endpoint.slice(0, 50))
         if (err?.statusCode === 410) {
 					await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
         }
