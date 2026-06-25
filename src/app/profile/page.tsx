@@ -145,6 +145,16 @@ export default function ProfilePage() {
       })
   }, [sessionStatus, player?.playerId])
 
+  useEffect(() => {
+    async function checkSubscription() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+      const reg = await navigator.serviceWorker.ready
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) setPushSubscribed(true)
+    }
+    checkSubscription()
+  }, [])
+
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
