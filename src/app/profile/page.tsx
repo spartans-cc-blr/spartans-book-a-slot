@@ -67,38 +67,28 @@ export default function ProfilePage() {
   const [pushSuccess, setPushSuccess] = useState(false)
 
   async function subscribeToPush() {
+  if (!('serviceWorker' in navigator)) return
+  if (!('PushManager' in window)) return
+  setPushLoading(true)
   try {
-    alert('Step 1: starting')
-    if (!('serviceWorker' in navigator)) return alert('SW not supported')
-    if (!('PushManager' in window)) return alert('PushManager not supported — iOS PWA required')
-
-    setPushLoading(true)
-    alert('Step 2: registering SW')
     const reg = await navigator.serviceWorker.register('/sw.js')
-    alert('Step 3: SW registered — waiting for ready')
-    const readyReg = await Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('SW ready timeout')), 8000))
-    ])
-    alert('Step 4: SW ready — subscribing to push')
-    const sub = await (readyReg as ServiceWorkerRegistration).pushManager.subscribe({
+    await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     })
-    alert('Step 5: subscribed — saving to server')
     const res = await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(sub.toJSON()),
     })
-    alert(`Step 6: server responded ${res.status}`)
     if (res.ok) {
       setPushSubscribed(true)
       setPushSuccess(true)
       setTimeout(() => setPushSuccess(false), 3000)
     }
   } catch (err: any) {
-    alert(`FAILED: ${err?.message ?? String(err)}`)
+    console.error('Push subscription error:', err)
   } finally {
     setPushLoading(false)
   }
@@ -433,7 +423,7 @@ export default function ProfilePage() {
               disabled={pushSubscribed || pushLoading}
               className="font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded transition-colors"
             >
-              {pushLoading ? 'Enabling...' : pushSubscribed ? '✓ Notifications enabled' : '🔔 Enable match notifications'}
+              {pushLoading ? 'Enabling...' : pushSubscribed ? '✓ Notifications enabled' : '🔔 Subscribe to notifications'}
             </button>
             {pushSuccess && (
               <p className="font-rajdhani text-[11px] text-emerald-400 mt-1.5">You'll be notified when you're selected in a squad.</p>
