@@ -89,8 +89,9 @@ export default function ProfilePage() {
         setPushSuccess(true)
         setTimeout(() => setPushSuccess(false), 3000)
       }
-    } catch {
-      // silently ignore — user may have denied permission
+    } catch (err: any) {
+      console.error('Push subscription error:', err)
+      alert(`Notification setup failed: ${err?.message ?? err}`)
     } finally {
       setPushLoading(false)
     }
