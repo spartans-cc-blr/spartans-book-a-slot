@@ -51,6 +51,8 @@ export async function POST(req: NextRequest) {
       supabase.from('bookings').select('game_date, slot_time, format, opponent_name, tournament:tournaments(name)').eq('id', booking_id).single()
     ])
 
+		console.log('[announce] booking fetched:', booking?.id, 'squad players:', squadPlayers?.length)
+
     if (!squadRows?.length || !booking) return
 
     const tournamentName = (booking.tournament as any)?.name
