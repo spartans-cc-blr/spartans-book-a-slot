@@ -32,7 +32,7 @@ console.log('[webpush] subs found:', subs?.length ?? 0, 'error:', subError?.mess
       } catch (err: any) {
     		 console.error('[webpush] send error:', err.statusCode, err.message, sub.endpoint.slice(0, 50))
         if (err?.statusCode === 410) {
-          await supabase.from('push_subscriptions').delete().eq('id', sub.id)
+					await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
         }
         throw err
       }
