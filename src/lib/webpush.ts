@@ -28,6 +28,7 @@ export async function sendPushToPlayer(playerId: string, payload: PushPayload) {
           JSON.stringify(payload)
         )
       } catch (err: any) {
+    		 console.error('[webpush] send error:', err.statusCode, err.message, sub.endpoint.slice(0, 50))
         if (err?.statusCode === 410) {
           await supabase.from('push_subscriptions').delete().eq('id', sub.id)
         }
