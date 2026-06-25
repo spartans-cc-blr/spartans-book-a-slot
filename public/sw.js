@@ -5,7 +5,7 @@ const OFFLINE_URL = '/offline'
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(cache =>
-      cache.addAll(['/', '/fixtures'])
+      cache.addAll(['/'])
     )
   )
   self.skipWaiting()
