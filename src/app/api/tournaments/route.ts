@@ -15,7 +15,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('tournaments')
-    .select('id, name, organiser_name, organiser_contact, ball_type, ground_id, active, created_at')
+    .select('id, name, organiser_name, organiser_contact, ball_type, ground_id, active, created_at, total_league_games, vc_captain_id, cricheroes_points_table_url, match_fee')
     .order('name', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ tournaments: data ?? [] })
