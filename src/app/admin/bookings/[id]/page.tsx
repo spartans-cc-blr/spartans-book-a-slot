@@ -50,6 +50,7 @@ export default function BookingDetailPage() {
 
   const [matchStage, setMatchStage] = useState('')
   const [gameDate, setGameDate] = useState('')
+  const [matchFeeOverride, setMatchFeeOverride] = useState<string>('')
 
   useEffect(() => {
     fetch('/api/captains').then(r => r.json()).then(d => setCaptains(d.captains ?? []))
@@ -75,6 +76,7 @@ export default function BookingDetailPage() {
         setGameDate(b.game_date ?? '')
         setLoading(false)
         setMatchStage(b.match_stage ?? '')
+        setMatchFeeOverride((b as any).match_fee_override != null ? String((b as any).match_fee_override) : '')
       })
   }, [id])
 
@@ -173,6 +175,7 @@ const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'war
         notes:           notes || null,
         organiser_name:  organiserName || null,
         organiser_phone: organiserPhone || null,
+        match_fee_override: matchFeeOverride ? parseInt(matchFeeOverride) : null,
         ...extraFields,
       }),
     })
@@ -417,6 +420,23 @@ const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'war
                     className="form-input" />
                   <p className="font-rajdhani text-xs text-zinc-600 mt-1">
                     Organiser's confirmed match start time — may differ from slot time.
+                  </p>
+                </div>
+                <div>
+                  <label className="form-label">Fee Override (₹ total)</label>
+                  <input
+                    type="number" min="0"
+                    value={matchFeeOverride}
+                    onChange={e => setMatchFeeOverride(e.target.value)}
+                    placeholder="Leave blank to use tournament default"
+                    className="form-input w-32"
+                  />
+                  <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                    {matchFeeOverride
+                      ? `Override active: ₹${matchFeeOverride}`
+                      : (booking.tournament as any)?.match_fee
+                        ? `Using tournament default: ₹${(booking.tournament as any).match_fee}`
+                        : 'No fee configured on tournament'}
                   </p>
                 </div>
               </div>

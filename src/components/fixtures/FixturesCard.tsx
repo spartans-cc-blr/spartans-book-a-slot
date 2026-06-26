@@ -87,7 +87,6 @@ function PinkBall({ size = 20 }: { size?: number }) {
   );
 }
 
-// Replace the stageIcon function with:
 function stageIcon(stage: string): string {
   const s = stage.toLowerCase()
   if (s.includes('final') || s.includes('quarter')) return '🏆'
@@ -169,6 +168,7 @@ function ShareIcon() {
     </svg>
   )
 }
+
 // ── Main Card Component ───────────────────────────────────────────
 type SquadPlayer = {
   id:               string
@@ -176,7 +176,7 @@ type SquadPlayer = {
   jersey_name:      string | null
   jersey_number:    number | null
   primary_skill:    string | null
-	cricheroes_url:   string | null
+  cricheroes_url:   string | null
   is_match_captain: boolean
   is_vc:            boolean
   is_wk:            boolean
@@ -187,9 +187,7 @@ type BookingProp = {
   game_date: string
   slot_time: string
   format: string
-  // after: format: string
   match_time?: string | null
-  // In the BookingProp type, add after match_time:
   match_stage?: string | null
   opponent_name?: string | null
   cricheroes_url?: string | null
@@ -197,17 +195,24 @@ type BookingProp = {
   tournament?: {
     name: string
     ball_type: 'red' | 'white' | 'pink'
-		cricheroes_points_table_url?: string | null
+    cricheroes_points_table_url?: string | null
     ground?: { name: string; maps_url: string; hospital_url: string } | null
   } | null
   squad?: SquadPlayer[]
+  feePerPlayer?:             number | null
+  isLoggedInPlayerInSquad?:  boolean
+  isLoggedInPlayerExempt?:   boolean
+  loggedInWalletBalance?:    number | null
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
   const [squadOpen, setSquadOpen] = useState(false)
   const squad = booking.squad ?? []
   const squadAnnounced = squad.length > 0
-  const { game_date, slot_time, format, opponent_name, cricheroes_url, tournament, matchStatus, match_stage } = booking;
+  const {
+    game_date, slot_time, format, opponent_name, cricheroes_url, tournament, matchStatus, match_stage,
+    feePerPlayer, isLoggedInPlayerInSquad, isLoggedInPlayerExempt, loggedInWalletBalance,
+  } = booking;
   const ground = tournament?.ground;
   const ballType  = tournament?.ball_type || "red";
   const jColour   = jerseyColour(ballType);
@@ -272,17 +277,17 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       <div>
         <div style={{ fontSize: "15px", fontWeight: 700, color: "#F9FAFB", lineHeight: 1.3, marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
           {tournament?.cricheroes_points_table_url ? (
-				    <a
-							href={tournament.cricheroes_points_table_url}
-							target="_blank"
-							rel="noopener noreferrer"
-							style={{ fontWeight: 700, color: '#F5F5F5', textDecoration: 'underline', textDecorationColor: '#C9A84C', textUnderlineOffset: '3px' }}
-						>
-						{tournament.name}
-					</a>
-					) : (
-					<span style={{ fontWeight: 700, color: '#F5F5F5' }}>{tournament?.name}</span>
-					)}
+            <a
+              href={tournament.cricheroes_points_table_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontWeight: 700, color: '#F5F5F5', textDecoration: 'underline', textDecorationColor: '#C9A84C', textUnderlineOffset: '3px' }}
+            >
+              {tournament.name}
+            </a>
+          ) : (
+            <span style={{ fontWeight: 700, color: '#F5F5F5' }}>{tournament?.name}</span>
+          )}
           {booking.id && (
             <a
               href={`/fixtures/${booking.id}`}
@@ -394,6 +399,47 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             <span style={{ fontSize: '14px', color: '#6B7280' }}>{squadOpen ? '▲' : '▼'}</span>
           </button>
 
+          {/* Match fee row — shown to all when squad announced and fee is configured */}
+          {squadAnnounced && feePerPlayer != null && (
+            <div style={{
+              fontSize: '11px',
+              color: '#9CA3AF',
+              fontFamily: "'Rajdhani', sans-serif",
+              paddingTop: '6px',
+              borderTop: '1px solid #1F2937',
+            }}>
+              💰 Match fee: <span style={{ color: '#F5D78E', fontWeight: 600 }}>₹{feePerPlayer}</span> per player
+              {isLoggedInPlayerInSquad && isLoggedInPlayerExempt && (
+                <span style={{ color: '#6B7280', marginLeft: '6px' }}>· You are exempt</span>
+              )}
+            </div>
+          )}
+
+          {/* Wallet projection — shown only to logged-in player if they are in squad and non-exempt */}
+          {squadAnnounced
+            && feePerPlayer != null
+            && isLoggedInPlayerInSquad
+            && !isLoggedInPlayerExempt
+            && loggedInWalletBalance != null && (
+            <div style={{
+              fontSize: '11px',
+              fontFamily: "'Rajdhani', sans-serif",
+              color: '#9CA3AF',
+              marginTop: '4px',
+            }}>
+              Your wallet after this match:{' '}
+              <span style={{
+                fontWeight: 700,
+                color: (loggedInWalletBalance - feePerPlayer) < 0 ? '#F59E0B' : '#4ADE80',
+              }}>
+                ₹{loggedInWalletBalance - feePerPlayer}
+              </span>
+              <span style={{ color: '#6B7280', marginLeft: '4px' }}>
+                (currently ₹{loggedInWalletBalance} · −₹{feePerPlayer})
+              </span>
+            </div>
+          )}
+
           {squadOpen && (
             <div style={{
               display: 'grid', gridTemplateColumns: '1fr 1fr',
@@ -408,7 +454,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
                   }}>
                     <span style={{ flex: 1 }}>
                       {p.cricheroes_url ? (
-    										<a
+                        <a
                           href={p.cricheroes_url}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -498,7 +544,6 @@ export default function App() {
       alignItems: "center",
       gap: "8px",
     }}>
-      {/* Header */}
       <div style={{ textAlign: "center", marginBottom: "24px" }}>
         <div style={{ fontSize: "11px", letterSpacing: "0.2em", color: "#C9A84C", fontWeight: 700, marginBottom: "6px" }}>
           SPARTANS CRICKET CLUB · BENGALURU
@@ -509,12 +554,10 @@ export default function App() {
         <div style={{ fontSize: "12px", color: "#6B7280", marginTop: "4px" }}>Upcoming confirmed matches</div>
       </div>
 
-      {/* Cards */}
       {DEMO_BOOKINGS.map(b => (
         <FixturesCard key={b.id} booking={b} />
       ))}
 
-      {/* Legend */}
       <div style={{
         marginTop: "24px", padding: "14px 20px",
         background: "#1C2333", borderRadius: "10px", border: "1px solid #2D3748",

@@ -32,6 +32,13 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const body = await req.json()
+
+  // match_fee_override is admin-only — strip it from non-admin requests
+  const user = session.user as any
+  if (!user?.isAdmin && 'match_fee_override' in body) {
+    delete body.match_fee_override
+  }
+
   const supabase = createServiceClient()
 
   const { data: existing } = await supabase

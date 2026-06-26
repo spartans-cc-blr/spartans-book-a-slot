@@ -58,10 +58,10 @@ export default async function FixturesPage() {
 
   const { data: bookings } = await supabase
     .from('bookings')
-    // Change the select to:
     .select(`
       id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
-      tournament:tournaments(name, ball_type, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url))
+      match_fee_override,
+      tournament:tournaments(name, ball_type, match_fee, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url))
     `)
     .eq('status', 'confirmed')
     .gte('game_date', yesterday)
@@ -78,20 +78,22 @@ export default async function FixturesPage() {
   }
 
   let hasDues = false
-    if (player?.playerId) {
-      const { data: playerRow } = await supabase
-        .from('players')
-        .select('wallet_balance, dues_override')
-        .eq('id', player.playerId)
-        .single()
-      hasDues = (playerRow?.wallet_balance ?? 0) < 0 && !playerRow?.dues_override
-    }
+  let loggedInWalletBalance: number | null = null
+  if (player?.playerId) {
+    const { data: playerRow } = await supabase
+      .from('players')
+      .select('wallet_balance, dues_override')
+      .eq('id', player.playerId)
+      .single()
+    hasDues = (playerRow?.wallet_balance ?? 0) < 0 && !playerRow?.dues_override
+    loggedInWalletBalance = playerRow?.wallet_balance ?? null
+  }
 
 // Fetch announced squads for all active bookings
   const bookingIds = (bookings ?? []).map(b => b.id)
   const { data: squadRows } = bookingIds.length ? await supabase
     .from('squad')
-    .select('booking_id, status, is_captain, is_vc, is_wk, player:players(id, name, cricheroes_url)')
+    .select('booking_id, status, is_captain, is_vc, is_wk, player:players(id, name, cricheroes_url, fee_exemptions(start_date, end_date))')
     .in('booking_id', bookingIds)
     .eq('status', 'announced')
   : { data: [] }
@@ -128,6 +130,14 @@ export default async function FixturesPage() {
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'
   const isCaptain = isPlayer && !!player?.isCaptain
 
+  // Helper — live exemption check (same logic as admin fee-apply route)
+  function isCurrentlyExempt(exemptions: { start_date: string; end_date: string | null }[]): boolean {
+    const today = new Date().toISOString().split('T')[0]
+    return (exemptions ?? []).some(
+      e => e.start_date <= today && (e.end_date === null || e.end_date >= today)
+    )
+  }
+
   // Filter out ended matches, tag in-progress ones
   const activeBookings = (bookings ?? []).filter(b => {
     const status = getMatchStatus((b as any).game_date, (b as any).slot_time, (b as any).format)
@@ -139,19 +149,49 @@ export default async function FixturesPage() {
     matchStatus: getMatchStatus((b as any).game_date, (b as any).slot_time, (b as any).format)
   }))
 
+  // Per booking, compute fee_per_player and whether the logged-in player is exempt
+  const feePerPlayerMap: Record<string, number | null> = {}
+  const loggedInPlayerExemptMap: Record<string, boolean> = {}
+
+  for (const booking of bookingsWithStatus) {
+    const b = booking as any
+    const baseFee: number | null = b.match_fee_override ?? b.tournament?.match_fee ?? null
+    const squadRows = squadMap[b.id] ?? []
+
+    if (baseFee && squadStatusMap[b.id] === 'announced' && squadRows.length > 0) {
+      const nonExemptCount = squadRows.filter(
+        p => !isCurrentlyExempt((p as any).fee_exemptions ?? [])
+      ).length
+      feePerPlayerMap[b.id] = nonExemptCount > 0 ? Math.ceil(baseFee / nonExemptCount) : null
+    } else {
+      feePerPlayerMap[b.id] = null
+    }
+
+    if (isPlayer && player?.playerId) {
+      const myRow = squadRows.find((p: any) => p.id === player.playerId)
+      if (myRow) {
+        loggedInPlayerExemptMap[b.id] = isCurrentlyExempt((myRow as any).fee_exemptions ?? [])
+      }
+    }
+  }
+
   // Group bookings by ISO weekend — preserving order
   const weekendOrder: string[] = []
   type BookingWithCard = {
-    id:              string
-    game_date:       string
-    slot_time:       string
-    initialResponse: string | null
-	  matchStatus:     'upcoming' | 'in_progress'
-    squad:           any[]
-    cardData:        any
-    hasDues:         boolean
-    squadAnnounced:  boolean
-    slotLocked:      boolean
+    id:                      string
+    game_date:               string
+    slot_time:               string
+    initialResponse:         string | null
+    matchStatus:             'upcoming' | 'in_progress'
+    squad:                   any[]
+    cardData:                any
+    hasDues:                 boolean
+    squadAnnounced:          boolean
+    slotLocked:              boolean
+    feePerPlayer:            number | null
+    isLoggedInPlayerInSquad: boolean
+    isLoggedInPlayerExempt:  boolean
+    loggedInWalletBalance:   number | null
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
 
@@ -162,17 +202,27 @@ export default async function FixturesPage() {
       weekendMap[wk] = []
     }
     
-	weekendMap[wk].push({
-      id:              b.id,
-      game_date:       (b as any).game_date,
-      slot_time:       (b as any).slot_time,
-      initialResponse: existingResponses[b.id] ?? null,
-      matchStatus: (b as any).matchStatus as 'upcoming' | 'in_progress',
-      squad:           squadMap[b.id] ?? [],
-	    cardData:        b,
-      hasDues:         hasDues,
-      squadAnnounced:  squadStatusMap[b.id] === 'announced',
-      slotLocked:      (b as any).availability_locked ?? false,
+    weekendMap[wk].push({
+      id:                      b.id,
+      game_date:               (b as any).game_date,
+      slot_time:               (b as any).slot_time,
+      initialResponse:         existingResponses[b.id] ?? null,
+      matchStatus:             (b as any).matchStatus as 'upcoming' | 'in_progress',
+      squad:                   squadMap[b.id] ?? [],
+      cardData: {
+        ...b,
+        feePerPlayer:             feePerPlayerMap[b.id] ?? null,
+        isLoggedInPlayerInSquad:  isPlayer && (squadMap[b.id] ?? []).some((p: any) => p.id === player?.playerId),
+        isLoggedInPlayerExempt:   loggedInPlayerExemptMap[b.id] ?? false,
+        loggedInWalletBalance:    loggedInWalletBalance,
+      },
+      hasDues:                 hasDues,
+      squadAnnounced:          squadStatusMap[b.id] === 'announced',
+      slotLocked:              (b as any).availability_locked ?? false,
+      feePerPlayer:            feePerPlayerMap[b.id] ?? null,
+      isLoggedInPlayerInSquad: isPlayer && (squadMap[b.id] ?? []).some((p: any) => p.id === player?.playerId),
+      isLoggedInPlayerExempt:  loggedInPlayerExemptMap[b.id] ?? false,
+      loggedInWalletBalance:   loggedInWalletBalance,
     })
 
   }
@@ -243,8 +293,6 @@ export default async function FixturesPage() {
         {weekendOrder.length === 0 ? (
           <p className="font-rajdhani text-zinc-500 text-sm">No upcoming fixtures confirmed yet. Check back soon.</p>
         ) : (
-          // FixturesWeekendGroup renders FixturesCard + availability row for every booking
-          // in the weekend. One group per weekend = shared weekendResponses state.
           weekendOrder.map(wk => (
             <FixturesWeekendGroup
               key={wk}

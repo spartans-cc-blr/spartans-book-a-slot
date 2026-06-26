@@ -15,6 +15,7 @@ type Tournament = {
   total_league_games: number | null
   vc_captain_id: string | null
   cricheroes_points_table_url: string | null
+  match_fee: number | null
 }
 
 const BALL_LABELS = { red: '🔴 Red', white: '⚪ White', pink: '🩷 Pink' }
@@ -26,7 +27,7 @@ export default function AdminTournamentsPage() {
   const [editingId,   setEditingId]   = useState<string | null>(null)
   const [editForm,    setEditForm]    = useState<Partial<Tournament>>({})
   const [showAdd,     setShowAdd]     = useState(false)
-  const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', cricheroes_points_table_url: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '', total_league_games: '' as string, vc_captain_id: '' as string })
+  const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', cricheroes_points_table_url: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '', total_league_games: '' as string, vc_captain_id: '' as string, match_fee: '' as string })
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
   const [captains, setCaptains] = useState<{ id: string; name: string }[]>([])
@@ -46,7 +47,7 @@ export default function AdminTournamentsPage() {
 
   function startEdit(t: Tournament) {
     setEditingId(t.id)
-    setEditForm({ name: t.name, organiser_name: t.organiser_name ?? '', organiser_contact: t.organiser_contact ?? '', cricheroes_points_table_url: t.cricheroes_points_table_url ?? '', ball_type: t.ball_type, ground_id: t.ground_id ?? '', active: t.active, total_league_games: t.total_league_games, vc_captain_id: t.vc_captain_id ?? '' })
+    setEditForm({ name: t.name, organiser_name: t.organiser_name ?? '', organiser_contact: t.organiser_contact ?? '', cricheroes_points_table_url: t.cricheroes_points_table_url ?? '', ball_type: t.ball_type, ground_id: t.ground_id ?? '', active: t.active, total_league_games: t.total_league_games, vc_captain_id: t.vc_captain_id ?? '', match_fee: t.match_fee })
     setError('')
   }
 
@@ -63,6 +64,7 @@ export default function AdminTournamentsPage() {
         ? parseInt(editForm.total_league_games as unknown as string, 10)
         : null,
       vc_captain_id: editForm.vc_captain_id || null,
+      match_fee: editForm.match_fee ? parseInt(editForm.match_fee as unknown as string) : null,
     }),
     })
     if (res.ok) {
@@ -94,13 +96,13 @@ export default function AdminTournamentsPage() {
     const res = await fetch('/api/tournaments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...addForm, ground_id: addForm.ground_id || null, total_league_games: addForm.total_league_games ? parseInt(addForm.total_league_games, 10) : null, vc_captain_id: addForm.vc_captain_id || null }),
+      body: JSON.stringify({ ...addForm, ground_id: addForm.ground_id || null, total_league_games: addForm.total_league_games ? parseInt(addForm.total_league_games, 10) : null, vc_captain_id: addForm.vc_captain_id || null, match_fee: addForm.match_fee ? parseInt(addForm.match_fee) : null }),
     })
     if (res.ok) {
       const d = await res.json()
       setTournaments(prev => [d.tournament, ...prev])
       setShowAdd(false)
-      setAddForm({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white', ground_id: '', total_league_games: '',cricheroes_points_table_url: '', vc_captain_id: '' })
+      setAddForm({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white', ground_id: '', total_league_games: '', cricheroes_points_table_url: '', vc_captain_id: '', match_fee: '' })
     } else {
       setError('Failed to add tournament.')
     }
@@ -142,21 +144,19 @@ export default function AdminTournamentsPage() {
               <input value={addForm.organiser_contact} onChange={e => setAddForm(f => ({ ...f, organiser_contact: e.target.value }))}
                 placeholder="e.g. 919876543210" className="form-input" />
             </div>
-						<div>
-  						<label className="form-label">
-    						CricHeroes Points Table URL
-  						</label>
-  						 <input
-                  type="url"
-                  value={addForm.cricheroes_points_table_url}
-                  onChange={e => setAddForm(f => ({ ...f, cricheroes_points_table_url: e.target.value }))}
-                  placeholder="https://cricheroes.in/tournament/..."
-                  className="form-input"
-                />
-							<p className="text-xs text-zinc-500 mt-1">
-    						Players will see this as a link on the fixture card tournament name.
-  						</p>
-						</div>
+            <div>
+              <label className="form-label">CricHeroes Points Table URL</label>
+              <input
+                type="url"
+                value={addForm.cricheroes_points_table_url}
+                onChange={e => setAddForm(f => ({ ...f, cricheroes_points_table_url: e.target.value }))}
+                placeholder="https://cricheroes.in/tournament/..."
+                className="form-input"
+              />
+              <p className="text-xs text-zinc-500 mt-1">
+                Players will see this as a link on the fixture card tournament name.
+              </p>
+            </div>
             <div>
               <label className="form-label">Vice Captain</label>
               <select
@@ -184,6 +184,19 @@ export default function AdminTournamentsPage() {
               />
               <p className="font-rajdhani text-xs text-zinc-600 mt-1">
                 League games only — knockouts added separately if Spartans qualify.
+              </p>
+            </div>
+            <div>
+              <label className="form-label">Organiser Fee (₹ total per match)</label>
+              <input
+                type="number" min="0"
+                value={addForm.match_fee}
+                onChange={e => setAddForm(f => ({ ...f, match_fee: e.target.value }))}
+                placeholder="e.g. 1500"
+                className="form-input w-32"
+              />
+              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                Total fee paid to organiser per match. Divided by non-exempt squad members.
               </p>
             </div>
             <div>
@@ -269,6 +282,19 @@ export default function AdminTournamentsPage() {
                              className="form-input w-24"
                            />
                          </div>
+                        <div>
+                          <label className="form-label">Organiser Fee (₹ total per match)</label>
+                          <input
+                            type="number" min="0"
+                            value={editForm.match_fee ?? ''}
+                            onChange={e => setEditForm(f => ({ ...f, match_fee: e.target.value ? parseInt(e.target.value) : null }))}
+                            placeholder="e.g. 1500"
+                            className="form-input w-32"
+                          />
+                          <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                            Total fee paid to organiser per match. Divided by non-exempt squad members.
+                          </p>
+                        </div>
                         <div>
                           <label className="form-label">Ground</label>
                           <select value={editForm.ground_id ?? ''} onChange={e => setEditForm(f => ({ ...f, ground_id: e.target.value }))} className="form-input">

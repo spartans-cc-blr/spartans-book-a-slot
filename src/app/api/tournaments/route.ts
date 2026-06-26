@@ -26,11 +26,11 @@ export async function POST(request: Request) {
   if (deny) return deny
   const supabase = createServiceClient()
   const body = await request.json()
-  const { name, organiser_name, organiser_contact, ball_type = 'red', ground_id, total_league_games, cricheroes_points_table_url } = body
+  const { name, organiser_name, organiser_contact, ball_type = 'red', ground_id, total_league_games, cricheroes_points_table_url, match_fee } = body
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
   const { data, error } = await supabase
     .from('tournaments')
-    .insert({ name, organiser_name: organiser_name || null, organiser_contact: organiser_contact || null, ball_type, ground_id: ground_id || null, active: true, total_league_games: total_league_games ?? null, cricheroes_points_table_url: cricheroes_points_table_url || null  })
+    .insert({ name, organiser_name: organiser_name || null, organiser_contact: organiser_contact || null, ball_type, ground_id: ground_id || null, active: true, total_league_games: total_league_games ?? null, cricheroes_points_table_url: cricheroes_points_table_url || null, match_fee: match_fee ?? null })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
