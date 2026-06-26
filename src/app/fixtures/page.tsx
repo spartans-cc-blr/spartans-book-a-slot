@@ -195,12 +195,20 @@ export default async function FixturesPage() {
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
 
+    // Running balance for wallet projection — chains across matches chronologically
+    // bookingsWithStatus is already sorted by game_date + slot_time ASC from the query
+    let runningWalletBalance: number | null = loggedInWalletBalance
+
     for (const b of bookingsWithStatus) {
     const wk = validationGroupKey((b as any).game_date)
     if (!weekendMap[wk]) {
       weekendOrder.push(wk)
       weekendMap[wk] = []
     }
+
+    const isInSquad = isPlayer && (squadMap[b.id] ?? []).some((p: any) => p.id === player?.playerId)
+    const isExempt  = loggedInPlayerExemptMap[b.id] ?? false
+    const fee       = feePerPlayerMap[b.id] ?? null
     
     weekendMap[wk].push({
       id:                      b.id,
@@ -212,19 +220,22 @@ export default async function FixturesPage() {
       cardData: {
         ...b,
         feePerPlayer:             feePerPlayerMap[b.id] ?? null,
-        isLoggedInPlayerInSquad:  isPlayer && (squadMap[b.id] ?? []).some((p: any) => p.id === player?.playerId),
-        isLoggedInPlayerExempt:   loggedInPlayerExemptMap[b.id] ?? false,
-        loggedInWalletBalance:    loggedInWalletBalance,
+        isLoggedInPlayerInSquad:  isInSquad,
+        isLoggedInPlayerExempt:   isExempt,
+        loggedInWalletBalance:    runningWalletBalance,
       },
       hasDues:                 hasDues,
       squadAnnounced:          squadStatusMap[b.id] === 'announced',
       slotLocked:              (b as any).availability_locked ?? false,
       feePerPlayer:            feePerPlayerMap[b.id] ?? null,
-      isLoggedInPlayerInSquad: isPlayer && (squadMap[b.id] ?? []).some((p: any) => p.id === player?.playerId),
-      isLoggedInPlayerExempt:  loggedInPlayerExemptMap[b.id] ?? false,
-      loggedInWalletBalance:   loggedInWalletBalance,
+      isLoggedInPlayerInSquad: isInSquad,
+      isLoggedInPlayerExempt:  isExempt,
+      loggedInWalletBalance:   runningWalletBalance,
     })
-
+    // Deduct this match's fee from the running balance for subsequent cards
+    if (isInSquad && !isExempt && fee !== null && runningWalletBalance !== null) {
+      runningWalletBalance = runningWalletBalance - fee
+    }
   }
 
   return (
