@@ -354,7 +354,21 @@ useEffect(() => {
                     <button key={c.id} onClick={() => setCaptainId(c.id)}
                       className={`px-4 py-3 border rounded text-left transition-all
                         ${captainId === c.id ? 'border-gold bg-gold/8 text-gold' : 'border-ink-5 bg-ink-4 text-parchment hover:border-gold-dim'}`}>
-                      <p className="font-rajdhani font-semibold text-sm">{c.name}</p>
+                      <p className="font-rajdhani font-semibold text-sm">
+                        {c.players?.cricheroes_url ? (
+                          <a
+                            href={c.players.cricheroes_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="hover:text-gold underline underline-offset-2 transition-colors"
+                          >
+                            {c.name}
+                          </a>
+                        ) : (
+                          c.name
+                        )}
+                      </p>
                     </button>
                   ))}
                 </div>

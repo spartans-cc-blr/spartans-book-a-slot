@@ -24,7 +24,7 @@ export default async function TournamentPlannerPage() {
     .from('bookings')
     .select(`
       id, game_date, slot_time, format, captain_id,
-      tournament:tournaments!bookings_tournament_id_fkey(id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, cricheroes_points_table_url),
+      tournament:tournaments!bookings_tournament_id_fkey(id, name, organiser_name, organiser_contact, total_league_games, cricheroes_points_table_url),
       captain:captains!bookings_captain_id_fkey(id, name)
     `)
     .eq('status', 'confirmed')
@@ -48,7 +48,6 @@ export default async function TournamentPlannerPage() {
        organiser_name: string | null
        organiser_contact: string | null
        total_league_games: number | null
-       vc_captain_id: string | null
        cricheroes_points_table_url: string | null
      } | null
      captain: { id: string; name: string } | null
@@ -69,44 +68,30 @@ export default async function TournamentPlannerPage() {
   // 3. All active captains
   const { data: captains } = await supabase
     .from('captains')
-    .select('id, name')
+    .select('id, name, player_id')
     .eq('active', true)
     .order('name')
 
+  const today = new Date().toISOString().split('T')[0]
+
   // 4. Resolve captainId for the current viewer if they are a captain
-  //    Match by name since captains table has no player_id FK yet
-  // Clean version — replace the entire block above with this:
+  //    Use player_id FK — no fragile name matching
   let viewerCaptainId: string | null = null
-  let viewerIsVC = false
 
- // Resolution logic — clean and simple:
-  if (user?.isCaptain && user?.playerName) {
-    const viewerName = (user.playerName as string).toLowerCase()
-    const myRecord   = (captains ?? []).find(c => c.name.toLowerCase() === viewerName)
-
+  if (user?.isCaptain && user?.playerId) {
+    const myRecord = (captains ?? []).find(c => c.player_id === user.playerId)
     if (myRecord) {
-      // Are they a primary captain on any tournament?
-      const asPrimary = bookings.find(b => b.captain_id === myRecord.id)
-
-      // Are they a VC on any tournament?
-      const asVC = bookings.find(
-        b => b.tournament?.vc_captain_id === myRecord.id
+      // Only show personal bandwidth view if they have at least one upcoming booking
+      const hasActiveBooking = (bookings ?? []).some(
+        b => b.captain_id === myRecord.id && b.game_date >= today
       )
-
-      if (asPrimary && !asVC) {
-        viewerCaptainId = myRecord.id        // pure captain
-      } else if (asVC && !asPrimary) {
-        viewerCaptainId = asVC.captain_id    // pure VC — show primary captain's view
-        viewerIsVC      = true
-      } else if (asPrimary && asVC) {
-        viewerCaptainId = myRecord.id        // captain on some, VC on others — own id takes precedence
-        // follow-up sprint: support both simultaneously via captainIds[]
+      if (hasActiveBooking) {
+        viewerCaptainId = myRecord.id
       }
     }
   }
 
   const announcedBookingIds: string[] = []
-  const today = new Date().toISOString().split('T')[0]
 
   return (
     <>
@@ -122,7 +107,6 @@ export default async function TournamentPlannerPage() {
             isGC:      !!user?.isGC,
             isAdmin:   !!user?.isAdmin,
             captainId: viewerCaptainId,
-            isVC: viewerIsVC,
           }}
         />
       </main>

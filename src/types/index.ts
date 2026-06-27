@@ -9,7 +9,9 @@ export interface Captain {
   id:         string
   name:       string
   active:     boolean
+  player_id:  string | null
   created_at: string
+  players:    { cricheroes_url: string | null } | null
 }
 
 export interface Tournament {
