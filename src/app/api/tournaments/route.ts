@@ -26,7 +26,9 @@ export async function POST(request: Request) {
   if (deny) return deny
   const supabase = createServiceClient()
   const body = await request.json()
-  const { name, organiser_name, organiser_contact, ball_type = 'red', ground_id, total_league_games, cricheroes_points_table_url, match_fee } = body
+  // vibe-security: explicitly exclude vc_captain_id — deprecated, never written
+  const { vc_captain_id: _dropped, ...safeBody } = body
+  const { name, organiser_name, organiser_contact, ball_type = 'red', ground_id, total_league_games, cricheroes_points_table_url, match_fee } = safeBody
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
   const { data, error } = await supabase
     .from('tournaments')
@@ -42,7 +44,8 @@ export async function PATCH(request: Request) {
   if (deny) return deny
   const supabase = createServiceClient()
   const body = await request.json()
-  const { id, ...updates } = body
+  // vibe-security: strip vc_captain_id — deprecated, never written
+  const { id, vc_captain_id: _dropped, ...updates } = body
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
   const { data, error } = await supabase
     .from('tournaments')
