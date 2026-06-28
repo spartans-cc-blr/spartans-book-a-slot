@@ -20,7 +20,12 @@ export default async function AdminDashboard({
   // Upcoming confirmed bookings + soft blocks
   const { data: bookings } = await supabase
     .from('bookings')
-    .select('*, captain:captains!bookings_captain_id_fkey(id, name), tournament:tournaments(id, name)')
+    .select(`
+      id, game_date, slot_time, format, status, venue, opponent_name, block_reason, notes, created_at, updated_at, tournament_id,
+      tournament:tournaments!bookings_tournament_id_fkey(
+        id, name, captains!tournaments_captain_id_fkey(id, name)
+      )
+    `)
     .neq('status', 'cancelled')
     .gte('game_date', today)
     .order('game_date')
@@ -96,7 +101,7 @@ const { data: tournamentsMd } = await supabase.from('tournaments').select('id, n
           slot_time: b.slot_time,
           format: b.format ?? null,
           status: b.status,
-          captain_name: (b as any).captain?.name ?? null,
+          captain_name: (b as any).tournament?.captains?.name ?? null,
           tournament_name: (b as any).tournament?.name ?? null,
         }))}
     />
@@ -141,7 +146,7 @@ const { data: tournamentsMd } = await supabase.from('tournaments').select('id, n
                   </td>
                   <td className="px-4 py-3 font-cinzel text-sm text-parchment">{b.slot_time}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{b.format ?? '—'}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{(b as any).captain?.name ?? '—'}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{(b as any).tournament?.captains?.name ?? '—'}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400 max-w-[140px] truncate">
                     {b.status === 'soft_block' ? b.block_reason : (b as any).tournament?.name ?? '—'}
                   </td>

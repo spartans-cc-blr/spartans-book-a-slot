@@ -8,7 +8,7 @@ import type { CreateBookingRequest } from '@/types'
 
 
 // ── GET /api/bookings ─────────────────────────────────────────────
-// Admin only. Returns all bookings with captain and tournament joined.
+// Admin only. Returns all bookings with tournament (including captain) joined.
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
@@ -21,7 +21,12 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from('bookings')
-    .select(`*, captain:captains(*), tournament:tournaments(*)`)
+    .select(`
+      *,
+      tournament:tournaments!bookings_tournament_id_fkey(
+        *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
+      )
+    `)
     .order('game_date', { ascending: true })
     .order('slot_time', { ascending: true })
 
@@ -41,50 +46,75 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const body: CreateBookingRequest = await req.json()
-  const { game_date, slot_time, format, captain_id, tournament_id, venue, notes, opponent_name, match_id, cricheroes_url } = body as any
-  
-  // Basic presence check
-  if (!game_date || !slot_time || !format || !captain_id || !tournament_id) {
+  const body = await req.json()
+  // vibe-security: strip captain_id if client sends it — captain is always derived from tournament
+  const { captain_id: _dropped, ...safeBody } = body
+  const {
+    game_date, slot_time, format, tournament_id,
+    venue, notes, opponent_name, match_id, cricheroes_url,
+    match_time, match_stage, match_fee_override,
+  } = safeBody
+
+  if (!game_date || !slot_time || !format || !tournament_id) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
 
-  // Fetch existing bookings and names for validation messages
-  const [{ data: existing }, { data: captain }, { data: tournament }] =
-    await Promise.all([
-      supabase.from('bookings').select('*').neq('status', 'cancelled'),
-      supabase.from('captains').select('name').eq('id', captain_id).single(),
-      supabase.from('tournaments').select('name').eq('id', tournament_id).single(),
-    ])
+  const [{ data: existingRaw }, { data: tournament }] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select('*, tournament:tournaments!bookings_tournament_id_fkey(id, name, captain_id)')
+      .neq('status', 'cancelled'),
+    supabase
+      .from('tournaments')
+      .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name)')
+      .eq('id', tournament_id)
+      .single(),
+  ])
+
+  if (!tournament) {
+    return NextResponse.json({ error: 'Tournament not found' }, { status: 400 })
+  }
+
+  const existing = (existingRaw ?? []).map((b: any) => ({
+    ...b,
+    tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
+  }))
 
   const result = validateBooking(
-    body,
-    existing ?? [],
-    captain?.name ?? 'This captain',
-    tournament?.name ?? 'This tournament'
+    safeBody as CreateBookingRequest,
+    existing,
+    (tournament.captains as any)?.name ?? 'This captain',
+    tournament.name,
+    tournament.captain_id ?? null
   )
 
   if (!result.valid) {
     return NextResponse.json({ errors: result.errors }, { status: 422 })
   }
 
-  const { body: rawBody } = req  // already parsed above
-
   const { data, error } = await supabase
     .from('bookings')
     .insert({
       game_date, slot_time, format,
-      captain_id, tournament_id,
-      venue:          venue ?? null,
-      notes:          notes ?? null,
-      status:         'confirmed',
-      opponent_name:  opponent_name ?? null,
-      match_id:       match_id ?? null,
-      cricheroes_url: cricheroes_url ?? null,
+      tournament_id,
+      venue:              venue ?? null,
+      notes:              notes ?? null,
+      status:             'confirmed',
+      opponent_name:      opponent_name ?? null,
+      match_id:           match_id ?? null,
+      cricheroes_url:     cricheroes_url ?? null,
+      match_time:         match_time ?? null,
+      match_stage:        match_stage ?? null,
+      match_fee_override: match_fee_override ?? null,
     })
-    .select(`*, captain:captains(*), tournament:tournaments(*)`)
+    .select(`
+      *,
+      tournament:tournaments!bookings_tournament_id_fkey(
+        *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
+      )
+    `)
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

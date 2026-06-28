@@ -14,7 +14,12 @@ export async function GET(
 
   const { data, error } = await supabase
     .from('bookings')
-    .select(`*, captain:captains(*), tournament:tournaments(*)`)
+    .select(`
+      *,
+      tournament:tournaments!bookings_tournament_id_fkey(
+        *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
+      )
+    `)
     .eq('id', params.id)
     .single()
 
@@ -33,10 +38,13 @@ export async function PATCH(
 
   const body = await req.json()
 
+  // vibe-security: strip captain_id — captain is always derived from tournament
+  const { captain_id: _dropped, ...safeUpdates } = body
+
   // match_fee_override is admin-only — strip it from non-admin requests
   const user = session.user as any
-  if (!user?.isAdmin && 'match_fee_override' in body) {
-    delete body.match_fee_override
+  if (!user?.isAdmin && 'match_fee_override' in safeUpdates) {
+    delete safeUpdates.match_fee_override
   }
 
   const supabase = createServiceClient()
@@ -48,14 +56,19 @@ export async function PATCH(
   .single()
 
   const dateOrSlotChanged =
-    (body.game_date && body.game_date !== existing?.game_date) ||
-    (body.slot_time && body.slot_time !== existing?.slot_time)
+    (safeUpdates.game_date && safeUpdates.game_date !== existing?.game_date) ||
+    (safeUpdates.slot_time && safeUpdates.slot_time !== existing?.slot_time)
 
   const { data, error } = await supabase
     .from('bookings')
-    .update({ ...body, updated_at: new Date().toISOString() })
+    .update({ ...safeUpdates, updated_at: new Date().toISOString() })
     .eq('id', params.id)
-    .select(`*, captain:captains(*), tournament:tournaments(*)`)
+    .select(`
+      *,
+      tournament:tournaments!bookings_tournament_id_fkey(
+        *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
+      )
+    `)
     .single()
 
   if (dateOrSlotChanged) {

@@ -15,12 +15,20 @@ export interface Captain {
 }
 
 export interface Tournament {
-  id:                string
-  name:              string
-  organiser_name:    string | null
-  organiser_contact: string | null
-  active:            boolean
-  created_at:        string
+  id:                          string
+  name:                        string
+  organiser_name:              string | null
+  organiser_contact:           string | null
+  active:                      boolean
+  created_at:                  string
+  captain_id:                  string | null
+  total_league_games:          number | null
+  cricheroes_points_table_url: string | null
+  captains: {
+    id:      string
+    name:    string
+    players: { cricheroes_url: string | null } | null
+  } | null
 }
 
 export interface Booking {
@@ -29,7 +37,6 @@ export interface Booking {
   slot_time:     SlotTime
   format:        GameFormat | null
   venue:         string | null
-  captain_id:    string | null
   tournament_id: string | null
   status:        BookingStatus
   block_reason:  string | null
@@ -37,13 +44,14 @@ export interface Booking {
   created_at:    string
   updated_at:    string
   // Joined fields (from API responses)
-  captain?:      Captain
-  tournament?:   Tournament
+  tournament?:   Tournament & {
+    captain_id: string | null
+    captains: { id: string; name: string; players: { cricheroes_url: string | null } | null } | null
+  }
   reserved_until?: string | null
   organiser_name?: string | null
   organiser_phone?: string | null
   match_id?: string | null
-  //after: match_id?: string | null
   match_stage?: string | null
   match_time?: string | null
   opponent_name?: string | null
@@ -84,8 +92,7 @@ export interface CreateBookingRequest {
   game_date:      string
   slot_time:      SlotTime
   format:         GameFormat
-  captain_id:     string
-  tournament_id:  string
+  tournament_id:  string        // captain derived server-side from this
   venue?:         string | null
   notes?:         string | null
   opponent_name?: string | null

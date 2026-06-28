@@ -12,46 +12,49 @@ export const revalidate = 0
 export default async function TournamentPlannerPage() {
    const session = await getServerSession(authOptions)
    const user    = session?.user as any
- 
+
    // vibe-security: role check before any data fetch
    if (!session) redirect('/login')
    if (!user?.isCaptain && !user?.isGC && !user?.isAdmin) redirect('/fixtures')
- 
+
   const supabase = createServiceClient()
 
-  // 1. All confirmed bookings with tournament + captain joins
+  // 1. All confirmed bookings with tournament + captain joins (via tournament)
   const { data: rawBookings } = await supabase
     .from('bookings')
     .select(`
-      id, game_date, slot_time, format, captain_id,
-      tournament:tournaments!bookings_tournament_id_fkey(id, name, organiser_name, organiser_contact, total_league_games, cricheroes_points_table_url),
-      captain:captains!bookings_captain_id_fkey(id, name)
+      id, game_date, slot_time, format,
+      tournament:tournaments!bookings_tournament_id_fkey(
+        id, name, organiser_name, organiser_contact,
+        total_league_games, cricheroes_points_table_url,
+        captain_id,
+        captains!tournaments_captain_id_fkey(id, name)
+      )
     `)
     .eq('status', 'confirmed')
     .not('tournament_id', 'is', null)
     .order('game_date', { ascending: true })
 
-     // Supabase returns FK joins as arrays — cast to single objects to match Booking type
-   const bookings = (rawBookings ?? []).map(b => ({
-     ...b,
-     tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
-     captain:    Array.isArray(b.captain)    ? b.captain[0]    ?? null : b.captain,
-    })) as unknown as Array<{
-     id: string
-     game_date: string
-     slot_time: string
-     format: string | null
-     captain_id: string | null
-     tournament: {
-       id: string
-       name: string
-       organiser_name: string | null
-       organiser_contact: string | null
-       total_league_games: number | null
-       cricheroes_points_table_url: string | null
-     } | null
-     captain: { id: string; name: string } | null
-   }>
+  // Supabase returns FK joins as arrays — cast to single objects to match Booking type
+  const bookings = (rawBookings ?? []).map(b => ({
+    ...b,
+    tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
+  })) as unknown as Array<{
+    id: string
+    game_date: string
+    slot_time: string
+    format: string | null
+    tournament: {
+      id: string
+      name: string
+      organiser_name: string | null
+      organiser_contact: string | null
+      total_league_games: number | null
+      cricheroes_points_table_url: string | null
+      captain_id: string | null
+      captains: { id: string; name: string } | null
+    } | null
+  }>
 
   // 2. Squad status per booking — only need announced rows to determine "completed"
   //    A game is "completed" when game_date < today AND squad status = announced.
@@ -82,8 +85,9 @@ export default async function TournamentPlannerPage() {
     const myRecord = (captains ?? []).find(c => c.player_id === user.playerId)
     if (myRecord) {
       // Only show personal bandwidth view if they have at least one upcoming booking
-      const hasActiveBooking = (bookings ?? []).some(
-        b => b.captain_id === myRecord.id && b.game_date >= today
+      // (via tournament.captain_id, not booking.captain_id)
+      const hasActiveBooking = bookings.some(
+        b => b.tournament?.captain_id === myRecord.id && b.game_date >= today
       )
       if (hasActiveBooking) {
         viewerCaptainId = myRecord.id
