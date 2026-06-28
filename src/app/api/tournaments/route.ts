@@ -15,7 +15,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('tournaments')
-    .select('*, captains(id, name, players(cricheroes_url))')
+    .select('*, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))')
     .order('name', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ tournaments: data ?? [] })
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       match_fee: match_fee ?? null,
       captain_id: captain_id || null,
     })
-    .select('*, captains(id, name, players(cricheroes_url))')
+    .select('*, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ tournament: data })
@@ -90,7 +90,7 @@ export async function PATCH(request: Request) {
     .from('tournaments')
     .update(updates)
     .eq('id', id)
-    .select('*, captains(id, name, players(cricheroes_url))')
+    .select('*, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ tournament: data })
