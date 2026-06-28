@@ -1,2 +1,4 @@
 node_modules
 tsconfig.tsbuildinfo
+# Claude session state — ephemeral, not architecture
+.claude/rules/session_context.md

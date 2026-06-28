@@ -25,3 +25,7 @@ src/lib/**/*.ts
 src/middleware.ts
 src/types/
 supabase/migrations/
+
+# Project knowledge — now in .claude/rules/
+# These are READ by Claude Code automatically via settings.json
+# Do not add them to claudeignore
