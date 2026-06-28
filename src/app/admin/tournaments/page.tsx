@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 
 type Ground = { id: string; name: string }
+type Captain = { id: string; name: string }
 type Tournament = {
   id: string
   name: string
@@ -15,6 +16,8 @@ type Tournament = {
   total_league_games: number | null
   cricheroes_points_table_url: string | null
   match_fee: number | null
+  captain_id: string | null
+  captains: Captain | null
 }
 
 const BALL_LABELS = { red: '🔴 Red', white: '⚪ White', pink: '🩷 Pink' }
@@ -22,11 +25,16 @@ const BALL_LABELS = { red: '🔴 Red', white: '⚪ White', pink: '🩷 Pink' }
 export default function AdminTournamentsPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [grounds,     setGrounds]     = useState<Ground[]>([])
+  const [captains,    setCaptains]    = useState<Captain[]>([])
   const [loading,     setLoading]     = useState(true)
   const [editingId,   setEditingId]   = useState<string | null>(null)
-  const [editForm,    setEditForm]    = useState<Partial<Tournament>>({})
+  const [editForm,    setEditForm]    = useState<Partial<Tournament> & { captain_id?: string }>({})
   const [showAdd,     setShowAdd]     = useState(false)
-  const [addForm,     setAddForm]     = useState({ name: '', organiser_name: '', organiser_contact: '', cricheroes_points_table_url: '', ball_type: 'white' as 'red'|'white'|'pink', ground_id: '', total_league_games: '' as string, match_fee: '' as string })
+  const [addForm,     setAddForm]     = useState({
+    name: '', organiser_name: '', organiser_contact: '', cricheroes_points_table_url: '',
+    ball_type: 'white' as 'red'|'white'|'pink', ground_id: '',
+    total_league_games: '' as string, match_fee: '' as string, captain_id: '',
+  })
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
@@ -34,16 +42,25 @@ export default function AdminTournamentsPage() {
     Promise.all([
       fetch('/api/tournaments').then(r => r.json()),
       fetch('/api/grounds').then(r => r.json()),
-    ]).then(([t, g]) => {
+      fetch('/api/captains').then(r => r.json()),
+    ]).then(([t, g, c]) => {
       setTournaments(t.tournaments ?? [])
       setGrounds(g.grounds ?? [])
+      setCaptains(c.captains ?? [])
       setLoading(false)
     })
   }, [])
 
   function startEdit(t: Tournament) {
     setEditingId(t.id)
-    setEditForm({ name: t.name, organiser_name: t.organiser_name ?? '', organiser_contact: t.organiser_contact ?? '', cricheroes_points_table_url: t.cricheroes_points_table_url ?? '', ball_type: t.ball_type, ground_id: t.ground_id ?? '', active: t.active, total_league_games: t.total_league_games, match_fee: t.match_fee })
+    setEditForm({
+      name: t.name, organiser_name: t.organiser_name ?? '',
+      organiser_contact: t.organiser_contact ?? '',
+      cricheroes_points_table_url: t.cricheroes_points_table_url ?? '',
+      ball_type: t.ball_type, ground_id: t.ground_id ?? '',
+      active: t.active, total_league_games: t.total_league_games,
+      match_fee: t.match_fee, captain_id: t.captain_id ?? '',
+    })
     setError('')
   }
 
@@ -54,20 +71,22 @@ export default function AdminTournamentsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-      id, ...editForm,
-      ground_id: editForm.ground_id || null,
-      total_league_games: editForm.total_league_games
-        ? parseInt(editForm.total_league_games as unknown as string, 10)
-        : null,
-      match_fee: editForm.match_fee ? parseInt(editForm.match_fee as unknown as string) : null,
-    }),
+        id, ...editForm,
+        ground_id: editForm.ground_id || null,
+        total_league_games: editForm.total_league_games
+          ? parseInt(editForm.total_league_games as unknown as string, 10)
+          : null,
+        match_fee: editForm.match_fee ? parseInt(editForm.match_fee as unknown as string) : null,
+        captain_id: editForm.captain_id || null,
+      }),
     })
     if (res.ok) {
       const d = await res.json()
       setTournaments(prev => prev.map(t => t.id === id ? d.tournament : t))
       setEditingId(null)
     } else {
-      setError('Failed to save.')
+      const d = await res.json().catch(() => ({}))
+      setError(d.error ?? 'Failed to save.')
     }
     setSaving(false)
   }
@@ -91,15 +110,26 @@ export default function AdminTournamentsPage() {
     const res = await fetch('/api/tournaments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...addForm, ground_id: addForm.ground_id || null, total_league_games: addForm.total_league_games ? parseInt(addForm.total_league_games, 10) : null, match_fee: addForm.match_fee ? parseInt(addForm.match_fee) : null }),
+      body: JSON.stringify({
+        ...addForm,
+        ground_id: addForm.ground_id || null,
+        total_league_games: addForm.total_league_games ? parseInt(addForm.total_league_games, 10) : null,
+        match_fee: addForm.match_fee ? parseInt(addForm.match_fee) : null,
+        captain_id: addForm.captain_id || null,
+      }),
     })
     if (res.ok) {
       const d = await res.json()
       setTournaments(prev => [d.tournament, ...prev])
       setShowAdd(false)
-      setAddForm({ name: '', organiser_name: '', organiser_contact: '', ball_type: 'white', ground_id: '', total_league_games: '', cricheroes_points_table_url: '', match_fee: '' })
+      setAddForm({
+        name: '', organiser_name: '', organiser_contact: '', ball_type: 'white',
+        ground_id: '', total_league_games: '', cricheroes_points_table_url: '',
+        match_fee: '', captain_id: '',
+      })
     } else {
-      setError('Failed to add tournament.')
+      const d = await res.json().catch(() => ({}))
+      setError(d.error ?? 'Failed to add tournament.')
     }
     setSaving(false)
   }
@@ -128,6 +158,16 @@ export default function AdminTournamentsPage() {
               <label className="form-label">Tournament Name <span className="text-crimson">*</span></label>
               <input value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="e.g. Lakeview RCG Edition 12" className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Captain</label>
+              <select value={addForm.captain_id} onChange={e => setAddForm(f => ({ ...f, captain_id: e.target.value }))} className="form-input">
+                <option value="">Select captain...</option>
+                {captains.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                The captain who owns this tournament. Auto-fills on new bookings.
+              </p>
             </div>
             <div>
               <label className="form-label">Organiser Name</label>
@@ -212,26 +252,37 @@ export default function AdminTournamentsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-ink-5 bg-ink-4">
-                {['Tournament', 'Organiser', 'Ball', 'Ground', 'Status', ''].map(h => (
+                {['Tournament', 'Captain', 'Organiser', 'Ball', 'Ground', 'Status', ''].map(h => (
                   <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">Loading...</td></tr>
               )}
               {!loading && tournaments.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No tournaments yet.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No tournaments yet.</td></tr>
               )}
               {tournaments.map(t => (
                 <tr key={t.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
                   {editingId === t.id ? (
-                    <td colSpan={6} className="px-4 py-4">
+                    <td colSpan={7} className="px-4 py-4">
                       <div className="grid sm:grid-cols-2 gap-3">
                         <div>
                           <label className="form-label">Name</label>
                           <input value={editForm.name ?? ''} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} className="form-input" />
+                        </div>
+                        <div>
+                          <label className="form-label">Captain</label>
+                          <select
+                            value={editForm.captain_id ?? ''}
+                            onChange={e => setEditForm(f => ({ ...f, captain_id: e.target.value }))}
+                            className="form-input"
+                          >
+                            <option value="">None</option>
+                            {captains.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
                         </div>
                         <div>
                           <label className="form-label">Organiser Name</label>
@@ -309,8 +360,11 @@ export default function AdminTournamentsPage() {
                   ) : (
                     <>
                       <td className="px-4 py-3 font-rajdhani font-semibold text-sm text-parchment max-w-[180px] truncate">{t.name}</td>
+                      <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">
+                        {t.captains?.name ?? <span className="text-zinc-600">—</span>}
+                      </td>
                       <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{t.organiser_name ?? '—'}</td>
-                      <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{BALL_LABELS[t.ball_type] ?? '—'}</td>
+                      <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{BALL_LABELS[t.ball_type as 'red' | 'white' | 'pink'] ?? '—'}</td>
                       <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{groundName(t.ground_id)}</td>
                       <td className="px-4 py-3">
                         <span className={`font-rajdhani text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm border
