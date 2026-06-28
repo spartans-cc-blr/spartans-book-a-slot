@@ -2,9 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Captain, Tournament, SlotTime, GameFormat, ValidationResult, RuleCheckItem } from '@/types'
+import type { Tournament, SlotTime, GameFormat, ValidationResult, RuleCheckItem } from '@/types'
 
 type Ground = { id: string; name: string; maps_url: string; hospital_url: string }
+type TournamentWithCaptain = Tournament & {
+  captain_id: string | null
+  captains: { id: string; name: string; players: { cricheroes_url: string | null } | null } | null
+}
 import { SLOT_TIMES, SLOT_FORMATS } from '@/types'
 
 type BookingMode = 'confirmed' | 'reserved'
@@ -36,24 +40,26 @@ export default function NewBookingPage() {
   const [opponentName,  setOpponentName]  = useState('')
   const [matchId,       setMatchId]       = useState('')
   const [cricHeroesUrl, setCricHeroesUrl] = useState('')
-  const [matchTime, setMatchTime] = useState('')
+  const [matchTime,     setMatchTime]     = useState('')
+  const [captainOverride, setCaptainOverride] = useState(false)
 
   // Reservation-only fields
   const [organiserName,  setOrganiserName]  = useState('')
   const [organiserPhone, setOrganiserPhone] = useState('')
 
   // Quick-add tournament
-  const [showAddTournament,   setShowAddTournament]   = useState(false)
-  const [newTournamentName,   setNewTournamentName]   = useState('')
-  const [newTournamentOrg,    setNewTournamentOrg]    = useState('')
-  const [newTournamentBall,   setNewTournamentBall]   = useState<'red' | 'white' | 'pink'>('red')
-  const [newTournamentGround, setNewTournamentGround] = useState('')
-  const [addingTournament,    setAddingTournament]    = useState(false)
+  const [showAddTournament,    setShowAddTournament]    = useState(false)
+  const [newTournamentName,    setNewTournamentName]    = useState('')
+  const [newTournamentOrg,     setNewTournamentOrg]     = useState('')
+  const [newTournamentBall,    setNewTournamentBall]    = useState<'red' | 'white' | 'pink'>('red')
+  const [newTournamentGround,  setNewTournamentGround]  = useState('')
+  const [newTournamentCaptain, setNewTournamentCaptain] = useState('')
+  const [addingTournament,     setAddingTournament]     = useState(false)
 
   // Data
-  const [captains,    setCaptains]    = useState<Captain[]>([])
-  const [tournaments, setTournaments] = useState<Tournament[]>([])
-  const [grounds,     setGrounds]     = useState<Ground[]>([])
+  const [tournaments,      setTournaments]      = useState<TournamentWithCaptain[]>([])
+  const [grounds,          setGrounds]          = useState<Ground[]>([])
+  const [overrideCaptains, setOverrideCaptains] = useState<{ id: string; name: string }[]>([])
 
   // Validation
   const [ruleChecks,  setRuleChecks]  = useState<RuleCheckItem[]>(
@@ -63,11 +69,11 @@ export default function NewBookingPage() {
   const [submitError, setSubmitError] = useState('')
 
   const [matchStage, setMatchStage] = useState('')
-  
+
   useEffect(() => {
-    fetch('/api/captains').then(r => r.json()).then(d => setCaptains(d.captains ?? []))
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
     fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? []))
+    fetch('/api/captains').then(r => r.json()).then(d => setOverrideCaptains(d.captains ?? []))
   }, [])
 
   useEffect(() => {
@@ -76,75 +82,85 @@ export default function NewBookingPage() {
     setOpponentName(''); setMatchId(''); setCricHeroesUrl(''); setMatchTime('')
     setOrganiserName(''); setOrganiserPhone('')
     setShowAddTournament(false); setNewTournamentName(''); setNewTournamentOrg('')
-    setNewTournamentBall('red'); setNewTournamentGround('')
+    setNewTournamentBall('red'); setNewTournamentGround(''); setNewTournamentCaptain('')
+    setCaptainOverride(false)
     setSubmitError('')
     setRuleChecks(RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' })))
     setMatchStage('')
   }, [mode])
 
-  // AFTER
-useEffect(() => {
-  if (!cricHeroesUrl) return
-  try {
-    const url = new URL(cricHeroesUrl)
-    const parts = url.pathname.split('/').filter(Boolean)
-    // parts: ['scorecard', '22711244', 'lakeview-rcg-edition-10-(t30-white-ball)', 'spartans-cc-bengaluru-vs-demigods-cricket-club']
-
-    // 1. Match ID
-    const idIndex = parts.indexOf('scorecard')
-    if (idIndex !== -1 && parts[idIndex + 1]) {
-      setMatchId(parts[idIndex + 1])
+  // Auto-populate captainId from tournament
+  useEffect(() => {
+    if (!tournamentId) {
+      if (!captainOverride) setCaptainId('')
+      return
     }
-
-    // 2. Opponent name — from last segment
-    const matchSegment = parts[parts.length - 1]
-    if (matchSegment?.includes('-vs-')) {
-      const [teamA, teamB] = matchSegment.split('-vs-')
-      const opponent = teamA.includes('spartans') ? teamB : teamA
-      const formatted = opponent
-        .split('-')
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ')
-      setOpponentName(prev => prev || formatted) // don't overwrite if already set
+    const tournament = tournaments.find(t => t.id === tournamentId)
+    if (tournament?.captain_id && !captainOverride) {
+      setCaptainId(tournament.captain_id)
     }
+  }, [tournamentId, tournaments, captainOverride])
 
-    // 3. Tournament name — from slug segment (index 2), strip format suffix & parens
-    const tournamentSlug = parts[2] ?? ''
-    if (tournamentSlug) {
-      // Strip parenthetical format hints: "(t30-white-ball)", "(t20)"
-      const withoutParens = tournamentSlug.replace(/\([^)]*\)/g, '').trim().replace(/-+$/, '')
-      const tournamentGuess = withoutParens
-        .split('-')
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ')
-
-      // Fuzzy match against loaded tournaments list
-      const lower = withoutParens.toLowerCase()
-      const matched = tournaments.find(t =>
-        t.name.toLowerCase().includes(lower.split('-').slice(0, 3).join(' ')) ||
-        lower.includes(t.name.toLowerCase().replace(/\s+/g, '-'))
-      )
-      if (matched) {
-        setTournamentId(prev => prev || matched.id)
-      }
-      // Store the guess in notes if no match found, so admin sees it
-      if (!matched && tournamentGuess) {
-        setNotes(prev => prev || `Tournament from URL: ${tournamentGuess}`)
-      }
-    }
-
-    // 4. Format hint — from tournament slug parenthetical
-    const formatHint = tournamentSlug.match(/\((t20|t30)[^)]*\)/i)?.[1]?.toUpperCase()
-    if (formatHint === 'T20' || formatHint === 'T30') {
-      setFormat(prev => prev || formatHint)
-    }
-
-  } catch {
-    // Invalid URL — ignore
+  function disableOverride() {
+    setCaptainOverride(false)
+    const tournament = tournaments.find(t => t.id === tournamentId)
+    if (tournament?.captain_id) setCaptainId(tournament.captain_id)
+    else setCaptainId('')
   }
-}, [cricHeroesUrl, tournaments]) // add `tournaments` to dep array
 
-  
+  useEffect(() => {
+    if (!cricHeroesUrl) return
+    try {
+      const url = new URL(cricHeroesUrl)
+      const parts = url.pathname.split('/').filter(Boolean)
+
+      const idIndex = parts.indexOf('scorecard')
+      if (idIndex !== -1 && parts[idIndex + 1]) {
+        setMatchId(parts[idIndex + 1])
+      }
+
+      const matchSegment = parts[parts.length - 1]
+      if (matchSegment?.includes('-vs-')) {
+        const [teamA, teamB] = matchSegment.split('-vs-')
+        const opponent = teamA.includes('spartans') ? teamB : teamA
+        const formatted = opponent
+          .split('-')
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ')
+        setOpponentName(prev => prev || formatted)
+      }
+
+      const tournamentSlug = parts[2] ?? ''
+      if (tournamentSlug) {
+        const withoutParens = tournamentSlug.replace(/\([^)]*\)/g, '').trim().replace(/-+$/, '')
+        const tournamentGuess = withoutParens
+          .split('-')
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ')
+
+        const lower = withoutParens.toLowerCase()
+        const matched = tournaments.find(t =>
+          t.name.toLowerCase().includes(lower.split('-').slice(0, 3).join(' ')) ||
+          lower.includes(t.name.toLowerCase().replace(/\s+/g, '-'))
+        )
+        if (matched) {
+          setTournamentId(prev => prev || matched.id)
+        }
+        if (!matched && tournamentGuess) {
+          setNotes(prev => prev || `Tournament from URL: ${tournamentGuess}`)
+        }
+      }
+
+      const tournamentSlugForFormat = parts[2] ?? ''
+      const formatHint = tournamentSlugForFormat.match(/\((t20|t30)[^)]*\)/i)?.[1]?.toUpperCase()
+      if (formatHint === 'T20' || formatHint === 'T30') {
+        setFormat(prev => prev || formatHint)
+      }
+    } catch {
+      // Invalid URL — ignore
+    }
+  }, [cricHeroesUrl, tournaments])
+
   const validate = useCallback(async () => {
     if (mode === 'reserved') {
       setRuleChecks(RULES.map(r => ({ ...r, status: 'pass', message: 'N/A for reservations' })))
@@ -186,21 +202,27 @@ useEffect(() => {
         organiser_name: newTournamentOrg.trim() || null,
         ball_type: newTournamentBall,
         ground_id: newTournamentGround || null,
+        captain_id: newTournamentCaptain || null,
       }),
     })
     if (res.ok) {
       const d = await res.json()
-      setTournaments(prev => [...prev, d.tournament])
-      setTournamentId(d.tournament.id)
+      const created = d.tournament as TournamentWithCaptain
+      setTournaments(prev => [...prev, created])
+      setTournamentId(created.id)
+      if (created.captain_id && !captainOverride) {
+        setCaptainId(created.captain_id)
+      }
       setShowAddTournament(false)
       setNewTournamentName('')
       setNewTournamentOrg('')
+      setNewTournamentCaptain('')
     }
     setAddingTournament(false)
   }
 
   async function handleSubmit() {
-    if (mode === 'confirmed' && !allPassed) return
+    if (mode === 'confirmed' && (!allPassed || !captainId)) return
     if (mode === 'reserved' && !reservationReady) return
 
     setSubmitting(true)
@@ -255,6 +277,8 @@ useEffect(() => {
       }
     }
   }
+
+  const selectedTournament = tournaments.find(t => t.id === tournamentId)
 
   return (
     <div>
@@ -348,40 +372,86 @@ useEffect(() => {
           {/* Confirmed-only fields */}
           {mode === 'confirmed' && (
             <>
-              <FormCard step={3} title="Assign Captain">
-                <div className="grid grid-cols-2 gap-2">
-                  {captains.filter(c => c.active).map(c => (
-                    <button key={c.id} onClick={() => setCaptainId(c.id)}
-                      className={`px-4 py-3 border rounded text-left transition-all
-                        ${captainId === c.id ? 'border-gold bg-gold/8 text-gold' : 'border-ink-5 bg-ink-4 text-parchment hover:border-gold-dim'}`}>
-                      <p className="font-rajdhani font-semibold text-sm">
-                        {c.players?.cricheroes_url ? (
-                          <a
-                            href={c.players.cricheroes_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            className="hover:text-gold underline underline-offset-2 transition-colors"
-                          >
-                            {c.name}
-                          </a>
-                        ) : (
-                          c.name
-                        )}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </FormCard>
-
-              <FormCard step={4} title="Tournament">
-                <select value={tournamentId} onChange={e => { setTournamentId(e.target.value); setShowAddTournament(false) }}
-                  className="form-input">
+              {/* Step 3: Tournament (captain inline) */}
+              <FormCard step={3} title="Tournament">
+                <select
+                  value={tournamentId}
+                  onChange={e => {
+                    setTournamentId(e.target.value)
+                    setShowAddTournament(false)
+                    setCaptainOverride(false)
+                  }}
+                  className="form-input"
+                >
                   <option value="">Select tournament...</option>
                   {tournaments.filter(t => t.active).map(t => (
-                    <option key={t.id} value={t.id}>{t.name}{t.organiser_name ? ` — ${t.organiser_name}` : ''}</option>
+                    <option key={t.id} value={t.id}>
+                      {t.name}{t.organiser_name ? ` — ${t.organiser_name}` : ''}
+                    </option>
                   ))}
                 </select>
+
+                {/* Captain derived from tournament */}
+                {tournamentId && (
+                  <div className="mt-3 p-3 rounded bg-ink-4 border border-ink-5">
+                    <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-1">
+                      Captain
+                    </p>
+                    {captainOverride ? (
+                      <div>
+                        <select
+                          value={captainId}
+                          onChange={e => setCaptainId(e.target.value)}
+                          className="form-input text-sm"
+                        >
+                          <option value="">Select override captain...</option>
+                          {overrideCaptains.filter(c => (c as any).active !== false).map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={disableOverride}
+                          className="mt-1.5 font-rajdhani text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                        >
+                          ✕ Use tournament captain ({selectedTournament?.captains?.name ?? 'none set'})
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="font-rajdhani font-semibold text-sm text-parchment">
+                          {selectedTournament?.captains?.name ? (
+                            selectedTournament.captains.players?.cricheroes_url ? (
+                              <a
+                                href={selectedTournament.captains.players.cricheroes_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="hover:text-gold underline underline-offset-2 transition-colors"
+                              >
+                                {selectedTournament.captains.name}
+                              </a>
+                            ) : selectedTournament.captains.name
+                          ) : (
+                            <span className="text-amber-400 text-xs">No captain set on this tournament</span>
+                          )}
+                        </span>
+                        <button
+                          onClick={() => setCaptainOverride(true)}
+                          className="font-rajdhani text-[11px] text-zinc-500 hover:text-gold transition-colors"
+                        >
+                          Different captain for this game?
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {tournamentId && !captainId && !captainOverride && (
+                  <p className="font-rajdhani text-xs text-amber-400 mt-2">
+                    This tournament has no captain set. Go to Tournaments master data to add one, or use &quot;Different captain for this game?&quot; to set one manually.
+                  </p>
+                )}
+
                 <button onClick={() => setShowAddTournament(v => !v)}
                   className="mt-2 font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors flex items-center gap-1">
                   {showAddTournament ? '✕ Cancel' : '＋ Add new tournament'}
@@ -397,6 +467,15 @@ useEffect(() => {
                       <label className="form-label">Organiser Name <span className="text-zinc-600">(optional)</span></label>
                       <input type="text" value={newTournamentOrg} onChange={e => setNewTournamentOrg(e.target.value)}
                         placeholder="e.g. Ravi Kumar" className="form-input" />
+                    </div>
+                    <div>
+                      <label className="form-label">Captain</label>
+                      <select value={newTournamentCaptain} onChange={e => setNewTournamentCaptain(e.target.value)} className="form-input">
+                        <option value="">Select captain...</option>
+                        {overrideCaptains.filter(c => (c as any).active !== false).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="form-label">Ball Type</label>
@@ -432,7 +511,7 @@ useEffect(() => {
                 )}
               </FormCard>
 
-              <FormCard step={5} title="Venue & Notes (optional)">
+              <FormCard step={4} title="Venue & Notes (optional)">
                 <div className="space-y-3">
                   <div>
                     <label className="form-label">Venue</label>
@@ -448,7 +527,7 @@ useEffect(() => {
               </FormCard>
 
               {tournamentId && (
-                <FormCard step={6} title="Match Details (optional)">
+                <FormCard step={5} title="Match Details (optional)">
                   <div className="space-y-3">
                     <div>
                       <label className="form-label">Opponent Name</label>
@@ -513,7 +592,7 @@ useEffect(() => {
               Cancel
             </button>
             <button onClick={handleSubmit}
-              disabled={mode === 'confirmed' ? (!allPassed || submitting) : (!reservationReady || submitting)}
+              disabled={mode === 'confirmed' ? (!allPassed || submitting || !captainId) : (!reservationReady || submitting)}
               className={`font-rajdhani text-sm font-bold tracking-widest uppercase disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors
                 ${mode === 'confirmed' ? 'bg-crimson hover:bg-crimson-dark' : 'bg-amber-700 hover:bg-amber-600'}`}>
               {submitting ? 'Saving...' : mode === 'confirmed' ? '✓ Confirm Booking' : '🟡 Reserve Slot'}
@@ -547,7 +626,7 @@ useEffect(() => {
                   </div>
                 ))}
                 <div className="px-4 py-3 bg-ink-4">
-                  {allPassed
+                  {allPassed && captainId
                     ? <p className="font-rajdhani text-xs text-emerald-400 font-bold">✓ All rules passed. Ready to confirm.</p>
                     : <p className="font-rajdhani text-xs text-zinc-600">Fix the issues above before confirming.</p>}
                 </div>
@@ -564,8 +643,8 @@ useEffect(() => {
                 {gameDate      && <p>📅 {gameDate}</p>}
                 {slotTime  && <p>🕐 Slot: {slotTime}{format ? ` — ${format}` : ''}</p>}
                 {matchTime && <p>⏰ Match starts: {matchTime}</p>}
-                {mode === 'confirmed' && captainId    && <p>👤 {captains.find(c => c.id === captainId)?.name}</p>}
-                {mode === 'confirmed' && tournamentId && <p>🏆 {tournaments.find(t => t.id === tournamentId)?.name}</p>}
+                {mode === 'confirmed' && captainId    && <p>👤 {overrideCaptains.find(c => c.id === captainId)?.name ?? selectedTournament?.captains?.name}</p>}
+                {mode === 'confirmed' && tournamentId && <p>🏆 {selectedTournament?.name}</p>}
                 {mode === 'confirmed' && venue        && <p>📍 {venue}</p>}
                 {mode === 'confirmed' && opponentName && <p>⚔️ vs {opponentName}</p>}
                 {mode === 'confirmed' && cricHeroesUrl && (

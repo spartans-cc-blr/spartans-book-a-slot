@@ -17,22 +17,34 @@ export async function POST(req: NextRequest) {
   const body: Partial<CreateBookingRequest> = await req.json()
   const { game_date, slot_time, format, captain_id, tournament_id, exclude_id } = body
 
-  if (!game_date || !slot_time || !format || !captain_id || !tournament_id) {
+  const supabase = createServiceClient()
+
+  // Resolve captain_id server-side from tournament if not explicitly provided
+  let resolvedCaptainId = captain_id
+  if (!resolvedCaptainId && tournament_id) {
+    const { data: t } = await supabase
+      .from('tournaments')
+      .select('captain_id')
+      .eq('id', tournament_id)
+      .single()
+    resolvedCaptainId = t?.captain_id ?? null
+  }
+
+  if (!game_date || !slot_time || !format || !resolvedCaptainId || !tournament_id) {
     return NextResponse.json({ valid: false, errors: [], incomplete: true })
   }
 
-  const supabase = createServiceClient()
   const [{ data: existing }, { data: captain }, { data: tournament }] =
     await Promise.all([
       exclude_id
   		? supabase.from('bookings').select('*').neq('status', 'cancelled').neq('id', exclude_id)
   		: supabase.from('bookings').select('*').neq('status', 'cancelled'),
-      supabase.from('captains').select('name').eq('id', captain_id).single(),
+      supabase.from('captains').select('name').eq('id', resolvedCaptainId).single(),
       supabase.from('tournaments').select('name').eq('id', tournament_id).single(),
     ])
 
   const result = validateBooking(
-    body as CreateBookingRequest,
+    { ...body, captain_id: resolvedCaptainId } as CreateBookingRequest,
     existing ?? [],
     captain?.name ?? 'This captain',
     tournament?.name ?? 'This tournament'
