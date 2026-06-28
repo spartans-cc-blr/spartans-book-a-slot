@@ -14,40 +14,53 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const body: Partial<CreateBookingRequest> = await req.json()
-  const { game_date, slot_time, format, captain_id, tournament_id, exclude_id } = body
+  const body = await req.json()
+  const { game_date, slot_time, format, tournament_id, exclude_id } = body
 
-  const supabase = createServiceClient()
-
-  // Resolve captain_id server-side from tournament if not explicitly provided
-  let resolvedCaptainId = captain_id
-  if (!resolvedCaptainId && tournament_id) {
-    const { data: t } = await supabase
-      .from('tournaments')
-      .select('captain_id')
-      .eq('id', tournament_id)
-      .single()
-    resolvedCaptainId = t?.captain_id ?? null
-  }
-
-  if (!game_date || !slot_time || !format || !resolvedCaptainId || !tournament_id) {
+  if (!game_date || !slot_time || !format || !tournament_id) {
     return NextResponse.json({ valid: false, errors: [], incomplete: true })
   }
 
-  const [{ data: existing }, { data: captain }, { data: tournament }] =
-    await Promise.all([
-      exclude_id
-  		? supabase.from('bookings').select('*').neq('status', 'cancelled').neq('id', exclude_id)
-  		: supabase.from('bookings').select('*').neq('status', 'cancelled'),
-      supabase.from('captains').select('name').eq('id', resolvedCaptainId).single(),
-      supabase.from('tournaments').select('name').eq('id', tournament_id).single(),
-    ])
+  const supabase = createServiceClient()
+
+  const [{ data: existingRaw }, { data: tournament }] = await Promise.all([
+    exclude_id
+      ? supabase
+          .from('bookings')
+          .select('*, tournament:tournaments!bookings_tournament_id_fkey(id, name, captain_id)')
+          .neq('status', 'cancelled')
+          .neq('id', exclude_id)
+      : supabase
+          .from('bookings')
+          .select('*, tournament:tournaments!bookings_tournament_id_fkey(id, name, captain_id)')
+          .neq('status', 'cancelled'),
+    supabase
+      .from('tournaments')
+      .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name)')
+      .eq('id', tournament_id)
+      .single(),
+  ])
+
+  if (!tournament) {
+    return NextResponse.json({ valid: false, errors: [], incomplete: true })
+  }
+
+  const thisTournamentCaptainId = tournament.captain_id ?? null
+  const captainName = (tournament.captains as any)?.name ?? 'This captain'
+  const tournamentName = tournament.name
+
+  // Normalise array-wrapped FK joins from Supabase
+  const existing = (existingRaw ?? []).map((b: any) => ({
+    ...b,
+    tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
+  }))
 
   const result = validateBooking(
-    { ...body, captain_id: resolvedCaptainId } as CreateBookingRequest,
-    existing ?? [],
-    captain?.name ?? 'This captain',
-    tournament?.name ?? 'This tournament'
+    body as CreateBookingRequest,
+    existing,
+    captainName,
+    tournamentName,
+    thisTournamentCaptainId
   )
 
   return NextResponse.json(result)

@@ -11,7 +11,6 @@ interface Booking {
   game_date: string
   slot_time: string
   format: string | null
-  captain_id: string | null
   tournament: {
     id: string
     name: string
@@ -19,8 +18,9 @@ interface Booking {
     organiser_contact: string | null
     total_league_games: number | null
     cricheroes_points_table_url: string | null
+    captain_id: string | null
+    captains: { id: string; name: string } | null
   } | null
-  captain: { id: string; name: string } | null
 }
 
 interface Captain { id: string; name: string }
@@ -121,7 +121,7 @@ function BandwidthSection({
   const otherCaptains   = isCaptainView ? captains.filter(c => c.id !== viewerCaptainId) : captains
 
   function renderCaptainCard(captain: Captain, isOwn: boolean) {
-    const mine      = tourneyBookings.filter(b => b.captain_id === captain.id)
+    const mine      = tourneyBookings.filter(b => b.tournament?.captain_id === captain.id)
     const completed = mine.filter(b => b.game_date < today)
     const scheduled = mine.filter(b => b.game_date >= today)
 
@@ -858,8 +858,8 @@ function GameRow({ game, gap, avgGapRef, isDone = false }: {
           <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">{game.format}</span>
         </div>
         <div className="font-rajdhani text-xs text-zinc-400">
-          Captain: {game.captain
-            ? <PlayerNameLink name={game.captain.name} className="text-blue-400" />
+          Captain: {game.tournament?.captains
+            ? <PlayerNameLink name={game.tournament.captains.name} className="text-blue-400" />
             : <span className="text-zinc-600">Unassigned</span>
           }
         </div>
@@ -931,10 +931,10 @@ export function TournamentPlannerClient({
 
   const isCaptainView    = viewerRole.isCaptain && !!viewerRole.captainId
   const myTournaments    = isCaptainView
-    ? sortedTournaments.filter(t => t.games.some(g => g.captain_id === viewerRole.captainId))
+    ? sortedTournaments.filter(({ tournament }) => tournament?.captain_id === viewerRole.captainId)
     : sortedTournaments
   const otherTournaments = isCaptainView
-    ? sortedTournaments.filter(t => t.games.every(g => g.captain_id !== viewerRole.captainId))
+    ? sortedTournaments.filter(({ tournament }) => tournament?.captain_id !== viewerRole.captainId)
     : []
 
   return (

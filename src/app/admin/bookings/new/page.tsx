@@ -15,7 +15,7 @@ type BookingMode = 'confirmed' | 'reserved'
 
 const RULES: { rule: string; label: string }[] = [
   { rule: 'R1', label: 'Max 3 games per weekend' },
-  { rule: 'R2', label: 'One captain per weekend' },
+  { rule: 'R2', label: 'Captain leading another tournament this weekend' },
   { rule: 'R3', label: 'Max 2 games per tournament/month' },
   { rule: 'R4', label: 'Slot not already taken' },
   { rule: 'R5', label: 'No T20/T30 format clash' },
@@ -34,14 +34,12 @@ export default function NewBookingPage() {
   const [notes,         setNotes]         = useState('')
 
   // Confirmed-only fields
-  const [captainId,     setCaptainId]     = useState('')
   const [tournamentId,  setTournamentId]  = useState('')
   const [venue,         setVenue]         = useState('')
   const [opponentName,  setOpponentName]  = useState('')
   const [matchId,       setMatchId]       = useState('')
   const [cricHeroesUrl, setCricHeroesUrl] = useState('')
   const [matchTime,     setMatchTime]     = useState('')
-  const [captainOverride, setCaptainOverride] = useState(false)
 
   // Reservation-only fields
   const [organiserName,  setOrganiserName]  = useState('')
@@ -53,13 +51,11 @@ export default function NewBookingPage() {
   const [newTournamentOrg,     setNewTournamentOrg]     = useState('')
   const [newTournamentBall,    setNewTournamentBall]    = useState<'red' | 'white' | 'pink'>('red')
   const [newTournamentGround,  setNewTournamentGround]  = useState('')
-  const [newTournamentCaptain, setNewTournamentCaptain] = useState('')
   const [addingTournament,     setAddingTournament]     = useState(false)
 
   // Data
-  const [tournaments,      setTournaments]      = useState<TournamentWithCaptain[]>([])
-  const [grounds,          setGrounds]          = useState<Ground[]>([])
-  const [overrideCaptains, setOverrideCaptains] = useState<{ id: string; name: string }[]>([])
+  const [tournaments,  setTournaments]  = useState<TournamentWithCaptain[]>([])
+  const [grounds,      setGrounds]      = useState<Ground[]>([])
 
   // Validation
   const [ruleChecks,  setRuleChecks]  = useState<RuleCheckItem[]>(
@@ -73,40 +69,19 @@ export default function NewBookingPage() {
   useEffect(() => {
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
     fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? []))
-    fetch('/api/captains').then(r => r.json()).then(d => setOverrideCaptains(d.captains ?? []))
   }, [])
 
   useEffect(() => {
     setGameDate(''); setSlotTime(''); setFormat(''); setNotes('')
-    setCaptainId(''); setTournamentId(''); setVenue('')
+    setTournamentId(''); setVenue('')
     setOpponentName(''); setMatchId(''); setCricHeroesUrl(''); setMatchTime('')
     setOrganiserName(''); setOrganiserPhone('')
     setShowAddTournament(false); setNewTournamentName(''); setNewTournamentOrg('')
-    setNewTournamentBall('red'); setNewTournamentGround(''); setNewTournamentCaptain('')
-    setCaptainOverride(false)
+    setNewTournamentBall('red'); setNewTournamentGround('')
     setSubmitError('')
     setRuleChecks(RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' })))
     setMatchStage('')
   }, [mode])
-
-  // Auto-populate captainId from tournament
-  useEffect(() => {
-    if (!tournamentId) {
-      if (!captainOverride) setCaptainId('')
-      return
-    }
-    const tournament = tournaments.find(t => t.id === tournamentId)
-    if (tournament?.captain_id && !captainOverride) {
-      setCaptainId(tournament.captain_id)
-    }
-  }, [tournamentId, tournaments, captainOverride])
-
-  function disableOverride() {
-    setCaptainOverride(false)
-    const tournament = tournaments.find(t => t.id === tournamentId)
-    if (tournament?.captain_id) setCaptainId(tournament.captain_id)
-    else setCaptainId('')
-  }
 
   useEffect(() => {
     if (!cricHeroesUrl) return
@@ -166,14 +141,14 @@ export default function NewBookingPage() {
       setRuleChecks(RULES.map(r => ({ ...r, status: 'pass', message: 'N/A for reservations' })))
       return
     }
-    if (!gameDate || !format || !slotTime || !captainId || !tournamentId) {
+    if (!gameDate || !format || !slotTime || !tournamentId) {
       setRuleChecks(RULES.map(r => ({ ...r, status: 'pending', message: 'Fill all fields to check.' })))
       return
     }
     const res = await fetch('/api/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ game_date: gameDate, format, slot_time: slotTime, captain_id: captainId, tournament_id: tournamentId }),
+      body: JSON.stringify({ game_date: gameDate, format, slot_time: slotTime, tournament_id: tournamentId }),
     })
     const result: ValidationResult = await res.json()
     const errorMap   = Object.fromEntries(result.errors.map(e => [e.rule, e.message]))
@@ -183,7 +158,7 @@ export default function NewBookingPage() {
       status:  errorMap[r.rule] ? 'fail' : warningMap[r.rule] ? 'warn' : 'pass',
       message: errorMap[r.rule] ?? warningMap[r.rule] ?? '✓ Passed',
     })))
-  }, [mode, gameDate, format, slotTime, captainId, tournamentId])
+  }, [mode, gameDate, format, slotTime, tournamentId])
 
   useEffect(() => { validate() }, [validate])
 
@@ -202,7 +177,6 @@ export default function NewBookingPage() {
         organiser_name: newTournamentOrg.trim() || null,
         ball_type: newTournamentBall,
         ground_id: newTournamentGround || null,
-        captain_id: newTournamentCaptain || null,
       }),
     })
     if (res.ok) {
@@ -210,19 +184,15 @@ export default function NewBookingPage() {
       const created = d.tournament as TournamentWithCaptain
       setTournaments(prev => [...prev, created])
       setTournamentId(created.id)
-      if (created.captain_id && !captainOverride) {
-        setCaptainId(created.captain_id)
-      }
       setShowAddTournament(false)
       setNewTournamentName('')
       setNewTournamentOrg('')
-      setNewTournamentCaptain('')
     }
     setAddingTournament(false)
   }
 
   async function handleSubmit() {
-    if (mode === 'confirmed' && (!allPassed || !captainId)) return
+    if (mode === 'confirmed' && !allPassed) return
     if (mode === 'reserved' && !reservationReady) return
 
     setSubmitting(true)
@@ -233,18 +203,17 @@ export default function NewBookingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          game_date:     gameDate,
+          game_date:      gameDate,
           format,
-          slot_time:     slotTime,
-          captain_id:    captainId,
-          tournament_id: tournamentId,
-          venue:         venue || null,
-          notes:         notes || null,
-          opponent_name: opponentName || null,
-          match_id:      matchId || null,
-          match_stage:   matchStage || null,
+          slot_time:      slotTime,
+          tournament_id:  tournamentId,
+          venue:          venue || null,
+          notes:          notes || null,
+          opponent_name:  opponentName || null,
+          match_id:       matchId || null,
+          match_stage:    matchStage || null,
           cricheroes_url: cricHeroesUrl || null,
-          match_time: matchTime || null,
+          match_time:     matchTime || null,
         }),
       })
       if (res.ok) {
@@ -372,14 +341,13 @@ export default function NewBookingPage() {
           {/* Confirmed-only fields */}
           {mode === 'confirmed' && (
             <>
-              {/* Step 3: Tournament (captain inline) */}
+              {/* Step 3: Tournament (captain read-only from tournament) */}
               <FormCard step={3} title="Tournament">
                 <select
                   value={tournamentId}
                   onChange={e => {
                     setTournamentId(e.target.value)
                     setShowAddTournament(false)
-                    setCaptainOverride(false)
                   }}
                   className="form-input"
                 >
@@ -391,66 +359,33 @@ export default function NewBookingPage() {
                   ))}
                 </select>
 
-                {/* Captain derived from tournament */}
-                {tournamentId && (
-                  <div className="mt-3 p-3 rounded bg-ink-4 border border-ink-5">
-                    <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-1">
-                      Captain
-                    </p>
-                    {captainOverride ? (
-                      <div>
-                        <select
-                          value={captainId}
-                          onChange={e => setCaptainId(e.target.value)}
-                          className="form-input text-sm"
-                        >
-                          <option value="">Select override captain...</option>
-                          {overrideCaptains.filter(c => (c as any).active !== false).map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={disableOverride}
-                          className="mt-1.5 font-rajdhani text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
-                        >
-                          ✕ Use tournament captain ({selectedTournament?.captains?.name ?? 'none set'})
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <span className="font-rajdhani font-semibold text-sm text-parchment">
-                          {selectedTournament?.captains?.name ? (
-                            selectedTournament.captains.players?.cricheroes_url ? (
-                              <a
-                                href={selectedTournament.captains.players.cricheroes_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={e => e.stopPropagation()}
-                                className="hover:text-gold underline underline-offset-2 transition-colors"
-                              >
-                                {selectedTournament.captains.name}
-                              </a>
-                            ) : selectedTournament.captains.name
-                          ) : (
-                            <span className="text-amber-400 text-xs">No captain set on this tournament</span>
-                          )}
+                {/* Captain — read-only, derived from tournament */}
+                {tournamentId && (() => {
+                  const t = selectedTournament
+                  const captainName = t?.captains?.name
+                  const captainUrl  = t?.captains?.players?.cricheroes_url
+                  return (
+                    <div className="mt-3 p-3 rounded bg-ink-4 border border-ink-5">
+                      <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-1">
+                        Captain
+                      </p>
+                      {captainName ? (
+                        captainUrl ? (
+                          <a href={captainUrl} target="_blank" rel="noopener noreferrer"
+                             className="font-rajdhani font-semibold text-sm text-parchment hover:text-gold underline underline-offset-2 transition-colors">
+                            {captainName}
+                          </a>
+                        ) : (
+                          <span className="font-rajdhani font-semibold text-sm text-parchment">{captainName}</span>
+                        )
+                      ) : (
+                        <span className="font-rajdhani text-xs text-amber-400">
+                          No captain set on this tournament — go to Tournaments to add one.
                         </span>
-                        <button
-                          onClick={() => setCaptainOverride(true)}
-                          className="font-rajdhani text-[11px] text-zinc-500 hover:text-gold transition-colors"
-                        >
-                          Different captain for this game?
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {tournamentId && !captainId && !captainOverride && (
-                  <p className="font-rajdhani text-xs text-amber-400 mt-2">
-                    This tournament has no captain set. Go to Tournaments master data to add one, or use &quot;Different captain for this game?&quot; to set one manually.
-                  </p>
-                )}
+                      )}
+                    </div>
+                  )
+                })()}
 
                 <button onClick={() => setShowAddTournament(v => !v)}
                   className="mt-2 font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors flex items-center gap-1">
@@ -467,15 +402,6 @@ export default function NewBookingPage() {
                       <label className="form-label">Organiser Name <span className="text-zinc-600">(optional)</span></label>
                       <input type="text" value={newTournamentOrg} onChange={e => setNewTournamentOrg(e.target.value)}
                         placeholder="e.g. Ravi Kumar" className="form-input" />
-                    </div>
-                    <div>
-                      <label className="form-label">Captain</label>
-                      <select value={newTournamentCaptain} onChange={e => setNewTournamentCaptain(e.target.value)} className="form-input">
-                        <option value="">Select captain...</option>
-                        {overrideCaptains.filter(c => (c as any).active !== false).map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
                     </div>
                     <div>
                       <label className="form-label">Ball Type</label>
@@ -502,6 +428,9 @@ export default function NewBookingPage() {
                         ))}
                       </select>
                     </div>
+                    <p className="font-rajdhani text-xs text-zinc-500">
+                      Captain can be assigned after creation via the Tournaments page.
+                    </p>
                     <button onClick={handleAddTournament}
                       disabled={!newTournamentName.trim() || addingTournament}
                       className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
@@ -592,7 +521,7 @@ export default function NewBookingPage() {
               Cancel
             </button>
             <button onClick={handleSubmit}
-              disabled={mode === 'confirmed' ? (!allPassed || submitting || !captainId) : (!reservationReady || submitting)}
+              disabled={mode === 'confirmed' ? (!allPassed || submitting) : (!reservationReady || submitting)}
               className={`font-rajdhani text-sm font-bold tracking-widest uppercase disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors
                 ${mode === 'confirmed' ? 'bg-crimson hover:bg-crimson-dark' : 'bg-amber-700 hover:bg-amber-600'}`}>
               {submitting ? 'Saving...' : mode === 'confirmed' ? '✓ Confirm Booking' : '🟡 Reserve Slot'}
@@ -626,7 +555,7 @@ export default function NewBookingPage() {
                   </div>
                 ))}
                 <div className="px-4 py-3 bg-ink-4">
-                  {allPassed && captainId
+                  {allPassed
                     ? <p className="font-rajdhani text-xs text-emerald-400 font-bold">✓ All rules passed. Ready to confirm.</p>
                     : <p className="font-rajdhani text-xs text-zinc-600">Fix the issues above before confirming.</p>}
                 </div>
@@ -643,7 +572,7 @@ export default function NewBookingPage() {
                 {gameDate      && <p>📅 {gameDate}</p>}
                 {slotTime  && <p>🕐 Slot: {slotTime}{format ? ` — ${format}` : ''}</p>}
                 {matchTime && <p>⏰ Match starts: {matchTime}</p>}
-                {mode === 'confirmed' && captainId    && <p>👤 {overrideCaptains.find(c => c.id === captainId)?.name ?? selectedTournament?.captains?.name}</p>}
+                {mode === 'confirmed' && selectedTournament?.captains?.name && <p>👤 {selectedTournament.captains.name}</p>}
                 {mode === 'confirmed' && tournamentId && <p>🏆 {selectedTournament?.name}</p>}
                 {mode === 'confirmed' && venue        && <p>📍 {venue}</p>}
                 {mode === 'confirmed' && opponentName && <p>⚔️ vs {opponentName}</p>}

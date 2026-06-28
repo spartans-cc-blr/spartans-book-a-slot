@@ -50,11 +50,18 @@ function hasT20T30Conflict(
   return false
 }
 
+type BookingWithTournamentCaptain = Booking & {
+  tournament?: {
+    captain_id: string | null
+  } | null
+}
+
 export function validateBooking(
   booking: CreateBookingRequest,
-  existingBookings: Booking[],
+  existingBookings: BookingWithTournamentCaptain[],
   captainName: string,
-  tournamentName: string
+  tournamentName: string,
+  thisTournamentCaptainId: string | null = null
 ): ValidationResult {
   const errors: ValidationError[] = []
   const warnings: ValidationError[] = []
@@ -76,17 +83,18 @@ export function validateBooking(
     }
   }
 
-  // ── R2: One game per captain per weekend (weekends only, WARNING) ──
-  if (isWeekendGame) {
-    const captainWeekend = active.filter(b =>
+  // ── R2: Captain leading another tournament same weekend (WARNING) ──
+  if (isWeekendGame && thisTournamentCaptainId) {
+    const captainWeekendConflict = active.filter(b =>
       weekend.includes(b.game_date) &&
-      b.captain_id === booking.captain_id &&
+      b.tournament_id !== booking.tournament_id &&
+      b.tournament?.captain_id === thisTournamentCaptainId &&
       b.status === 'confirmed'
     )
-    if (captainWeekend.length > 0) {
+    if (captainWeekendConflict.length > 0) {
       warnings.push({
         rule: 'R2',
-        message: `${captainName} is already playing this weekend. Confirm only if the captain has agreed to play again.`,
+        message: `${captainName} is already leading another tournament this weekend. Confirm only if they have agreed to play again.`,
       })
     }
   }
