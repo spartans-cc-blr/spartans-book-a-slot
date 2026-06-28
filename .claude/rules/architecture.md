@@ -125,9 +125,9 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
  
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/bookings` | GET, POST, PATCH, DELETE | Admin | Booking CRUD |
+| `/api/bookings` | GET, POST, PATCH, DELETE | Admin | Booking CRUD | PATCH clears availability rows when game_date or slot_time changes
 | `/api/bookings/reserve` | POST | Admin | Create soft_block reservation |
-| `/api/validate` | POST | Admin | Live rule validation during booking form entry |
+| `/api/validate` | POST | Admin | Live rule validation during booking form entry; accepts optional exclude_id to exclude current booking from R4 self-conflict on edit
 | `/api/captains` | GET, POST, PATCH | Admin | Captain master data |
 | `/api/tournaments` | GET, POST, PATCH | Admin | Tournament master data; PATCH also used by `InlineGameCountEditor` in Tournament Planner to update `total_league_games`; POST/PATCH both handle `cricheroes_points_table_url` |
 | `/api/players` | GET, POST, PATCH | Admin | Full player directory management |
