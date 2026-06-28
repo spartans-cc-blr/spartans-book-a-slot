@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "rules": {
+    "include": [
+      ".claude/rules/*.md",
+      ".claude/rules/features/*.md"
+    ]
+  }
+}
