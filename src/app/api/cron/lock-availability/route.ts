@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
+import { sendPushToPlayer } from '@/lib/webpush'
+
 
 // Runs every Thursday at 02:30 UTC = 08:00 IST
 // Blanket-locks ALL confirmed Sat/Sun slots for the upcoming weekend.
@@ -39,5 +41,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ locked: result?.length ?? 0, dates })
+    const notifyGCs = async (title: string, body: string) => {
+    const { data: gcs } = await supabase.from('players').select('id').eq('is_gc', true)
+    if (gcs?.length) {
+      await Promise.all(gcs.map(gc => sendPushToPlayer(gc.id, { title, body, url: '/admin' })))
+    }
+  }
+
+  if (error) {
+    await notifyGCs(
+      '⚠️ Availability Lock Failed',
+      `Cron error: ${error.message}`
+    )
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (!result || result.length === 0) {
+    await notifyGCs(
+      '⚠️ Availability Lock — Nothing Locked',
+      `No confirmed slots found for ${dates.join(' & ')} — check bookings`
+    )
+    return NextResponse.json({ locked: 0, dates })
+  }
+
+  await notifyGCs(
+    '🔒 Availability Locked',
+    `${result.length} slot${result.length > 1 ? 's' : ''} locked for ${dates.join(' & ')}`
+  )
+  return NextResponse.json({ locked: result.length, dates })
+
 }
