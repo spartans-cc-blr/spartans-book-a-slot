@@ -22,6 +22,7 @@ self.addEventListener('activate', e => {
 })
 
 // Network-first for API and auth routes, cache-first for shell
+// After
 self.addEventListener('fetch', e => {
   const { request } = e
   const url = new URL(request.url)
@@ -36,7 +37,17 @@ self.addEventListener('fetch', e => {
     return // Let it go to network untouched
   }
 
-  // Cache-first for static shell
+  // Navigation requests (actual page loads) are always network-only.
+  // These pages are session-bound (fixtures/captains-corner/profile/etc) —
+  // never let them be cache-first, even by accident in a future change.
+  if (request.mode === 'navigate') {
+    e.respondWith(
+      fetch(request, { cache: 'no-store' }).catch(() => caches.match(OFFLINE_URL))
+    )
+    return
+  }
+
+  // Cache-first for static shell assets only (JS, CSS, images, fonts)
   e.respondWith(
     caches.match(request).then(cached => {
       return cached ?? fetch(request).catch(() =>

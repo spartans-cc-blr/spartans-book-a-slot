@@ -35,8 +35,6 @@ export const metadata: Metadata = {
   title: 'Upcoming Fixtures — Spartans Cricket Club',
 }
 
-export const revalidate = 60
-
 // Groups bookings for OYE validation purposes:
 // - Sat + Sun of the same weekend share a key → validation applies across them
 // - Weekday games get an isolated key → no cross-game validation
