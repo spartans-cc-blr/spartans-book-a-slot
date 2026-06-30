@@ -59,7 +59,6 @@ export async function POST(req: NextRequest) {
       notes: notes ?? null,
       status: 'soft_block',
       format: null,
-      captain_id: null,
       tournament_id: null,
     })
     .select()
