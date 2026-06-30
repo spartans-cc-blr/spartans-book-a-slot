@@ -41,19 +41,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-    const notifyGCs = async (title: string, body: string) => {
-    const { data: gcs } = await supabase.from('players').select('id').eq('is_gc', true)
-    if (gcs?.length) {
-      await Promise.all(gcs.map(gc => sendPushToPlayer(gc.id, { title, body, url: '/admin' })))
+  const notifyGCs = async (title: string, body: string) => {
+  const { data: gcs } = await supabase.from('players').select('id').eq('is_gc', true)
+  if (gcs?.length) {
+    await Promise.all(gcs.map(gc => sendPushToPlayer(gc.id, { title, body, url: '/admin' })))
     }
   }
 
   if (error) {
+    const errMsg = (error as { message: string }).message
     await notifyGCs(
       '⚠️ Availability Lock Failed',
-      `Cron error: ${error.message}`
+      `Cron error: ${errMsg}`
     )
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: errMsg }, { status: 500 })
   }
 
   if (!result || result.length === 0) {
