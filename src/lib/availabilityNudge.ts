@@ -44,7 +44,20 @@ export interface NudgeBooking {
 export interface NudgeCandidate {
   playerId: string
   booking: NudgeBooking
-  theme: NudgeTheme
+  theme: Exclude<NudgeTheme, 'deadline'>
+}
+
+// Wednesday is a last-chance warning, not an invitation to one opportunity —
+// it must name every booking the player still has a gap on, not just one.
+// `representativeBooking` exists only so the caller has a single booking_id
+// to write to availability_nudge_log (the idempotency guard is per-day, not
+// per-booking) and a single deep link for the push; the actual copy is built
+// from the full `gapBookings` list via buildDeadlineCopy().
+export interface DeadlineNudgeCandidate {
+  playerId: string
+  theme: 'deadline'
+  representativeBooking: NudgeBooking
+  gapBookings: NudgeBooking[]
 }
 
 interface PlayerHistory {
@@ -194,17 +207,23 @@ export function pickNudgeCandidate(
   gapBookings: NudgeBooking[],
   history: PlayerHistory,
   priorNudgeThisWeek: PriorNudge | null
-): NudgeCandidate | null {
+): NudgeCandidate | DeadlineNudgeCandidate | null {
   if (!gapBookings.length) return null
 
   // Wednesday — always fires if still unanswered, overrides theme choice,
-  // carries the same booking reference used earlier in the week if possible.
+  // and must cover every remaining gap booking (not just one): this is the
+  // last nudge before the irreversible Thursday 8am lock, so unlike Sun/Mon/
+  // Tue's single invitational pick, it can't afford to warn about only one
+  // of several open bookings. representativeBooking carries the same
+  // reference used earlier in the week where possible, purely so the daily
+  // log row / push deep-link has one concrete booking to point at — the
+  // actual copy is built from the full gapBookings list.
   if (dow === 3) {
     const carried = priorNudgeThisWeek
       ? gapBookings.find(b => b.id === priorNudgeThisWeek.bookingId)
       : undefined
-    const booking = carried ?? gapBookings[0]
-    return { playerId, booking, theme: 'deadline' }
+    const representativeBooking = carried ?? gapBookings[0]
+    return { playerId, theme: 'deadline', representativeBooking, gapBookings }
   }
 
   // Deliberate: inactive players always get generic reactivation copy,
@@ -247,7 +266,9 @@ export function pickNudgeCandidate(
 }
 
 // ── Copy — self-referential only, explicit date always, no counts/scarcity ─
-export function buildNudgeCopy(theme: NudgeTheme, booking: NudgeBooking): { title: string; body: string } {
+// 'deadline' is handled by the dedicated buildDeadlineCopy() below — it needs
+// every remaining gap booking, not just one, so it isn't part of this switch.
+export function buildNudgeCopy(theme: NudgeCandidate['theme'], booking: NudgeBooking): { title: string; body: string } {
   const dt = formatNudgeDateTime(booking)
   switch (theme) {
     case 'habitual':
@@ -275,11 +296,41 @@ export function buildNudgeCopy(theme: NudgeTheme, booking: NudgeBooking): { titl
         title: '🏏 Still open',
         body: `Still open: ${dt}. Whenever you're ready to play again.`,
       }
-    case 'deadline':
-      return {
-        title: '⏰ Locks tomorrow at 8am',
-        body: `Availability for ${formatNudgeDateOnly(booking)} locks tomorrow at 8am — you haven't marked yours yet.`,
-      }
+  }
+}
+
+// Wednesday's last-chance warning — must name every booking the player still
+// has a gap on. Naming a player's own count/list of outstanding items is
+// consistent with the existing Pending Availability dashboard card (which
+// already states a personal number) — this is not the others'-response-count
+// scarcity pattern the no-counts rule was written to prevent.
+export function buildDeadlineCopy(gapBookings: NudgeBooking[]): { title: string; body: string } {
+  const title = '⏰ Locks tomorrow at 8am'
+  if (!gapBookings.length) return { title, body: 'Availability locks tomorrow at 8am.' }
+
+  // nextLockWeekend only ever spans Sat + Sun, but dedupe by game_date first
+  // regardless — two unresponded slots on the same day must not repeat the
+  // same date twice in the copy.
+  const uniqueDates = Array.from(new Set(gapBookings.map(b => b.game_date))).sort()
+  const dateLabels = uniqueDates.map(gameDate =>
+    formatNudgeDateOnly(gapBookings.find(b => b.game_date === gameDate)!)
+  )
+
+  if (dateLabels.length === 1) {
+    return {
+      title,
+      body: `Availability for ${dateLabels[0]} locks tomorrow at 8am — you haven't marked yours yet.`,
+    }
+  }
+  if (dateLabels.length === 2) {
+    return {
+      title,
+      body: `Availability locks tomorrow at 8am — you haven't marked ${dateLabels[0]} or ${dateLabels[1]} yet.`,
+    }
+  }
+  return {
+    title,
+    body: `Availability locks tomorrow at 8am — you still have slots open on ${dateLabels.join(', ')} that you haven't marked yet.`,
   }
 }
 
@@ -422,6 +473,11 @@ export async function getNudgeForPlayer(
     prior
   )
   if (!candidate) return null
+
+  if (candidate.theme === 'deadline') {
+    const { title, body } = buildDeadlineCopy(candidate.gapBookings)
+    return { theme: candidate.theme, booking: candidate.representativeBooking, title, body }
+  }
 
   const { title, body } = buildNudgeCopy(candidate.theme, candidate.booking)
   return { theme: candidate.theme, booking: candidate.booking, title, body }

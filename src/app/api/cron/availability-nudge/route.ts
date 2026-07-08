@@ -7,7 +7,9 @@ import {
   getPriorNudgesThisWeek,
   pickNudgeCandidate,
   buildNudgeCopy,
+  buildDeadlineCopy,
   type NudgeCandidate,
+  type DeadlineNudgeCandidate,
 } from '@/lib/availabilityNudge'
 
 // Runs daily Sun–Wed at 14:30 UTC = 20:00 IST.
@@ -69,7 +71,7 @@ export async function GET(req: NextRequest) {
     // instead of a query per player inside the loop below.
     const priorNudges = await getPriorNudgesThisWeek(supabase, playerIds, bookingSlotMap, now)
 
-    const candidates: NudgeCandidate[] = []
+    const candidates: (NudgeCandidate | DeadlineNudgeCandidate)[] = []
     for (const player of players) {
       const gapBookings = bookingList.filter(b => !answeredKey.has(`${player.id}|${b.id}`))
       if (!gapBookings.length) continue
@@ -92,6 +94,14 @@ export async function GET(req: NextRequest) {
 
     const results = await Promise.allSettled(
       candidates.map(async (candidate) => {
+        // Wednesday's 'deadline' theme covers every remaining gap booking, so
+        // it carries a representativeBooking purely for the log row's
+        // booking_id (the daily idempotency guard) and the push deep-link —
+        // the copy itself is built from the full gapBookings list.
+        const logBookingId = candidate.theme === 'deadline'
+          ? candidate.representativeBooking.id
+          : candidate.booking.id
+
         // Insert the log row first with status 'pending' — the
         // UNIQUE(player_id, nudge_date) constraint is the idempotency guard.
         // If this fails (already nudged today, e.g. a retried invocation),
@@ -100,7 +110,7 @@ export async function GET(req: NextRequest) {
           .from('availability_nudge_log')
           .insert({
             player_id:  candidate.playerId,
-            booking_id: candidate.booking.id,
+            booking_id: logBookingId,
             theme:      candidate.theme,
             nudge_date: today,
             status:     'pending',
@@ -113,11 +123,13 @@ export async function GET(req: NextRequest) {
         // Delivery status is tracked separately from the attempt — a push
         // failure must not leave the log row claiming success.
         try {
-          const { title, body } = buildNudgeCopy(candidate.theme, candidate.booking)
+          const { title, body } = candidate.theme === 'deadline'
+            ? buildDeadlineCopy(candidate.gapBookings)
+            : buildNudgeCopy(candidate.theme, candidate.booking)
           const pushResults = await sendPushToPlayer(candidate.playerId, {
             title,
             body,
-            url: `/fixtures/${candidate.booking.id}`,
+            url: `/fixtures/${logBookingId}`,
           })
 
           // sendPushToPlayer settles per-subscription via Promise.allSettled
