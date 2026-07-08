@@ -38,3 +38,14 @@ export async function sendPushToPlayer(playerId: string, payload: PushPayload) {
 
   return results
 }
+
+// Broadcast a push notification to every GC member — used by cron jobs to
+// surface failures/results that would otherwise go unnoticed (Vercel Hobby
+// doesn't retry failed cron invocations and drops logs within an hour).
+export async function notifyGCs(title: string, body: string, url: string = '/admin') {
+  const supabase = createServiceClient()
+  const { data: gcs } = await supabase.from('players').select('id').eq('is_gc', true)
+  if (gcs?.length) {
+    await Promise.all(gcs.map(gc => sendPushToPlayer(gc.id, { title, body, url })))
+  }
+}

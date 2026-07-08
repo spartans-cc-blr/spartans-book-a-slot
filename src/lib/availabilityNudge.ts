@@ -25,7 +25,7 @@ export const MIN_HISTORY_SAMPLE = 6
 
 export type NudgeTheme =
   | 'habitual'
-  | 'format_stretch'
+  | 'same_format_new_slot'
   | 'tournament_eligibility'
   | 'reactivation_1'
   | 'reactivation_2'
@@ -55,7 +55,7 @@ interface PlayerHistory {
   tournamentIdsWithResponse: Set<string>
 }
 
-interface PriorNudge {
+export interface PriorNudge {
   bookingId: string
   slotTime: string
 }
@@ -207,6 +207,12 @@ export function pickNudgeCandidate(
     return { playerId, booking, theme: 'deadline' }
   }
 
+  // Deliberate: inactive players always get generic reactivation copy,
+  // regardless of how much habitual-pattern history they have. Presuming a
+  // lapsed player still wants their old slot back is presumptuous — a plain
+  // "come back anytime" is the safer re-engagement hook. Do not change this
+  // to `playerStatus === 'inactive' && !history.hasEnoughSample` without a
+  // product decision — see availability-nudge follow-up spec, Fix 3 Option A.
   const noHistory = playerStatus === 'inactive' || !history.hasEnoughSample
   if (noHistory) {
     const booking = gapBookings[0]
@@ -227,7 +233,7 @@ export function pickNudgeCandidate(
       !(priorNudgeThisWeek && b.id === priorNudgeThisWeek.bookingId) &&
       !(priorNudgeThisWeek && b.slot_time === priorNudgeThisWeek.slotTime)
     )
-    return booking ? { playerId, booking, theme: 'format_stretch' } : null
+    return booking ? { playerId, booking, theme: 'same_format_new_slot' } : null
   }
 
   if (dow === 2) {
@@ -249,7 +255,7 @@ export function buildNudgeCopy(theme: NudgeTheme, booking: NudgeBooking): { titl
         title: '🏏 Your usual slot is open',
         body: `Your usual slot — ${dt} — is open. You haven't marked your availability yet.`,
       }
-    case 'format_stretch':
+    case 'same_format_new_slot':
       return {
         title: `🏏 ${booking.format} slot open`,
         body: `A ${booking.format} slot is open on ${dt} — same format you usually play.`,
@@ -333,6 +339,46 @@ export async function getPriorNudgeThisWeek(
   const row = data?.[0]
   if (!row) return null
   return { bookingId: row.booking_id, slotTime: bookingSlotMap.get(row.booking_id) ?? '' }
+}
+
+// ── Batched version of getPriorNudgeThisWeek — one round-trip for the whole
+// roster instead of one query per player. Used by the cron's main loop;
+// getPriorNudgeThisWeek() itself stays as-is for the single-player dashboard
+// pipeline (getNudgeForPlayer), which only ever needs one player's data. ──
+export async function getPriorNudgesThisWeek(
+  supabase: ServiceClient,
+  playerIds: string[],
+  bookingSlotMap: Map<string, string>,
+  now = new Date()
+): Promise<Map<string, PriorNudge>> {
+  const result = new Map<string, PriorNudge>()
+  if (!playerIds.length) return result
+
+  const dow = now.getDay()
+  const today = now.toISOString().split('T')[0]
+  const thisSunday = new Date(now)
+  thisSunday.setDate(now.getDate() - dow)
+  const thisSundayStr = thisSunday.toISOString().split('T')[0]
+
+  const { data } = await supabase
+    .from('availability_nudge_log')
+    .select('player_id, booking_id, nudge_date')
+    .in('player_id', playerIds)
+    .gte('nudge_date', thisSundayStr)
+    .lt('nudge_date', today)
+    .order('nudge_date', { ascending: false })
+
+  // Rows arrive most-recent-first — keep only the first (i.e. most recent)
+  // row seen per player.
+  for (const row of (data ?? [])) {
+    if (result.has(row.player_id)) continue
+    result.set(row.player_id, {
+      bookingId: row.booking_id,
+      slotTime: bookingSlotMap.get(row.booking_id) ?? '',
+    })
+  }
+
+  return result
 }
 
 // ── Single-player pipeline — used for the read-only dashboard section ──────
