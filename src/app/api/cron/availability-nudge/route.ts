@@ -5,11 +5,13 @@ import {
   fetchNextLockWeekendBookings,
   buildPlayerHistories,
   getPriorNudgesThisWeek,
+  getWeeklyNudgeHistoryForPlayers,
   pickNudgeCandidate,
   buildNudgeCopy,
   buildDeadlineCopy,
   type NudgeCandidate,
   type DeadlineNudgeCandidate,
+  type WeeklyNudgeHistoryEntry,
 } from '@/lib/availabilityNudge'
 
 // Runs daily Sun–Wed at 14:30 UTC = 20:00 IST.
@@ -71,6 +73,12 @@ export async function GET(req: NextRequest) {
     // instead of a query per player inside the loop below.
     const priorNudges = await getPriorNudgesThisWeek(supabase, playerIds, bookingSlotMap, now)
 
+    // Fix 7: one batched round-trip for the whole roster's used-themes and
+    // referenced-bookings history, powering the priority list's skip-
+    // already-used rule and the soft unreferenced-booking preference.
+    const weeklyHistory = await getWeeklyNudgeHistoryForPlayers(supabase, playerIds, now)
+    const emptyWeeklyHistory: WeeklyNudgeHistoryEntry = { usedThemes: new Set(), referencedBookingIds: new Set() }
+
     const candidates: (NudgeCandidate | DeadlineNudgeCandidate)[] = []
     for (const player of players) {
       const gapBookings = bookingList.filter(b => !answeredKey.has(`${player.id}|${b.id}`))
@@ -80,9 +88,12 @@ export async function GET(req: NextRequest) {
       if (!history) continue
 
       const prior = priorNudges.get(player.id) ?? null
+      const { usedThemes, referencedBookingIds } = weeklyHistory.get(player.id) ?? emptyWeeklyHistory
       const status: 'active' | 'inactive' = player.status === 'inactive' ? 'inactive' : 'active'
 
-      const candidate = pickNudgeCandidate(dow, player.id, status, gapBookings, history, prior)
+      const candidate = pickNudgeCandidate(
+        dow, player.id, status, gapBookings, history, prior, usedThemes, referencedBookingIds
+      )
       if (candidate) candidates.push(candidate)
     }
 
