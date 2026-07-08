@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
-import { sendPushToPlayer } from '@/lib/webpush'
+import { notifyGCs } from '@/lib/webpush'
 
 
 // Runs every Thursday at 02:30 UTC = 08:00 IST
@@ -36,17 +36,6 @@ export async function GET(req: NextRequest) {
     .eq('status', 'confirmed')
     .eq('availability_locked', false)   // idempotent — skip already-locked rows
     .select('id')
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  const notifyGCs = async (title: string, body: string) => {
-  const { data: gcs } = await supabase.from('players').select('id').eq('is_gc', true)
-  if (gcs?.length) {
-    await Promise.all(gcs.map(gc => sendPushToPlayer(gc.id, { title, body, url: '/admin' })))
-    }
-  }
 
   if (error) {
     const errMsg = (error as { message: string }).message
