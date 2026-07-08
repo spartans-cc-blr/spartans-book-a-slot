@@ -1,0 +1,382 @@
+// src/lib/availabilityNudge.ts
+//
+// Core logic for the Sun 8pm → Wed 8pm availability nudge cadence.
+// Reminds players to mark availability for `nextLockWeekend` — the Sat/Sun
+// pair that the upcoming Thursday 08:00 IST lock-availability cron will freeze.
+//
+// Shared by:
+//   - src/app/api/cron/availability-nudge/route.ts (sends pushes, writes the log)
+//   - src/app/page.tsx (read-only "matches your pattern" dashboard section)
+//
+// Copy rules (hard constraints — see push_notifications spec):
+//   - Always name the explicit date, never "this weekend"
+//   - No scarcity / social-proof / comparative language, no raw counts
+//   - Deadline framing ("locks tomorrow at 8am") is the one factual exception
+//
+// Out of scope for this pass: the "discovery" themes (format stretch / novel
+// slot) — the spec describes them as an at-most-once-per-cycle addition with
+// no defined trigger day, separate from this Sun–Wed cadence.
+
+import { createServiceClient } from '@/lib/supabase'
+
+type ServiceClient = ReturnType<typeof createServiceClient>
+
+export const MIN_HISTORY_SAMPLE = 6
+
+export type NudgeTheme =
+  | 'habitual'
+  | 'format_stretch'
+  | 'tournament_eligibility'
+  | 'reactivation_1'
+  | 'reactivation_2'
+  | 'deadline'
+
+export interface NudgeBooking {
+  id: string
+  game_date: string          // YYYY-MM-DD
+  slot_time: string
+  match_time: string | null
+  format: string
+  tournament_id: string | null
+  tournament_name: string | null
+}
+
+export interface NudgeCandidate {
+  playerId: string
+  booking: NudgeBooking
+  theme: NudgeTheme
+}
+
+interface PlayerHistory {
+  hasEnoughSample: boolean
+  favoriteDow: number | null     // 0=Sun..6=Sat
+  favoriteSlot: string | null
+  favoriteFormat: string | null
+  tournamentIdsWithResponse: Set<string>
+}
+
+interface PriorNudge {
+  bookingId: string
+  slotTime: string
+}
+
+// ── Date / label helpers ────────────────────────────────────────────────────
+
+const SLOT_LABELS: Record<string, string> = {
+  '07:30': '7:15 AM', '10:30': '10:15 AM', '12:30': '12:15 PM', '14:30': '2:15 PM',
+}
+
+function slotLabel(slot: string): string {
+  return SLOT_LABELS[slot] ?? slot
+}
+
+function formatReportingTime(matchTime: string | null): string {
+  if (!matchTime) return ''
+  const [h, m] = matchTime.split(':').map(Number)
+  const totalMinutes = h * 60 + m - 15   // reporting time is 15 min before kickoff
+  const rh = Math.floor(totalMinutes / 60)
+  const rm = totalMinutes % 60
+  const period = rh >= 12 ? 'PM' : 'AM'
+  const hour12 = rh % 12 || 12
+  return `${hour12}${rm > 0 ? `:${String(rm).padStart(2, '0')}` : ''} ${period}`
+}
+
+function formatNudgeDateOnly(booking: NudgeBooking): string {
+  const d = new Date(booking.game_date + 'T00:00:00')
+  return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+export function formatNudgeDateTime(booking: NudgeBooking): string {
+  const timeLabel = formatReportingTime(booking.match_time) || slotLabel(booking.slot_time)
+  return `${formatNudgeDateOnly(booking)}, ${timeLabel}`
+}
+
+// ── nextLockWeekend — mirrors lock-availability cron's own Sat/Sun calc ────
+// Thursday cron: saturday = thursday+2, sunday = thursday+3.
+// From any day Sun(0)..Wed(3), the next Thursday is (4 - dow) days out.
+export function getNextLockWeekendDates(now = new Date()) {
+  const dow = now.getDay()
+  const daysUntilThursday = ((4 - dow) % 7 + 7) % 7 || 7
+  const thursday = new Date(now)
+  thursday.setDate(now.getDate() + daysUntilThursday)
+  const saturday = new Date(thursday)
+  saturday.setDate(thursday.getDate() + 2)
+  const sunday = new Date(saturday)
+  sunday.setDate(saturday.getDate() + 1)
+  return {
+    saturday: saturday.toISOString().split('T')[0],
+    sunday: sunday.toISOString().split('T')[0],
+    dow,
+  }
+}
+
+// ── Historical frequency — Y/O/E responses only (genuine-willingness signal) ─
+// L (deliberate unavailability) and blank (no data) are excluded.
+export async function buildPlayerHistories(
+  supabase: ServiceClient,
+  playerIds: string[]
+): Promise<Map<string, PlayerHistory>> {
+  const map = new Map<string, PlayerHistory>()
+  if (!playerIds.length) return map
+
+  const { data } = await supabase
+    .from('availability')
+    .select('player_id, response, bookings!inner(slot_time, format, game_date, tournament_id)')
+    .in('player_id', playerIds)
+    .in('response', ['Y', 'O', 'E'])
+
+  type Row = {
+    player_id: string
+    bookings: { slot_time: string; format: string; game_date: string; tournament_id: string | null }
+  }
+
+  const byPlayer = new Map<string, Row[]>()
+  for (const row of ((data ?? []) as unknown as Row[])) {
+    const list = byPlayer.get(row.player_id) ?? []
+    list.push(row)
+    byPlayer.set(row.player_id, list)
+  }
+
+  for (const playerId of playerIds) {
+    const rows = byPlayer.get(playerId) ?? []
+    const dowSlotCounts = new Map<string, number>()
+    const formatCounts = new Map<string, number>()
+    const tournamentIds = new Set<string>()
+
+    for (const row of rows) {
+      const dow = new Date(row.bookings.game_date + 'T00:00:00').getDay()
+      const key = `${dow}|${row.bookings.slot_time}`
+      dowSlotCounts.set(key, (dowSlotCounts.get(key) ?? 0) + 1)
+      formatCounts.set(row.bookings.format, (formatCounts.get(row.bookings.format) ?? 0) + 1)
+      if (row.bookings.tournament_id) tournamentIds.add(row.bookings.tournament_id)
+    }
+
+    let favoriteDow: number | null = null
+    let favoriteSlot: string | null = null
+    let bestDowSlotCount = 0
+    dowSlotCounts.forEach((count, key) => {
+      if (count > bestDowSlotCount) {
+        bestDowSlotCount = count
+        const [dowStr, slot] = key.split('|')
+        favoriteDow = Number(dowStr)
+        favoriteSlot = slot
+      }
+    })
+
+    let favoriteFormat: string | null = null
+    let bestFormatCount = 0
+    formatCounts.forEach((count, format) => {
+      if (count > bestFormatCount) {
+        bestFormatCount = count
+        favoriteFormat = format
+      }
+    })
+
+    map.set(playerId, {
+      hasEnoughSample: rows.length >= MIN_HISTORY_SAMPLE,
+      favoriteDow,
+      favoriteSlot,
+      favoriteFormat,
+      tournamentIdsWithResponse: tournamentIds,
+    })
+  }
+
+  return map
+}
+
+// ── Candidate selection — one theme/booking per player per day ─────────────
+// dow: 0=Sun, 1=Mon, 2=Tue, 3=Wed. gapBookings must already be filtered to
+// bookings this player has NOT responded to (any of Y/O/E/L counts as answered).
+export function pickNudgeCandidate(
+  dow: number,
+  playerId: string,
+  playerStatus: 'active' | 'inactive',
+  gapBookings: NudgeBooking[],
+  history: PlayerHistory,
+  priorNudgeThisWeek: PriorNudge | null
+): NudgeCandidate | null {
+  if (!gapBookings.length) return null
+
+  // Wednesday — always fires if still unanswered, overrides theme choice,
+  // carries the same booking reference used earlier in the week if possible.
+  if (dow === 3) {
+    const carried = priorNudgeThisWeek
+      ? gapBookings.find(b => b.id === priorNudgeThisWeek.bookingId)
+      : undefined
+    const booking = carried ?? gapBookings[0]
+    return { playerId, booking, theme: 'deadline' }
+  }
+
+  const noHistory = playerStatus === 'inactive' || !history.hasEnoughSample
+  if (noHistory) {
+    const booking = gapBookings[0]
+    return { playerId, booking, theme: dow === 0 ? 'reactivation_1' : 'reactivation_2' }
+  }
+
+  if (dow === 0) {
+    const booking = gapBookings.find(b =>
+      new Date(b.game_date + 'T00:00:00').getDay() === history.favoriteDow &&
+      b.slot_time === history.favoriteSlot
+    )
+    return booking ? { playerId, booking, theme: 'habitual' } : null
+  }
+
+  if (dow === 1) {
+    const booking = gapBookings.find(b =>
+      b.format === history.favoriteFormat &&
+      !(priorNudgeThisWeek && b.id === priorNudgeThisWeek.bookingId) &&
+      !(priorNudgeThisWeek && b.slot_time === priorNudgeThisWeek.slotTime)
+    )
+    return booking ? { playerId, booking, theme: 'format_stretch' } : null
+  }
+
+  if (dow === 2) {
+    const booking = gapBookings.find(b =>
+      b.tournament_id && !history.tournamentIdsWithResponse.has(b.tournament_id)
+    )
+    return booking ? { playerId, booking, theme: 'tournament_eligibility' } : null
+  }
+
+  return null
+}
+
+// ── Copy — self-referential only, explicit date always, no counts/scarcity ─
+export function buildNudgeCopy(theme: NudgeTheme, booking: NudgeBooking): { title: string; body: string } {
+  const dt = formatNudgeDateTime(booking)
+  switch (theme) {
+    case 'habitual':
+      return {
+        title: '🏏 Your usual slot is open',
+        body: `Your usual slot — ${dt} — is open. You haven't marked your availability yet.`,
+      }
+    case 'format_stretch':
+      return {
+        title: `🏏 ${booking.format} slot open`,
+        body: `A ${booking.format} slot is open on ${dt} — same format you usually play.`,
+      }
+    case 'tournament_eligibility':
+      return {
+        title: '🏏 Stay eligible',
+        body: `You haven't featured in ${booking.tournament_name ?? 'this tournament'} yet — ${dt} keeps you eligible if we reach the knockouts.`,
+      }
+    case 'reactivation_1':
+      return {
+        title: '🏏 Jump back in',
+        body: `It's been a while, Spartans! A game's open on ${dt} — jump back in anytime.`,
+      }
+    case 'reactivation_2':
+      return {
+        title: '🏏 Still open',
+        body: `Still open: ${dt}. Whenever you're ready to play again.`,
+      }
+    case 'deadline':
+      return {
+        title: '⏰ Locks tomorrow at 8am',
+        body: `Availability for ${formatNudgeDateOnly(booking)} locks tomorrow at 8am — you haven't marked yours yet.`,
+      }
+  }
+}
+
+// ── Shared booking fetch — nextLockWeekend, confirmed, not yet locked ──────
+export async function fetchNextLockWeekendBookings(
+  supabase: ServiceClient,
+  now = new Date()
+): Promise<NudgeBooking[]> {
+  const { saturday, sunday } = getNextLockWeekendDates(now)
+
+  const { data } = await supabase
+    .from('bookings')
+    .select('id, game_date, slot_time, match_time, format, tournament_id, tournament:tournaments(name)')
+    .in('game_date', [saturday, sunday])
+    .eq('status', 'confirmed')
+    .eq('availability_locked', false)
+
+  return (data ?? [])
+    .map(b => ({
+      id: b.id,
+      game_date: b.game_date,
+      slot_time: b.slot_time,
+      match_time: b.match_time,
+      format: b.format,
+      tournament_id: b.tournament_id,
+      tournament_name: (b.tournament as any)?.name ?? null,
+    }))
+    .sort((a, b) => (a.game_date === b.game_date
+      ? a.slot_time.localeCompare(b.slot_time)
+      : a.game_date.localeCompare(b.game_date)))
+}
+
+// ── Most recent nudge already sent to this player earlier in the current
+// Sun–Wed cycle (used for Monday's "different slot" rule and Wednesday's
+// carried-booking rule). ──────────────────────────────────────────────────
+export async function getPriorNudgeThisWeek(
+  supabase: ServiceClient,
+  playerId: string,
+  bookingSlotMap: Map<string, string>,
+  now = new Date()
+): Promise<PriorNudge | null> {
+  const dow = now.getDay()
+  const today = now.toISOString().split('T')[0]
+  const thisSunday = new Date(now)
+  thisSunday.setDate(now.getDate() - dow)
+  const thisSundayStr = thisSunday.toISOString().split('T')[0]
+
+  const { data } = await supabase
+    .from('availability_nudge_log')
+    .select('booking_id, nudge_date')
+    .eq('player_id', playerId)
+    .gte('nudge_date', thisSundayStr)
+    .lt('nudge_date', today)
+    .order('nudge_date', { ascending: false })
+    .limit(1)
+
+  const row = data?.[0]
+  if (!row) return null
+  return { bookingId: row.booking_id, slotTime: bookingSlotMap.get(row.booking_id) ?? '' }
+}
+
+// ── Single-player pipeline — used for the read-only dashboard section ──────
+export async function getNudgeForPlayer(
+  supabase: ServiceClient,
+  playerId: string,
+  playerStatus: string | null | undefined
+): Promise<{ theme: NudgeTheme; booking: NudgeBooking; title: string; body: string } | null> {
+  if (playerStatus === 'expelled') return null
+
+  const now = new Date()
+  const dow = now.getDay()
+  if (dow > 3) return null   // outside the Sun 8pm–Wed 8pm nudge window
+
+  const bookingList = await fetchNextLockWeekendBookings(supabase, now)
+  if (!bookingList.length) return null
+  const bookingIds = bookingList.map(b => b.id)
+
+  const { data: responded } = await supabase
+    .from('availability')
+    .select('booking_id')
+    .eq('player_id', playerId)
+    .in('booking_id', bookingIds)
+
+  const respondedIds = new Set((responded ?? []).map(r => r.booking_id))
+  const gapBookings = bookingList.filter(b => !respondedIds.has(b.id))
+  if (!gapBookings.length) return null
+
+  const histories = await buildPlayerHistories(supabase, [playerId])
+  const history = histories.get(playerId)!
+
+  const bookingSlotMap = new Map(bookingList.map(b => [b.id, b.slot_time]))
+  const prior = await getPriorNudgeThisWeek(supabase, playerId, bookingSlotMap, now)
+
+  const candidate = pickNudgeCandidate(
+    dow,
+    playerId,
+    playerStatus === 'inactive' ? 'inactive' : 'active',
+    gapBookings,
+    history,
+    prior
+  )
+  if (!candidate) return null
+
+  const { title, body } = buildNudgeCopy(candidate.theme, candidate.booking)
+  return { theme: candidate.theme, booking: candidate.booking, title, body }
+}
