@@ -92,37 +92,72 @@ export async function GET(req: NextRequest) {
 
     const results = await Promise.allSettled(
       candidates.map(async (candidate) => {
-        // Insert the log row first — the UNIQUE(player_id, nudge_date) constraint
-        // is the idempotency guard. If this fails (already nudged today, e.g. a
-        // retried invocation), skip the push entirely rather than double-send.
-        const { error: logError } = await supabase
+        // Insert the log row first with status 'pending' — the
+        // UNIQUE(player_id, nudge_date) constraint is the idempotency guard.
+        // If this fails (already nudged today, e.g. a retried invocation),
+        // skip the push entirely rather than double-send.
+        const { data: logRow, error: logError } = await supabase
           .from('availability_nudge_log')
           .insert({
             player_id:  candidate.playerId,
             booking_id: candidate.booking.id,
             theme:      candidate.theme,
             nudge_date: today,
+            status:     'pending',
+          })
+          .select('id')
+          .single()
+
+        if (logError || !logRow) return { outcome: 'skipped' as const }
+
+        // Delivery status is tracked separately from the attempt — a push
+        // failure must not leave the log row claiming success.
+        try {
+          const { title, body } = buildNudgeCopy(candidate.theme, candidate.booking)
+          const pushResults = await sendPushToPlayer(candidate.playerId, {
+            title,
+            body,
+            url: `/fixtures/${candidate.booking.id}`,
           })
 
-        if (logError) return { sent: false, skipped: true }
+          // sendPushToPlayer settles per-subscription via Promise.allSettled
+          // and never rethrows individual delivery errors to its caller, so a
+          // bare try/catch around it would rarely fire. Inspect the settled
+          // results instead: zero subscriptions is a normal opt-in absence
+          // (see push-notifications.md — not a failure), but subscriptions
+          // that all rejected is a genuine delivery failure.
+          if (pushResults?.length && pushResults.every(r => r.status === 'rejected')) {
+            const reason = pushResults
+              .map(r => (r as PromiseRejectedResult).reason)
+              .map(e => (e instanceof Error ? e.message : String(e)))
+              .join('; ')
+            throw new Error(reason)
+          }
 
-        const { title, body } = buildNudgeCopy(candidate.theme, candidate.booking)
-        await sendPushToPlayer(candidate.playerId, {
-          title,
-          body,
-          url: `/fixtures/${candidate.booking.id}`,
-        })
-        return { sent: true }
+          await supabase
+            .from('availability_nudge_log')
+            .update({ status: 'sent' })
+            .eq('id', logRow.id)
+          return { outcome: 'sent' as const }
+        } catch (pushErr) {
+          const errMsg = pushErr instanceof Error ? pushErr.message : String(pushErr)
+          await supabase
+            .from('availability_nudge_log')
+            .update({ status: 'failed', error_message: errMsg })
+            .eq('id', logRow.id)
+          return { outcome: 'failed' as const }
+        }
       })
     )
 
-    const sentCount = results.filter(
-      r => r.status === 'fulfilled' && (r.value as { sent: boolean }).sent
-    ).length
+    const outcomes = results.map(r => (r.status === 'fulfilled' ? r.value.outcome : 'failed'))
+    const sentCount   = outcomes.filter(o => o === 'sent').length
+    const failedCount = outcomes.filter(o => o === 'failed').length
 
     return NextResponse.json({
       candidates: candidates.length,
       sent: sentCount,
+      failed: failedCount,
       dow,
       weekend: { saturday: bookingList[0]?.game_date, dates: Array.from(new Set(bookingList.map(b => b.game_date))) },
     })
