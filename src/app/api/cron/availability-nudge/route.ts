@@ -14,8 +14,8 @@ import {
   type WeeklyNudgeHistoryEntry,
 } from '@/lib/availabilityNudge'
 
-// Runs daily Sun–Wed at 14:30 UTC = 20:00 IST.
-// vercel.json entry: { "path": "/api/cron/availability-nudge", "schedule": "30 14 * * 0-3" }
+// Runs daily Sun–Wed at 15:15 UTC = 20:45 IST.
+// vercel.json entry: { "path": "/api/cron/availability-nudge", "schedule": "15 15 * * 0-3" }
 //
 // Reminds players who haven't yet responded to a confirmed booking in
 // `nextLockWeekend` (the Sat/Sun the upcoming Thursday 08:00 IST lock will
