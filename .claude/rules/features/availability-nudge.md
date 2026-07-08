@@ -61,6 +61,7 @@ When a theme matches more than one gap booking (e.g. two bookings both satisfy `
 - Only `players.status IN ('active', 'inactive')` — `expelled` players are excluded
 - A player is skipped entirely for a given booking if they already have **any** response (`Y`/`O`/`E`/`L`) against it — `L` counts as a complete answer, not a gap
 - Max one notification per player per day, enforced by `UNIQUE(player_id, nudge_date)` on `availability_nudge_log` — the log row is inserted *before* the push is sent (status `'pending'`, claiming the daily slot), so a retried cron invocation skips re-attempting rather than double-notifying. The row is then updated to `status = 'sent'` or `'failed'` (with `error_message`) once the push actually resolves — a `'failed'` row still counts against the daily cap (no same-day retry), but is now visible in the table instead of masquerading as a success.
+- The route distinguishes *why* a log insert failed: a `23505` (unique-violation) error is the expected, benign idempotency hit — that player was already nudged today — and is counted as `already_nudged` in the response. Anything else is counted as `skipped` and triggers a GC push alert (`⚠️ Availability Nudge — Skipped`), since a genuine log-write failure (e.g. a schema drift between the code and the live DB — see the July 2026 incident in Section 6) otherwise leaves `sent`/`failed` both at 0, which reads identically to "nobody needed nudging today."
 - Outside the Sun–Wed window (i.e. `getDay() > 3`), the route is a no-op, not an error
 
 ---
@@ -82,10 +83,13 @@ When a theme matches more than one gap booking (e.g. two bookings both satisfy `
 > - [ ] Wednesday deadline nudge correctly carries forward the earlier-week booking reference, and correctly lists every remaining gap when there's more than one
 > - [ ] `availability_nudge_log` dedupe holds under a manual re-trigger
 > - [ ] Failure-alerting fix has actually fired a test alert successfully, not just been merged
-> - [ ] `030_availability_nudge_log_delivery_status.sql` migration is applied and rows correctly show `status = 'sent'` vs `'failed'` (not just `'pending'` left unresolved)
+> - [x] `030_availability_nudge_log_delivery_status.sql` migration is applied and rows correctly show `status = 'sent'` vs `'failed'` — see the July 2026 incident below; confirmed applied 8 Jul 2026
 > - [ ] Priority-list selection (Fix 7) actually closes the silent-day gap observed in manual simulation — confirm via a live cycle that active players with a real gap get nudged every day, not just on days matching their "expected" theme
 
 **Product decision recorded:** an `inactive` player always gets generic reactivation copy regardless of history depth (Fix 3, Option A) — see the comment above `noHistory` in `pickNudgeCandidate()`. Deliberate, not an oversight.
+
+**Incident — 8 Jul 2026, migration 030 not applied to production:** the Sun 8pm cron ran successfully (HTTP 200, no thrown error, ~6s) but sent zero nudges. Root cause: migration `029_availability_nudge_log.sql` had been applied to the live Supabase project but `030_availability_nudge_log_delivery_status.sql` had not, so the live table was still missing `status`/`error_message`. Every candidate's `.insert({ ..., status: 'pending' })` failed with an unrecognized-column error, which the route (pre-fix) treated identically to "already nudged today" — no push was attempted, no row was written, and the response body (`sent: 0, failed: 0`) was indistinguishable from a legitimately quiet day. Caught only by manually inspecting the Vercel function trace and cross-checking `availability_nudge_log` row counts against `list_migrations`.
+Fixed by: (1) applying migration 030 to the live project, and (2) the route now separates `already_nudged` (benign `23505` unique-violation — the real idempotency case) from `skipped` (any other insert failure), and fires a GC push alert whenever `skipped > 0`, since nobody actively reads a cron's JSON response body. Take-away: **a merged migration file is not the same as an applied migration** — this project's Supabase migrations are applied manually (see `list_migrations` vs. the files in `supabase/migrations/`), so a merged PR touching schema needs a manual apply step confirmed separately, not assumed from the merge itself.
 
 **Resolved as of this writing** (formerly listed here as pending):
 - Failure alerting on cron error via the shared `notifyGCs()` helper (now in `src/lib/webpush.ts`, used by both this cron and `lock-availability`)
@@ -94,6 +98,7 @@ When a theme matches more than one gap booking (e.g. two bookings both satisfy `
 - Per-player delivery outcome tracked via `status`/`error_message` on `availability_nudge_log`, updated after the push actually resolves
 - Wednesday's deadline nudge covers every remaining gap booking, not just one (Fix 6)
 - Fixed day→theme mapping replaced with the priority list described in Section 3 (Fix 7) — closes the "silent day" gap where a player's real gap didn't match that day's single expected condition
+- `skipped` vs `already_nudged` distinction in the log-insert failure path, with a GC alert on genuine skips — see incident above
 
 ---
 

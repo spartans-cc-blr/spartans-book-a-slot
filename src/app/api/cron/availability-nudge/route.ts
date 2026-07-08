@@ -129,7 +129,18 @@ export async function GET(req: NextRequest) {
           .select('id')
           .single()
 
-        if (logError || !logRow) return { outcome: 'skipped' as const }
+        if (logError || !logRow) {
+          // 23505 = unique_violation — the expected, benign idempotency hit
+          // (already nudged this player today, e.g. a retried invocation).
+          // Anything else (missing column, connection error, etc.) is a
+          // real problem that would otherwise silently look identical to
+          // "nobody needed nudging" in the response body.
+          const isDuplicate = logError?.code === '23505'
+          return {
+            outcome: isDuplicate ? 'already_nudged' as const : 'skipped' as const,
+            logErrorMessage: logError?.message,
+          }
+        }
 
         // Delivery status is tracked separately from the attempt — a push
         // failure must not leave the log row claiming success.
@@ -174,13 +185,32 @@ export async function GET(req: NextRequest) {
     )
 
     const outcomes = results.map(r => (r.status === 'fulfilled' ? r.value.outcome : 'failed'))
-    const sentCount   = outcomes.filter(o => o === 'sent').length
-    const failedCount = outcomes.filter(o => o === 'failed').length
+    const sentCount          = outcomes.filter(o => o === 'sent').length
+    const failedCount        = outcomes.filter(o => o === 'failed').length
+    const alreadyNudgedCount = outcomes.filter(o => o === 'already_nudged').length
+    const skippedCount       = outcomes.filter(o => o === 'skipped').length
+
+    // skippedCount is the "silent false-success" case this route has already
+    // been bitten by once — the log insert itself failing (e.g. a schema
+    // mismatch between the code and the live DB) leaves sent/failed both at
+    // 0, which reads exactly like "nobody needed nudging today." Nobody
+    // actively watches the JSON response of a cron job, so surfacing it in
+    // the body alone isn't enough — alert GCs the same way lock-availability
+    // alerts on an unexpected zero-locked run. already_nudged is excluded:
+    // that's the expected, benign idempotency hit on a retried invocation.
+    if (skippedCount > 0) {
+      await notifyGCs(
+        '⚠️ Availability Nudge — Skipped',
+        `${skippedCount} of ${candidates.length} nudge${candidates.length === 1 ? '' : 's'} skipped today — the log write failed for a reason other than the daily idempotency guard. Check availability_nudge_log schema/migrations.`
+      )
+    }
 
     return NextResponse.json({
       candidates: candidates.length,
       sent: sentCount,
       failed: failedCount,
+      alreadyNudged: alreadyNudgedCount,
+      skipped: skippedCount,
       dow,
       weekend: { saturday: bookingList[0]?.game_date, dates: Array.from(new Set(bookingList.map(b => b.game_date))) },
     })
