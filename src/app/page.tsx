@@ -9,10 +9,11 @@ import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { getNudgeForPlayer } from '@/lib/availabilityNudge'
 
 export const revalidate = 60
 
-async function getPlayerData(playerId: string) {
+async function getPlayerData(playerId: string, playerStatus: string | null | undefined) {
   const supabase = createServiceClient()
 
   // Upcoming fixtures count
@@ -58,7 +59,11 @@ async function getPlayerData(playerId: string) {
   const respondedIds = new Set((avail ?? []).map(a => a.booking_id))
   const pendingCount = (upcomingBookings ?? []).filter(b => !respondedIds.has(b.id)).length
 
-  return { upcomingCount: upcomingCount ?? 0, nextFixture, nextFixtureResponse, pendingCount }
+  // Read-only rendering of the same Sun-Wed nudge logic the cron uses —
+  // shows this player's own "still open, matches your pattern" nudge, if any.
+  const nudge = await getNudgeForPlayer(supabase, playerId, playerStatus)
+
+  return { upcomingCount: upcomingCount ?? 0, nextFixture, nextFixtureResponse, pendingCount, nudge }
 }
 
 function formatDate(dateStr: string) {
@@ -92,7 +97,7 @@ export default async function HomePage() {
   const isExpelled  = isLoggedIn && player?.playerStatus === 'expelled'
   const isUnmatched = isLoggedIn && !player?.playerId && !isExpelled
 
-  const playerData = isPlayer ? await getPlayerData(player.playerId) : null
+  const playerData = isPlayer ? await getPlayerData(player.playerId, player?.playerStatus) : null
 
   return (
     <div className="min-h-screen bg-ink grain">
@@ -230,6 +235,27 @@ export default async function HomePage() {
               </Link>
 
             </div>
+
+            {/* Availability nudge — read-only rendering of the Sun-Wed cron logic */}
+            {playerData.nudge && (
+              <Link href={`/fixtures/${playerData.nudge.booking.id}`}
+                className="mb-3 flex items-center justify-between gap-4 bg-amber-950/20 border border-amber-800/40 rounded p-4 hover:border-amber-600 transition-colors group">
+                <div className="flex items-start gap-3 min-w-0">
+                  <span className="text-xl flex-shrink-0">{playerData.nudge.title.split(' ')[0]}</span>
+                  <div className="min-w-0">
+                    <p className="font-cinzel text-xs font-semibold text-amber-300 truncate">
+                      {playerData.nudge.title.replace(/^\S+\s/, '')}
+                    </p>
+                    <p className="font-rajdhani text-xs text-amber-600/90 mt-0.5">
+                      {playerData.nudge.body}
+                    </p>
+                  </div>
+                </div>
+                <span className="font-rajdhani text-xs text-amber-500 group-hover:text-amber-300 transition-colors flex-shrink-0">
+                  Mark now →
+                </span>
+              </Link>
+            )}
 
             {/* Next fixture callout */}
             {playerData.nextFixture && (
