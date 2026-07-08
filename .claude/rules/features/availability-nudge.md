@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-Personalised push reminders sent **Sunday 8pm through Wednesday 8pm IST**, nudging players to mark availability for `nextLockWeekend` — the Sat/Sun pair the upcoming Thursday 8am lock-availability cron will freeze. Each nudge is derived entirely from the individual player's own historical response pattern, never from how full or empty a slot looks, so it can't bias a player toward or away from any particular slot.
+Personalised push reminders sent **Sunday 8:45pm through Wednesday 8:45pm IST**, nudging players to mark availability for `nextLockWeekend` — the Sat/Sun pair the upcoming Thursday 8am lock-availability cron will freeze. Each nudge is derived entirely from the individual player's own historical response pattern, never from how full or empty a slot looks, so it can't bias a player toward or away from any particular slot.
 
 Also functions as a re-engagement channel: submitting any availability response already auto-reactivates an `inactive` player (existing behavior, see `player-availability.md`), so an inactive player receiving a nudge and responding is a genuine second front door back into the club, not just a stats feature.
 
@@ -23,7 +23,7 @@ Also functions as a re-engagement channel: submitting any availability response 
 | `src/app/page.tsx` | Read-only rendering of the same day's nudge as a dashboard card, next to the existing Pending Availability count |
 | `supabase/migrations/029_availability_nudge_log.sql` | `availability_nudge_log` table — idempotency guard (`UNIQUE(player_id, nudge_date)`) and per-day audit trail |
 | `supabase/migrations/030_availability_nudge_log_delivery_status.sql` | Adds `status` (`pending`/`sent`/`failed`) and `error_message` — per-player delivery outcome, not just attempt |
-| `vercel.json` | Cron schedule entry: `"30 14 * * 0-3"` (14:30 UTC = 20:00 IST, Sun–Wed) |
+| `vercel.json` | Cron schedule entry: `"15 15 * * 0-3"` (15:15 UTC = 20:45 IST, Sun–Wed) |
 | `src/lib/webpush.ts` | Shared push-send utility, reused as-is (no changes for this feature) |
 
 ---
