@@ -28,6 +28,8 @@ type Player = {
   active: boolean
   dues_override: boolean
   is_captain: boolean
+  is_gc: boolean
+  is_wrangler: boolean
   status: 'active' | 'inactive' | 'expelled'
   cricheroes_url: string | null
   fee_exemptions?: FeeExemption[]
@@ -336,6 +338,7 @@ export default function AdminPlayersPage() {
                           {[
                             { key: 'active', label: 'Active' },
                             { key: 'is_captain', label: 'Captain' },
+                            { key: 'is_wrangler', label: 'Wrangler' },
                           ].map(({ key, label }) => (
                             <label key={key} className="flex items-center gap-2 cursor-pointer">
                               <input type="checkbox" checked={(editForm as any)[key] ?? false}
@@ -438,6 +441,8 @@ export default function AdminPlayersPage() {
                           <p className="font-rajdhani text-xs text-zinc-600">{p.jersey_name ?? ''}{p.jersey_number ? ` #${p.jersey_number}` : ''}</p>
                         </div>
                         {p.is_captain && <span className="font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1.5 py-0.5 rounded">CAP</span>}
+                        {p.is_gc && <span className="font-rajdhani text-[9px] font-bold bg-sky-900/40 border border-sky-700 text-sky-400 px-1.5 py-0.5 rounded">GC</span>}
+                        {p.is_wrangler && <span className="font-rajdhani text-[9px] font-bold bg-emerald-950 border border-emerald-800 text-emerald-400 px-1.5 py-0.5 rounded">WRANGLER</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3">

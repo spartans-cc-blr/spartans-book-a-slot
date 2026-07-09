@@ -20,6 +20,7 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
   const isExpelled = player?.playerStatus === 'expelled'
   const isGC       = !!player?.isGC || !!player?.isAdmin
   const isCaptain  = !!player?.isCaptain
+  const isWrangler = !!player?.isWrangler || !!player?.isAdmin
 
   const links = [
     { href: 'https://spartanscricketclub.vercel.app', label: 'Club Site' },
@@ -40,6 +41,10 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
     // Tournament Planner — captains, GC, admin
     ...(isCaptain || isGC || isAdmin
       ? [{ href: '/tournament-planner', label: 'Tournaments', key: 'planner' }]
+      : []),
+    // Squad Backfill — wranglers & admin only
+    ...(isWrangler
+      ? [{ href: '/wrangler/backfill-squad', label: 'Squad Backfill', key: 'wrangler' }]
       : []),
     ...(isLoggedIn && !isExpelled
       ? [{ href: '/profile', label: 'My Profile', key: 'profile' }]
