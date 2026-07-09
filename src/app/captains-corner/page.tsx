@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { computeSquadVersion } from '@/lib/squadVersion'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { CaptainsCornerGrid } from '@/components/captains/CaptainsCornerGrid'
 import { getISOWeek, getISOWeekYear, parseISO, startOfISOWeek, addDays, format } from 'date-fns'
@@ -118,7 +119,11 @@ export default async function CaptainsCornerPage() {
     existingSquads = (squads ?? []) as ExistingSquadRow[]
   }
 
-  // Build initialSquadMap: bookingId → hydration data for SlotCard
+  // Build initialSquadMap: bookingId → hydration data for SlotCard.
+  // One entry per active booking (not just ones with existing squad rows) —
+  // every booking needs a definite version fingerprint so the client can
+  // always send a valid expected_version on save, including a first-ever
+  // save for a booking with no squad rows yet.
   type InitialSquad = {
     status:   'draft' | 'pending' | 'approved' | 'announced'
     selected: string[]
@@ -127,23 +132,44 @@ export default async function CaptainsCornerPage() {
     wk:       string[]
     matchRoles:  Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>  // ADD
     gcReturnNote: string | null
+    version:  string
   }
-  const initialSquadMap: Record<string, InitialSquad> = {}
+  const rowsByBooking: Record<string, ExistingSquadRow[]> = {}
   for (const row of existingSquads) {
-    if (!initialSquadMap[row.booking_id]) {
-      const mapped = row.status === 'pending_approval' ? 'pending'
-                   : row.status === 'announced'        ? 'announced'
-                   : row.status === 'approved'         ? 'approved'
-                   : 'draft'
-      initialSquadMap[row.booking_id] = { status: mapped, selected: [], captain: null, vc: null, wk: [],matchRoles: {}, gcReturnNote: (bookings ?? []).find(b => b.id === row.booking_id)?.gc_return_note ?? null ,}
-    }
-    const entry = initialSquadMap[row.booking_id]
-    entry.selected.push(row.player_id)
-    if (row.is_captain) entry.captain = row.player_id
-    if (row.is_vc)      entry.vc      = row.player_id
-    if (row.is_wk)      entry.wk.push(row.player_id)
-    if (row.match_role) entry.matchRoles[row.player_id] = row.match_role
+    (rowsByBooking[row.booking_id] ??= []).push(row)
+  }
 
+  const initialSquadMap: Record<string, InitialSquad> = {}
+  for (const b of activeBookings ?? []) {
+    const rows      = rowsByBooking[b.id] ?? []
+    const rawStatus = rows[0]?.status ?? 'draft'
+    const mapped    = rawStatus === 'pending_approval' ? 'pending'
+                     : rawStatus === 'announced'        ? 'announced'
+                     : rawStatus === 'approved'         ? 'approved'
+                     : 'draft'
+    const entry: InitialSquad = {
+      status: mapped,
+      selected: [],
+      captain: null,
+      vc: null,
+      wk: [],
+      matchRoles: {},
+      gcReturnNote: b.gc_return_note ?? null,
+      // Fingerprint must be computed from raw DB status values — the same
+      // shape POST /api/squad computes server-side — not the display-mapped status.
+      version: computeSquadVersion(rows.map(r => ({
+        player_id: r.player_id, status: r.status, is_captain: r.is_captain,
+        is_vc: r.is_vc, is_wk: r.is_wk, match_role: r.match_role ?? null,
+      }))),
+    }
+    for (const row of rows) {
+      entry.selected.push(row.player_id)
+      if (row.is_captain) entry.captain = row.player_id
+      if (row.is_vc)      entry.vc      = row.player_id
+      if (row.is_wk)      entry.wk.push(row.player_id)
+      if (row.match_role) entry.matchRoles[row.player_id] = row.match_role
+    }
+    initialSquadMap[b.id] = entry
   }
 
   // ── Group bookings into weekends ───────────────────────────
