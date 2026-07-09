@@ -12,7 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 
-type Role = 'C' | 'VC' | 'WK' | null
+type Role = 'C' | 'VC' | 'WK'
 const VALID_ROLES = new Set(['C', 'VC', 'WK'])
 
 async function requireWrangler() {
@@ -55,11 +55,17 @@ export async function POST(req: NextRequest) {
     }
     seen.add(row.player_id)
 
-    if (row.role !== null && row.role !== undefined && !VALID_ROLES.has(row.role)) {
-      return NextResponse.json({ error: `Invalid role: ${row.role}` }, { status: 400 })
+    const roles = row.roles ?? []
+    if (!Array.isArray(roles)) {
+      return NextResponse.json({ error: 'roles must be an array' }, { status: 400 })
     }
-    if (row.role === 'C') captainCount++
-    if (row.role === 'VC') vcCount++
+    for (const r of roles) {
+      if (!VALID_ROLES.has(r)) {
+        return NextResponse.json({ error: `Invalid role: ${r}` }, { status: 400 })
+      }
+    }
+    if (roles.includes('C'))  captainCount++
+    if (roles.includes('VC')) vcCount++
   }
   if (captainCount > 1) return NextResponse.json({ error: 'Only one Captain (C) allowed' }, { status: 400 })
   if (vcCount > 1)      return NextResponse.json({ error: 'Only one Vice Captain (VC) allowed' }, { status: 400 })
@@ -89,13 +95,13 @@ export async function POST(req: NextRequest) {
     if (deleteErr) return NextResponse.json({ error: deleteErr.message }, { status: 500 })
   }
 
-  const rows = players.map((row: { player_id: string; role: Role }) => ({
+  const rows = players.map((row: { player_id: string; roles?: Role[] }) => ({
     booking_id,
     player_id:  row.player_id,
     status:     'announced',
-    is_captain: row.role === 'C',
-    is_vc:      row.role === 'VC',
-    is_wk:      row.role === 'WK',
+    is_captain: (row.roles ?? []).includes('C'),
+    is_vc:      (row.roles ?? []).includes('VC'),
+    is_wk:      (row.roles ?? []).includes('WK'),
   }))
 
   const { error: insertErr } = await supabase.from('squad').insert(rows)
