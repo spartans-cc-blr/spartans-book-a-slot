@@ -71,6 +71,30 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
+  // Time gate — only applies when no squad exists yet for this booking.
+  // Editing an existing draft (any status) is always allowed.
+  // Window: blocked Mon–Wed and Thursday before 08:00 IST; allowed
+  // Thursday 08:00 IST onward through Sunday.
+  const { data: existingSquad } = await supabase
+    .from('squad')
+    .select('id')
+    .eq('booking_id', booking_id)
+    .limit(1)
+    .maybeSingle()
+
+  if (!existingSquad) {
+    const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000)
+    const day     = nowIST.getDay()   // 0=Sun .. 6=Sat
+    const hour    = nowIST.getHours()
+    const isBlockedWindow = (day >= 1 && day <= 3) || (day === 4 && hour < 8)
+    if (isBlockedWindow) {
+      return NextResponse.json(
+        { error: 'Squad selection opens Thursday 08:00 IST' },
+        { status: 403 }
+      )
+    }
+  }
+
   // Delete all existing rows for this booking regardless of status,
   // then re-insert fresh. This handles edits to announced squads
   // without hitting the (player_id, booking_id) unique constraint.
@@ -99,6 +123,12 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.from('squad').insert(rows)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // Lock availability the moment a squad is drafted
+  await supabase
+    .from('bookings')
+    .update({ availability_locked: true })
+    .eq('id', booking_id)
 
   return NextResponse.json({ ok: true })
 }

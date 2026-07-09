@@ -23,10 +23,9 @@ interface BookingEntry {
   slot_time:       string
   initialResponse: string | null
   matchStatus:     'upcoming' | 'in_progress'   // add this
-  squad:           SquadPlayer[] 
+  squad:           SquadPlayer[]
   cardData:        any
   hasDues:         boolean
-  squadAnnounced:  boolean
   slotLocked:      boolean
 }
 
@@ -106,17 +105,7 @@ export function FixturesWeekendGroup({
       {bookings.map(b => (
         <div key={b.id} className="mb-4">
           <FixturesCard booking={{ ...b.cardData, squad: b.squad }} />
-                    {b.squadAnnounced ? (
-             <div style={{
-               marginTop: '-6px', padding: '10px 16px',
-               background: '#111827', border: '1px solid #2D3748',
-               borderTop: 'none', borderRadius: '0 0 12px 12px',
-             }}>
-               <p style={{ fontSize: '11px', color: '#6B7280', fontFamily: "'DM Sans', sans-serif" }}>
-                 ✓ Squad announced — availability closed
-               </p>
-             </div>
-           ) : b.hasDues ? (
+                    {b.hasDues ? (
             <div style={{
               marginTop: '-6px', padding: '10px 16px',
              background: '#111827', border: '1px solid #2D3748',
@@ -139,7 +128,6 @@ export function FixturesWeekendGroup({
             weekendBookings={weekendBookings}
             onSelect={handleSelect}
             hasDues={b.hasDues}
-            squadAnnounced={b.squadAnnounced}
             slotLocked={b.slotLocked}
           />
 )}
