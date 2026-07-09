@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { notifyGCs } from '@/lib/webpush'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 // Runs daily at 02:30 UTC = 08:00 IST (Vercel Hobby only supports daily cron
 // granularity — the route itself guards to only act on Thursday IST).

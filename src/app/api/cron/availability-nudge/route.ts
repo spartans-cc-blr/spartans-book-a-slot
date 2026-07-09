@@ -14,6 +14,9 @@ import {
   type WeeklyNudgeHistoryEntry,
 } from '@/lib/availabilityNudge'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // Runs daily Sun–Wed at 15:15 UTC = 20:45 IST.
 // vercel.json entry: { "path": "/api/cron/availability-nudge", "schedule": "15 15 * * 0-3" }
 //
