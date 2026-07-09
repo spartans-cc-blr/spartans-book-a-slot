@@ -49,5 +49,14 @@ export async function POST(req: NextRequest) {
    .eq('id', booking_id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Audit log — fire and forget
+  supabase
+    .from('squad_audit')
+    .insert({ booking_id, action: 'submitted', actor_id: user.playerId })
+    .then(({ error }) => {
+      if (error) console.error('[squad_audit] insert failed:', error.message)
+    })
+
   return NextResponse.json({ ok: true })
 }
