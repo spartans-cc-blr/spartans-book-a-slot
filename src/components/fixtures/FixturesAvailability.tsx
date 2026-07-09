@@ -43,6 +43,7 @@ interface Props {
   // New props added to FixturesAvailabilityProps:
   hasDues?: boolean          // wallet_balance < 0 AND no dues_override
   slotLocked?: boolean       // bookings.availability_locked === true
+  squadAnnounced?: boolean
 }
 
 // ── Validation ────────────────────────────────────────────────────
@@ -111,6 +112,7 @@ export function FixturesAvailability({
   onSelect,
   hasDues,
   slotLocked,
+  squadAnnounced,
 }: Props) {
 
   // ── Not a player — sign-in prompt ────────────────────────────
