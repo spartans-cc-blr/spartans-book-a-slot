@@ -169,6 +169,7 @@ export default async function FixturesPage() {
     cardData:                any
     hasDues:                 boolean
     slotLocked:              boolean
+    squadAnnounced:          boolean 
     feePerPlayer:            number | null
     isLoggedInPlayerInSquad: boolean
     isLoggedInPlayerExempt:  boolean
@@ -207,6 +208,7 @@ export default async function FixturesPage() {
       },
       hasDues:                 hasDues,
       slotLocked:              (b as any).availability_locked ?? false,
+      squadAnnounced:          (squadMap[b.id] ?? []).length > 0,
       feePerPlayer:            feePerPlayerMap[b.id] ?? null,
       isLoggedInPlayerInSquad: isInSquad,
       isLoggedInPlayerExempt:  isExempt,
