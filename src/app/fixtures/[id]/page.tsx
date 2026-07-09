@@ -92,7 +92,6 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     squad,
     cardData:        { ...booking, squad, matchStatus: getMatchStatus(booking.game_date, booking.slot_time, booking.format) },
     hasDues,
-    squadAnnounced,
     slotLocked:      (booking as any).availability_locked ?? false,
   }
 
