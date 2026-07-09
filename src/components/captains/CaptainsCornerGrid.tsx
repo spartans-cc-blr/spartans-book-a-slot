@@ -61,7 +61,10 @@ interface InitialSquad {
    wk:          string[]
    matchRoles?: Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>  // persisted from DB
    gcReturnNote: string | null
+   version:     string  // optimistic-concurrency fingerprint — see src/lib/squadVersion.ts
  }
+
+type SquadStatus = 'draft' | 'pending' | 'approved' | 'announced'
 
 // FIX 3: matchRole / onMatchRoleToggle removed from Props — they belong on SelectablePlayerRow
 interface Props {
@@ -856,7 +859,7 @@ function AddPlayerPanel({
 
 // ── SlotCard ──────────────────────────────────────────────────────
 function SlotCard({
-  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad, onSelectedChange,
+  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad, onSelectedChange, onStatusChange,
 }: {
   booking:     Booking
   bookings:    Booking[]
@@ -866,12 +869,17 @@ function SlotCard({
   defaultOpen: boolean
   initialSquad?: InitialSquad
   onSelectedChange: (bookingId: string, selected: Set<string>) => void
+  onStatusChange?: (bookingId: string, status: SquadStatus) => void
 }) {
   const [open,          setOpen]          = useState(defaultOpen)
-  const [status,        setStatus]        = useState<'draft' | 'pending' | 'approved' | 'announced'>(initialSquad?.status ?? 'draft')
+  const [status,        setStatus]        = useState<SquadStatus>(initialSquad?.status ?? 'draft')
   const [everAnnounced, setEverAnnounced] = useState(initialSquad?.status === 'announced')
   const [saving,        setSaving]        = useState(false)
   const [saveError,     setSaveError]     = useState<string | null>(null)
+  // Optimistic-concurrency fingerprint — see src/lib/squadVersion.ts.
+  // Sent back on every save; server rejects (409) if it no longer matches
+  // the DB, meaning someone else changed this squad since we last knew.
+  const [version,       setVersion]       = useState<string>(initialSquad?.version ?? '')
 
   // Live availMap — starts from server data, updated on captain proxy adds
   const [liveAvailMap, setLiveAvailMap] = useState<Record<string, string>>(
@@ -894,6 +902,7 @@ function SlotCard({
     })
     if (res.ok) {
       setStatus('draft')
+      onStatusChange?.(booking.id, 'draft')
     } else {
       const d = await res.json().catch(() => ({}))
       setSaveError(d.error ?? 'Failed to withdraw')
@@ -932,10 +941,14 @@ function SlotCard({
     return auto
   })
 
-  // Register initial selection into parent's allSelected on mount only.
-  // This runs once — subsequent changes go through toggle() → onSelectedChange().
+  // Register initial selection + status into parent's lifted state on mount
+  // only. This runs once — subsequent changes go through their own handlers
+  // (toggle() → onSelectedChange(), setStatus(...) sites → onStatusChange()).
+  // Feeds MatrixView, which reads the parent's live maps rather than the
+  // frozen initialSquadMap prop so it reflects in-session Per Slot edits.
   useEffect(() => {
     onSelectedChange(booking.id, selected)
+    onStatusChange?.(booking.id, status)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // intentionally empty — mount only
 
@@ -1084,14 +1097,50 @@ function SlotCard({
     saveDraft(selected, roles, nextMatchRoles)
   }
 
+  // Reconciles local state to what the server says is actually there —
+  // called on a 409 (stale write or locked-status-needs-reopen) so a
+  // rejected save surfaces the real current squad instead of leaving the
+  // UI showing the (now known-wrong) local view.
+  function applyServerSquad(
+    current: {
+      player_ids: string[]
+      roles: { captain: string | null; vc: string | null; wk: string[] }
+      match_roles?: Record<string, string>
+      status: string | null
+      version: string
+    },
+    message: string
+  ) {
+    const nextSelected = new Set(current.player_ids)
+    setSelected(nextSelected)
+    onSelectedChange(booking.id, nextSelected)
+    setRoles({ captain: current.roles.captain, vc: current.roles.vc, wk: new Set(current.roles.wk) })
+    if (current.match_roles) setMatchRoles(current.match_roles as Record<string, 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar'>)
+    const mappedStatus: SquadStatus =
+      current.status === 'pending_approval' ? 'pending' :
+      current.status === 'announced'        ? 'announced' :
+      current.status === 'approved'         ? 'approved' :
+      'draft'
+    setStatus(mappedStatus)
+    onStatusChange?.(booking.id, mappedStatus)
+    if (mappedStatus === 'announced') setEverAnnounced(true)
+    setVersion(current.version)
+    setSaveError(message)
+  }
+
   // FIX 8: saveDraft accepts and sends matchRoles
   // match_roles is included in the body now; the API ignores it until the
   // squad.match_role column migration (U-18) has been applied.
+  // Returns false (and reconciles local state via applyServerSquad) if the
+  // server rejected the write as stale or as a locked-status change that
+  // needs an explicit reopen — callers that chain a follow-up API call
+  // (submit, announce) must check this before proceeding.
   async function saveDraft(
     currentSelected: Set<string>,
     currentRoles: MatchRoles,
-    currentMatchRoles: Record<string, string> = {}
-  ) {
+    currentMatchRoles: Record<string, string> = {},
+    reopen: boolean = false
+  ): Promise<boolean> {
     setSaveError(null)
     const responded = new Set(Object.keys(liveAvailMap))
     const cleanSelected = new Set(Array.from(currentSelected).filter(id => responded.has(id)))
@@ -1108,18 +1157,49 @@ function SlotCard({
          player_ids: Array.from(cleanSelected),
          roles:      cleanRoles,
          match_roles: currentMatchRoles,
+         expected_version: version,
+         reopen,
       }),
     })
-    if (!res.ok) {
+    if (res.ok) {
       const d = await res.json().catch(() => ({}))
-      setSaveError(d.error ?? 'Failed to save squad')
+      if (d.version) setVersion(d.version)
+      return true
     }
+    const d = await res.json().catch(() => ({}))
+    if (res.status === 409 && d.current) {
+      applyServerSquad(d.current, d.error ?? 'This squad changed elsewhere — showing the latest version.')
+      return false
+    }
+    setSaveError(d.error ?? 'Failed to save squad')
+    return false
+  }
+
+  // Explicit, logged reopen for a squad that's pending_approval, approved,
+  // or announced — required before a plain save can move it back to draft.
+  // Replaces the old silent `setStatus('draft')` on the Announced "Edit"
+  // button, which flipped local state with no API call and no audit trail.
+  async function handleReopen() {
+    setSaving(true)
+    const ok = await saveDraft(selected, roles, matchRoles, true)
+    if (ok) {
+      setStatus('draft')
+      onStatusChange?.(booking.id, 'draft')
+    }
+    setSaving(false)
   }
 
   async function handleSubmit() {
     setSaving(true)
     setSaveError(null)
-    await saveDraft(selected, roles, matchRoles)
+    const ok = await saveDraft(selected, roles, matchRoles)
+    if (!ok) {
+      // Stale write or locked-status conflict — saveDraft already reconciled
+      // local state to the server's truth and set a visible error. Don't
+      // chain the submit call on top of a save that didn't happen as intended.
+      setSaving(false)
+      return
+    }
     const res = await fetch('/api/squad/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1127,6 +1207,7 @@ function SlotCard({
     })
     if (res.ok) {
       setStatus('pending')
+      onStatusChange?.(booking.id, 'pending')
       // U-3: open pre-filled WhatsApp for GC notification
       // Destination-free (wa.me/?text=) — captain picks the recipient (GC group or individual)
       const date    = new Date(booking.game_date + 'T00:00:00').toLocaleDateString('en-IN', {
@@ -1153,6 +1234,7 @@ function SlotCard({
     })
     if (res.ok) {
       setStatus('announced')
+      onStatusChange?.(booking.id, 'announced')
       setEverAnnounced(true)
     } else {
       const d = await res.json().catch(() => ({}))
@@ -1443,9 +1525,10 @@ function SlotCard({
                     <WAIcon size={13} />
                   </a>
                   <button
-                    onClick={() => setStatus('draft')}
-                    className="font-rajdhani text-[9px] font-bold px-2 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors">
-                    Edit
+                    onClick={handleReopen}
+                    disabled={saving}
+                    className="font-rajdhani text-[9px] font-bold px-2 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-40">
+                    {saving ? '…' : 'Edit'}
                   </button>
                 </>
               )}
@@ -1501,12 +1584,19 @@ function SlotCard({
 
 // ── Matrix view ───────────────────────────────────────────────────
 function MatrixView({
-  bookings, players, availMap, initialSquadMap = {},
+  bookings, players, availMap, liveSquadMap = {}, statusMap = {},
 }: {
   bookings: Booking[]
   players:  Player[]
   availMap: Record<string, Record<string, string>>
-  initialSquadMap?: Record<string, { status: 'draft' | 'pending' | 'approved' | 'announced'; selected: string[] }>
+  // Live, in-session state lifted in CaptainsCornerGrid — NOT the frozen
+  // initialSquadMap page-load snapshot. Per Slot edits push into
+  // allSelected/statusMap via onSelectedChange/onStatusChange, so reading
+  // those here (instead of initialSquadMap) is what keeps Matrix in sync
+  // with Per Slot within the same session — previously Matrix only ever
+  // showed what was true when the page first loaded.
+  liveSquadMap?: Record<string, string[]>
+  statusMap?:    Record<string, SquadStatus>
 }) {
   const activePlayers = players.filter(p =>
     bookings.some(b => {
@@ -1514,8 +1604,8 @@ function MatrixView({
       return r === 'Y' || r === 'O' || r === 'E'
     })
   ).sort((a, b) => {
-    const aGames = bookings.filter(bk => initialSquadMap[bk.id]?.selected.includes(a.id)).length
-    const bGames = bookings.filter(bk => initialSquadMap[bk.id]?.selected.includes(b.id)).length
+    const aGames = bookings.filter(bk => liveSquadMap[bk.id]?.includes(a.id)).length
+    const bGames = bookings.filter(bk => liveSquadMap[bk.id]?.includes(b.id)).length
     if (bGames !== aGames) return bGames - aGames          // desc by squad games
     return a.name.localeCompare(b.name)                    // asc by name within same count
   })
@@ -1635,7 +1725,7 @@ function MatrixView({
                   <td className="py-1.5 text-center" style={{ width: 28, minWidth: 28, padding: '0 4px' }}>
                     {(() => {
                       const n = bookings.filter(b =>
-                        initialSquadMap[b.id]?.selected.includes(p.id)
+                        liveSquadMap[b.id]?.includes(p.id)
                       ).length
                       return n > 0 ? (
                         <span className="font-rajdhani text-[11px] font-bold tabular-nums"
@@ -1651,8 +1741,7 @@ function MatrixView({
                     const r          = availMap[b.id]?.[p.id]
                     const display    = (r === 'Y' || r === 'O' || r === 'E') ? r : null
                     const isConflict = display === 'O' || display === 'E'
-                    const squad      = initialSquadMap[b.id]
-                    const squadStatus = squad?.selected.includes(p.id) ? squad.status : null
+                    const squadStatus = liveSquadMap[b.id]?.includes(p.id) ? (statusMap[b.id] ?? null) : null
                     return (
                       <RespCell key={b.id} code={display} isConflict={isConflict} squadStatus={squadStatus} />
                     )
@@ -1745,6 +1834,23 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
     setAllSelected(prev => ({ ...prev, [bookingId]: next }))
   }
 
+  // Lift squad status too — same rationale as allSelected above. Without
+  // this, MatrixView had no live signal at all for status and had to read
+  // the frozen initialSquadMap prop, which is why it could show a squad
+  // membership/status combination that was already stale within the same
+  // session (not just across tabs — see squadVersion.ts for the cross-tab case).
+  const [statusMap, setStatusMap] = useState<Record<string, SquadStatus>>(() => {
+    const init: Record<string, SquadStatus> = {}
+    for (const b of bookings) {
+      init[b.id] = initialSquadMap[b.id]?.status ?? 'draft'
+    }
+    return init
+  })
+
+  function updateStatus(bookingId: string, status: SquadStatus) {
+    setStatusMap(prev => ({ ...prev, [bookingId]: status }))
+  }
+
   return (
     <div>
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
@@ -1819,6 +1925,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
               defaultOpen={i === 0}
               initialSquad={initialSquadMap[b.id]}
               onSelectedChange={updateSelected}
+              onStatusChange={updateStatus}
             />
           ))}
         </div>
@@ -1827,7 +1934,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
       {view === 'matrix' && (
         <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
           {weekendBookings.length > 0
-            ? <MatrixView bookings={weekendBookings} players={players} availMap={availMap} initialSquadMap={initialSquadMap} />
+            ? <MatrixView bookings={weekendBookings} players={players} availMap={availMap} liveSquadMap={liveSquadMap} statusMap={statusMap} />
             : <p className="px-4 py-6 font-rajdhani text-sm text-zinc-600 text-center">No weekend games this week.</p>
           }
         </div>
