@@ -42,7 +42,6 @@ interface Props {
   onSelect:         (bookingId: string, code: AvailKey | null) => void
   // New props added to FixturesAvailabilityProps:
   hasDues?: boolean          // wallet_balance < 0 AND no dues_override
-  squadAnnounced?: boolean   // squad status === 'announced'
   slotLocked?: boolean       // bookings.availability_locked === true
 }
 
@@ -111,7 +110,6 @@ export function FixturesAvailability({
   weekendBookings,
   onSelect,
   hasDues,
-  squadAnnounced,
   slotLocked,
 }: Props) {
 
@@ -142,9 +140,8 @@ export function FixturesAvailability({
   // ── Upstream guards (apply to ALL buttons) ────────────────────
  
    const upstreamBlock =
-    hasDues        ? 'Your account has outstanding dues — please clear your balance to update availability' :
-    slotLocked     ? 'Availability locked — Squad selection in progress' :
-    squadAnnounced ? 'Availability locked — Squad selection in progress' :
+    hasDues    ? 'Your account has outstanding dues — please clear your balance to update availability' :
+    slotLocked ? 'Availability locked — Squad selection in progress' :
     null
  
    const blockedReasons: Partial<Record<AvailKey, string>> = {}
@@ -215,7 +212,7 @@ export function FixturesAvailability({
       )}
 
       {/* Frozen slot notice */}
-       {(slotLocked || squadAnnounced) && (
+       {slotLocked && (
     <p style={{ fontSize: '10px', color: '#6B7280', marginTop: '6px',
       fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4 }}>
       🔒 Availability locked — Squad selection in progress

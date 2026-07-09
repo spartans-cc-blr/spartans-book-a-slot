@@ -15,24 +15,12 @@ async function checkFreeze(
   supabase: ReturnType<typeof createServiceClient>,
   booking_id: string
 ): Promise<string | null> {
-  // Single query: booking lock flag + any non-draft squad status in one round-trip
-  const [{ data: booking }, { data: squad }] = await Promise.all([
-    supabase
-      .from('bookings')
-      .select('availability_locked')
-      .eq('id', booking_id)
-      .single(),
-    supabase
-      .from('squad')
-      .select('status')
-      .eq('booking_id', booking_id)
-      .in('status', ['pending_approval', 'approved', 'announced'])
-      .limit(1)
-      .maybeSingle(),
-  ])
-
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('availability_locked')
+    .eq('id', booking_id)
+    .single()
   if (booking?.availability_locked) return LOCK_MSG
-  if (squad?.status)                return LOCK_MSG
   return null
 }
 
@@ -91,7 +79,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── GUARD 2: availability_locked OR squad pending_approval/approved/announced ──
+  // ── GUARD 2: availability_locked ──────────────────────────────────────────
   // Captains, GC, and admins bypass this guard — they manage the pool directly.
   if (!player.isCaptain && !player.isGC && !player.isAdmin) {
     const freezeMsg = await checkFreeze(supabase, booking_id)
@@ -169,7 +157,7 @@ export async function DELETE(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // ── GUARD: availability_locked OR squad pending_approval/approved/announced ──
+  // ── GUARD: availability_locked ──────────────────────────────────────────────
   // Captains, GC, and admins bypass — they can always override via captain-availability route.
   if (!player.isCaptain && !player.isGC && !player.isAdmin) {
     const freezeMsg = await checkFreeze(supabase, booking_id)

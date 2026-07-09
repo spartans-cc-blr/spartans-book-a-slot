@@ -96,15 +96,7 @@ export default async function FixturesPage() {
     .eq('status', 'announced')
   : { data: [] }
 
-  // Fetch squad status separately for lock checks (any status)
-  const { data: squadStatusRows } = bookingIds.length ? await supabase
-    .from('squad')
-    .select('booking_id, status')
-    .in('booking_id', bookingIds)
-  : { data: [] }
-
   const squadMap: Record<string, any[]> = {}
-  const squadStatusMap: Record<string, string> = {}
 
   for (const row of squadRows ?? []) {
     if (!squadMap[row.booking_id]) squadMap[row.booking_id] = []
@@ -114,15 +106,6 @@ export default async function FixturesPage() {
       is_vc:            row.is_vc,
       is_wk:            row.is_wk,
     })
-  }
-  
-  for (const row of squadStatusRows ?? []) {
-    // Keep the highest status per booking (announced > approved > pending_approval > draft)
-    const order: Record<string, number> = { draft: 0, pending_approval: 1, approved: 2, announced: 3 }
-    const existing = squadStatusMap[row.booking_id]
-    if (!existing || (order[row.status] ?? 0) > (order[existing] ?? 0)) {
-      squadStatusMap[row.booking_id] = row.status
-    }
   }
 
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'
@@ -156,7 +139,8 @@ export default async function FixturesPage() {
     const baseFee: number | null = b.match_fee_override ?? b.tournament?.match_fee ?? null
     const squadRows = squadMap[b.id] ?? []
 
-    if (baseFee && squadStatusMap[b.id] === 'announced' && squadRows.length > 0) {
+    // squadMap only contains rows already filtered to status = 'announced'
+    if (baseFee && squadRows.length > 0) {
       const nonExemptCount = squadRows.filter(
         p => !isCurrentlyExempt((p as any).fee_exemptions ?? [])
       ).length
@@ -184,7 +168,6 @@ export default async function FixturesPage() {
     squad:                   any[]
     cardData:                any
     hasDues:                 boolean
-    squadAnnounced:          boolean
     slotLocked:              boolean
     feePerPlayer:            number | null
     isLoggedInPlayerInSquad: boolean
@@ -223,7 +206,6 @@ export default async function FixturesPage() {
         loggedInWalletBalance:    runningWalletBalance,
       },
       hasDues:                 hasDues,
-      squadAnnounced:          squadStatusMap[b.id] === 'announced',
       slotLocked:              (b as any).availability_locked ?? false,
       feePerPlayer:            feePerPlayerMap[b.id] ?? null,
       isLoggedInPlayerInSquad: isInSquad,

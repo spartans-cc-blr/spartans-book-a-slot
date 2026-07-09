@@ -100,5 +100,11 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Lock availability the moment a squad is drafted
+  await supabase
+    .from('bookings')
+    .update({ availability_locked: true })
+    .eq('id', booking_id)
+
   return NextResponse.json({ ok: true })
 }
