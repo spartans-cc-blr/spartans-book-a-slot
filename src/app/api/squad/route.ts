@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
+import { findIneligiblePlayers } from '@/lib/squadValidation'
 
 async function requireCaptain() {
   const session = await getServerSession(authOptions)
@@ -93,6 +94,21 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       )
     }
+  }
+
+  // Availability gate — reject rather than silently drop; role assignments
+  // (captain/VC/WK) could be affected by dropping a player after the fact.
+  let ineligible: string[]
+  try {
+    ineligible = await findIneligiblePlayers(supabase, booking_id, player_ids)
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+  if (ineligible.length > 0) {
+    return NextResponse.json(
+      { error: 'Some selected players are not available (L or no response) for this match', player_ids: ineligible },
+      { status: 400 }
+    )
   }
 
   // Delete all existing rows for this booking regardless of status,

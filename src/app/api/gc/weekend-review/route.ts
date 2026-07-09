@@ -86,5 +86,19 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Audit log — fire and forget
+  supabase
+    .from('squad_audit')
+    .insert({
+      booking_id,
+      action: decision === 'approved' ? 'approved' : 'returned',
+      actor_id: user.playerId ?? null,
+      note: note ?? null,
+    })
+    .then(({ error }) => {
+      if (error) console.error('[squad_audit] insert failed:', error.message)
+    })
+
   return NextResponse.json({ ok: true })
 }
