@@ -49,13 +49,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     .eq('booking_id', booking.id)
     .eq('status', 'announced')
 
-  // Fetch squad status separately for the lock check
-  const { data: allSquadStatuses } = await supabase
-    .from('squad')
-    .select('status')
-    .eq('booking_id', booking.id)
 
-  const squadAnnounced = (allSquadStatuses ?? []).some(r => r.status === 'announced')
 
   const squad = (squadRows ?? [])
     .filter(r => r.player)

@@ -11,10 +11,7 @@ const LOCK_MSG = 'Availability locked — Squad selection in progress'
 // ── Shared freeze check ───────────────────────────────────────────────────────
 // Returns LOCK_MSG if the slot is frozen for any reason, null otherwise.
 // Vibe-security: always evaluated server-side — never trust client flags.
-async function checkFreeze(
-  supabase: ReturnType<typeof createServiceClient>,
-  booking_id: string
-): Promise<string | null> {
+async function checkFreeze(supabase: any, booking_id: string): Promise<string | null> {
   const { data: booking } = await supabase
     .from('bookings')
     .select('availability_locked')
