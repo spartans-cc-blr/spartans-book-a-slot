@@ -212,7 +212,7 @@ export function FixturesAvailability({
       )}
 
       {/* Frozen slot notice */}
-       {slotLocked && (
+{slotLocked && !squadAnnounced && (
     <p style={{ fontSize: '10px', color: '#6B7280', marginTop: '6px',
       fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4 }}>
       🔒 Availability locked — Squad selection in progress
