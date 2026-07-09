@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { sendPushToPlayer } from '@/lib/webpush'
+import { findIneligiblePlayers } from '@/lib/squadValidation'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -26,6 +27,29 @@ export async function POST(req: NextRequest) {
 
   if (!['approved', 'announced'].includes(rows[0].status))
     return NextResponse.json({ error: 'Squad must be approved by GC before announcement' }, { status: 400 })
+
+  // Re-check availability against the CURRENT squad — availability can
+  // change between submit and announce, so this must be re-validated here,
+  // not just at save time in POST /api/squad.
+  const { data: currentSquad } = await supabase
+    .from('squad')
+    .select('player_id')
+    .eq('booking_id', booking_id)
+    .in('status', ['approved', 'announced'])
+
+  const currentPlayerIds = (currentSquad ?? []).map(r => r.player_id)
+  let ineligible: string[]
+  try {
+    ineligible = await findIneligiblePlayers(supabase, booking_id, currentPlayerIds)
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+  if (ineligible.length > 0) {
+    return NextResponse.json(
+      { error: 'Some squad players are no longer available (L or no response) — update the squad before announcing', player_ids: ineligible },
+      { status: 400 }
+    )
+  }
 
   const { error } = await supabase
     .from('squad')
