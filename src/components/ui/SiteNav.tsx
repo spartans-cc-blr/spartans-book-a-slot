@@ -10,9 +10,10 @@ interface SiteNavProps {
 }
 
 export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
-  const [open,        setOpen]        = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
-  const [gcOpen, setGcOpen] = useState(false)
+  const [open,         setOpen]         = useState(false)
+  const [profileOpen,  setProfileOpen]  = useState(false)
+  const [gcOpen,       setGcOpen]       = useState(false)
+  const [matchesOpen,  setMatchesOpen]  = useState(false)
   const { data: session, status }     = useSession()
 
   const player     = session?.user as any
@@ -29,13 +30,7 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
       ? [{ href: '/schedule', label: 'Schedule', key: 'schedule' }]
       : []),
     ...(isLoggedIn && !isExpelled
-      ? [{ href: '/fixtures', label: 'Fixtures', key: 'fixtures' }]
-      : []),
-    ...(isLoggedIn && !isExpelled
       ? [{ href: '/dugout', label: 'The Dugout', key: 'dugout' }]
-      : []),
-    ...(isLoggedIn && !isExpelled
-      ? [{ href: '/matches/history', label: 'Past Matches', key: 'matches' }]
       : []),
     // Captains' Corner — direct top-level link for captains & admin
     ...(isCaptain || isAdmin
@@ -67,6 +62,37 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center ml-auto gap-0">
+          {/* Matches submenu — desktop */}
+          {isLoggedIn && !isExpelled && (
+            <div className="relative"
+              onMouseEnter={() => setMatchesOpen(true)}
+              onMouseLeave={() => setMatchesOpen(false)}>
+              <button
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                  ${activePage === 'fixtures' || activePage === 'matches'
+                    ? 'text-gold border-crimson'
+                    : 'text-zinc-500 border-transparent hover:text-gold'}`}>
+                Matches <span className="text-[8px] mt-0.5">▾</span>
+              </button>
+              {matchesOpen && (
+                <div className="absolute top-14 left-0 w-44 bg-ink-2 border border-ink-5 rounded-b shadow-xl z-50">
+                  <Link href="/fixtures"
+                    onClick={() => setMatchesOpen(false)}
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-ink-5
+                      ${activePage === 'fixtures' ? 'text-gold bg-ink-3' : 'text-zinc-400 hover:text-gold hover:bg-ink-3'}`}>
+                    🏏 Upcoming
+                  </Link>
+                  <Link href="/matches/history"
+                    onClick={() => setMatchesOpen(false)}
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
+                      ${activePage === 'matches' ? 'text-gold bg-ink-3' : 'text-zinc-400 hover:text-gold hover:bg-ink-3'}`}>
+                    📜 Past Matches
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+
           {links.map(item => (
             <Link key={item.label} href={item.href}
               className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center border-b-2 transition-all
@@ -246,6 +272,23 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
       {/* Mobile nav dropdown */}
       {open && (
         <div className="md:hidden bg-ink-2 border-t border-ink-5 px-5 py-3 flex flex-col gap-1">
+          {isLoggedIn && !isExpelled && (
+            <>
+              <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 pt-1">
+                Matches
+              </p>
+              <Link href="/fixtures" onClick={() => setOpen(false)}
+                className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
+                  ${activePage === 'fixtures' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
+                🏏 Upcoming
+              </Link>
+              <Link href="/matches/history" onClick={() => setOpen(false)}
+                className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
+                  ${activePage === 'matches' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
+                📜 Past Matches
+              </Link>
+            </>
+          )}
           {links.map(item => (
             <Link key={item.label} href={item.href} onClick={() => setOpen(false)}
               className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
