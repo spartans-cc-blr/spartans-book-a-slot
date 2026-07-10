@@ -70,34 +70,46 @@ export async function GET(req: NextRequest) {
   // client-supplied player_id.
   let restrictToBookingIds: string[] | null = null
   if (mine || led) {
-    if (!user?.playerId) return NextResponse.json({ matches: [], nextCursor: null })
+    if (!user?.playerId) return NextResponse.json({ matches: [], nextCursor: null, totalCount: 0 })
     let squadQuery = supabase.from('squad').select('booking_id').eq('player_id', user.playerId)
     if (led) squadQuery = squadQuery.or('is_captain.eq.true,is_vc.eq.true')
     const { data: squadRows, error: squadErr } = await squadQuery
     if (squadErr) return NextResponse.json({ error: squadErr.message }, { status: 500 })
     restrictToBookingIds = Array.from(new Set((squadRows ?? []).map(r => r.booking_id)))
-    if (restrictToBookingIds.length === 0) return NextResponse.json({ matches: [], nextCursor: null })
+    if (restrictToBookingIds.length === 0) return NextResponse.json({ matches: [], nextCursor: null, totalCount: 0 })
   }
-
-  let query = supabase
-    .from('bookings')
-    .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, venue, cricheroes_url, tournament:tournaments(name, ball_type)')
-    .eq('status', 'confirmed')
-    .lt('game_date', today)
-    .order('game_date', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(limit)
-
-  if (tournamentId)         query = query.eq('tournament_id', tournamentId)
-  if (venue)                query = query.eq('venue', venue)
-  if (format)               query = query.eq('format', format)
-  if (restrictToBookingIds) query = query.in('id', restrictToBookingIds)
 
   // Never trust the client's month blindly — strictly shaped before use.
   const monthMatch = monthParam?.match(MONTH_RE)
-  if (monthMatch) {
-    query = query.gte('game_date', `${monthMatch[0]}-01`).lt('game_date', `${nextMonthStr(monthMatch[0])}-01`)
+
+  // Filters shared between the row fetch and the total-count query below —
+  // deliberately excludes `cursor`, since the count must reflect the whole
+  // current filter set, not just what's left after the page already loaded.
+  function applySharedFilters(q: any) {
+    q = q.eq('status', 'confirmed').lt('game_date', today)
+    if (tournamentId)         q = q.eq('tournament_id', tournamentId)
+    if (venue)                q = q.eq('venue', venue)
+    if (format)               q = q.eq('format', format)
+    if (restrictToBookingIds) q = q.in('id', restrictToBookingIds)
+    if (monthMatch) {
+      q = q.gte('game_date', `${monthMatch[0]}-01`).lt('game_date', `${nextMonthStr(monthMatch[0])}-01`)
+    }
+    return q
   }
+
+  const { count: totalCount, error: countErr } = await applySharedFilters(
+    supabase.from('bookings').select('id', { count: 'exact', head: true })
+  )
+  if (countErr) return NextResponse.json({ error: countErr.message }, { status: 500 })
+
+  let query = applySharedFilters(
+    supabase
+      .from('bookings')
+      .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, venue, cricheroes_url, tournament:tournaments(name, ball_type)')
+  )
+    .order('game_date', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit)
 
   // Never trust the client's cursor blindly — it's about to be interpolated
   // into a raw filter string, so it must match this exact shape first.
@@ -110,7 +122,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const matches = (data ?? []).map(b => ({
+  const matches = (data ?? []).map((b: any) => ({
     booking_id:      b.id,
     game_date:       b.game_date,
     slot_time:       b.slot_time,
@@ -127,5 +139,5 @@ export async function GET(req: NextRequest) {
   const last = matches[matches.length - 1]
   const nextCursor = matches.length === limit && last ? `${last.game_date}_${last.booking_id}` : null
 
-  return NextResponse.json({ matches, nextCursor })
+  return NextResponse.json({ matches, nextCursor, totalCount: totalCount ?? 0 })
 }
