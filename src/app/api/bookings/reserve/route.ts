@@ -5,7 +5,8 @@ import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+const user = session?.user as any
+if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const body = await req.json()
   const { game_date, slot_time, organiser_name, organiser_phone, reserved_until, notes } = body
@@ -39,7 +40,6 @@ export async function POST(req: NextRequest) {
       reserved_until:  reserved_until,
       notes:           notes ?? null,
       format:          null,
-      captain_id:      null,
       tournament_id:   null,
       venue:           null,
       block_reason:    'Reserved pending CricHeroes match creation',

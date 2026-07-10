@@ -11,7 +11,8 @@ import type { CreateBookingRequest } from '@/types'
 // Admin only. Returns all bookings with tournament (including captain) joined.
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const user = session?.user as any
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const supabase = createServiceClient()
   const { searchParams } = req.nextUrl

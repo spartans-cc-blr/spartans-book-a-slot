@@ -12,7 +12,8 @@ import type { CreateBookingRequest } from '@/types'
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+const user = session?.user as any
+if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const body = await req.json()
   const { game_date, slot_time, format, tournament_id, exclude_id } = body
