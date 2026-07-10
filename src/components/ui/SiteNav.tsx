@@ -34,6 +34,9 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
     ...(isLoggedIn && !isExpelled
       ? [{ href: '/dugout', label: 'The Dugout', key: 'dugout' }]
       : []),
+    ...(isLoggedIn && !isExpelled
+      ? [{ href: '/matches/history', label: 'Past Matches', key: 'matches' }]
+      : []),
     // Captains' Corner — direct top-level link for captains & admin
     ...(isCaptain || isAdmin
       ? [{ href: '/captains-corner', label: "Captains' Corner", key: 'captains' }]
