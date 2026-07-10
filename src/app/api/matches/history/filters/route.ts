@@ -31,20 +31,22 @@ export async function GET() {
 
   const tournamentMap = new Map<string, string>()
   const venueSet = new Set<string>()
-  const monthCounts = new Map<string, number>()
+  const monthSet = new Set<string>()
   for (const b of data ?? []) {
     const tournamentName = (b.tournament as any)?.name
     if (b.tournament_id && tournamentName) tournamentMap.set(b.tournament_id, tournamentName)
     if (b.venue) venueSet.add(b.venue)
-    const month = b.game_date.slice(0, 7) // 'YYYY-MM-DD' -> 'YYYY-MM'
-    monthCounts.set(month, (monthCounts.get(month) ?? 0) + 1)
+    monthSet.add(b.game_date.slice(0, 7)) // 'YYYY-MM-DD' -> 'YYYY-MM'
   }
 
   const tournaments = Array.from(tournamentMap, ([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name))
   const venues = Array.from(venueSet).sort()
-  const months = Array.from(monthCounts, ([month, count]) => ({ month, count }))
-    .sort((a, b) => b.month.localeCompare(a.month)) // most recent first
+  // No count per month — it wouldn't reflect whatever role/tournament/venue/
+  // format filters are active on the client, and a stale, filter-blind count
+  // sitting on the chip label was confusing (see /matches/history feedback).
+  // The list itself shows an always-accurate "N matches" total instead.
+  const months = Array.from(monthSet).sort((a, b) => b.localeCompare(a)) // most recent first
 
   return NextResponse.json({ tournaments, venues, months, formats: ['T20', 'T30'] })
 }

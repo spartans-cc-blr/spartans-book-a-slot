@@ -26,7 +26,7 @@ interface FilterOptions {
   tournaments: { id: string; name: string }[]
   venues:      string[]
   formats:     string[]
-  months:      { month: string; count: number }[]
+  months:      string[]
 }
 
 interface SquadPlayer {
@@ -161,6 +161,7 @@ export function MatchHistoryClient({
 
   const [matches, setMatches]         = useState<MatchSummary[]>([])
   const [nextCursor, setNextCursor]   = useState<string | null>(null)
+  const [totalCount, setTotalCount]   = useState(0)
   const [loading, setLoading]         = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError]             = useState('')
@@ -196,6 +197,7 @@ export function MatchHistoryClient({
         if (data.error) { setError(data.error); return }
         setMatches(data.matches ?? [])
         setNextCursor(data.nextCursor ?? null)
+        setTotalCount(data.totalCount ?? 0)
       })
       .catch(() => { if (!cancelled) setError('Network error') })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -233,7 +235,7 @@ export function MatchHistoryClient({
             other filter below (an AND'd param, not a replacement for them) */}
         {filterOptions.months.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
-            {filterOptions.months.map(({ month, count }) => (
+            {filterOptions.months.map(month => (
               <button
                 key={month}
                 onClick={() => setMonthFilter(prev => prev === month ? '' : month)}
@@ -242,7 +244,7 @@ export function MatchHistoryClient({
                     ? 'bg-gold/20 border-gold-dim text-gold'
                     : 'bg-ink-4 border-ink-5 text-zinc-500 hover:text-zinc-300'
                 }`}>
-                {monthChipLabel(month)} <span className="opacity-60">({count})</span>
+                {monthChipLabel(month)}
               </button>
             ))}
           </div>
@@ -304,6 +306,16 @@ export function MatchHistoryClient({
       {!loading && !error && matches.length === 0 && (
         <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">
           {hasActiveFilters ? 'No matches found for these filters.' : 'No completed matches yet.'}
+        </p>
+      )}
+
+      {/* Always reflects every active filter together (role + month +
+          tournament + venue + format) — unlike a per-chip count, this can't
+          go stale relative to whatever's currently selected. */}
+      {!loading && !error && matches.length > 0 && (
+        <p className="font-rajdhani text-xs text-zinc-600">
+          {totalCount} match{totalCount === 1 ? '' : 'es'}
+          {matches.length < totalCount ? ` · showing ${matches.length}` : ''}
         </p>
       )}
 
