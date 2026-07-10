@@ -35,7 +35,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
  const session = await getServerSession(authOptions)
-//const user = session?.user as any
+const user = session?.user as any
 if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const body = await req.json()
@@ -44,7 +44,7 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
   const { captain_id: _dropped, ...safeUpdates } = body
 
   // match_fee_override is admin-only — strip it from non-admin requests
-  const user = session.user as any
+  //const user = session.user as any
   if (!user?.isAdmin && 'match_fee_override' in safeUpdates) {
     delete safeUpdates.match_fee_override
   }
