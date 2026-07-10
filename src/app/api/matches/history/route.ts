@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('bookings')
-    .select('id, game_date, opponent_name, format, tournament_id, tournament:tournaments(name)')
+    .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, cricheroes_url, tournament:tournaments(name, ball_type)')
     .eq('status', 'confirmed')
     .gte('game_date', monthStart)
     .lt('game_date', upperBoundExclusive)
@@ -53,10 +53,14 @@ export async function GET(req: NextRequest) {
   const matches = (data ?? []).map(b => ({
     booking_id:      b.id,
     game_date:       b.game_date,
+    slot_time:       b.slot_time,
+    match_time:      b.match_time,
     opponent_name:   b.opponent_name,
     format:          b.format,
     tournament_id:   b.tournament_id,
     tournament_name: (b.tournament as any)?.name ?? null,
+    ball_type:       (b.tournament as any)?.ball_type ?? null,
+    cricheroes_url:  b.cricheroes_url,
   }))
 
   // Cheap existence check — is there any confirmed past match before this

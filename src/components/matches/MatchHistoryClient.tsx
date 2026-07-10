@@ -1,15 +1,22 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
+import { JerseyIcon } from '@/components/ui/JerseyIcon'
+
+type BallType = 'red' | 'white' | 'pink'
 
 interface MatchSummary {
   booking_id:      string
   game_date:       string
+  slot_time:       string
+  match_time:      string | null
   opponent_name:   string | null
   format:          string | null
   tournament_id:   string | null
   tournament_name: string | null
+  ball_type:       BallType | null
+  cricheroes_url:  string | null
 }
 
 interface SquadPlayer {
@@ -22,7 +29,7 @@ interface SquadPlayer {
 }
 
 interface MatchDetail {
-  booking: MatchSummary & { cricheroes_url: string | null }
+  booking: { booking_id: string; tournament_id: string | null; tournament_name: string | null }
   squad:   SquadPlayer[]
 }
 
@@ -54,14 +61,98 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
+function slotLabel(slot: string): string {
+  const map: Record<string, string> = { '07:30': '7:15 AM', '10:30': '10:15 AM', '12:30': '12:15 PM', '14:30': '2:15 PM' }
+  return map[slot] || slot
+}
+
+// ── Ball icons (mirrors src/components/fixtures/FixturesCard.tsx) ──────────
+function RedBall({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="mh-rb" cx="38%" cy="30%" r="62%">
+          <stop offset="0%" stopColor="#E8553A"/><stop offset="35%" stopColor="#C0392B"/>
+          <stop offset="75%" stopColor="#8B1A0F"/><stop offset="100%" stopColor="#5C0E08"/>
+        </radialGradient>
+        <clipPath id="mh-rc"><circle cx="30" cy="30" r="28"/></clipPath>
+      </defs>
+      <circle cx="30" cy="30" r="28" fill="url(#mh-rb)"/>
+      <g transform="rotate(-30 30 30)" clipPath="url(#mh-rc)">
+        <line x1="2" y1="30" x2="58" y2="30" stroke="#5C0E08" strokeWidth="3"/>
+        <line x1="2" y1="24" x2="58" y2="24" stroke="#E8C49A" strokeWidth="1" strokeDasharray="3 2.5"/>
+        <line x1="2" y1="36" x2="58" y2="36" stroke="#E8C49A" strokeWidth="1" strokeDasharray="3 2.5"/>
+      </g>
+      <ellipse cx="21" cy="17" rx="9" ry="5" fill="white" opacity="0.13" transform="rotate(-30 21 17)"/>
+    </svg>
+  )
+}
+
+function WhiteBall({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="mh-wb" cx="38%" cy="30%" r="62%">
+          <stop offset="0%" stopColor="#FFFFFF"/><stop offset="45%" stopColor="#EDE9DF"/>
+          <stop offset="80%" stopColor="#C8C2B0"/><stop offset="100%" stopColor="#A09880"/>
+        </radialGradient>
+        <clipPath id="mh-wc"><circle cx="30" cy="30" r="28"/></clipPath>
+      </defs>
+      <circle cx="30" cy="30" r="28" fill="url(#mh-wb)" stroke="#C0BAA8" strokeWidth="0.5"/>
+      <g transform="rotate(-30 30 30)" clipPath="url(#mh-wc)">
+        <line x1="2" y1="30" x2="58" y2="30" stroke="#9A9080" strokeWidth="3"/>
+        <line x1="2" y1="24" x2="58" y2="24" stroke="#707060" strokeWidth="1" strokeDasharray="3 2.5"/>
+        <line x1="2" y1="36" x2="58" y2="36" stroke="#707060" strokeWidth="1" strokeDasharray="3 2.5"/>
+      </g>
+      <ellipse cx="21" cy="17" rx="9" ry="5" fill="white" opacity="0.45" transform="rotate(-30 21 17)"/>
+    </svg>
+  )
+}
+
+function PinkBall({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="mh-pb" cx="38%" cy="30%" r="62%">
+          <stop offset="0%" stopColor="#F780B8"/><stop offset="35%" stopColor="#EC4899"/>
+          <stop offset="75%" stopColor="#9D1A5C"/><stop offset="100%" stopColor="#6B0D3A"/>
+        </radialGradient>
+        <clipPath id="mh-pc"><circle cx="30" cy="30" r="28"/></clipPath>
+      </defs>
+      <circle cx="30" cy="30" r="28" fill="url(#mh-pb)"/>
+      <g transform="rotate(-30 30 30)" clipPath="url(#mh-pc)">
+        <line x1="2" y1="30" x2="58" y2="30" stroke="#7A0A3C" strokeWidth="3"/>
+        <line x1="2" y1="24" x2="58" y2="24" stroke="#C9956B" strokeWidth="1" strokeDasharray="3 2.5"/>
+        <line x1="2" y1="36" x2="58" y2="36" stroke="#C9956B" strokeWidth="1" strokeDasharray="3 2.5"/>
+      </g>
+      <ellipse cx="21" cy="17" rx="9" ry="5" fill="white" opacity="0.16" transform="rotate(-30 21 17)"/>
+    </svg>
+  )
+}
+
+function BallIcon({ type, size = 20 }: { type: BallType; size?: number }) {
+  if (type === 'white') return <WhiteBall size={size} />
+  if (type === 'pink')  return <PinkBall size={size} />
+  return <RedBall size={size} />
+}
+
+function CricHeroesIcon({ size = 20 }: { size?: number }) {
+  return (
+    <img src="/cricheroes-logo.jpg" alt="CricHeroes" width={size} height={size}
+      style={{ borderRadius: '50%', objectFit: 'cover' }} />
+  )
+}
+
+function jerseyColour(ballType: BallType): 'gold' | 'white' {
+  return ballType === 'white' ? 'gold' : 'white'
+}
+
 export function MatchHistoryClient({ canEditRoles, canEditTournament }: { canEditRoles: boolean; canEditTournament: boolean }) {
   const [month, setMonth]     = useState(currentMonthStr())
   const [matches, setMatches] = useState<MatchSummary[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
-
-  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const isCurrentMonth = month === currentMonthStr()
 
@@ -81,10 +172,6 @@ export function MatchHistoryClient({ canEditRoles, canEditTournament }: { canEdi
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [month])
-
-  function toggleExpand(bookingId: string) {
-    setExpandedId(prev => prev === bookingId ? null : bookingId)
-  }
 
   return (
     <div className="space-y-4">
@@ -108,22 +195,18 @@ export function MatchHistoryClient({ canEditRoles, canEditTournament }: { canEdi
       {error && (
         <p className="font-rajdhani text-sm text-red-400 bg-red-950/40 border border-red-800 rounded px-4 py-2.5">{error}</p>
       )}
-
       {loading && (
         <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">Loading…</p>
       )}
-
       {!loading && !error && matches.length === 0 && (
         <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">No completed matches in {monthLabel(month)}.</p>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         {matches.map(m => (
-          <MatchRow
+          <MatchHistoryCard
             key={m.booking_id}
             match={m}
-            expanded={expandedId === m.booking_id}
-            onToggle={() => toggleExpand(m.booking_id)}
             canEditRoles={canEditRoles}
             canEditTournament={canEditTournament}
           />
@@ -133,21 +216,22 @@ export function MatchHistoryClient({ canEditRoles, canEditTournament }: { canEdi
   )
 }
 
-function MatchRow({
-  match, expanded, onToggle, canEditRoles, canEditTournament,
+function MatchHistoryCard({
+  match, canEditRoles, canEditTournament,
 }: {
   match: MatchSummary
-  expanded: boolean
-  onToggle: () => void
   canEditRoles: boolean
   canEditTournament: boolean
 }) {
+  const [squadOpen, setSquadOpen]     = useState(false)
   const [detail, setDetail]           = useState<MatchDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
 
+  const ballType = match.ball_type ?? 'red'
+
   useEffect(() => {
-    if (!expanded || detail || detailLoading) return
+    if (!squadOpen || detail || detailLoading) return
     setDetailLoading(true)
     setDetailError('')
     fetch(`/api/matches/history/${match.booking_id}`)
@@ -158,51 +242,102 @@ function MatchRow({
       })
       .catch(() => setDetailError('Network error'))
       .finally(() => setDetailLoading(false))
-  }, [expanded, detail, detailLoading, match.booking_id])
+  }, [squadOpen, detail, detailLoading, match.booking_id])
 
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-ink-4 transition-colors text-left">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="font-rajdhani text-xs font-semibold text-zinc-500 w-20 flex-shrink-0">{formatDate(match.game_date)}</span>
-          <span className="font-cinzel text-sm text-parchment truncate">
-            vs {match.opponent_name ?? 'TBD'}
-          </span>
-          {match.format && (
-            <span className="font-rajdhani text-[10px] font-bold bg-ink-4 border border-ink-5 text-zinc-400 px-1.5 py-0.5 rounded flex-shrink-0">
-              {match.format}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <span className="font-rajdhani text-xs text-zinc-600 hidden sm:inline">
-            {match.tournament_name ?? 'Unassigned'}
-          </span>
-          <span className="text-zinc-600">{expanded ? '▲' : '▼'}</span>
-        </div>
-      </button>
+    <div style={{
+      background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
+      border: '1px solid #2D3748',
+      borderRadius: '12px',
+      padding: '14px 16px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
+      boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
 
-      {expanded && (
-        <div className="border-t border-ink-5 px-4 py-4">
-          {detailLoading && <p className="font-rajdhani text-sm text-zinc-600">Loading squad…</p>}
-          {detailError && <p className="font-rajdhani text-sm text-red-400">{detailError}</p>}
-          {detail && (
-            <MatchDetailPanel
-              detail={detail}
-              onDetailChange={setDetail}
-              canEditRoles={canEditRoles}
-              canEditTournament={canEditTournament}
-            />
-          )}
+      {/* Date + slot + format */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', fontWeight: 600, color: '#C9A84C', letterSpacing: '0.05em' }}>
+          {formatDate(match.game_date)} · {match.match_time
+            ? match.match_time.slice(0, 5).replace(/^0/, '') + ' ' + (parseInt(match.match_time) < 12 ? 'AM' : 'PM')
+            : slotLabel(match.slot_time)}
+        </span>
+        {match.format && (
+          <span style={{ background: '#1E3A5F', color: '#93C5FD', fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', letterSpacing: '0.08em' }}>
+            {match.format}
+          </span>
+        )}
+      </div>
+
+      {/* Tournament + opponent */}
+      <div>
+        <div style={{ fontSize: '15px', fontWeight: 700, color: '#F5F5F5', lineHeight: 1.3, marginBottom: '3px' }}>
+          {match.tournament_name ?? 'Unassigned'}
         </div>
-      )}
+        <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+          vs <span style={{ color: '#D1D5DB', fontWeight: 500 }}>{match.opponent_name || 'TBD'}</span>
+        </div>
+      </div>
+
+      <div style={{ height: '1px', background: '#2D3748' }} />
+
+      {/* Icons row — ball, jersey, CricHeroes only (no ground/hospital) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+          <BallIcon type={ballType} size={22} />
+          <span style={{ fontSize: '9px', color: '#6B7280', textTransform: 'capitalize' }}>{ballType} ball</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+          <JerseyIcon colour={jerseyColour(ballType)} size={22} />
+          <span style={{ fontSize: '9px', color: '#6B7280' }}>{ballType === 'white' ? 'Colour jersey' : 'White jersey'}</span>
+        </div>
+        <div style={{ flex: 1 }} />
+        {match.cricheroes_url && (
+          <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
+            <CricHeroesIcon size={22} />
+            <span style={{ fontSize: '9px', color: '#6B7280' }}>CricHeroes</span>
+          </a>
+        )}
+      </div>
+
+      {/* Collapsible squad */}
+      <div>
+        <div style={{ height: '1px', background: '#2D3748' }} />
+        <button
+          onClick={() => setSquadOpen(v => !v)}
+          style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#C9A84C' }}>
+            SQUAD{detail ? ` · ${detail.squad.length} players` : ''}
+          </span>
+          <span style={{ fontSize: '14px', color: '#6B7280' }}>{squadOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {squadOpen && (
+          <div style={{ paddingTop: '4px', paddingBottom: '2px' }}>
+            {detailLoading && <p className="font-rajdhani text-sm text-zinc-600">Loading squad…</p>}
+            {detailError && <p className="font-rajdhani text-sm text-red-400">{detailError}</p>}
+            {detail && (
+              <SquadPanel
+                detail={detail}
+                onDetailChange={setDetail}
+                canEditRoles={canEditRoles}
+                canEditTournament={canEditTournament}
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function MatchDetailPanel({
+function SquadPanel({
   detail, onDetailChange, canEditRoles, canEditTournament,
 }: {
   detail: MatchDetail
@@ -254,8 +389,8 @@ function MatchDetailPanel({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1.5">
+    <div className="space-y-3">
+      <div className="space-y-1">
         {editedSquad
           .slice()
           .sort((a, b) => a.player_name.localeCompare(b.player_name))
