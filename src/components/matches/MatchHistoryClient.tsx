@@ -16,7 +16,16 @@ interface MatchSummary {
   tournament_id:   string | null
   tournament_name: string | null
   ball_type:       BallType | null
+  venue:           string | null
   cricheroes_url:  string | null
+}
+
+type RoleFilter = 'all' | 'played' | 'led'
+
+interface FilterOptions {
+  tournaments: { id: string; name: string }[]
+  venues:      string[]
+  formats:     string[]
 }
 
 interface SquadPlayer {
@@ -37,24 +46,6 @@ interface Tournament {
   id:     string
   name:   string
   active: boolean
-}
-
-function pad(n: number) { return String(n).padStart(2, '0') }
-
-function currentMonthStr(): string {
-  const d = new Date()
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`
-}
-
-function shiftMonth(month: string, delta: number): string {
-  const [y, m] = month.split('-').map(Number)
-  const idx = y * 12 + (m - 1) + delta
-  return `${Math.floor(idx / 12)}-${pad((idx % 12) + 1)}`
-}
-
-function monthLabel(month: string): string {
-  const [y, m] = month.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 }
 
 function formatDate(dateStr: string): string {
@@ -147,49 +138,134 @@ function jerseyColour(ballType: BallType): 'gold' | 'white' {
   return ballType === 'white' ? 'gold' : 'white'
 }
 
-export function MatchHistoryClient({ canEditRoles, canEditTournament }: { canEditRoles: boolean; canEditTournament: boolean }) {
-  const [month, setMonth]     = useState(currentMonthStr())
-  const [matches, setMatches] = useState<MatchSummary[]>([])
-  const [hasMore, setHasMore] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState('')
+export function MatchHistoryClient({
+  canEditRoles, canEditTournament, viewerPlayerId,
+}: {
+  canEditRoles: boolean
+  canEditTournament: boolean
+  viewerPlayerId: string | null
+}) {
+  const [roleFilter, setRoleFilter]     = useState<RoleFilter>('all')
+  const [tournamentId, setTournamentId] = useState('')
+  const [venue, setVenue]               = useState('')
+  const [format, setFormat]             = useState('')
 
-  const isCurrentMonth = month === currentMonthStr()
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ tournaments: [], venues: [], formats: ['T20', 'T30'] })
 
+  const [matches, setMatches]         = useState<MatchSummary[]>([])
+  const [nextCursor, setNextCursor]   = useState<string | null>(null)
+  const [loading, setLoading]         = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError]             = useState('')
+
+  useEffect(() => {
+    fetch('/api/matches/history/filters')
+      .then(res => res.json())
+      .then(data => { if (!data.error) setFilterOptions(data) })
+      .catch(() => {})
+  }, [])
+
+  function buildParams(cursor?: string | null) {
+    const p = new URLSearchParams()
+    if (cursor) p.set('cursor', cursor)
+    if (roleFilter === 'played') p.set('mine', '1')
+    if (roleFilter === 'led')    p.set('led', '1')
+    if (tournamentId) p.set('tournament_id', tournamentId)
+    if (venue)        p.set('venue', venue)
+    if (format)       p.set('format', format)
+    return p.toString()
+  }
+
+  // Re-run from scratch whenever a filter changes.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError('')
-    fetch(`/api/matches/history?month=${month}`)
+    fetch(`/api/matches/history?${buildParams()}`)
       .then(res => res.json())
       .then(data => {
         if (cancelled) return
         if (data.error) { setError(data.error); return }
         setMatches(data.matches ?? [])
-        setHasMore(!!data.hasMore)
+        setNextCursor(data.nextCursor ?? null)
       })
       .catch(() => { if (!cancelled) setError('Network error') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [month])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleFilter, tournamentId, venue, format])
+
+  async function loadMore() {
+    if (!nextCursor) return
+    setLoadingMore(true)
+    try {
+      const res = await fetch(`/api/matches/history?${buildParams(nextCursor)}`)
+      const data = await res.json()
+      if (data.error) { setError(data.error); return }
+      setMatches(prev => [...prev, ...(data.matches ?? [])])
+      setNextCursor(data.nextCursor ?? null)
+    } catch {
+      setError('Network error')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  const hasActiveFilters = roleFilter !== 'all' || !!tournamentId || !!venue || !!format
+
+  function clearFilters() {
+    setRoleFilter('all'); setTournamentId(''); setVenue(''); setFormat('')
+  }
 
   return (
     <div className="space-y-4">
-      {/* Month nav */}
-      <div className="flex items-center justify-between bg-ink-3 border border-ink-5 rounded px-4 py-3">
-        <button
-          onClick={() => setMonth(m => shiftMonth(m, -1))}
-          disabled={!hasMore && !loading}
-          className="font-rajdhani text-xs font-bold tracking-wide text-zinc-400 hover:text-gold disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
-          ← Older
-        </button>
-        <span className="font-cinzel text-sm font-semibold text-parchment">{monthLabel(month)}</span>
-        <button
-          onClick={() => setMonth(m => shiftMonth(m, 1))}
-          disabled={isCurrentMonth}
-          className="font-rajdhani text-xs font-bold tracking-wide text-zinc-400 hover:text-gold disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
-          Newer →
-        </button>
+      {/* Filter bar — stacks on mobile, single row from sm up */}
+      <div className="bg-ink-3 border border-ink-5 rounded px-4 py-3 space-y-3">
+        {viewerPlayerId && (
+          <div className="flex flex-wrap gap-2">
+            {(['all', 'played', 'led'] as RoleFilter[]).map(rf => (
+              <button
+                key={rf}
+                onClick={() => setRoleFilter(rf)}
+                className={`font-rajdhani text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full border transition-colors ${
+                  roleFilter === rf
+                    ? 'bg-gold/20 border-gold-dim text-gold'
+                    : 'bg-ink-4 border-ink-5 text-zinc-500 hover:text-zinc-300'
+                }`}>
+                {rf === 'all' ? 'All Matches' : rf === 'played' ? 'I Played' : 'I Led (C/VC)'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <select value={tournamentId} onChange={e => setTournamentId(e.target.value)} className="form-input text-xs">
+            <option value="">All tournaments</option>
+            {filterOptions.tournaments.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+          <select value={venue} onChange={e => setVenue(e.target.value)} className="form-input text-xs">
+            <option value="">All grounds</option>
+            {filterOptions.venues.map(v => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+          <select value={format} onChange={e => setFormat(e.target.value)} className="form-input text-xs">
+            <option value="">All formats</option>
+            {filterOptions.formats.map(f => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+        </div>
+
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="font-rajdhani text-xs font-semibold text-zinc-500 hover:text-gold transition-colors">
+            ✕ Clear filters
+          </button>
+        )}
       </div>
 
       {error && (
@@ -199,7 +275,9 @@ export function MatchHistoryClient({ canEditRoles, canEditTournament }: { canEdi
         <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">Loading…</p>
       )}
       {!loading && !error && matches.length === 0 && (
-        <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">No completed matches in {monthLabel(month)}.</p>
+        <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">
+          {hasActiveFilters ? 'No matches found for these filters.' : 'No completed matches yet.'}
+        </p>
       )}
 
       <div className="space-y-3">
@@ -212,6 +290,17 @@ export function MatchHistoryClient({ canEditRoles, canEditTournament }: { canEdi
           />
         ))}
       </div>
+
+      {!loading && nextCursor && (
+        <div className="text-center pt-2">
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="font-rajdhani text-xs font-bold tracking-wide uppercase bg-ink-3 border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
+            {loadingMore ? 'Loading…' : 'Load Older Matches'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -282,6 +371,9 @@ function MatchHistoryCard({
         <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
           vs <span style={{ color: '#D1D5DB', fontWeight: 500 }}>{match.opponent_name || 'TBD'}</span>
         </div>
+        {match.venue && (
+          <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>📍 {match.venue}</div>
+        )}
       </div>
 
       <div style={{ height: '1px', background: '#2D3748' }} />

@@ -1,8 +1,10 @@
 // PATCH /api/matches/history/[bookingId]/roles
-// GC or Admin only — corrects per-player match-day roles (C/VC/WK) on a
-// squad after the fact. Never trusts the client's role flags: re-checks
-// isGC/isAdmin from the session on every call, and only ever writes a row
-// for a player_id that already exists in this booking's squad.
+// GC, Admin, or Wrangler only — corrects per-player match-day roles (C/VC/WK)
+// on a squad after the fact. Wranglers get this too since they're the ones
+// backfilling squad data from WhatsApp announcements and are best placed to
+// spot a wrong C/VC/WK. Never trusts the client's role flags: re-checks
+// isGC/isAdmin/isWrangler from the session on every call, and only ever
+// writes a row for a player_id that already exists in this booking's squad.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -24,7 +26,7 @@ export async function PATCH(
   const session = await getServerSession(authOptions)
   const user = session?.user as any
   if (!user?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  if (!user?.isGC && !user?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!user?.isGC && !user?.isAdmin && !user?.isWrangler) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const limited = await rateLimit(req, RATE_LIMITS.adminWrite, user.playerId)
   if (limited) return limited
