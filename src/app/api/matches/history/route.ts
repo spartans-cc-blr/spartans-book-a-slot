@@ -1,10 +1,12 @@
 // GET /api/matches/history?month=YYYY-MM
-// Public read — lightweight list of past confirmed matches, paginated by
-// calendar month. No squad data here; see /api/matches/history/[bookingId]
-// for the full detail. Reads still go through the service-role client
-// (consistent with the rest of the app — no client-side Supabase reads).
+// Signed-in members only — the detail route this list feeds into surfaces
+// player names (with CricHeroes links), so unlike /schedule this isn't
+// public. Reads still go through the service-role client (consistent with
+// the rest of the app — no client-side Supabase reads).
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 
 function pad(n: number) { return String(n).padStart(2, '0') }
@@ -20,6 +22,11 @@ function nextMonthStr(month: string): string {
 }
 
 export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!session) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (user?.playerStatus === 'expelled') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const today = new Date().toISOString().split('T')[0]
   const monthParam = req.nextUrl.searchParams.get('month')
   const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentMonthStr()

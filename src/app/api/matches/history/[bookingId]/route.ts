@@ -1,21 +1,30 @@
 // GET /api/matches/history/[bookingId]
-// Public read — full squad + booking detail for one past match.
+// Signed-in members only — this returns full squad rows (player names with
+// CricHeroes links), so it's gated the same way as the list route rather
+// than being public like /schedule.
 //
-// vibe-security: gated to bookings that actually satisfy the "past" predicate
-// (status = 'confirmed' AND game_date < today) — the same one the list route
-// uses. Without this, an unauthenticated request for a *future* confirmed
-// booking's id would leak its in-progress squad selection (draft captain/VC/
-// WK picks, not yet announced) to anyone who can guess or enumerate a
-// booking_id. Non-past bookings are treated as not-found here, matching the
-// list view's scope.
+// vibe-security: also gated to bookings that actually satisfy the "past"
+// predicate (status = 'confirmed' AND game_date < today) — the same one the
+// list route uses. Without this, a signed-in-but-non-privileged request for
+// a *future* confirmed booking's id would leak its in-progress squad
+// selection (draft captain/VC/WK picks, not yet announced) to anyone who can
+// guess or enumerate a booking_id. Non-past bookings are treated as
+// not-found here, matching the list view's scope.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { bookingId: string } }
 ) {
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!session) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (user?.playerStatus === 'expelled') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const today = new Date().toISOString().split('T')[0]
   const supabase = createServiceClient()
 

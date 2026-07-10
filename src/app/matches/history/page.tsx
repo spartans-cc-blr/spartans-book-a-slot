@@ -1,5 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { MatchHistoryClient } from '@/components/matches/MatchHistoryClient'
 import type { Metadata } from 'next'
@@ -10,6 +11,11 @@ export const revalidate = 0
 export default async function MatchHistoryPage() {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
+
+  // Signed-in members only — squad rows here include player names (with
+  // CricHeroes links), so unlike /schedule this isn't public.
+  if (!session) redirect('/login')
+  if (user?.playerStatus === 'expelled') redirect('/')
 
   const isGC    = !!user?.isGC || !!user?.isAdmin
   const isAdmin = !!user?.isAdmin
