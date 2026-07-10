@@ -26,6 +26,7 @@ interface FilterOptions {
   tournaments: { id: string; name: string }[]
   venues:      string[]
   formats:     string[]
+  months:      { month: string; count: number }[]
 }
 
 interface SquadPlayer {
@@ -46,6 +47,11 @@ interface Tournament {
   id:     string
   name:   string
   active: boolean
+}
+
+function monthChipLabel(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
 function formatDate(dateStr: string): string {
@@ -146,11 +152,12 @@ export function MatchHistoryClient({
   viewerPlayerId: string | null
 }) {
   const [roleFilter, setRoleFilter]     = useState<RoleFilter>('all')
+  const [monthFilter, setMonthFilter]   = useState('')
   const [tournamentId, setTournamentId] = useState('')
   const [venue, setVenue]               = useState('')
   const [format, setFormat]             = useState('')
 
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ tournaments: [], venues: [], formats: ['T20', 'T30'] })
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ tournaments: [], venues: [], months: [], formats: ['T20', 'T30'] })
 
   const [matches, setMatches]         = useState<MatchSummary[]>([])
   const [nextCursor, setNextCursor]   = useState<string | null>(null)
@@ -170,6 +177,7 @@ export function MatchHistoryClient({
     if (cursor) p.set('cursor', cursor)
     if (roleFilter === 'played') p.set('mine', '1')
     if (roleFilter === 'led')    p.set('led', '1')
+    if (monthFilter)  p.set('month', monthFilter)
     if (tournamentId) p.set('tournament_id', tournamentId)
     if (venue)        p.set('venue', venue)
     if (format)       p.set('format', format)
@@ -193,7 +201,7 @@ export function MatchHistoryClient({
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFilter, tournamentId, venue, format])
+  }, [roleFilter, monthFilter, tournamentId, venue, format])
 
   async function loadMore() {
     if (!nextCursor) return
@@ -211,16 +219,35 @@ export function MatchHistoryClient({
     }
   }
 
-  const hasActiveFilters = roleFilter !== 'all' || !!tournamentId || !!venue || !!format
+  const hasActiveFilters = roleFilter !== 'all' || !!monthFilter || !!tournamentId || !!venue || !!format
 
   function clearFilters() {
-    setRoleFilter('all'); setTournamentId(''); setVenue(''); setFormat('')
+    setRoleFilter('all'); setMonthFilter(''); setTournamentId(''); setVenue(''); setFormat('')
   }
 
   return (
     <div className="space-y-4">
       {/* Filter bar — stacks on mobile, single row from sm up */}
       <div className="bg-ink-3 border border-ink-5 rounded px-4 py-3 space-y-3">
+        {/* Month chip strip — horizontally scrollable, independent of every
+            other filter below (an AND'd param, not a replacement for them) */}
+        {filterOptions.months.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
+            {filterOptions.months.map(({ month, count }) => (
+              <button
+                key={month}
+                onClick={() => setMonthFilter(prev => prev === month ? '' : month)}
+                className={`font-rajdhani text-xs font-bold tracking-wide px-3 py-1.5 rounded-full border whitespace-nowrap flex-shrink-0 transition-colors ${
+                  monthFilter === month
+                    ? 'bg-gold/20 border-gold-dim text-gold'
+                    : 'bg-ink-4 border-ink-5 text-zinc-500 hover:text-zinc-300'
+                }`}>
+                {monthChipLabel(month)} <span className="opacity-60">({count})</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {viewerPlayerId && (
           <div className="flex flex-wrap gap-2">
             {(['all', 'played', 'led'] as RoleFilter[]).map(rf => (
