@@ -1,11 +1,11 @@
 // GET /api/matches/history/filters
 // Signed-in members only (same gate as the rest of /api/matches/history) —
-// returns the distinct tournaments and venues that actually appear among
-// past confirmed matches, so the filter dropdowns on /matches/history never
-// offer an option with zero results. Deliberately not sourced from the full
-// /api/tournaments or /api/grounds lists: a tournament that's since been
-// marked inactive, or a one-off away venue, still needs to show up here as
-// long as a historical match references it.
+// returns the distinct tournaments, venues, and months that actually appear
+// among past confirmed matches, so the filter dropdowns and month chip strip
+// on /matches/history never offer an option with zero results. Deliberately
+// not sourced from the full /api/tournaments or /api/grounds lists: a
+// tournament that's since been marked inactive, or a one-off away venue,
+// still needs to show up here as long as a historical match references it.
 
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -23,7 +23,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('bookings')
-    .select('tournament_id, venue, tournament:tournaments(id, name)')
+    .select('game_date, tournament_id, venue, tournament:tournaments(id, name)')
     .eq('status', 'confirmed')
     .lt('game_date', today)
 
@@ -31,15 +31,20 @@ export async function GET() {
 
   const tournamentMap = new Map<string, string>()
   const venueSet = new Set<string>()
+  const monthCounts = new Map<string, number>()
   for (const b of data ?? []) {
     const tournamentName = (b.tournament as any)?.name
     if (b.tournament_id && tournamentName) tournamentMap.set(b.tournament_id, tournamentName)
     if (b.venue) venueSet.add(b.venue)
+    const month = b.game_date.slice(0, 7) // 'YYYY-MM-DD' -> 'YYYY-MM'
+    monthCounts.set(month, (monthCounts.get(month) ?? 0) + 1)
   }
 
   const tournaments = Array.from(tournamentMap, ([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name))
   const venues = Array.from(venueSet).sort()
+  const months = Array.from(monthCounts, ([month, count]) => ({ month, count }))
+    .sort((a, b) => b.month.localeCompare(a.month)) // most recent first
 
-  return NextResponse.json({ tournaments, venues, formats: ['T20', 'T30'] })
+  return NextResponse.json({ tournaments, venues, months, formats: ['T20', 'T30'] })
 }

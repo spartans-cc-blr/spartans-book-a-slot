@@ -23,6 +23,10 @@
 //                   captain or vice-captain (squad.is_captain / squad.is_vc —
 //                   never players.is_captain, which is the permanent
 //                   club-level flag, not a per-match record)
+//   month=YYYY-MM — jump straight to one calendar month (the month chip
+//                   strip on the client); ANDs with every filter above and
+//                   is completely independent of `cursor` — picking a month
+//                   never disturbs the other filters, and vice versa
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -32,6 +36,12 @@ import { createServiceClient } from '@/lib/supabase'
 const DEFAULT_LIMIT = 15
 const MAX_LIMIT = 50
 const CURSOR_RE = /^(\d{4}-\d{2}-\d{2})_([0-9a-fA-F-]{36})$/
+const MONTH_RE  = /^(\d{4})-(\d{2})$/
+
+function nextMonthStr(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+}
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -51,6 +61,7 @@ export async function GET(req: NextRequest) {
   const mine         = params.get('mine') === '1'
   const led          = params.get('led') === '1'
   const cursor       = params.get('cursor') || null
+  const monthParam   = params.get('month') || null
 
   const supabase = createServiceClient()
 
@@ -81,6 +92,12 @@ export async function GET(req: NextRequest) {
   if (venue)                query = query.eq('venue', venue)
   if (format)               query = query.eq('format', format)
   if (restrictToBookingIds) query = query.in('id', restrictToBookingIds)
+
+  // Never trust the client's month blindly — strictly shaped before use.
+  const monthMatch = monthParam?.match(MONTH_RE)
+  if (monthMatch) {
+    query = query.gte('game_date', `${monthMatch[0]}-01`).lt('game_date', `${nextMonthStr(monthMatch[0])}-01`)
+  }
 
   // Never trust the client's cursor blindly — it's about to be interpolated
   // into a raw filter string, so it must match this exact shape first.
