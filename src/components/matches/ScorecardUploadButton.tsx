@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export type ScorecardStatus = 'pending_parse' | 'parsed' | 'synced' | 'fees_applied'
 
@@ -90,6 +90,14 @@ export function ScorecardUploadButton({
   const [stepMessage, setStepMessage] = useState('')
   const [error, setError]         = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // uploadStatus can change from elsewhere (e.g. the admin "Sync Stats"
+  // action updates the parent's status independently of this component's
+  // own upload flow) — without this, status only ever reflected whatever
+  // uploadStatus was at mount, so the badge got stuck on a stale value.
+  useEffect(() => {
+    setStatus(uploadStatus)
+  }, [uploadStatus])
 
   if (!canUpload) return null
 

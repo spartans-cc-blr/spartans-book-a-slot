@@ -521,7 +521,10 @@ function MatchHistoryCard({
                   <span>🏏 <span style={{ color: '#C9A84C' }}>{match.stats.top_bat.name}</span> — {match.stats.top_bat.runs} ({match.stats.top_bat.balls})</span>
                 )}
                 {match.stats.top_bowl && (
-                  <span>🎳 <span style={{ color: '#C9A84C' }}>{match.stats.top_bowl.name}</span> — {match.stats.top_bowl.wickets}/{match.stats.top_bowl.runs} ({match.stats.top_bowl.overs} ov)</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <BallIcon type={ballType} size={12} />
+                    <span style={{ color: '#C9A84C' }}>{match.stats.top_bowl.name}</span> — {match.stats.top_bowl.wickets}/{match.stats.top_bowl.runs} ({match.stats.top_bowl.overs} ov)
+                  </span>
                 )}
               </div>
             )}

@@ -32,8 +32,19 @@ export function ScorecardTables({
   bowling: any[]
   squad?: SquadRef[]
 }) {
-  const topBatRuns  = batting.reduce((max, r) => Math.max(max, num(r, ['runs', 'total_runs'])), 0)
-  const topBowlWkts = bowling.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
+  // Players who didn't bat/bowl get a zero-filled row (dismissal_method:
+  // 'did_not_bat' for batting; every bowling field 0 for a player who never
+  // bowled) so every squad member has a row in each table server-side —
+  // filtered out here since they're just clutter in the readout. Balls
+  // faced (not runs) is the right batting signal: a player can legitimately
+  // score 0 off a ball they actually faced.
+  const battingRows = batting.filter(row =>
+    pickField(row, ['dismissal_method']) !== 'did_not_bat' && num(row, ['balls', 'balls_faced']) > 0
+  )
+  const bowlingRows = bowling.filter(row => num(row, ['overs', 'overs_bowled']) > 0)
+
+  const topBatRuns  = battingRows.reduce((max, r) => Math.max(max, num(r, ['runs', 'total_runs'])), 0)
+  const topBowlWkts = bowlingRows.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
 
   return (
     <div className="space-y-4">
@@ -52,7 +63,7 @@ export function ScorecardTables({
               </tr>
             </thead>
             <tbody>
-              {batting.map((row, i) => {
+              {battingRows.map((row, i) => {
                 const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
                 const runs = num(row, ['runs', 'total_runs'])
                 const isTop = topBatRuns > 0 && runs === topBatRuns
@@ -69,7 +80,7 @@ export function ScorecardTables({
                   </tr>
                 )
               })}
-              {batting.length === 0 && (
+              {battingRows.length === 0 && (
                 <tr><td colSpan={6} className="text-zinc-600 py-2">No batting data.</td></tr>
               )}
             </tbody>
@@ -91,7 +102,7 @@ export function ScorecardTables({
               </tr>
             </thead>
             <tbody>
-              {bowling.map((row, i) => {
+              {bowlingRows.map((row, i) => {
                 const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
                 const wkts = num(row, ['wickets', 'wickets_taken'])
                 const isTop = topBowlWkts > 0 && wkts === topBowlWkts
@@ -107,7 +118,7 @@ export function ScorecardTables({
                   </tr>
                 )
               })}
-              {bowling.length === 0 && (
+              {bowlingRows.length === 0 && (
                 <tr><td colSpan={5} className="text-zinc-600 py-2">No bowling data.</td></tr>
               )}
             </tbody>
