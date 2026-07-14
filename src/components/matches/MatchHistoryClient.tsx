@@ -3,8 +3,22 @@
 import { useEffect, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { JerseyIcon } from '@/components/ui/JerseyIcon'
+import { ScorecardUploadButton, type ScorecardStatus } from '@/components/matches/ScorecardUploadButton'
+import { ScorecardTables } from '@/components/matches/ScorecardTables'
 
 type BallType = 'red' | 'white' | 'pink'
+
+interface StatsSummary {
+  match_result:     string | null
+  team_total:       number | null
+  team_wickets:     number | null
+  team_overs:       number | null
+  opponent_total:   number | null
+  opponent_wickets: number | null
+  opponent_overs:   number | null
+  top_bat:  { name: string; runs: number; balls: number } | null
+  top_bowl: { name: string; wickets: number; runs: number; overs: number } | null
+}
 
 interface MatchSummary {
   booking_id:      string
@@ -18,6 +32,10 @@ interface MatchSummary {
   ball_type:       BallType | null
   venue:           string | null
   cricheroes_url:  string | null
+  scorecard_status:      ScorecardStatus | null
+  scorecard_uploaded_at: string | null
+  can_upload:      boolean
+  stats:           StatsSummary | null
 }
 
 type RoleFilter = 'all' | 'played' | 'led'
@@ -41,6 +59,13 @@ interface SquadPlayer {
 interface MatchDetail {
   booking: { booking_id: string; tournament_id: string | null; tournament_name: string | null }
   squad:   SquadPlayer[]
+}
+
+interface FullScorecard {
+  batting:   any[]
+  bowling:   any[]
+  fielding:  any[]
+  team_list: any[]
 }
 
 interface Tournament {
@@ -142,6 +167,20 @@ function CricHeroesIcon({ size = 20 }: { size?: number }) {
 
 function jerseyColour(ballType: BallType): 'gold' | 'white' {
   return ballType === 'white' ? 'gold' : 'white'
+}
+
+function resultBadgeStyle(result: string | null): { bg: string; color: string; label: string } {
+  const r = (result ?? '').toLowerCase()
+  if (r.includes('win'))  return { bg: '#052E1E', color: '#059669', label: 'WON' }
+  if (r.includes('los'))  return { bg: '#3B0A0A', color: '#DC2626', label: 'LOST' }
+  if (r.includes('tie'))  return { bg: '#3B2F0A', color: '#D97706', label: 'TIED' }
+  return { bg: '#1E293B', color: '#94A3B8', label: (result ?? 'NO RESULT').toUpperCase() }
+}
+
+function scoreLine(stats: StatsSummary): string {
+  const own = `${stats.team_total ?? '—'}/${stats.team_wickets ?? '—'} (${stats.team_overs ?? '—'} ov)`
+  const opp = `${stats.opponent_total ?? '—'}/${stats.opponent_wickets ?? '—'} (${stats.opponent_overs ?? '—'} ov)`
+  return `${own} vs ${opp}`
 }
 
 export function MatchHistoryClient({
@@ -326,6 +365,9 @@ export function MatchHistoryClient({
             match={m}
             canEditRoles={canEditRoles}
             canEditTournament={canEditTournament}
+            onScorecardStatusChange={(bookingId, status) =>
+              setMatches(prev => prev.map(x => x.booking_id === bookingId ? { ...x, scorecard_status: status } : x))
+            }
           />
         ))}
       </div>
@@ -345,21 +387,29 @@ export function MatchHistoryClient({
 }
 
 function MatchHistoryCard({
-  match, canEditRoles, canEditTournament,
+  match, canEditRoles, canEditTournament, onScorecardStatusChange,
 }: {
   match: MatchSummary
   canEditRoles: boolean
   canEditTournament: boolean
+  onScorecardStatusChange: (bookingId: string, status: ScorecardStatus) => void
 }) {
   const [squadOpen, setSquadOpen]     = useState(false)
   const [detail, setDetail]           = useState<MatchDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
 
+  const [scorecardOpen, setScorecardOpen]       = useState(false)
+  const [scorecard, setScorecard]               = useState<FullScorecard | null>(null)
+  const [scorecardLoading, setScorecardLoading] = useState(false)
+  const [scorecardError, setScorecardError]     = useState('')
+
   const ballType = match.ball_type ?? 'red'
 
+  // Squad detail is also needed to resolve CricHeroes links in the
+  // scorecard tables, so either panel opening triggers the same fetch.
   useEffect(() => {
-    if (!squadOpen || detail || detailLoading) return
+    if (!(squadOpen || scorecardOpen) || detail || detailLoading) return
     setDetailLoading(true)
     setDetailError('')
     fetch(`/api/matches/history/${match.booking_id}`)
@@ -370,7 +420,21 @@ function MatchHistoryCard({
       })
       .catch(() => setDetailError('Network error'))
       .finally(() => setDetailLoading(false))
-  }, [squadOpen, detail, detailLoading, match.booking_id])
+  }, [squadOpen, scorecardOpen, detail, detailLoading, match.booking_id])
+
+  useEffect(() => {
+    if (!scorecardOpen || scorecard || scorecardLoading) return
+    setScorecardLoading(true)
+    setScorecardError('')
+    fetch(`/api/matches/history/${match.booking_id}/scorecard`)
+      .then(res => res.json().then(data => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) { setScorecardError(data.error ?? 'Failed to load scorecard'); return }
+        setScorecard(data)
+      })
+      .catch(() => setScorecardError('Network error'))
+      .finally(() => setScorecardLoading(false))
+  }, [scorecardOpen, scorecard, scorecardLoading, match.booking_id])
 
   return (
     <div style={{
@@ -414,6 +478,40 @@ function MatchHistoryCard({
           <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>📍 {match.venue}</div>
         )}
       </div>
+
+      {/* Result strip — only once stats have been synced */}
+      {match.stats && (() => {
+        const badge = resultBadgeStyle(match.stats.match_result)
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ background: badge.bg, color: badge.color, fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', letterSpacing: '0.06em' }}>
+                {badge.label}
+              </span>
+              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{scoreLine(match.stats)}</span>
+            </div>
+            {(match.stats.top_bat || match.stats.top_bowl) && (
+              <div style={{ fontSize: '10px', color: '#6B7280', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {match.stats.top_bat && (
+                  <span>🏏 <span style={{ color: '#C9A84C' }}>{match.stats.top_bat.name}</span> — {match.stats.top_bat.runs} ({match.stats.top_bat.balls})</span>
+                )}
+                {match.stats.top_bowl && (
+                  <span>🎳 <span style={{ color: '#C9A84C' }}>{match.stats.top_bowl.name}</span> — {match.stats.top_bowl.wickets}/{match.stats.top_bowl.runs} ({match.stats.top_bowl.overs} ov)</span>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {match.can_upload && (
+        <ScorecardUploadButton
+          bookingId={match.booking_id}
+          uploadStatus={match.scorecard_status}
+          canUpload={match.can_upload}
+          onStatusChange={onScorecardStatusChange}
+        />
+      )}
 
       <div style={{ height: '1px', background: '#2D3748' }} />
 
@@ -464,6 +562,35 @@ function MatchHistoryCard({
           </div>
         )}
       </div>
+
+      {/* Collapsible full scorecard — only once stats have been synced */}
+      {match.stats && (
+        <div>
+          <div style={{ height: '1px', background: '#2D3748' }} />
+          <button
+            onClick={() => setScorecardOpen(v => !v)}
+            style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#C9A84C' }}>
+              SCORECARD
+            </span>
+            <span style={{ fontSize: '14px', color: '#6B7280' }}>{scorecardOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {scorecardOpen && (
+            <div style={{ paddingTop: '4px', paddingBottom: '2px' }}>
+              {scorecardLoading && <p className="font-rajdhani text-sm text-zinc-600">Loading scorecard…</p>}
+              {scorecardError && <p className="font-rajdhani text-sm text-red-400">{scorecardError}</p>}
+              {scorecard && (
+                <ScorecardTables
+                  batting={scorecard.batting}
+                  bowling={scorecard.bowling}
+                  squad={detail?.squad}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -43,6 +43,62 @@ function nextMonthStr(month: string): string {
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
 }
 
+// Analytics DB field names aren't part of this repo's schema, so every
+// lookup tries a couple of likely keys rather than assuming one exact shape.
+function pickField(row: any, keys: string[]): any {
+  for (const k of keys) if (row?.[k] != null) return row[k]
+  return null
+}
+
+function num(row: any, keys: string[]): number {
+  const v = pickField(row, keys)
+  return v != null ? Number(v) : 0
+}
+
+// Derives a light top-bat/top-bowl summary server-side so the list response
+// stays small — the full batting/bowling arrays are only sent by the
+// dedicated scorecard endpoint when a card is expanded.
+function summarizeStats(row: any) {
+  const battingArr = Array.isArray(row.batting) ? row.batting : []
+  const bowlingArr = Array.isArray(row.bowling) ? row.bowling : []
+
+  const topBat = battingArr.reduce((best: any, cur: any) => {
+    const runs = num(cur, ['runs', 'total_runs'])
+    const bestRuns = best ? num(best, ['runs', 'total_runs']) : -1
+    return runs > bestRuns ? cur : best
+  }, null)
+
+  const topBowl = bowlingArr.reduce((best: any, cur: any) => {
+    const wkts = num(cur, ['wickets', 'wickets_taken'])
+    const bestWkts = best ? num(best, ['wickets', 'wickets_taken']) : -1
+    if (wkts !== bestWkts) return wkts > bestWkts ? cur : best
+    const conceded = num(cur, ['runs', 'runs_conceded'])
+    const bestConceded = best ? num(best, ['runs', 'runs_conceded']) : Infinity
+    return conceded < bestConceded ? cur : best
+  }, null)
+
+  return {
+    match_result:     row.match_result ?? null,
+    team_total:       row.team_total ?? null,
+    team_wickets:     row.team_wickets ?? null,
+    team_overs:       row.team_overs ?? null,
+    opponent_total:   row.opponent_total ?? null,
+    opponent_wickets: row.opponent_wickets ?? null,
+    opponent_overs:   row.opponent_overs ?? null,
+    top_bat: topBat ? {
+      name:  pickField(topBat, ['player_name', 'name']),
+      runs:  num(topBat, ['runs', 'total_runs']),
+      balls: num(topBat, ['balls', 'balls_faced']),
+    } : null,
+    top_bowl: topBowl ? {
+      name:    pickField(topBowl, ['player_name', 'name']),
+      wickets: num(topBowl, ['wickets', 'wickets_taken']),
+      runs:    num(topBowl, ['runs', 'runs_conceded']),
+      overs:   num(topBowl, ['overs', 'overs_bowled']),
+    } : null,
+  }
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
@@ -122,19 +178,46 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const matches = (data ?? []).map((b: any) => ({
-    booking_id:      b.id,
-    game_date:       b.game_date,
-    slot_time:       b.slot_time,
-    match_time:      b.match_time,
-    opponent_name:   b.opponent_name,
-    format:          b.format,
-    tournament_id:   b.tournament_id,
-    tournament_name: (b.tournament as any)?.name ?? null,
-    ball_type:       (b.tournament as any)?.ball_type ?? null,
-    venue:           b.venue,
-    cricheroes_url:  b.cricheroes_url,
-  }))
+  const bookingIds = (data ?? []).map((b: any) => b.id)
+
+  // Scorecard upload status, cached stats summary, and (for the signed-in
+  // player) which of these bookings they led — batched into one round-trip
+  // each rather than per-row, and merged in JS below.
+  const [uploadsRes, statsRes, ledRes] = bookingIds.length ? await Promise.all([
+    supabase.from('scorecard_uploads').select('booking_id, status, uploaded_at').in('booking_id', bookingIds),
+    supabase.from('match_stats_cache').select('booking_id, match_result, team_total, team_wickets, team_overs, opponent_total, opponent_wickets, opponent_overs, batting, bowling').in('booking_id', bookingIds),
+    user?.playerId
+      ? supabase.from('squad').select('booking_id').eq('player_id', user.playerId).in('booking_id', bookingIds).or('is_captain.eq.true,is_vc.eq.true')
+      : Promise.resolve({ data: [] as { booking_id: string }[], error: null }),
+  ]) : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }]
+
+  const uploadByBooking = new Map((uploadsRes.data ?? []).map((r: any) => [r.booking_id, r]))
+  const statsByBooking  = new Map((statsRes.data ?? []).map((r: any) => [r.booking_id, r]))
+  const ledBookingIds   = new Set((ledRes.data ?? []).map((r: any) => r.booking_id))
+
+  const matches = (data ?? []).map((b: any) => {
+    const upload = uploadByBooking.get(b.id)
+    const statsRow = statsByBooking.get(b.id)
+    return {
+      booking_id:      b.id,
+      game_date:       b.game_date,
+      slot_time:       b.slot_time,
+      match_time:      b.match_time,
+      opponent_name:   b.opponent_name,
+      format:          b.format,
+      tournament_id:   b.tournament_id,
+      tournament_name: (b.tournament as any)?.name ?? null,
+      ball_type:       (b.tournament as any)?.ball_type ?? null,
+      venue:           b.venue,
+      cricheroes_url:  b.cricheroes_url,
+      scorecard_status:      upload?.status ?? null,
+      scorecard_uploaded_at: upload?.uploaded_at ?? null,
+      // Never trust the client — eligibility is derived from the session's
+      // own role flags plus a server-side squad lookup, never client params.
+      can_upload: !!user?.isWrangler || !!user?.isAdmin || ledBookingIds.has(b.id),
+      stats: statsRow ? summarizeStats(statsRow) : null,
+    }
+  })
 
   const last = matches[matches.length - 1]
   const nextCursor = matches.length === limit && last ? `${last.game_date}_${last.booking_id}` : null
