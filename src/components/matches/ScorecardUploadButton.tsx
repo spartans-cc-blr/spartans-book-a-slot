@@ -15,6 +15,65 @@ function Spinner() {
   return <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
 }
 
+// The server streams newline-delimited JSON progress events once past its
+// fast validation checks, so a slow upload shows exactly which stage it's
+// in (recording the row vs. waiting on the microservice vs. finalizing)
+// instead of one opaque "Uploading…" for the whole duration.
+async function uploadWithProgress(
+  bookingId: string,
+  file: File,
+  onStep: (message: string) => void
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const fd = new FormData()
+  fd.append('file', file)
+
+  let res: Response
+  try {
+    res = await fetch(`/api/matches/${bookingId}/scorecard`, { method: 'POST', body: fd })
+  } catch {
+    return { ok: false, error: 'Network error' }
+  }
+
+  if (!res.ok) {
+    // Fast validation failure (auth/booking/file checks) — plain JSON error,
+    // never entered the streaming path.
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, error: data.error ?? 'Upload failed' }
+  }
+
+  if (!res.body) return { ok: false, error: 'Upload failed — empty response' }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let sawDone = false
+  let failure: string | null = null
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.trim()) continue
+      let event: any
+      try { event = JSON.parse(line) } catch { continue }
+      if (event.step === 'error') {
+        failure = event.message ?? 'Upload failed'
+      } else if (event.step === 'done') {
+        sawDone = true
+      } else if (event.message) {
+        onStep(event.message)
+      }
+    }
+  }
+
+  if (failure) return { ok: false, error: failure }
+  if (!sawDone) return { ok: false, error: 'Upload ended unexpectedly — please retry' }
+  return { ok: true }
+}
+
 export function ScorecardUploadButton({
   bookingId, uploadStatus, canUpload, onStatusChange,
 }: {
@@ -23,9 +82,10 @@ export function ScorecardUploadButton({
   canUpload: boolean
   onStatusChange: (bookingId: string, status: ScorecardStatus) => void
 }) {
-  const [status, setStatus]     = useState<ScorecardStatus | null>(uploadStatus)
+  const [status, setStatus]       = useState<ScorecardStatus | null>(uploadStatus)
   const [uploading, setUploading] = useState(false)
-  const [error, setError]       = useState('')
+  const [stepMessage, setStepMessage] = useState('')
+  const [error, setError]         = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   if (!canUpload) return null
@@ -37,22 +97,24 @@ export function ScorecardUploadButton({
 
     setUploading(true)
     setError('')
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch(`/api/matches/${bookingId}/scorecard`, { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Upload failed'); return }
+    setStepMessage('Uploading file…')
+
+    const result = await uploadWithProgress(bookingId, file, setStepMessage)
+
+    if (!result.ok) {
+      setError(result.error)
+    } else {
       setStatus('pending_parse')
       onStatusChange(bookingId, 'pending_parse')
-    } catch {
-      setError('Network error')
-    } finally {
-      setUploading(false)
     }
+    setUploading(false)
+    setStepMessage('')
   }
 
   const input = <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFile} />
+  const progress = uploading && stepMessage && (
+    <p className="font-rajdhani text-[10px] text-zinc-500 mt-1 max-w-[220px]">{stepMessage}</p>
+  )
 
   // parsed/synced/fees_applied are server-confirmed checkpoints — re-uploading
   // over one of those is an admin-only override (Post-Match panel), not a
@@ -78,6 +140,7 @@ export function ScorecardUploadButton({
           <Spinner />
           {uploading ? 'Uploading…' : cfg.label}
         </div>
+        {progress}
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
@@ -98,6 +161,7 @@ export function ScorecardUploadButton({
         className="font-rajdhani text-[11px] font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-2.5 py-1 rounded transition-colors">
         {uploading ? 'Uploading…' : 'Upload Scorecard'}
       </button>
+      {progress}
       {error && <p className="font-rajdhani text-[10px] text-red-400 mt-1">{error}</p>}
     </div>
   )

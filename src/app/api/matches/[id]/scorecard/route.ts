@@ -8,6 +8,17 @@
 // THIS booking_id + THIS player_id — never just "is this player a captain
 // anywhere". is_wrangler bypasses the per-booking check but still requires
 // an authenticated session with a valid playerId.
+//
+// Response shape: fast validation failures (auth, booking, file checks)
+// return a normal JSON error response. Once past those, the response is a
+// newline-delimited JSON stream of `{ step, message, ... }` progress events
+// so the client can show exactly which stage a slow upload is sitting in
+// (recording the row, forwarding to the microservice, waiting on it,
+// finalizing) rather than one opaque "Uploading…" the whole time. The
+// terminal event is always `{ step: 'done', ok: true, ... }` or
+// `{ step: 'error', message }` — the HTTP status of a streamed response is
+// fixed at 200 once headers are sent, so the client must read the terminal
+// event to know success/failure, not res.ok.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -93,68 +104,103 @@ export async function POST(
     return NextResponse.json({ error: 'Analytics microservice is not configured' }, { status: 500 })
   }
 
-  // Upsert upload record — status always starts at pending_parse on a fresh
-  // upload attempt (forward-only progression from here on).
-  const { error: upsertErr } = await supabase.from('scorecard_uploads').upsert({
-    booking_id:  bookingId,
-    match_id:    booking.match_id,
-    status:      'pending_parse',
-    uploaded_by: user.playerId,
-    uploaded_at: new Date().toISOString(),
-    error_message: null,
-  }, { onConflict: 'booking_id' })
+  // Past this point every step is potentially slow (DB write, a network
+  // call that can legitimately take 45s on a cold start) — stream progress
+  // instead of leaving the client with a single opaque wait.
+  const encoder = new TextEncoder()
 
-  if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      function send(event: Record<string, unknown>) {
+        controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'))
+      }
 
-  // Forward to microservice — secret sent server-to-server only.
-  const fd = new FormData()
-  fd.append('file', new Blob([buf], { type: 'application/pdf' }), file.name)
-  if (booking.match_id) fd.append('match_id', booking.match_id)
+      // Whatever happens below, the stream must end with exactly one
+      // terminal event and always close — an unclosed stream leaves the
+      // client's reader hanging forever, which is the exact failure mode
+      // this endpoint exists to avoid.
+      try {
+        // Upsert upload record — status always starts at pending_parse on a
+        // fresh upload attempt (forward-only progression from here on).
+        send({ step: 'recording', message: 'Recording upload…' })
+        const { error: upsertErr } = await supabase.from('scorecard_uploads').upsert({
+          booking_id:  bookingId,
+          match_id:    booking.match_id,
+          status:      'pending_parse',
+          uploaded_by: user.playerId,
+          uploaded_at: new Date().toISOString(),
+          error_message: null,
+        }, { onConflict: 'booking_id' })
 
-  let msRes: Response
-  try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), MICROSERVICE_TIMEOUT_MS)
-    try {
-      msRes = await fetch(`${microserviceUrl}/parse-scorecard`, {
-        method:  'POST',
-        headers: { 'x-secret': microserviceSecret },
-        body:    fd,
-        signal:  controller.signal,
-      })
-    } finally {
-      clearTimeout(timeout)
-    }
-  } catch (err: any) {
-    const timedOut = err?.name === 'AbortError'
-    await supabase.from('scorecard_uploads')
-      .update({
-        error_message: timedOut
-          ? `Microservice did not respond within ${MICROSERVICE_TIMEOUT_MS / 1000}s (likely a cold start — try again)`
-          : `Microservice unreachable: ${err?.message ?? 'unknown error'}`,
-      })
-      .eq('booking_id', bookingId)
-    return NextResponse.json(
-      { error: timedOut ? 'Analytics microservice timed out — it may be cold-starting, try again in a minute' : 'Failed to reach analytics microservice' },
-      { status: 502 }
-    )
-  }
+        if (upsertErr) {
+          send({ step: 'error', message: upsertErr.message })
+          return
+        }
 
-  if (!msRes.ok) {
-    const errText = await msRes.text().catch(() => 'Unknown error')
-    await supabase.from('scorecard_uploads')
-      .update({ error_message: errText })
-      .eq('booking_id', bookingId)
-    return NextResponse.json({ error: 'Parse failed', detail: errText }, { status: 502 })
-  }
+        // Forward to microservice — secret sent server-to-server only.
+        const fd = new FormData()
+        fd.append('file', new Blob([buf], { type: 'application/pdf' }), file.name)
+        if (booking.match_id) fd.append('match_id', booking.match_id)
 
-  const { error: statusErr } = await supabase
-    .from('scorecard_uploads')
-    .update({ status: 'parsed' })
-    .eq('booking_id', bookingId)
+        send({ step: 'sending', message: 'Sending scorecard to analytics service — this can take up to a minute if it’s cold-starting…' })
 
-  if (statusErr) return NextResponse.json({ error: statusErr.message }, { status: 500 })
+        let msRes: Response
+        try {
+          const abortController = new AbortController()
+          const timeout = setTimeout(() => abortController.abort(), MICROSERVICE_TIMEOUT_MS)
+          try {
+            msRes = await fetch(`${microserviceUrl}/parse-scorecard`, {
+              method:  'POST',
+              headers: { 'x-secret': microserviceSecret },
+              body:    fd,
+              signal:  abortController.signal,
+            })
+          } finally {
+            clearTimeout(timeout)
+          }
+        } catch (err: any) {
+          const timedOut = err?.name === 'AbortError'
+          const message = timedOut
+            ? `Microservice did not respond within ${MICROSERVICE_TIMEOUT_MS / 1000}s (likely a cold start — try again)`
+            : `Microservice unreachable: ${err?.message ?? 'unknown error'}`
+          await supabase.from('scorecard_uploads').update({ error_message: message }).eq('booking_id', bookingId)
+          send({ step: 'error', message })
+          return
+        }
 
-  const result = await msRes.json().catch(() => ({}))
-  return NextResponse.json({ ok: true, ...result })
+        if (!msRes.ok) {
+          const errText = await msRes.text().catch(() => 'Unknown error')
+          await supabase.from('scorecard_uploads').update({ error_message: errText }).eq('booking_id', bookingId)
+          send({ step: 'error', message: `Parse failed: ${errText}` })
+          return
+        }
+
+        send({ step: 'finalizing', message: 'Analytics service responded — saving results…' })
+
+        const { error: statusErr } = await supabase
+          .from('scorecard_uploads')
+          .update({ status: 'parsed' })
+          .eq('booking_id', bookingId)
+
+        if (statusErr) {
+          send({ step: 'error', message: statusErr.message })
+          return
+        }
+
+        const result = await msRes.json().catch(() => ({}))
+        send({ step: 'done', ok: true, ...result })
+      } catch (err: any) {
+        send({ step: 'error', message: err?.message ?? 'Unexpected server error' })
+      } finally {
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type':  'application/x-ndjson',
+      'Cache-Control': 'no-cache',
+    },
+  })
 }
