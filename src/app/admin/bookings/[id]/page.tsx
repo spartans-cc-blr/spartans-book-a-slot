@@ -116,6 +116,8 @@ export default function BookingDetailPage() {
   const [scorecardSquad,   setScorecardSquad]    = useState<{ player_name: string; cricheroes_url: string | null }[] | undefined>(undefined)
   const [scorecardLoading, setScorecardLoading]  = useState(false)
   const [scorecardError,   setScorecardError]    = useState('')
+  const [resetLoading,     setResetLoading]      = useState(false)
+  const [resetError,       setResetError]        = useState('')
 
   useEffect(() => {
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
@@ -232,6 +234,29 @@ export default function BookingDetailPage() {
       setFeeError('Network error')
     } finally {
       setFeeConfirming(false)
+    }
+  }
+
+  async function handleResetUpload() {
+    if (!postMatch?.upload) return
+    const feesWarning = postMatch.upload.status === 'fees_applied'
+      ? '\n\n⚠ Fees have already been applied for this match — resetting the upload does NOT reverse any wallet debits.'
+      : ''
+    if (!confirm(`This clears the scorecard upload record for this booking so it can be re-uploaded from scratch.${feesWarning}\n\nContinue?`)) return
+    setResetLoading(true)
+    setResetError('')
+    try {
+      const res = await fetch(`/api/admin/matches/${id}/post-match`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) { setResetError(data.error ?? 'Reset failed'); return }
+      setFeePreview(null)
+      setScorecard(null)
+      setScorecardOpen(false)
+      await refreshPostMatch()
+    } catch {
+      setResetError('Network error')
+    } finally {
+      setResetLoading(false)
     }
   }
 
@@ -635,6 +660,14 @@ export default function BookingDetailPage() {
                       </button>
                     )}
                     {syncError && <p className="font-rajdhani text-xs text-red-400">{syncError}</p>}
+
+                    {/* Admin override — clears a stuck/wrong upload so it can be
+                        re-uploaded from scratch. Never reverses fee debits. */}
+                    <button onClick={handleResetUpload} disabled={resetLoading}
+                      className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
+                      {resetLoading ? 'Resetting…' : 'Reset Upload'}
+                    </button>
+                    {resetError && <p className="font-rajdhani text-xs text-red-400">{resetError}</p>}
                   </div>
                 ) : (
                   !postMatchLoading && (

@@ -52,19 +52,46 @@ export function ScorecardUploadButton({
     }
   }
 
-  if (status) {
+  const input = <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFile} />
+
+  // parsed/synced/fees_applied are server-confirmed checkpoints — re-uploading
+  // over one of those is an admin-only override (Post-Match panel), not a
+  // casual retry, so no self-service action is offered here.
+  if (status && status !== 'pending_parse') {
     const cfg = SCORECARD_STATUS_CONFIG[status]
     return (
       <div className={`font-rajdhani text-[11px] font-bold tracking-wide px-2.5 py-1 rounded border inline-flex items-center gap-1.5 w-fit ${cfg.className}`}>
-        {status === 'pending_parse' && <Spinner />}
         {cfg.label}
+      </div>
+    )
+  }
+
+  // pending_parse is the only state that can genuinely get stuck (a killed
+  // or timed-out parse request) — a retry here just re-upserts the row and
+  // tries again, which is safe to repeat.
+  if (status === 'pending_parse') {
+    const cfg = SCORECARD_STATUS_CONFIG.pending_parse
+    return (
+      <div className="space-y-1">
+        {input}
+        <div className={`font-rajdhani text-[11px] font-bold tracking-wide px-2.5 py-1 rounded border inline-flex items-center gap-1.5 w-fit ${cfg.className}`}>
+          <Spinner />
+          {uploading ? 'Uploading…' : cfg.label}
+        </div>
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="font-rajdhani text-[10px] font-semibold text-zinc-500 hover:text-gold disabled:opacity-40 underline underline-offset-2 transition-colors block">
+          Stuck? Retry upload
+        </button>
+        {error && <p className="font-rajdhani text-[10px] text-red-400">{error}</p>}
       </div>
     )
   }
 
   return (
     <div>
-      <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFile} />
+      {input}
       <button
         onClick={() => inputRef.current?.click()}
         disabled={uploading}

@@ -1,11 +1,18 @@
 // GET /api/admin/matches/[id]/post-match
 // Admin only. Feeds the "Post-Match" panel on /admin/bookings/[id] — upload
 // status (with uploader name) plus the cached stats summary, if synced.
+//
+// DELETE clears a stuck or wrong scorecard_uploads row for this booking so
+// the upload flow can restart cleanly — admin-only override, since a
+// captain/wrangler self-service reset could otherwise erase a legitimate
+// synced/fees_applied record. Never touches wallet_transactions — resetting
+// the upload record does not reverse a debit already applied.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 
 export async function GET(
   req: NextRequest,
@@ -64,4 +71,26 @@ export async function GET(
     } : null,
     stats,
   })
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
+
+  const limited = await rateLimit(req, RATE_LIMITS.adminWrite, user.playerId)
+  if (limited) return limited
+
+  const supabase = createServiceClient()
+
+  const { error } = await supabase
+    .from('scorecard_uploads')
+    .delete()
+    .eq('booking_id', params.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }
