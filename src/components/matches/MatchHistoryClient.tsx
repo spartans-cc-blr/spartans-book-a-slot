@@ -184,11 +184,12 @@ function scoreLine(stats: StatsSummary): string {
 }
 
 export function MatchHistoryClient({
-  canEditRoles, canEditTournament, viewerPlayerId,
+  canEditRoles, canEditTournament, viewerPlayerId, isAdmin,
 }: {
   canEditRoles: boolean
   canEditTournament: boolean
   viewerPlayerId: string | null
+  isAdmin: boolean
 }) {
   const [roleFilter, setRoleFilter]     = useState<RoleFilter>('all')
   const [monthFilter, setMonthFilter]   = useState('')
@@ -365,6 +366,7 @@ export function MatchHistoryClient({
             match={m}
             canEditRoles={canEditRoles}
             canEditTournament={canEditTournament}
+            isAdmin={isAdmin}
             onScorecardStatusChange={(bookingId, status) =>
               setMatches(prev => prev.map(x => x.booking_id === bookingId ? { ...x, scorecard_status: status } : x))
             }
@@ -387,11 +389,12 @@ export function MatchHistoryClient({
 }
 
 function MatchHistoryCard({
-  match, canEditRoles, canEditTournament, onScorecardStatusChange,
+  match, canEditRoles, canEditTournament, isAdmin, onScorecardStatusChange,
 }: {
   match: MatchSummary
   canEditRoles: boolean
   canEditTournament: boolean
+  isAdmin: boolean
   onScorecardStatusChange: (bookingId: string, status: ScorecardStatus) => void
 }) {
   const [squadOpen, setSquadOpen]     = useState(false)
@@ -403,6 +406,9 @@ function MatchHistoryCard({
   const [scorecard, setScorecard]               = useState<FullScorecard | null>(null)
   const [scorecardLoading, setScorecardLoading] = useState(false)
   const [scorecardError, setScorecardError]     = useState('')
+
+  const [syncLoading, setSyncLoading] = useState(false)
+  const [syncError, setSyncError]     = useState('')
 
   const ballType = match.ball_type ?? 'red'
 
@@ -435,6 +441,25 @@ function MatchHistoryCard({
       .catch(() => setScorecardError('Network error'))
       .finally(() => setScorecardLoading(false))
   }, [scorecardOpen, scorecard, scorecardLoading, match.booking_id])
+
+  async function handleSyncStats() {
+    setSyncLoading(true)
+    setSyncError('')
+    try {
+      const res = await fetch('/api/admin/sync-match-stats', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ booking_id: match.booking_id }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setSyncError(data.error ?? 'Sync failed'); return }
+      onScorecardStatusChange(match.booking_id, 'synced')
+    } catch {
+      setSyncError('Network error')
+    } finally {
+      setSyncLoading(false)
+    }
+  }
 
   return (
     <div style={{
@@ -511,6 +536,16 @@ function MatchHistoryCard({
           canUpload={match.can_upload}
           onStatusChange={onScorecardStatusChange}
         />
+      )}
+
+      {match.scorecard_status === 'parsed' && isAdmin && (
+        <div>
+          <button onClick={handleSyncStats} disabled={syncLoading}
+            className="font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
+            {syncLoading ? 'Syncing…' : 'Sync Stats from Analytics DB'}
+          </button>
+          {syncError && <p className="font-rajdhani text-xs text-red-400 mt-1">{syncError}</p>}
+        </div>
       )}
 
       <div style={{ height: '1px', background: '#2D3748' }} />

@@ -37,6 +37,7 @@ export default async function MatchHistoryPage() {
           canEditRoles={canEditRoles}
           canEditTournament={isAdmin}
           viewerPlayerId={user?.playerId ?? null}
+          isAdmin={isAdmin}
         />
       </main>
     </>
