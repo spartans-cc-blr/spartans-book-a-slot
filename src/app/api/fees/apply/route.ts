@@ -90,6 +90,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Partial failure', details: errors }, { status: 500 })
   }
 
+  await supabase
+    .from('scorecard_uploads')
+    .update({ status: 'fees_applied', fees_applied_at: new Date().toISOString() })
+    .eq('booking_id', booking_id)
+
   return NextResponse.json({
     ok:               true,
     fee_per_player:   feePerPlayer,

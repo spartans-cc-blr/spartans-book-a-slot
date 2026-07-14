@@ -4,6 +4,46 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import type { Booking, GameFormat, SlotTime } from '@/types'
 import { SLOT_TIMES, SLOT_FORMATS } from '@/types'
+import { ScorecardTables } from '@/components/matches/ScorecardTables'
+
+type ScorecardUploadStatus = 'pending_parse' | 'parsed' | 'synced' | 'fees_applied'
+
+const UPLOAD_STATUS_CONFIG: Record<ScorecardUploadStatus, { label: string; className: string }> = {
+  pending_parse: { label: 'Pending Parse',       className: 'bg-ink-4 border-ink-5 text-zinc-400' },
+  parsed:        { label: 'Parsed',              className: 'bg-amber-950/40 border-amber-800 text-amber-400' },
+  synced:        { label: 'Synced ✓',            className: 'bg-emerald-950/40 border-emerald-800 text-emerald-400' },
+  fees_applied:  { label: 'Fees Applied ✓',      className: 'bg-emerald-950/40 border-emerald-800 text-emerald-400' },
+}
+
+interface PostMatchUpload {
+  status:           ScorecardUploadStatus
+  uploaded_at:      string | null
+  uploaded_by_name: string | null
+  error_message:    string | null
+  fees_applied_at:  string | null
+}
+
+interface PostMatchStats {
+  match_result:     string | null
+  team_total:       number | null
+  team_wickets:     number | null
+  team_overs:       number | null
+  opponent_total:   number | null
+  opponent_wickets: number | null
+  opponent_overs:   number | null
+}
+
+interface PostMatchData {
+  upload: PostMatchUpload | null
+  stats:  PostMatchStats | null
+}
+
+interface FeePreview {
+  base_fee:         number
+  non_exempt_count: number
+  fee_per_player:   number
+  total_squad:      number
+}
 
 type TournamentWithCaptain = {
   id: string
@@ -62,6 +102,21 @@ export default function BookingDetailPage() {
   const [gameDate,          setGameDate]           = useState('')
   const [matchFeeOverride,  setMatchFeeOverride]   = useState<string>('')
 
+  // ── Post-match: scorecard upload status, stats sync, fee application ──
+  const [postMatch,        setPostMatch]        = useState<PostMatchData | null>(null)
+  const [postMatchLoading, setPostMatchLoading] = useState(false)
+  const [syncLoading,      setSyncLoading]       = useState(false)
+  const [syncError,        setSyncError]         = useState('')
+  const [feePreview,       setFeePreview]        = useState<FeePreview | null>(null)
+  const [feeLoading,       setFeeLoading]        = useState(false)
+  const [feeError,         setFeeError]          = useState('')
+  const [feeConfirming,    setFeeConfirming]     = useState(false)
+  const [scorecardOpen,    setScorecardOpen]     = useState(false)
+  const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[] } | null>(null)
+  const [scorecardSquad,   setScorecardSquad]    = useState<{ player_name: string; cricheroes_url: string | null }[] | undefined>(undefined)
+  const [scorecardLoading, setScorecardLoading]  = useState(false)
+  const [scorecardError,   setScorecardError]    = useState('')
+
   useEffect(() => {
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
     fetch(`/api/bookings/${id}`)
@@ -86,6 +141,99 @@ export default function BookingDetailPage() {
         setLoading(false)
       })
   }, [id])
+
+  const today = new Date().toISOString().split('T')[0]
+  const isPostMatchEligible = !!booking && booking.status === 'confirmed' && booking.game_date < today
+
+  function refreshPostMatch() {
+    setPostMatchLoading(true)
+    return fetch(`/api/admin/matches/${id}/post-match`)
+      .then(r => r.json())
+      .then(d => { if (!d.error) setPostMatch(d); return d })
+      .finally(() => setPostMatchLoading(false))
+  }
+
+  useEffect(() => {
+    if (!isPostMatchEligible) return
+    refreshPostMatch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPostMatchEligible, id])
+
+  useEffect(() => {
+    if (!postMatch?.upload || !['synced', 'fees_applied'].includes(postMatch.upload.status)) return
+    setFeeLoading(true)
+    setFeeError('')
+    fetch('/api/fees/apply', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ booking_id: id, confirm: false }),
+    })
+      .then(res => res.json().then(data => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) { setFeeError(data.error ?? 'Could not compute fee preview'); return }
+        setFeePreview(data)
+      })
+      .catch(() => setFeeError('Network error'))
+      .finally(() => setFeeLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postMatch?.upload?.status, id])
+
+  useEffect(() => {
+    if (!scorecardOpen || scorecard || scorecardLoading) return
+    setScorecardLoading(true)
+    setScorecardError('')
+    Promise.all([
+      fetch(`/api/matches/history/${id}/scorecard`).then(res => res.json().then(data => ({ ok: res.ok, data }))),
+      fetch(`/api/matches/history/${id}`).then(res => res.json()).catch(() => null),
+    ])
+      .then(([sc, hist]) => {
+        if (!sc.ok) { setScorecardError(sc.data.error ?? 'Failed to load scorecard'); return }
+        setScorecard(sc.data)
+        setScorecardSquad(hist?.squad ?? undefined)
+      })
+      .catch(() => setScorecardError('Network error'))
+      .finally(() => setScorecardLoading(false))
+  }, [scorecardOpen, scorecard, scorecardLoading, id])
+
+  async function handleSyncStats() {
+    setSyncLoading(true)
+    setSyncError('')
+    try {
+      const res = await fetch('/api/admin/sync-match-stats', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ booking_id: id }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setSyncError(data.error ?? 'Sync failed'); return }
+      await refreshPostMatch()
+    } catch {
+      setSyncError('Network error')
+    } finally {
+      setSyncLoading(false)
+    }
+  }
+
+  async function handleApplyFees() {
+    if (!feePreview) return
+    if (!confirm(`This will debit ₹${feePreview.fee_per_player} from ${feePreview.non_exempt_count} wallets. Continue?`)) return
+    setFeeConfirming(true)
+    setFeeError('')
+    try {
+      const res = await fetch('/api/fees/apply', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ booking_id: id, confirm: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setFeeError(data.error ?? 'Failed to apply fees'); return }
+      await refreshPostMatch()
+    } catch {
+      setFeeError('Network error')
+    } finally {
+      setFeeConfirming(false)
+    }
+  }
 
   useEffect(() => {
     if (!cricheroes) return
@@ -452,6 +600,101 @@ export default function BookingDetailPage() {
                         : 'No fee configured on tournament'}
                   </p>
                 </div>
+              </div>
+            </FormCard>
+          )}
+
+          {/* Post-match — scorecard upload status, stats sync, fee application */}
+          {isPostMatchEligible && (
+            <FormCard title="Post-Match">
+              <div className="space-y-4">
+                {postMatchLoading && !postMatch && (
+                  <p className="font-rajdhani text-xs text-zinc-600">Loading…</p>
+                )}
+
+                {postMatch?.upload ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-rajdhani text-[11px] font-bold tracking-wide px-2.5 py-1 rounded border ${UPLOAD_STATUS_CONFIG[postMatch.upload.status].className}`}>
+                        {UPLOAD_STATUS_CONFIG[postMatch.upload.status].label}
+                      </span>
+                      {postMatch.upload.uploaded_by_name && (
+                        <span className="font-rajdhani text-xs text-zinc-500">
+                          uploaded by {postMatch.upload.uploaded_by_name}
+                          {postMatch.upload.uploaded_at && ` · ${new Date(postMatch.upload.uploaded_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}`}
+                        </span>
+                      )}
+                    </div>
+                    {postMatch.upload.error_message && (
+                      <p className="font-rajdhani text-xs text-red-400">⚠ {postMatch.upload.error_message}</p>
+                    )}
+                    {postMatch.upload.status === 'parsed' && (
+                      <button onClick={handleSyncStats} disabled={syncLoading}
+                        className="font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
+                        {syncLoading ? 'Syncing…' : 'Sync Stats from Analytics DB'}
+                      </button>
+                    )}
+                    {syncError && <p className="font-rajdhani text-xs text-red-400">{syncError}</p>}
+                  </div>
+                ) : (
+                  !postMatchLoading && (
+                    <p className="font-rajdhani text-xs text-zinc-600">No scorecard uploaded yet.</p>
+                  )
+                )}
+
+                {postMatch?.stats && (
+                  <div className="border-t border-ink-5 pt-3 space-y-2">
+                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Stats Preview</p>
+                    <p className="font-rajdhani text-sm text-parchment">
+                      {postMatch.stats.match_result ?? 'Result pending'}
+                    </p>
+                    <p className="font-rajdhani text-xs text-zinc-400">
+                      {postMatch.stats.team_total ?? '—'}/{postMatch.stats.team_wickets ?? '—'} ({postMatch.stats.team_overs ?? '—'} ov)
+                      {' vs '}
+                      {postMatch.stats.opponent_total ?? '—'}/{postMatch.stats.opponent_wickets ?? '—'} ({postMatch.stats.opponent_overs ?? '—'} ov)
+                    </p>
+
+                    <button onClick={() => setScorecardOpen(v => !v)}
+                      className="font-rajdhani text-xs font-bold text-gold hover:underline">
+                      {scorecardOpen ? '▲ Hide full scorecard' : '▼ View full scorecard'}
+                    </button>
+                    {scorecardOpen && (
+                      <div className="pt-2">
+                        {scorecardLoading && <p className="font-rajdhani text-xs text-zinc-600">Loading…</p>}
+                        {scorecardError && <p className="font-rajdhani text-xs text-red-400">{scorecardError}</p>}
+                        {scorecard && (
+                          <ScorecardTables batting={scorecard.batting} bowling={scorecard.bowling} squad={scorecardSquad} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {postMatch?.upload && ['synced', 'fees_applied'].includes(postMatch.upload.status) && (
+                  <div className="border-t border-ink-5 pt-3 space-y-2">
+                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Match Fees</p>
+                    {feeLoading && <p className="font-rajdhani text-xs text-zinc-600">Calculating…</p>}
+                    {feeError && <p className="font-rajdhani text-xs text-red-400">{feeError}</p>}
+                    {feePreview && (
+                      <>
+                        <p className="font-rajdhani text-xs text-zinc-400">
+                          ₹{feePreview.fee_per_player} per player · {feePreview.non_exempt_count} of {feePreview.total_squad} players
+                        </p>
+                        {postMatch.upload.status === 'fees_applied' ? (
+                          <p className="font-rajdhani text-xs text-emerald-400">
+                            ✓ Fees already applied
+                            {postMatch.upload.fees_applied_at && ` · ${new Date(postMatch.upload.fees_applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
+                          </p>
+                        ) : (
+                          <button onClick={handleApplyFees} disabled={feeConfirming}
+                            className="font-rajdhani text-sm font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
+                            {feeConfirming ? 'Applying…' : `Apply Match Fees — ₹${feePreview.fee_per_player} · ${feePreview.non_exempt_count} players`}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </FormCard>
           )}
