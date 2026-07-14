@@ -17,6 +17,16 @@ import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10MB
 
+// Render's free/hobby tier spins down after inactivity — a cold start alone
+// can take ~30s, on top of parse time. Bounded well under maxDuration below
+// so a hung or cold-starting microservice fails fast with a clear error
+// instead of leaving the client waiting indefinitely.
+const MICROSERVICE_TIMEOUT_MS = 45_000
+
+// Vercel Hobby defaults to a 10s function timeout — nowhere near enough to
+// wait out a cold microservice start plus parse. 60s is the Hobby ceiling.
+export const maxDuration = 60
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -103,16 +113,31 @@ export async function POST(
 
   let msRes: Response
   try {
-    msRes = await fetch(`${microserviceUrl}/parse-scorecard`, {
-      method:  'POST',
-      headers: { 'x-secret': microserviceSecret },
-      body:    fd,
-    })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), MICROSERVICE_TIMEOUT_MS)
+    try {
+      msRes = await fetch(`${microserviceUrl}/parse-scorecard`, {
+        method:  'POST',
+        headers: { 'x-secret': microserviceSecret },
+        body:    fd,
+        signal:  controller.signal,
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
   } catch (err: any) {
+    const timedOut = err?.name === 'AbortError'
     await supabase.from('scorecard_uploads')
-      .update({ error_message: `Microservice unreachable: ${err?.message ?? 'unknown error'}` })
+      .update({
+        error_message: timedOut
+          ? `Microservice did not respond within ${MICROSERVICE_TIMEOUT_MS / 1000}s (likely a cold start — try again)`
+          : `Microservice unreachable: ${err?.message ?? 'unknown error'}`,
+      })
       .eq('booking_id', bookingId)
-    return NextResponse.json({ error: 'Failed to reach analytics microservice' }, { status: 502 })
+    return NextResponse.json(
+      { error: timedOut ? 'Analytics microservice timed out — it may be cold-starting, try again in a minute' : 'Failed to reach analytics microservice' },
+      { status: 502 }
+    )
   }
 
   if (!msRes.ok) {
