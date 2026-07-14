@@ -188,7 +188,10 @@ export async function POST(
         }
 
         const result = await msRes.json().catch(() => ({}))
-        send({ step: 'done', ok: true, ...result })
+        // ok/status intentionally last — must always reflect what this route
+        // itself just confirmed, never whatever the microservice happens to
+        // include in its own response body.
+        send({ step: 'done', ...result, ok: true, status: 'parsed' })
       } catch (err: any) {
         send({ step: 'error', message: err?.message ?? 'Unexpected server error' })
       } finally {

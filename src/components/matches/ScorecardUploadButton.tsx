@@ -23,7 +23,7 @@ async function uploadWithProgress(
   bookingId: string,
   file: File,
   onStep: (message: string) => void
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; status: ScorecardStatus } | { ok: false; error: string }> {
   const fd = new FormData()
   fd.append('file', file)
 
@@ -46,7 +46,10 @@ async function uploadWithProgress(
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  let sawDone = false
+  // The route sets status: 'parsed' on its terminal `done` event — reading
+  // it here (rather than assuming) is what fixes the local badge getting
+  // stuck showing "Processing…" after the upload already finished server-side.
+  let doneStatus: ScorecardStatus | null = null
   let failure: string | null = null
 
   while (true) {
@@ -62,7 +65,7 @@ async function uploadWithProgress(
       if (event.step === 'error') {
         failure = event.message ?? 'Upload failed'
       } else if (event.step === 'done') {
-        sawDone = true
+        doneStatus = event.status ?? 'pending_parse'
       } else if (event.message) {
         onStep(event.message)
       }
@@ -70,8 +73,8 @@ async function uploadWithProgress(
   }
 
   if (failure) return { ok: false, error: failure }
-  if (!sawDone) return { ok: false, error: 'Upload ended unexpectedly — please retry' }
-  return { ok: true }
+  if (!doneStatus) return { ok: false, error: 'Upload ended unexpectedly — please retry' }
+  return { ok: true, status: doneStatus }
 }
 
 export function ScorecardUploadButton({
@@ -104,8 +107,8 @@ export function ScorecardUploadButton({
     if (!result.ok) {
       setError(result.error)
     } else {
-      setStatus('pending_parse')
-      onStatusChange(bookingId, 'pending_parse')
+      setStatus(result.status)
+      onStatusChange(bookingId, result.status)
     }
     setUploading(false)
     setStepMessage('')
