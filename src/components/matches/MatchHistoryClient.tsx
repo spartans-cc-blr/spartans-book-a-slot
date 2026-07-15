@@ -185,12 +185,11 @@ function scoreLine(stats: StatsSummary): string {
 }
 
 export function MatchHistoryClient({
-  canEditRoles, canEditTournament, viewerPlayerId, isAdmin,
+  canEditRoles, canEditTournament, viewerPlayerId,
 }: {
   canEditRoles: boolean
   canEditTournament: boolean
   viewerPlayerId: string | null
-  isAdmin: boolean
 }) {
   const [roleFilter, setRoleFilter]     = useState<RoleFilter>('all')
   const [monthFilter, setMonthFilter]   = useState('')
@@ -367,7 +366,6 @@ export function MatchHistoryClient({
             match={m}
             canEditRoles={canEditRoles}
             canEditTournament={canEditTournament}
-            isAdmin={isAdmin}
             onScorecardStatusChange={(bookingId, status) =>
               setMatches(prev => prev.map(x => x.booking_id === bookingId ? { ...x, scorecard_status: status } : x))
             }
@@ -390,12 +388,11 @@ export function MatchHistoryClient({
 }
 
 function MatchHistoryCard({
-  match, canEditRoles, canEditTournament, isAdmin, onScorecardStatusChange,
+  match, canEditRoles, canEditTournament, onScorecardStatusChange,
 }: {
   match: MatchSummary
   canEditRoles: boolean
   canEditTournament: boolean
-  isAdmin: boolean
   onScorecardStatusChange: (bookingId: string, status: ScorecardStatus) => void
 }) {
   const [squadOpen, setSquadOpen]     = useState(false)
@@ -542,7 +539,10 @@ function MatchHistoryCard({
         />
       )}
 
-      {match.scorecard_status === 'parsed' && isAdmin && (
+      {/* Same audience as the upload button — wrangler/admin (any booking)
+          or captain/VC for this specific booking (match.can_upload) — not
+          gated to admin alone. Server-side re-checks the identical set. */}
+      {match.scorecard_status === 'parsed' && match.can_upload && (
         <div>
           <button onClick={handleSyncStats} disabled={syncLoading}
             className="font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
