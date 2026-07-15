@@ -1,29 +1,43 @@
-# Post-Match Scorecard Integration Plan
+# Post-Match Scorecard Integration
+
 **Spartans Hub · Data Wranglers Integration**
-*Prepared: June 2026 · Status: Planning*
+*Prepared: June 2026 · Status: Implemented (July 2026)*
 
 ---
 
 ## 1. Overview
 
-This document describes the end-to-end plan to integrate the existing analytics
-pipeline (`spartans-dw-ui`) with the Spartans Hub so that match scorecards can be
-uploaded and processed from within the Hub by captains, vice-captains, and data
-wranglers — with no manual Python runs required after the initial deployment.
+Match scorecards flow from CricHeroes into the Hub without any manual Python
+runs. Two independent paths converge on the same pipeline:
+
+- **Manual upload** — a wrangler, that match's captain/VC, or an admin
+  uploads a CricHeroes PDF from the match card on `/matches/history`.
+- **Automated fetch** — a daily cron (and an on-demand admin backfill page)
+  pulls the PDF directly from CricHeroes's own PDF endpoint, no browser
+  automation and no human needed. This was not part of the original plan —
+  see Section 3 for why it turned out to be viable after all.
+
+Both paths land in the same `scorecard_uploads` status machine and the same
+analytics pipeline. Parsing and syncing stats into the Hub DB are now
+seamless end-to-end for the automated path; **applying match fees is a
+permanently separate, explicit, manual admin action** — nothing in this
+feature ever triggers a wallet debit on its own. See Section 6.
 
 ---
 
-## 2. Permanent Limitations
+## 2. Permanent Limitations (revised)
 
-> These are fixed constraints that apply to all design decisions in this plan.
-> Do not re-evaluate or work around these — they are confirmed and documented.
+> These were the original constraints. One of them turned out to be only
+> partially true — see the correction below. Do not re-litigate the ones
+> that still hold; do re-litigate assumptions this project already disproved
+> once, elsewhere (that's how the CricHeroes one below got fixed).
 
-| Limitation | Detail |
+| Limitation | Status |
 |---|---|
-| **CricHeroes blocks all automated access** | Confirmed via `robots.txt`. No server-side fetch, no headless browser, no workaround. PDF download from the CricHeroes desktop site remains the only reliable data source. |
-| **Vercel cannot run Python** | Hub is deployed on Vercel (Next.js). Vercel does not support Python runtimes. All Python analytics code must remain in `spartans-dw-ui` and be hosted separately. |
-| **Google Drive OAuth not suitable for hosted services** | `g_drive.py` uses `token.pickle` + `credentials.json` (personal OAuth). This cannot be hosted on a server without re-auth breaking on token expiry. The Drive step is bypassed in the Hub integration — PDFs come directly from the Hub upload instead. The Drive-based local workflow continues to work for wranglers' standalone runs. |
-| **Supabase free tier — 50MB storage cap** | No file storage in Hub DB. PDFs are forwarded directly to the microservice and not persisted in Supabase. |
+| **CricHeroes blocks all automated access** | ⚠️ **Partially wrong — corrected in `limitations.md`.** The scorecard *webpage* is a JS-rendered SPA and is not scraped. But CricHeroes's own PDF endpoint (`pdf.cricheroes.in/scorecard-summary/{match_id}/...`) is a plain HTTP resource that returns a normal 200 with the right headers (`User-Agent`, `Accept`, `Referer: https://cricheroes.in/`) — no browser automation, no login, no rate-limit trouble observed. This is the entire basis for the automated fetch path in Section 3. Manual PDF download remains a fallback for matches this doesn't work for. |
+| **Vercel cannot run Python** | ✅ Still true. All parsing stays in `spartans-python`, hosted separately. |
+| **Google Drive OAuth not suitable for hosted services** | ✅ Still true. Bypassed — PDFs never touch Drive in the Hub flow. |
+| **Supabase free tier — 50MB storage cap** | ✅ Still true, and irrelevant here — PDFs are never persisted in Supabase, only forwarded to the microservice. |
 
 ---
 
@@ -32,778 +46,373 @@ wranglers — with no manual Python runs required after the initial deployment.
 ### 3.1 Two Repos, Permanently Separate
 
 ```
-spartans-dw-ui  (Python · Railway)    spartans-hub  (Next.js · Vercel)
+spartans-python  (Python · Render)     spartans-hub  (Next.js · Vercel)
 ══════════════════════════════════    ══════════════════════════════════
-pdf_extractor.py   ← untouched        /api/matches/[id]/scorecard
-field_extractors.py ← untouched       /api/admin/sync-match-stats
-dismissal_parser.py ← untouched       /api/admin/apply-match-fees
-mvp_calculator.py  ← untouched        match_stats_cache  (Hub DB table)
-import_to_supabase.py ← untouched     scorecard_uploads  (Hub DB table)
-api.py             ← NEW ONLY
+pdf_extractor.py    ← untouched       src/app/api/matches/[id]/scorecard
+field_extractors.py ← untouched       src/app/api/admin/sync-match-stats
+dismissal_parser.py ← untouched       src/app/api/fees/apply (existing)
+mvp_calculator.py   ← untouched       src/lib/matchStatsSync.ts
+csv_writers.py       ← touched        src/lib/scorecardBackfill.ts
+import_to_supabase.py ← touched       src/app/api/cron/backfill-scorecards
+api.py               ← new           src/app/api/admin/scorecard-backfill
 ```
+
+> **Hosting note:** the microservice is deployed on **Render**, not Railway
+> as originally planned — see the `Render's free/hobby tier spins down after
+> inactivity` comment in `src/app/api/matches/[id]/scorecard/route.ts`. Cold
+> starts take up to ~30s; every fetch to it carries a 45s client-side
+> timeout to absorb that without hanging.
 
 ### 3.2 End-to-End Data Flow
 
 ```
-CricHeroes desktop site
-        │  (manual PDF download — permanent)
-        ▼
-Captain / VC / Wrangler opens completed match in Hub
-        │
-        ▼
-"Upload Scorecard" button → file picker (PDF only)
-        │
-        ▼
-POST /api/matches/[id]/scorecard  (Hub — auth: captain | VC | wrangler)
-        │  validates file type + size server-side
-        │  checks uploader is captain/VC for this specific booking
-        │  OR has is_wrangler = true
-        ▼
-Railway microservice  (spartans-dw-ui/api.py)
-        │  pdf_extractor → field_extractors → dismissal_parser
-        │  mvp_calculator → import_to_supabase
-        ▼
-Analytics Supabase DB
-  match_stats / batting_stats / bowling_stats / fielding_stats / team_list
-        │
-        ▼
-POST /api/admin/sync-match-stats  (Hub — admin only)
-        │  reads from analytics DB (separate env vars)
-        │  upserts into Hub DB: match_stats_cache
-        ▼
-Admin reviews stats in /admin/bookings/[id]
-        │
-        ▼
-POST /api/admin/apply-match-fees  (Hub — admin only, explicit confirmation)
-        │  debits wallet_balance per squad member
-        │  updates scorecard_uploads.status → 'fees_applied'
-        ▼
-Match card on /fixtures shows result + top scorer + top bowler
+                         CricHeroes
+                             │
+        ┌────────────────────┴────────────────────┐
+        │ manual PDF download                      │ direct PDF fetch
+        ▼                                           │ (Referer + UA headers,
+Captain / VC / Wrangler opens match                 │  no browser needed)
+in /matches/history                                 │
+        │                                            │
+        ▼                                            ▼
+"Upload Scorecard" → file picker            Daily cron (07:00 IST) or
+        │                                    /admin/scorecard-backfill
+        ▼                                            │
+POST /api/matches/[id]/scorecard             backfillOneBooking()
+  (streamed progress events)                  (src/lib/scorecardBackfill.ts)
+        │                                            │
+        └─────────────────┬──────────────────────────┘
+                           ▼
+              spartans-python api.py
+        (POST /parse-scorecard  — manual path)
+        (POST /fetch-and-parse-scorecard — automated path)
+                           │
+                           ▼
+              Analytics Supabase DB
+   match_stats / batting_stats / bowling_stats / fielding_stats / team_list
+                           │
+        ┌──────────────────┴──────────────────┐
+        │ manual path: stops at 'parsed'       │ automated path: chains
+        │ — admin/wrangler/captain/VC clicks   │ straight into sync — no
+        │ "Sync Stats" explicitly              │ separate click needed
+        ▼                                      ▼
+         syncMatchStatsForBooking()  (src/lib/matchStatsSync.ts)
+              — upserts match_stats_cache in Hub DB
+                           │
+                           ▼
+        Result + scorecard visible on /matches/history for everyone
+                           │
+                           ▼
+        Admin explicitly runs POST /api/fees/apply — separate, manual,
+        never automated by anything above
 ```
 
 ---
 
-## 4. New Persona — Data Wrangler (`is_wrangler`)
+## 4. Data Wrangler Persona (`is_wrangler`)
 
-### 4.1 Why a New Persona
+Unchanged from the original plan — fully implemented, no action needed:
 
-Currently Hub has three boolean flags on the `players` table:
-- `is_captain` — gates Captains Corner
-- `is_gc` — gates GC Review
-- `isAdmin` — from `ADMIN_EMAILS` env var (not DB)
+- `players.is_wrangler boolean not null default false` (migration `042_add_wrangler_role.sql`)
+- Selected into the JWT in `src/lib/auth.ts`: `token.isWrangler = player?.is_wrangler ?? false`
+- Surfaced on the session: `session.user.isWrangler`
 
-Data wranglers need upload access to completed matches without captain-level or
-admin-level access to the rest of the Hub. A new `is_wrangler` flag follows the
-exact same pattern as `is_gc`.
+### Access matrix (as actually shipped — wider than originally planned)
 
-### 4.2 Schema Change
-
-✅ **Already done — `supabase/migrations/042_add_wrangler_role.sql`**
-
-```sql
--- Migration: 042_add_wrangler_role (LIVE IN REPO)
-alter table players
-  add column if not exists is_wrangler boolean not null default false;
-```
-
-No action needed.
-
-### 4.3 JWT Token Change
-
-✅ **Already done — `src/lib/auth.ts`**
-
-`is_wrangler` is already selected in the player query and written to the JWT:
-```ts
-token.isWrangler = player?.is_wrangler ?? false
-```
-And surfaced in the session callback:
-```ts
-(session.user as any).isWrangler = token.isWrangler
-```
-
-No action needed.
-
-### 4.4 Access Gates
-
-| Feature | Captain | VC (match) | Wrangler | Admin |
+| Feature | Captain (own match) | VC (own match) | Wrangler | Admin |
 |---|---|---|---|---|
-| Upload scorecard | ✅ (own match only) | ✅ (own match only) | ✅ (any match) | ✅ |
-| View completed matches | ✅ | ✅ | ✅ | ✅ |
-| Sync stats from analytics DB | ❌ | ❌ | ❌ | ✅ |
-| Apply match fees | ❌ | ❌ | ❌ | ✅ |
-| Captains Corner | ✅ | ❌ | ❌ | ✅ |
-| GC Review | ❌ | ❌ | ❌ | ✅ |
+| Upload scorecard | ✅ | ✅ | ✅ (any match) | ✅ |
+| View completed matches / scorecards | ✅ | ✅ | ✅ | ✅ |
+| **Sync stats from analytics DB** | ✅ (own match) | ✅ (own match) | ✅ | ✅ |
+| Apply match fees | ❌ | ❌ | ❌ | ✅ only |
+| Run the one-time backfill page | ❌ | ❌ | ❌ | ✅ only |
 
-> **Security (vibe-security):** Captain/VC check for upload must verify the uploader
-> is captain or VC for **this specific booking** via a `squad` table lookup — not
-> just any player where `players.is_captain = true`. `is_wrangler` bypasses the
-> per-booking check but still requires an authenticated session with a valid `playerId`.
-
----
-
-## 5. Database Migrations (Hub DB)
-
-### 5.1 Migration 042 — Wrangler Persona
-✅ **Already done.** See Section 4.2.
-
-### 5.2 Migration 043 — `match_stats_cache`
-
-**File:** `supabase/migrations/043_match_stats_cache.sql`
-
-```sql
--- Migration: 009_match_stats_cache
--- Caches parsed match stats from analytics DB into Hub DB.
--- All reads/writes via service role through API routes only.
--- JSON arrays avoid separate batting/bowling tables — keeps Hub schema lean.
-
-CREATE TABLE IF NOT EXISTS match_stats_cache (
-  match_id          text PRIMARY KEY,
-  booking_id        uuid REFERENCES bookings(id) ON DELETE SET NULL,
-
-  -- Match level
-  match_result      text,          -- 'won' | 'lost' | 'tied' | 'no result'
-  team_total        int,
-  team_wickets      int,
-  team_overs        float,
-  opponent_total    int,
-  opponent_wickets  int,
-  opponent_overs    float,
-  opponent_name     text,
-  ground            text,
-  tournament_name   text,
-  match_date        date,
-
-  -- Per-player arrays (jsonb — matches analytics DB column structure exactly)
-  batting           jsonb,         -- array of batting_stats rows
-  bowling           jsonb,         -- array of bowling_stats rows
-  fielding          jsonb,         -- array of fielding_stats rows
-  team_list         jsonb,         -- array of { match_id, player_name }
-
-  -- Meta
-  synced_at         timestamptz NOT NULL DEFAULT now(),
-  synced_by         uuid REFERENCES players(id) ON DELETE SET NULL
-);
-
-COMMENT ON TABLE match_stats_cache IS
-  'Read-only cache of match stats synced from analytics Supabase DB. '
-  'Source of truth remains analytics DB. Hub reads from here for display only.';
-```
-
-### 5.3 Migration 044 — `scorecard_uploads`
-
-**File:** `supabase/migrations/044_scorecard_uploads.sql`
-
-```sql
--- Migration: 010_scorecard_uploads
--- Tracks scorecard upload status per booking.
--- One row per booking. Status progresses linearly.
-
-CREATE TYPE scorecard_status AS ENUM (
-  'pending_parse',   -- PDF uploaded, sent to microservice, awaiting parse
-  'parsed',          -- stats written to analytics DB, awaiting admin sync
-  'synced',          -- admin synced stats into match_stats_cache
-  'fees_applied'     -- admin applied match fees, wallets debited
-);
-
-CREATE TABLE IF NOT EXISTS scorecard_uploads (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id      uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-  match_id        text,                          -- from bookings.match_id
-
-  status          scorecard_status NOT NULL DEFAULT 'pending_parse',
-
-  uploaded_by     uuid REFERENCES players(id) ON DELETE SET NULL,
-  uploaded_at     timestamptz NOT NULL DEFAULT now(),
-  fees_applied_at timestamptz,
-  fees_applied_by uuid REFERENCES players(id) ON DELETE SET NULL,
-
-  error_message   text,          -- populated if microservice parse fails
-
-  UNIQUE (booking_id)            -- one upload record per match
-);
-
-COMMENT ON TABLE scorecard_uploads IS
-  'Tracks the lifecycle of scorecard upload and processing per booking.';
-```
+> **Change from the original plan:** "Sync stats" was originally admin-only.
+> It's now open to the same audience as upload — a match's captain/VC, or
+> any wrangler — because there was no reason to make someone wait on an
+> admin to unstick a `parsed` scorecard they were already trusted to upload.
+> `POST /api/admin/sync-match-stats` re-derives this server-side via the
+> identical `squad` table lookup the upload route uses — never trusts the
+> client-side gate that decided to show the button.
 
 ---
 
-## 6. Analytics Repo Changes (`spartans-dw-ui`)
+## 5. Database (Hub DB)
 
-### 6.1 What Does NOT Change
+### `match_stats_cache` — migration `044_match_stats_cache.sql`
+Read-through cache of analytics-DB stats, keyed by `match_id`, FK'd to
+`booking_id`. `batting` / `bowling` / `fielding` / `team_list` are `jsonb`
+arrays mirroring the analytics DB's column shapes exactly — no separate
+per-stat tables in the Hub DB.
 
-All of the following are untouched:
+### `scorecard_uploads` — migration `045_scorecard_uploads.sql`
+One row per booking (`UNIQUE(booking_id)`). `status` is a Postgres enum:
+`pending_parse → parsed → synced → fees_applied`, forward-only. Set by
+whichever path (manual or automated) is currently acting on that booking.
 
-- `utils/pdf_extractor.py`
-- `utils/field_extractors.py`
-- `utils/field_config.py`
-- `utils/dismissal_parser.py`
-- `utils/mvp_calculator.py`
-- `utils/csv_writers.py`
-- `utils/g_drive.py`
-- `utils/cricheroes_helper.py`
-- `scripts/import_to_supabase.py`
-- `scripts/*.sql`
-- `main.py`
-- `stats_by_house.py`
+### RLS — migration `046_enable_rls_scorecard_tables.sql`
+> ⚠️ **Both tables were created without RLS enabled** — a real gap, found
+> and closed 2026-07-15. Unlike the rest of this app's tables, they were
+> fully readable *and writable* via the public anon key until this
+> migration. No policies added, matching the established pattern for
+> `players` / `availability` / `fee_exemptions` — blanket deny for
+> anon/authenticated, service-role-only access. Every read/write to these
+> two tables already goes through `createServiceClient()`, so this closes
+> the exposure without changing app behaviour.
 
-The Drive-based local workflow (`main.py` → Drive → parse → analytics DB) continues
-to work exactly as before. The new `api.py` is an additional entry point, not a
-replacement.
+### `players.is_wrangler` — migration `042_add_wrangler_role.sql`
+See Section 4.
 
-### 6.2 New File: `api.py`
-
-A FastAPI wrapper that exposes the existing pipeline as HTTP endpoints.
-
-```python
-# api.py — FastAPI wrapper for spartans-dw-ui analytics pipeline
-# Deploy on Railway. Hub calls this after PDF upload.
-# Requires: pip install fastapi uvicorn python-multipart
-
-import os
-import tempfile
-from fastapi import FastAPI, UploadFile, File, HTTPException, Header
-from fastapi.responses import JSONResponse
-
-# Import existing pipeline utils (unchanged)
-from utils.pdf_extractor import PDFTextExtractor
-from utils.field_extractors import extract_all_fields
-from utils.dismissal_parser import parse_dismissals
-from utils.mvp_calculator import calculate_mvp_scores
-from scripts.import_to_supabase import SupabaseImporter
-
-app = FastAPI(title="Spartans Analytics Microservice")
-
-MICROSERVICE_SECRET = os.environ.get("MICROSERVICE_SECRET", "")
-SUPABASE_URL        = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY        = os.environ.get("SUPABASE_KEY", "")
-
-
-def verify_secret(x_secret: str = Header(None)):
-    """Reject requests without the shared secret."""
-    if not MICROSERVICE_SECRET or x_secret != MICROSERVICE_SECRET:
-        raise HTTPException(status_code=401, detail="Unauthorised")
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-
-@app.post("/parse-scorecard")
-async def parse_scorecard(
-    file: UploadFile = File(...),
-    match_id: str    = None,
-    x_secret: str    = Header(None),
-):
-    """
-    Accept a PDF scorecard from Hub, run the analytics pipeline,
-    write to analytics DB, return parsed stats summary.
-    """
-    verify_secret(x_secret)
-
-    # Validate file type
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="PDF files only")
-
-    # Write to temp file (pipeline expects a file path)
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        contents = await file.read()
-        if len(contents) > 10 * 1024 * 1024:  # 10MB cap
-            raise HTTPException(status_code=400, detail="File too large (max 10MB)")
-        tmp.write(contents)
-        tmp_path = tmp.name
-
-    try:
-        # Run existing pipeline (same as main.py flow)
-        extractor = PDFTextExtractor(tmp_path)
-        blocks    = extractor.extract_text_with_blocks()
-        extractor.close_document()
-
-        fields    = extract_all_fields(blocks)
-        fields    = parse_dismissals(fields)
-        fields    = calculate_mvp_scores(fields)
-
-        if match_id:
-            fields["match_stats"]["match_id"] = match_id
-
-        # Write to analytics DB (existing importer, unchanged)
-        importer = SupabaseImporter(SUPABASE_URL, SUPABASE_KEY)
-        importer.import_from_dict(fields)   # see note below
-
-        return JSONResponse({
-            "ok":          True,
-            "match_id":    fields.get("match_stats", {}).get("match_id"),
-            "match_result": fields.get("match_stats", {}).get("match_result"),
-            "team_total":  fields.get("match_stats", {}).get("team_total"),
-        })
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    finally:
-        os.unlink(tmp_path)
-```
-
-> **Note on `import_from_dict`:** The existing `SupabaseImporter` reads from CSV
-> files. Add an `import_from_dict(data: dict)` method that accepts the parsed dict
-> directly and calls the same Supabase upsert logic — bypassing the CSV step for
-> the Hub flow. The CSV flow remains available for local runs.
-
-### 6.3 Railway Deployment
-
-1. Create a new Railway project pointing at `spartans-dw-ui` repo
-2. Set start command: `uvicorn api:app --host 0.0.0.0 --port $PORT`
-3. Set environment variables in Railway dashboard:
-
-```
-SUPABASE_URL        = <analytics Supabase URL>
-SUPABASE_KEY        = <analytics Supabase service role key>
-MICROSERVICE_SECRET = <generate a strong random string — share with Hub team>
-```
-
-4. Note the Railway app URL (e.g. `https://spartans-dw.railway.app`)
-
-### 6.4 New `requirements.txt` entries
-
-```
-fastapi
-uvicorn[standard]
-python-multipart
-```
+> **Repo/DB drift note:** migrations `044`–`046` were applied directly to
+> the live project via Supabase MCP and were not checked into this repo
+> until this documentation pass (2026-07-15). Same failure class the
+> `availability-nudge.md` incident write-up warns about, just inverted —
+> *applied* but not *checked in*, rather than the other way round. Always
+> cross-check `list_migrations` against `supabase/migrations/*.sql` after a
+> session that touched schema.
 
 ---
 
-## 7. Hub Repo Changes (`spartans-hub`)
-
-### 7.1 New Environment Variables
-
-Add to Vercel dashboard (never `NEXT_PUBLIC_` prefix — server-side only):
+## 6. Status Lifecycle — and why fees are deliberately decoupled
 
 ```
-ANALYTICS_SUPABASE_URL     = <analytics Supabase URL>
-ANALYTICS_SUPABASE_KEY     = <analytics Supabase service role key>
-MICROSERVICE_URL           = https://spartans-dw.railway.app
-MICROSERVICE_SECRET        = <same value as Railway env var>
+pending_parse → parsed → synced → fees_applied
 ```
 
-### 7.2 New API Routes
-
-#### `POST /api/matches/[id]/scorecard`
-
-**File:** `src/app/api/matches/[id]/scorecard/route.ts`
-
-```ts
-// Auth: captain or VC for this specific booking, OR is_wrangler
-// Validates PDF server-side. Forwards to Railway microservice.
-// Updates scorecard_uploads record.
-
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const session  = await getServerSession(authOptions)
-  const user     = session?.user as any
-  if (!user?.playerId) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-
-  const supabase = createServiceClient()
-
-  // Auth check — per-booking captain/VC OR wrangler
-  // NEVER trust client: always verify server-side
-  if (!user.isWrangler) {
-    const { data: squadRow } = await supabase
-      .from('squad')
-      .select('is_captain, is_vc')
-      .eq('booking_id', params.id)
-      .eq('player_id', user.playerId)   // must be THIS player in THIS booking
-      .single()
-
-    if (!squadRow?.is_captain && !squadRow?.is_vc) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-  }
-
-  // Validate booking exists and is completed
-  const { data: booking } = await supabase
-    .from('bookings')
-    .select('id, match_id, game_date, slot_time, format')
-    .eq('id', params.id)
-    .eq('status', 'confirmed')
-    .single()
-
-  if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
-
-  // Must be a completed match
-  const endTime = getMatchEndTime(booking.game_date, booking.slot_time, booking.format)
-  if (new Date() < endTime) {
-    return NextResponse.json({ error: 'Match not yet completed' }, { status: 400 })
-  }
-
-  // Validate file — server-side, never trust Content-Type header
-  const formData = await req.formData()
-  const file     = formData.get('file') as File | null
-  if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-
-  const bytes = await file.arrayBuffer()
-  const buf   = Buffer.from(bytes)
-
-  // Check PDF magic bytes (not Content-Type)
-  if (buf.slice(0, 4).toString() !== '%PDF') {
-    return NextResponse.json({ error: 'File must be a valid PDF' }, { status: 400 })
-  }
-  if (buf.length > 10 * 1024 * 1024) {
-    return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 })
-  }
-
-  // Upsert upload record
-  await supabase.from('scorecard_uploads').upsert({
-    booking_id:  params.id,
-    match_id:    booking.match_id,
-    status:      'pending_parse',
-    uploaded_by: user.playerId,
-    uploaded_at: new Date().toISOString(),
-  }, { onConflict: 'booking_id' })
-
-  // Forward to microservice
-  const fd = new FormData()
-  fd.append('file', new Blob([buf], { type: 'application/pdf' }), file.name)
-  if (booking.match_id) fd.append('match_id', booking.match_id)
-
-  const msRes = await fetch(`${process.env.MICROSERVICE_URL}/parse-scorecard`, {
-    method:  'POST',
-    headers: { 'x-secret': process.env.MICROSERVICE_SECRET! },
-    body:    fd,
-  })
-
-  if (!msRes.ok) {
-    const err = await msRes.text()
-    await supabase.from('scorecard_uploads')
-      .update({ error_message: err })
-      .eq('booking_id', params.id)
-    return NextResponse.json({ error: 'Parse failed', detail: err }, { status: 502 })
-  }
-
-  // Update status to parsed
-  await supabase.from('scorecard_uploads')
-    .update({ status: 'parsed' })
-    .eq('booking_id', params.id)
-
-  const result = await msRes.json()
-  return NextResponse.json({ ok: true, ...result })
-}
-```
-
----
-
-#### `POST /api/admin/sync-match-stats`
-
-**File:** `src/app/api/admin/sync-match-stats/route.ts`
-
-```ts
-// Admin only. Reads from analytics DB. Writes to match_stats_cache in Hub DB.
-
-export async function POST(req: Request) {
-  const guard = await requireAdmin()
-  if (guard) return guard
-
-  const { booking_id } = await req.json()
-
-  const hubSupabase      = createServiceClient()
-  const analyticsSupabase = createClient(
-    process.env.ANALYTICS_SUPABASE_URL!,
-    process.env.ANALYTICS_SUPABASE_KEY!
-  )
-
-  // Get match_id from booking
-  const { data: booking } = await hubSupabase
-    .from('bookings')
-    .select('match_id')
-    .eq('id', booking_id)
-    .single()
-
-  if (!booking?.match_id) {
-    return NextResponse.json({ error: 'No match_id on this booking' }, { status: 400 })
-  }
-
-  const mid = booking.match_id
-
-  // Fetch all stats from analytics DB in parallel
-  const [match, batting, bowling, fielding, team] = await Promise.all([
-    analyticsSupabase.from('match_stats').select('*').eq('match_id', mid).single(),
-    analyticsSupabase.from('batting_stats').select('*').eq('match_id', mid),
-    analyticsSupabase.from('bowling_stats').select('*').eq('match_id', mid),
-    analyticsSupabase.from('fielding_stats').select('*').eq('match_id', mid),
-    analyticsSupabase.from('team_list').select('*').eq('match_id', mid),
-  ])
-
-  if (!match.data) {
-    return NextResponse.json({ error: 'No stats found in analytics DB for this match_id' }, { status: 404 })
-  }
-
-  // Upsert into Hub DB cache
-  await hubSupabase.from('match_stats_cache').upsert({
-    match_id:        mid,
-    booking_id:      booking_id,
-    match_result:    match.data.match_result,
-    team_total:      match.data.team_total,
-    team_wickets:    match.data.team_wickets,
-    team_overs:      match.data.team_overs,
-    opponent_total:  match.data.opponent_total,
-    opponent_wickets: match.data.opponent_wickets,
-    opponent_overs:  match.data.opponent_overs,
-    opponent_name:   match.data.opponent_name,
-    ground:          match.data.ground,
-    tournament_name: match.data.tournament_name,
-    batting:         batting.data,
-    bowling:         bowling.data,
-    fielding:        fielding.data,
-    team_list:       team.data,
-    synced_at:       new Date().toISOString(),
-  }, { onConflict: 'match_id' })
-
-  // Update upload record
-  await hubSupabase.from('scorecard_uploads')
-    .update({ status: 'synced' })
-    .eq('booking_id', booking_id)
-
-  return NextResponse.json({ ok: true })
-}
-```
-
----
-
-#### `POST /api/fees/apply`
-
-✅ **Already exists in repo — do not rebuild.**
-
-`src/app/api/fees/apply/route.ts` already handles match fee debits correctly:
-- Admin only
-- Derives fee **server-side**: `bookings.match_fee_override ?? tournaments.match_fee`
-- Splits total equally across non-exempt announced squad: `Math.ceil(baseFee / nonExemptCount)`
-- Supports dry-run (`confirm: false`) to preview fee before applying
-- Logs every debit to `wallet_transactions` table with `type: 'match_fee'` and `booking_id`
-- Fee-exempt players skipped server-side
-
-The only addition needed for scorecard integration is to **also update `scorecard_uploads.status`
-to `'fees_applied'`** after a successful debit. Add to the existing route:
-
-```ts
-// src/app/api/fees/apply/route.ts — add after successful debits, before return
-await supabase
-  .from('scorecard_uploads')
-  .update({ status: 'fees_applied', fees_applied_at: new Date().toISOString() })
-  .eq('booking_id', booking_id)
-```
-
-That is the only change needed. Do not create a new route.
-
----
-
-### 7.3 Completed Match Visibility
-
-✅ **Already done — `/matches/history` page exists in repo.**
-
-`src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` +
-`MatchHistoryCard` are fully implemented with pagination, filters (tournament / venue /
-format / role), and squad expand. **No changes to `/fixtures` needed.**
-
-`/fixtures` remains upcoming-only — that is correct and intentional.
-
----
-
-### 7.4 Upload UI — `MatchHistoryCard` (not `FixturesCard`)
-
-The upload button and scorecard display belong inside `MatchHistoryCard` in
-`src/components/matches/MatchHistoryClient.tsx`, following the existing on-demand
-expand pattern (same as the squad detail panel).
-
-**`ScorecardUploadButton`** — add inside `MatchHistoryCard`, alongside the existing
-squad expand toggle:
-
-```tsx
-{canUpload && (
-  <ScorecardUploadButton
-    bookingId={match.booking_id}
-    currentStatus={uploadStatus}  // from scorecard_uploads joined in list query
-  />
-)}
-```
-
-`canUpload` passed as prop from `MatchHistoryClient` — computed from session:
-```ts
-// Already available: canEditRoles covers wrangler/GC/admin
-// Add captain/VC check: viewerPlayerId matches a squad row with is_captain/is_vc
-const canUpload = canEditRoles || isMatchCaptainOrVC
-```
-
-`ScorecardUploadButton` states:
-
-| `uploadStatus` | Button label | Behaviour |
+| Transition | Trigger | Who |
 |---|---|---|
-| `null` | Upload Scorecard | File picker → POST |
-| `pending_parse` | Processing... | Spinner, disabled |
-| `parsed` | Awaiting Admin Sync | Disabled, amber |
-| `synced` | Stats Synced ✓ | Disabled, green |
-| `fees_applied` | Fees Applied ✓ | Disabled, green |
+| *(none)* → `pending_parse` | Upload initiated / backfill run started | Upload route or `backfillOneBooking()` |
+| `pending_parse` → `parsed` | Microservice parse succeeds | Both paths |
+| `parsed` → `synced` | `syncMatchStatsForBooking()` succeeds | **Automatic** on the backfill/cron path; **explicit click** ("Sync Stats") on the manual-upload path |
+| `synced` → `fees_applied` | Admin runs `POST /api/fees/apply` | **Always manual, always admin-only, never triggered by anything else in this feature** |
 
-**Result strip** — add to `MatchHistoryCard` header once `match_stats_cache` has data.
-Join `scorecard_uploads.status` and a summary from `match_stats_cache` in the existing
-`GET /api/matches/history` list query:
+**Why fees stay manual:** past match fees are being handled through a
+separate Hub-sheet export/import process, and going forward the club wants
+fee application to always be an explicit admin decision — not something a
+cron silently does on a schedule. `src/lib/scorecardBackfill.ts` and its
+cron caller never call `/api/fees/apply`, by design, and the code comments
+say so explicitly to prevent a future edit from "helpfully" wiring it up.
 
-```ts
-// Add to list query select:
-scorecard_uploads(status),
-match_stats_cache(match_result, team_total, team_wickets, team_overs,
-                  opponent_total, opponent_wickets, opponent_overs)
-```
-
-**Full scorecard expand** — on-demand inside `MatchHistoryCard`, same pattern as squad:
-
-```ts
-// New endpoint:
-GET /api/matches/history/[bookingId]/scorecard
-// Returns batting[], bowling[], fielding[] from match_stats_cache
-// Auth: any signed-in member (stats are not sensitive)
-```
+A sync failure on the automated path (e.g. analytics DB not reachable) just
+leaves the booking at `parsed` — identical to where a manual upload would
+sit before someone clicks "Sync Stats". No new failure-path UI was needed;
+the existing admin Post-Match panel and match-card indicator already handle
+that state.
 
 ---
 
-### 7.5 Admin Post-Match Panel
+## 7. API Routes (as shipped)
 
-Add to `/admin/bookings/[id]` — new "Post-Match" section:
+| Route | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/matches/[id]/scorecard` | POST | Captain/VC (own booking) or wrangler/admin | Manual PDF upload. Streams newline-delimited JSON progress events (`recording` → `sending` → `finalizing` → `done`/`error`) so a slow parse shows exactly where it's stuck. 45s microservice timeout, `maxDuration=60` (Hobby ceiling). Magic-byte PDF validation (`%PDF`), 10MB cap, both enforced server-side. |
+| `/api/admin/sync-match-stats` | POST | Captain/VC (own booking) or wrangler/admin | Manual "Sync Stats" trigger. Thin wrapper around `syncMatchStatsForBooking()` (shared with the automated path). |
+| `/api/admin/matches/[id]/post-match` | GET, DELETE | Admin only | Feeds the admin Post-Match panel (upload status + uploader name + stats preview). DELETE resets a stuck/wrong `scorecard_uploads` row — admin-only override, never reverses a fee debit. |
+| `/api/admin/scorecard-backfill` | GET, POST | Admin only | GET lists past confirmed bookings with a `match_id` that aren't yet `synced`/`fees_applied`. POST processes exactly one booking per call — the admin page drives the loop client-side, paced ~4s apart, never server-side (a single Vercel invocation can't safely loop a whole historical backlog). |
+| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Daily cron. See Section 8. |
+| `/api/matches/history` | GET | Any signed-in, non-expelled member | Paginated match list feeding `/matches/history`. Computes `can_upload` and `roles_complete` server-side per booking; joins `scorecard_uploads` status and a `match_stats_cache` summary. |
+| `/api/matches/history/[bookingId]` | GET | Any signed-in member | Squad detail for one booking (also resolves CricHeroes links for the scorecard tables). |
+| `/api/matches/history/[bookingId]/scorecard` | GET | Any signed-in member | Full `batting`/`bowling`/`fielding`/`team_list` from `match_stats_cache` — stats aren't sensitive, so no role gate beyond being signed in. |
+| `/api/matches/history/[bookingId]/roles` | PATCH | Same as `canEditRoles` (GC/admin/wrangler) | Corrects C/VC/WK on a past match. |
+| `/api/matches/history/[bookingId]/tournament` | PATCH | Admin only | Reassigns a mis-tagged tournament after the fact. |
+| `/api/fees/apply` | POST | Admin only | Pre-existing route, untouched in spirit. Only addition: sets `scorecard_uploads.status = 'fees_applied'` and `fees_applied_at`/`fees_applied_by` after a successful debit. |
 
-```
-POST-MATCH
-──────────────────────────────────────────────────────
-Upload Status:  parsed  (uploaded by Rahul · 14 Jun)
+### Microservice endpoints (`spartans-python/api.py`)
 
-[ Sync Stats from Analytics DB ]
-
-──────────────────────────────────────────────────────
-Stats Preview (once synced):
-  Result:    Won by 24 runs
-  Score:     156/6 (20 ov) vs 132/9 (20 ov)
-
-  Top Bat:   Rohan — 54 (38)
-  Top Bowl:  Arjun — 3/18 (4 ov)
-
-──────────────────────────────────────────────────────
-[ Apply Match Fees — ₹X per player · 11 players ]
-  ⚠️  This will debit wallets for 11 players.
-      2 players are fee-exempt and will be skipped.
-      [ Confirm & Apply ]
-```
+| Endpoint | Used by | Notes |
+|---|---|---|
+| `POST /parse-scorecard` | Manual upload route | Accepts a multipart PDF + optional `match_id` form field. `match_id` must be `Form(...)`-annotated — a bare parameter is silently read as a query param instead (a real bug hit and fixed during development). |
+| `POST /fetch-and-parse-scorecard` | `backfillOneBooking()` (backfill page + cron) | Accepts `{ match_id, dry_run }` JSON. Downloads the PDF directly from `pdf.cricheroes.in` server-side with the CricHeroes-friendly headers, then runs the identical parse pipeline. `dry_run: true` parses without writing to the analytics DB — used to validate a new match_id safely. |
+| `GET /health` | — | Liveness check. |
 
 ---
 
-## 8. Navigation Changes
+## 8. Automation — Backfill & Daily Cron
 
-✅ **`/matches/history` already in nav** — Past Matches is already a named route
-accessible to signed-in members. No new nav entry needed for scorecard display.
+### `src/lib/scorecardBackfill.ts` — shared core
+`backfillOneBooking(bookingId)` is the single function used by both the
+one-time admin page and the daily cron. Per booking: validates the booking
+is completed and has a `match_id`, upserts `scorecard_uploads` to
+`pending_parse`, calls the microservice's `/fetch-and-parse-scorecard`
+(45s timeout), flips to `parsed` on success, then **immediately** calls
+`syncMatchStatsForBooking()` — this is what makes the automated path
+seamless end-to-end. Never calls `/api/fees/apply`.
 
-The wrangler squad backfill page (`/wrangler/backfill-squad`) already exists in nav.
-No additional wrangler nav item needed for scorecard upload — the upload button lives
-inside each `MatchHistoryCard` directly.
+### `/admin/scorecard-backfill` — one-time catch-up UI
+Lists every eligible past booking, admin selects which to run, and the
+**client** drives a sequential loop (~4s pacing between CricHeroes fetches,
+matching the wrangler's own `download_scorecard.py` etiquette) — the server
+route only ever processes one booking per request, since a single Vercel
+invocation can't safely absorb an entire historical backlog.
+
+### `/api/cron/backfill-scorecards` — daily, self-healing
+Runs daily at 07:00 IST (`vercel.json`: `"30 1 * * *"`). Queries **all**
+past unsynced bookings with a `match_id`, not just "yesterday" — so a run
+that's cut short, or a match that keeps failing, just rolls into tomorrow's
+run instead of being permanently skipped. `MAX_PER_RUN = 5` bounds each
+individual run; a backlog beyond that drains a few more per day until
+clear. Pushes a GC notification on completion (success count, or failures
+with reasons).
+
+> **Known, accepted risk (Vercel Hobby):** `maxDuration = 60` on this route
+> matches Hobby's actual ceiling, but nothing in the loop *guarantees* the
+> whole batch finishes inside it — 5 sequential bookings, each with up to a
+> 45s microservice timeout, can exceed 60s under a cold Render start plus a
+> slow item or two. If Vercel kills the function mid-loop, the in-flight
+> booking is left at `pending_parse` with no error message — but since the
+> eligibility filter picks up anything not yet `synced`/`fees_applied`,
+> it's automatically retried the next day. Nothing gets permanently stuck;
+> worst case is a wasted day and no GC notification for that run (the
+> notification only fires after the full loop completes). Deliberately left
+† as-is for now ("wait and watch") rather than pre-emptively lowering
+  `MAX_PER_RUN` — revisit if a run is ever observed actually getting killed
+  mid-batch.
+
+### Why the daily-cron-plus-guard shape exists at all
+Vercel Hobby does not support day-of-week-restricted cron expressions —
+this was discovered the hard way on the *separate* `lock-availability`
+cron (`"30 2 * * 4"` never fired at all on Hobby; see that route's git
+history). `backfill-scorecards` doesn't need day-of-week restriction — it's
+meant to run every day — so it isn't affected by that specific failure
+mode, but it's worth knowing the platform constraint exists before adding
+any future cron that does need one.
 
 ---
 
-## 9. Execution Order with Dependencies
+## 9. UI — `MatchHistoryCard` (`src/components/matches/MatchHistoryClient.tsx`)
 
-```
-Phase 0 — Documentation (no code, 30 min)
-  └─ Add permanent limitations to limitations.md
-  └─ Record this plan in project knowledge
+### Result badge vs. sync status — deliberately asymmetric weight
+A win gets a solid green pill (`WON`, celebratory). A loss, tie, or
+no-result renders as **plain coloured text, no pill** — a bordered badge on
+every outcome made a loss read as visually "achieved" as a win, which is
+backwards. The scorecard's sync lifecycle (`parsed` / `synced` /
+`fees_applied`) is intentionally the quietest thing on the card: a small
+icon + caption (`⏳ Awaiting sync`, `✓ Stats synced`, `✓ Fees applied`) sat
+inline in the icon row, not a standalone highlighted box — it used to be a
+bordered badge and was outshining the actual match result, so it moved.
 
-Phase 1 — DB Migrations
-  ├─ 042_add_wrangler_role.sql         ✅ DONE
-  ├─ 043_match_stats_cache.sql         ❌ TODO
-  └─ 044_scorecard_uploads.sql         ❌ TODO
+### Icon row
+Ground link (mirrors `FixturesCard`'s `MapPinIcon`, opens Google Maps),
+then CricHeroes, then the subtle sync indicator described above — hidden
+entirely if none apply. Ball/jersey icons were removed from this card
+(they're still on `FixturesCard` for upcoming fixtures; here they added
+nothing a completed-match viewer needed).
 
-Phase 2 — Analytics Microservice (parallel with Phase 1)
-  ├─ Add import_from_dict() method to SupabaseImporter
-  ├─ Write api.py (FastAPI wrapper)
-  ├─ Update requirements.txt
-  ├─ Deploy to Railway
-  └─ Share: Railway URL + MICROSERVICE_SECRET with Hub team
+### "Did not bat" line
+The batting table filters out players who didn't face a ball — that's the
+right call for the table itself, but on its own it hides who else was in
+the squad that day. A line under the batting table lists everyone from
+`team_list` who isn't in the filtered batting rows, CricHeroes-linked the
+same way every other player name is — mirrors CricHeroes's own scorecard
+convention.
 
-Phase 3 — Hub Auth Extension
-  ├─ src/lib/auth.ts — isWrangler in JWT callback    ✅ DONE
-  └─ src/types/next-auth.d.ts — session type         ✅ DONE
+### Squad collapsible — hidden once redundant
+Only shown when `!match.stats || !match.roles_complete` — i.e. hidden once
+the scorecard has synced stats *and* C/VC/WK are all set, since at that
+point the scorecard already answers "who played," and roles essentially
+never need touching again after that. `roles_complete` is computed
+server-side in `/api/matches/history` from the `squad` table (at least one
+`is_captain`, one `is_vc`, one `is_wk` row for that booking).
 
-Phase 4 — Hub API Routes (depends on: Phase 1 + Phase 2 + Phase 3)
-  ├─ POST /api/matches/[id]/scorecard                              ❌ TODO
-  ├─ POST /api/admin/sync-match-stats                              ❌ TODO
-  └─ POST /api/fees/apply — add scorecard_uploads status update   ✅ EXISTS (minor addition only)
+### Actionable vs. passive states — where each renders
+`ScorecardUploadButton` (file picker / "Processing…" spinner / "Stuck?
+Retry upload") only renders for the two states that need a human action:
+no upload yet, or a stuck `pending_parse`. Every later state
+(`parsed`/`synced`/`fees_applied`) is passive and renders as the subtle
+icon-row indicator instead — see above.
 
-Phase 5 — Completed Match Visibility
-  └─ ✅ DONE — /matches/history fully built. No fixtures changes needed.
-
-Phase 6 — Scorecard UI in MatchHistoryCard (depends on: Phase 4)
-  ├─ GET /api/matches/history/[bookingId]/scorecard   ← new endpoint
-  ├─ Join scorecard_uploads + match_stats_cache summary into list query
-  ├─ ScorecardUploadButton component inside MatchHistoryCard
-  └─ Full batting/bowling expand panel inside MatchHistoryCard
-
-Phase 7 — Admin Post-Match Panel (depends on: Phase 4 + Phase 6)
-  └─ /admin/bookings/[id] — post-match section
-
-Phase 8 — Wrangler Admin Management
-  ├─ /wrangler/backfill-squad page                   ✅ DONE
-  ├─ /api/wrangler/parse-announcement route          ✅ DONE
-  ├─ /api/wrangler/backfill-squad route              ✅ DONE
-  └─ /admin/players — is_wrangler toggle in edit     ⚠️ VERIFY
-```
-
-**Dependency tree:**
-
-```
-Phase 0
-    │
-Phase 1 ──────────────────────────────────┐
-    │                                      │
-    ├── Phase 2 (parallel)                 │
-    │       │                              │
-Phase 3 ◄───┘                             │
-    │                                      │
-    ├── Phase 4 ◄── needs Phase 2          │
-    │       │                              │
-    ├── Phase 5 ◄──────────────────────────┘
-    │       │
-    └── Phase 6 ◄── needs Phase 4 + Phase 5
-            │
-        Phase 7
-        Phase 8
-```
+### Ground link
+`match.ground` comes from a `tournaments → grounds` join added to
+`/api/matches/history` specifically for this card, mirroring
+`FixturesCard`'s pattern exactly. Falls back to the booking's free-text
+`venue` column when no ground record is linked to the tournament.
 
 ---
 
 ## 10. Security Checklist (vibe-security)
 
-| Check | Detail |
+| Check | Status |
 |---|---|
-| Upload auth is per-booking, not just role | `squad` table lookup confirms uploader is captain/VC for **this specific booking** |
-| `is_wrangler` bypasses per-booking check | Acceptable — wrangler is a trusted role set only by admin |
-| PDF validated by magic bytes, not Content-Type | `%PDF` header check prevents disguised file uploads |
-| File size capped at 10MB server-side | Both Hub API route and microservice enforce this independently |
-| `MICROSERVICE_SECRET` never in client bundle | No `NEXT_PUBLIC_` prefix. Sent server-to-server only |
-| `ANALYTICS_SUPABASE_KEY` never in client bundle | No `NEXT_PUBLIC_` prefix. Service role key — server-side only |
-| `ANALYTICS_SUPABASE_URL` never in client bundle | No `NEXT_PUBLIC_` prefix. Analytics DB URL hidden from browser |
-| Fees auto-debit after admin sync | Triggered automatically once admin runs sync-match-stats — no payment gateway. Fee-exempt players skipped server-side. |
-| Fee-exempt players skipped server-side | Exemption check runs server-side — never relying on client to filter |
-| `isWrangler` from DB, `isAdmin` from env var | Consistent with existing pattern — admin cannot be escalated via DB |
-| Wallet debit has no client-facing price param | ✅ Already correct — `/api/fees/apply` derives fee server-side from `match_fee_override ?? tournaments.match_fee`. Never from client input. |
+| Upload/sync auth is per-booking, not just role | ✅ `squad` table lookup scoped to this `booking_id` + this `player_id`, in both `/api/matches/[id]/scorecard` and `/api/admin/sync-match-stats` |
+| `is_wrangler` bypasses per-booking check | ✅ Acceptable — wrangler is a trusted role, admin-writable only |
+| PDF validated by magic bytes, not Content-Type | ✅ `%PDF` header check |
+| File size capped at 10MB server-side | ✅ Both the Hub route and the microservice enforce independently |
+| `MICROSERVICE_SECRET` / `ANALYTICS_SUPABASE_KEY` / `ANALYTICS_SUPABASE_URL` never in client bundle | ✅ No `NEXT_PUBLIC_` prefix on any of them |
+| Fees never auto-triggered | ✅ `scorecardBackfill.ts` and its cron caller never call `/api/fees/apply` — verified by reading the file, not just by comment |
+| Fee-exempt players skipped server-side | ✅ Pre-existing behaviour in `/api/fees/apply`, untouched |
+| `match_stats_cache` / `scorecard_uploads` RLS | ✅ **Fixed 2026-07-15** — see Section 5. Was disabled since table creation; closed via migration `046`. |
+| CricHeroes direct-fetch endpoint auth | ✅ Server-to-server only (`MICROSERVICE_SECRET` header), never called from the browser |
 
 ---
 
-## 11. Open Questions
+## 11. File Map
 
-| Question | Status | Notes |
-|---|---|---|
-| Match fee — fixed or per tournament? | ✅ Resolved | `POST /api/fees/apply` already exists. Fee derived server-side from `match_fee_override ?? tournaments.match_fee`, split equally across non-exempt squad. Only addition needed: update `scorecard_uploads.status = 'fees_applied'` at end of that route. |
-| Wrong PDF uploaded — admin override? | 🔜 Follow-on | Re-upload upserts correctly. Add a "Reset to pending" button in admin post-match panel as a follow-on task. |
-| Wrangler nav location? | ✅ Resolved | `/wrangler/backfill-squad` already in nav. Scorecard upload lives inside `MatchHistoryCard` on `/matches/history` — no new nav entry needed. |
-| `import_from_dict` implementation | ⏳ Wrangler team | Add to `SupabaseImporter` in `spartans-dw-ui`. Code spec in Section 6 of this doc. |
-| Railway free tier sleep latency | ⏳ Wrangler team | First request after inactivity ~30s. Acceptable — admin-triggered, not player-facing. |
+| File | Role |
+|---|---|
+| `src/app/api/matches/[id]/scorecard/route.ts` | Manual upload — streamed progress, per-booking captain/VC or wrangler/admin auth |
+| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill path |
+| `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — shared core for the admin backfill page and the daily cron; chains parse → sync, never touches fees |
+| `src/app/api/admin/sync-match-stats/route.ts` | Manual sync trigger — thin wrapper around `matchStatsSync.ts` |
+| `src/app/api/admin/matches/[id]/post-match/route.ts` | Admin Post-Match panel feed (GET) + stuck-upload reset (DELETE) |
+| `src/app/api/admin/scorecard-backfill/route.ts` | One-time backfill: GET lists eligible bookings, POST processes one |
+| `src/app/admin/scorecard-backfill/page.tsx` | Admin UI driving the client-side backfill loop |
+| `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron |
+| `src/app/api/matches/history/route.ts` | Paginated match list — `can_upload`, `roles_complete`, `scorecard_status`, `ground` join |
+| `src/app/api/matches/history/[bookingId]/route.ts` | Squad detail for one booking |
+| `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Full batting/bowling/fielding/team_list |
+| `src/app/api/matches/history/[bookingId]/roles/route.ts` | Correct C/VC/WK post-hoc |
+| `src/app/api/matches/history/[bookingId]/tournament/route.ts` | Reassign tournament post-hoc |
+| `src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` | `/matches/history` page — filters, pagination, `MatchHistoryCard` |
+| `src/components/matches/ScorecardUploadButton.tsx` | Upload button + actionable-state UI only (no-upload / stuck pending_parse) |
+| `src/components/matches/ScorecardTables.tsx` | Batting/bowling tables + "Did not bat" line |
+| `src/app/admin/bookings/[id]/page.tsx` | Admin booking edit page — Post-Match panel |
+| `supabase/migrations/042_add_wrangler_role.sql` | `players.is_wrangler` |
+| `supabase/migrations/044_match_stats_cache.sql` | `match_stats_cache` table (reconstructed — see Section 5) |
+| `supabase/migrations/045_scorecard_uploads.sql` | `scorecard_uploads` table + enum (reconstructed — see Section 5) |
+| `supabase/migrations/046_enable_rls_scorecard_tables.sql` | RLS fix (see Section 5) |
+| `spartans-python/api.py` | FastAPI wrapper — `/parse-scorecard`, `/fetch-and-parse-scorecard`, `/health` |
+| `spartans-python/scripts/import_to_supabase.py` | `raise_on_error` param added — silent-failure bug fix |
+| `spartans-python/utils/csv_writers.py` | `HOUSE_NAME = "SPARTANS"` constant — house system is defunct, replaced the old per-player house lookup |
+
+---
+
+## 12. Environment Variables
+
+Add to Vercel (never `NEXT_PUBLIC_` — all server-side only):
+
+```
+ANALYTICS_SUPABASE_URL     = <analytics Supabase project URL>
+ANALYTICS_SUPABASE_KEY     = <analytics Supabase service role key>
+MICROSERVICE_URL           = <Render app URL for spartans-python/api.py>
+MICROSERVICE_SECRET        = <shared secret, same value set on Render>
+```
+
+On Render (`spartans-python`):
+
+```
+SUPABASE_URL         = <analytics Supabase project URL — must be the API
+                        URL, e.g. https://<ref>.supabase.co, not a
+                        dashboard URL — this was a real bug hit once>
+SUPABASE_KEY         = <analytics Supabase SERVICE ROLE key, not anon —
+                        also a real bug hit once, caused RLS violations>
+MICROSERVICE_SECRET  = <same value as Hub's MICROSERVICE_SECRET>
+```
+
+---
+
+## 13. Known Gaps / Follow-on
+
+| Item | Status |
+|---|---|
+| `match_stats_cache` / `scorecard_uploads` RLS disabled | ✅ Fixed 2026-07-15, migration `046` |
+| Migrations `044`–`046` applied but not checked in | ✅ Fixed 2026-07-15, this doc pass |
+| Vercel Hobby cron duration risk on `backfill-scorecards` (`MAX_PER_RUN=5` vs. 60s ceiling) | ⏳ Accepted, monitoring — see Section 8 |
+| Wrong PDF uploaded — admin override | ✅ Done — "Reset Upload" / `DELETE /api/admin/matches/[id]/post-match` |
+| `import_from_dict` on `SupabaseImporter` | ✅ Done, live on Render |
+| CricHeroes match URL backfill for pre-existing bookings | ⏳ See `pending-backlog.md` E-3 — separate, ongoing coordinator task |
 
 ---
 
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*
 *Security audit: vibe-security patterns applied per SKILL.md*
-*Analytics pipeline: spartans-dw-ui repo · Hub: spartans-hub repo*
+*Analytics pipeline: `spartans-python` repo (Render) · Hub: `spartans-book-a-slot` repo (Vercel)*

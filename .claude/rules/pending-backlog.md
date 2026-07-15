@@ -76,6 +76,22 @@ const ids = rawIds.slice(0, 20)  // add before .in(ids)
 These have dependencies on other systems (analytics app, third-party APIs, ownership transfers) and need to be sequenced before UX work that relies on them.
  
 ### E-1 · Player stats API from analytics app
+**Status:** ✅ Closed — superseded, July 2026.
+
+The `spartansccianalytics.vercel.app` REST-API approach described below was
+never built — it was superseded by a different, already-shipped mechanism:
+a Python microservice (`spartans-python`, hosted on Render) that fetches
+CricHeroes PDFs directly (manual upload or automated fetch), parses them,
+and writes to a separate analytics Supabase project that the Hub reads from
+directly (`ANALYTICS_SUPABASE_URL`/`KEY`) rather than through a REST API
+contract. Full detail in `features/post-match-scorecard.md`. Player-facing
+stats display (item 3 below) remains open as a genuinely separate task —
+`match_stats_cache` currently only feeds the `/matches/history` scorecard
+view, not `/profile` or `/fixtures/[id]` player cards yet.
+
+<details>
+<summary>Original text (kept for history)</summary>
+
 **Dependency:** `spartansccianalytics.vercel.app` (maintained by data wrangler)
  
 CricHeroes is a JS-rendered SPA — server-side scraping is not viable. The analytics app parses CricHeroes scorecards and is the planned source for player stats.
@@ -84,6 +100,8 @@ CricHeroes is a JS-rendered SPA — server-side scraping is not viable. The anal
 1. Agree API contract with data wrangler: endpoint shape, auth (bearer token or open), CORS policy for `hub.spartanscricketclub.in`
 2. Build player self-entry fallback on `/profile` (immediate fallback while API is being built)
 3. Integrate stats API call into `/fixtures/[id]` and `/profile` player cards once live
+
+</details>
 ---
  
 ### E-2 · GitHub Org + Vercel + Supabase ownership transfer
@@ -565,7 +583,7 @@ Players who signed in before the `auth.ts` photo-seeding change won't have `phot
 ---
  
 ### L-4 · CricHeroes post-match stats via `bookings.match_id`
-**Sprint 5.** Squad rows are linked to `booking_id` → `match_id` — enables per-player stat attribution once the analytics API is live.
+**Status:** ✅ Done — July 2026. Shipped as the full post-match scorecard integration (manual upload + automated CricHeroes fetch, daily cron, `/matches/history` display). See `features/post-match-scorecard.md`.
  
 ---
  
@@ -637,7 +655,7 @@ U-11  audit log UI
 ```
 E-3   CricHeroes URL backfill (manual, coordinator task)
 E-2   GitHub / Vercel / Supabase ownership transfer (ops)
-E-1   analytics API (ongoing with data wrangler)
+E-1   ✅ closed — superseded by post-match-scorecard integration (July 2026)
 ```
  
 **Phase 9 — Housekeeping**
