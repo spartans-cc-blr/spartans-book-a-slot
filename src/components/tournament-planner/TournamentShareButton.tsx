@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 
-export function TournamentShareButton({ tournamentId }: { tournamentId: string }) {
+export function TournamentShareButton({ tournamentId, className }: { tournamentId: string; className?: string }) {
   const [copied, setCopied] = useState(false)
 
   async function handleShare() {
@@ -17,8 +17,8 @@ export function TournamentShareButton({ tournamentId }: { tournamentId: string }
 
   return (
     <button onClick={handleShare}
-      className="font-rajdhani text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors">
-      {copied ? '✅ Link copied!' : '📤 Share tournament card'}
+      className={className ?? 'font-rajdhani text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors'}>
+      {copied ? '✅ Link copied!' : <>↗ Share tournament card</>}
     </button>
   )
 }
