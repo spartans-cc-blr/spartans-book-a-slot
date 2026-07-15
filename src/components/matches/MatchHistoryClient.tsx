@@ -186,13 +186,16 @@ function MapPinIcon({ size = 18 }: { size?: number }) {
 
 // Result is the headline of a completed match — it should read as the most
 // prominent thing on the card, more so than a passive "stats synced"
-// bookkeeping note. Bordered pill with real weight, not a tiny tinted label.
-function resultBadgeStyle(result: string | null): { bg: string; border: string; color: string; label: string } {
+// bookkeeping note. A win gets the celebratory solid-fill pill; anything
+// else (loss, tie, no result) is stated plainly in colour, no pill — the
+// pill reads as an achievement badge, so putting one on a loss made losses
+// look as "highlighted" as wins, which is exactly backwards.
+function resultBadgeStyle(result: string | null): { pill: boolean; bg: string; color: string; label: string } {
   const r = (result ?? '').toLowerCase()
-  if (r.includes('win'))  return { bg: '#052E1E', border: '#0F5132', color: '#34D399', label: 'WON' }
-  if (r.includes('los'))  return { bg: '#3B0A0A', border: '#7F1D1D', color: '#F87171', label: 'LOST' }
-  if (r.includes('tie'))  return { bg: '#3B2F0A', border: '#78350F', color: '#FBBF24', label: 'TIED' }
-  return { bg: '#1E293B', border: '#334155', color: '#94A3B8', label: (result ?? 'NO RESULT').toUpperCase() }
+  if (r.includes('win'))  return { pill: true,  bg: '#059669', color: '#FFFFFF', label: 'WON' }
+  if (r.includes('los'))  return { pill: false, bg: '',        color: '#F87171', label: 'LOST' }
+  if (r.includes('tie'))  return { pill: false, bg: '',        color: '#FBBF24', label: 'TIED' }
+  return { pill: false, bg: '', color: '#94A3B8', label: (result ?? 'NO RESULT').toUpperCase() }
 }
 
 // Passive, read-only checkpoints in the scorecard_uploads lifecycle — shown
@@ -564,7 +567,9 @@ function MatchHistoryCard({
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color, fontSize: '13px', fontWeight: 800, padding: '4px 12px', borderRadius: '6px', letterSpacing: '0.06em' }}>
+              <span style={badge.pill
+                ? { background: badge.bg, color: badge.color, fontSize: '13px', fontWeight: 800, padding: '4px 12px', borderRadius: '6px', letterSpacing: '0.06em' }
+                : { color: badge.color, fontSize: '13px', fontWeight: 800, letterSpacing: '0.06em' }}>
                 {badge.label}
               </span>
               <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{scoreLine(match.stats)}</span>
@@ -622,18 +627,18 @@ function MatchHistoryCard({
               <ScorecardSyncIndicator status={match.scorecard_status} />
             )}
             <div style={{ flex: 1 }} />
-            {match.cricheroes_url && (
-              <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
-                <CricHeroesIcon size={22} />
-                <span style={{ fontSize: '9px', color: '#6B7280' }}>CricHeroes</span>
-              </a>
-            )}
             {match.ground?.maps_url && (
               <a href={match.ground.maps_url} target="_blank" rel="noopener noreferrer" title="Open ground in Google Maps"
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
                 <MapPinIcon size={22} />
                 <span style={{ fontSize: '9px', color: '#6B7280' }}>Ground</span>
+              </a>
+            )}
+            {match.cricheroes_url && (
+              <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
+                <CricHeroesIcon size={22} />
+                <span style={{ fontSize: '9px', color: '#6B7280' }}>CricHeroes</span>
               </a>
             )}
           </div>
