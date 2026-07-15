@@ -36,6 +36,7 @@ interface MatchSummary {
   scorecard_uploaded_at: string | null
   can_upload:      boolean
   stats:           StatsSummary | null
+  roles_complete:  boolean
 }
 
 type RoleFilter = 'all' | 'played' | 'led'
@@ -573,33 +574,41 @@ function MatchHistoryCard({
         )}
       </div>
 
-      {/* Collapsible squad */}
-      <div>
-        <div style={{ height: '1px', background: '#2D3748' }} />
-        <button
-          onClick={() => setSquadOpen(v => !v)}
-          style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#C9A84C' }}>
-            SQUAD{detail ? ` · ${detail.squad.length} players` : ''}
-          </span>
-          <span style={{ fontSize: '14px', color: '#6B7280' }}>{squadOpen ? '▲' : '▼'}</span>
-        </button>
+      {/* Collapsible squad — once the scorecard is synced AND C/VC/WK are
+          all set, this panel is redundant (the scorecard already lists
+          who played, and roles never need touching again). Kept visible
+          whenever roles are still incomplete so they can be fixed, or the
+          scorecard hasn't synced yet so the squad list is the only record
+          of selection. Direct Supabase edit remains the escape hatch for
+          the rare post-sync correction. */}
+      {(!match.stats || !match.roles_complete) && (
+        <div>
+          <div style={{ height: '1px', background: '#2D3748' }} />
+          <button
+            onClick={() => setSquadOpen(v => !v)}
+            style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#C9A84C' }}>
+              SQUAD{detail ? ` · ${detail.squad.length} players` : ''}
+            </span>
+            <span style={{ fontSize: '14px', color: '#6B7280' }}>{squadOpen ? '▲' : '▼'}</span>
+          </button>
 
-        {squadOpen && (
-          <div style={{ paddingTop: '4px', paddingBottom: '2px' }}>
-            {detailLoading && <p className="font-rajdhani text-sm text-zinc-600">Loading squad…</p>}
-            {detailError && <p className="font-rajdhani text-sm text-red-400">{detailError}</p>}
-            {detail && (
-              <SquadPanel
-                detail={detail}
-                onDetailChange={setDetail}
-                canEditRoles={canEditRoles}
-                canEditTournament={canEditTournament}
-              />
-            )}
-          </div>
-        )}
-      </div>
+          {squadOpen && (
+            <div style={{ paddingTop: '4px', paddingBottom: '2px' }}>
+              {detailLoading && <p className="font-rajdhani text-sm text-zinc-600">Loading squad…</p>}
+              {detailError && <p className="font-rajdhani text-sm text-red-400">{detailError}</p>}
+              {detail && (
+                <SquadPanel
+                  detail={detail}
+                  onDetailChange={setDetail}
+                  canEditRoles={canEditRoles}
+                  canEditTournament={canEditTournament}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Collapsible full scorecard — only once stats have been synced */}
       {match.stats && (
@@ -622,6 +631,7 @@ function MatchHistoryCard({
                 <ScorecardTables
                   batting={scorecard.batting}
                   bowling={scorecard.bowling}
+                  teamList={scorecard.team_list}
                   squad={detail?.squad}
                 />
               )}

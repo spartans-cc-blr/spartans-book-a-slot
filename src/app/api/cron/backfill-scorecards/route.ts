@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ processed: 0, succeeded: 0, failed: 0, results: [] })
   }
 
-  const results: { booking_id: string; match_id: string | null; opponent_name: string | null; ok: boolean; error?: string }[] = []
+  const results: { booking_id: string; match_id: string | null; opponent_name: string | null; ok: boolean; parsed: boolean; synced: boolean; error?: string }[] = []
 
   for (let i = 0; i < eligible.length; i++) {
     const result = await backfillOneBooking(eligible[i].id)
@@ -71,14 +71,14 @@ export async function GET(req: NextRequest) {
   const succeeded = results.filter(r => r.ok)
   const failed    = results.filter(r => !r.ok)
 
-  // Nudge GC to review + sync — parsing is automated, but sync into
-  // match_stats_cache stays a deliberate manual checkpoint (see the
-  // scorecard-upload design discussion — parse can succeed while the
-  // underlying extraction still has an issue worth a human glance).
+  // Parse and sync into match_stats_cache both happen automatically now —
+  // this nudge is just visibility, not a "please go sync this" action item.
+  // Fees are deliberately never touched here; that stays a separate manual
+  // step regardless of how a match got synced.
   if (succeeded.length > 0) {
     await notifyGCs(
-      '📥 Scorecards Fetched',
-      `${succeeded.length} scorecard${succeeded.length > 1 ? 's' : ''} auto-fetched from CricHeroes — ready for Sync Stats review.`,
+      '📥 Scorecards Synced',
+      `${succeeded.length} scorecard${succeeded.length > 1 ? 's' : ''} auto-fetched from CricHeroes and synced.`,
       '/matches/history',
       false
     )

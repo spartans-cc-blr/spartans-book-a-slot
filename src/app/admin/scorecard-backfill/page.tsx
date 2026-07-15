@@ -106,9 +106,10 @@ export default function ScorecardBackfillPage() {
       <div className="mb-6">
         <h1 className="font-cinzel text-xl font-bold text-gold">Scorecard Backfill</h1>
         <p className="font-rajdhani text-sm text-zinc-500 mt-1">
-          Fetch and parse scorecards directly from CricHeroes for past matches that were never uploaded.
-          Each match still needs a manual &ldquo;Sync Stats&rdquo; confirmation afterwards — this only gets them
-          to &ldquo;Awaiting Admin Sync&rdquo;.
+          Fetch, parse, and sync scorecards directly from CricHeroes for past matches that were never uploaded —
+          parse and sync both happen automatically here. A row still lands on &ldquo;Failed&rdquo; if the sync step
+          alone had trouble; it&apos;s reachable from the match&apos;s &ldquo;Sync Stats&rdquo; button afterwards.
+          Match fees are never touched by this — that stays a fully separate, manual step.
         </p>
       </div>
 
