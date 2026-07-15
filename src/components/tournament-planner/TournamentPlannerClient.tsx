@@ -25,6 +25,8 @@ interface Booking {
 
 interface Captain { id: string; name: string }
 
+interface TournamentPlayer { id: string; name: string; cricheroes_url: string | null }
+
 interface ViewerRole {
   isCaptain: boolean
   isGC: boolean
@@ -38,6 +40,7 @@ interface Props {
   captains: Captain[]
   today: string
   viewerRole: ViewerRole
+  tournamentPlayersMap: Record<string, TournamentPlayer[]>
 }
 
 // ── Slot definitions ───────────────────────────────────────────────
@@ -517,7 +520,7 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
 
 // ── Tournament block ───────────────────────────────────────────────
 function TournamentBlock({
-  tournament, games, announcedSet, today, isAdmin, isGC,
+  tournament, games, announcedSet, today, isAdmin, isGC, players,
 }: {
   tournament: NonNullable<Booking['tournament']>
   games: Booking[]
@@ -525,9 +528,11 @@ function TournamentBlock({
   today: string
   isAdmin: boolean
   isGC: boolean
+  players: TournamentPlayer[]
 }) {
   const [open, setOpen]               = useState(false)
   const [completedOpen, setCompletedOpen] = useState(false)
+  const [playersOpen, setPlayersOpen] = useState(false)
 
   const completed = games.filter(g => g.game_date < today)
   const scheduled = games.filter(g => g.game_date >= today)
@@ -823,6 +828,30 @@ function TournamentBlock({
               </p>
             )}
           </div>
+
+          {/* Players represented — collapsible, sourced from announced squads */}
+          <div className="px-4 py-3 border-t border-ink-5">
+            <button
+              onClick={() => setPlayersOpen(v => !v)}
+              className="flex items-center gap-1 font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-2 w-full text-left hover:text-zinc-400"
+            >
+              <span>{playersOpen ? '▲' : '▶'}</span>
+              <span>Players represented — {players.length}</span>
+            </button>
+            {playersOpen && (
+              players.length > 0 ? (
+                <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                  {players.map(p => (
+                    <span key={p.id} className="font-rajdhani text-xs text-zinc-400">
+                      <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} />
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-rajdhani text-xs text-zinc-600">No announced squads yet for this tournament.</p>
+              )
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -890,7 +919,7 @@ function GameRow({ game, gap, avgGapRef, isDone = false }: {
 
 // ── Root client component ──────────────────────────────────────────
 export function TournamentPlannerClient({
-  bookings, announcedBookingIds, captains, today, viewerRole,
+  bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
   const [showUpcoming,  setShowUpcoming]  = useState(true)
@@ -986,7 +1015,8 @@ export function TournamentPlannerClient({
                 {myTournaments.map(({ tournament, games }) => (
                   <TournamentBlock key={tournament.id} tournament={tournament} games={games}
                     announcedSet={announcedSet} today={today}
-                    isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC} />
+                    isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC}
+                    players={tournamentPlayersMap[tournament.id] ?? []} />
                 ))}
                 {otherTournaments.length > 0 && (
                   <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-6 mb-3">Other tournaments</p>
@@ -996,7 +1026,8 @@ export function TournamentPlannerClient({
             {(isCaptainView ? otherTournaments : sortedTournaments).map(({ tournament, games }) => (
               <TournamentBlock key={tournament.id} tournament={tournament} games={games}
                 announcedSet={announcedSet} today={today}
-                isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC} />
+                isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC}
+                players={tournamentPlayersMap[tournament.id] ?? []} />
             ))}
           </>
         )}

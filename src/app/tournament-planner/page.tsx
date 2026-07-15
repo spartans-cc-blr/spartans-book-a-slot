@@ -63,10 +63,25 @@ export default async function TournamentPlannerPage() {
   const { data: squads } = bookingIds.length
     ? await supabase
         .from('squad')
-        .select('booking_id, status')
+        .select('booking_id, status, players(id, name, cricheroes_url)')
         .in('booking_id', bookingIds)
         .eq('status', 'announced')
     : { data: [] }
+
+  // Players represented per tournament — dedupe + sort, sourced from announced squads only
+  const bookingToTournamentId = new Map(bookings.map(b => [b.id, b.tournament?.id ?? null]))
+  const tournamentPlayersMap: Record<string, { id: string; name: string; cricheroes_url: string | null }[]> = {}
+  for (const row of (squads ?? []) as any[]) {
+    const tournamentId = bookingToTournamentId.get(row.booking_id)
+    if (!tournamentId) continue
+    const player = Array.isArray(row.players) ? row.players[0] : row.players
+    if (!player) continue
+    const list = tournamentPlayersMap[tournamentId] ?? (tournamentPlayersMap[tournamentId] = [])
+    if (!list.some(p => p.id === player.id)) list.push(player)
+  }
+  for (const list of Object.values(tournamentPlayersMap)) {
+    list.sort((a, b) => a.name.localeCompare(b.name))
+  }
 
   // 3. All active captains
   const { data: captains } = await supabase
@@ -106,6 +121,7 @@ export default async function TournamentPlannerPage() {
           announcedBookingIds={announcedBookingIds}
           captains={captains ?? []}
           today={today}
+          tournamentPlayersMap={tournamentPlayersMap}
           viewerRole={{
             isCaptain: !!user?.isCaptain,
             isGC:      !!user?.isGC,
