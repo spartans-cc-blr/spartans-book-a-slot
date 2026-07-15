@@ -2,11 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
-import { JerseyIcon } from '@/components/ui/JerseyIcon'
 import { ScorecardUploadButton, type ScorecardStatus } from '@/components/matches/ScorecardUploadButton'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 
 type BallType = 'red' | 'white' | 'pink'
+
+interface Ground {
+  name:          string
+  maps_url:      string | null
+  hospital_url:  string | null
+}
 
 interface StatsSummary {
   match_result:     string | null
@@ -31,6 +36,7 @@ interface MatchSummary {
   tournament_name: string | null
   ball_type:       BallType | null
   venue:           string | null
+  ground:          Ground | null
   cricheroes_url:  string | null
   scorecard_status:      ScorecardStatus | null
   scorecard_uploaded_at: string | null
@@ -166,16 +172,48 @@ function CricHeroesIcon({ size = 20 }: { size?: number }) {
   )
 }
 
-function jerseyColour(ballType: BallType): 'gold' | 'white' {
-  return ballType === 'white' ? 'gold' : 'white'
+// Mirrors src/components/fixtures/FixturesCard.tsx's MapPinIcon exactly, so
+// the ground link reads as the same affordance across both cards.
+function MapPinIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
+        fill="#34A853" stroke="#1E7A3A" strokeWidth="0.5"/>
+      <circle cx="12" cy="9" r="2.5" fill="white" opacity="0.9"/>
+    </svg>
+  )
 }
 
-function resultBadgeStyle(result: string | null): { bg: string; color: string; label: string } {
+// Result is the headline of a completed match — it should read as the most
+// prominent thing on the card, more so than a passive "stats synced"
+// bookkeeping note. Bordered pill with real weight, not a tiny tinted label.
+function resultBadgeStyle(result: string | null): { bg: string; border: string; color: string; label: string } {
   const r = (result ?? '').toLowerCase()
-  if (r.includes('win'))  return { bg: '#052E1E', color: '#059669', label: 'WON' }
-  if (r.includes('los'))  return { bg: '#3B0A0A', color: '#DC2626', label: 'LOST' }
-  if (r.includes('tie'))  return { bg: '#3B2F0A', color: '#D97706', label: 'TIED' }
-  return { bg: '#1E293B', color: '#94A3B8', label: (result ?? 'NO RESULT').toUpperCase() }
+  if (r.includes('win'))  return { bg: '#052E1E', border: '#0F5132', color: '#34D399', label: 'WON' }
+  if (r.includes('los'))  return { bg: '#3B0A0A', border: '#7F1D1D', color: '#F87171', label: 'LOST' }
+  if (r.includes('tie'))  return { bg: '#3B2F0A', border: '#78350F', color: '#FBBF24', label: 'TIED' }
+  return { bg: '#1E293B', border: '#334155', color: '#94A3B8', label: (result ?? 'NO RESULT').toUpperCase() }
+}
+
+// Passive, read-only checkpoints in the scorecard_uploads lifecycle — shown
+// as a small icon + caption alongside CricHeroes/Ground, not as a standalone
+// highlighted box. Only the actionable states (no upload yet, or a stuck
+// pending_parse needing retry) still render as ScorecardUploadButton above.
+const SYNC_INDICATOR: Partial<Record<ScorecardStatus, { icon: string; label: string; color: string }>> = {
+  parsed:        { icon: '⏳', label: 'Awaiting sync', color: '#9CA3AF' },
+  synced:        { icon: '✓',  label: 'Stats synced',  color: '#6B7280' },
+  fees_applied:  { icon: '✓',  label: 'Fees applied',  color: '#6B7280' },
+}
+
+function ScorecardSyncIndicator({ status }: { status: ScorecardStatus }) {
+  const cfg = SYNC_INDICATOR[status]
+  if (!cfg) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }} title={cfg.label}>
+      <span style={{ fontSize: '15px', lineHeight: 1, color: cfg.color }}>{cfg.icon}</span>
+      <span style={{ fontSize: '9px', color: '#6B7280', whiteSpace: 'nowrap' }}>{cfg.label}</span>
+    </div>
+  )
 }
 
 function scoreLine(stats: StatsSummary): string {
@@ -409,6 +447,7 @@ function MatchHistoryCard({
   const [syncError, setSyncError]     = useState('')
 
   const ballType = match.ball_type ?? 'red'
+  const showSyncIndicator = match.can_upload && !!match.scorecard_status && match.scorecard_status !== 'pending_parse'
 
   // Squad detail is also needed to resolve CricHeroes links in the
   // scorecard tables, so either panel opening triggers the same fetch.
@@ -497,18 +536,35 @@ function MatchHistoryCard({
         <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
           vs <span style={{ color: '#D1D5DB', fontWeight: 500 }}>{match.opponent_name || 'TBD'}</span>
         </div>
-        {match.venue && (
+        {/* Ground link mirrors FixturesCard: hyperlinked when the tournament
+            has a maps_url, falling back to the booking's free-text venue
+            when no ground record is attached. */}
+        {match.ground?.name ? (
+          <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+            {'@ '}
+            {match.ground.maps_url ? (
+              <a href={match.ground.maps_url} target="_blank" rel="noopener noreferrer"
+                style={{ color: '#34A853', textDecoration: 'none' }}>
+                {match.ground.name}
+              </a>
+            ) : (
+              <span>{match.ground.name}</span>
+            )}
+          </div>
+        ) : match.venue ? (
           <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>📍 {match.venue}</div>
-        )}
+        ) : null}
       </div>
 
-      {/* Result strip — only once stats have been synced */}
+      {/* Result strip — only once stats have been synced. This is the
+          headline of a completed match, so it gets the bordered/prominent
+          treatment — a passive "stats synced" note should never outshine it. */}
       {match.stats && (() => {
         const badge = resultBadgeStyle(match.stats.match_result)
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ background: badge.bg, color: badge.color, fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', letterSpacing: '0.06em' }}>
+              <span style={{ background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color, fontSize: '13px', fontWeight: 800, padding: '4px 12px', borderRadius: '6px', letterSpacing: '0.06em' }}>
                 {badge.label}
               </span>
               <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{scoreLine(match.stats)}</span>
@@ -530,7 +586,11 @@ function MatchHistoryCard({
         )
       })()}
 
-      {match.can_upload && (
+      {/* Only the actionable states render here — no upload yet, or a stuck
+          pending_parse needing retry. Once a status is confirmed (parsed,
+          synced, fees_applied) it's a passive checkpoint, not something to
+          act on, so it moves into the subtle icon-row indicator below. */}
+      {match.can_upload && (!match.scorecard_status || match.scorecard_status === 'pending_parse') && (
         <ScorecardUploadButton
           bookingId={match.booking_id}
           uploadStatus={match.scorecard_status}
@@ -552,27 +612,33 @@ function MatchHistoryCard({
         </div>
       )}
 
-      <div style={{ height: '1px', background: '#2D3748' }} />
-
-      {/* Icons row — ball, jersey, CricHeroes only (no ground/hospital) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-          <BallIcon type={ballType} size={22} />
-          <span style={{ fontSize: '9px', color: '#6B7280', textTransform: 'capitalize' }}>{ballType} ball</span>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-          <JerseyIcon colour={jerseyColour(ballType)} size={22} />
-          <span style={{ fontSize: '9px', color: '#6B7280' }}>{ballType === 'white' ? 'Colour jersey' : 'White jersey'}</span>
-        </div>
-        <div style={{ flex: 1 }} />
-        {match.cricheroes_url && (
-          <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
-            <CricHeroesIcon size={22} />
-            <span style={{ fontSize: '9px', color: '#6B7280' }}>CricHeroes</span>
-          </a>
-        )}
-      </div>
+      {/* Icons row — sync status (subtle, replaces the old ball/jersey
+          icons), CricHeroes, and ground. Hidden entirely when none apply. */}
+      {(showSyncIndicator || match.cricheroes_url || match.ground?.maps_url) && (
+        <>
+          <div style={{ height: '1px', background: '#2D3748' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {showSyncIndicator && match.scorecard_status && (
+              <ScorecardSyncIndicator status={match.scorecard_status} />
+            )}
+            <div style={{ flex: 1 }} />
+            {match.cricheroes_url && (
+              <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
+                <CricHeroesIcon size={22} />
+                <span style={{ fontSize: '9px', color: '#6B7280' }}>CricHeroes</span>
+              </a>
+            )}
+            {match.ground?.maps_url && (
+              <a href={match.ground.maps_url} target="_blank" rel="noopener noreferrer" title="Open ground in Google Maps"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
+                <MapPinIcon size={22} />
+                <span style={{ fontSize: '9px', color: '#6B7280' }}>Ground</span>
+              </a>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Collapsible squad — once the scorecard is synced AND C/VC/WK are
           all set, this panel is redundant (the scorecard already lists
