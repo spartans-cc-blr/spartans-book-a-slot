@@ -840,9 +840,9 @@ function TournamentBlock({
             </button>
             {playersOpen && (
               players.length > 0 ? (
-                <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                   {players.map(p => (
-                    <span key={p.id} className="font-rajdhani text-xs text-zinc-400">
+                    <span key={p.id} className="font-rajdhani text-xs text-zinc-400 truncate">
                       <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} />
                     </span>
                   ))}
