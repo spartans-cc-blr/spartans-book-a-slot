@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
   let query = applySharedFilters(
     supabase
       .from('bookings')
-      .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, venue, cricheroes_url, tournament:tournaments(name, ball_type)')
+      .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, venue, cricheroes_url, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))')
   )
     .order('game_date', { ascending: false })
     .order('id', { ascending: false })
@@ -224,6 +224,7 @@ export async function GET(req: NextRequest) {
       tournament_name: (b.tournament as any)?.name ?? null,
       ball_type:       (b.tournament as any)?.ball_type ?? null,
       venue:           b.venue,
+      ground:          (b.tournament as any)?.ground ?? null,
       cricheroes_url:  b.cricheroes_url,
       scorecard_status:      upload?.status ?? null,
       scorecard_uploaded_at: upload?.uploaded_at ?? null,
