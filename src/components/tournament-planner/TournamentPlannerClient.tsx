@@ -63,6 +63,10 @@ function slotKey(game_date: string, slot_time: string): SlotKey {
   return `${day}-${slot_time}` as SlotKey
 }
 
+function scrollToTournament(tournamentId: string) {
+  document.getElementById(`tournament-block-${tournamentId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 // ── Pace helpers ───────────────────────────────────────────────────
 function avgGapWeeks(dates: string[]): number | null {
   if (dates.length < 2) return null
@@ -157,6 +161,25 @@ function BandwidthSection({
     const captainFormats = Array.from(new Set(mine.map(b => b.format).filter((f): f is string => !!f)))
     const captainActiveFormats = captainFormats.length === 0 ? ['T20', 'T30'] : captainFormats
 
+    // Per-tournament played/outstanding/unbooked — this is what captains actually care about,
+    // the slot grid below is secondary
+    const byTournament = new Map<string, { tournament: NonNullable<Booking['tournament']>; games: Booking[] }>()
+    mine.forEach(b => {
+      if (!b.tournament) return
+      const tid = b.tournament.id
+      if (!byTournament.has(tid)) byTournament.set(tid, { tournament: b.tournament, games: [] })
+      byTournament.get(tid)!.games.push(b)
+    })
+    const tournamentBreakdown = Array.from(byTournament.values())
+      .map(({ tournament: t, games }) => {
+        const played      = games.filter(g => g.game_date < today).length
+        const outstanding = games.filter(g => g.game_date >= today).length
+        const totalLeague = t.total_league_games ?? games.length
+        const tUnbooked   = Math.max(0, totalLeague - games.length)
+        return { tournament: t, played, outstanding, unbooked: tUnbooked }
+      })
+      .sort((a, b) => a.tournament.name.localeCompare(b.tournament.name))
+
     return (
       <div
         key={captain.id}
@@ -197,11 +220,40 @@ function BandwidthSection({
           {pendW  > 0 && <div className="h-full bg-zinc-600 transition-all"    style={{ width: `${pendW}%` }} />}
         </div>
 
-        {/* Slot fairness grid */}
+        {/* Per-tournament breakdown — played / outstanding / unbooked, click through to the tournament below */}
+        {tournamentBreakdown.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-ink-5">
+            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-3">
+              By tournament
+            </p>
+            <div className="flex flex-col gap-2">
+              {tournamentBreakdown.map(({ tournament: t, played, outstanding, unbooked: tUnbooked }) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => scrollToTournament(t.id)}
+                  className="w-full text-left bg-ink-4 border border-ink-5 hover:border-gold-dim rounded-lg px-3 py-2.5 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-cinzel text-xs font-bold text-parchment truncate">{t.name}</span>
+                    <span className="font-rajdhani text-[10px] text-zinc-600 flex-shrink-0">↓ view</span>
+                  </div>
+                  <p className="font-rajdhani text-[11px] text-zinc-500 mt-1">
+                    <span className="text-emerald-400 font-semibold">{played}</span> played &nbsp;·&nbsp;
+                    <span className="text-amber-400 font-semibold">{outstanding}</span> outstanding &nbsp;·&nbsp;
+                    <span className="text-zinc-400 font-semibold">{tUnbooked}</span> unbooked
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Overall slot balance — secondary to the per-tournament breakdown above */}
         {mine.length > 0 && (
           <div className="mt-4 pt-4 border-t border-ink-5">
             <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-3">
-              Games by slot &amp; day
+              Overall slot balance
             </p>
             <div className="grid grid-cols-8 gap-1.5">
               {ALL_SLOTS.map(s => {
@@ -614,7 +666,7 @@ function TournamentBlock({
     : null
 
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded-lg mb-4 overflow-hidden">
+    <div id={`tournament-block-${tournament.id}`} className="bg-ink-3 border border-ink-5 rounded-lg mb-4 overflow-hidden scroll-mt-24">
 
       {/* Header */}
       <button className="w-full text-left px-4 py-3 hover:bg-ink-4 transition-colors" onClick={() => setOpen(v => !v)}>
