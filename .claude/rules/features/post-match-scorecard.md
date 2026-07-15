@@ -48,14 +48,25 @@ feature ever triggers a wallet debit on its own. See Section 6.
 ```
 spartans-python  (Python · Render)     spartans-hub  (Next.js · Vercel)
 ══════════════════════════════════    ══════════════════════════════════
-pdf_extractor.py    ← untouched       src/app/api/matches/[id]/scorecard
-field_extractors.py ← untouched       src/app/api/admin/sync-match-stats
-dismissal_parser.py ← untouched       src/app/api/fees/apply (existing)
-mvp_calculator.py   ← untouched       src/lib/matchStatsSync.ts
-csv_writers.py       ← touched        src/lib/scorecardBackfill.ts
-import_to_supabase.py ← touched       src/app/api/cron/backfill-scorecards
-api.py               ← new           src/app/api/admin/scorecard-backfill
+pdf_extractor.py     ← touched        src/app/api/matches/[id]/scorecard
+field_config.py      ← touched        src/app/api/admin/sync-match-stats
+field_extractors.py  ← untouched      src/app/api/fees/apply (existing)
+dismissal_parser.py  ← untouched      src/lib/matchStatsSync.ts
+mvp_calculator.py    ← untouched      src/lib/scorecardBackfill.ts
+csv_writers.py       ← touched        src/app/api/cron/backfill-scorecards
+import_to_supabase.py ← touched       src/app/api/admin/scorecard-backfill
+api.py               ← new
 ```
+
+> **Real bug fixed here, worth knowing if fielding/bowling ever looks empty
+> again:** `field_config.py`'s `PDFLayoutConfig.LAYOUT_RULES` originally
+> pointed the extractor at PDF pages 2 and 3 for the batting/bowling
+> scorecard content. Page 2 is actually the "Playing Squad" page, not a
+> scorecard — this silently produced complete batting data (which happened
+> to also appear on page 2) but zero bowling/fielding rows every time,
+> because the real scorecard content is on pages 3 and 4. Verified against
+> a real PDF: 0 → 7 bowlers once corrected. If a future CricHeroes export
+> format changes page layout again, this is the first place to check.
 
 > **Hosting note:** the microservice is deployed on **Render**, not Railway
 > as originally planned — see the `Render's free/hobby tier spins down after
@@ -292,11 +303,14 @@ inline in the icon row, not a standalone highlighted box — it used to be a
 bordered badge and was outshining the actual match result, so it moved.
 
 ### Icon row
-Ground link (mirrors `FixturesCard`'s `MapPinIcon`, opens Google Maps),
-then CricHeroes, then the subtle sync indicator described above — hidden
-entirely if none apply. Ball/jersey icons were removed from this card
-(they're still on `FixturesCard` for upcoming fixtures; here they added
-nothing a completed-match viewer needed).
+Left to right: the subtle sync indicator described above (when
+`can_upload` and a status exists), a spacer, then Ground (mirrors
+`FixturesCard`'s `MapPinIcon`, opens Google Maps), then CricHeroes —
+Ground intentionally comes before CricHeroes here, the reverse of
+`FixturesCard`'s order. Hidden entirely if none of the three apply. Ball/
+jersey icons were removed from this card (they're still on `FixturesCard`
+for upcoming fixtures; here they added nothing a completed-match viewer
+needed).
 
 ### "Did not bat" line
 The batting table filters out players who didn't face a ball — that's the
@@ -373,6 +387,7 @@ icon-row indicator instead — see above.
 | `spartans-python/api.py` | FastAPI wrapper — `/parse-scorecard`, `/fetch-and-parse-scorecard`, `/health` |
 | `spartans-python/scripts/import_to_supabase.py` | `raise_on_error` param added — silent-failure bug fix |
 | `spartans-python/utils/csv_writers.py` | `HOUSE_NAME = "SPARTANS"` constant — house system is defunct, replaced the old per-player house lookup |
+| `spartans-python/utils/field_config.py` | `PDFLayoutConfig.LAYOUT_RULES` corrected to pages 3,4 (was 2,3) — see Section 3.1 note; the real cause of bowling/fielding always coming back empty |
 
 ---
 

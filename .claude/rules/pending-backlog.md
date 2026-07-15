@@ -166,11 +166,10 @@ Confirm `NEXTAUTH_SECRET` is stable in Vercel and has not been rotated without r
 ---
  
 ### S-8 · Availability lock — Thursday blanket lock (Thursday auto-lock)
-**Status:** ✅ Implemented (June 2026). Design revised from original Y-count-based lock.
+**Status:** ⚠️ Implemented, but with a rocky reliability history — two real bugs found and fixed; the current fix has not yet been confirmed working on a live Thursday as of this writing (2026-07-15, next Thursday is 2026-07-16).
 
 **Implemented design:**
-- Every Thursday at **08:00 IST (02:30 UTC)**, a Vercel Cron job blanket-locks **all** confirmed Sat/Sun bookings for the upcoming weekend — no Y-count condition.
-- `bookings.availability_locked = true` is set on all qualifying rows in one UPDATE. Idempotent — already-locked rows skipped.
+- `bookings.availability_locked = true` is set on all qualifying confirmed Sat/Sun rows in one UPDATE — no Y-count condition, blanket lock. Idempotent — already-locked rows skipped.
 - `POST /api/player-availability` and `DELETE /api/player-availability` both hard-block locked slots for players. Captains, GC, and Admins bypass via `isCaptain || isGC || isAdmin` session check.
 - Squad submission (`pending_approval`, `approved`, `announced`) adds a second independent freeze via `checkFreeze()` — either condition is sufficient to block.
 - **Single error message** for all frozen states: `"Availability locked — Squad selection in progress"`
@@ -180,7 +179,14 @@ Confirm `NEXTAUTH_SECRET` is stable in Vercel and has not been rotated without r
 
 **Schema:** `bookings.availability_locked boolean NOT NULL DEFAULT false` — already live.
 
-**Cron schedule:** `"30 2 * * 4"` in `vercel.json` (previously `"30 0 * * 4"` = 06:00 IST — updated to 08:00 IST).
+#### Reliability incident history (both fixes are live on `main`, unverified in production as of this writing)
+
+1. **The weekly cron never fired at all.** `vercel.json` originally had `"schedule": "30 2 * * 4"` (Thursday-only). Vercel Hobby silently accepts day-of-week-restricted cron expressions but never actually invokes them — confirmed empirically, not from docs. See `limitations.md`'s new "Vercel Hobby — Cron Jobs Cannot Restrict Day-of-Week" entry. Fixed by switching to a truly-daily schedule (`"30 2 * * *"` = 08:00 IST every day) plus an in-code IST day-of-week guard in the route that no-ops on any day that isn't Thursday.
+2. **Then the daily-fire version got cached.** Once the function *was* being invoked every day, Vercel's logs showed the Supabase REST calls hitting `"Using cache"` on every run — the route looked like it succeeded but the DB update was a silent no-op, for 3 consecutive Thursdays. Fixed with `export const dynamic = 'force-dynamic'` + `export const revalidate = 0` on the route.
+
+**Current schedule:** `"30 2 * * *"` in `vercel.json` (daily; the Thursday restriction lives entirely in `src/app/api/cron/lock-availability/route.ts`'s in-code guard, not the cron expression).
+
+**Open item — not yet done, deliberately deferred:** the club coordinator chose to "wait and watch" the next real Thursday (2026-07-16) rather than pre-emptively add a second, independent trigger. `notifyGCs()` fires on every outcome (success, "nothing locked," or hard error), so a missing push notification by ~8:15 IST that Thursday is itself the signal something broke again. **If it does fail again**, the proposed fix (agreed but not yet built) is a redundant **GitHub Actions scheduled workflow** hitting the same endpoint with a real weekly cron expression — GitHub Actions supports day-of-week restriction natively, unlike Vercel Hobby, and the route is idempotent so a second trigger is safe to add without removing the first. There's also a minor, non-urgent correctness smell in the route worth fixing whenever this is revisited: the Thursday-check uses an IST-shifted clock (`nowIST`) but the Saturday/Sunday date math a few lines below it uses the unshifted `now` — harmless at exactly 02:30 UTC firing time, but an inconsistency that shouldn't be there.
 
 **Vibe-security check:** `checkFreeze()` runs entirely server-side in the API route — client flags are never trusted. Ref: `authentication.md`.
  
