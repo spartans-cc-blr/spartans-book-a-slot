@@ -15,6 +15,7 @@ const NAV = [
   { href: '/schedule',               label: 'Organiser View',   icon: '🌐', section: 'Views' },
   { href: '/fixtures',               label: 'Upcoming Matches', icon: '🏏' },
   { href: '/matches/history',        label: 'Past Matches',     icon: '📜' },
+  { href: '/admin/scorecard-backfill', label: 'Scorecard Backfill', icon: '📥' },
   { href: '/tournament-planner',     label: 'Tournament Planner',   icon: '📊' },
   { href: '/admin/players',          label: 'Players',          icon: '🏏' },
   { href: '/gc-review',              label: 'GC Review',        icon: '⚖️' },
