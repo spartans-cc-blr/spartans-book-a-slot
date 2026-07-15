@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseISO, differenceInDays, format } from 'date-fns'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { TournamentShareButton } from './TournamentShareButton'
@@ -27,6 +27,8 @@ interface Captain { id: string; name: string }
 
 interface TournamentPlayer { id: string; name: string; cricheroes_url: string | null }
 
+interface SquadCaptain { name: string; cricheroes_url: string | null }
+
 interface ViewerRole {
   isCaptain: boolean
   isGC: boolean
@@ -41,6 +43,7 @@ interface Props {
   today: string
   viewerRole: ViewerRole
   tournamentPlayersMap: Record<string, TournamentPlayer[]>
+  bookingCaptainMap: Record<string, SquadCaptain>
 }
 
 // ── Slot definitions ───────────────────────────────────────────────
@@ -114,13 +117,14 @@ function paceSignal(
 
 // ── Captain bandwidth section ──────────────────────────────────────
 function BandwidthSection({
-  captains, bookings, today, viewerCaptainId,
+  captains, bookings, today, viewerCaptainId, onViewTournament,
 }: {
   captains: Captain[]
   bookings: Booking[]
   announcedSet: Set<string>
   today: string
   viewerCaptainId: string | null
+  onViewTournament: (tournamentId: string) => void
 }) {
   const tourneyBookings = bookings.filter(b => b.tournament)
   const isCaptainView   = !!viewerCaptainId
@@ -178,6 +182,10 @@ function BandwidthSection({
         const tUnbooked   = Math.max(0, totalLeague - games.length)
         return { tournament: t, played, outstanding, unbooked: tUnbooked }
       })
+      // Hide tournaments with nothing left to play — total games === played means
+      // no scheduled or unbooked games remain. Whether that counts as "completed"
+      // is a separate decision for later; for now just keep these out of view.
+      .filter(({ outstanding, unbooked }) => outstanding > 0 || unbooked > 0)
       .sort((a, b) => a.tournament.name.localeCompare(b.tournament.name))
 
     return (
@@ -231,7 +239,7 @@ function BandwidthSection({
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => scrollToTournament(t.id)}
+                  onClick={() => onViewTournament(t.id)}
                   className="w-full text-left bg-ink-4 border border-ink-5 hover:border-gold-dim rounded-lg px-3 py-2.5 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -572,7 +580,7 @@ function PaceTimeline({ sortedGames, avgGap, today }: {
 
 // ── Tournament block ───────────────────────────────────────────────
 function TournamentBlock({
-  tournament, games, announcedSet, today, isAdmin, isGC, players,
+  tournament, games, announcedSet, today, isAdmin, isGC, players, bookingCaptainMap, forceOpenToken,
 }: {
   tournament: NonNullable<Booking['tournament']>
   games: Booking[]
@@ -581,10 +589,18 @@ function TournamentBlock({
   isAdmin: boolean
   isGC: boolean
   players: TournamentPlayer[]
+  bookingCaptainMap: Record<string, SquadCaptain>
+  forceOpenToken?: number
 }) {
   const [open, setOpen]               = useState(false)
   const [completedOpen, setCompletedOpen] = useState(false)
   const [playersOpen, setPlayersOpen] = useState(false)
+
+  // A "view" click from the Captain Bandwidth cards bumps forceOpenToken —
+  // expand this block even if the viewer had previously collapsed it manually
+  useEffect(() => {
+    if (forceOpenToken !== undefined) setOpen(true)
+  }, [forceOpenToken])
 
   const completed = games.filter(g => g.game_date < today)
   const scheduled = games.filter(g => g.game_date >= today)
@@ -690,6 +706,7 @@ function TournamentBlock({
             </div>
             <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
               {tournament.organiser_name && <>Organiser: <span className="text-zinc-400">{tournament.organiser_name}</span> &nbsp;·&nbsp;</>}
+              {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} className="text-blue-400" /> &nbsp;·&nbsp;</>}
               Avg gap: <span className="text-zinc-300 font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
             </p>
           </div>
@@ -797,7 +814,7 @@ function TournamentBlock({
                   <div className="flex flex-col gap-1.5 opacity-60">
                     {completed.map((g) => {
                       const idx = sortedGames.findIndex(x => x.id === g.id)
-                      return <GameRow key={g.id} game={g} gap={gapLabel(idx, sortedGames)} avgGapRef={gap ?? 2} isDone />
+                      return <GameRow key={g.id} game={g} gap={gapLabel(idx, sortedGames)} avgGapRef={gap ?? 2} isDone captain={bookingCaptainMap[g.id] ?? null} />
                     })}
                   </div>
                 )}
@@ -911,8 +928,8 @@ function TournamentBlock({
 }
 
 // ── Game row ───────────────────────────────────────────────────────
-function GameRow({ game, gap, avgGapRef, isDone = false }: {
-  game: Booking; gap: string; avgGapRef: number; isDone?: boolean
+function GameRow({ game, gap, avgGapRef, isDone = false, captain = null }: {
+  game: Booking; gap: string; avgGapRef: number; isDone?: boolean; captain?: SquadCaptain | null
 }) {
   const d       = parseISO(game.game_date)
   const dayName = d.getDay() === 6 ? 'Sat' : 'Sun'
@@ -938,12 +955,14 @@ function GameRow({ game, gap, avgGapRef, isDone = false }: {
           <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">{game.slot_time}</span>
           <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">{game.format}</span>
         </div>
-        <div className="font-rajdhani text-xs text-zinc-400">
-          Captain: {game.tournament?.captains
-            ? <PlayerNameLink name={game.tournament.captains.name} className="text-blue-400" />
-            : <span className="text-zinc-600">Unassigned</span>
-          }
-        </div>
+        {isDone && (
+          <div className="font-rajdhani text-xs text-zinc-400">
+            Captain: {captain
+              ? <PlayerNameLink name={captain.name} cricHeroesUrl={captain.cricheroes_url} className="text-blue-400" />
+              : <span className="text-zinc-600">Unassigned</span>
+            }
+          </div>
+        )}
       </div>
       <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-ink-5 min-w-[60px]">
         {gap !== '—' ? (
@@ -971,12 +990,23 @@ function GameRow({ game, gap, avgGapRef, isDone = false }: {
 
 // ── Root client component ──────────────────────────────────────────
 export function TournamentPlannerClient({
-  bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap,
+  bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, bookingCaptainMap,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
   const [showUpcoming,  setShowUpcoming]  = useState(true)
   const [showOngoing,   setShowOngoing]   = useState(true)
   const [showCompleted, setShowCompleted] = useState(false)
+
+  // "view" click from a Captain Bandwidth tournament card — scrolls to and expands
+  // the matching TournamentBlock below. Token bumps on every click (even repeat
+  // clicks on the same tournament) so a manually re-collapsed block reopens too.
+  const [expandRequest, setExpandRequest] = useState<{ id: string; token: number } | null>(null)
+  const expandTokenRef = useRef(0)
+  function handleViewTournament(tournamentId: string) {
+    expandTokenRef.current += 1
+    setExpandRequest({ id: tournamentId, token: expandTokenRef.current })
+    requestAnimationFrame(() => scrollToTournament(tournamentId))
+  }
 
   const tournamentMap = useMemo(() => {
     const map = new Map<string, { tournament: NonNullable<Booking['tournament']>; games: Booking[] }>()
@@ -1026,6 +1056,7 @@ export function TournamentPlannerClient({
         announcedSet={announcedSet}
         today={today}
         viewerCaptainId={viewerRole.captainId}
+        onViewTournament={handleViewTournament}
       />
 
       {/* Tournament filter */}
@@ -1068,7 +1099,9 @@ export function TournamentPlannerClient({
                   <TournamentBlock key={tournament.id} tournament={tournament} games={games}
                     announcedSet={announcedSet} today={today}
                     isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC}
-                    players={tournamentPlayersMap[tournament.id] ?? []} />
+                    players={tournamentPlayersMap[tournament.id] ?? []}
+                    bookingCaptainMap={bookingCaptainMap}
+                    forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
                 ))}
                 {otherTournaments.length > 0 && (
                   <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-6 mb-3">Other tournaments</p>
@@ -1079,7 +1112,9 @@ export function TournamentPlannerClient({
               <TournamentBlock key={tournament.id} tournament={tournament} games={games}
                 announcedSet={announcedSet} today={today}
                 isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC}
-                players={tournamentPlayersMap[tournament.id] ?? []} />
+                players={tournamentPlayersMap[tournament.id] ?? []}
+                bookingCaptainMap={bookingCaptainMap}
+                forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
             ))}
           </>
         )}
