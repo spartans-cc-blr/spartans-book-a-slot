@@ -180,20 +180,35 @@ export async function GET(req: NextRequest) {
 
   const bookingIds = (data ?? []).map((b: any) => b.id)
 
-  // Scorecard upload status, cached stats summary, and (for the signed-in
-  // player) which of these bookings they led — batched into one round-trip
-  // each rather than per-row, and merged in JS below.
-  const [uploadsRes, statsRes, ledRes] = bookingIds.length ? await Promise.all([
+  // Scorecard upload status, cached stats summary, (for the signed-in
+  // player) which of these bookings they led, and squad role coverage —
+  // batched into one round-trip each rather than per-row, and merged in JS
+  // below. Role coverage drives whether the Squad collapsible even needs to
+  // be shown on a card that already has synced stats (see roles_complete).
+  const [uploadsRes, statsRes, ledRes, rolesRes] = bookingIds.length ? await Promise.all([
     supabase.from('scorecard_uploads').select('booking_id, status, uploaded_at').in('booking_id', bookingIds),
     supabase.from('match_stats_cache').select('booking_id, match_result, team_total, team_wickets, team_overs, opponent_total, opponent_wickets, opponent_overs, batting, bowling').in('booking_id', bookingIds),
     user?.playerId
       ? supabase.from('squad').select('booking_id').eq('player_id', user.playerId).in('booking_id', bookingIds).or('is_captain.eq.true,is_vc.eq.true')
       : Promise.resolve({ data: [] as { booking_id: string }[], error: null }),
-  ]) : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }]
+    supabase.from('squad').select('booking_id, is_captain, is_vc, is_wk').in('booking_id', bookingIds),
+  ]) : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }]
 
   const uploadByBooking = new Map((uploadsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const statsByBooking  = new Map((statsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const ledBookingIds   = new Set((ledRes.data ?? []).map((r: any) => r.booking_id))
+
+  // roles_complete: at least one squad row for the booking has is_captain,
+  // one has is_vc, and one has is_wk. Computed per-booking from the flat
+  // rolesRes rows rather than a groupBy, since Supabase JS has no groupBy.
+  const rolesByBooking = new Map<string, { captain: boolean; vc: boolean; wk: boolean }>()
+  for (const row of (rolesRes.data ?? [])) {
+    const entry = rolesByBooking.get(row.booking_id) ?? { captain: false, vc: false, wk: false }
+    if (row.is_captain) entry.captain = true
+    if (row.is_vc) entry.vc = true
+    if (row.is_wk) entry.wk = true
+    rolesByBooking.set(row.booking_id, entry)
+  }
 
   const matches = (data ?? []).map((b: any) => {
     const upload = uploadByBooking.get(b.id)
@@ -216,6 +231,10 @@ export async function GET(req: NextRequest) {
       // own role flags plus a server-side squad lookup, never client params.
       can_upload: !!user?.isWrangler || !!user?.isAdmin || ledBookingIds.has(b.id),
       stats: statsRow ? summarizeStats(statsRow) : null,
+      roles_complete: (() => {
+        const r = rolesByBooking.get(b.id)
+        return !!r && r.captain && r.vc && r.wk
+      })(),
     }
   })
 

@@ -26,10 +26,11 @@ function findCricHeroesUrl(name: string, squad?: SquadRef[]): string | null {
 }
 
 export function ScorecardTables({
-  batting, bowling, squad,
+  batting, bowling, teamList, squad,
 }: {
   batting: any[]
   bowling: any[]
+  teamList?: any[]
   squad?: SquadRef[]
 }) {
   // Players who didn't bat/bowl get a zero-filled row (dismissal_method:
@@ -45,6 +46,20 @@ export function ScorecardTables({
 
   const topBatRuns  = battingRows.reduce((max, r) => Math.max(max, num(r, ['runs', 'total_runs'])), 0)
   const topBowlWkts = bowlingRows.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
+
+  // The batting table filters out players who didn't bat, so on its own it
+  // can't answer "who else was in the squad that day" — team_list (the full
+  // playing XI from CricHeroes) fills that gap, mirroring the "Did not bat"
+  // line CricHeroes itself shows below the scorecard.
+  const battedNames = new Set(
+    battingRows.map(row => (pickField(row, ['player_name', 'name']) ?? '').trim().toLowerCase())
+  )
+  const didNotBatNames = Array.from(new Set(
+    (teamList ?? [])
+      .map(row => pickField(row, ['player_name', 'name']))
+      .filter((name): name is string => !!name)
+      .filter(name => !battedNames.has(name.trim().toLowerCase()))
+  ))
 
   return (
     <div className="space-y-4">
@@ -86,6 +101,17 @@ export function ScorecardTables({
             </tbody>
           </table>
         </div>
+        {didNotBatNames.length > 0 && (
+          <p className="font-rajdhani text-xs text-zinc-500 mt-2 flex flex-wrap items-baseline gap-x-1">
+            <span className="text-zinc-600">Did not bat:</span>
+            {didNotBatNames.map((name, i) => (
+              <span key={name}>
+                <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(name, squad)} />
+                {i < didNotBatNames.length - 1 ? ',' : ''}
+              </span>
+            ))}
+          </p>
+        )}
       </div>
 
       <div>
