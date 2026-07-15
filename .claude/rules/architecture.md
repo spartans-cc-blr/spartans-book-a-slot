@@ -36,6 +36,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | **Player** | Google OAuth | `/fixtures`, `/profile` | Mark Y/O/E/L availability (**N removed** — blank = not available), view announced squad, edit own profile |
 | **Captain** | Google OAuth + `is_captain` | `/fixtures`, `/captains-corner`, `/tournament-planner`, `/profile` | All player actions + full availability breakdown, squad selection & announcement, captain bandwidth view |
 | **GC (Governing Council)** | Google OAuth + `is_gc` | `/gc-review`, `/tournament-planner` | Approve or return submitted squads; tournament pace overview |
+| **Data Wrangler** | Google OAuth + `is_wrangler` | `/wrangler/backfill-squad`, `/matches/history` | Upload/sync scorecards for any match (not just own), backfill squad rows from WhatsApp announcements. Admin-writable flag only — see `features/post-match-scorecard.md` |
 | **Admin (Coordinator)** | Google OAuth + `ADMIN_EMAILS` env var | `/admin/**`, `/tournament-planner`, all above | Full booking CRUD, player management, override all workflows |
  
 > **Security note (vibe-security audit):** `isAdmin` is derived from an environment variable — not the database — making it tamper-proof. `isCaptain` and `isGC` are DB-sourced flags written into the JWT at sign-in. Middleware enforces role checks on every protected route server-side.
@@ -60,6 +61,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Route | Component | Data source |
 |---|---|---|
 | `/profile` | Server + client form | `players` (own row only — IDOR protected) |
+| `/matches/history` | Server → `MatchHistoryClient` (client) | `bookings` (past confirmed), `scorecard_uploads`, `match_stats_cache`, `squad`; upload/sync actions gated per-booking to captain/VC/wrangler/admin — see `features/post-match-scorecard.md` |
  
 ### Captain Routes (`isCaptain` or `isAdmin`)
  
@@ -74,18 +76,25 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 |---|---|---|
 | `/gc-review` | Server → `GCReviewClient` (client) | `bookings`, `availability`, `squad` (pending/approved/announced) |
  
+### Wrangler Routes (`isWrangler` or `isAdmin`)
+ 
+| Route | Component | Data source |
+|---|---|---|
+| `/wrangler/backfill-squad` | Server → client form | Parses WhatsApp squad announcement text, backfills `squad` rows for a booking |
+ 
 ### Admin Routes (`isAdmin`)
  
 | Route | Purpose |
 |---|---|
 | `/admin` | Booking dashboard — all confirmed + soft_block |
 | `/admin/bookings/new` | Create confirmed booking or reservation |
-| `/admin/bookings/[id]` | Edit, confirm, cancel + WhatsApp notify |
+| `/admin/bookings/[id]` | Edit, confirm, cancel + WhatsApp notify; Post-Match panel (scorecard upload status, Sync Stats, Apply Fees) |
 | `/admin/players` | Full player directory management |
 | `/admin/captains` | Captain master data |
 | `/admin/tournaments` | Tournament master data (includes `total_league_games` and `cricheroes_points_table_url` inputs) |
 | `/admin/grounds` | Grounds master data (name, Maps URL, hospital URL) |
 | `/admin/soft-blocks/new` | Create reservation (soft block) |
+| `/admin/scorecard-backfill` | One-time catch-up UI — fetches scorecards directly from CricHeroes for past matches never uploaded; see `features/post-match-scorecard.md` |
  
 ---
  
@@ -121,6 +130,24 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 |---|---|---|---|
 | `/api/gc/weekend-review` | PATCH | GC or Admin | `approved` → `pending_approval` → `approved`; `returned` → `draft` |
  
+### Match History & Scorecard APIs
+ 
+Access here is genuinely mixed per-route rather than one role — see
+`features/post-match-scorecard.md` for the full picture.
+ 
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/matches/history` | GET | Any signed-in, non-expelled member | Paginated past-match list; computes `can_upload` and `roles_complete` server-side |
+| `/api/matches/history/[bookingId]` | GET | Any signed-in member | Squad detail for one booking |
+| `/api/matches/history/[bookingId]/scorecard` | GET | Any signed-in member | Full batting/bowling/fielding/team_list — stats aren't sensitive |
+| `/api/matches/history/[bookingId]/roles` | PATCH | GC/admin/wrangler | Correct C/VC/WK post-hoc |
+| `/api/matches/history/[bookingId]/tournament` | PATCH | Admin | Reassign tournament post-hoc |
+| `/api/matches/[id]/scorecard` | POST | Captain/VC (own booking) or wrangler/admin | Manual PDF upload — streamed progress, `%PDF` magic-byte + 10MB validation |
+| `/api/admin/sync-match-stats` | POST | Captain/VC (own booking) or wrangler/admin | Manual "Sync Stats" trigger — despite the `/admin/` path, **not** admin-only; re-derives the per-booking squad check server-side |
+| `/api/admin/matches/[id]/post-match` | GET, DELETE | Admin | Admin Post-Match panel feed; DELETE resets a stuck/wrong upload |
+| `/api/admin/scorecard-backfill` | GET, POST | Admin | One-time catch-up: list eligible bookings, process one per POST |
+| `/api/fees/apply` | POST | Admin | Pre-existing — applies match fees, sets `scorecard_uploads.status = 'fees_applied'`. Always manual, never triggered by the scorecard automation |
+ 
 ### Admin APIs
  
 | Endpoint | Method | Auth | Purpose |
@@ -144,7 +171,8 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
 | `/api/cron/expire-reservations` | GET | `CRON_SECRET` bearer | Daily at 18:30 UTC — delete expired `soft_block` rows |
-| `/api/cron/lock-availability` | GET | `CRON_SECRET` bearer | Thursday at 02:30 UTC (08:00 IST) — blanket-lock all confirmed Sat/Sun bookings for the upcoming weekend |
+| `/api/cron/lock-availability` | GET | `CRON_SECRET` bearer | Fires daily (Vercel Hobby can't restrict cron by day-of-week — see `limitations.md`); route itself gates to Thursday IST via an in-code check before blanket-locking all confirmed Sat/Sun bookings for the upcoming weekend |
+| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Daily at 07:00 IST — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 5/run; see `features/post-match-scorecard.md` |
  
 ---
  
@@ -211,6 +239,7 @@ Full member directory.
 | `dues_override` | Admin-managed boolean; allows player with negative balance to still mark availability |
 | `inducted_on`, `referred_by` | Admin-managed |
 | `is_captain`, `is_gc` | Admin-managed; surface as JWT token flags |
+| `is_wrangler` | Admin-managed; surfaces as `token.isWrangler`. Grants scorecard upload/sync for any match plus `/wrangler/backfill-squad` — see `features/post-match-scorecard.md` |
 | `is_vc` | *(Planned U-23)* Vice-captain flag — grants access to emergency contacts |
 | `status` | `active` / `inactive` / `expelled` |
 | `active` | boolean |
@@ -233,6 +262,14 @@ Full member directory.
 **Unique constraint:** `UNIQUE(player_id, booking_id)`
  
 **Status machine:** `draft → pending_approval → approved → announced` (with GC return path back to `draft`)
+ 
+#### `scorecard_uploads`
+`id, booking_id FK (unique), match_id, status, uploaded_by FK, uploaded_at, fees_applied_at, fees_applied_by FK, error_message`
+`status` enum: `pending_parse → parsed → synced → fees_applied`, forward-only. One row per booking. **RLS enabled, no anon/authenticated policies** — service role only (fixed 2026-07-15, was previously disabled — see `features/post-match-scorecard.md` §5). See that doc for the full lifecycle and why `fees_applied` is always a separate manual step.
+ 
+#### `match_stats_cache`
+`match_id PK, booking_id FK, match_result, team_total/wickets/overs, opponent_total/wickets/overs, opponent_name, ground, tournament_name, match_date, batting/bowling/fielding/team_list (jsonb arrays), synced_at, synced_by FK`
+Read-through cache of the separate analytics Supabase project — source of truth stays there. **RLS enabled, no anon/authenticated policies** (same fix as above). See `features/post-match-scorecard.md`.
  
 #### `fee_exemptions`
 Full lockdown RLS. Joined to `players` in admin view.
@@ -414,6 +451,8 @@ Next.js API Routes (server-side)
 | `availability` | ❌ Locked | ❌ Locked | Service role only |
 | `fee_exemptions` | ❌ Locked | ❌ Locked | Service role only |
 | `squad` | ❌ *(RLS must be enabled before public exposure)* | ❌ | Service role only |
+| `scorecard_uploads` | ❌ Locked | ❌ Locked | Service role only *(RLS enabled 2026-07-15 — was previously disabled, see `features/post-match-scorecard.md` §5)* |
+| `match_stats_cache` | ❌ Locked | ❌ Locked | Service role only *(same fix, same date)* |
 | `family_sessions` *(planned)* | ❌ Locked | ❌ Locked | Service role only |
  
 ### Security Checklist Status (vibe-security audit)
@@ -446,6 +485,10 @@ Next.js API Routes (server-side)
 | NEXT_PUBLIC_VAPID_PUBLIC_KEY | Public | No | VAPID public key for web push subscriptions |
 | VAPID_PRIVATE_KEY | None | ✅ Yes | VAPID private key — server-only, never NEXT_PUBLIC_ |
 | VAPID_EMAIL | None | ✅ Yes | Must include mailto: prefix e.g. mailto:foo@gmail.com |
+| `ANALYTICS_SUPABASE_URL` | None | No | Separate analytics Supabase project URL — source of truth for match stats |
+| `ANALYTICS_SUPABASE_KEY` | None | ✅ Yes | Analytics project's service role key — never anon (caused RLS violations once, see `features/post-match-scorecard.md`) |
+| `MICROSERVICE_URL` | None | No | Render URL for the `spartans-python` analytics microservice |
+| `MICROSERVICE_SECRET` | None | ✅ Yes | Shared secret for Hub ↔ microservice requests; same value set on Render |
  
 ### Rules enforced
 - No secret is prefixed with `NEXT_PUBLIC_` — secrets never enter the client bundle
@@ -484,6 +527,12 @@ Next.js API Routes (server-side)
 | src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup |
 | src/app/api/push/subscribe/route.ts | POST — saves browser push subscription; player_id from session only |
 | public/sw.js | Service worker — PWA caching + push notification display + notificationclick handler |
+| `src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` | `/matches/history` — past-match list, `MatchHistoryCard` (result badge, subtle sync status, ground/CricHeroes links, Did-not-bat line) |
+| `src/app/api/matches/[id]/scorecard/route.ts` | Manual scorecard PDF upload — streamed progress, per-booking captain/VC or wrangler/admin auth |
+| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path |
+| `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — CricHeroes direct-fetch pipeline; chains parse → sync; never touches fees |
+| `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron — see `features/post-match-scorecard.md` |
+| `src/app/admin/scorecard-backfill/page.tsx` | One-time admin catch-up UI, client-driven sequential loop |
 | supabase/migrations/009_push_subscriptions.sql | push_subscriptions table — one row per player per device |
  
 ---
