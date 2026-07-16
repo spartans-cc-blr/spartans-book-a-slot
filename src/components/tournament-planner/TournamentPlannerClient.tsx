@@ -999,7 +999,7 @@ function SuggestedSlotsPanel({
 
   const waMessage = suggestions && suggestions.length > 0
     ? [
-        `Hi${organiserName ? ' ' + organiserName : ''}! For ${tournamentName}, here are our next earliest available slot options — not every open slot, just what fits soonest on our end:`,
+        `Hi${organiserName ? ' ' + organiserName : ''}! For ${tournamentName}, here are our next earliest fully open days on our end:`,
         ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')}, ${s.slot_time}`),
         ...(capNote ? [``, capNote] : []),
         `Let us know which of these works and we'll get it locked in. Thanks!`,
@@ -1024,7 +1024,7 @@ function SuggestedSlotsPanel({
       </div>
       {!loading && !error && (
         <p className="text-[11px] text-stone-500 mt-0.5">
-          Earliest available options, not an exhaustive list — other open dates further out exist too.
+          Only days with nothing booked at all — a day with any existing game on it, even at a different time, isn't suggested.
         </p>
       )}
       {error && <p className="text-[11px] text-red-700 mt-1.5">{error}</p>}

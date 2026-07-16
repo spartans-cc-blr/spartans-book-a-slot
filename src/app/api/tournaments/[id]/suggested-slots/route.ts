@@ -1,16 +1,26 @@
 // GET /api/tournaments/[id]/suggested-slots
 //
-// GC/Admin only. Finds upcoming (Sat/Sun) slots for this tournament — up to
+// GC/Admin only. Finds upcoming (Sat/Sun) DAYS for this tournament — up to
 // however many games are still unbooked (total_league_games minus confirmed
 // games, capped at MAX_SUGGESTIONS_CAP) — that pass the same R1-R6 booking
 // rules engine used by the admin booking form (src/lib/validation.ts) —
 // reused as-is here rather than reimplemented, so a suggestion can never
 // contradict what the form would actually accept.
 //
+// Only days with NO existing booking at all (any status, any slot_time) are
+// candidates — a day that already has one game on it is deliberately never
+// suggested, even if another slot_time on that same day is technically
+// still open. Mixing "fully free day" and "partially booked day" results in
+// the same list was the actual source of confusion this replaced: a
+// suggestion sitting right next to a day that already has a game on it
+// reads as odd even though it passes every rule. Restricting to wide-open
+// days keeps the list simple to reason about — every suggested date really
+// is a clean slate.
+//
 // Deliberately does NOT consider a captain's overall cross-tournament slot
 // balance (the Captain Bandwidth "Overall slot balance" signal) — that's a
-// separate fairness feature. Ranking here only prefers slots this specific
-// tournament itself has used least, so its own slot spread stays balanced.
+// separate fairness feature. Slot-time ranking here only prefers this
+// tournament's own least-used slot_time, so its own spread stays balanced.
 //
 // Suggestions are selected incrementally: each accepted candidate is folded
 // into the working "existing bookings" set before the next candidate is
@@ -143,7 +153,11 @@ export async function GET(
     tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
   }))
 
-  // Build the full candidate list (weekend x slot), ranked by this
+  // Days with any existing booking at all (any slot_time, any status) are
+  // excluded entirely below — only wide-open days are ever suggested.
+  const bookedDates = new Set(existing.map(b => b.game_date))
+
+  // Build the full candidate list (open day x slot), ranked by this
   // tournament's own slot balance (least-used slot first), then soonest
   // date first as a tie-break.
   type Candidate = { game_date: string; slot_time: SlotTime; format: GameFormat; day: 'Sat' | 'Sun' }
@@ -152,13 +166,15 @@ export async function GET(
     const sat = addDays(firstSat, week * 7)
     const sun = addDays(sat, 1)
     for (const [date, day] of [[sat, 'Sat'], [sun, 'Sun']] as const) {
+      const dateStr = toISODate(date)
+      if (bookedDates.has(dateStr)) continue
       for (const slotDef of SLOT_DEFS) {
         const candidateFormats = activeFormats.length
           ? slotDef.validFor.filter(f => activeFormats.includes(f))
           : slotDef.validFor
         if (candidateFormats.length === 0) continue
         candidates.push({
-          game_date: toISODate(date),
+          game_date: dateStr,
           slot_time: slotDef.time,
           format: candidateFormats[0],
           day,
@@ -175,7 +191,7 @@ export async function GET(
   // across every available slot at least once.
   const working = [...existing]
   const suggestions: Candidate[] = []
-  const remaining = [...candidates]
+  let remaining = [...candidates]
   const suggestedMonthCounts: Record<string, number> = {}
 
   while (suggestions.length < MAX_SUGGESTIONS && remaining.length > 0) {
@@ -214,6 +230,10 @@ export async function GET(
     if (pickedIndex === -1) break // nothing left in the horizon is valid at all
 
     const [picked] = remaining.splice(pickedIndex, 1)
+    // Only one suggested slot_time per day — drop the day's other now-moot
+    // slot_time candidates rather than potentially suggesting two different
+    // times on what was meant to be presented as a single open day.
+    remaining = remaining.filter(c => c.game_date !== picked.game_date)
     suggestions.push(picked)
     ownSlotCounts[picked.slot_time] = (ownSlotCounts[picked.slot_time] ?? 0) + 1
     const pickedMonth = getYearMonth(picked.game_date)
