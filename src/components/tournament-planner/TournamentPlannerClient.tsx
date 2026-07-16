@@ -566,57 +566,46 @@ function TournamentBlock({
   )
   const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
 
-  const shareMessage = useMemo(() => {
-    const tl           = tournament.total_league_games ?? games.length
-    const completedCnt = games.filter(g => g.game_date < today).length
-    const scheduledCnt = games.filter(g => g.game_date >= today).length
-    const unbookedCnt  = Math.max(0, tl - games.length)
-    const slotLines    = ALL_SLOTS
-      .map(s => { const k: SlotKey = `${s.day}-${s.time}`; const c = slotCounts[k]; return c > 0 ? `  ${s.day} ${s.time}: ${c} game${c > 1 ? 's' : ''}` : null })
-      .filter(Boolean).join('\n')
-    return [
-      `*${tournament.name} — Spartans CC Update*`, ``,
-      `📊 Status: ${scheduledCnt} upcoming · ${completedCnt} past matches · ${unbookedCnt} unbooked`,
-      `⏱ Avg gap between games: ${gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}`, ``,
-      `🗓 Slot breakdown so far:`, slotLines, ``,
-      isSlotImbalanced
-        ? `⚠️ Slot balance is skewed — would appreciate spreading remaining ${unbookedCnt} game${unbookedCnt !== 1 ? 's' : ''} across other slots.`
-        : `✅ Slot balance looks good across the tournament.`,
-      ``, `Could you help schedule the remaining games? Happy to discuss slots that work for both sides.`,
-    ].join('\n')
-  }, [tournament, games, today, gap, slotCounts, isSlotImbalanced])
-
-  const shareLink = tournament.organiser_contact
-    ? `https://wa.me/${tournament.organiser_contact.replace(/\D/g, '')}?text=${encodeURIComponent(shareMessage)}`
-    : null
-
   return (
     <div id={`tournament-block-${tournament.id}`} className="bg-white border border-parchment-3 rounded-2xl mb-4 overflow-hidden scroll-mt-24">
 
-      {/* Header */}
-      <button className="w-full text-left px-4 py-3 hover:bg-parchment-2 transition-colors" onClick={() => setOpen(v => !v)}>
+      {/* Header — a div (not <button>) since it now contains the nested
+          interactive Share button; role/tabIndex/onKeyDown keep it keyboard
+          operable the same way a <button> would be. */}
+      <div role="button" tabIndex={0}
+        className="w-full text-left px-4 py-3 hover:bg-parchment-2 transition-colors cursor-pointer"
+        onClick={() => setOpen(v => !v)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(v => !v) } }}>
         <div className="flex items-start gap-3">
           <span className="text-amber-500 mt-0.5">🏆</span>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-           			{tournament.cricheroes_points_table_url ? (
-									<a
-										href={tournament.cricheroes_points_table_url}
-										target="_blank"
-										rel="noopener noreferrer"
-										className="font-cinzel text-sm font-bold text-ink underline decoration-gold underline-offset-2"
-									>
-										{tournament.name}
-									</a>
-									) : (
-									<span className="font-cinzel text-sm font-bold text-ink">{tournament.name}</span>
-								)}
-              {tournamentFormats.length > 0 && (
-                <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                  {tournamentFormats.join(' / ')}
-                </span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                {tournament.cricheroes_points_table_url ? (
+                  <a
+                    href={tournament.cricheroes_points_table_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-cinzel text-sm font-bold text-ink underline decoration-gold underline-offset-2"
+                  >
+                    {tournament.name}
+                  </a>
+                  ) : (
+                  <span className="font-cinzel text-sm font-bold text-ink">{tournament.name}</span>
+                )}
+                {tournamentFormats.length > 0 && (
+                  <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                    {tournamentFormats.join(' / ')}
+                  </span>
+                )}
+                <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${pace.bg} ${pace.txt}`}>{pace.label}</span>
+              </div>
+              {(isAdmin || isGC) && (
+                <TournamentShareButton
+                  tournamentId={tournament.id}
+                  className="flex-shrink-0 text-stone-400 hover:text-emerald-700 transition-colors"
+                />
               )}
-              <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${pace.bg} ${pace.txt}`}>{pace.label}</span>
             </div>
             <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
               {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} className="text-blue-700" /> &nbsp;·&nbsp;</>}
@@ -632,7 +621,7 @@ function TournamentBlock({
           </div>
           <span className="text-stone-400 flex-shrink-0">{open ? '▲' : '▼'}</span>
         </div>
-      </button>
+      </div>
 
       {/* Collapsed mini bar */}
       {!open && (
@@ -677,10 +666,11 @@ function TournamentBlock({
               showFormatOnRow={tournamentFormats.length > 1}
             />
 
-            {/* Pace insight — also carries the organiser name + share icon, moved down from the header.
+            {/* Pace insight — also carries the organiser name, moved down from the header.
                 The old WhatsApp "ping about pace" nudge was dropped in favour of the more actionable
-                Suggest-slots WhatsApp nudge on the Unbooked tab, which covers the same need. */}
-            {(gap !== null || tournament.organiser_name || isAdmin || isGC) && (
+                Suggest-slots WhatsApp nudge on the Unbooked tab, which covers the same need. The
+                share-tournament-card action lives in the header now (top-right, next to the title). */}
+            {(gap !== null || tournament.organiser_name) && (
               <div className="mt-2.5 bg-amber-50 border border-amber-200 rounded-2xl p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex gap-5 flex-wrap">
@@ -703,27 +693,10 @@ function TournamentBlock({
                       </div>
                     )}
                   </div>
-                  {(tournament.organiser_name || isAdmin || isGC) && (
-                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                      {tournament.organiser_name && (
-                        <span className="text-xs text-stone-600">
-                          Organiser: <span className="text-stone-800 font-semibold">{tournament.organiser_name}</span>
-                        </span>
-                      )}
-                      <div className="flex items-center gap-3">
-                        {(isAdmin || isGC) && shareLink && (
-                          <TournamentShareButton
-                            tournamentId={tournament.id}
-                            className="flex flex-col items-center gap-0.5 text-emerald-700 hover:text-emerald-800 transition-colors flex-shrink-0"
-                            iconClassName="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100"
-                            label="Share"
-                          />
-                        )}
-                      </div>
-                      {(isAdmin || isGC) && !shareLink && (
-                        <span className="text-[10px] text-stone-400 text-right">Add organiser WhatsApp to enable sharing</span>
-                      )}
-                    </div>
+                  {tournament.organiser_name && (
+                    <span className="text-xs text-stone-600 flex-shrink-0">
+                      Organiser: <span className="text-stone-800 font-semibold">{tournament.organiser_name}</span>
+                    </span>
                   )}
                 </div>
                 {gap !== null && (
