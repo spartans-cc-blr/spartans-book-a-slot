@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseISO, differenceInDays, format } from 'date-fns'
+import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { TournamentShareButton, WA_ICON } from './TournamentShareButton'
 
@@ -866,15 +867,13 @@ function MatchTabsSection({
                     <span className="bg-emerald-50 text-emerald-700 text-[11.5px] font-bold px-2.5 py-1 rounded-full flex-shrink-0">Done</span>
                   </div>
                 )
-                return g.cricheroes_url ? (
-                  <a key={g.id} href={g.cricheroes_url} target="_blank" rel="noopener noreferrer"
+                // Links into the Hub's own match page (scorecard synced there) rather
+                // than out to CricHeroes — keeps captains self-reliant on the Hub.
+                return (
+                  <Link key={g.id} href={`/matches/history/${g.id}`}
                     className="block bg-white border border-parchment-3 rounded-2xl px-4 py-3.5 hover:border-gold-dim transition-colors">
                     {inner}
-                  </a>
-                ) : (
-                  <div key={g.id} className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5">
-                    {inner}
-                  </div>
+                  </Link>
                 )
               })
         )}
