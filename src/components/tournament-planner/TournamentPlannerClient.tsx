@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseISO, differenceInDays, format } from 'date-fns'
 import { PlayerNameLink } from '@/lib/playerLink'
-import { TournamentShareButton } from './TournamentShareButton'
+import { TournamentShareButton, WA_ICON } from './TournamentShareButton'
 
 // ── Types ──────────────────────────────────────────────────────────
 interface Booking {
@@ -215,8 +215,8 @@ function BandwidthSection({
             </div>
             <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
               <span className="text-ink font-semibold">{total}</span> total &nbsp;·&nbsp;
-              <span className="text-emerald-700 font-semibold">{completed.length}</span> completed &nbsp;·&nbsp;
-              <span className="text-amber-700 font-semibold">{scheduled.length}</span> scheduled &nbsp;·&nbsp;
+              <span className="text-amber-700 font-semibold">{scheduled.length}</span> upcoming &nbsp;·&nbsp;
+              <span className="text-emerald-700 font-semibold">{completed.length}</span> past matches &nbsp;·&nbsp;
               <span className="text-stone-600 font-semibold">{unbooked}</span> unbooked
             </p>
           </div>
@@ -224,8 +224,8 @@ function BandwidthSection({
 
         {/* Bandwidth bar */}
         <div className="h-3 rounded-full bg-parchment-2 overflow-hidden flex mb-2">
-          {doneW  > 0 && <div className="h-full bg-emerald-600 transition-all" style={{ width: `${doneW}%` }} />}
           {schedW > 0 && <div className="h-full bg-amber-600 transition-all"   style={{ width: `${schedW}%` }} />}
+          {doneW  > 0 && <div className="h-full bg-emerald-600 transition-all" style={{ width: `${doneW}%` }} />}
           {pendW  > 0 && <div className="h-full bg-stone-400 transition-all"   style={{ width: `${pendW}%` }} />}
         </div>
 
@@ -248,8 +248,8 @@ function BandwidthSection({
                     <span className="font-rajdhani text-[10px] text-stone-500 flex-shrink-0">↓ view</span>
                   </div>
                   <p className="font-rajdhani text-[11px] text-stone-500 mt-1">
-                    <span className="text-emerald-700 font-semibold">{played}</span> played &nbsp;·&nbsp;
-                    <span className="text-amber-700 font-semibold">{outstanding}</span> outstanding &nbsp;·&nbsp;
+                    <span className="text-amber-700 font-semibold">{outstanding}</span> upcoming &nbsp;·&nbsp;
+                    <span className="text-emerald-700 font-semibold">{played}</span> past matches &nbsp;·&nbsp;
                     <span className="text-stone-600 font-semibold">{tUnbooked}</span> unbooked
                   </p>
                 </button>
@@ -316,14 +316,14 @@ function BandwidthSection({
       <p className="font-rajdhani text-sm text-stone-500 mb-5">
         {isCaptainView
           ? 'Your tournament load — followed by other captains.'
-          : 'Total tournament game load per captain — completed, scheduled, and unbooked.'}
+          : 'Total tournament game load per captain — upcoming, past matches, and unbooked.'}
       </p>
 
       {/* Legend */}
       <div className="flex gap-5 mb-4 flex-wrap">
         {[
-          { color: 'bg-emerald-600', label: 'Completed (past date)' },
-          { color: 'bg-amber-600',   label: 'Scheduled (upcoming booked)' },
+          { color: 'bg-amber-600',   label: 'Upcoming (booked)' },
+          { color: 'bg-emerald-600', label: 'Past matches (past date)' },
           { color: 'bg-stone-400',   label: 'Unbooked (remaining league games)' },
         ].map(({ color, label }) => (
           <div key={label} className="flex items-center gap-2">
@@ -585,7 +585,7 @@ function TournamentBlock({
       .filter(Boolean).join('\n')
     return [
       `*${tournament.name} — Spartans CC Update*`, ``,
-      `📊 Status: ${completedCnt} completed · ${scheduledCnt} scheduled · ${unbookedCnt} unbooked`,
+      `📊 Status: ${scheduledCnt} upcoming · ${completedCnt} past matches · ${unbookedCnt} unbooked`,
       `⏱ Avg gap between games: ${gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}`, ``,
       `🗓 Slot breakdown so far:`, slotLines, ``,
       isSlotImbalanced
@@ -627,8 +627,8 @@ function TournamentBlock({
               Avg gap: <span className="text-ink font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
             </p>
             <div className="flex gap-1.5 flex-wrap mt-2">
-              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{completed.length} done</span>
-              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">{scheduled.length} sched</span>
+              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">{scheduled.length} upcoming</span>
+              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{completed.length} past</span>
               {unbooked > 0 && (
                 <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">{unbooked} unbooked</span>
               )}
@@ -675,10 +675,10 @@ function TournamentBlock({
               bookingCaptainMap={bookingCaptainMap}
             />
 
-            {/* Pace insight — also carries the organiser name + a WhatsApp ping icon, moved down from the header */}
-            {(gap !== null || tournament.organiser_name || whatsappLink) && (
+            {/* Pace insight — also carries the organiser name + WhatsApp ping/share icons, moved down from the header */}
+            {(gap !== null || tournament.organiser_name || whatsappLink || isAdmin || isGC) && (
               <div className="mt-2.5 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex gap-5 flex-wrap">
                     {gap !== null && (
                       <div>
@@ -699,19 +699,30 @@ function TournamentBlock({
                       </div>
                     )}
                   </div>
-                  {(tournament.organiser_name || whatsappLink) && (
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                  {(tournament.organiser_name || whatsappLink || isAdmin || isGC) && (
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                       {tournament.organiser_name && (
                         <span className="text-xs text-stone-600">
                           Organiser: <span className="text-stone-800 font-semibold">{tournament.organiser_name}</span>
                         </span>
                       )}
-                      {whatsappLink && (
-                        <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
-                          title={`Ping ${tournament.organiser_name ?? 'organiser'} on WhatsApp — ${pace.label}`}
-                          className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex-shrink-0">
-                          📲
-                        </a>
+                      <div className="flex items-center gap-2">
+                        {whatsappLink && (
+                          <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                            title={`Ping ${tournament.organiser_name ?? 'organiser'} on WhatsApp — ${pace.label}`}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex-shrink-0">
+                            {WA_ICON}
+                          </a>
+                        )}
+                        {(isAdmin || isGC) && shareLink && (
+                          <TournamentShareButton
+                            tournamentId={tournament.id}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex-shrink-0"
+                          />
+                        )}
+                      </div>
+                      {(isAdmin || isGC) && !shareLink && (
+                        <span className="text-[10px] text-stone-400 text-right">Add organiser WhatsApp to enable sharing</span>
                       )}
                     </div>
                   )}
@@ -726,23 +737,6 @@ function TournamentBlock({
               </div>
             )}
           </div>
-
-          {/* Share actions */}
-          {(isAdmin || isGC) && (
-            <div className="px-4 pt-3 flex flex-col gap-2">
-              {shareLink && (
-                <TournamentShareButton
-                  tournamentId={tournament.id}
-                  className="w-full flex items-center justify-center gap-2 bg-ink text-white rounded-xl py-3.5 text-[15px] font-bold hover:bg-ink-2 transition-colors"
-                />
-              )}
-              {!shareLink && (
-                <p className="text-xs text-stone-500">
-                  Add organiser WhatsApp in /admin/tournaments to enable sharing
-                </p>
-              )}
-            </div>
-          )}
 
           {/* Pace timeline */}
           <GameTimelineCard sortedGames={sortedGames} gaps={gaps} avgGap={gap} />
@@ -920,7 +914,7 @@ function MatchTabsSection({
         )}
         {activeTab === 'unbooked' && (
           unbooked === 0
-            ? <p className="text-xs text-stone-500 py-3">No unbooked games — fully scheduled.</p>
+            ? <p className="text-xs text-stone-500 py-3">No unbooked games — fully booked.</p>
             : (
               <div className="bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3">
                 <p className="text-xs font-semibold text-stone-600">
