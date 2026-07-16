@@ -994,7 +994,7 @@ function SuggestedSlotsPanel({
   const waMessage = suggestions && suggestions.length > 0
     ? [
         `Hi${organiserName ? ' ' + organiserName : ''}! For ${tournamentName}, here are a few slots that work well on our end for the next game${suggestions.length !== 1 ? 's' : ''}:`,
-        ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')}, ${s.slot_time} (${s.format})`),
+        ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')}, ${s.slot_time}`),
         `Let us know which works and we'll get it locked in. Thanks!`,
       ].join('\n')
     : ''
@@ -1025,7 +1025,7 @@ function SuggestedSlotsPanel({
               {suggestions.map(s => (
                 <p key={`${s.game_date}-${s.slot_time}`} className="text-xs text-stone-700">
                   <span className="font-semibold text-ink">{s.day} {format(parseISO(s.game_date), 'd MMM')}</span>
-                  {' '}· {s.slot_time} · {s.format}
+                  {' '}· {s.slot_time}
                 </p>
               ))}
             </div>
