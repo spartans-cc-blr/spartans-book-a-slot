@@ -1,0 +1,30 @@
+name: Cron — availability-nudge
+
+# Backstop for Vercel Hobby's unreliable cron scheduler — see
+# cron-lock-availability.yml for the full incident writeup. Confirmed
+# 2026-07-16: availability_nudge_log shows real sent activity on Jul 8, 12,
+# 13 and 15, but Jul 14 (a Tuesday, inside the Sun-Wed window) has zero rows
+# — an intermittent miss of the same failure class as the other crons, just
+# not total. GitHub Actions doesn't restrict day-of-week ranges the way
+# Vercel Hobby does either, so "0-3" below works natively.
+#
+# Safe to run alongside the existing vercel.json cron entry — the route's
+# own UNIQUE(player_id, nudge_date) guard on availability_nudge_log means a
+# same-day double-fire only sends once per player; the second call's insert
+# attempts just land as the existing 'already_nudged' (23505) outcome.
+
+on:
+  schedule:
+    # 15:15 UTC, Sunday through Wednesday = 20:45 IST
+    - cron: '15 15 * * 0-3'
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call availability-nudge cron endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://hub.spartanscricketclub.in/api/cron/availability-nudge

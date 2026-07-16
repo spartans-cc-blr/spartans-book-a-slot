@@ -1,0 +1,28 @@
+name: Cron — expire-reservations
+
+# Backstop for Vercel Hobby's unreliable cron scheduler — see
+# cron-lock-availability.yml for the full incident writeup. No live evidence
+# either way for this specific route as of 2026-07-16 (no soft_block booking
+# currently has a past reserved_until to test against), but it shares the
+# same Vercel Hobby scheduling mechanism as the two confirmed-broken crons,
+# so it gets the same backstop rather than waiting to be caught by a gap.
+#
+# Safe to run alongside the existing vercel.json cron entry — deleting
+# already-expired soft_block rows is naturally idempotent (nothing left to
+# delete on a second run).
+
+on:
+  schedule:
+    # 18:30 UTC daily
+    - cron: '30 18 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call expire-reservations cron endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://hub.spartanscricketclub.in/api/cron/expire-reservations
