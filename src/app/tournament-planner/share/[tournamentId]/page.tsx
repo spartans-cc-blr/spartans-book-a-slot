@@ -27,30 +27,32 @@ export default async function TournamentSharePage({
 }: { params: { tournamentId: string } }) {
   const supabase = createServiceClient()
 
-  // Fetch tournament
-  const { data: tournament } = await supabase
+  // Fetch tournament — captain lives on tournaments, not bookings (bookings
+  // has no captain_id column/FK at all; a prior version of this query joined
+  // captains via a nonexistent bookings_captain_id_fkey, which failed
+  // silently and made every booking fetch below return nothing).
+  const { data: rawTournament } = await supabase
     .from('tournaments')
-    .select('id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id')
+    .select('id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, captains!tournaments_captain_id_fkey(id, name)')
     .eq('id', params.tournamentId)
     .single()
 
-  if (!tournament) redirect('/')
+  if (!rawTournament) redirect('/')
+
+  const tournament = {
+    ...rawTournament,
+    captain: Array.isArray(rawTournament.captains) ? rawTournament.captains[0] ?? null : rawTournament.captains,
+  }
 
   // Fetch confirmed bookings for this tournament
   const { data: rawBookings } = await supabase
     .from('bookings')
-    .select(`
-      id, game_date, slot_time, format, captain_id,
-      captain:captains!bookings_captain_id_fkey(id, name)
-    `)
+    .select('id, game_date, slot_time, format')
     .eq('status', 'confirmed')
     .eq('tournament_id', params.tournamentId)
     .order('game_date', { ascending: true })
 
-  const bookings = (rawBookings ?? []).map(b => ({
-    ...b,
-    captain: Array.isArray(b.captain) ? b.captain[0] ?? null : b.captain,
-  }))
+  const bookings = rawBookings ?? []
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 
