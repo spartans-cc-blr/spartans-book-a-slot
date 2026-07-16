@@ -11,6 +11,7 @@ interface Booking {
   game_date: string
   slot_time: string
   format: string | null
+  cricheroes_url: string | null
   tournament: {
     id: string
     name: string
@@ -386,32 +387,30 @@ function InlineGameCountEditor({
     return (
       <button
         onClick={() => { setVal(String(currentValue ?? '')); setEditing(true) }}
-        className="group flex items-center gap-1 font-cinzel text-[26px] font-extrabold text-ink hover:text-gold-dim transition-colors leading-none"
+        className="group flex items-center gap-1 font-bold text-ink hover:text-gold-dim transition-colors"
         title="Edit total league games"
       >
         {currentValue ?? '?'}
-        <span className="text-stone-400 group-hover:text-gold-dim text-xs opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
+        <span className="text-stone-400 group-hover:text-gold-dim text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
       </button>
     )
   }
 
   return (
-    <div className="flex flex-col items-start gap-1">
-      <div className="flex items-center gap-1">
-        <input
-          type="number" min={1} max={99} value={val} autoFocus
-          onChange={e => setVal(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-14 bg-white border border-gold text-ink font-cinzel text-sm font-bold text-center rounded px-1 py-0.5 focus:outline-none"
-        />
-        <button onClick={handleSave} disabled={saving}
-          className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 px-1.5 py-0.5 border border-emerald-300 rounded disabled:opacity-50">
-          {saving ? '…' : '✓'}
-        </button>
-        <button onClick={() => { setEditing(false); setError('') }}
-          className="text-[10px] text-stone-500 hover:text-stone-700 px-1 py-0.5">✕</button>
-      </div>
-      {error && <span className="text-[9px] text-red-700">{error}</span>}
+    <div className="flex items-center gap-1">
+      <input
+        type="number" min={1} max={99} value={val} autoFocus
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="w-12 bg-white border border-gold text-ink text-xs font-bold text-center rounded px-1 py-0.5 focus:outline-none"
+      />
+      <button onClick={handleSave} disabled={saving}
+        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 px-1 py-0.5 border border-emerald-300 rounded disabled:opacity-50">
+        {saving ? '…' : '✓'}
+      </button>
+      <button onClick={() => { setEditing(false); setError('') }}
+        className="text-[10px] text-stone-500 hover:text-stone-700 px-1 py-0.5">✕</button>
+      {error && <span className="text-[9px] text-red-700 ml-1">{error}</span>}
     </div>
   )
 }
@@ -657,33 +656,25 @@ function TournamentBlock({
       {open && (
         <div className="bg-parchment">
 
-          {/* Stats grid — 2x2 */}
+          {/* Matches — tabbed (Upcoming / Past Matches / Unbooked), replacing the old 4-card stat grid */}
           <div className="px-4 pt-4">
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5">
-                <p className="text-[11px] font-bold tracking-wide uppercase text-stone-500">Total</p>
-                {isAdmin
-                  ? <InlineGameCountEditor tournamentId={tournament.id} currentValue={totalLeagueGames} onSaved={setTotalLeagueGames} />
-                  : <p className="font-cinzel text-[26px] font-extrabold text-ink mt-0.5 leading-none">{totalLeague}</p>
-                }
-                <p className="text-xs text-stone-500 mt-1">league games</p>
-              </div>
-              <div className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5">
-                <p className="text-[11px] font-bold tracking-wide uppercase text-stone-500">Completed</p>
-                <p className="font-cinzel text-[26px] font-extrabold text-emerald-700 mt-0.5 leading-none">{completed.length}</p>
-                <p className="text-xs text-stone-500 mt-1">past dates</p>
-              </div>
-              <div className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5">
-                <p className="text-[11px] font-bold tracking-wide uppercase text-stone-500">Scheduled</p>
-                <p className="font-cinzel text-[26px] font-extrabold text-blue-700 mt-0.5 leading-none">{scheduled.length}</p>
-                <p className="text-xs text-stone-500 mt-1">booked, upcoming</p>
-              </div>
-              <div className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5">
-                <p className="text-[11px] font-bold tracking-wide uppercase text-stone-500">Unbooked</p>
-                <p className="font-cinzel text-[26px] font-extrabold text-ink mt-0.5 leading-none">{unbooked}</p>
-                <p className="text-xs text-stone-500 mt-1">games remaining</p>
-              </div>
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <p className="text-[15px] font-bold text-ink">Matches</p>
+              {isAdmin ? (
+                <div className="flex items-center gap-1 text-xs text-stone-500">
+                  <InlineGameCountEditor tournamentId={tournament.id} currentValue={totalLeagueGames} onSaved={setTotalLeagueGames} /> league games
+                </div>
+              ) : (
+                <span className="text-xs text-stone-500">{totalLeague} league games</span>
+              )}
             </div>
+            <MatchTabsSection
+              upcoming={scheduled}
+              pastMatches={completed}
+              unbooked={unbooked}
+              sortedGames={sortedGames}
+              bookingCaptainMap={bookingCaptainMap}
+            />
 
             {/* Pace insight */}
             {gap !== null && (
@@ -741,15 +732,6 @@ function TournamentBlock({
           {/* Pace timeline */}
           <GameTimelineCard sortedGames={sortedGames} gaps={gaps} avgGap={gap} />
 
-          {/* Tabs — Completed / Scheduled */}
-          <GameTabsSection
-            completed={completed}
-            scheduled={scheduled}
-            unbooked={unbooked}
-            sortedGames={sortedGames}
-            bookingCaptainMap={bookingCaptainMap}
-          />
-
           {/* Slot balance — grouped by day */}
           <SlotBalanceByDay
             slotCounts={slotCounts}
@@ -792,18 +774,21 @@ function TournamentBlock({
   )
 }
 
-// ── Tabs — Completed / Scheduled game lists (warm-light cards) ──────
-function GameTabsSection({
-  completed, scheduled, unbooked, sortedGames, bookingCaptainMap,
+// ── Tabs — Upcoming / Past Matches / Unbooked (warm-light cards) ────
+// Naming mirrors /fixtures ("Upcoming" / "Past Matches"). Upcoming is first
+// since that's what captains care about most day-to-day.
+function MatchTabsSection({
+  upcoming, pastMatches, unbooked, sortedGames, bookingCaptainMap,
 }: {
-  completed: Booking[]
-  scheduled: Booking[]
+  upcoming: Booking[]
+  pastMatches: Booking[]
   unbooked: number
   sortedGames: Booking[]
   bookingCaptainMap: Record<string, SquadCaptain>
 }) {
-  const [activeTab, setActiveTab] = useState<'completed' | 'scheduled'>(
-    scheduled.length > 0 ? 'scheduled' : 'completed'
+  type TabKey = 'upcoming' | 'past' | 'unbooked'
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    upcoming.length > 0 ? 'upcoming' : pastMatches.length > 0 ? 'past' : 'unbooked'
   )
 
   function gapLabelFor(g: Booking): string {
@@ -822,32 +807,40 @@ function GameTabsSection({
     return { bg: 'bg-emerald-50', text: 'text-emerald-700' }
   }
 
+  const tabs: Array<{ key: TabKey; label: string; count: number }> = [
+    { key: 'upcoming', label: 'Upcoming',     count: upcoming.length },
+    { key: 'past',     label: 'Past Matches', count: pastMatches.length },
+    { key: 'unbooked', label: 'Unbooked',     count: unbooked },
+  ]
+
   return (
-    <div className="px-4 pt-4">
+    <div>
       <div className="flex bg-parchment-2 rounded-xl p-1 gap-1">
-        <button type="button" onClick={() => setActiveTab('completed')}
-          className={`flex-1 rounded-lg py-2.5 text-[13.5px] font-bold transition-colors ${
-            activeTab === 'completed' ? 'bg-white text-ink shadow-sm' : 'text-stone-500'
-          }`}>
-          Completed · {completed.length}
-        </button>
-        <button type="button" onClick={() => setActiveTab('scheduled')}
-          className={`flex-1 rounded-lg py-2.5 text-[13.5px] font-bold transition-colors ${
-            activeTab === 'scheduled' ? 'bg-white text-ink shadow-sm' : 'text-stone-500'
-          }`}>
-          Scheduled · {scheduled.length}
-        </button>
+        {tabs.map(t => {
+          const disabled = t.key === 'unbooked' && t.count === 0
+          return (
+            <button key={t.key} type="button" disabled={disabled}
+              onClick={() => setActiveTab(t.key)}
+              className={`flex-1 rounded-lg py-2.5 text-[12.5px] font-bold transition-colors ${
+                disabled
+                  ? 'text-stone-300 cursor-not-allowed'
+                  : activeTab === t.key ? 'bg-white text-ink shadow-sm' : 'text-stone-500'
+              }`}>
+              {t.label} [{t.count}]
+            </button>
+          )
+        })}
       </div>
 
       <div className="flex flex-col gap-2.5 mt-3">
-        {activeTab === 'completed' && (
-          completed.length === 0
-            ? <p className="text-xs text-stone-500 py-3">No completed games yet.</p>
-            : completed.map(g => {
+        {activeTab === 'past' && (
+          pastMatches.length === 0
+            ? <p className="text-xs text-stone-500 py-3">No past matches yet.</p>
+            : pastMatches.map(g => {
                 const d = parseISO(g.game_date)
                 const captain = bookingCaptainMap[g.id] ?? null
-                return (
-                  <div key={g.id} className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5 flex items-center gap-3.5">
+                const inner = (
+                  <div className="flex items-center gap-3.5">
                     <div className="text-center w-11 flex-shrink-0">
                       <p className="font-cinzel text-xl font-extrabold text-ink leading-none">{format(d, 'd')}</p>
                       <p className="text-[11px] font-semibold text-stone-500 uppercase mt-1">{format(d, 'MMM')}</p>
@@ -864,17 +857,27 @@ function GameTabsSection({
                     <span className="bg-emerald-50 text-emerald-700 text-[11.5px] font-bold px-2.5 py-1 rounded-full flex-shrink-0">Done</span>
                   </div>
                 )
+                return g.cricheroes_url ? (
+                  <a key={g.id} href={g.cricheroes_url} target="_blank" rel="noopener noreferrer"
+                    className="block bg-white border border-parchment-3 rounded-2xl px-4 py-3.5 hover:border-gold-dim transition-colors">
+                    {inner}
+                  </a>
+                ) : (
+                  <div key={g.id} className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5">
+                    {inner}
+                  </div>
+                )
               })
         )}
-        {activeTab === 'scheduled' && (
-          scheduled.length === 0
-            ? <p className="text-xs text-stone-500 py-3">No scheduled games yet.</p>
-            : scheduled.map(g => {
+        {activeTab === 'upcoming' && (
+          upcoming.length === 0
+            ? <p className="text-xs text-stone-500 py-3">No upcoming games yet.</p>
+            : upcoming.map(g => {
                 const d  = parseISO(g.game_date)
                 const gs = gapLabelFor(g)
                 const c  = gapColors(gs)
-                return (
-                  <div key={g.id} className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5 flex items-center gap-3.5">
+                const inner = (
+                  <div className="flex items-center gap-3.5">
                     <div className="text-center w-11 flex-shrink-0">
                       <p className="font-cinzel text-xl font-extrabold text-ink leading-none">{format(d, 'd')}</p>
                       <p className="text-[11px] font-semibold text-stone-500 uppercase mt-1">{format(d, 'MMM')}</p>
@@ -888,17 +891,30 @@ function GameTabsSection({
                     </span>
                   </div>
                 )
+                return g.cricheroes_url ? (
+                  <a key={g.id} href={g.cricheroes_url} target="_blank" rel="noopener noreferrer"
+                    className="block bg-white border border-parchment-3 rounded-2xl px-4 py-3.5 hover:border-gold-dim transition-colors">
+                    {inner}
+                  </a>
+                ) : (
+                  <div key={g.id} className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5">
+                    {inner}
+                  </div>
+                )
               })
         )}
+        {activeTab === 'unbooked' && (
+          unbooked === 0
+            ? <p className="text-xs text-stone-500 py-3">No unbooked games — fully scheduled.</p>
+            : (
+              <div className="bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3">
+                <p className="text-xs font-semibold text-stone-600">
+                  ○ {unbooked} unbooked game{unbooked !== 1 ? 's' : ''} — date &amp; slot not yet booked
+                </p>
+              </div>
+            )
+        )}
       </div>
-
-      {unbooked > 0 && (
-        <div className="mt-2.5 bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3">
-          <p className="text-xs font-semibold text-stone-600">
-            ○ {unbooked} unbooked game{unbooked !== 1 ? 's' : ''} remaining — date &amp; slot not yet booked
-          </p>
-        </div>
-      )}
     </div>
   )
 }
