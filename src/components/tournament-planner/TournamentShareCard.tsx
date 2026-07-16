@@ -1,4 +1,14 @@
 import { parseISO, differenceInDays, format } from 'date-fns'
+import type { SuggestedDate } from '@/lib/suggestedSlots'
+
+// This is a Server Component (no 'use client'), so the icon is inlined
+// here rather than imported from TournamentShareButton.tsx (a client
+// component) to keep the server/client boundary clean.
+const WA_ICON = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+  </svg>
+)
 
 // Re-use the same slot definitions and helpers
 const ALL_SLOTS = [
@@ -19,6 +29,7 @@ interface Booking {
   game_date: string
   slot_time: string
   format: string | null
+  cricheroes_url: string | null
 }
 
 interface Tournament {
@@ -32,11 +43,16 @@ interface Tournament {
 }
 
 export function TournamentShareCard({
-  tournament, bookings, today,
+  tournament, bookings, today, suggestedDates, waNumber,
 }: {
   tournament: Tournament
   bookings: Booking[]
   today: string
+  // Next fully-open dates (see src/lib/suggestedSlots.ts) — a booking
+  // enquiry link is shown per date so the organiser can reach the club
+  // directly from this card, mirroring /schedule's enquiry links.
+  suggestedDates: SuggestedDate[]
+  waNumber: string
 }) {
   const sorted     = [...bookings].sort((a, b) => a.game_date.localeCompare(b.game_date))
   const completed  = sorted.filter(g => g.game_date < today)
@@ -76,6 +92,15 @@ export function TournamentShareCard({
   const formats         = Array.from(new Set(sorted.map(g => g.format).filter((f): f is string => !!f)))
   const activeFormats   = formats.length === 0 ? ['T20', 'T30'] : formats
 
+  // Enquiry link to the club for one of the fully-open suggested dates —
+  // no slot_time is named (mirrors the private planner's suggested-slots
+  // panel) since the whole day is open, not one specific time.
+  function suggestedDateWaLink(s: SuggestedDate): string {
+    const dayLabel = format(parseISO(s.game_date), 'EEEE d MMM')
+    const message = `Hi Spartans! For ${tournament.name}, is ${dayLabel} available to book? We'd like to schedule our next league game.`
+    return `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`
+  }
+
   const gapColor = (gap: number | null) => {
     if (!gap)       return 'text-stone-500'
     if (gap <= 1)   return 'text-red-700'
@@ -97,7 +122,14 @@ export function TournamentShareCard({
         <div className="flex items-start gap-3">
           <span className="text-amber-500 text-xl">🏆</span>
           <div>
-            <h1 className="font-cinzel text-base font-bold text-ink">{tournament.name}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-cinzel text-base font-bold text-ink">{tournament.name}</h1>
+              {formats.length > 0 && (
+                <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                  {formats.join(' / ')}
+                </span>
+              )}
+            </div>
             <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
               {tournament.captain && (
                 <>Captain: <span className="text-ink font-semibold">{tournament.captain.name}</span> &nbsp;·&nbsp; </>
@@ -138,18 +170,17 @@ export function TournamentShareCard({
             const isSat   = dayName === 'Sat'
             const gap     = gameGaps[i]
             const isDone  = g.game_date < today
-            return (
-              <div key={g.id}
-                // Fixed-width first/third columns (not `auto`) so the divider
-                // between them lines up across rows — each row is its own grid
-                // (a separate <div> per game), so an `auto` track sizes to that
-                // row's own content only and drifted row-to-row depending on
-                // whether it held "start" or "10w / from prev".
-                className={`grid grid-cols-[44px_1fr_72px] border border-parchment-3 rounded-xl overflow-hidden ${isDone ? 'opacity-60' : ''}`}>
+            // Fixed-width first/third columns (not `auto`) so the divider
+            // between them lines up across rows — each row is its own grid
+            // (a separate element per game), so an `auto` track sizes to that
+            // row's own content only and drifted row-to-row depending on
+            // whether it held "start" or "10w / from prev".
+            const rowClass = `grid grid-cols-[44px_1fr_72px] border border-parchment-3 rounded-xl overflow-hidden transition-colors ${isDone ? 'opacity-60' : ''} ${g.cricheroes_url ? 'hover:border-gold-dim' : ''}`
+            const inner = (
+              <>
                 <div className="bg-parchment-2 flex flex-col items-center justify-center py-2 border-r border-parchment-3">
                   <span className="font-cinzel text-base font-bold text-ink leading-none">{format(d, 'd')}</span>
                   <span className="font-rajdhani text-[9px] text-stone-500 uppercase">{format(d, 'MMM')}</span>
-                  <span className="font-rajdhani text-[9px] text-stone-500">{dayName}</span>
                 </div>
                 <div className="px-2.5 py-2 flex flex-col gap-0.5">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -157,7 +188,9 @@ export function TournamentShareCard({
                       isSat ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-pink-100 text-pink-700 border-pink-300'
                     }`}>{dayName}</span>
                     <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">{g.slot_time}</span>
-                    <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">{g.format}</span>
+                    {formats.length > 1 && (
+                      <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">{g.format}</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-parchment-3">
@@ -167,6 +200,15 @@ export function TournamentShareCard({
                   }
                   {gap !== null && <span className="font-rajdhani text-[9px] text-stone-400">from prev</span>}
                 </div>
+              </>
+            )
+            return g.cricheroes_url ? (
+              <a key={g.id} href={g.cricheroes_url} target="_blank" rel="noopener noreferrer" className={rowClass}>
+                {inner}
+              </a>
+            ) : (
+              <div key={g.id} className={rowClass}>
+                {inner}
               </div>
             )
           })}
@@ -176,6 +218,32 @@ export function TournamentShareCard({
             </div>
           ))}
         </div>
+
+        {/* Next available dates — fully open days only (see
+            src/lib/suggestedSlots.ts), each with a booking enquiry link to
+            the club, mirroring /schedule's WhatsApp enquiry pattern. Only
+            shown when there's actually something left to book. */}
+        {unbooked > 0 && suggestedDates.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-parchment-3">
+            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-2">
+              Next available dates
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {suggestedDates.map(s => (
+                <a key={s.game_date} href={suggestedDateWaLink(s)} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 hover:bg-emerald-100 transition-colors">
+                  <span className="font-rajdhani text-xs font-semibold text-emerald-800">
+                    {s.day} {format(parseISO(s.game_date), 'd MMM')}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-emerald-700">
+                    {WA_ICON}
+                    <span className="font-rajdhani text-[11px] font-bold">Book this date</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Game timeline — pace view. Needs 2+ real games to plot a line
