@@ -17,12 +17,23 @@
 // checked, so all suggestions remain mutually valid if the organiser books
 // all of them (otherwise two suggestions from the same weekend could each
 // look valid alone while jointly breaking R1's weekend cap).
+//
+// R3 (max 2 confirmed games per tournament per calendar month) is the one
+// exception to "fold every accepted pick into the working set": a suggestion
+// isn't a booking, so two suggested dates in the same month must not, by
+// themselves, disqualify a third open date in that month from ever being
+// offered — there's no guarantee the organiser takes both of the earlier
+// ones. R3 is instead checked against real confirmed bookings only, with a
+// small buffer (MAX_SUGGESTIONS_PER_MONTH) so a month doesn't flood with
+// more alternatives than could plausibly ever get booked. The response
+// flags any month whose suggestion count already exceeds R3's real cap so
+// the UI can tell the organiser only some of them are actually bookable.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { validateBooking } from '@/lib/validation'
+import { validateBooking, getYearMonth } from '@/lib/validation'
 import type { CreateBookingRequest, GameFormat, SlotTime } from '@/types'
 
 const SLOT_DEFS: { time: SlotTime; validFor: GameFormat[] }[] = [
@@ -39,6 +50,12 @@ const DEFAULT_SUGGESTIONS = 3
 // Hard ceiling regardless of how large the unbooked count is, so a
 // mis-entered total_league_games can't blow up the horizon scan.
 const MAX_SUGGESTIONS_CAP = 12
+// R3's real cap (2) plus one backup alternative — a month can offer up to
+// this many suggested dates even though only R3_MONTHLY_CAP of them could
+// actually be booked, since we don't know in advance which ones the
+// organiser will take.
+const R3_MONTHLY_CAP = 2
+const MAX_SUGGESTIONS_PER_MONTH = R3_MONTHLY_CAP + 1
 
 function addDays(d: Date, n: number): Date {
   const r = new Date(d)
@@ -159,6 +176,7 @@ export async function GET(
   const working = [...existing]
   const suggestions: Candidate[] = []
   const remaining = [...candidates]
+  const suggestedMonthCounts: Record<string, number> = {}
 
   while (suggestions.length < MAX_SUGGESTIONS && remaining.length > 0) {
     remaining.sort((a, b) => {
@@ -175,8 +193,22 @@ export async function GET(
         format: candidate.format,
         tournament_id: params.id,
       }
+      // R1/R4/R5/R6 must hold against the full working set (real bookings
+      // plus already-accepted suggestions) — those are physical calendar
+      // clashes that would be real if the organiser books everything
+      // suggested. R3 from this check is ignored and re-checked below
+      // against real bookings only — see the file-header comment.
       const result = validateBooking(body, working, captainName, tournamentName, thisTournamentCaptainId)
-      return result.errors.length === 0 && result.warnings.length === 0
+      const blockingErrors = result.errors.filter(e => e.rule !== 'R3')
+      if (blockingErrors.length > 0 || result.warnings.length > 0) return false
+
+      const realResult = validateBooking(body, existing, captainName, tournamentName, thisTournamentCaptainId)
+      if (realResult.errors.some(e => e.rule === 'R3')) return false // genuinely maxed for real this month
+
+      const month = getYearMonth(candidate.game_date)
+      if ((suggestedMonthCounts[month] ?? 0) >= MAX_SUGGESTIONS_PER_MONTH) return false
+
+      return true
     })
 
     if (pickedIndex === -1) break // nothing left in the horizon is valid at all
@@ -184,6 +216,8 @@ export async function GET(
     const [picked] = remaining.splice(pickedIndex, 1)
     suggestions.push(picked)
     ownSlotCounts[picked.slot_time] = (ownSlotCounts[picked.slot_time] ?? 0) + 1
+    const pickedMonth = getYearMonth(picked.game_date)
+    suggestedMonthCounts[pickedMonth] = (suggestedMonthCounts[pickedMonth] ?? 0) + 1
     working.push({
       id: `candidate-${suggestions.length}`,
       game_date: picked.game_date,
@@ -200,5 +234,13 @@ export async function GET(
     } as any)
   }
 
-  return NextResponse.json({ suggestions })
+  // Flag any month where the suggestion count already exceeds R3's real
+  // cap, so the UI can tell the organiser only R3_MONTHLY_CAP of that
+  // month's options can actually be booked.
+  const overCapMonths = Object.entries(suggestedMonthCounts)
+    .filter(([, count]) => count > R3_MONTHLY_CAP)
+    .map(([month]) => month)
+    .sort()
+
+  return NextResponse.json({ suggestions, monthlyCap: R3_MONTHLY_CAP, overCapMonths })
 }
