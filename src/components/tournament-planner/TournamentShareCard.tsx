@@ -2,14 +2,14 @@ import { parseISO, differenceInDays, format } from 'date-fns'
 
 // Re-use the same slot definitions and helpers
 const ALL_SLOTS = [
-  { day: 'Sat', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
-  { day: 'Sat', time: '10:30', formats: 'T20 only',  validFor: ['T20']        },
-  { day: 'Sat', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
-  { day: 'Sat', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
-  { day: 'Sun', time: '07:30', formats: 'T20 / T30', validFor: ['T20', 'T30'] },
-  { day: 'Sun', time: '10:30', formats: 'T20 only',  validFor: ['T20']        },
-  { day: 'Sun', time: '12:30', formats: 'T30 only',  validFor: ['T30']        },
-  { day: 'Sun', time: '14:30', formats: 'T20 only',  validFor: ['T20']        },
+  { day: 'Sat', time: '07:30', validFor: ['T20', 'T30'] },
+  { day: 'Sat', time: '10:30', validFor: ['T20']        },
+  { day: 'Sat', time: '12:30', validFor: ['T30']        },
+  { day: 'Sat', time: '14:30', validFor: ['T20']        },
+  { day: 'Sun', time: '07:30', validFor: ['T20', 'T30'] },
+  { day: 'Sun', time: '10:30', validFor: ['T20']        },
+  { day: 'Sun', time: '12:30', validFor: ['T30']        },
+  { day: 'Sun', time: '14:30', validFor: ['T20']        },
 ] as const
 
 type SlotKey = `${'Sat'|'Sun'}-${'07:30'|'10:30'|'12:30'|'14:30'}`
@@ -70,6 +70,8 @@ export function TournamentShareCard({
     if (slotCounts[k] !== undefined) slotCounts[k]++
   })
   const maxSlotCount = Math.max(...Object.values(slotCounts), 1)
+  const dominantSlot  = Object.entries(slotCounts).reduce((a, b) => b[1] > a[1] ? b : a, ['', 0])[0]
+  const isSlotImbalanced = maxSlotCount > Math.ceil(sorted.length / 2) && sorted.length >= 3
 
   const formats         = Array.from(new Set(sorted.map(g => g.format).filter((f): f is string => !!f)))
   const activeFormats   = formats.length === 0 ? ['T20', 'T30'] : formats
@@ -138,7 +140,12 @@ export function TournamentShareCard({
             const isDone  = g.game_date < today
             return (
               <div key={g.id}
-                className={`grid grid-cols-[44px_1fr_auto] border border-parchment-3 rounded-xl overflow-hidden ${isDone ? 'opacity-60' : ''}`}>
+                // Fixed-width first/third columns (not `auto`) so the divider
+                // between them lines up across rows — each row is its own grid
+                // (a separate <div> per game), so an `auto` track sizes to that
+                // row's own content only and drifted row-to-row depending on
+                // whether it held "start" or "10w / from prev".
+                className={`grid grid-cols-[44px_1fr_72px] border border-parchment-3 rounded-xl overflow-hidden ${isDone ? 'opacity-60' : ''}`}>
                 <div className="bg-parchment-2 flex flex-col items-center justify-center py-2 border-r border-parchment-3">
                   <span className="font-cinzel text-base font-bold text-ink leading-none">{format(d, 'd')}</span>
                   <span className="font-rajdhani text-[9px] text-stone-500 uppercase">{format(d, 'MMM')}</span>
@@ -153,7 +160,7 @@ export function TournamentShareCard({
                     <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">{g.format}</span>
                   </div>
                 </div>
-                <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-parchment-3 min-w-[44px]">
+                <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-parchment-3">
                   {gap !== null
                     ? <span className={`font-cinzel text-sm font-bold ${gapColor(gap)}`}>{gap}w</span>
                     : <span className="font-rajdhani text-[9px] text-stone-500">start</span>
@@ -222,40 +229,47 @@ export function TournamentShareCard({
         )
       })()}
 
-      {/* Slot balance */}
-      <div className="px-4 py-3">
+      {/* Slot balance — day-grouped cards with horizontal bars, identical to
+          the private planner's SlotBalanceByDay (TournamentPlannerClient.tsx) */}
+      <div className="px-4 pt-3 pb-2">
         <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">
           Slot balance
         </p>
-        <div className="grid grid-cols-8 gap-1.5">
-          {ALL_SLOTS.map(s => {
-            const k: SlotKey   = `${s.day}-${s.time}`
-            const count        = slotCounts[k]
-            const barH         = count > 0 ? Math.round((count / maxSlotCount) * 100) : 0
-            const isSat        = s.day === 'Sat'
-            const isApplicable = s.validFor.some(f => activeFormats.includes(f))
+        <div className="flex flex-col gap-3">
+          {(['Sat', 'Sun'] as const).map(day => {
+            // Only slots valid for this tournament's actual format(s) — cuts N/A rows to save space
+            const rows = ALL_SLOTS.filter(s => s.day === day && s.validFor.some(f => activeFormats.includes(f)))
             return (
-              <div key={k} className="bg-parchment-2 border border-parchment-3 rounded p-1.5 flex flex-col items-center">
-                <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 border ${
-                  isSat ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-pink-100 text-pink-700 border-pink-300'
-                }`}>{s.day}</span>
-                <span className="font-rajdhani text-[10px] text-stone-500 mb-1.5">{s.time}</span>
-                <div className="w-full h-8 bg-parchment-3 rounded overflow-hidden flex flex-col-reverse mb-1">
-                  {count > 0 && isApplicable && (
-                    <div className={`w-full rounded transition-all ${count === maxSlotCount ? 'bg-emerald-600' : 'bg-amber-600'}`}
-                      style={{ height: `${barH}%` }} />
-                  )}
-                </div>
-                <span className={`font-cinzel text-xs font-bold ${
-                  !isApplicable ? 'text-stone-300' : count > 0 ? 'text-amber-700' : 'text-stone-500'
-                }`}>
-                  {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
-                </span>
-                <span className="font-rajdhani text-[8px] text-stone-400 mt-0.5">{s.formats}</span>
+              <div key={day} className="bg-white border border-parchment-3 rounded-2xl px-3.5 pb-1">
+                <p className="text-xs font-bold uppercase tracking-wide text-stone-500 pt-2.5 pb-1.5">{day}</p>
+                {rows.map(s => {
+                  const k: SlotKey = `${s.day}-${s.time}`
+                  const count      = slotCounts[k]
+                  const pct        = count > 0 ? Math.max(12, Math.round((count / maxSlotCount) * 100)) : 0
+                  return (
+                    <div key={k} className="flex items-center gap-3 py-1.5 border-t border-parchment-2 first:border-t-0">
+                      <span className="w-[52px] flex-shrink-0 text-[12.5px] font-semibold text-stone-700">{s.time}</span>
+                      <div className="flex-1 h-2 bg-parchment-2 rounded-full overflow-hidden">
+                        {count > 0 && (
+                          <div className={`h-full rounded-full ${count === maxSlotCount ? 'bg-emerald-600' : 'bg-amber-600'}`}
+                            style={{ width: `${pct}%` }} />
+                        )}
+                      </div>
+                      <span className="w-[18px] flex-shrink-0 text-sm font-extrabold text-ink text-right">
+                        {count}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             )
           })}
         </div>
+        {isSlotImbalanced && (
+          <p className="text-xs text-blue-700 mt-2.5">
+            ↗ {dominantSlot} has {maxSlotCount} of {sorted.length} games — unbooked games should favour other slots
+          </p>
+        )}
       </div>
     </div>
   )
