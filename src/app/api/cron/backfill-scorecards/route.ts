@@ -17,7 +17,13 @@ export const maxDuration = 60
 // the leftover bookings just get picked up by tomorrow's run instead of
 // being permanently skipped. MAX_PER_RUN bounds each individual run's
 // duration; a backlog beyond that drains a few more each day until clear.
-const MAX_PER_RUN = 5
+//
+// Lowered from 5 to 3 on 2026-07-16 — a live manual run timed out
+// (504 FUNCTION_INVOCATION_TIMEOUT) after completing exactly 3 bookings and
+// starting a 4th, confirming the "accepted risk" this comment used to only
+// warn about in the abstract. 3 sequential bookings reliably fits inside the
+// 60s Hobby ceiling even with a cold Render start; 5 does not.
+const MAX_PER_RUN = 3
 
 // Respectful pacing between CricHeroes fetches — same spirit as the
 // wrangler's standalone download_scorecard.py script.

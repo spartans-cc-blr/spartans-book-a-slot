@@ -1,0 +1,28 @@
+name: Cron — lock-availability
+
+# Backstop for Vercel Hobby's unreliable cron scheduler (confirmed 2026-07-16:
+# /api/cron/lock-availability did not fire on its 08:00 IST Thursday schedule
+# despite the route working correctly when invoked directly — see
+# .claude/rules/pending-backlog.md S-8). GitHub Actions supports real
+# day-of-week cron, so this runs on the actual intended schedule instead of
+# the daily-fire-plus-in-code-guard workaround the Vercel-side cron needs.
+#
+# Safe to run alongside the existing vercel.json cron entry — the route is
+# idempotent (`.eq('availability_locked', false)` guards every write), so an
+# occasional double-fire from both schedulers is a harmless no-op.
+
+on:
+  schedule:
+    # 02:30 UTC every Thursday = 08:00 IST
+    - cron: '30 2 * * 4'
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call lock-availability cron endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://hub.spartanscricketclub.in/api/cron/lock-availability
