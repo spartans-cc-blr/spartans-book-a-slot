@@ -960,6 +960,8 @@ function SuggestedSlotsPanel({
   organiserContact: string | null
 }) {
   const [suggestions, setSuggestions] = useState<SuggestedSlot[] | null>(null)
+  const [monthlyCap, setMonthlyCap] = useState(2)
+  const [overCapMonths, setOverCapMonths] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -970,12 +972,22 @@ function SuggestedSlotsPanel({
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Could not load suggestions'); return }
       setSuggestions(data.suggestions ?? [])
+      setMonthlyCap(data.monthlyCap ?? 2)
+      setOverCapMonths(data.overCapMonths ?? [])
     } catch {
       setError('Network error')
     } finally {
       setLoading(false)
     }
   }
+
+  // Months where the club's own per-tournament monthly cap means not every
+  // suggested date in that month can actually be booked — the extra options
+  // are backups in case an earlier one in the same month falls through, not
+  // a guarantee all of them are simultaneously bookable.
+  const capNote = overCapMonths.length > 0
+    ? `Only ${monthlyCap} confirmed game${monthlyCap !== 1 ? 's' : ''} per month is allowed for ${tournamentName} — for ${overCapMonths.map(m => format(parseISO(`${m}-01`), 'MMMM')).join(' and ')}, pick at most ${monthlyCap} of the options below.`
+    : ''
 
   // This panel only mounts once the viewer is actually on the Unbooked tab
   // (see canSuggestSlots gating in MatchTabsSection), so fetching immediately
@@ -989,6 +1001,7 @@ function SuggestedSlotsPanel({
     ? [
         `Hi${organiserName ? ' ' + organiserName : ''}! For ${tournamentName}, here are our next earliest available slot options — not every open slot, just what fits soonest on our end:`,
         ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')}, ${s.slot_time}`),
+        ...(capNote ? [``, capNote] : []),
         `Let us know which of these works and we'll get it locked in. Thanks!`,
       ].join('\n')
     : ''
@@ -1028,6 +1041,11 @@ function SuggestedSlotsPanel({
                 </p>
               ))}
             </div>
+            {capNote && (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2">
+                {capNote}
+              </p>
+            )}
             {waLink && (
               <a href={waLink} target="_blank" rel="noopener noreferrer"
                 className="mt-2.5 w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-700 rounded-xl py-2 text-xs font-bold hover:bg-emerald-200 transition-colors">
