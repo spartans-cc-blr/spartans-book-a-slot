@@ -47,22 +47,52 @@ Requires the Python microservice bridge described above.
 
 ---
 
-## Vercel Hobby — Cron Jobs Cannot Restrict Day-of-Week
+## Vercel Hobby — Cron Jobs Do Not Reliably Fire, Restricted or Not
 
-Discovered via a real production failure on the `lock-availability` cron: a
-schedule like `"30 2 * * 4"` (Thursday-only) is silently accepted by
-`vercel.json` but **never actually fires** on the Hobby plan. Hobby only
-reliably fires schedules that run unrestricted every day.
+Originally discovered via a real production failure on the
+`lock-availability` cron: a schedule like `"30 2 * * 4"` (Thursday-only) is
+silently accepted by `vercel.json` but **never actually fires** on the
+Hobby plan. Hobby's own dashboard now discloses part of why — cron jobs on
+Hobby only get a **flexible 1-hour firing window**, not an exact time, and
+(per Vercel's docs) day-of-week-restricted schedules aren't reliably
+honoured at all.
+
+**Escalation (confirmed 2026-07-16):** the failure isn't limited to
+day-of-week-restricted schedules. `lock-availability` had already been
+moved to a truly-daily schedule (`"30 2 * * *"`) with an in-code Thursday
+guard, plus a fix for a second, unrelated caching bug — and on the actual
+Thursday it was meant to prove itself on, it *still* did not fire on its
+own. Manually triggering the same route from the Vercel dashboard succeeded
+immediately (the DB write went through, GC push notifications fired), which
+ruled out a code bug — this is Vercel's own scheduler not invoking the
+route, full stop. The same day, `/api/cron/backfill-scorecards` (a plain
+unrestricted daily `"30 1 * * *"` schedule, no day-of-week guard at all)
+was found to have **zero evidence of ever firing automatically** in its
+entire history — every row in `scorecard_uploads` had been created by a
+human via manual upload, never by the cron's own `uploaded_by: null` write
+path, despite the feature having shipped weeks earlier. A ~33-booking
+backlog (mid-March through early July) had quietly accumulated as a result.
 
 **Impact:** any cron that needs to act on a specific day of the week (not
 just "once a day") must fire daily and gate itself in code with an
 IST-aware day check — see `lock-availability`'s `route.ts` for the pattern.
-This is fragile in a way a real weekly schedule wouldn't be (a second,
-unrelated bug — Next.js caching the route's Supabase calls — nearly
-sabotaged it even after the daily-plus-guard fix landed; see that file's
-git history). For a genuinely reliable weekly trigger on Hobby, an external
-scheduler (e.g. a GitHub Actions cron workflow calling the endpoint) is the
-safer alternative — not yet implemented, proposed but deferred.
+But even that workaround only addresses the day-of-week restriction, not
+Hobby's broader invocation unreliability.
+
+**Fix (implemented 2026-07-16):** all five crons now have a matching
+GitHub Actions workflow in `.github/workflows/cron-*.yml` that calls the
+same endpoint with the same `CRON_SECRET` on the same intended schedule,
+using GitHub Actions' own scheduler instead of Vercel's — including native
+day-of-week support, so `lock-availability`'s GitHub Actions workflow uses a
+real `30 2 * * 4` expression with no in-code guard needed on that side.
+Every affected route is idempotent, so running on both schedulers
+simultaneously is safe — a same-day double-invocation is a no-op. The
+`vercel.json` cron entries were left in place rather than removed, since an
+occasional Vercel-side fire alongside the GitHub Actions one costs nothing.
+One caveat carried over: GitHub Actions auto-disables scheduled workflows
+after 60 days with no commits to the repo on any branch — not a concern for
+an actively-developed project, but worth knowing if the repo ever goes
+quiet for an extended period.
 
 ---
 

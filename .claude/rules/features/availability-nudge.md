@@ -91,6 +91,26 @@ When a theme matches more than one gap booking (e.g. two bookings both satisfy `
 **Incident — 8 Jul 2026, migration 030 not applied to production:** the Sun 8pm cron ran successfully (HTTP 200, no thrown error, ~6s) but sent zero nudges. Root cause: migration `029_availability_nudge_log.sql` had been applied to the live Supabase project but `030_availability_nudge_log_delivery_status.sql` had not, so the live table was still missing `status`/`error_message`. Every candidate's `.insert({ ..., status: 'pending' })` failed with an unrecognized-column error, which the route (pre-fix) treated identically to "already nudged today" — no push was attempted, no row was written, and the response body (`sent: 0, failed: 0`) was indistinguishable from a legitimately quiet day. Caught only by manually inspecting the Vercel function trace and cross-checking `availability_nudge_log` row counts against `list_migrations`.
 Fixed by: (1) applying migration 030 to the live project, and (2) the route now separates `already_nudged` (benign `23505` unique-violation — the real idempotency case) from `skipped` (any other insert failure), and fires a GC push alert whenever `skipped > 0`, since nobody actively reads a cron's JSON response body. Take-away: **a merged migration file is not the same as an applied migration** — this project's Supabase migrations are applied manually (see `list_migrations` vs. the files in `supabase/migrations/`), so a merged PR touching schema needs a manual apply step confirmed separately, not assumed from the merge itself.
 
+**Incident — confirmed 2026-07-16, Vercel cron intermittently not firing:**
+while investigating the same-day `lock-availability` and
+`backfill-scorecards` failures (see `pending-backlog.md` S-8), the same
+class of problem was found here too, just partial rather than total —
+`availability_nudge_log` shows real `sent` activity on 8, 12, 13, and 15
+Jul (149–160 players nudged each of those days), but **14 Jul (a Tuesday,
+inside the Sun–Wed window) has zero log rows at all** — not a single
+`sent`, `failed`, or `already_nudged` entry, meaning Vercel simply never
+invoked the route that day. This is a distinct failure from the
+already-tracked "silent day" gap above (Fix 7, still pending live
+confirmation) — that one is about the *theme-selection logic* skipping a
+specific player on a specific day; this one is the *entire cron*
+skipping every player on a specific day. Fixed the same way as the other
+crons: a GitHub Actions workflow
+(`.github/workflows/cron-availability-nudge.yml`) now calls this route on
+the same `15 15 * * 0-3` schedule as a reliable second trigger, safe to run
+alongside the existing `vercel.json` entry since the route's own
+`UNIQUE(player_id, nudge_date)` guard on `availability_nudge_log` means a
+same-day double-fire just lands as `already_nudged` on the second pass.
+
 **Resolved as of this writing** (formerly listed here as pending):
 - Failure alerting on cron error via the shared `notifyGCs()` helper (now in `src/lib/webpush.ts`, used by both this cron and `lock-availability`)
 - Theme rename `format_stretch` → `same_format_new_slot`, freeing `format_stretch` for the future discovery theme

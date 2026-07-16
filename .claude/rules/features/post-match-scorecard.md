@@ -256,28 +256,47 @@ matching the wrangler's own `download_scorecard.py` etiquette) — the server
 route only ever processes one booking per request, since a single Vercel
 invocation can't safely absorb an entire historical backlog.
 
-### `/api/cron/backfill-scorecards` — daily, self-healing
-Runs daily at 07:00 IST (`vercel.json`: `"30 1 * * *"`). Queries **all**
-past unsynced bookings with a `match_id`, not just "yesterday" — so a run
-that's cut short, or a match that keeps failing, just rolls into tomorrow's
-run instead of being permanently skipped. `MAX_PER_RUN = 5` bounds each
-individual run; a backlog beyond that drains a few more per day until
-clear. Pushes a GC notification on completion (success count, or failures
-with reasons).
+### `/api/cron/backfill-scorecards` — twice daily, self-healing
+Runs at 07:00 and 19:00 IST (`vercel.json`: `"30 1,13 * * *"` — widened
+from once daily on 2026-07-16 to help drain the backlog described below;
+drop back to once-daily once it's clear). Queries **all** past unsynced
+bookings with a `match_id`, not just "yesterday" — so a run that's cut
+short, or a match that keeps failing, just rolls into the next run instead
+of being permanently skipped. `MAX_PER_RUN = 3` bounds each individual run
+(lowered from 5, see incident below); a backlog beyond that drains a few
+more per run until clear. Pushes a GC notification on completion (success
+count, or failures with reasons).
 
-> **Known, accepted risk (Vercel Hobby):** `maxDuration = 60` on this route
-> matches Hobby's actual ceiling, but nothing in the loop *guarantees* the
-> whole batch finishes inside it — 5 sequential bookings, each with up to a
-> 45s microservice timeout, can exceed 60s under a cold Render start plus a
-> slow item or two. If Vercel kills the function mid-loop, the in-flight
-> booking is left at `pending_parse` with no error message — but since the
-> eligibility filter picks up anything not yet `synced`/`fees_applied`,
-> it's automatically retried the next day. Nothing gets permanently stuck;
-> worst case is a wasted day and no GC notification for that run (the
-> notification only fires after the full loop completes). Deliberately left
-† as-is for now ("wait and watch") rather than pre-emptively lowering
-  `MAX_PER_RUN` — revisit if a run is ever observed actually getting killed
-  mid-batch.
+> **Incident (2026-07-16) — this route had never actually fired
+> automatically, and separately, its per-run cap was too high.** Two
+> distinct problems, found the same day while investigating why two known
+> past matches (4 & 5 Jul) hadn't synced:
+>
+> 1. **Vercel Hobby was never invoking the cron.** Every row in
+>    `scorecard_uploads` had `uploaded_by` set to a real player — the
+>    automated path always writes `uploaded_by: null`, and zero such rows
+>    existed anywhere in the table's history. A ~33-booking backlog going
+>    back to mid-March had quietly accumulated with no errors anywhere,
+>    because nothing had ever actually run. Manually triggering the route
+>    from the Vercel dashboard worked immediately and correctly. This is
+>    the same failure class as `lock-availability` (see `pending-backlog.md`
+>    S-8 and `limitations.md`) — not a bug in this route's code.
+> 2. **The previously "accepted risk" below materialized for real.** A
+>    manual run at `MAX_PER_RUN = 5` completed exactly 3 bookings and then
+>    hit a `504 FUNCTION_INVOCATION_TIMEOUT` starting the 4th — confirming
+>    the prediction that used to live in this callout as a hypothetical.
+>    Nothing was left corrupted (each booking only reaches `synced` after
+>    its full cycle completes, so the killed 4th attempt left no dangling
+>    row), but it did confirm 5 was too high for a reliable single run.
+>
+> **Fixed:** `MAX_PER_RUN` lowered 5→3 (3 sequential bookings reliably fits
+> the 60s Hobby ceiling even under a cold Render start); a GitHub Actions
+> workflow (`.github/workflows/cron-backfill-scorecards.yml`) now calls this
+> route twice daily as a reliable second trigger alongside the still-present
+> `vercel.json` entry — safe since re-running only ever touches bookings not
+> yet `synced`/`fees_applied`. The March–July backlog is being drained via
+> `/admin/scorecard-backfill` (client-paced, one booking per request, not
+> subject to the 60s ceiling at all) rather than repeated cron runs.
 
 ### Why the daily-cron-plus-guard shape exists at all
 Vercel Hobby does not support day-of-week-restricted cron expressions —
@@ -421,7 +440,8 @@ MICROSERVICE_SECRET  = <same value as Hub's MICROSERVICE_SECRET>
 |---|---|
 | `match_stats_cache` / `scorecard_uploads` RLS disabled | ✅ Fixed 2026-07-15, migration `046` |
 | Migrations `044`–`046` applied but not checked in | ✅ Fixed 2026-07-15, this doc pass |
-| Vercel Hobby cron duration risk on `backfill-scorecards` (`MAX_PER_RUN=5` vs. 60s ceiling) | ⏳ Accepted, monitoring — see Section 8 |
+| Vercel Hobby cron duration risk on `backfill-scorecards` (`MAX_PER_RUN=5` vs. 60s ceiling) | ✅ Fixed 2026-07-16 — risk confirmed live (a run 504'd after 3/5 bookings), `MAX_PER_RUN` lowered to 3 — see Section 8 |
+| `backfill-scorecards` never actually firing on its Vercel schedule (~33-booking backlog accumulated, mid-March–July) | ✅ Fixed 2026-07-16 — GitHub Actions backstop added (`.github/workflows/cron-backfill-scorecards.yml`); backlog drained via `/admin/scorecard-backfill` — see Section 8 and `pending-backlog.md` S-8 |
 | Wrong PDF uploaded — admin override | ✅ Done — "Reset Upload" / `DELETE /api/admin/matches/[id]/post-match` |
 | `import_from_dict` on `SupabaseImporter` | ✅ Done, live on Render |
 | CricHeroes match URL backfill for pre-existing bookings | ⏳ See `pending-backlog.md` E-3 — separate, ongoing coordinator task |

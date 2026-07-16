@@ -172,7 +172,20 @@ Access here is genuinely mixed per-route rather than one role — see
 |---|---|---|---|
 | `/api/cron/expire-reservations` | GET | `CRON_SECRET` bearer | Daily at 18:30 UTC — delete expired `soft_block` rows |
 | `/api/cron/lock-availability` | GET | `CRON_SECRET` bearer | Fires daily (Vercel Hobby can't restrict cron by day-of-week — see `limitations.md`); route itself gates to Thursday IST via an in-code check before blanket-locking all confirmed Sat/Sun bookings for the upcoming weekend |
-| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Daily at 07:00 IST — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 5/run; see `features/post-match-scorecard.md` |
+| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Twice daily, 07:00 & 19:00 IST — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 3/run; see `features/post-match-scorecard.md` |
+| `/api/cron/sync-player-status` | GET | `CRON_SECRET` bearer | Daily at 02:00 IST — recomputes every non-expelled player's `active`/`inactive` status from 42-day availability signal; see `features/gc-players.md` |
+| `/api/cron/availability-nudge` | GET | `CRON_SECRET` bearer | Sun–Wed at 20:45 IST — personalised push reminders for `nextLockWeekend` gaps; see `features/availability-nudge.md` |
+
+> **GitHub Actions backstop (added 2026-07-16):** Vercel Hobby's own cron
+> scheduler was confirmed unreliable in production — `lock-availability` and
+> `backfill-scorecards` both had zero evidence of ever firing on schedule
+> (see `limitations.md` and `pending-backlog.md` S-8). All five crons above
+> now have a matching workflow in `.github/workflows/cron-*.yml` that calls
+> the same endpoint with the same `CRON_SECRET` on the same intended
+> schedule, using GitHub Actions' own scheduler instead of Vercel's. Every
+> route is idempotent, so it's safe for both schedulers to fire — a
+> same-day double-invocation is a no-op. Requires `CRON_SECRET` to also be
+> set as a GitHub repo secret (Settings → Secrets and variables → Actions).
  
 ---
  
