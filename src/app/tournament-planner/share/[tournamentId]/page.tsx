@@ -3,7 +3,13 @@
 import { createServiceClient } from '@/lib/supabase'
 import { redirect } from 'next/navigation'
 import { TournamentShareCard } from '@/components/tournament-planner/TournamentShareCard'
+import { getSuggestedOpenDates } from '@/lib/suggestedSlots'
 import type { Metadata } from 'next'
+
+// Fixed at 3 regardless of the tournament's own unbooked count — this is a
+// "here's what's open soon" nudge for the organiser, not an exhaustive
+// booking plan (the GC/Admin suggested-slots panel is the exhaustive one).
+const SHARE_CARD_SUGGESTION_COUNT = 3
 
 export const revalidate = 300 // 5 min cache — public page
 
@@ -47,7 +53,7 @@ export default async function TournamentSharePage({
   // Fetch confirmed bookings for this tournament
   const { data: rawBookings } = await supabase
     .from('bookings')
-    .select('id, game_date, slot_time, format')
+    .select('id, game_date, slot_time, format, cricheroes_url')
     .eq('status', 'confirmed')
     .eq('tournament_id', params.tournamentId)
     .order('game_date', { ascending: true })
@@ -55,6 +61,12 @@ export default async function TournamentSharePage({
   const bookings = rawBookings ?? []
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+
+  // Next fully-open dates — same algorithm as the GC/Admin suggested-slots
+  // panel (src/lib/suggestedSlots.ts), just capped at a fixed 3 here rather
+  // than the tournament's full unbooked count.
+  const suggestedResult = await getSuggestedOpenDates(params.tournamentId, SHARE_CARD_SUGGESTION_COUNT)
+  const suggestedDates  = suggestedResult.ok ? suggestedResult.suggestions : []
 
   return (
     <div className="min-h-screen bg-parchment px-4 py-8 max-w-2xl mx-auto">
@@ -71,6 +83,8 @@ export default async function TournamentSharePage({
         tournament={tournament}
         bookings={bookings}
         today={today}
+        suggestedDates={suggestedDates}
+        waNumber={process.env.NEXT_PUBLIC_WA_NUMBER ?? ''}
       />
 
       {/* Footer */}
