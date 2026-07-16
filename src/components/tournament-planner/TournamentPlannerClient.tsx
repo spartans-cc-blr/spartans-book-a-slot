@@ -949,7 +949,10 @@ function MatchTabsSection({
 // Fetches candidates from the server (which reuses the R1-R6 validation
 // engine) on demand rather than on mount, since this hits Supabase with a
 // wider club-wide query than the rest of the page needs.
-interface SuggestedSlot { game_date: string; slot_time: string; format: string; day: 'Sat' | 'Sun' }
+// No slot_time — every suggested date is a fully open day, so any
+// slot_time on it would work; showing one specific time would wrongly
+// read as a constraint. See the API route's header comment.
+interface SuggestedSlot { game_date: string; day: 'Sat' | 'Sun' }
 
 function SuggestedSlotsPanel({
   tournamentId, tournamentName, organiserName, organiserContact,
@@ -1000,7 +1003,7 @@ function SuggestedSlotsPanel({
   const waMessage = suggestions && suggestions.length > 0
     ? [
         `Hi${organiserName ? ' ' + organiserName : ''}! For ${tournamentName}, here are our next earliest fully open days on our end:`,
-        ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')}, ${s.slot_time}`),
+        ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')} — whole day open`),
         ...(capNote ? [``, capNote] : []),
         `Let us know which of these works and we'll get it locked in. Thanks!`,
       ].join('\n')
@@ -1035,9 +1038,8 @@ function SuggestedSlotsPanel({
           <>
             <div className="flex flex-col gap-1.5 mt-2">
               {suggestions.map(s => (
-                <p key={`${s.game_date}-${s.slot_time}`} className="text-xs text-stone-700">
+                <p key={s.game_date} className="text-xs text-stone-700">
                   <span className="font-semibold text-ink">{s.day} {format(parseISO(s.game_date), 'd MMM')}</span>
-                  {' '}· {s.slot_time}
                 </p>
               ))}
             </div>
