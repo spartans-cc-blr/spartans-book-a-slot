@@ -134,44 +134,55 @@ export async function GET(
       }
     }
   }
-  candidates.sort((a, b) => {
-    const aCount = ownSlotCounts[a.slot_time] ?? 0
-    const bCount = ownSlotCounts[b.slot_time] ?? 0
-    if (aCount !== bCount) return aCount - bCount
-    return a.game_date.localeCompare(b.game_date)
-  })
-
-  // Incremental selection — each accepted suggestion joins the working set
-  // before the next candidate is checked, so R1 (weekend cap) and R3
-  // (monthly cap) can't be violated by the suggestions taken together.
+  // Incremental selection — re-ranked before EVERY pick, not sorted once up
+  // front. ownSlotCounts is mutated as each suggestion is accepted, so two
+  // slots tied at (say) 0 games each get suggested once before either gets
+  // suggested a second time — otherwise a static one-time sort just finds
+  // "the single least-used slot" and keeps handing out that same slot_time
+  // for all 3 suggestions, which defeats the point of spreading league games
+  // across every available slot at least once.
   const working = [...existing]
   const suggestions: Candidate[] = []
-  for (const candidate of candidates) {
-    if (suggestions.length >= MAX_SUGGESTIONS) break
-    const body: CreateBookingRequest = {
-      game_date: candidate.game_date,
-      slot_time: candidate.slot_time,
-      format: candidate.format,
-      tournament_id: params.id,
-    }
-    const result = validateBooking(body, working, captainName, tournamentName, thisTournamentCaptainId)
-    if (result.errors.length === 0 && result.warnings.length === 0) {
-      suggestions.push(candidate)
-      working.push({
-        id: `candidate-${suggestions.length}`,
+  const remaining = [...candidates]
+
+  while (suggestions.length < MAX_SUGGESTIONS && remaining.length > 0) {
+    remaining.sort((a, b) => {
+      const aCount = ownSlotCounts[a.slot_time] ?? 0
+      const bCount = ownSlotCounts[b.slot_time] ?? 0
+      if (aCount !== bCount) return aCount - bCount
+      return a.game_date.localeCompare(b.game_date)
+    })
+
+    const pickedIndex = remaining.findIndex(candidate => {
+      const body: CreateBookingRequest = {
         game_date: candidate.game_date,
         slot_time: candidate.slot_time,
         format: candidate.format,
-        venue: null,
         tournament_id: params.id,
-        status: 'confirmed',
-        block_reason: null,
-        notes: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tournament: { captain_id: thisTournamentCaptainId } as any,
-      } as any)
-    }
+      }
+      const result = validateBooking(body, working, captainName, tournamentName, thisTournamentCaptainId)
+      return result.errors.length === 0 && result.warnings.length === 0
+    })
+
+    if (pickedIndex === -1) break // nothing left in the horizon is valid at all
+
+    const [picked] = remaining.splice(pickedIndex, 1)
+    suggestions.push(picked)
+    ownSlotCounts[picked.slot_time] = (ownSlotCounts[picked.slot_time] ?? 0) + 1
+    working.push({
+      id: `candidate-${suggestions.length}`,
+      game_date: picked.game_date,
+      slot_time: picked.slot_time,
+      format: picked.format,
+      venue: null,
+      tournament_id: params.id,
+      status: 'confirmed',
+      block_reason: null,
+      notes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      tournament: { captain_id: thisTournamentCaptainId } as any,
+    } as any)
   }
 
   return NextResponse.json({ suggestions })
