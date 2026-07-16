@@ -1139,7 +1139,21 @@ export function TournamentPlannerClient({
         const isCompleted    = completedGames.length >= totalLeague && scheduledGames.length === 0
         const isUpcoming     = completedGames.length === 0
         const isOngoing      = !isCompleted && !isUpcoming
-        return { tournament, games, isCompleted, isUpcoming, isOngoing }
+
+        // Priority signal for sorting — "overdue relative to this tournament's
+        // own pace" (paceSignal's Nudge/Ask-to-slow-down labels), not raw avg
+        // gap or raw unbooked count alone. See the same logic driving each
+        // tournament block's own pace pill.
+        const sortedGames  = [...games].sort((a, b) => a.game_date.localeCompare(b.game_date))
+        const gap          = avgGapWeeks(games.map(g => g.game_date).sort())
+        const unbooked     = Math.max(0, totalLeague - games.length)
+        const lastGameDate = sortedGames.length > 0 ? sortedGames[sortedGames.length - 1].game_date : today
+        const pace         = paceSignal(gap, unbooked, lastGameDate, today)
+        const priorityRank = pace.label === 'Nudge to schedule' ? 0
+          : pace.label === 'Ask to slow down' ? 1
+          : 2
+
+        return { tournament, games, isCompleted, isUpcoming, isOngoing, priorityRank }
       })
       .filter(t => {
         if (t.isCompleted) return showCompleted
@@ -1147,7 +1161,7 @@ export function TournamentPlannerClient({
         if (t.isOngoing)   return showOngoing
         return true
       })
-      .sort((a, b) => b.games.length - a.games.length),
+      .sort((a, b) => a.priorityRank - b.priorityRank || b.games.length - a.games.length),
     [tournamentMap, today, showUpcoming, showOngoing, showCompleted]
   )
 
@@ -1191,7 +1205,7 @@ export function TournamentPlannerClient({
       <section>
         <h2 className="font-cinzel text-xl font-bold text-gold-dim mb-1">By Tournament</h2>
         <p className="font-rajdhani text-sm text-stone-500 mb-5">
-          Organiser pace, game scheduling frequency, and slot balance per tournament.
+          Organiser pace, game scheduling frequency, and slot balance per tournament — tournaments flagged "Nudge to schedule" surface first.
         </p>
         {sortedTournaments.length === 0 ? (
           <p className="font-rajdhani text-sm text-stone-500">
