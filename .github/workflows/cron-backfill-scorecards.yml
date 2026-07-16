@@ -1,0 +1,31 @@
+name: Cron — backfill-scorecards
+
+# Backstop for Vercel Hobby's unreliable cron scheduler (confirmed 2026-07-16:
+# /api/cron/backfill-scorecards had zero automated scorecard_uploads rows in
+# its entire history until manually triggered — see
+# .claude/rules/pending-backlog.md S-8 and
+# .claude/rules/features/post-match-scorecard.md §8). Runs twice a day for
+# now to help drain the March–July backlog that accumulated while the
+# Vercel-side cron was silently not firing; drop back to once daily once the
+# backlog is clear.
+#
+# Safe to run alongside the existing vercel.json cron entry and even to
+# overlap with a same-day manual run — the route only ever processes
+# bookings not yet 'synced'/'fees_applied', so re-running is a no-op for
+# anything already done.
+
+on:
+  schedule:
+    # 01:30 UTC = 07:00 IST, and 13:30 UTC = 19:00 IST
+    - cron: '30 1,13 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call backfill-scorecards cron endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://hub.spartanscricketclub.in/api/cron/backfill-scorecards

@@ -1,0 +1,29 @@
+name: Cron — sync-player-status
+
+# Backstop for Vercel Hobby's unreliable cron scheduler — see
+# cron-lock-availability.yml for the full incident writeup. No dedicated log
+# table exists for this route, so there's no direct evidence either way as
+# of 2026-07-16, but it shares the same Vercel Hobby scheduling mechanism as
+# the two confirmed-broken crons, so it gets the same backstop rather than
+# waiting to be caught by a gap.
+#
+# Safe to run alongside the existing vercel.json cron entry — the route
+# always derives the full active/inactive partition from scratch each run
+# (never touches 'expelled'), so a same-day double-fire just recomputes the
+# same result.
+
+on:
+  schedule:
+    # 20:30 UTC daily = 02:00 IST
+    - cron: '30 20 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sync-player-status cron endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://hub.spartanscricketclub.in/api/cron/sync-player-status
