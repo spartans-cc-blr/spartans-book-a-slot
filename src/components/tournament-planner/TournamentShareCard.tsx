@@ -19,8 +19,6 @@ interface Booking {
   game_date: string
   slot_time: string
   format: string | null
-  captain_id: string | null
-  captain: { id: string; name: string } | null
 }
 
 interface Tournament {
@@ -30,6 +28,7 @@ interface Tournament {
   organiser_contact: string | null
   total_league_games: number | null
   vc_captain_id: string | null
+  captain: { id: string; name: string } | null
 }
 
 export function TournamentShareCard({
@@ -81,6 +80,12 @@ export function TournamentShareCard({
     if (avgGap && gap > avgGap + 2) return 'text-amber-400'
     return 'text-emerald-400'
   }
+  const gapDotColor = (gap: number | null) => {
+    if (!gap)       return 'bg-zinc-500'
+    if (gap <= 1)   return 'bg-red-600'
+    if (avgGap && gap > avgGap + 2) return 'bg-amber-600'
+    return 'bg-emerald-600'
+  }
 
   return (
     <div className="bg-ink-3 border border-ink-5 rounded-lg overflow-hidden">
@@ -92,6 +97,9 @@ export function TournamentShareCard({
           <div>
             <h1 className="font-cinzel text-base font-bold text-parchment">{tournament.name}</h1>
             <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
+              {tournament.captain && (
+                <>Captain: <span className="text-zinc-300 font-semibold">{tournament.captain.name}</span> &nbsp;·&nbsp; </>
+              )}
               Avg gap: <span className="text-zinc-300 font-semibold">
                 {avgGap !== null ? `${avgGap} week${avgGap !== 1 ? 's' : ''}` : 'N/A'}
               </span>
@@ -144,9 +152,6 @@ export function TournamentShareCard({
                     <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">{g.slot_time}</span>
                     <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">{g.format}</span>
                   </div>
-                  {g.captain && (
-                    <p className="font-rajdhani text-xs text-zinc-500">Captain: <span className="text-zinc-300">{g.captain.name}</span></p>
-                  )}
                 </div>
                 <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-ink-5 min-w-[44px]">
                   {gap !== null
@@ -165,6 +170,56 @@ export function TournamentShareCard({
           ))}
         </div>
       </div>
+
+      {/* Game timeline — pace view. Needs 2+ real games to plot a line
+          between, same guard as the private planner's GameTimelineCard. */}
+      {sorted.length >= 2 && (() => {
+        const start   = parseISO(sorted[0].game_date).getTime()
+        const end     = parseISO(sorted[sorted.length - 1].game_date).getTime()
+        const totalMs = end - start || 1
+        const pcts    = sorted.map(g => ((parseISO(g.game_date).getTime() - start) / totalMs) * 100)
+        let lastPct = -100, row = 0
+        const rows = pcts.map(pct => {
+          row = (pct - lastPct < 9) ? (row === 0 ? 1 : 0) : 0
+          lastPct = pct
+          return row
+        })
+        return (
+          <div className="px-4 py-3 border-b border-ink-5">
+            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-3">
+              Game timeline — pace view
+            </p>
+            <div className="flex gap-3.5 flex-wrap mb-3">
+              {[
+                { dot: 'bg-red-600',     label: 'Too fast' },
+                { dot: 'bg-emerald-600', label: 'On pace'  },
+                { dot: 'bg-amber-600',   label: 'Slower'   },
+              ].map(({ dot, label }) => (
+                <div key={label} className="flex items-center gap-1.5 font-rajdhani text-[10px] text-zinc-500">
+                  <span className={`w-2 h-2 rounded-full ${dot}`} />{label}
+                </div>
+              ))}
+            </div>
+            <div className="relative" style={{ height: 16 }}>
+              <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-ink-5" />
+              {sorted.map((g, i) => (
+                <div key={g.id} className="absolute top-0" style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)' }}>
+                  <div className={`w-3 h-3 rounded-full border-2 border-ink-3 ${gapDotColor(gameGaps[i])}`} />
+                </div>
+              ))}
+            </div>
+            <div className="relative mt-1" style={{ height: 30 }}>
+              {sorted.map((g, i) => (
+                <div key={g.id}
+                  className={`absolute whitespace-nowrap font-rajdhani text-[9px] font-semibold ${gapColor(gameGaps[i])}`}
+                  style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)', top: rows[i] * 14 }}>
+                  {format(parseISO(g.game_date), 'd MMM')}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Slot balance */}
       <div className="px-4 py-3">
