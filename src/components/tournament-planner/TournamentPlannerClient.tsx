@@ -88,16 +88,16 @@ function paceSignal(
   today: string
 ): { label: string; bg: string; txt: string; waLabel: string } {
   if (weeks === null) return {
-    label: 'Not enough data', bg: 'bg-zinc-800', txt: 'text-zinc-400', waLabel: '',
+    label: 'Not enough data', bg: 'bg-stone-100', txt: 'text-stone-600', waLabel: '',
   }
   // Nearly done — no action needed regardless of gap
   if (unbooked <= 1) return {
-    label: 'Good pace', bg: 'bg-emerald-900/30', txt: 'text-emerald-400', waLabel: '',
+    label: 'Good pace', bg: 'bg-emerald-50', txt: 'text-emerald-700', waLabel: '',
   }
   // Too fast
   if (weeks <= 1) return {
     label: 'Ask to slow down',
-    bg: 'bg-crimson/20', txt: 'text-red-400',
+    bg: 'bg-red-50', txt: 'text-red-700',
     waLabel: `Hi! We've been playing every week for this tournament — could we space the remaining games out a bit more? Ideally 2 games a month works well for us.`,
   }
   // Nudge only if organiser has gone quiet (last game is past and >21 days ago, 2+ unbooked)
@@ -107,11 +107,11 @@ function paceSignal(
   const hasGoneQuiet = lastGameDate < today && daysSinceLastGame > 21
   if (hasGoneQuiet && unbooked >= 2) return {
     label: 'Nudge to schedule',
-    bg: 'bg-amber-900/40', txt: 'text-amber-400',
+    bg: 'bg-amber-50', txt: 'text-amber-700',
     waLabel: `Hi! It's been a few weeks since our last game in this tournament. Could we get the next couple of fixtures on the calendar? We're targeting 2 games a month.`,
   }
   return {
-    label: 'Good pace', bg: 'bg-emerald-900/30', txt: 'text-emerald-400', waLabel: '',
+    label: 'Good pace', bg: 'bg-emerald-50', txt: 'text-emerald-700', waLabel: '',
   }
 }
 
@@ -191,47 +191,47 @@ function BandwidthSection({
     return (
       <div
         key={captain.id}
-        className={`bg-ink-3 rounded-lg border p-4 transition-opacity ${
+        className={`bg-white rounded-2xl border p-4 transition-opacity ${
           isOwn
             ? 'border-gold-dim ring-1 ring-gold/20'
             : isCaptainView
-            ? `${isLowLoad ? 'border-emerald-800' : 'border-ink-5'} opacity-60`
-            : isLowLoad ? 'border-emerald-800' : 'border-ink-5'
+            ? `${isLowLoad ? 'border-emerald-300' : 'border-parchment-3'} opacity-60`
+            : isLowLoad ? 'border-emerald-300' : 'border-parchment-3'
         }`}
       >
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center font-cinzel text-gold text-sm font-bold flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center font-cinzel text-gold-dim text-sm font-bold flex-shrink-0">
             {captain.name.slice(0, 2).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-cinzel text-sm font-bold text-parchment">{captain.name}</span>
+              <span className="font-cinzel text-sm font-bold text-ink">{captain.name}</span>
               {isLowLoad && (
-                <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-800">
+                <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Bandwidth available — can take new tournament
                 </span>
               )}
             </div>
-            <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
-              <span className="text-parchment font-semibold">{total}</span> total &nbsp;·&nbsp;
-              <span className="text-emerald-400 font-semibold">{completed.length}</span> completed &nbsp;·&nbsp;
-              <span className="text-amber-400 font-semibold">{scheduled.length}</span> scheduled &nbsp;·&nbsp;
-              <span className="text-zinc-400 font-semibold">{unbooked}</span> unbooked
+            <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
+              <span className="text-ink font-semibold">{total}</span> total &nbsp;·&nbsp;
+              <span className="text-emerald-700 font-semibold">{completed.length}</span> completed &nbsp;·&nbsp;
+              <span className="text-amber-700 font-semibold">{scheduled.length}</span> scheduled &nbsp;·&nbsp;
+              <span className="text-stone-600 font-semibold">{unbooked}</span> unbooked
             </p>
           </div>
         </div>
 
         {/* Bandwidth bar */}
-        <div className="h-3 rounded-full bg-zinc-800 overflow-hidden flex mb-2">
+        <div className="h-3 rounded-full bg-parchment-2 overflow-hidden flex mb-2">
           {doneW  > 0 && <div className="h-full bg-emerald-600 transition-all" style={{ width: `${doneW}%` }} />}
           {schedW > 0 && <div className="h-full bg-amber-600 transition-all"   style={{ width: `${schedW}%` }} />}
-          {pendW  > 0 && <div className="h-full bg-zinc-600 transition-all"    style={{ width: `${pendW}%` }} />}
+          {pendW  > 0 && <div className="h-full bg-stone-400 transition-all"   style={{ width: `${pendW}%` }} />}
         </div>
 
         {/* Per-tournament breakdown — played / outstanding / unbooked, click through to the tournament below */}
         {tournamentBreakdown.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-ink-5">
-            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-3">
+          <div className="mt-4 pt-4 border-t border-parchment-3">
+            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 mb-3">
               By tournament
             </p>
             <div className="flex flex-col gap-2">
@@ -240,16 +240,16 @@ function BandwidthSection({
                   key={t.id}
                   type="button"
                   onClick={() => onViewTournament(t.id)}
-                  className="w-full text-left bg-ink-4 border border-ink-5 hover:border-gold-dim rounded-lg px-3 py-2.5 transition-colors"
+                  className="w-full text-left bg-parchment-2 border border-parchment-3 hover:border-gold-dim rounded-lg px-3 py-2.5 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-cinzel text-xs font-bold text-parchment truncate">{t.name}</span>
-                    <span className="font-rajdhani text-[10px] text-zinc-600 flex-shrink-0">↓ view</span>
+                    <span className="font-cinzel text-xs font-bold text-ink truncate">{t.name}</span>
+                    <span className="font-rajdhani text-[10px] text-stone-500 flex-shrink-0">↓ view</span>
                   </div>
-                  <p className="font-rajdhani text-[11px] text-zinc-500 mt-1">
-                    <span className="text-emerald-400 font-semibold">{played}</span> played &nbsp;·&nbsp;
-                    <span className="text-amber-400 font-semibold">{outstanding}</span> outstanding &nbsp;·&nbsp;
-                    <span className="text-zinc-400 font-semibold">{tUnbooked}</span> unbooked
+                  <p className="font-rajdhani text-[11px] text-stone-500 mt-1">
+                    <span className="text-emerald-700 font-semibold">{played}</span> played &nbsp;·&nbsp;
+                    <span className="text-amber-700 font-semibold">{outstanding}</span> outstanding &nbsp;·&nbsp;
+                    <span className="text-stone-600 font-semibold">{tUnbooked}</span> unbooked
                   </p>
                 </button>
               ))}
@@ -259,8 +259,8 @@ function BandwidthSection({
 
         {/* Overall slot balance — secondary to the per-tournament breakdown above */}
         {mine.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-ink-5">
-            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-3">
+          <div className="mt-4 pt-4 border-t border-parchment-3">
+            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 mb-3">
               Overall slot balance
             </p>
             <div className="grid grid-cols-8 gap-1.5">
@@ -271,12 +271,12 @@ function BandwidthSection({
                 const isSat = s.day === 'Sat'
                 const isApplicable = s.validFor.some(f => captainActiveFormats.includes(f))
                 return (
-                  <div key={k} className="bg-ink-4 border border-ink-5 rounded p-1.5 flex flex-col items-center">
+                  <div key={k} className="bg-parchment-2 border border-parchment-3 rounded p-1.5 flex flex-col items-center">
                     <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
-                      isSat ? 'bg-blue-900/50 text-blue-400' : 'bg-pink-900/40 text-pink-400'
+                      isSat ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
                     }`}>{s.day}</span>
-                    <span className="font-rajdhani text-[10px] text-zinc-500 mb-1.5">{s.time}</span>
-                    <div className="w-full h-8 bg-zinc-800 rounded overflow-hidden flex flex-col-reverse mb-1">
+                    <span className="font-rajdhani text-[10px] text-stone-500 mb-1.5">{s.time}</span>
+                    <div className="w-full h-8 bg-parchment-3 rounded overflow-hidden flex flex-col-reverse mb-1">
                       {count > 0 && isApplicable && (
                         <div
                           className="w-full rounded bg-amber-600 transition-all"
@@ -285,18 +285,18 @@ function BandwidthSection({
                       )}
                     </div>
                     <span className={`font-cinzel text-xs font-bold ${
-                      !isApplicable ? 'text-zinc-800' :
-                      count > 0 ? 'text-amber-400' : 'text-zinc-600'
+                      !isApplicable ? 'text-stone-300' :
+                      count > 0 ? 'text-amber-700' : 'text-stone-500'
                     }`}>
                       {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
                     </span>
-                    <span className="font-rajdhani text-[8px] text-zinc-700 mt-0.5">{s.formats}</span>
+                    <span className="font-rajdhani text-[8px] text-stone-400 mt-0.5">{s.formats}</span>
                   </div>
                 )
               })}
             </div>
             {isImbalanced && (
-              <p className="font-rajdhani text-xs text-blue-400 mt-2">
+              <p className="font-rajdhani text-xs text-blue-700 mt-2">
                 ↗ Heavy on {dominantSlot} — route unbooked games to other slots for balance
               </p>
             )}
@@ -308,11 +308,11 @@ function BandwidthSection({
 
   return (
     <section className="mb-10">
-      <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-600 mb-1">
+      <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-stone-500 mb-1">
         Tournament Planner
       </p>
-      <h1 className="font-cinzel text-xl font-bold text-gold mb-1">Captain Bandwidth</h1>
-      <p className="font-rajdhani text-sm text-zinc-500 mb-5">
+      <h1 className="font-cinzel text-xl font-bold text-gold-dim mb-1">Captain Bandwidth</h1>
+      <p className="font-rajdhani text-sm text-stone-500 mb-5">
         {isCaptainView
           ? 'Your tournament load — followed by other captains.'
           : 'Total tournament game load per captain — completed, scheduled, and unbooked.'}
@@ -323,11 +323,11 @@ function BandwidthSection({
         {[
           { color: 'bg-emerald-600', label: 'Completed (past date)' },
           { color: 'bg-amber-600',   label: 'Scheduled (upcoming booked)' },
-          { color: 'bg-zinc-600',    label: 'Unbooked (remaining league games)' },
+          { color: 'bg-stone-400',   label: 'Unbooked (remaining league games)' },
         ].map(({ color, label }) => (
           <div key={label} className="flex items-center gap-2">
             <div className={`w-3 h-3 rounded-sm ${color}`} />
-            <span className="font-rajdhani text-xs text-zinc-500">{label}</span>
+            <span className="font-rajdhani text-xs text-stone-600">{label}</span>
           </div>
         ))}
       </div>
@@ -335,10 +335,10 @@ function BandwidthSection({
       <div className="flex flex-col gap-4">
         {isCaptainView && myCaptain && (
           <>
-            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-500">Your bandwidth</p>
+            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500">Your bandwidth</p>
             {renderCaptainCard(myCaptain, true)}
             {otherCaptains.length > 0 && (
-              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-2">Other captains</p>
+              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mt-2">Other captains</p>
             )}
           </>
         )}
@@ -601,10 +601,10 @@ function TournamentBlock({
     : null
 
   return (
-    <div id={`tournament-block-${tournament.id}`} className="bg-ink-3 border border-ink-5 rounded-lg mb-4 overflow-hidden scroll-mt-24">
+    <div id={`tournament-block-${tournament.id}`} className="bg-white border border-parchment-3 rounded-2xl mb-4 overflow-hidden scroll-mt-24">
 
       {/* Header */}
-      <button className="w-full text-left px-4 py-3 hover:bg-ink-4 transition-colors" onClick={() => setOpen(v => !v)}>
+      <button className="w-full text-left px-4 py-3 hover:bg-parchment-2 transition-colors" onClick={() => setOpen(v => !v)}>
         <div className="flex items-start gap-3">
           <span className="text-amber-500 mt-0.5">🏆</span>
           <div className="flex-1 min-w-0">
@@ -614,28 +614,28 @@ function TournamentBlock({
 										href={tournament.cricheroes_points_table_url}
 										target="_blank"
 										rel="noopener noreferrer"
-										className="font-cinzel text-sm font-bold text-parchment underline decoration-gold underline-offset-2"
+										className="font-cinzel text-sm font-bold text-ink underline decoration-gold underline-offset-2"
 									>
 										{tournament.name}
 									</a>
 									) : (
-									<span className="font-cinzel text-sm font-bold text-parchment">{tournament.name}</span>
+									<span className="font-cinzel text-sm font-bold text-ink">{tournament.name}</span>
 								)}
               <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${pace.bg} ${pace.txt}`}>{pace.label}</span>
             </div>
-            <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
-              {tournament.organiser_name && <>Organiser: <span className="text-zinc-400">{tournament.organiser_name}</span> &nbsp;·&nbsp;</>}
-              {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} className="text-blue-400" /> &nbsp;·&nbsp;</>}
-              Avg gap: <span className="text-zinc-300 font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
+            <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
+              {tournament.organiser_name && <>Organiser: <span className="text-stone-700">{tournament.organiser_name}</span> &nbsp;·&nbsp;</>}
+              {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} className="text-blue-700" /> &nbsp;·&nbsp;</>}
+              Avg gap: <span className="text-ink font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
             </p>
           </div>
           <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
-            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400">{completed.length} done</span>
-            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-400">{scheduled.length} sched</span>
+            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{completed.length} done</span>
+            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">{scheduled.length} sched</span>
             {unbooked > 0 && (
-              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-zinc-700/60 text-zinc-400">{unbooked} unbooked</span>
+              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">{unbooked} unbooked</span>
             )}
-            <span className="text-zinc-600 ml-1 self-center">{open ? '▲' : '▼'}</span>
+            <span className="text-stone-400 ml-1 self-center">{open ? '▲' : '▼'}</span>
           </div>
         </div>
       </button>
@@ -643,12 +643,12 @@ function TournamentBlock({
       {/* Collapsed mini bar */}
       {!open && (
         <div className="px-4 pb-3">
-          <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-zinc-800 mt-1">
+          <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-parchment-3 mt-1">
             {sortedGames.map(g => (
               <div key={g.id} className={`flex-1 ${g.game_date < today ? 'bg-emerald-600' : 'bg-amber-600'}`} />
             ))}
             {Array.from({ length: unbooked }).map((_, i) => (
-              <div key={`u${i}`} className="flex-1 bg-zinc-700 opacity-40" />
+              <div key={`u${i}`} className="flex-1 bg-stone-400 opacity-50" />
             ))}
           </div>
         </div>
@@ -1030,7 +1030,7 @@ export function TournamentPlannerClient({
 
       {/* Tournament filter */}
       <div className="flex items-center gap-5 mb-5 flex-wrap">
-        <span className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600">Show:</span>
+        <span className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500">Show:</span>
         {([
           { label: 'Upcoming',  checked: showUpcoming,  set: setShowUpcoming  },
           { label: 'Ongoing',   checked: showOngoing,   set: setShowOngoing   },
@@ -1040,30 +1040,30 @@ export function TournamentPlannerClient({
             <input type="checkbox" checked={checked} onChange={e => set(e.target.checked)}
               className="accent-gold w-3.5 h-3.5 cursor-pointer" />
             <span className={`font-rajdhani text-xs font-semibold tracking-wide transition-colors ${
-              checked ? 'text-zinc-300' : 'text-zinc-600'
+              checked ? 'text-ink' : 'text-stone-500'
             }`}>{label}</span>
           </label>
         ))}
       </div>
 
       <section>
-        <h2 className="font-cinzel text-xl font-bold text-gold mb-1">By Tournament</h2>
-        <p className="font-rajdhani text-sm text-zinc-500 mb-5">
+        <h2 className="font-cinzel text-xl font-bold text-gold-dim mb-1">By Tournament</h2>
+        <p className="font-rajdhani text-sm text-stone-500 mb-5">
           Organiser pace, game scheduling frequency, and slot balance per tournament.
         </p>
         {sortedTournaments.length === 0 ? (
-          <p className="font-rajdhani text-sm text-zinc-600">
+          <p className="font-rajdhani text-sm text-stone-500">
             No tournaments match the selected filters.{' '}
             <button
               onClick={() => { setShowUpcoming(true); setShowOngoing(true); setShowCompleted(true) }}
-              className="text-gold underline"
+              className="text-gold-dim underline"
             >Show all</button>
           </p>
         ) : (
           <>
             {isCaptainView && myTournaments.length > 0 && (
               <>
-                <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Your tournaments</p>
+                <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">Your tournaments</p>
                 {myTournaments.map(({ tournament, games }) => (
                   <TournamentBlock key={tournament.id} tournament={tournament} games={games}
                     announcedSet={announcedSet} today={today}
@@ -1073,7 +1073,7 @@ export function TournamentPlannerClient({
                     forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
                 ))}
                 {otherTournaments.length > 0 && (
-                  <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mt-6 mb-3">Other tournaments</p>
+                  <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mt-6 mb-3">Other tournaments</p>
                 )}
               </>
             )}
