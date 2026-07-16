@@ -623,19 +623,18 @@ function TournamentBlock({
               <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${pace.bg} ${pace.txt}`}>{pace.label}</span>
             </div>
             <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
-              {tournament.organiser_name && <>Organiser: <span className="text-stone-700">{tournament.organiser_name}</span> &nbsp;·&nbsp;</>}
               {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} className="text-blue-700" /> &nbsp;·&nbsp;</>}
               Avg gap: <span className="text-ink font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
             </p>
+            <div className="flex gap-1.5 flex-wrap mt-2">
+              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{completed.length} done</span>
+              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">{scheduled.length} sched</span>
+              {unbooked > 0 && (
+                <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">{unbooked} unbooked</span>
+              )}
+            </div>
           </div>
-          <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
-            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{completed.length} done</span>
-            <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">{scheduled.length} sched</span>
-            {unbooked > 0 && (
-              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">{unbooked} unbooked</span>
-            )}
-            <span className="text-stone-400 ml-1 self-center">{open ? '▲' : '▼'}</span>
-          </div>
+          <span className="text-stone-400 flex-shrink-0">{open ? '▲' : '▼'}</span>
         </div>
       </button>
 
@@ -676,55 +675,71 @@ function TournamentBlock({
               bookingCaptainMap={bookingCaptainMap}
             />
 
-            {/* Pace insight */}
-            {gap !== null && (
+            {/* Pace insight — also carries the organiser name + a WhatsApp ping icon, moved down from the header */}
+            {(gap !== null || tournament.organiser_name || whatsappLink) && (
               <div className="mt-2.5 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                <div className="flex gap-5 flex-wrap">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Avg gap</p>
-                    <p className="font-cinzel text-xl font-extrabold text-amber-800 mt-0.5">{gap}w</p>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex gap-5 flex-wrap">
+                    {gap !== null && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Avg gap</p>
+                        <p className="font-cinzel text-xl font-extrabold text-amber-800 mt-0.5">{gap}w</p>
+                      </div>
+                    )}
+                    {fastestGap !== null && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-stone-500">Fastest</p>
+                        <p className="font-cinzel text-xl font-extrabold text-red-700 mt-0.5">{fastestGap}w</p>
+                      </div>
+                    )}
+                    {slowestGap !== null && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-stone-500">Slowest</p>
+                        <p className="font-cinzel text-xl font-extrabold text-amber-700 mt-0.5">{slowestGap}w</p>
+                      </div>
+                    )}
                   </div>
-                  {fastestGap !== null && (
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-stone-500">Fastest</p>
-                      <p className="font-cinzel text-xl font-extrabold text-red-700 mt-0.5">{fastestGap}w</p>
-                    </div>
-                  )}
-                  {slowestGap !== null && (
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-stone-500">Slowest</p>
-                      <p className="font-cinzel text-xl font-extrabold text-amber-700 mt-0.5">{slowestGap}w</p>
+                  {(tournament.organiser_name || whatsappLink) && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {tournament.organiser_name && (
+                        <span className="text-xs text-stone-600">
+                          Organiser: <span className="text-stone-800 font-semibold">{tournament.organiser_name}</span>
+                        </span>
+                      )}
+                      {whatsappLink && (
+                        <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                          title={`Ping ${tournament.organiser_name ?? 'organiser'} on WhatsApp — ${pace.label}`}
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex-shrink-0">
+                          📲
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>
-                <p className="text-[13px] leading-relaxed text-amber-900 mt-3">
-                  {isUneven
-                    ? `Games are unevenly spaced (${fastestGap}w–${slowestGap}w) — ask the organiser to smooth scheduling closer to the ${gap}w average.`
-                    : `Games are evenly paced around the ${gap}w average — no action needed.`}
-                </p>
+                {gap !== null && (
+                  <p className="text-[13px] leading-relaxed text-amber-900 mt-3">
+                    {isUneven
+                      ? `Games are unevenly spaced (${fastestGap}w–${slowestGap}w) — ask the organiser to smooth scheduling closer to the ${gap}w average.`
+                      : `Games are evenly paced around the ${gap}w average — no action needed.`}
+                  </p>
+                )}
               </div>
             )}
           </div>
 
           {/* Share actions */}
-          {(whatsappLink || isAdmin || isGC) && (
+          {(isAdmin || isGC) && (
             <div className="px-4 pt-3 flex flex-col gap-2">
-              {(isAdmin || isGC) && shareLink && (
+              {shareLink && (
                 <TournamentShareButton
                   tournamentId={tournament.id}
                   className="w-full flex items-center justify-center gap-2 bg-ink text-white rounded-xl py-3.5 text-[15px] font-bold hover:bg-ink-2 transition-colors"
                 />
               )}
-              {(isAdmin || isGC) && !shareLink && (
+              {!shareLink && (
                 <p className="text-xs text-stone-500">
                   Add organiser WhatsApp in /admin/tournaments to enable sharing
                 </p>
-              )}
-              {whatsappLink && (
-                <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl py-2.5 text-sm font-bold">
-                  📲 WhatsApp {tournament.organiser_name ?? 'organiser'} — {pace.label}
-                </a>
               )}
             </div>
           )}
