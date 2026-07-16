@@ -8,7 +8,15 @@ export const WA_ICON = (
   </svg>
 )
 
-export function TournamentShareButton({ tournamentId, className }: { tournamentId: string; className?: string }) {
+export function TournamentShareButton({ tournamentId, className, iconClassName, label }: {
+  tournamentId: string
+  className?: string
+  // When set, wraps the icon in its own element (iconClassName) with a small
+  // caption underneath — used where this sits next to another WhatsApp-styled
+  // icon (the organiser ping) that would otherwise be indistinguishable from it.
+  iconClassName?: string
+  label?: string
+}) {
   const [copied, setCopied] = useState(false)
 
   async function handleShare() {
@@ -22,10 +30,17 @@ export function TournamentShareButton({ tournamentId, className }: { tournamentI
     setTimeout(() => setCopied(false), 2500)
   }
 
+  const icon = copied ? '✅' : WA_ICON
+
   return (
     <button onClick={handleShare} title={copied ? 'Link copied!' : 'Share tournament card'}
       className={className ?? 'inline-flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors'}>
-      {copied ? '✅' : WA_ICON}
+      {label ? (
+        <>
+          <span className={iconClassName}>{icon}</span>
+          <span className="text-[9px] font-semibold text-stone-500">{copied ? 'Copied!' : label}</span>
+        </>
+      ) : icon}
     </button>
   )
 }
