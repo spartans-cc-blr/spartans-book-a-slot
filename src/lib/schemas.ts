@@ -25,6 +25,11 @@ export const SKILLS = [
 
 export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const
 
+// Strict YYYY-MM-DD — 4-digit year only. Postgres `date` will happily accept
+// a mistyped 5+ digit year (e.g. '12026-08-15'), which then throws
+// `RangeError: Invalid time value` out of date-fns when rendered.
+export const GAME_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
 // ── PLAYER SELF-EDIT (PATCH /api/players/[id]) ──────────────────────────────
 
 export const playerSelfEditSchema = z.object({

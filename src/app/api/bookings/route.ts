@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { validateBooking } from '@/lib/validation'
+import { GAME_DATE_REGEX } from '@/lib/schemas'
 import type { CreateBookingRequest } from '@/types'
 
 
@@ -59,6 +60,10 @@ export async function POST(req: NextRequest) {
 
   if (!game_date || !slot_time || !format || !tournament_id) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  if (!GAME_DATE_REGEX.test(game_date)) {
+    return NextResponse.json({ error: 'game_date must be in YYYY-MM-DD format' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
