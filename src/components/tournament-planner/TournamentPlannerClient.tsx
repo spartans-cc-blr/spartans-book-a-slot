@@ -566,16 +566,6 @@ function TournamentBlock({
   )
   const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
 
-   const cardUrl = typeof window !== 'undefined'
-     ? `${window.location.origin}/tournament-planner/share/${tournament.id}`
-     : `https://hub.spartanscricketclub.in/tournament-planner/share/${tournament.id}`
- 
-   const whatsappLink = pace.waLabel && tournament.organiser_contact
-     ? `https://wa.me/${tournament.organiser_contact.replace(/\D/g, '')}?text=${encodeURIComponent(
-         `${pace.waLabel}\n\nHere's a summary of where we stand on slots and scheduling:\n${cardUrl}`
-       )}`
-     : null
-
   const shareMessage = useMemo(() => {
     const tl           = tournament.total_league_games ?? games.length
     const completedCnt = games.filter(g => g.game_date < today).length
@@ -681,8 +671,10 @@ function TournamentBlock({
               canSuggestSlots={isAdmin || isGC}
             />
 
-            {/* Pace insight — also carries the organiser name + WhatsApp ping/share icons, moved down from the header */}
-            {(gap !== null || tournament.organiser_name || whatsappLink || isAdmin || isGC) && (
+            {/* Pace insight — also carries the organiser name + share icon, moved down from the header.
+                The old WhatsApp "ping about pace" nudge was dropped in favour of the more actionable
+                Suggest-slots WhatsApp nudge on the Unbooked tab, which covers the same need. */}
+            {(gap !== null || tournament.organiser_name || isAdmin || isGC) && (
               <div className="mt-2.5 bg-amber-50 border border-amber-200 rounded-2xl p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex gap-5 flex-wrap">
@@ -705,7 +697,7 @@ function TournamentBlock({
                       </div>
                     )}
                   </div>
-                  {(tournament.organiser_name || whatsappLink || isAdmin || isGC) && (
+                  {(tournament.organiser_name || isAdmin || isGC) && (
                     <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                       {tournament.organiser_name && (
                         <span className="text-xs text-stone-600">
@@ -713,14 +705,6 @@ function TournamentBlock({
                         </span>
                       )}
                       <div className="flex items-center gap-3">
-                        {whatsappLink && (
-                          <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
-                            title={`Ping ${tournament.organiser_name ?? 'organiser'} on WhatsApp — ${pace.label}`}
-                            className="flex flex-col items-center gap-0.5 text-emerald-700 hover:text-emerald-800 transition-colors flex-shrink-0">
-                            <span className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100">{WA_ICON}</span>
-                            <span className="text-[9px] font-semibold text-stone-500">Ping</span>
-                          </a>
-                        )}
                         {(isAdmin || isGC) && shareLink && (
                           <TournamentShareButton
                             tournamentId={tournament.id}
