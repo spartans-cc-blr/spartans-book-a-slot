@@ -75,32 +75,32 @@ export function TournamentShareCard({
   const activeFormats   = formats.length === 0 ? ['T20', 'T30'] : formats
 
   const gapColor = (gap: number | null) => {
-    if (!gap)       return 'text-zinc-500'
-    if (gap <= 1)   return 'text-red-400'
-    if (avgGap && gap > avgGap + 2) return 'text-amber-400'
-    return 'text-emerald-400'
+    if (!gap)       return 'text-stone-500'
+    if (gap <= 1)   return 'text-red-700'
+    if (avgGap && gap > avgGap + 2) return 'text-amber-700'
+    return 'text-emerald-700'
   }
   const gapDotColor = (gap: number | null) => {
-    if (!gap)       return 'bg-zinc-500'
+    if (!gap)       return 'bg-stone-400'
     if (gap <= 1)   return 'bg-red-600'
     if (avgGap && gap > avgGap + 2) return 'bg-amber-600'
     return 'bg-emerald-600'
   }
 
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded-lg overflow-hidden">
+    <div className="bg-white border border-parchment-3 rounded-2xl overflow-hidden">
 
       {/* Header */}
-      <div className="px-5 py-4 border-b border-ink-5">
+      <div className="px-5 py-4 border-b border-parchment-3">
         <div className="flex items-start gap-3">
           <span className="text-amber-500 text-xl">🏆</span>
           <div>
-            <h1 className="font-cinzel text-base font-bold text-parchment">{tournament.name}</h1>
-            <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
+            <h1 className="font-cinzel text-base font-bold text-ink">{tournament.name}</h1>
+            <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
               {tournament.captain && (
-                <>Captain: <span className="text-zinc-300 font-semibold">{tournament.captain.name}</span> &nbsp;·&nbsp; </>
+                <>Captain: <span className="text-ink font-semibold">{tournament.captain.name}</span> &nbsp;·&nbsp; </>
               )}
-              Avg gap: <span className="text-zinc-300 font-semibold">
+              Avg gap: <span className="text-ink font-semibold">
                 {avgGap !== null ? `${avgGap} week${avgGap !== 1 ? 's' : ''}` : 'N/A'}
               </span>
             </p>
@@ -109,24 +109,24 @@ export function TournamentShareCard({
       </div>
 
       {/* Stat bar */}
-      <div className="grid grid-cols-4 border-b border-ink-5">
+      <div className="grid grid-cols-4 border-b border-parchment-3">
         {[
-          { label: 'Total',     val: totalLeague.toString(), col: 'text-parchment',   sub: 'league games'   },
-          { label: 'Completed', val: completed.length.toString(),  col: 'text-emerald-400', sub: 'past date'      },
-          { label: 'Scheduled', val: scheduled.length.toString(),  col: 'text-amber-400',   sub: 'upcoming'       },
-          { label: 'Unbooked',  val: unbooked.toString(),    col: 'text-zinc-400',    sub: 'not yet booked' },
+          { label: 'Total',     val: totalLeague.toString(), col: 'text-ink',         sub: 'league games'   },
+          { label: 'Completed', val: completed.length.toString(),  col: 'text-emerald-700', sub: 'past date'      },
+          { label: 'Scheduled', val: scheduled.length.toString(),  col: 'text-amber-700',   sub: 'upcoming'       },
+          { label: 'Unbooked',  val: unbooked.toString(),    col: 'text-stone-500',   sub: 'not yet booked' },
         ].map(({ label, val, col, sub }, i) => (
-          <div key={label} className={`px-3 py-2.5 text-center ${i > 0 ? 'border-l border-ink-5' : ''}`}>
-            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-zinc-600">{label}</p>
+          <div key={label} className={`px-3 py-2.5 text-center ${i > 0 ? 'border-l border-parchment-3' : ''}`}>
+            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-stone-500">{label}</p>
             <p className={`font-cinzel text-lg font-bold ${col}`}>{val}</p>
-            <p className="font-rajdhani text-[9px] text-zinc-600">{sub}</p>
+            <p className="font-rajdhani text-[9px] text-stone-400">{sub}</p>
           </div>
         ))}
       </div>
 
       {/* Game list */}
-      <div className="px-4 py-3 border-b border-ink-5">
-        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-3">
+      <div className="px-4 py-3 border-b border-parchment-3">
+        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">
           Schedule
         </p>
         <div className="flex flex-col gap-1.5">
@@ -138,33 +138,33 @@ export function TournamentShareCard({
             const isDone  = g.game_date < today
             return (
               <div key={g.id}
-                className={`grid grid-cols-[44px_1fr_auto] border border-ink-5 rounded overflow-hidden ${isDone ? 'opacity-50' : ''}`}>
-                <div className="bg-ink-4 flex flex-col items-center justify-center py-2 border-r border-ink-5">
-                  <span className="font-cinzel text-base font-bold text-parchment leading-none">{format(d, 'd')}</span>
-                  <span className="font-rajdhani text-[9px] text-zinc-500 uppercase">{format(d, 'MMM')}</span>
-                  <span className="font-rajdhani text-[9px] text-zinc-600">{dayName}</span>
+                className={`grid grid-cols-[44px_1fr_auto] border border-parchment-3 rounded-xl overflow-hidden ${isDone ? 'opacity-60' : ''}`}>
+                <div className="bg-parchment-2 flex flex-col items-center justify-center py-2 border-r border-parchment-3">
+                  <span className="font-cinzel text-base font-bold text-ink leading-none">{format(d, 'd')}</span>
+                  <span className="font-rajdhani text-[9px] text-stone-500 uppercase">{format(d, 'MMM')}</span>
+                  <span className="font-rajdhani text-[9px] text-stone-500">{dayName}</span>
                 </div>
                 <div className="px-2.5 py-2 flex flex-col gap-0.5">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                      isSat ? 'bg-blue-900/40 text-blue-400' : 'bg-pink-900/30 text-pink-400'
+                    <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                      isSat ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-pink-100 text-pink-700 border-pink-300'
                     }`}>{dayName}</span>
-                    <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">{g.slot_time}</span>
-                    <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">{g.format}</span>
+                    <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">{g.slot_time}</span>
+                    <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">{g.format}</span>
                   </div>
                 </div>
-                <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-ink-5 min-w-[44px]">
+                <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-parchment-3 min-w-[44px]">
                   {gap !== null
                     ? <span className={`font-cinzel text-sm font-bold ${gapColor(gap)}`}>{gap}w</span>
-                    : <span className="font-rajdhani text-[9px] text-zinc-600">start</span>
+                    : <span className="font-rajdhani text-[9px] text-stone-500">start</span>
                   }
-                  {gap !== null && <span className="font-rajdhani text-[9px] text-zinc-700">from prev</span>}
+                  {gap !== null && <span className="font-rajdhani text-[9px] text-stone-400">from prev</span>}
                 </div>
               </div>
             )
           })}
           {Array.from({ length: unbooked }).map((_, i) => (
-            <div key={`u${i}`} className="flex items-center gap-2 py-1.5 px-2 font-rajdhani text-xs text-zinc-700 border border-dashed border-ink-5 rounded">
+            <div key={`u${i}`} className="flex items-center gap-2 py-1.5 px-2 font-rajdhani text-xs text-stone-400 border border-dashed border-parchment-3 rounded-xl">
               ○ Game {sorted.length + i + 1} — date &amp; slot not yet booked
             </div>
           ))}
@@ -185,8 +185,8 @@ export function TournamentShareCard({
           return row
         })
         return (
-          <div className="px-4 py-3 border-b border-ink-5">
-            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-3">
+          <div className="px-4 py-3 border-b border-parchment-3">
+            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">
               Game timeline — pace view
             </p>
             <div className="flex gap-3.5 flex-wrap mb-3">
@@ -195,16 +195,17 @@ export function TournamentShareCard({
                 { dot: 'bg-emerald-600', label: 'On pace'  },
                 { dot: 'bg-amber-600',   label: 'Slower'   },
               ].map(({ dot, label }) => (
-                <div key={label} className="flex items-center gap-1.5 font-rajdhani text-[10px] text-zinc-500">
+                <div key={label} className="flex items-center gap-1.5 font-rajdhani text-[10px] text-stone-500">
                   <span className={`w-2 h-2 rounded-full ${dot}`} />{label}
                 </div>
               ))}
             </div>
             <div className="relative" style={{ height: 16 }}>
-              <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-ink-5" />
+              <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3" />
               {sorted.map((g, i) => (
                 <div key={g.id} className="absolute top-0" style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)' }}>
-                  <div className={`w-3 h-3 rounded-full border-2 border-ink-3 ${gapDotColor(gameGaps[i])}`} />
+                  <div className={`w-3 h-3 rounded-full border-2 border-white ${gapDotColor(gameGaps[i])}`}
+                    style={{ boxShadow: '0 0 0 1px #E2DACE' }} />
                 </div>
               ))}
             </div>
@@ -223,7 +224,7 @@ export function TournamentShareCard({
 
       {/* Slot balance */}
       <div className="px-4 py-3">
-        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-3">
+        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">
           Slot balance
         </p>
         <div className="grid grid-cols-8 gap-1.5">
@@ -234,23 +235,23 @@ export function TournamentShareCard({
             const isSat        = s.day === 'Sat'
             const isApplicable = s.validFor.some(f => activeFormats.includes(f))
             return (
-              <div key={k} className="bg-ink-4 border border-ink-5 rounded p-1.5 flex flex-col items-center">
-                <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
-                  isSat ? 'bg-blue-900/50 text-blue-400' : 'bg-pink-900/40 text-pink-400'
+              <div key={k} className="bg-parchment-2 border border-parchment-3 rounded p-1.5 flex flex-col items-center">
+                <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 border ${
+                  isSat ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-pink-100 text-pink-700 border-pink-300'
                 }`}>{s.day}</span>
-                <span className="font-rajdhani text-[10px] text-zinc-500 mb-1.5">{s.time}</span>
-                <div className="w-full h-8 bg-zinc-800 rounded overflow-hidden flex flex-col-reverse mb-1">
+                <span className="font-rajdhani text-[10px] text-stone-500 mb-1.5">{s.time}</span>
+                <div className="w-full h-8 bg-parchment-3 rounded overflow-hidden flex flex-col-reverse mb-1">
                   {count > 0 && isApplicable && (
                     <div className={`w-full rounded transition-all ${count === maxSlotCount ? 'bg-emerald-600' : 'bg-amber-600'}`}
                       style={{ height: `${barH}%` }} />
                   )}
                 </div>
                 <span className={`font-cinzel text-xs font-bold ${
-                  !isApplicable ? 'text-zinc-800' : count > 0 ? 'text-amber-400' : 'text-zinc-600'
+                  !isApplicable ? 'text-stone-300' : count > 0 ? 'text-amber-700' : 'text-stone-500'
                 }`}>
                   {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
                 </span>
-                <span className="font-rajdhani text-[8px] text-zinc-700 mt-0.5">{s.formats}</span>
+                <span className="font-rajdhani text-[8px] text-stone-400 mt-0.5">{s.formats}</span>
               </div>
             )
           })}
