@@ -712,18 +712,21 @@ function TournamentBlock({
                           Organiser: <span className="text-stone-800 font-semibold">{tournament.organiser_name}</span>
                         </span>
                       )}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         {whatsappLink && (
                           <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
                             title={`Ping ${tournament.organiser_name ?? 'organiser'} on WhatsApp — ${pace.label}`}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex-shrink-0">
-                            {WA_ICON}
+                            className="flex flex-col items-center gap-0.5 text-emerald-700 hover:text-emerald-800 transition-colors flex-shrink-0">
+                            <span className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100">{WA_ICON}</span>
+                            <span className="text-[9px] font-semibold text-stone-500">Ping</span>
                           </a>
                         )}
                         {(isAdmin || isGC) && shareLink && (
                           <TournamentShareButton
                             tournamentId={tournament.id}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex-shrink-0"
+                            className="flex flex-col items-center gap-0.5 text-emerald-700 hover:text-emerald-800 transition-colors flex-shrink-0"
+                            iconClassName="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100"
+                            label="Share"
                           />
                         )}
                       </div>
@@ -980,6 +983,14 @@ function SuggestedSlotsPanel({
     }
   }
 
+  // This panel only mounts once the viewer is actually on the Unbooked tab
+  // (see canSuggestSlots gating in MatchTabsSection), so fetching immediately
+  // here already is the lazy behaviour — no extra click needed to see it.
+  useEffect(() => {
+    loadSuggestions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournamentId])
+
   const waMessage = suggestions && suggestions.length > 0
     ? [
         `Hi${organiserName ? ' ' + organiserName : ''}! For ${tournamentName}, here are a few slots that work well on our end for the next game${suggestions.length !== 1 ? 's' : ''}:`,
@@ -996,10 +1007,11 @@ function SuggestedSlotsPanel({
     <div className="mt-2.5 bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3.5">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold text-stone-700">Suggest slots to organiser</p>
-        {!suggestions && (
-          <button type="button" onClick={loadSuggestions} disabled={loading}
-            className="text-[11px] font-bold text-gold-dim hover:text-gold disabled:opacity-50 flex-shrink-0">
-            {loading ? 'Finding slots…' : 'Find next 3 slots'}
+        {loading && <span className="text-[11px] text-stone-400 flex-shrink-0">Finding slots…</span>}
+        {error && (
+          <button type="button" onClick={loadSuggestions}
+            className="text-[11px] font-bold text-gold-dim hover:text-gold flex-shrink-0">
+            Retry
           </button>
         )}
       </div>
