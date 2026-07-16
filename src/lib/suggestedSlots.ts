@@ -115,11 +115,12 @@ export async function getSuggestedOpenDates(
   if (toISODate(firstSat) === toISODate(today)) firstSat = addDays(firstSat, 7)
   const horizonEnd = addDays(firstSat, HORIZON_WEEKS * 7)
 
-  // This tournament's own confirmed games — used only to rank candidate
-  // slots by how under-used they are for THIS tournament specifically.
+  // This tournament's own confirmed games — used to rank candidate slots by
+  // how under-used they are for THIS tournament specifically, and to find
+  // the latest one already on the calendar (see latestOwnBookingDate below).
   const { data: ownGames, error: ownErr } = await supabase
     .from('bookings')
-    .select('slot_time, format')
+    .select('game_date, slot_time, format')
     .eq('tournament_id', tournamentId)
     .eq('status', 'confirmed')
 
@@ -132,6 +133,18 @@ export async function getSuggestedOpenDates(
   const activeFormats = Array.from(new Set(
     (ownGames ?? []).map(g => g.format).filter((f): f is GameFormat => !!f)
   ))
+
+  // Latest date already on this tournament's own calendar (scheduled or
+  // completed) — candidates on or before it are excluded below. Without
+  // this, an earlier open weekend that happened to sit between two
+  // already-scheduled games (e.g. 16 Aug, when the tournament already has
+  // a game on 13 Sep) would get suggested — technically valid, but not
+  // useful: suggestions should continue the season forward from whatever's
+  // already locked in, not backfill gaps the organiser already scheduled
+  // around.
+  const latestOwnBookingDate = (ownGames ?? []).reduce<string | null>(
+    (max, g) => (max === null || g.game_date > max ? g.game_date : max), null
+  )
 
   // Match the unbooked count shown elsewhere on the page (total_league_games
   // minus confirmed games) unless the caller passed an explicit override —
@@ -175,6 +188,7 @@ export async function getSuggestedOpenDates(
     for (const [date, day] of [[sat, 'Sat'], [sun, 'Sun']] as const) {
       const dateStr = toISODate(date)
       if (bookedDates.has(dateStr)) continue
+      if (latestOwnBookingDate && dateStr <= latestOwnBookingDate) continue
       for (const slotDef of SLOT_DEFS) {
         const candidateFormats = activeFormats.length
           ? slotDef.validFor.filter(f => activeFormats.includes(f))
