@@ -17,10 +17,18 @@
 // days keeps the list simple to reason about — every suggested date really
 // is a clean slate.
 //
-// Deliberately does NOT consider a captain's overall cross-tournament slot
-// balance (the Captain Bandwidth "Overall slot balance" signal) — that's a
-// separate fairness feature. Slot-time ranking here only prefers this
-// tournament's own least-used slot_time, so its own spread stays balanced.
+// The response only ever returns dates (game_date/day), never a slot_time —
+// every candidate day is fully open, so any slot_time on it would work.
+// slot_time/format are still used internally to rank and validate
+// candidates against R1-R6 (a day still needs at least one concrete
+// slot_time/format to check), but surfacing the one we happened to pick
+// would wrongly read as "this is the time," when really the whole day is
+// free. Ranking still prefers this tournament's own least-used slot_time
+// as an internal tie-break, purely to keep its eventual slot spread
+// balanced once a real time is chosen at booking time — deliberately does
+// NOT consider a captain's overall cross-tournament slot balance (the
+// Captain Bandwidth "Overall slot balance" signal), which is a separate
+// fairness feature.
 //
 // Suggestions are selected incrementally: each accepted candidate is folded
 // into the working "existing bookings" set before the next candidate is
@@ -262,5 +270,12 @@ export async function GET(
     .map(([month]) => month)
     .sort()
 
-  return NextResponse.json({ suggestions, monthlyCap: R3_MONTHLY_CAP, overCapMonths })
+  // slot_time/format were only needed internally to validate and rank
+  // candidates against R1-R6 — every suggested day is fully open, so any
+  // slot_time on it would work. Exposing the one we happened to validate
+  // against would wrongly read as "this is the time," so only the date
+  // is returned.
+  const suggestedDates = suggestions.map(s => ({ game_date: s.game_date, day: s.day }))
+
+  return NextResponse.json({ suggestions: suggestedDates, monthlyCap: R3_MONTHLY_CAP, overCapMonths })
 }
