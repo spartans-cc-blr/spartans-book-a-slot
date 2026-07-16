@@ -7,7 +7,8 @@ import type { CreateSoftBlockRequest } from '@/types'
 // ── GET /api/soft-blocks ──────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const user = session?.user as any
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const supabase = createServiceClient()
   const { data, error } = await supabase
@@ -23,7 +24,8 @@ export async function GET(req: NextRequest) {
 // ── POST /api/soft-blocks ─────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const user = session?.user as any
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const body: CreateSoftBlockRequest = await req.json()
   const { game_date, slot_time, block_reason, notes } = body
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest) {
     .eq('game_date', game_date)
     .eq('slot_time', slot_time)
     .neq('status', 'cancelled')
-    .single()
+    .maybeSingle()
 
   if (existing) {
     return NextResponse.json(
@@ -60,6 +62,8 @@ export async function POST(req: NextRequest) {
       status: 'soft_block',
       format: null,
       tournament_id: null,
+      reserved_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      organiser_name: 'Internal — Coordinator',
     })
     .select()
     .single()

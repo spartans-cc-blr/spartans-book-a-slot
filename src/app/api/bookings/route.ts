@@ -45,7 +45,8 @@ export async function GET(req: NextRequest) {
 // Admin only. Creates a confirmed booking after running all 5 rule checks.
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const user = session?.user as any
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const body = await req.json()
   // vibe-security: strip captain_id if client sends it — captain is always derived from tournament
