@@ -806,8 +806,10 @@ function MatchTabsSection({
   showFormatOnRow: boolean
 }) {
   type TabKey = 'upcoming' | 'past' | 'unbooked'
+  // Upcoming or Unbooked — whichever is actionable — take priority over
+  // Past Matches, which is read-only and the least useful default view.
   const [activeTab, setActiveTab] = useState<TabKey>(
-    upcoming.length > 0 ? 'upcoming' : pastMatches.length > 0 ? 'past' : 'unbooked'
+    upcoming.length > 0 ? 'upcoming' : unbooked > 0 ? 'unbooked' : 'past'
   )
 
   function gapLabelFor(g: Booking): string {
@@ -858,6 +860,8 @@ function MatchTabsSection({
             : pastMatches.map(g => {
                 const d = parseISO(g.game_date)
                 const captain = bookingCaptainMap[g.id] ?? null
+                const gs = gapLabelFor(g)
+                const c  = gapColors(gs)
                 const inner = (
                   <div className="flex items-center gap-3.5">
                     <div className="text-center w-11 flex-shrink-0">
@@ -873,6 +877,9 @@ function MatchTabsSection({
                           : 'Unassigned'}
                       </p>
                     </div>
+                    <span className={`${c.bg} ${c.text} text-[11.5px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 text-center`}>
+                      {gs === '—' ? 'first' : `${gs} gap`}
+                    </span>
                   </div>
                 )
                 // Links into the Hub's own match page (scorecard synced there) rather
@@ -987,9 +994,19 @@ function SuggestedSlotsPanel({
   // Months where the club's own per-tournament monthly cap means not every
   // suggested date in that month can actually be booked — the extra options
   // are backups in case an earlier one in the same month falls through, not
-  // a guarantee all of them are simultaneously bookable.
-  const capNote = overCapMonths.length > 0
-    ? `Only ${monthlyCap} confirmed game${monthlyCap !== 1 ? 's' : ''} per month is allowed for ${tournamentName} — for ${overCapMonths.map(m => format(parseISO(`${m}-01`), 'MMMM')).join(' and ')}, pick at most ${monthlyCap} of the options below.`
+  // a guarantee all of them are simultaneously bookable. Named explicitly by
+  // date rather than "the options below" — that phrasing read as applying to
+  // every suggestion shown (including unaffected months), when the cap is
+  // really scoped to just the listed dates that share an over-cap month.
+  const capNote = overCapMonths.length > 0 && suggestions
+    ? overCapMonths
+        .map(m => {
+          const datesInMonth = suggestions
+            .filter(s => s.game_date.startsWith(m))
+            .map(s => `${s.day} ${format(parseISO(s.game_date), 'd MMM')}`)
+          return `Of ${datesInMonth.join(', ')}, only ${monthlyCap} can actually be booked (${tournamentName} is capped at ${monthlyCap} confirmed games per month).`
+        })
+        .join(' ')
     : ''
 
   // This panel only mounts once the viewer is actually on the Unbooked tab
@@ -1003,7 +1020,7 @@ function SuggestedSlotsPanel({
   const waMessage = suggestions && suggestions.length > 0
     ? [
         `Hi${organiserName ? ' ' + organiserName : ''}! For ${tournamentName}, here are our next earliest fully open days on our end:`,
-        ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')} — whole day open`),
+        ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')}`),
         ...(capNote ? [``, capNote] : []),
         `Let us know which of these works and we'll get it locked in. Thanks!`,
       ].join('\n')
