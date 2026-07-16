@@ -8,6 +8,16 @@ import NLPBookingBar from '@/components/admin/NLPBookingBar'
 
 export const revalidate = 0  // Always fresh for admin
 
+// A single malformed game_date (e.g. a mistyped year) must never crash the
+// whole dashboard for every admin — fall back to the raw value instead.
+function formatGameDate(gameDate: string): string {
+  try {
+    return format(parseISO(gameDate), 'EEE d MMM')
+  } catch {
+    return `Invalid date (${gameDate})`
+  }
+}
+
 export default async function AdminDashboard({
   searchParams,
 }: {
@@ -142,7 +152,7 @@ const { data: tournamentsMd } = await supabase.from('tournaments').select('id, n
               {(bookings ?? []).map(b => (
                 <tr key={b.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
                   <td className="px-4 py-3 font-rajdhani font-semibold text-sm text-parchment whitespace-nowrap">
-                    {format(parseISO(b.game_date), 'EEE d MMM')}
+                    {formatGameDate(b.game_date)}
                   </td>
                   <td className="px-4 py-3 font-cinzel text-sm text-parchment">{b.slot_time}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{b.format ?? '—'}</td>

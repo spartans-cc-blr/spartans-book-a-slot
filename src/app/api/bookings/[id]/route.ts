@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { GAME_DATE_REGEX } from '@/lib/schemas'
 
 export async function GET(
   req: NextRequest,
@@ -47,6 +48,10 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
   //const user = session.user as any
   if (!user?.isAdmin && 'match_fee_override' in safeUpdates) {
     delete safeUpdates.match_fee_override
+  }
+
+  if (safeUpdates.game_date && !GAME_DATE_REGEX.test(safeUpdates.game_date)) {
+    return NextResponse.json({ error: 'game_date must be in YYYY-MM-DD format' }, { status: 400 })
   }
 
   const supabase = createServiceClient()

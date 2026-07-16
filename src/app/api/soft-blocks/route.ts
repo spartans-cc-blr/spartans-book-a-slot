@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import type { CreateSoftBlockRequest } from '@/types'
+import { GAME_DATE_REGEX } from '@/lib/schemas'
 
 // ── GET /api/soft-blocks ──────────────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -32,6 +33,10 @@ export async function POST(req: NextRequest) {
 
   if (!game_date || !slot_time || !block_reason) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  if (!GAME_DATE_REGEX.test(game_date)) {
+    return NextResponse.json({ error: 'game_date must be in YYYY-MM-DD format' }, { status: 400 })
   }
 
   const supabase = createServiceClient()

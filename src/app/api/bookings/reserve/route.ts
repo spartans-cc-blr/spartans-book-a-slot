@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { GAME_DATE_REGEX } from '@/lib/schemas'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -13,6 +14,10 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
 
   if (!game_date || !slot_time || !organiser_name) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  if (!GAME_DATE_REGEX.test(game_date)) {
+    return NextResponse.json({ error: 'game_date must be in YYYY-MM-DD format' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
