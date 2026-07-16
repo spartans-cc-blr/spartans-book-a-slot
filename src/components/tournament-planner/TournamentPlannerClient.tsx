@@ -920,26 +920,26 @@ function SlotBalanceByDay({
       <p className="text-[15px] font-bold text-ink mb-3">Slot balance across this tournament</p>
       <div className="flex flex-col gap-3">
         {days.map(day => {
-          const rows = ALL_SLOTS.filter(s => s.day === day)
+          // Only slots valid for this tournament's actual format(s) — cuts N/A rows to save space
+          const rows = ALL_SLOTS.filter(s => s.day === day && s.validFor.some(f => activeFormats.includes(f)))
           return (
             <div key={day} className="bg-white border border-parchment-3 rounded-2xl px-3.5 pb-1">
               <p className="text-xs font-bold uppercase tracking-wide text-stone-500 pt-2.5 pb-1.5">{day}</p>
               {rows.map(s => {
-                const k: SlotKey    = `${s.day}-${s.time}`
-                const count         = slotCounts[k]
-                const isApplicable  = s.validFor.some(f => activeFormats.includes(f))
-                const pct           = count > 0 ? Math.max(12, Math.round((count / maxSlotCount) * 100)) : 0
+                const k: SlotKey = `${s.day}-${s.time}`
+                const count      = slotCounts[k]
+                const pct        = count > 0 ? Math.max(12, Math.round((count / maxSlotCount) * 100)) : 0
                 return (
                   <div key={k} className="flex items-center gap-3 py-1.5 border-t border-parchment-2 first:border-t-0">
                     <span className="w-[52px] flex-shrink-0 text-[12.5px] font-semibold text-stone-700">{s.time}</span>
                     <div className="flex-1 h-2 bg-parchment-2 rounded-full overflow-hidden">
-                      {isApplicable && count > 0 && (
+                      {count > 0 && (
                         <div className={`h-full rounded-full ${count === maxSlotCount ? 'bg-emerald-600' : 'bg-amber-600'}`}
                           style={{ width: `${pct}%` }} />
                       )}
                     </div>
                     <span className="w-[18px] flex-shrink-0 text-sm font-extrabold text-ink text-right">
-                      {!isApplicable ? '–' : count}
+                      {count}
                     </span>
                   </div>
                 )
