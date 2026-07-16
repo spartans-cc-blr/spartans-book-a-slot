@@ -674,6 +674,11 @@ function TournamentBlock({
               unbooked={unbooked}
               sortedGames={sortedGames}
               bookingCaptainMap={bookingCaptainMap}
+              tournamentId={tournament.id}
+              tournamentName={tournament.name}
+              organiserName={tournament.organiser_name}
+              organiserContact={tournament.organiser_contact}
+              canSuggestSlots={isAdmin || isGC}
             />
 
             {/* Pace insight — also carries the organiser name + WhatsApp ping/share icons, moved down from the header */}
@@ -789,12 +794,18 @@ function TournamentBlock({
 // since that's what captains care about most day-to-day.
 function MatchTabsSection({
   upcoming, pastMatches, unbooked, sortedGames, bookingCaptainMap,
+  tournamentId, tournamentName, organiserName, organiserContact, canSuggestSlots,
 }: {
   upcoming: Booking[]
   pastMatches: Booking[]
   unbooked: number
   sortedGames: Booking[]
   bookingCaptainMap: Record<string, SquadCaptain>
+  tournamentId: string
+  tournamentName: string
+  organiserName: string | null
+  organiserContact: string | null
+  canSuggestSlots: boolean
 }) {
   type TabKey = 'upcoming' | 'past' | 'unbooked'
   const [activeTab, setActiveTab] = useState<TabKey>(
@@ -915,14 +926,109 @@ function MatchTabsSection({
           unbooked === 0
             ? <p className="text-xs text-stone-500 py-3">No unbooked games — fully booked.</p>
             : (
-              <div className="bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3">
-                <p className="text-xs font-semibold text-stone-600">
-                  ○ {unbooked} unbooked game{unbooked !== 1 ? 's' : ''} — date &amp; slot not yet booked
-                </p>
-              </div>
+              <>
+                <div className="bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3">
+                  <p className="text-xs font-semibold text-stone-600">
+                    ○ {unbooked} unbooked game{unbooked !== 1 ? 's' : ''} — date &amp; slot not yet booked
+                  </p>
+                </div>
+                {canSuggestSlots && (
+                  <SuggestedSlotsPanel
+                    tournamentId={tournamentId}
+                    tournamentName={tournamentName}
+                    organiserName={organiserName}
+                    organiserContact={organiserContact}
+                  />
+                )}
+              </>
             )
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Suggested slots for unbooked games — GC/Admin only ────────────────
+// Fetches candidates from the server (which reuses the R1-R6 validation
+// engine) on demand rather than on mount, since this hits Supabase with a
+// wider club-wide query than the rest of the page needs.
+interface SuggestedSlot { game_date: string; slot_time: string; format: string; day: 'Sat' | 'Sun' }
+
+function SuggestedSlotsPanel({
+  tournamentId, tournamentName, organiserName, organiserContact,
+}: {
+  tournamentId: string
+  tournamentName: string
+  organiserName: string | null
+  organiserContact: string | null
+}) {
+  const [suggestions, setSuggestions] = useState<SuggestedSlot[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function loadSuggestions() {
+    setLoading(true); setError('')
+    try {
+      const res = await fetch(`/api/tournaments/${tournamentId}/suggested-slots`)
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Could not load suggestions'); return }
+      setSuggestions(data.suggestions ?? [])
+    } catch {
+      setError('Network error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const waMessage = suggestions && suggestions.length > 0
+    ? [
+        `Hi${organiserName ? ' ' + organiserName : ''}! For ${tournamentName}, here are a few slots that work well on our end for the next game${suggestions.length !== 1 ? 's' : ''}:`,
+        ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')}, ${s.slot_time} (${s.format})`),
+        `Let us know which works and we'll get it locked in. Thanks!`,
+      ].join('\n')
+    : ''
+
+  const waLink = organiserContact && waMessage
+    ? `https://wa.me/${organiserContact.replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`
+    : null
+
+  return (
+    <div className="mt-2.5 bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold text-stone-700">Suggest slots to organiser</p>
+        {!suggestions && (
+          <button type="button" onClick={loadSuggestions} disabled={loading}
+            className="text-[11px] font-bold text-gold-dim hover:text-gold disabled:opacity-50 flex-shrink-0">
+            {loading ? 'Finding slots…' : 'Find next 3 slots'}
+          </button>
+        )}
+      </div>
+      {error && <p className="text-[11px] text-red-700 mt-1.5">{error}</p>}
+      {suggestions && (
+        suggestions.length === 0 ? (
+          <p className="text-xs text-stone-500 mt-2">No open slots found that satisfy the booking rules in the next few months.</p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1.5 mt-2">
+              {suggestions.map(s => (
+                <p key={`${s.game_date}-${s.slot_time}`} className="text-xs text-stone-700">
+                  <span className="font-semibold text-ink">{s.day} {format(parseISO(s.game_date), 'd MMM')}</span>
+                  {' '}· {s.slot_time} · {s.format}
+                </p>
+              ))}
+            </div>
+            {waLink && (
+              <a href={waLink} target="_blank" rel="noopener noreferrer"
+                className="mt-2.5 w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-700 rounded-xl py-2 text-xs font-bold hover:bg-emerald-200 transition-colors">
+                {WA_ICON} Suggest these slots via WhatsApp
+              </a>
+            )}
+            {!organiserContact && (
+              <p className="text-[10px] text-stone-400 mt-1.5">Add organiser WhatsApp in /admin/tournaments to enable sending.</p>
+            )}
+          </>
+        )
+      )}
     </div>
   )
 }
