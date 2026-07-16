@@ -1,9 +1,11 @@
 // GET /api/tournaments/[id]/suggested-slots
 //
-// GC/Admin only. Finds up to 3 upcoming (Sat/Sun) slots for this tournament
-// that pass the same R1-R6 booking rules engine used by the admin booking
-// form (src/lib/validation.ts) — reused as-is here rather than reimplemented,
-// so a suggestion can never contradict what the form would actually accept.
+// GC/Admin only. Finds upcoming (Sat/Sun) slots for this tournament — up to
+// however many games are still unbooked (total_league_games minus confirmed
+// games, capped at MAX_SUGGESTIONS_CAP) — that pass the same R1-R6 booking
+// rules engine used by the admin booking form (src/lib/validation.ts) —
+// reused as-is here rather than reimplemented, so a suggestion can never
+// contradict what the form would actually accept.
 //
 // Deliberately does NOT consider a captain's overall cross-tournament slot
 // balance (the Captain Bandwidth "Overall slot balance" signal) — that's a
@@ -12,9 +14,9 @@
 //
 // Suggestions are selected incrementally: each accepted candidate is folded
 // into the working "existing bookings" set before the next candidate is
-// checked, so all 3 suggestions remain mutually valid if the organiser
-// books all of them (otherwise two suggestions from the same weekend could
-// each look valid alone while jointly breaking R1's weekend cap).
+// checked, so all suggestions remain mutually valid if the organiser books
+// all of them (otherwise two suggestions from the same weekend could each
+// look valid alone while jointly breaking R1's weekend cap).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -31,7 +33,12 @@ const SLOT_DEFS: { time: SlotTime; validFor: GameFormat[] }[] = [
 ]
 
 const HORIZON_WEEKS = 16
-const MAX_SUGGESTIONS = 3
+// Fallback when a tournament has no total_league_games set — the previous
+// fixed suggestion count, kept only for that unknown-total case.
+const DEFAULT_SUGGESTIONS = 3
+// Hard ceiling regardless of how large the unbooked count is, so a
+// mis-entered total_league_games can't blow up the horizon scan.
+const MAX_SUGGESTIONS_CAP = 12
 
 function addDays(d: Date, n: number): Date {
   const r = new Date(d)
@@ -56,7 +63,7 @@ export async function GET(
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
-    .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name)')
+    .select('id, name, captain_id, total_league_games, captains!tournaments_captain_id_fkey(id, name)')
     .eq('id', params.id)
     .single()
 
@@ -92,6 +99,14 @@ export async function GET(
   const activeFormats = Array.from(new Set(
     (ownGames ?? []).map(g => g.format).filter((f): f is GameFormat => !!f)
   ))
+
+  // Match the unbooked count shown elsewhere on the page (total_league_games
+  // minus confirmed games) rather than a fixed count — a tournament with 4
+  // games still unbooked should get up to 4 suggestions, not just 3.
+  const unbookedCount = tournament.total_league_games != null
+    ? Math.max(0, tournament.total_league_games - (ownGames ?? []).length)
+    : DEFAULT_SUGGESTIONS
+  const MAX_SUGGESTIONS = Math.min(unbookedCount, MAX_SUGGESTIONS_CAP)
 
   // All non-cancelled bookings within the suggestion horizon, club-wide —
   // R1/R4/R5/R6 depend on every booking that day/weekend, not just this

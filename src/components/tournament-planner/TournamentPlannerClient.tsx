@@ -611,6 +611,11 @@ function TournamentBlock({
 									) : (
 									<span className="font-cinzel text-sm font-bold text-ink">{tournament.name}</span>
 								)}
+              {tournamentFormats.length > 0 && (
+                <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                  {tournamentFormats.join(' / ')}
+                </span>
+              )}
               <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${pace.bg} ${pace.txt}`}>{pace.label}</span>
             </div>
             <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
@@ -669,6 +674,7 @@ function TournamentBlock({
               organiserName={tournament.organiser_name}
               organiserContact={tournament.organiser_contact}
               canSuggestSlots={isAdmin || isGC}
+              showFormatOnRow={tournamentFormats.length > 1}
             />
 
             {/* Pace insight — also carries the organiser name + share icon, moved down from the header.
@@ -782,6 +788,7 @@ function TournamentBlock({
 function MatchTabsSection({
   upcoming, pastMatches, unbooked, sortedGames, bookingCaptainMap,
   tournamentId, tournamentName, organiserName, organiserContact, canSuggestSlots,
+  showFormatOnRow,
 }: {
   upcoming: Booking[]
   pastMatches: Booking[]
@@ -793,6 +800,10 @@ function MatchTabsSection({
   organiserName: string | null
   organiserContact: string | null
   canSuggestSlots: boolean
+  // Format is shown once at the tournament header now (see TournamentBlock).
+  // Only repeat it per-row when this tournament actually mixes formats —
+  // otherwise it's the same value on every row and just adds noise.
+  showFormatOnRow: boolean
 }) {
   type TabKey = 'upcoming' | 'past' | 'unbooked'
   const [activeTab, setActiveTab] = useState<TabKey>(
@@ -856,13 +867,12 @@ function MatchTabsSection({
                     <div className="flex-1 min-w-0">
                       <p className="text-[13.5px] font-bold text-ink">{format(d, 'EEE')} · {g.slot_time}</p>
                       <p className="text-xs text-stone-500 mt-0.5">
-                        {g.format} · Captain{' '}
+                        {showFormatOnRow && <>{g.format} · </>}Captain{' '}
                         {captain
                           ? <PlayerNameLink name={captain.name} cricHeroesUrl={captain.cricheroes_url} className="text-blue-700" />
                           : 'Unassigned'}
                       </p>
                     </div>
-                    <span className="bg-emerald-50 text-emerald-700 text-[11.5px] font-bold px-2.5 py-1 rounded-full flex-shrink-0">Done</span>
                   </div>
                 )
                 // Links into the Hub's own match page (scorecard synced there) rather
@@ -890,7 +900,7 @@ function MatchTabsSection({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13.5px] font-bold text-ink">{format(d, 'EEE')} · {g.slot_time}</p>
-                      <p className="text-xs text-stone-500 mt-0.5">{g.format}</p>
+                      {showFormatOnRow && <p className="text-xs text-stone-500 mt-0.5">{g.format}</p>}
                     </div>
                     <span className={`${c.bg} ${c.text} text-[11.5px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 text-center`}>
                       {gs === '—' ? 'first' : `${gs} gap`}
