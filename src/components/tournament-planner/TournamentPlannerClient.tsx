@@ -138,14 +138,44 @@ function BandwidthSection({
   const otherCaptains   = isCaptainView ? captains.filter(c => c.id !== viewerCaptainId) : captains
 
   function renderCaptainCard(captain: Captain, isOwn: boolean) {
-    const mine      = tourneyBookings.filter(b => b.tournament?.captain_id === captain.id)
+    const allMine = tourneyBookings.filter(b => b.tournament?.captain_id === captain.id)
+
+    // Group by tournament first, to work out which tournaments are still
+    // "ongoing" (something outstanding or unbooked) vs fully wrapped up.
+    const byTournament = new Map<string, { tournament: NonNullable<Booking['tournament']>; games: Booking[] }>()
+    allMine.forEach(b => {
+      if (!b.tournament) return
+      const tid = b.tournament.id
+      if (!byTournament.has(tid)) byTournament.set(tid, { tournament: b.tournament, games: [] })
+      byTournament.get(tid)!.games.push(b)
+    })
+    const tournamentBreakdown = Array.from(byTournament.values())
+      .map(({ tournament: t, games }) => {
+        const played      = games.filter(g => g.game_date < today).length
+        const outstanding = games.filter(g => g.game_date >= today).length
+        const totalLeague = t.total_league_games ?? games.length
+        const tUnbooked   = Math.max(0, totalLeague - games.length)
+        return { tournament: t, played, outstanding, unbooked: tUnbooked }
+      })
+      // Hide tournaments with nothing left to play — total games === played means
+      // no scheduled or unbooked games remain. Whether that counts as "completed"
+      // is a separate decision for later; for now just keep these out of view.
+      .filter(({ outstanding, unbooked }) => outstanding > 0 || unbooked > 0)
+      .sort((a, b) => a.tournament.name.localeCompare(b.tournament.name))
+
+    // Headline stats (count line, bar, timeline) are scoped to ongoing
+    // tournaments only, matching the breakdown list above — a tournament
+    // that wrapped up months ago shouldn't inflate today's workload picture.
+    // Made explicit in the UI caption below so this isn't a silent filter.
+    const ongoingTournamentIds = new Set(tournamentBreakdown.map(({ tournament }) => tournament.id))
+    const mine      = allMine.filter(b => ongoingTournamentIds.has(b.tournament!.id))
     const completed = mine.filter(b => b.game_date < today)
     const scheduled = mine.filter(b => b.game_date >= today)
 
-    const totalLeague = Array.from(new Set(mine.map(b => b.tournament!.id)))
+    const totalLeague = Array.from(ongoingTournamentIds)
       .reduce((sum, tid) => {
-        const t = mine.find(b => b.tournament!.id === tid)?.tournament
-        return sum + (t?.total_league_games ?? mine.filter(b => b.tournament!.id === tid).length)
+        const entry = byTournament.get(tid)!
+        return sum + (entry.tournament.total_league_games ?? entry.games.length)
       }, 0)
     const unbooked  = Math.max(0, totalLeague - mine.length)
     const total     = mine.length + unbooked
@@ -170,29 +200,6 @@ function BandwidthSection({
     // Format mix for this captain's bookings
     const captainFormats = Array.from(new Set(mine.map(b => b.format).filter((f): f is string => !!f)))
     const captainActiveFormats = captainFormats.length === 0 ? ['T20', 'T30'] : captainFormats
-
-    // Per-tournament played/outstanding/unbooked — this is what captains actually care about,
-    // the slot grid below is secondary
-    const byTournament = new Map<string, { tournament: NonNullable<Booking['tournament']>; games: Booking[] }>()
-    mine.forEach(b => {
-      if (!b.tournament) return
-      const tid = b.tournament.id
-      if (!byTournament.has(tid)) byTournament.set(tid, { tournament: b.tournament, games: [] })
-      byTournament.get(tid)!.games.push(b)
-    })
-    const tournamentBreakdown = Array.from(byTournament.values())
-      .map(({ tournament: t, games }) => {
-        const played      = games.filter(g => g.game_date < today).length
-        const outstanding = games.filter(g => g.game_date >= today).length
-        const totalLeague = t.total_league_games ?? games.length
-        const tUnbooked   = Math.max(0, totalLeague - games.length)
-        return { tournament: t, played, outstanding, unbooked: tUnbooked }
-      })
-      // Hide tournaments with nothing left to play — total games === played means
-      // no scheduled or unbooked games remain. Whether that counts as "completed"
-      // is a separate decision for later; for now just keep these out of view.
-      .filter(({ outstanding, unbooked }) => outstanding > 0 || unbooked > 0)
-      .sort((a, b) => a.tournament.name.localeCompare(b.tournament.name))
 
     return (
       <div
@@ -224,6 +231,11 @@ function BandwidthSection({
               <span className="text-emerald-700 font-semibold">{completed.length}</span> past matches &nbsp;·&nbsp;
               <span className="text-stone-600 font-semibold">{unbooked}</span> unbooked
             </p>
+            {/* Counts are colour-coded to match the bar below (see the page-level
+                legend above), repeated per-card since that legend is easy to lose
+                track of a few cards down. Explicitly scoped to ongoing tournaments
+                only — a captain's finished tournaments don't count toward this. */}
+            <p className="font-rajdhani text-[10px] text-stone-400 mt-0.5">Ongoing tournaments only</p>
           </div>
         </div>
 
@@ -233,6 +245,66 @@ function BandwidthSection({
           {doneW  > 0 && <div className="h-full bg-emerald-600 transition-all" style={{ width: `${doneW}%` }} />}
           {pendW  > 0 && <div className="h-full bg-stone-400 transition-all"   style={{ width: `${pendW}%` }} />}
         </div>
+
+        {/* Availability timeline — today through the latest already-booked game
+            across all this captain's ongoing tournaments, so gaps between games
+            read as "free" at a glance. Additive to the bar above (which shows
+            proportional load), not a replacement — the bar answers "how much is
+            left," the timeline answers "when are they actually free." */}
+        {tournamentBreakdown.length > 0 && (() => {
+          const upcoming = [...scheduled].sort((a, b) => a.game_date.localeCompare(b.game_date))
+          if (upcoming.length === 0) {
+            return (
+              <p className="font-rajdhani text-[11px] text-emerald-700 mt-1 mb-2">
+                ✓ Free from today — no games booked yet.
+              </p>
+            )
+          }
+          const todayMs = parseISO(today).getTime()
+          const lastGame = upcoming[upcoming.length - 1]
+          const lastMs   = parseISO(lastGame.game_date).getTime()
+          const totalMs  = lastMs - todayMs || 1
+          const pcts = upcoming.map(g => Math.max(0, ((parseISO(g.game_date).getTime() - todayMs) / totalMs) * 100))
+          let lastPct = -100, row = 0
+          const rows = pcts.map(pct => {
+            row = (pct - lastPct < 9) ? (row === 0 ? 1 : 0) : 0
+            lastPct = pct
+            return row
+          })
+          return (
+            <div className="mt-2 mb-1">
+              <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 mb-2">
+                Availability — today onward
+              </p>
+              <div className="relative" style={{ height: 16 }}>
+                <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3" />
+                <div className="absolute top-0" style={{ left: '0%', transform: 'translateX(-50%)' }}>
+                  <div className="w-2.5 h-2.5 rounded-full bg-stone-400 border-2 border-white" style={{ boxShadow: '0 0 0 1px #E2DACE' }} />
+                </div>
+                {upcoming.map((g, i) => (
+                  <div key={g.id} className="absolute top-0" style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)' }}>
+                    <div className="w-3 h-3 rounded-full bg-amber-600 border-2 border-white" style={{ boxShadow: '0 0 0 1px #E2DACE' }} />
+                  </div>
+                ))}
+              </div>
+              <div className="relative mt-1" style={{ height: 30 }}>
+                <div className="absolute whitespace-nowrap text-[9px] font-semibold text-stone-500" style={{ left: '0%', transform: 'translateX(-50%)' }}>
+                  Today
+                </div>
+                {upcoming.map((g, i) => (
+                  <div key={g.id}
+                    className="absolute whitespace-nowrap text-[9px] font-semibold text-amber-700"
+                    style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)', top: rows[i] * 14 }}>
+                    {format(parseISO(g.game_date), 'd MMM')}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-stone-400 mt-1">
+                Free beyond {format(parseISO(lastGame.game_date), 'd MMM')} unless more games get booked.
+              </p>
+            </div>
+          )
+        })()}
 
         {/* Per-tournament breakdown — played / outstanding / unbooked, click through to the tournament below */}
         {tournamentBreakdown.length > 0 && (
