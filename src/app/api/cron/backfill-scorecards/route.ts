@@ -20,10 +20,12 @@ export const maxDuration = 60
 //
 // Lowered from 5 to 3 on 2026-07-16 — a live manual run timed out
 // (504 FUNCTION_INVOCATION_TIMEOUT) after completing exactly 3 bookings and
-// starting a 4th, confirming the "accepted risk" this comment used to only
-// warn about in the abstract. 3 sequential bookings reliably fits inside the
-// 60s Hobby ceiling even with a cold Render start; 5 does not.
-const MAX_PER_RUN = 3
+// starting a 4th. Lowered again to 2 on 2026-07-17 — even 3 wasn't safe: a
+// scheduled run that day 504'd mid-fetch on the 3rd booking (2/3 synced, one
+// left at pending_parse to retry next run). Per-item latency against the
+// Render microservice + CricHeroes PDF fetch is variable enough that 2 is
+// the first value that's actually held up under a real timeout.
+const MAX_PER_RUN = 2
 
 // Respectful pacing between CricHeroes fetches — same spirit as the
 // wrangler's standalone download_scorecard.py script.
