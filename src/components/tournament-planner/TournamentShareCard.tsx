@@ -192,7 +192,6 @@ export function TournamentShareCard({
           {sorted.map((g, i) => {
             const d       = parseISO(g.game_date)
             const dayName = d.getDay() === 6 ? 'Sat' : 'Sun'
-            const isSat   = dayName === 'Sat'
             const gap     = gameGaps[i]
             const isDone  = g.game_date < today
             // Fixed-width first/third columns (not `auto`) so the divider
@@ -200,18 +199,15 @@ export function TournamentShareCard({
             // (a separate element per game), so an `auto` track sizes to that
             // row's own content only and drifted row-to-row depending on
             // whether it held "start" or "10w / from prev".
-            const rowClass = `grid grid-cols-[58px_1fr_72px] border border-parchment-3 rounded-xl overflow-hidden transition-colors ${isDone ? 'opacity-60' : ''} ${g.cricheroes_url ? 'hover:border-gold-dim' : ''}`
+            const rowClass = `grid grid-cols-[44px_1fr_72px] border border-parchment-3 rounded-xl overflow-hidden transition-colors ${isDone ? 'opacity-60' : ''} ${g.cricheroes_url ? 'hover:border-gold-dim' : ''}`
             const inner = (
               <>
-                <div className="bg-parchment-2 flex flex-col items-center justify-center py-2 gap-1 border-r border-parchment-3">
+                <div className="bg-parchment-2 flex flex-col items-center justify-center py-2 border-r border-parchment-3">
                   <span className="font-cinzel text-base font-bold text-ink leading-none">{format(d, 'd')}</span>
                   <span className="font-rajdhani text-[9px] text-stone-500 uppercase">{format(d, 'MMM')}</span>
-                  <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
-                    isSat ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-pink-100 text-pink-700 border-pink-300'
-                  }`}>{dayName}</span>
-                  <span className="font-rajdhani text-[9px] text-stone-500">{g.slot_time}</span>
                 </div>
-                <div className="px-2.5 py-2 flex flex-col justify-center gap-1 min-w-0">
+                <div className="px-2.5 py-2 flex flex-col items-start justify-center gap-0.5 min-w-0">
+                  <p className="font-rajdhani text-[10px] text-stone-500">{dayName} · {g.slot_time}</p>
                   <p className="font-rajdhani text-[13px] font-semibold text-ink truncate">
                     vs {g.opponent_name || 'TBD'}
                     {formats.length > 1 && <span className="text-stone-400 font-normal"> · {g.format}</span>}
