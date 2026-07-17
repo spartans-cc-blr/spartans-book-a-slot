@@ -23,7 +23,7 @@ export default async function TournamentPlannerPage() {
   const { data: rawBookings } = await supabase
     .from('bookings')
     .select(`
-      id, game_date, slot_time, format, cricheroes_url,
+      id, game_date, slot_time, format, cricheroes_url, match_id,
       tournament:tournaments!bookings_tournament_id_fkey(
         id, name, organiser_name, organiser_contact,
         total_league_games, cricheroes_points_table_url,
@@ -35,9 +35,20 @@ export default async function TournamentPlannerPage() {
     .not('tournament_id', 'is', null)
     .order('game_date', { ascending: true })
 
+  // Match result for any finished games with a synced scorecard — read-through
+  // cache table, same source matches/history and the tournament share page
+  // use. Not every past game has one yet (scorecard sync is a separate
+  // manual/cron step), so this is a best-effort attach, not a requirement.
+  const matchIds = (rawBookings ?? []).map(b => b.match_id).filter((id): id is string => !!id)
+  const { data: statsRows } = matchIds.length
+    ? await supabase.from('match_stats_cache').select('match_id, match_result').in('match_id', matchIds)
+    : { data: [] }
+  const resultByMatchId = new Map((statsRows ?? []).map(r => [r.match_id, r.match_result]))
+
   // Supabase returns FK joins as arrays — cast to single objects to match Booking type
   const bookings = (rawBookings ?? []).map(b => ({
     ...b,
+    match_result: b.match_id ? resultByMatchId.get(b.match_id) ?? null : null,
     tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
   })) as unknown as Array<{
     id: string
@@ -45,6 +56,7 @@ export default async function TournamentPlannerPage() {
     slot_time: string
     format: string | null
     cricheroes_url: string | null
+    match_result: string | null
     tournament: {
       id: string
       name: string
