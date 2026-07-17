@@ -72,6 +72,20 @@ function slotKey(game_date: string, slot_time: string): SlotKey {
   return `${day}-${slot_time}` as SlotKey
 }
 
+// Alternates a 0/1 row for consecutive positions closer together than
+// thresholdPct — used to keep rotated labels from overlapping when their
+// anchor points are nearly on top of each other. Rotation alone only
+// narrows a label's own footprint; it doesn't stop two labels centred on
+// nearly the same point from landing on top of each other.
+function staggerRows(pcts: number[], thresholdPct: number): number[] {
+  let lastPct = -100, row = 0
+  return pcts.map(pct => {
+    row = (pct - lastPct < thresholdPct) ? (row === 0 ? 1 : 0) : 0
+    lastPct = pct
+    return row
+  })
+}
+
 function scrollToTournament(tournamentId: string) {
   document.getElementById(`tournament-block-${tournamentId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -259,11 +273,17 @@ function BandwidthSection({
             cum += s.width
             return { ...s, mid }
           })
+          // Stagger the rotated above-bar labels too — two adjacent narrow
+          // segments (e.g. a small "upcoming" sliver next to a small
+          // "unbooked" sliver) can have midpoints close enough to collide
+          // the same way the timeline's date labels did.
+          const narrow = withMid.filter(s => s.width > 0 && s.width < s.fullAt)
+          const narrowRows = staggerRows(narrow.map(s => s.mid), 10)
           return (
             <div className="mb-2">
-              <div className="relative" style={{ height: 34 }}>
-                {withMid.map(s => s.width > 0 && s.width < s.fullAt && (
-                  <div key={s.key} className="absolute" style={{ left: `${s.mid}%`, top: '50%', transform: 'translate(-50%, -50%)' }}>
+              <div className="relative" style={{ height: 48 }}>
+                {narrow.map((s, i) => (
+                  <div key={s.key} className="absolute" style={{ left: `${s.mid}%`, top: narrowRows[i] === 0 ? '25%' : '75%', transform: 'translate(-50%, -50%)' }}>
                     <span className={`inline-block whitespace-nowrap text-[8px] font-bold ${s.text}`} style={{ transform: 'rotate(270deg)' }}>
                       {s.label}
                     </span>
@@ -314,6 +334,7 @@ function BandwidthSection({
             ...upcoming.map(g => ({ key: g.id, label: format(parseISO(g.game_date), 'd MMM'), ms: parseISO(g.game_date).getTime(), isToday: false })),
           ]
           const pcts = points.map(p => Math.max(0, ((p.ms - todayMs) / totalMs) * 100))
+          const dateRows = staggerRows(pcts, 10)
           // Week gap between each consecutive pair, including Today → first
           // game, labelled at the midpoint between their two dots.
           const gaps = points.slice(1).map((p, i) => ({
@@ -343,14 +364,16 @@ function BandwidthSection({
                   </div>
                 ))}
               </div>
-              {/* Date labels rotated 270° (reads bottom-to-top) rather than
-                  staggered across two rows — takes far less horizontal room
-                  per label, so closely-spaced dates (e.g. 5 Sep/6 Sep) no
-                  longer need to be pushed onto alternating rows to avoid
-                  colliding with each other. */}
-              <div className="relative mt-1" style={{ height: 44 }}>
+              {/* Date labels rotated 270° (reads bottom-to-top) — much less
+                  horizontal room per label than upright text, but rotation
+                  alone doesn't stop two labels centred on nearly the same
+                  point from landing on top of each other (e.g. Today
+                  coinciding with an imminent first game, or 5 Sep/6 Sep on
+                  consecutive days) — still staggered onto a second row
+                  whenever two points land closer than the threshold. */}
+              <div className="relative mt-1" style={{ height: 78 }}>
                 {points.map((p, i) => (
-                  <div key={p.key} className="absolute" style={{ left: `${pcts[i]}%`, top: '50%', transform: 'translate(-50%, -50%)' }}>
+                  <div key={p.key} className="absolute" style={{ left: `${pcts[i]}%`, top: dateRows[i] === 0 ? '25%' : '75%', transform: 'translate(-50%, -50%)' }}>
                     <span className={`inline-block whitespace-nowrap text-[9px] font-semibold ${p.isToday ? 'text-stone-500' : 'text-amber-700'}`}
                       style={{ transform: 'rotate(270deg)' }}>
                       {p.label}
