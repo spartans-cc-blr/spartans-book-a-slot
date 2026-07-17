@@ -29,7 +29,7 @@ export const revalidate = 0
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader?.trim() !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
