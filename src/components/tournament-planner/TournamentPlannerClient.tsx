@@ -239,11 +239,25 @@ function BandwidthSection({
           </div>
         </div>
 
-        {/* Bandwidth bar */}
-        <div className="h-3 rounded-full bg-parchment-2 overflow-hidden flex mb-2">
-          {schedW > 0 && <div className="h-full bg-amber-600 transition-all"   style={{ width: `${schedW}%` }} />}
-          {doneW  > 0 && <div className="h-full bg-emerald-600 transition-all" style={{ width: `${doneW}%` }} />}
-          {pendW  > 0 && <div className="h-full bg-stone-400 transition-all"   style={{ width: `${pendW}%` }} />}
+        {/* Bandwidth bar — counts rendered inside each segment directly (not
+            just the text line above), so the bar is self-explanatory without
+            needing to cross-reference the count line or the page-level legend. */}
+        <div className="h-5 rounded-full bg-parchment-2 overflow-hidden flex mb-2">
+          {schedW > 0 && (
+            <div className="h-full bg-amber-600 flex items-center justify-center transition-all" style={{ width: `${schedW}%` }}>
+              {schedW >= 8 && <span className="text-white text-[10px] font-bold">{scheduled.length}</span>}
+            </div>
+          )}
+          {doneW  > 0 && (
+            <div className="h-full bg-emerald-600 flex items-center justify-center transition-all" style={{ width: `${doneW}%` }}>
+              {doneW >= 8 && <span className="text-white text-[10px] font-bold">{completed.length}</span>}
+            </div>
+          )}
+          {pendW  > 0 && (
+            <div className="h-full bg-stone-400 flex items-center justify-center transition-all" style={{ width: `${pendW}%` }}>
+              {pendW >= 8 && <span className="text-white text-[10px] font-bold">{unbooked}</span>}
+            </div>
+          )}
         </div>
 
         {/* Availability timeline — today through the latest already-booked game
@@ -264,13 +278,30 @@ function BandwidthSection({
           const lastGame = upcoming[upcoming.length - 1]
           const lastMs   = parseISO(lastGame.game_date).getTime()
           const totalMs  = lastMs - todayMs || 1
-          const pcts = upcoming.map(g => Math.max(0, ((parseISO(g.game_date).getTime() - todayMs) / totalMs) * 100))
+
+          // "Today" is folded into the same points/stagger array as the games
+          // themselves (not handled as a one-off at a fixed row), so it
+          // collides and staggers with a same-week first game exactly like
+          // 5 Sep/6 Sep already do with each other.
+          type Point = { key: string; label: string; ms: number; isToday: boolean }
+          const points: Point[] = [
+            { key: 'today', label: 'Today', ms: todayMs, isToday: true },
+            ...upcoming.map(g => ({ key: g.id, label: format(parseISO(g.game_date), 'd MMM'), ms: parseISO(g.game_date).getTime(), isToday: false })),
+          ]
+          const pcts = points.map(p => Math.max(0, ((p.ms - todayMs) / totalMs) * 100))
           let lastPct = -100, row = 0
           const rows = pcts.map(pct => {
             row = (pct - lastPct < 9) ? (row === 0 ? 1 : 0) : 0
             lastPct = pct
             return row
           })
+          // Week gap between each consecutive pair, including Today → first
+          // game, labelled at the midpoint between their two dots.
+          const gaps = points.slice(1).map((p, i) => ({
+            pct: (pcts[i] + pcts[i + 1]) / 2,
+            weeks: Math.round((p.ms - points[i].ms) / (1000 * 60 * 60 * 24 * 7)),
+          }))
+
           return (
             <div className="mt-2 mb-1">
               <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 mb-2">
@@ -278,24 +309,27 @@ function BandwidthSection({
               </p>
               <div className="relative" style={{ height: 16 }}>
                 <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3" />
-                <div className="absolute top-0" style={{ left: '0%', transform: 'translateX(-50%)' }}>
-                  <div className="w-2.5 h-2.5 rounded-full bg-stone-400 border-2 border-white" style={{ boxShadow: '0 0 0 1px #E2DACE' }} />
-                </div>
-                {upcoming.map((g, i) => (
-                  <div key={g.id} className="absolute top-0" style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)' }}>
-                    <div className="w-3 h-3 rounded-full bg-amber-600 border-2 border-white" style={{ boxShadow: '0 0 0 1px #E2DACE' }} />
+                {points.map((p, i) => (
+                  <div key={p.key} className="absolute top-0" style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)' }}>
+                    <div className={`rounded-full border-2 border-white ${p.isToday ? 'w-2.5 h-2.5 bg-stone-400' : 'w-3 h-3 bg-amber-600'}`}
+                      style={{ boxShadow: '0 0 0 1px #E2DACE' }} />
+                  </div>
+                ))}
+              </div>
+              <div className="relative" style={{ height: 12 }}>
+                {gaps.map((g, i) => (
+                  <div key={i} className="absolute whitespace-nowrap text-[8px] font-semibold text-stone-400"
+                    style={{ left: `${g.pct}%`, transform: 'translateX(-50%)' }}>
+                    {g.weeks}w
                   </div>
                 ))}
               </div>
               <div className="relative mt-1" style={{ height: 30 }}>
-                <div className="absolute whitespace-nowrap text-[9px] font-semibold text-stone-500" style={{ left: '0%', transform: 'translateX(-50%)' }}>
-                  Today
-                </div>
-                {upcoming.map((g, i) => (
-                  <div key={g.id}
-                    className="absolute whitespace-nowrap text-[9px] font-semibold text-amber-700"
+                {points.map((p, i) => (
+                  <div key={p.key}
+                    className={`absolute whitespace-nowrap text-[9px] font-semibold ${p.isToday ? 'text-stone-500' : 'text-amber-700'}`}
                     style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)', top: rows[i] * 14 }}>
-                    {format(parseISO(g.game_date), 'd MMM')}
+                    {p.label}
                   </div>
                 ))}
               </div>
