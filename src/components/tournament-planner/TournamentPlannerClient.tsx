@@ -317,7 +317,7 @@ function BandwidthSection({
                 ))}
               </div>
               <div className="relative" style={{ height: 12 }}>
-                {gaps.map((g, i) => (
+                {gaps.map((g, i) => g.weeks > 2 && (
                   <div key={i} className="absolute whitespace-nowrap text-[8px] font-semibold text-stone-400"
                     style={{ left: `${g.pct}%`, transform: 'translateX(-50%)' }}>
                     {g.weeks}w
