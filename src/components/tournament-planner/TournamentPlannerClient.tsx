@@ -241,24 +241,49 @@ function BandwidthSection({
 
         {/* Bandwidth bar — counts rendered inside each segment directly (not
             just the text line above), so the bar is self-explanatory without
-            needing to cross-reference the count line or the page-level legend. */}
-        <div className="h-5 rounded-full bg-parchment-2 overflow-hidden flex mb-2">
-          {schedW > 0 && (
-            <div className="h-full bg-amber-600 flex items-center justify-center transition-all" style={{ width: `${schedW}%` }}>
-              {schedW >= 8 && <span className="text-white text-[10px] font-bold">{scheduled.length}</span>}
+            needing to cross-reference the count line or the page-level legend.
+            When a segment is wide enough, its label ("upcoming" etc.) renders
+            inline next to the count. When it isn't, the count alone stays
+            inside the segment and the label instead renders as 270°-rotated
+            text directly above that segment — same rotation technique as the
+            availability timeline's date labels below. */}
+        {(() => {
+          const segments = [
+            { key: 'sched', width: schedW, count: scheduled.length, label: 'upcoming',      bg: 'bg-amber-600',   text: 'text-amber-700',   fullAt: 22 },
+            { key: 'done',  width: doneW,  count: completed.length, label: 'past matches',  bg: 'bg-emerald-600', text: 'text-emerald-700', fullAt: 30 },
+            { key: 'pend',  width: pendW,  count: unbooked,         label: 'unbooked',       bg: 'bg-stone-400',   text: 'text-stone-600',   fullAt: 22 },
+          ]
+          let cum = 0
+          const withMid = segments.map(s => {
+            const mid = cum + s.width / 2
+            cum += s.width
+            return { ...s, mid }
+          })
+          return (
+            <div className="mb-2">
+              <div className="relative" style={{ height: 34 }}>
+                {withMid.map(s => s.width > 0 && s.width < s.fullAt && (
+                  <div key={s.key} className="absolute" style={{ left: `${s.mid}%`, top: '50%', transform: 'translate(-50%, -50%)' }}>
+                    <span className={`inline-block whitespace-nowrap text-[8px] font-bold ${s.text}`} style={{ transform: 'rotate(270deg)' }}>
+                      {s.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="h-5 rounded-full bg-parchment-2 overflow-hidden flex">
+                {withMid.map(s => s.width > 0 && (
+                  <div key={s.key} className={`h-full ${s.bg} flex items-center justify-center transition-all`} style={{ width: `${s.width}%` }}>
+                    {s.width >= s.fullAt ? (
+                      <span className="text-white text-[10px] font-bold whitespace-nowrap">{s.count} {s.label}</span>
+                    ) : s.width >= 8 ? (
+                      <span className="text-white text-[10px] font-bold">{s.count}</span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
-          {doneW  > 0 && (
-            <div className="h-full bg-emerald-600 flex items-center justify-center transition-all" style={{ width: `${doneW}%` }}>
-              {doneW >= 8 && <span className="text-white text-[10px] font-bold">{completed.length}</span>}
-            </div>
-          )}
-          {pendW  > 0 && (
-            <div className="h-full bg-stone-400 flex items-center justify-center transition-all" style={{ width: `${pendW}%` }}>
-              {pendW >= 8 && <span className="text-white text-[10px] font-bold">{unbooked}</span>}
-            </div>
-          )}
-        </div>
+          )
+        })()}
 
         {/* Availability timeline — today through the latest already-booked game
             across all this captain's ongoing tournaments, so gaps between games
@@ -289,12 +314,6 @@ function BandwidthSection({
             ...upcoming.map(g => ({ key: g.id, label: format(parseISO(g.game_date), 'd MMM'), ms: parseISO(g.game_date).getTime(), isToday: false })),
           ]
           const pcts = points.map(p => Math.max(0, ((p.ms - todayMs) / totalMs) * 100))
-          let lastPct = -100, row = 0
-          const rows = pcts.map(pct => {
-            row = (pct - lastPct < 9) ? (row === 0 ? 1 : 0) : 0
-            lastPct = pct
-            return row
-          })
           // Week gap between each consecutive pair, including Today → first
           // game, labelled at the midpoint between their two dots.
           const gaps = points.slice(1).map((p, i) => ({
@@ -324,12 +343,18 @@ function BandwidthSection({
                   </div>
                 ))}
               </div>
-              <div className="relative mt-1" style={{ height: 30 }}>
+              {/* Date labels rotated 270° (reads bottom-to-top) rather than
+                  staggered across two rows — takes far less horizontal room
+                  per label, so closely-spaced dates (e.g. 5 Sep/6 Sep) no
+                  longer need to be pushed onto alternating rows to avoid
+                  colliding with each other. */}
+              <div className="relative mt-1" style={{ height: 44 }}>
                 {points.map((p, i) => (
-                  <div key={p.key}
-                    className={`absolute whitespace-nowrap text-[9px] font-semibold ${p.isToday ? 'text-stone-500' : 'text-amber-700'}`}
-                    style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)', top: rows[i] * 14 }}>
-                    {p.label}
+                  <div key={p.key} className="absolute" style={{ left: `${pcts[i]}%`, top: '50%', transform: 'translate(-50%, -50%)' }}>
+                    <span className={`inline-block whitespace-nowrap text-[9px] font-semibold ${p.isToday ? 'text-stone-500' : 'text-amber-700'}`}
+                      style={{ transform: 'rotate(270deg)' }}>
+                      {p.label}
+                    </span>
                   </div>
                 ))}
               </div>
