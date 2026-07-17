@@ -281,10 +281,15 @@ function BandwidthSection({
           const narrowRows = staggerRows(narrow.map(s => s.mid), 10)
           return (
             <div className="mb-2">
-              <div className="relative" style={{ height: 48 }}>
+              {/* -45° rather than fully vertical — a diagonal angle avoids
+                  collisions almost as well as 270° but needs roughly half
+                  the vertical footprint, since the label's height and width
+                  both only contribute at cos/sin(45°) instead of the full
+                  text length landing entirely in one axis. */}
+              <div className="relative" style={{ height: 36 }}>
                 {narrow.map((s, i) => (
-                  <div key={s.key} className="absolute" style={{ left: `${s.mid}%`, top: narrowRows[i] === 0 ? '25%' : '75%', transform: 'translate(-50%, -50%)' }}>
-                    <span className={`inline-block whitespace-nowrap text-[8px] font-bold ${s.text}`} style={{ transform: 'rotate(270deg)' }}>
+                  <div key={s.key} className="absolute" style={{ left: `${s.mid}%`, top: narrowRows[i] === 0 ? '30%' : '80%', transform: 'translate(-50%, -50%)' }}>
+                    <span className={`inline-block whitespace-nowrap text-[8px] font-bold ${s.text}`} style={{ transform: 'rotate(-45deg)' }}>
                       {s.label}
                     </span>
                   </div>
@@ -364,18 +369,22 @@ function BandwidthSection({
                   </div>
                 ))}
               </div>
-              {/* Date labels rotated 270° (reads bottom-to-top) — much less
-                  horizontal room per label than upright text, but rotation
-                  alone doesn't stop two labels centred on nearly the same
-                  point from landing on top of each other (e.g. Today
-                  coinciding with an imminent first game, or 5 Sep/6 Sep on
-                  consecutive days) — still staggered onto a second row
-                  whenever two points land closer than the threshold. */}
-              <div className="relative mt-1" style={{ height: 78 }}>
+              {/* Date labels angled at -45° — a compromise between fully
+                  horizontal (collides easily) and fully vertical (needs the
+                  entire label length as height). At 45° the footprint splits
+                  roughly evenly between both axes, so it needs about half
+                  the vertical room 270° did while still resisting collision
+                  almost as well. Rotation alone still doesn't stop two
+                  labels centred on nearly the same point from landing on
+                  top of each other (e.g. Today coinciding with an imminent
+                  first game, or 5 Sep/6 Sep on consecutive days) — still
+                  staggered onto a second row whenever two points land
+                  closer than the threshold. */}
+              <div className="relative mt-1" style={{ height: 54 }}>
                 {points.map((p, i) => (
-                  <div key={p.key} className="absolute" style={{ left: `${pcts[i]}%`, top: dateRows[i] === 0 ? '25%' : '75%', transform: 'translate(-50%, -50%)' }}>
+                  <div key={p.key} className="absolute" style={{ left: `${pcts[i]}%`, top: dateRows[i] === 0 ? '30%' : '80%', transform: 'translate(-50%, -50%)' }}>
                     <span className={`inline-block whitespace-nowrap text-[9px] font-semibold ${p.isToday ? 'text-stone-500' : 'text-amber-700'}`}
-                      style={{ transform: 'rotate(270deg)' }}>
+                      style={{ transform: 'rotate(-45deg)' }}>
                       {p.label}
                     </span>
                   </div>
