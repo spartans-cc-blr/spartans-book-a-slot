@@ -186,13 +186,18 @@ function BandwidthSection({
     const completed = mine.filter(b => b.game_date < today)
     const scheduled = mine.filter(b => b.game_date >= today)
 
-    const totalLeague = Array.from(ongoingTournamentIds)
+    // Summed per-tournament (each clamped at 0 individually) rather than a
+    // single aggregate subtraction — an aggregate sum lets one over-booked
+    // tournament's negative delta silently cancel out another tournament's
+    // genuine unbooked count. This must match tournamentBreakdown's own
+    // per-tournament unbooked values above.
+    const unbooked = Array.from(ongoingTournamentIds)
       .reduce((sum, tid) => {
         const entry = byTournament.get(tid)!
-        return sum + (entry.tournament.total_league_games ?? entry.games.length)
+        const tLeague = entry.tournament.total_league_games ?? entry.games.length
+        return sum + Math.max(0, tLeague - entry.games.length)
       }, 0)
-    const unbooked  = Math.max(0, totalLeague - mine.length)
-    const total     = mine.length + unbooked
+    const total = mine.length + unbooked
 
     const slotCounts = Object.fromEntries(
       ALL_SLOTS.map(s => [`${s.day}-${s.time}`, 0])
@@ -206,9 +211,6 @@ function BandwidthSection({
     const dominantSlot = Object.entries(slotCounts).find(([, v]) => v === maxSlot)?.[0]
     const isImbalanced = maxSlot > Math.ceil(mine.length / 2) && mine.length >= 3
 
-    const doneW  = total > 0 ? (completed.length / total) * 100 : 0
-    const schedW = total > 0 ? (scheduled.length / total) * 100 : 0
-    const pendW  = total > 0 ? (unbooked / total) * 100 : 0
     const isLowLoad = total <= 4 && unbooked <= 1
 
     // Format mix for this captain's bookings
@@ -253,62 +255,20 @@ function BandwidthSection({
           </div>
         </div>
 
-        {/* Bandwidth bar — counts rendered inside each segment directly (not
-            just the text line above), so the bar is self-explanatory without
-            needing to cross-reference the count line or the page-level legend.
-            When a segment is wide enough, its label ("upcoming" etc.) renders
-            inline next to the count. When it isn't, the count alone stays
-            inside the segment and the label instead renders as 270°-rotated
-            text directly above that segment — same rotation technique as the
-            availability timeline's date labels below. */}
-        {(() => {
-          const segments = [
-            { key: 'sched', width: schedW, count: scheduled.length, label: 'upcoming',      bg: 'bg-amber-600',   text: 'text-amber-700',   fullAt: 22 },
-            { key: 'done',  width: doneW,  count: completed.length, label: 'past matches',  bg: 'bg-emerald-600', text: 'text-emerald-700', fullAt: 30 },
-            { key: 'pend',  width: pendW,  count: unbooked,         label: 'unbooked',       bg: 'bg-stone-400',   text: 'text-stone-600',   fullAt: 22 },
-          ]
-          let cum = 0
-          const withMid = segments.map(s => {
-            const mid = cum + s.width / 2
-            cum += s.width
-            return { ...s, mid }
-          })
-          // Stagger the rotated above-bar labels too — two adjacent narrow
-          // segments (e.g. a small "upcoming" sliver next to a small
-          // "unbooked" sliver) can have midpoints close enough to collide
-          // the same way the timeline's date labels did.
-          const narrow = withMid.filter(s => s.width > 0 && s.width < s.fullAt)
-          const narrowRows = staggerRows(narrow.map(s => s.mid), 10)
-          return (
-            <div className="mb-2">
-              {/* -45° rather than fully vertical — a diagonal angle avoids
-                  collisions almost as well as 270° but needs roughly half
-                  the vertical footprint, since the label's height and width
-                  both only contribute at cos/sin(45°) instead of the full
-                  text length landing entirely in one axis. */}
-              <div className="relative" style={{ height: 36 }}>
-                {narrow.map((s, i) => (
-                  <div key={s.key} className="absolute" style={{ left: `${s.mid}%`, top: narrowRows[i] === 0 ? '30%' : '80%', transform: 'translate(-50%, -50%)' }}>
-                    <span className={`inline-block whitespace-nowrap text-[8px] font-bold ${s.text}`} style={{ transform: 'rotate(-45deg)' }}>
-                      {s.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="h-5 rounded-full bg-parchment-2 overflow-hidden flex">
-                {withMid.map(s => s.width > 0 && (
-                  <div key={s.key} className={`h-full ${s.bg} flex items-center justify-center transition-all`} style={{ width: `${s.width}%` }}>
-                    {s.width >= s.fullAt ? (
-                      <span className="text-white text-[10px] font-bold whitespace-nowrap">{s.count} {s.label}</span>
-                    ) : s.width >= 8 ? (
-                      <span className="text-white text-[10px] font-bold">{s.count}</span>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })()}
+        {/* Upcoming / Unbooked cards — replaced the old 3-segment stacked bar.
+            Past matches already shows in the count line above and doesn't
+            need a second, more prominent home here; upcoming vs. unbooked is
+            the pair that actually matters for bandwidth planning. */}
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+            <p className="font-cinzel text-lg font-bold text-amber-700 leading-tight">{scheduled.length}</p>
+            <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-amber-700/80">Upcoming</p>
+          </div>
+          <div className="rounded-lg bg-parchment-2 border border-parchment-3 px-3 py-2">
+            <p className="font-cinzel text-lg font-bold text-stone-600 leading-tight">{unbooked}</p>
+            <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500">Unbooked</p>
+          </div>
+        </div>
 
         {/* Availability timeline — today through the latest already-booked game
             across all this captain's ongoing tournaments, so gaps between games
@@ -350,7 +310,7 @@ function BandwidthSection({
           return (
             <div className="mt-2 mb-1">
               <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 mb-2">
-                Availability — today onward
+                Schedule — today onward
               </p>
               <div className="relative" style={{ height: 16 }}>
                 <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3" />
