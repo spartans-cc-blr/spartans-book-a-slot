@@ -53,12 +53,25 @@ export default async function TournamentSharePage({
   // Fetch confirmed bookings for this tournament
   const { data: rawBookings } = await supabase
     .from('bookings')
-    .select('id, game_date, slot_time, format, cricheroes_url')
+    .select('id, game_date, slot_time, format, cricheroes_url, opponent_name, match_id')
     .eq('status', 'confirmed')
     .eq('tournament_id', params.tournamentId)
     .order('game_date', { ascending: true })
 
-  const bookings = rawBookings ?? []
+  // Match result for any finished games with a synced scorecard — read-through
+  // cache table, same source matches/history uses. Not every past game has
+  // one yet (scorecard sync is a separate manual/cron step), so this is a
+  // best-effort attach, not a requirement.
+  const matchIds = (rawBookings ?? []).map(b => b.match_id).filter((id): id is string => !!id)
+  const { data: statsRows } = matchIds.length
+    ? await supabase.from('match_stats_cache').select('match_id, match_result').in('match_id', matchIds)
+    : { data: [] }
+  const resultByMatchId = new Map((statsRows ?? []).map(r => [r.match_id, r.match_result]))
+
+  const bookings = (rawBookings ?? []).map(b => ({
+    ...b,
+    match_result: b.match_id ? resultByMatchId.get(b.match_id) ?? null : null,
+  }))
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 
