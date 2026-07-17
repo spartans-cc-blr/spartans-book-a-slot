@@ -39,6 +39,11 @@ export async function syncMatchStatsForBooking(
   }
   const analyticsSupabase = createSupabaseClient(analyticsUrl, analyticsKey, { auth: { persistSession: false } })
 
+  // select('*') deliberately, not an explicit column list — this is what
+  // makes player_id (see src/lib/playerIdentityResolution.ts) show up in
+  // match_stats_cache automatically once reconciled, with no change needed
+  // here. Rows synced before their name is reconciled just carry
+  // player_id: null into the cache until the next sync — expected, not a bug.
   const [match, batting, bowling, fielding, team] = await Promise.all([
     analyticsSupabase.from('match_stats').select('*').eq('match_id', mid).single(),
     analyticsSupabase.from('batting_stats').select('*').eq('match_id', mid),

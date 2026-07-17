@@ -122,3 +122,38 @@ export const inviteTokenSchema = z.object({
   // Optional: note for audit purposes
   note: z.string().max(200).optional(),
 })
+
+// ── PLAYER IDENTITY RECONCILIATION (POST /api/admin/player-reconciliation) ──
+// See src/lib/playerIdentityResolution.ts and
+// .claude/rules/features/player-identity-resolution.md
+
+const scorecardNameField = z.string().min(1, 'scorecard_name is required').max(120)
+
+export const playerReconciliationConfirmSchema = z.object({
+  mode:           z.literal('confirm'),
+  scorecard_name: scorecardNameField,
+  player_id:      z.string().uuid('player_id must be a valid UUID'),
+  // 'global' writes a player_name_aliases row (applies to every match);
+  // { match_id } writes a match_name_overrides row (this match only) —
+  // for genuine same-name-same-match collisions the global alias can't express.
+  scope: z.union([
+    z.literal('global'),
+    z.object({ match_id: z.string().min(1, 'match_id is required') }),
+  ]),
+})
+
+export const playerReconciliationIgnoreSchema = z.object({
+  mode:           z.literal('ignore'),
+  scorecard_name: scorecardNameField,
+})
+
+export const playerReconciliationReconcileSchema = z.object({
+  mode:           z.literal('reconcile'),
+  scorecard_name: scorecardNameField,
+})
+
+export const playerReconciliationRequestSchema = z.discriminatedUnion('mode', [
+  playerReconciliationConfirmSchema,
+  playerReconciliationIgnoreSchema,
+  playerReconciliationReconcileSchema,
+])

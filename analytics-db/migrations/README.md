@@ -1,0 +1,22 @@
+# Analytics DB Migrations
+
+This directory is separate from `supabase/migrations/` at the repo root,
+which targets the **Hub** Supabase project. Files here target the
+**analytics** Supabase project — a different Supabase project that stores
+parsed CricHeroes scorecards (`match_stats`, `batting_stats`,
+`bowling_stats`, `fielding_stats`, `team_list`), reachable from Hub API
+routes only via `ANALYTICS_SUPABASE_URL` / `ANALYTICS_SUPABASE_KEY` (see
+`src/lib/matchStatsSync.ts`).
+
+No Next.js code in this repo runs a migration runner against the analytics
+project automatically — these files are applied manually (e.g. via the
+Supabase MCP `apply_migration` tool against the analytics project, not the
+Hub project). As with the Hub DB's own migration history (see
+`.claude/rules/features/post-match-scorecard.md` §5, "Repo/DB drift note"),
+a file existing here is not proof it has been applied to the live analytics
+project — cross-check with `list_migrations` against the analytics project
+after applying.
+
+| File | Purpose |
+|---|---|
+| `001_player_identity_resolution.sql` | Adds nullable `player_id` to `batting_stats`/`bowling_stats`/`fielding_stats`/`team_list`, plus `player_name_aliases`, `match_name_overrides`, `ignored_names` — see `.claude/rules/features/player-identity-resolution.md` |

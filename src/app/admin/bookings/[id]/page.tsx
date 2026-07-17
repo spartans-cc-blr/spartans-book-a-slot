@@ -113,7 +113,7 @@ export default function BookingDetailPage() {
   const [feeConfirming,    setFeeConfirming]     = useState(false)
   const [scorecardOpen,    setScorecardOpen]     = useState(false)
   const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[]; team_list?: any[] } | null>(null)
-  const [scorecardSquad,   setScorecardSquad]    = useState<{ player_name: string; cricheroes_url: string | null }[] | undefined>(undefined)
+  const [scorecardSquad,   setScorecardSquad]    = useState<{ player_id: string; player_name: string; cricheroes_url: string | null }[] | undefined>(undefined)
   const [scorecardLoading, setScorecardLoading]  = useState(false)
   const [scorecardError,   setScorecardError]    = useState('')
   const [resetLoading,     setResetLoading]      = useState(false)

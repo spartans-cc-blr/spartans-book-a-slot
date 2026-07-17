@@ -80,6 +80,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   ])
 
   const squad = (squadRows ?? []).map((r: any) => ({
+    player_id:      r.player_id,
     player_name:    r.players?.name ?? 'Unknown',
     cricheroes_url: r.players?.cricheroes_url ?? null,
   }))

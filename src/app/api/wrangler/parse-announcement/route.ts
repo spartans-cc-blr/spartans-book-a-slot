@@ -10,6 +10,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { parseAnnouncement, type ParsedAnnouncement, type SquadRole } from '@/lib/parseAnnouncement'
+import { normaliseName as normalise, suggestPlayers } from '@/lib/nameMatch'
 
 async function requireWrangler() {
   const session = await getServerSession(authOptions)
@@ -17,25 +18,6 @@ async function requireWrangler() {
   if (!user?.playerId) return { error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }), user: null }
   if (!user?.isWrangler && !user?.isAdmin) return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }), user: null }
   return { error: null, user }
-}
-
-// Plain Levenshtein edit distance — small roster (~150 names), no need for a library.
-function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length
-  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)])
-  for (let j = 0; j <= n; j++) dp[0][j] = j
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1])
-    }
-  }
-  return dp[m][n]
-}
-
-function normalise(s: string): string {
-  return s.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim()
 }
 
 // date_raw is day + month only (e.g. "5th July") — no year, so this can
@@ -148,11 +130,7 @@ export async function POST(req: NextRequest) {
 
     let suggestions: string[] | undefined
     if (!exact && entry.name) {
-      const scored = roster
-        .map(p => ({ name: p.name, dist: levenshtein(key, normalise(p.name)) }))
-        .sort((a, b) => a.dist - b.dist)
-        .filter(s => s.dist <= Math.max(3, Math.ceil(key.length / 2)))
-        .slice(0, 3)
+      const scored = suggestPlayers(entry.name, roster)
       if (scored.length) suggestions = scored.map(s => s.name)
     }
 

@@ -3,6 +3,7 @@
 import { PlayerNameLink } from '@/lib/playerLink'
 
 interface SquadRef {
+  player_id:      string
   player_name:    string
   cricheroes_url: string | null
 }
@@ -19,10 +20,19 @@ function num(row: any, keys: string[]): number {
   return v != null ? Number(v) : 0
 }
 
-function findCricHeroesUrl(name: string, squad?: SquadRef[]): string | null {
+// Prefers player_id (set once a scorecard name has been reconciled — see
+// src/lib/playerIdentityResolution.ts) over the fragile case-insensitive
+// name string match, which stays as a fallback for rows synced before
+// reconciliation and degrades gracefully rather than showing no link at all.
+function findCricHeroesUrl(row: any, name: string, squad?: SquadRef[]): string | null {
   if (!squad) return null
-  const match = squad.find(p => p.player_name?.trim().toLowerCase() === name?.trim().toLowerCase())
-  return match?.cricheroes_url ?? null
+  const playerId = pickField(row, ['player_id'])
+  if (playerId) {
+    const byId = squad.find(p => p.player_id === playerId)
+    if (byId) return byId.cricheroes_url ?? null
+  }
+  const byName = squad.find(p => p.player_name?.trim().toLowerCase() === name?.trim().toLowerCase())
+  return byName?.cricheroes_url ?? null
 }
 
 export function ScorecardTables({
@@ -54,12 +64,16 @@ export function ScorecardTables({
   const battedNames = new Set(
     battingRows.map(row => (pickField(row, ['player_name', 'name']) ?? '').trim().toLowerCase())
   )
-  const didNotBatNames = Array.from(new Set(
-    (teamList ?? [])
-      .map(row => pickField(row, ['player_name', 'name']))
-      .filter((name): name is string => !!name)
-      .filter(name => !battedNames.has(name.trim().toLowerCase()))
-  ))
+  const seenDidNotBat = new Set<string>()
+  const didNotBatRows = (teamList ?? [])
+    .filter(row => {
+      const name = pickField(row, ['player_name', 'name'])
+      if (!name) return false
+      const key = name.trim().toLowerCase()
+      if (battedNames.has(key) || seenDidNotBat.has(key)) return false
+      seenDidNotBat.add(key)
+      return true
+    })
 
   return (
     <div className="space-y-4">
@@ -85,7 +99,7 @@ export function ScorecardTables({
                 return (
                   <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
                     <td className="py-1 pr-2">
-                      <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(name, squad)} />
+                      <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
                     <td className="text-right px-1">{runs}</td>
                     <td className="text-right px-1">{num(row, ['balls', 'balls_faced'])}</td>
@@ -101,15 +115,18 @@ export function ScorecardTables({
             </tbody>
           </table>
         </div>
-        {didNotBatNames.length > 0 && (
+        {didNotBatRows.length > 0 && (
           <p className="font-rajdhani text-xs text-zinc-500 mt-2 flex flex-wrap items-baseline gap-x-1">
             <span className="text-zinc-600">Did not bat:</span>
-            {didNotBatNames.map((name, i) => (
-              <span key={name}>
-                <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(name, squad)} />
-                {i < didNotBatNames.length - 1 ? ',' : ''}
-              </span>
-            ))}
+            {didNotBatRows.map((row, i) => {
+              const name = pickField(row, ['player_name', 'name'])
+              return (
+                <span key={name}>
+                  <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                  {i < didNotBatRows.length - 1 ? ',' : ''}
+                </span>
+              )
+            })}
           </p>
         )}
       </div>
@@ -135,7 +152,7 @@ export function ScorecardTables({
                 return (
                   <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
                     <td className="py-1 pr-2">
-                      <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(name, squad)} />
+                      <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
                     <td className="text-right px-1">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
                     <td className="text-right px-1">{wkts}</td>

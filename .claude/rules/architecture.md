@@ -95,6 +95,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/admin/grounds` | Grounds master data (name, Maps URL, hospital URL) |
 | `/admin/soft-blocks/new` | Create reservation (soft block) |
 | `/admin/scorecard-backfill` | One-time catch-up UI — fetches scorecards directly from CricHeroes for past matches never uploaded; see `features/post-match-scorecard.md` |
+| `/admin/player-reconciliation` | Resolves analytics-DB scorecard `player_name` strings to Hub `players.id` — suggestions, confirm/ignore, "Run Reconciliation Pass"; see `features/player-identity-resolution.md` |
  
 ---
  
@@ -146,6 +147,7 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/admin/sync-match-stats` | POST | Captain/VC (own booking) or wrangler/admin | Manual "Sync Stats" trigger — despite the `/admin/` path, **not** admin-only; re-derives the per-booking squad check server-side |
 | `/api/admin/matches/[id]/post-match` | GET, DELETE | Admin | Admin Post-Match panel feed; DELETE resets a stuck/wrong upload |
 | `/api/admin/scorecard-backfill` | GET, POST | Admin | One-time catch-up: list eligible bookings, process one per POST |
+| `/api/admin/player-reconciliation` | GET, POST | Admin | Resolves analytics-DB `player_name` strings to Hub `players.id` — GET buckets pending names, POST confirms/ignores/reconciles; see `features/player-identity-resolution.md` |
 | `/api/fees/apply` | POST | Admin | Pre-existing — applies match fees, sets `scorecard_uploads.status = 'fees_applied'`. Always manual, never triggered by the scorecard automation |
  
 ### Admin APIs
@@ -547,6 +549,11 @@ Next.js API Routes (server-side)
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron — see `features/post-match-scorecard.md` |
 | `src/app/admin/scorecard-backfill/page.tsx` | One-time admin catch-up UI, client-driven sequential loop |
 | supabase/migrations/009_push_subscriptions.sql | push_subscriptions table — one row per player per device |
+| `src/lib/playerIdentityResolution.ts` | `resolvePlayerName()` / `backfillPlayerIdForName()` — analytics-DB `player_name` → Hub `players.id` resolution; see `features/player-identity-resolution.md` |
+| `src/lib/nameMatch.ts` | Shared Levenshtein fuzzy-match helpers — extracted from `parse-announcement`, reused by player reconciliation |
+| `src/app/api/admin/player-reconciliation/route.ts` | GET buckets pending scorecard names, POST confirms/ignores/reconciles |
+| `src/app/admin/player-reconciliation/page.tsx` | Admin reconciliation UI + "Run Reconciliation Pass" client loop |
+| `analytics-db/migrations/001_player_identity_resolution.sql` | Analytics DB (separate project) — `player_id` columns + alias/override/ignore tables |
  
 ---
  
