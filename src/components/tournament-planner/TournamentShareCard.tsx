@@ -1,5 +1,6 @@
 import { parseISO, differenceInDays, format } from 'date-fns'
 import type { SuggestedDate } from '@/lib/suggestedSlots'
+import { ResultBadge } from '@/components/shared/ResultBadge'
 
 // This is a Server Component (no 'use client'), so the icon is inlined
 // here rather than imported from TournamentShareButton.tsx (a client
@@ -105,27 +106,6 @@ export function TournamentShareCard({
     return `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`
   }
 
-  // Result indicator for a finished game with a synced scorecard — win gets
-  // a solid green pill (celebratory), a loss is plain red text, matching the
-  // same asymmetric-weight convention MatchHistoryCard uses (a bordered
-  // badge on every outcome made a loss read as "achieved" as a win).
-  function resultBadge(result: string) {
-    // Stored values are literally "WON"/"LOST" (confirmed against live data)
-    // — matched via .includes() rather than exact equality so a more
-    // descriptive value (e.g. "won by 5 runs") still resolves correctly.
-    const r = result.toLowerCase()
-    if (r.includes('won')) {
-      return <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">WON</span>
-    }
-    if (r.includes('lost')) {
-      return <span className="text-red-700 text-[10px] font-bold">LOST</span>
-    }
-    if (r.includes('tie')) {
-      return <span className="text-amber-700 text-[10px] font-bold">TIED</span>
-    }
-    return <span className="text-stone-400 text-[10px] font-bold">{result.toUpperCase()}</span>
-  }
-
   const gapColor = (gap: number | null) => {
     if (!gap)       return 'text-stone-500'
     if (gap <= 1)   return 'text-red-700'
@@ -212,7 +192,7 @@ export function TournamentShareCard({
                     vs {g.opponent_name || 'TBD'}
                     {formats.length > 1 && <span className="text-stone-400 font-normal"> · {g.format}</span>}
                   </p>
-                  {isDone && g.match_result && resultBadge(g.match_result)}
+                  {isDone && g.match_result && <ResultBadge result={g.match_result} />}
                 </div>
                 <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-parchment-3">
                   {gap !== null

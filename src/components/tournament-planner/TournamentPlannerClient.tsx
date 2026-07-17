@@ -5,6 +5,7 @@ import { parseISO, differenceInDays, format } from 'date-fns'
 import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { TournamentShareButton, WA_ICON } from './TournamentShareButton'
+import { ResultBadge } from '@/components/shared/ResultBadge'
 
 // ── Types ──────────────────────────────────────────────────────────
 interface Booking {
@@ -13,6 +14,9 @@ interface Booking {
   slot_time: string
   format: string | null
   cricheroes_url: string | null
+  // Resolved server-side from match_stats_cache — null until a scorecard is
+  // synced for this match, even for a game that's already been played.
+  match_result: string | null
   tournament: {
     id: string
     name: string
@@ -843,6 +847,7 @@ function MatchTabsSection({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13.5px] font-bold text-ink">{format(d, 'EEE')} · {g.slot_time}</p>
+                      {g.match_result && <div className="mt-0.5"><ResultBadge result={g.match_result} /></div>}
                       <p className="text-xs text-stone-500 mt-0.5">
                         {showFormatOnRow && <>{g.format} · </>}Captain{' '}
                         {captain
