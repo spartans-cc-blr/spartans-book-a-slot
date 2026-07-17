@@ -30,6 +30,10 @@ interface Booking {
   slot_time: string
   format: string | null
   cricheroes_url: string | null
+  opponent_name: string | null
+  // Resolved server-side from match_stats_cache — null until a scorecard is
+  // synced for this match, even for a game that's already been played.
+  match_result: string | null
 }
 
 interface Tournament {
@@ -99,6 +103,27 @@ export function TournamentShareCard({
     const dayLabel = format(parseISO(s.game_date), 'EEEE d MMM')
     const message = `Hi Spartans! For ${tournament.name}, is ${dayLabel} available to book? We'd like to schedule our next league game.`
     return `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`
+  }
+
+  // Result indicator for a finished game with a synced scorecard — win gets
+  // a solid green pill (celebratory), a loss is plain red text, matching the
+  // same asymmetric-weight convention MatchHistoryCard uses (a bordered
+  // badge on every outcome made a loss read as "achieved" as a win).
+  function resultBadge(result: string) {
+    // Stored values are literally "WON"/"LOST" (confirmed against live data)
+    // — matched via .includes() rather than exact equality so a more
+    // descriptive value (e.g. "won by 5 runs") still resolves correctly.
+    const r = result.toLowerCase()
+    if (r.includes('won')) {
+      return <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">WON</span>
+    }
+    if (r.includes('lost')) {
+      return <span className="text-red-700 text-[10px] font-bold">LOST</span>
+    }
+    if (r.includes('tie')) {
+      return <span className="text-amber-700 text-[10px] font-bold">TIED</span>
+    }
+    return <span className="text-stone-400 text-[10px] font-bold">{result.toUpperCase()}</span>
   }
 
   const gapColor = (gap: number | null) => {
@@ -175,23 +200,23 @@ export function TournamentShareCard({
             // (a separate element per game), so an `auto` track sizes to that
             // row's own content only and drifted row-to-row depending on
             // whether it held "start" or "10w / from prev".
-            const rowClass = `grid grid-cols-[44px_1fr_72px] border border-parchment-3 rounded-xl overflow-hidden transition-colors ${isDone ? 'opacity-60' : ''} ${g.cricheroes_url ? 'hover:border-gold-dim' : ''}`
+            const rowClass = `grid grid-cols-[58px_1fr_72px] border border-parchment-3 rounded-xl overflow-hidden transition-colors ${isDone ? 'opacity-60' : ''} ${g.cricheroes_url ? 'hover:border-gold-dim' : ''}`
             const inner = (
               <>
-                <div className="bg-parchment-2 flex flex-col items-center justify-center py-2 border-r border-parchment-3">
+                <div className="bg-parchment-2 flex flex-col items-center justify-center py-2 gap-1 border-r border-parchment-3">
                   <span className="font-cinzel text-base font-bold text-ink leading-none">{format(d, 'd')}</span>
                   <span className="font-rajdhani text-[9px] text-stone-500 uppercase">{format(d, 'MMM')}</span>
+                  <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                    isSat ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-pink-100 text-pink-700 border-pink-300'
+                  }`}>{dayName}</span>
+                  <span className="font-rajdhani text-[9px] text-stone-500">{g.slot_time}</span>
                 </div>
-                <div className="px-2.5 py-2 flex flex-col gap-0.5">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
-                      isSat ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-pink-100 text-pink-700 border-pink-300'
-                    }`}>{dayName}</span>
-                    <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">{g.slot_time}</span>
-                    {formats.length > 1 && (
-                      <span className="font-rajdhani text-[10px] px-1.5 py-0.5 rounded-full bg-parchment-3 text-ink-3 border border-ink-5">{g.format}</span>
-                    )}
-                  </div>
+                <div className="px-2.5 py-2 flex flex-col justify-center gap-1 min-w-0">
+                  <p className="font-rajdhani text-[13px] font-semibold text-ink truncate">
+                    vs {g.opponent_name || 'TBD'}
+                    {formats.length > 1 && <span className="text-stone-400 font-normal"> · {g.format}</span>}
+                  </p>
+                  {isDone && g.match_result && resultBadge(g.match_result)}
                 </div>
                 <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-parchment-3">
                   {gap !== null
