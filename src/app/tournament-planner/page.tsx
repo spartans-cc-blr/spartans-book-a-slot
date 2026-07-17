@@ -57,6 +57,8 @@ export default async function TournamentPlannerPage() {
     } | null
   }>
 
+  const today = new Date().toISOString().split('T')[0]
+
   // 2. Squad status per booking — only need announced rows to determine "completed"
   //    A game is "completed" when game_date < today AND squad status = announced.
   //    Cap at 100 booking IDs (vibe-security: uncapped .in() is S-4 risk)
@@ -70,15 +72,19 @@ export default async function TournamentPlannerPage() {
     : { data: [] }
 
   // Players represented per tournament + per-booking squad captain — dedupe + sort,
-  // sourced from announced squads only
+  // sourced from announced squads only. "Players represented" is specifically a
+  // history of who has actually played, so it's restricted to past bookings
+  // (game_date < today) — bookingCaptainMap stays unrestricted since it also
+  // feeds the captain badge on upcoming/today's fixtures, not just past ones.
   const bookingToTournamentId = new Map(bookings.map(b => [b.id, b.tournament?.id ?? null]))
+  const pastBookingIds = new Set(bookings.filter(b => b.game_date < today).map(b => b.id))
   const tournamentPlayersMap: Record<string, { id: string; name: string; cricheroes_url: string | null }[]> = {}
   const bookingCaptainMap: Record<string, { name: string; cricheroes_url: string | null }> = {}
   for (const row of (squads ?? []) as any[]) {
     const player = Array.isArray(row.players) ? row.players[0] : row.players
     if (!player) continue
     const tournamentId = bookingToTournamentId.get(row.booking_id)
-    if (tournamentId) {
+    if (tournamentId && pastBookingIds.has(row.booking_id)) {
       const list = tournamentPlayersMap[tournamentId] ?? (tournamentPlayersMap[tournamentId] = [])
       if (!list.some(p => p.id === player.id)) list.push(player)
     }
@@ -96,8 +102,6 @@ export default async function TournamentPlannerPage() {
     .select('id, name, player_id')
     .eq('active', true)
     .order('name')
-
-  const today = new Date().toISOString().split('T')[0]
 
   // 4. Resolve captainId for the current viewer if they are a captain
   //    Use player_id FK — no fragile name matching
