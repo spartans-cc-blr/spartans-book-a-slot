@@ -24,6 +24,10 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     steps:
+      - name: TEMP — debug secret length (no value printed, remove after diagnosis)
+        run: echo "CRON_SECRET length is ${#CRON_SECRET} characters"
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
       - name: Call backfill-scorecards cron endpoint
         run: |
           curl --fail --silent --show-error \
