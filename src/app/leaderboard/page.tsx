@@ -4,15 +4,15 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { getLeaderboard } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { PlayerNameLink } from '@/lib/playerLink'
 import { LeaderboardFilters, type LeaderboardCategory } from '@/components/leaderboard/LeaderboardFilters'
+import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Leaderboard — Spartans CC' }
 export const revalidate = 0
 
 function isCategory(v: string | undefined): v is LeaderboardCategory {
-  return v === 'runs' || v === 'wickets' || v === 'mvp'
+  return v === 'batting' || v === 'bowling' || v === 'fielding' || v === 'mvp'
 }
 
 export default async function LeaderboardPage({
@@ -30,7 +30,7 @@ export default async function LeaderboardPage({
   const yearParam = searchParams?.year
   const year: number | 'all' = yearParam === 'all' ? 'all' : (Number(yearParam) || currentYear)
   const tournamentId = searchParams?.tournament && searchParams.tournament !== 'all' ? searchParams.tournament : 'all'
-  const category: LeaderboardCategory = isCategory(searchParams?.category) ? searchParams!.category as LeaderboardCategory : 'runs'
+  const category: LeaderboardCategory = isCategory(searchParams?.category) ? searchParams!.category as LeaderboardCategory : 'batting'
 
   const supabase = createServiceClient()
   const { data: tournaments } = await supabase
@@ -41,12 +41,6 @@ export default async function LeaderboardPage({
   const rows = await getLeaderboard({
     year: year === 'all' ? undefined : year,
     tournamentId: tournamentId === 'all' ? undefined : tournamentId,
-  })
-
-  const sorted = [...rows].sort((a, b) => {
-    if (category === 'runs')    return b.stats.runs - a.stats.runs
-    if (category === 'wickets') return b.stats.wickets - a.stats.wickets
-    return b.stats.mvpPoints - a.stats.mvpPoints
   })
 
   return (
@@ -72,41 +66,7 @@ export default async function LeaderboardPage({
           category={category}
         />
 
-        <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-ink-5 bg-ink-4">
-                  {['#', 'Player', 'Matches', 'Runs', 'Avg', 'S/R', 'Wickets', 'Economy', 'MVP'].map(h => (
-                    <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.length === 0 && (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No stats for this filter yet.</td></tr>
-                )}
-                {sorted.map((row, i) => (
-                  <tr key={row.playerId} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
-                    <td className="px-4 py-3 font-cinzel text-sm text-zinc-500">{i + 1}</td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-parchment">
-                      <PlayerNameLink name={row.playerName} cricHeroesUrl={row.cricheroesUrl} />
-                    </td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.matches}</td>
-                    <td className={`px-4 py-3 font-rajdhani text-sm ${category === 'runs' ? 'text-gold font-bold' : 'text-zinc-400'}`}>{row.stats.runs}</td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.battingAverage ?? '—'}</td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.strikeRate ?? '—'}</td>
-                    <td className={`px-4 py-3 font-rajdhani text-sm ${category === 'wickets' ? 'text-gold font-bold' : 'text-zinc-400'}`}>{row.stats.wickets}</td>
-                    <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.economy ?? '—'}</td>
-                    <td className={`px-4 py-3 font-rajdhani text-sm ${category === 'mvp' ? 'text-gold font-bold' : 'text-zinc-400'}`}>{row.stats.mvpPoints}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <LeaderboardTable rows={rows} category={category} />
       </div>
 
       <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
