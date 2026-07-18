@@ -180,3 +180,15 @@ export interface RecentForm {
   runs:    number
   wickets: number
 }
+
+// Per-booking context stats for Captains' Corner's tap-to-expand "Form"
+// panel — see src/lib/playerStats.ts getPlayerBookingContextStats() and
+// src/app/api/captains-corner/context-stats/route.ts. Each field is null
+// when the player has no reconciled matches in that scope (never a
+// zero-filled row) so the UI can render "No matches yet" instead of a
+// misleading all-zero line.
+export interface BookingContextStats {
+  tournament: PlayerStatsTotals | null
+  ground:     PlayerStatsTotals | null
+  format:     PlayerStatsTotals | null
+}
