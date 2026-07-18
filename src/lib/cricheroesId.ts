@@ -10,16 +10,24 @@
 //              the short link itself; the server has to follow the
 //              redirect and read where it actually lands.
 //
-// Confirmed in production (2026-07-18): chshare.link does NOT do a real
-// HTTP 3xx redirect — fetch(url, { redirect: 'follow' }) returns 200 with
-// res.url unchanged (~700ms, not a timeout), meaning the actual
-// destination is embedded in the page and resolved client-side (JS
-// redirect / app-deep-link fallback page, the same pattern as Branch.io
-// or Firebase Dynamic Links). So resolution can't stop at res.url — it
-// has to fall back to scanning the response body text for the same
-// profile-URL pattern (covers a meta tag, embedded JSON, or a JS
-// redirect literal, whichever chshare.link actually uses, without
-// depending on its exact markup).
+// Confirmed in production (2026-07-18): a plain, header-less fetch()
+// against chshare.link comes back 200 with res.url unchanged (~700ms, not
+// a timeout) — it isn't reachability, chshare.link is branching on
+// User-Agent. A real browser opening the same link (confirmed by pasting
+// the actual address-bar URL) lands on a Branch.io-style deferred-deep-
+// -link fallback page after following real HTTP redirects:
+//   https://crichero.es/?link=https://cricheroes.com/player-profile/4601286/Muthukumar-R&utm_source=app_share_android...
+// The destination is right there as the `link` query parameter — no HTML
+// parsing needed once fetch actually reaches it. Same class of fix this
+// repo already needed once before for a different CricHeroes endpoint
+// (pdf.cricheroes.in required a spoofed User-Agent/Referer — see
+// limitations.md): send a realistic mobile-browser User-Agent so
+// chshare.link serves the same redirect chain a real phone gets, instead
+// of whatever fallback it serves to an unrecognised client.
+//
+// Kept the body-scan fallback too (see resolveShareLink) in case a future
+// hop in the chain ever needs it — cheap insurance, not load-bearing for
+// the case above once the header fix lands.
 //
 // Best-effort throughout: any failure (timeout, no match found, network
 // error) returns null rather than throwing, so a save never fails because
@@ -27,6 +35,14 @@
 // Never call fetch() against an arbitrary client-supplied host — only
 // chshare.link is followed, everything else is a same-request regex or a
 // no-op.
+
+// Mimics a real Android Chrome browser — chshare.link's deep-link
+// resolution behaves differently for an unrecognised/bot User-Agent than
+// for what an actual player's phone sends.
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+}
 
 const DIRECT_PROFILE_ID_RE = /cricheroes\.(?:com|in)\/player-profile\/(\d+)\b/i
 
@@ -60,16 +76,27 @@ export function isCricheroesUrl(url: string): boolean {
   return Array.from(DIRECT_HOSTS).concat(SHARE_LINK_HOST).some(host => isHost(hostname, host))
 }
 
-function extractDirectId(url: string): string | null {
-  const m = url.match(DIRECT_PROFILE_ID_RE)
-  return m ? m[1] : null
+// Tries the raw text first, then a percent-decoded pass — the `link=`
+// query param carrying the real destination may or may not be
+// URL-encoded depending on which hop it's read from.
+function extractDirectId(text: string): string | null {
+  const direct = text.match(DIRECT_PROFILE_ID_RE)
+  if (direct) return direct[1]
+  try {
+    const decoded = decodeURIComponent(text)
+    const fromDecoded = decoded.match(DIRECT_PROFILE_ID_RE)
+    if (fromDecoded) return fromDecoded[1]
+  } catch {
+    // malformed percent-encoding — already tried raw, nothing more to do
+  }
+  return null
 }
 
 async function resolveShareLink(url: string): Promise<string | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REDIRECT_TIMEOUT_MS)
   try {
-    const res = await fetch(url, { redirect: 'follow', signal: controller.signal })
+    const res = await fetch(url, { redirect: 'follow', signal: controller.signal, headers: BROWSER_HEADERS })
 
     const fromRedirect = extractDirectId(res.url)
     if (fromRedirect) return fromRedirect
