@@ -44,6 +44,7 @@ interface Player {
   active: boolean
   status: string
   is_fee_exempt: boolean
+  recent_form?: { matches: number; runs: number; wickets: number } | null
 }
 
 // FIX 4: matchRoles removed from MatchRoles — it is separate state in SlotCard
@@ -435,6 +436,16 @@ const exemptBadge = player.is_fee_exempt
    ? <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted"><HeartHandshakeIcon size={12} /></span>
    : null
 
+  // Compact recent-form glance — runs (wickets) over the player's last few
+  // reconciled matches. Absent entirely (not a placeholder) for players
+  // with no reconciled matches yet, so unplayed/new members don't clutter
+  // an already-dense row.
+  const formBadge = player.recent_form && player.recent_form.matches > 0
+    ? <span className="ml-1.5 font-rajdhani text-[10px] text-zinc-600" title={`Last ${player.recent_form.matches} match${player.recent_form.matches === 1 ? '' : 'es'}`}>
+        {player.recent_form.runs} ({player.recent_form.wickets})
+      </span>
+    : null
+
   if (player.cricheroes_url && !isTaken) {
     return (
       <a
@@ -443,11 +454,11 @@ const exemptBadge = player.is_fee_exempt
         rel="noopener noreferrer"
         onClick={e => e.stopPropagation()}
         className={cls + ' hover:underline underline-offset-2'}>
-        {player.name}{badge}{exemptBadge}
+        {player.name}{badge}{exemptBadge}{formBadge}
       </a>
     )
   }
-  return <span className={cls}>{player.name}{badge}{exemptBadge}</span>
+  return <span className={cls}>{player.name}{badge}{exemptBadge}{formBadge}</span>
 }
 
 // ── Match Role SVG Icons ──────────────────────────────────────────

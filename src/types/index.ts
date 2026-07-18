@@ -145,3 +145,38 @@ export const BLOCK_REASONS = [
   'Practice / Internal Game',
   'Other',
 ] as const
+
+// ── Player performance stats (analytics DB, see src/lib/playerStats.ts) ───
+
+export interface PlayerStatsTotals {
+  matches:        number
+  runs:           number
+  balls:          number
+  notOuts:        number
+  battingAverage: number | null
+  strikeRate:     number | null
+  fours:          number
+  sixes:          number
+  wickets:        number
+  ballsBowled:    number
+  oversBowled:    string        // display form, e.g. "12.4" (12 overs, 4 balls)
+  runsConceded:   number
+  economy:        number | null
+  catches:        number
+  runOuts:        number
+  stumpings:      number
+  mvpPoints:      number
+}
+
+export interface LeaderboardRow {
+  playerId:      string
+  playerName:    string
+  cricheroesUrl: string | null
+  stats:         PlayerStatsTotals
+}
+
+export interface RecentForm {
+  matches: number
+  runs:    number
+  wickets: number
+}

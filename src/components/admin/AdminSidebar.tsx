@@ -15,6 +15,7 @@ const NAV = [
   { href: '/schedule',               label: 'Organiser View',   icon: '🌐', section: 'Views' },
   { href: '/fixtures',               label: 'Upcoming Matches', icon: '🏏' },
   { href: '/matches/history',        label: 'Past Matches',     icon: '📜' },
+  { href: '/admin/stats',            label: 'Performance Report', icon: '📈' },
   { href: '/admin/scorecard-backfill', label: 'Scorecard Backfill', icon: '📥' },
   { href: '/admin/player-reconciliation', label: 'Player Reconciliation', icon: '🪪' },
   { href: '/admin/cricheroes-id-backfill', label: 'CricHeroes ID Backfill', icon: '🔗' },
