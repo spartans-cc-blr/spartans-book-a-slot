@@ -55,6 +55,7 @@ const COLUMNS: Record<LeaderboardCategory, { key: SortKey; label: string }[]> = 
     { key: 'catches', label: 'Ct' },
     { key: 'runOuts', label: 'RO' },
     { key: 'stumpings', label: 'St' },
+    { key: 'dismissals', label: 'Total' },
   ],
   mvp: [
     { key: 'matches', label: 'M' },
@@ -66,7 +67,7 @@ const COLUMNS: Record<LeaderboardCategory, { key: SortKey; label: string }[]> = 
 }
 
 const DEFAULT_SORT: Record<LeaderboardCategory, SortKey> = {
-  batting: 'runs', bowling: 'wickets', fielding: 'catches', mvp: 'mvpPoints',
+  batting: 'runs', bowling: 'wickets', fielding: 'dismissals', mvp: 'mvpPoints',
 }
 
 export function LeaderboardTable({ rows, category }: { rows: LeaderboardRow[]; category: LeaderboardCategory }) {

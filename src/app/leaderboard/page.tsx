@@ -66,7 +66,7 @@ export default async function LeaderboardPage({
           category={category}
         />
 
-        <LeaderboardTable rows={rows} category={category} />
+        <LeaderboardTable key={category} rows={rows} category={category} />
       </div>
 
       <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
