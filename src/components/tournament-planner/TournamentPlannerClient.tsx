@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { TournamentShareButton, WA_ICON } from './TournamentShareButton'
 import { ResultBadge } from '@/components/shared/ResultBadge'
+import type { PlayerStatsTotals } from '@/types'
 
 // ── Types ──────────────────────────────────────────────────────────
 interface Booking {
@@ -49,6 +50,10 @@ interface Props {
   today: string
   viewerRole: ViewerRole
   tournamentPlayersMap: Record<string, TournamentPlayer[]>
+  // Keyed by real Hub player_id (reconciled — see src/lib/playerIdentityResolution.ts),
+  // scoped purely to this tournament's own matches via getLeaderboard({ tournamentId }).
+  // Never career-wide stats.
+  tournamentStatsMap: Record<string, Record<string, PlayerStatsTotals>>
   bookingCaptainMap: Record<string, SquadCaptain>
 }
 
@@ -84,6 +89,12 @@ function staggerRows(pcts: number[], thresholdPct: number): number[] {
     lastPct = pct
     return row
   })
+}
+
+// Same helper as CaptainsCornerGrid.tsx's ContextStatsTable — null stats render
+// as a dash rather than a misleading zero.
+function statCell(v: number | null | undefined): { text: string; dash: boolean } {
+  return v == null ? { text: '—', dash: true } : { text: String(v), dash: false }
 }
 
 function scrollToTournament(tournamentId: string) {
@@ -634,7 +645,7 @@ function GameTimelineCard({ sortedGames, gaps, avgGap }: {
 
 // ── Tournament block ───────────────────────────────────────────────
 function TournamentBlock({
-  tournament, games, announcedSet, today, isAdmin, isGC, players, bookingCaptainMap, forceOpenToken,
+  tournament, games, announcedSet, today, isAdmin, isGC, players, stats, bookingCaptainMap, forceOpenToken,
 }: {
   tournament: NonNullable<Booking['tournament']>
   games: Booking[]
@@ -643,6 +654,7 @@ function TournamentBlock({
   isAdmin: boolean
   isGC: boolean
   players: TournamentPlayer[]
+  stats: Record<string, PlayerStatsTotals>
   bookingCaptainMap: Record<string, SquadCaptain>
   forceOpenToken?: number
 }) {
@@ -850,23 +862,73 @@ function TournamentBlock({
             gamesLength={games.length}
           />
 
-          {/* Players represented — collapsible, sourced from announced squads */}
+          {/* Player Stats — collapsible, sourced from announced squads.
+              Stats are aggregated purely from THIS tournament's own synced
+              matches via getLeaderboard({ tournamentId }) — never
+              career-wide analytics. Reuses the exact card + table schema as
+              Captains Corner's tap-to-expand "📊 Form" panel
+              (ContextStatsTable in CaptainsCornerGrid.tsx): navy gradient
+              card, gold top edge, M/R/Avg/SR/Wk/Econ/Ct columns. A player
+              can be represented here (they were in an announced squad) but
+              still show "No stats synced" if none of their matches in this
+              tournament have a scorecard reconciled yet. */}
           <div className="px-4 py-4 border-t border-parchment-3 mt-2">
             <button
               onClick={() => setPlayersOpen(v => !v)}
               className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-stone-500 mb-2 w-full text-left"
             >
               <span>{playersOpen ? '▲' : '▶'}</span>
-              <span>Players represented — {players.length}</span>
+              <span>Player Stats — {players.length}</span>
             </button>
             {playersOpen && (
               players.length > 0 ? (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                  {players.map(p => (
-                    <span key={p.id} className="text-xs text-stone-700 truncate">
-                      <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
-                    </span>
-                  ))}
+                <div
+                  className="rounded-lg border relative overflow-hidden px-3 py-2.5"
+                  style={{ background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)', borderColor: '#2D3748' }}
+                >
+                  <div
+                    className="absolute top-0 left-0 right-0 h-[2px]"
+                    style={{ background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }}
+                  />
+                  <table className="w-full" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    <thead>
+                      <tr>
+                        <th></th>
+                        {['M', 'R', 'Avg', 'SR', 'Wk', 'Econ', 'Ct'].map(h => (
+                          <th key={h} className="font-rajdhani text-[8.5px] font-bold uppercase tracking-wide text-right pb-1"
+                            style={{ color: '#6B7280' }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {players.map(p => {
+                        const stat = stats[p.id] ?? null
+                        return (
+                          <tr key={p.id} style={{ borderTop: '1px solid rgba(45,55,72,0.6)' }}>
+                            <td className="font-rajdhani text-[11px] font-semibold py-1 pr-2 whitespace-nowrap" style={{ color: '#F9FAFB' }}>
+                              <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} className="text-[#93C5FD]" />
+                            </td>
+                            {stat == null ? (
+                              <td colSpan={7} className="text-[10.5px] italic py-1 text-right" style={{ color: '#6B7280' }}>No stats synced</td>
+                            ) : (
+                              [
+                                stat.matches, stat.runs, statCell(stat.battingAverage).text,
+                                statCell(stat.strikeRate).text, stat.wickets, statCell(stat.economy).text,
+                                stat.catches,
+                              ].map((v, i) => (
+                                <td key={i} className="font-cinzel text-[11.5px] font-bold text-right py-1"
+                                  style={{ color: v === '—' ? '#4B5563' : '#F9FAFB' }}>
+                                  {v}
+                                </td>
+                              ))
+                            )}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               ) : (
                 <p className="text-xs text-stone-500">No announced squads yet for this tournament.</p>
@@ -1238,7 +1300,7 @@ function SlotBalanceByDay({
 
 // ── Root client component ──────────────────────────────────────────
 export function TournamentPlannerClient({
-  bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, bookingCaptainMap,
+  bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, tournamentStatsMap, bookingCaptainMap,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
   const [showUpcoming,  setShowUpcoming]  = useState(true)
@@ -1362,6 +1424,7 @@ export function TournamentPlannerClient({
                     announcedSet={announcedSet} today={today}
                     isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC}
                     players={tournamentPlayersMap[tournament.id] ?? []}
+                    stats={tournamentStatsMap[tournament.id] ?? {}}
                     bookingCaptainMap={bookingCaptainMap}
                     forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
                 ))}
@@ -1375,6 +1438,7 @@ export function TournamentPlannerClient({
                 announcedSet={announcedSet} today={today}
                 isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC}
                 players={tournamentPlayersMap[tournament.id] ?? []}
+                stats={tournamentStatsMap[tournament.id] ?? {}}
                 bookingCaptainMap={bookingCaptainMap}
                 forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
             ))}
