@@ -104,7 +104,21 @@ async function resolveShareLink(url: string): Promise<string | null> {
     // No real HTTP redirect happened (res.url === the short link itself) —
     // fall back to scanning the page body for the destination.
     const body = await res.text()
-    return extractDirectId(body.slice(0, BODY_SCAN_LIMIT))
+    const id = extractDirectId(body.slice(0, BODY_SCAN_LIMIT))
+    if (!id) {
+      // Diagnostic only — no ID found isn't an error condition on its own,
+      // but leaves nothing to debug from without this. Logged at info
+      // level (not error) since a share link genuinely not resolving is
+      // an expected, non-alarming outcome, not a system fault.
+      console.log('[cricheroesId] no ID found in share-link response', {
+        requestUrl:  url,
+        finalUrl:    res.url,
+        status:      res.status,
+        bodyLength:  body.length,
+        bodySnippet: body.slice(0, 1000),
+      })
+    }
+    return id
   } catch (err) {
     console.error('[cricheroesId] share-link resolution failed:', err)
     return null
