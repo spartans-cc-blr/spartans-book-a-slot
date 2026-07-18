@@ -110,6 +110,16 @@ const STAT_COLUMNS: { key: Exclude<StatsSortKey, 'name'>; label: string }[] = [
   { key: 'catches',        label: 'Ct' },
 ]
 
+// Same abbreviation CaptainsCornerGrid.tsx's MatrixView uses for its mobile
+// column headers ("First L.") — keeps the name column narrow enough that a
+// right-aligned M/R/Avg/SR/Wk/Econ/Ct row fits a portrait phone width
+// without horizontal scroll.
+function mobileMatrixName(name: string): string {
+  const parts = name.trim().split(' ').filter(Boolean)
+  if (parts.length === 1) return parts[0]
+  return parts[0] + ' ' + parts[parts.length - 1][0] + '.'
+}
+
 function scrollToTournament(tournamentId: string) {
   document.getElementById(`tournament-block-${tournamentId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -931,7 +941,7 @@ function TournamentBlock({
                       <tr className="border-b border-parchment-3">
                         <th
                           onClick={() => handleStatsSort('name')}
-                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-left pl-3 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
+                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pl-3 pr-2 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
                         >
                           Player{statsSortKey === 'name' && (statsSortDir === 'asc' ? ' ▲' : ' ▼')}
                         </th>
@@ -951,8 +961,13 @@ function TournamentBlock({
                         const stat = stats[p.id] ?? null
                         return (
                           <tr key={p.id} className="border-t border-parchment-3 first:border-t-0">
-                            <td className="font-rajdhani text-[11px] font-semibold text-ink pl-3 py-1.5 whitespace-nowrap">
-                              <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                            <td className="font-rajdhani text-[11px] font-semibold text-ink text-right pl-3 pr-2 py-1.5 whitespace-nowrap">
+                              <span className="hidden sm:inline">
+                                <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                              </span>
+                              <span className="sm:hidden">
+                                <PlayerNameLink name={mobileMatrixName(p.name)} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                              </span>
                             </td>
                             {stat == null ? (
                               <td colSpan={STAT_COLUMNS.length} className="text-[10.5px] italic text-stone-400 pr-2 py-1.5 text-right">No stats synced</td>
