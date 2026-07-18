@@ -12,7 +12,7 @@ import type { LeaderboardCategory } from './LeaderboardFilters'
 type SortKey =
   | 'matches' | 'runs' | 'battingAverage' | 'strikeRate'
   | 'wickets' | 'economy' | 'bowlingAverage' | 'bowlingStrikeRate'
-  | 'catches' | 'runOuts' | 'stumpings' | 'mvpPoints'
+  | 'catches' | 'runOuts' | 'stumpings' | 'dismissals' | 'mvpPoints'
 
 // Bowling average/strike rate aren't precomputed on PlayerStatsTotals (only
 // the batting versions are) — derived here from the fields that are.
@@ -22,10 +22,17 @@ function bowlingAverage(s: PlayerStatsTotals): number | null {
 function bowlingStrikeRate(s: PlayerStatsTotals): number | null {
   return s.wickets > 0 ? Math.round((s.ballsBowled / s.wickets) * 100) / 100 : null
 }
+// Combined fielding dismissals — catches, run outs, and stumpings all count
+// toward MVP, so the MVP tab shows one rolled-up figure rather than catches
+// alone (the Fielding tab still breaks the three out individually).
+function dismissals(s: PlayerStatsTotals): number {
+  return s.catches + s.runOuts + s.stumpings
+}
 
 function statValue(row: LeaderboardRow, key: SortKey): number | null {
   if (key === 'bowlingAverage')    return bowlingAverage(row.stats)
   if (key === 'bowlingStrikeRate') return bowlingStrikeRate(row.stats)
+  if (key === 'dismissals')        return dismissals(row.stats)
   return (row.stats as any)[key] as number | null
 }
 
@@ -53,7 +60,7 @@ const COLUMNS: Record<LeaderboardCategory, { key: SortKey; label: string }[]> = 
     { key: 'matches', label: 'M' },
     { key: 'runs', label: 'Runs' },
     { key: 'wickets', label: 'Wkts' },
-    { key: 'catches', label: 'Ct' },
+    { key: 'dismissals', label: 'Dismissals' },
     { key: 'mvpPoints', label: 'MVP' },
   ],
 }
