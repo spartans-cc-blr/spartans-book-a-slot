@@ -21,7 +21,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
-import type { PlayerStatsTotals, LeaderboardRow, RecentForm } from '@/types'
+import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats } from '@/types'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -283,4 +283,84 @@ export async function getRecentForm(playerIds: string[], matchCount: number = 5)
   }
 
   return result
+}
+
+// ── Booking context stats (Captains' Corner "Form" panel) ──────────────────
+//
+// Three independently-scoped views of one player's record, all resolved
+// through the same bookings.match_id <-> analytics-DB match_id bridge used
+// everywhere else in this file:
+//   tournament — every match in this exact tournament
+//   ground     — every match played at tournaments sharing this booking's
+//                ground (tournaments.ground_id), falling back to an exact
+//                bookings.venue match when the tournament has no ground set
+//   format     — every match of this booking's format (T20/T30), across
+//                every tournament and ground
+// A scope with zero qualifying matches (or zero of them featuring this
+// player) returns null, not a zero-filled row — the UI shows "No matches
+// yet" rather than a misleading 0/0/0 line.
+
+async function matchIdsForFilter(filter: {
+  tournamentId?:    string
+  tournamentIdIn?:  string[]
+  venue?:           string
+  format?:          string
+}): Promise<string[]> {
+  const hub = createServiceClient()
+  let query = hub.from('bookings').select('match_id').not('match_id', 'is', null)
+  if (filter.tournamentId)   query = query.eq('tournament_id', filter.tournamentId)
+  if (filter.tournamentIdIn) query = query.in('tournament_id', filter.tournamentIdIn)
+  if (filter.venue)          query = query.eq('venue', filter.venue)
+  if (filter.format)         query = query.eq('format', filter.format)
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return Array.from(new Set<string>((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+}
+
+async function scopedPlayerStats(playerId: string, matchIds: string[]): Promise<PlayerStatsTotals | null> {
+  if (matchIds.length === 0) return null
+  const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds })
+  const matchIdSet = new Set<string>(team.map((r: any) => r.match_id).filter(Boolean))
+  if (matchIdSet.size === 0) return null
+  return aggregate(matchIdSet, batting, bowling, fielding)
+}
+
+export async function getPlayerBookingContextStats(playerId: string, bookingId: string): Promise<BookingContextStats> {
+  const hub = createServiceClient()
+  const { data: booking, error } = await hub
+    .from('bookings')
+    .select('tournament_id, format, venue, tournament:tournaments(ground_id)')
+    .eq('id', bookingId)
+    .single()
+  if (error) throw new Error(error.message)
+  if (!booking) throw new Error('Booking not found')
+
+  const tournamentId = booking.tournament_id as string | null
+  const groundId      = (booking as any).tournament?.ground_id as string | null
+  const venue         = booking.venue as string | null
+  const format        = booking.format as string | null
+
+  let groundTournamentIds: string[] | null = null
+  if (groundId) {
+    const { data: tournaments, error: tErr } = await hub.from('tournaments').select('id').eq('ground_id', groundId)
+    if (tErr) throw new Error(tErr.message)
+    groundTournamentIds = (tournaments ?? []).map((t: any) => t.id)
+  }
+
+  const [tournamentMatchIds, groundMatchIds, formatMatchIds] = await Promise.all([
+    tournamentId ? matchIdsForFilter({ tournamentId }) : Promise.resolve([]),
+    groundTournamentIds
+      ? (groundTournamentIds.length ? matchIdsForFilter({ tournamentIdIn: groundTournamentIds }) : Promise.resolve([]))
+      : (venue ? matchIdsForFilter({ venue }) : Promise.resolve([])),
+    format ? matchIdsForFilter({ format }) : Promise.resolve([]),
+  ])
+
+  const [tournament, ground, formatStats] = await Promise.all([
+    scopedPlayerStats(playerId, tournamentMatchIds),
+    scopedPlayerStats(playerId, groundMatchIds),
+    scopedPlayerStats(playerId, formatMatchIds),
+  ])
+
+  return { tournament, ground, format: formatStats }
 }

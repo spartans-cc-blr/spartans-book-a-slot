@@ -93,7 +93,12 @@ export default async function CaptainsCornerPage() {
   const today = new Date().toISOString().split('T')[0]
 
   // Batched — one round trip for the whole candidate pool, not per player.
-  // Players with no reconciled matches yet get `null` and render no badge.
+  // Only used to decide whether a player gets a "Form" toggle at all — a
+  // player with `null` here has no reconciled matches anywhere, so showing
+  // a toggle that always opens to "no data" would just be clutter. The
+  // actual tournament/ground/format breakdown behind the toggle is fetched
+  // lazily per player on tap (GET /api/captains-corner/context-stats), not
+  // computed here — see src/lib/playerStats.ts getPlayerBookingContextStats().
   const recentFormByPlayer = await getRecentForm((players ?? []).map(p => p.id))
 
   const playersWithExempt = (players ?? []).map(p => ({

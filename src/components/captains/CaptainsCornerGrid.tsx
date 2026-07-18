@@ -10,8 +10,11 @@
 // Match role badges (BAT / BOWL / BAT-AR / BOWL-AR) on selected rows in draft mode.
 // Player names link to CricHeroes profile if set.
 // Post-announcement edit + reshare supported.
+// "Form" toggle (players with any reconciled match) lazily fetches this
+// booking's tournament/ground/format record via /api/captains-corner/context-stats.
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import type { BookingContextStats, PlayerStatsTotals } from '@/types'
 
 interface Booking {
   id: string
@@ -436,16 +439,6 @@ const exemptBadge = player.is_fee_exempt
    ? <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted"><HeartHandshakeIcon size={12} /></span>
    : null
 
-  // Compact recent-form glance — runs (wickets) over the player's last few
-  // reconciled matches. Absent entirely (not a placeholder) for players
-  // with no reconciled matches yet, so unplayed/new members don't clutter
-  // an already-dense row.
-  const formBadge = player.recent_form && player.recent_form.matches > 0
-    ? <span className="ml-1.5 font-rajdhani text-[10px] text-zinc-600" title={`Last ${player.recent_form.matches} match${player.recent_form.matches === 1 ? '' : 'es'}`}>
-        {player.recent_form.runs} ({player.recent_form.wickets})
-      </span>
-    : null
-
   if (player.cricheroes_url && !isTaken) {
     return (
       <a
@@ -454,11 +447,11 @@ const exemptBadge = player.is_fee_exempt
         rel="noopener noreferrer"
         onClick={e => e.stopPropagation()}
         className={cls + ' hover:underline underline-offset-2'}>
-        {player.name}{badge}{exemptBadge}{formBadge}
+        {player.name}{badge}{exemptBadge}
       </a>
     )
   }
-  return <span className={cls}>{player.name}{badge}{exemptBadge}{formBadge}</span>
+  return <span className={cls}>{player.name}{badge}{exemptBadge}</span>
 }
 
 // ── Match Role SVG Icons ──────────────────────────────────────────
@@ -571,7 +564,7 @@ function MatchRoleIcon({ role, ballType = 'red' }: {
 // FIX 5: Added matchRole and onMatchRoleToggle to props
 function SelectablePlayerRow({
   player, response, selected, atCap, status, takenLabel, roles,
-  matchRole, ballType, onToggle, onRoleToggle, onMatchRoleToggle,
+  matchRole, ballType, bookingId, onToggle, onRoleToggle, onMatchRoleToggle,
 }: {
   player:             Player
   response:           string
@@ -582,10 +575,33 @@ function SelectablePlayerRow({
   roles:              MatchRoles
   matchRole:          'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null   // FIX 5
   ballType: 'red' | 'white' | 'pink'   // ADD
+  bookingId:          string   // for the tap-to-expand "Form" panel — see ContextStatsPanel
   onToggle:           (id: string) => void
   onRoleToggle:       (id: string, role: 'captain' | 'vc' | 'wk') => void
   onMatchRoleToggle:  (id: string, role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null) => void  // FIX 5
 }) {
+  const [formOpen,    setFormOpen]    = useState(false)
+  const [formStats,   setFormStats]   = useState<BookingContextStats | null>(null)
+  const [formLoading, setFormLoading] = useState(false)
+  const [formError,   setFormError]   = useState<string | null>(null)
+
+  async function handleFormToggle(e: React.MouseEvent) {
+    e.stopPropagation()
+    setFormOpen(v => !v)
+    if (formStats || formLoading) return
+    setFormLoading(true)
+    setFormError(null)
+    try {
+      const res = await fetch(`/api/captains-corner/context-stats?player_id=${player.id}&booking_id=${bookingId}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to load form')
+      setFormStats(data)
+    } catch (err: any) {
+      setFormError(err.message ?? 'Failed to load form')
+    } finally {
+      setFormLoading(false)
+    }
+  }
   const isTaken    = !!takenLabel
   const isSel      = selected.has(player.id)
   const isDisabled = isTaken || (atCap && !isSel) || status !== 'draft'
@@ -628,6 +644,16 @@ function SelectablePlayerRow({
         </span>
 
         <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} />
+
+        {/* Form toggle — only shown for players with at least one reconciled
+            match; opens the tournament/ground/format panel below. */}
+        {player.recent_form && (
+          <button
+            onClick={handleFormToggle}
+            className="font-rajdhani text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-[#1E3A5F] text-[#93C5FD] flex-shrink-0">
+            📊 Form {formOpen ? '▴' : '▾'}
+          </button>
+        )}
 
         {/* Right-side pill */}
         {isTaken ? (
@@ -717,7 +743,90 @@ function SelectablePlayerRow({
           )}
         </div>
       )}
+
+      {/* Form panel — tournament/ground/format record, mirrors FixturesCard's
+          own navy-gradient card styling (not the ink-3 tokens elsewhere on
+          this page) so it reads as the same "match info" family. Scope names
+          are deliberately omitted here — the SlotCard header above already
+          names this booking's tournament, ground, and format. */}
+      {formOpen && (
+        <div className="mx-3.5 mb-3" onClick={e => e.stopPropagation()}>
+          <div
+            className="rounded-lg border relative overflow-hidden px-3 py-2.5"
+            style={{
+              background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
+              borderColor: '#2D3748',
+            }}>
+            <div
+              className="absolute top-0 left-0 right-0 h-[2px]"
+              style={{ background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }}
+            />
+            {formLoading && (
+              <p className="font-rajdhani text-[11px] text-zinc-500">Loading form…</p>
+            )}
+            {formError && (
+              <p className="font-rajdhani text-[11px] text-red-400">{formError}</p>
+            )}
+            {formStats && <ContextStatsTable stats={formStats} />}
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+// ── ContextStatsTable — tournament/ground/format rows × M/R/Avg/SR/Wk/Econ/Ct ──
+function statCell(v: number | null | undefined): { text: string; dash: boolean } {
+  return v == null ? { text: '—', dash: true } : { text: String(v), dash: false }
+}
+
+function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
+  const rows: { icon: string; label: string; totals: PlayerStatsTotals | null }[] = [
+    { icon: '🏆', label: 'Tourn',  totals: stats.tournament },
+    { icon: '📍', label: 'Ground', totals: stats.ground },
+    { icon: '🏏', label: 'Format', totals: stats.format },
+  ]
+  const anyData = rows.some(r => r.totals)
+  if (!anyData) {
+    return <p className="font-rajdhani text-[11px] text-zinc-500 italic">No reconciled matches yet in any scope.</p>
+  }
+  return (
+    <table className="w-full" style={{ fontVariantNumeric: 'tabular-nums' }}>
+      <thead>
+        <tr>
+          <th></th>
+          {['M', 'R', 'Avg', 'SR', 'Wk', 'Econ', 'Ct'].map(h => (
+            <th key={h} className="font-rajdhani text-[8.5px] font-bold uppercase tracking-wide text-right pb-1"
+              style={{ color: '#6B7280' }}>
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(row => (
+          <tr key={row.label} style={{ borderTop: '1px solid rgba(45,55,72,0.6)' }}>
+            <td className="font-rajdhani text-[11px] font-semibold py-1 whitespace-nowrap" style={{ color: '#9CA3AF' }}>
+              {row.icon} {row.label}
+            </td>
+            {row.totals == null ? (
+              <td colSpan={7} className="text-[10.5px] italic py-1" style={{ color: '#6B7280' }}>No matches yet</td>
+            ) : (
+              [
+                row.totals.matches, row.totals.runs, statCell(row.totals.battingAverage).text,
+                statCell(row.totals.strikeRate).text, row.totals.wickets, statCell(row.totals.economy).text,
+                row.totals.catches,
+              ].map((v, i) => (
+                <td key={i} className="font-cinzel text-[11.5px] font-bold text-right py-1"
+                  style={{ color: v === '—' ? '#4B5563' : '#F9FAFB' }}>
+                  {v}
+                </td>
+              ))
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
@@ -1373,6 +1482,7 @@ function SlotCard({
                   roles={roles}
                   matchRole={matchRoles[player.id] ?? null}
                   ballType={ballType}
+                  bookingId={booking.id}
                   onToggle={toggle}
                   onRoleToggle={handleRoleToggle}
                   onMatchRoleToggle={handleMatchRoleToggle}
@@ -1420,6 +1530,7 @@ function SlotCard({
                 roles={roles}
                 matchRole={matchRoles[player.id] ?? null}
                 ballType={ballType}
+                bookingId={booking.id}
                 onToggle={toggle}
                 onRoleToggle={handleRoleToggle}
                 onMatchRoleToggle={handleMatchRoleToggle}
