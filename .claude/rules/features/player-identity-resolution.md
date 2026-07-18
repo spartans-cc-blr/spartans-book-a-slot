@@ -84,16 +84,32 @@ any client-supplied `cricheroes_player_id` before calling it. A partial
 unique index prevents two Hub members from ever sharing one CricHeroes
 profile ID.
 
-Two URL shapes, two resolution paths:
+Three URL shapes, two of which resolve reliably:
 - **Direct** (`cricheroes.com/player-profile/<id>/...`) — plain regex
   extraction, no network call.
-- **Share link** (`chshare.link/player/<code>`) — CricHeroes' own
-  short-link redirector. The ID isn't in the short link itself, so the
-  server does a bounded (6s), host-restricted (`chshare.link` only)
-  `fetch(url, { redirect: 'follow' })` and regexes the ID out of wherever
-  it actually lands. Best-effort throughout — any failure (timeout,
-  unreachable, non-CricHeroes redirect target) returns `null` rather than
-  failing the save; a player can always just re-save to retry.
+- **Deep-link landing page** (`crichero.es/?link=<destination>&utm_source=...`) —
+  same plain regex extraction (the destination is a literal query
+  parameter), no network call. This is what a phone's browser actually
+  lands on when a `chshare.link` share link is tapped, before confirming
+  "Open in app?" — see the `/profile` field hint, which now tells players
+  to copy the URL from the address bar at that point rather than sharing
+  the raw link text.
+- **Share link** (`chshare.link/player/<code>`) — the CricHeroes app's
+  own "Share profile" button only gives this format, and it **does not
+  reliably resolve server-side**. `src/lib/cricheroesId.ts` still
+  attempts it (bounded 6s, host-restricted `fetch`, spoofed mobile
+  User-Agent, body-scan fallback) but production testing (July 2026,
+  documented in full in that file's header comment) found `fetch()`
+  consistently gets a `200` with an empty-query 404 shell — identical
+  across a header-less attempt and a spoofed-browser-UA attempt — which
+  has the signature of deliberate anti-automation hardening at the edge
+  (Branch.io-style deferred deep links exist specifically to funnel real
+  users into installing the app; auto-resolving them programmatically
+  undermines that, and CricHeroes' infrastructure appears to treat
+  known-cloud-IP traffic accordingly regardless of headers sent). Kept as
+  a harmless best-effort path — always returns `null` on failure, never
+  blocks the save — rather than removed, but this is not expected to
+  start working without CricHeroes changing something on their end.
 
 **Why this doesn't close the analytics-DB auto-matching gap:** the
 scorecard PDF pipeline (`spartans-python`, a separate repo) only extracts

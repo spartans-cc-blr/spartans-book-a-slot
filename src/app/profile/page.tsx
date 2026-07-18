@@ -552,11 +552,13 @@ export default function ProfilePage() {
               type="url"
               value={cricheroes}
               onChange={e => setCricheroes(e.target.value)}
-              placeholder="https://chshare.link/..."
+              placeholder="https://cricheroes.com/player-profile/..."
               className="form-input"
             />
             <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
-              Open your CricHeroes profile → Share → Copy link
+              Tap your CricHeroes profile&apos;s Share button. When your phone&apos;s browser opens and asks
+              &ldquo;Open in app?&rdquo;, copy the URL from the address bar at that point (it&apos;ll start with
+              crichero.es) and paste it here — not the original share text.
             </p>
           </div>
           {cricheroes && (

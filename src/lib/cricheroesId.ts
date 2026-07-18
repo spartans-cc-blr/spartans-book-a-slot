@@ -2,32 +2,44 @@
 // for players.cricheroes_player_id — see
 // supabase/migrations/047_cricheroes_player_id.sql.
 //
-// Two URL shapes exist in the wild:
+// Three URL shapes exist in the wild:
 //   - Direct:  https://cricheroes.com/player-profile/4601286/muthukumar-r/stats
 //              -> ID is a plain regex extraction, no network call.
+//   - Deep-link landing page: https://crichero.es/?link=https://cricheroes.com/player-profile/4601286/Muthukumar-R&utm_source=...
+//              -> what a phone's browser actually lands on when a
+//              chshare.link share link is tapped (see below) — the real
+//              destination is right there as the `link` query parameter.
+//              Same plain regex extraction, no network call — this is
+//              the one players should actually paste (see PLAYER GUIDANCE
+//              below), not the raw share-link text.
 //   - Share link: https://chshare.link/player/tbXsKU
-//              -> a CricHeroes-generated short redirect. The ID isn't in
-//              the short link itself; the server has to follow the
-//              redirect and read where it actually lands.
+//              -> the CricHeroes app's own "share profile" button gives
+//              only this. See resolveShareLink for why this one is a
+//              known dead end server-side.
 //
-// Confirmed in production (2026-07-18): a plain, header-less fetch()
-// against chshare.link comes back 200 with res.url unchanged (~700ms, not
-// a timeout) — it isn't reachability, chshare.link is branching on
-// User-Agent. A real browser opening the same link (confirmed by pasting
-// the actual address-bar URL) lands on a Branch.io-style deferred-deep-
-// -link fallback page after following real HTTP redirects:
-//   https://crichero.es/?link=https://cricheroes.com/player-profile/4601286/Muthukumar-R&utm_source=app_share_android...
-// The destination is right there as the `link` query parameter — no HTML
-// parsing needed once fetch actually reaches it. Same class of fix this
-// repo already needed once before for a different CricHeroes endpoint
-// (pdf.cricheroes.in required a spoofed User-Agent/Referer — see
-// limitations.md): send a realistic mobile-browser User-Agent so
-// chshare.link serves the same redirect chain a real phone gets, instead
-// of whatever fallback it serves to an unrecognised client.
+// PLAYER GUIDANCE (surfaced on /profile — no desktop needed): tap the
+// share link on your phone; when the browser shows an "Open in app?"
+// interstitial (before or instead of confirming it), copy the URL from
+// the address bar at that point — it's the crichero.es one above — and
+// paste that instead of the original share text.
 //
-// Kept the body-scan fallback too (see resolveShareLink) in case a future
-// hop in the chain ever needs it — cheap insurance, not load-bearing for
-// the case above once the header fix lands.
+// resolveShareLink (chshare.link -> follow redirect) confirmed NOT
+// working in production, 2026-07-18, after multiple attempts documented
+// in this repo's PR history for this file: fetch() consistently gets a
+// 200 with an empty-query 404 shell (Next.js `/[type]/[code]` route
+// resolving with no params at all), identical across a header-less
+// attempt and a spoofed-mobile-browser-User-Agent attempt. That
+// consistency — not a timeout, not a real error, the exact same
+// degraded response regardless of headers sent — has the signature of
+// deliberate anti-automation hardening at the edge (CloudFront/WAF,
+// likely keyed on Vercel's known cloud IP ranges rather than headers),
+// which is a legitimate thing for a Branch.io-style deferred-deep-link
+// service to do — its entire purpose is funneling real users into
+// installing the app, so auto-resolving it programmatically undermines
+// that. Kept as a harmless best-effort path (always returns null
+// gracefully) rather than removed, in case CricHeroes' behaviour here
+// ever changes, but do not sink more time into headers/spoofing for
+// this one — it isn't a bug to keep chasing.
 //
 // Best-effort throughout: any failure (timeout, no match found, network
 // error) returns null rather than throwing, so a save never fails because
@@ -36,9 +48,6 @@
 // chshare.link is followed, everything else is a same-request regex or a
 // no-op.
 
-// Mimics a real Android Chrome browser — chshare.link's deep-link
-// resolution behaves differently for an unrecognised/bot User-Agent than
-// for what an actual player's phone sends.
 const BROWSER_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -51,7 +60,12 @@ const DIRECT_PROFILE_ID_RE = /cricheroes\.(?:com|in)\/player-profile\/(\d+)\b/i
 const BODY_SCAN_LIMIT = 200_000
 
 const SHARE_LINK_HOST = 'chshare.link'
-const DIRECT_HOSTS = new Set(['cricheroes.com', 'cricheroes.in'])
+
+// Every host in this set carries an extractable cricheroes.com/.in profile
+// URL directly in the string itself — either as the URL's own path
+// (cricheroes.com/.in) or embedded as a query parameter (crichero.es) —
+// so no network call is ever needed for any of them.
+const DIRECT_HOSTS = new Set(['cricheroes.com', 'cricheroes.in', 'crichero.es'])
 
 // Redirect-follow is a single, fast hop for a URL shortener — no reason
 // this should ever take long. Bounded well under the request's own budget
