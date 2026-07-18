@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { SiteNav } from '@/components/ui/SiteNav'
+import type { PlayerStatsTotals } from '@/types'
 
 const SKILLS = [
   'Right Hand Opening Batsman',
@@ -102,6 +103,12 @@ export default function ProfilePage() {
   nextMatchResponse: string | null
 } | null>(null)
 
+  const [stats, setStats] = useState<{
+    career: PlayerStatsTotals
+    season: PlayerStatsTotals
+    seasonYear: number
+  } | null>(null)
+
   // Editable fields
   const [whatsapp,        setWhatsapp]        = useState('')
   const [dob,             setDob]             = useState('')
@@ -142,6 +149,9 @@ export default function ProfilePage() {
         fetch(`/api/players/${player.playerId}/dashboard`)
           .then(r => r.json())
           .then(d => setDashboard(d))
+        fetch(`/api/players/${player.playerId}/stats`)
+          .then(r => r.json())
+          .then(d => { if (d.career) setStats(d) })
       })
   }, [sessionStatus, player?.playerId])
 
@@ -444,6 +454,19 @@ export default function ProfilePage() {
           </p>
         </div>
 
+        {/* ── MY STATS ── */}
+        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
+          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">My Stats</h2>
+          {!stats || stats.career.matches === 0 ? (
+            <p className="font-rajdhani text-sm text-zinc-500">No stats yet.</p>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-4">
+              <StatsColumn title="Career" totals={stats.career} />
+              <StatsColumn title={`This Season (${stats.seasonYear})`} totals={stats.season} />
+            </div>
+          )}
+        </div>
+
         {/* ── EDITABLE FIELDS ── */}
         <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
           <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">Personal Details</h2>
@@ -607,6 +630,39 @@ function ReadOnlyField({ label, value }: { label: string; value: string | null |
     <div>
       <label className="form-label">{label}</label>
       <p className="font-rajdhani text-sm text-zinc-400">{value ?? '—'}</p>
+    </div>
+  )
+}
+
+function StatsColumn({ title, totals }: { title: string; totals: PlayerStatsTotals }) {
+  if (totals.matches === 0) {
+    return (
+      <div>
+        <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">{title}</p>
+        <p className="font-rajdhani text-xs text-zinc-600">No matches.</p>
+      </div>
+    )
+  }
+  const rows: [string, string][] = [
+    ['Matches',  String(totals.matches)],
+    ['Runs',     String(totals.runs)],
+    ['Average',  totals.battingAverage != null ? totals.battingAverage.toFixed(2) : '—'],
+    ['S/R',      totals.strikeRate != null ? totals.strikeRate.toFixed(2) : '—'],
+    ['Wickets',  String(totals.wickets)],
+    ['Economy',  totals.economy != null ? totals.economy.toFixed(2) : '—'],
+    ['MVP Pts',  totals.mvpPoints.toFixed(2)],
+  ]
+  return (
+    <div>
+      <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">{title}</p>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-baseline justify-between border-b border-ink-5 pb-1">
+            <span className="font-rajdhani text-xs text-zinc-500">{label}</span>
+            <span className="font-cinzel text-sm font-bold text-parchment">{value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

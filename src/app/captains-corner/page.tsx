@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { computeSquadVersion } from '@/lib/squadVersion'
+import { getRecentForm } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { CaptainsCornerGrid } from '@/components/captains/CaptainsCornerGrid'
 import { getISOWeek, getISOWeekYear, parseISO, startOfISOWeek, addDays, format } from 'date-fns'
@@ -90,12 +91,18 @@ export default async function CaptainsCornerPage() {
   }
 
   const today = new Date().toISOString().split('T')[0]
+
+  // Batched — one round trip for the whole candidate pool, not per player.
+  // Players with no reconciled matches yet get `null` and render no badge.
+  const recentFormByPlayer = await getRecentForm((players ?? []).map(p => p.id))
+
   const playersWithExempt = (players ?? []).map(p => ({
    ...p,
    is_fee_exempt: (p.fee_exemptions ?? []).some(
      (e: { start_date: string; end_date: string | null }) =>
        e.start_date <= today && (e.end_date === null || e.end_date >= today)
    ),
+   recent_form: recentFormByPlayer[p.id] ?? null,
  }))
 
   // ── Fetch existing squad rows ──────────────────────────────
