@@ -23,23 +23,31 @@
 // the address bar at that point — it's the crichero.es one above — and
 // paste that instead of the original share text.
 //
-// resolveShareLink (chshare.link -> follow redirect) confirmed NOT
-// working in production, 2026-07-18, after multiple attempts documented
-// in this repo's PR history for this file: fetch() consistently gets a
-// 200 with an empty-query 404 shell (Next.js `/[type]/[code]` route
-// resolving with no params at all), identical across a header-less
-// attempt and a spoofed-mobile-browser-User-Agent attempt. That
-// consistency — not a timeout, not a real error, the exact same
-// degraded response regardless of headers sent — has the signature of
-// deliberate anti-automation hardening at the edge (CloudFront/WAF,
+// Direct-from-Vercel resolution (chshare.link -> follow redirect)
+// confirmed NOT working in production, 2026-07-18, after multiple
+// attempts documented in this repo's PR history for this file: fetch()
+// consistently gets a 200 with an empty-query 404 shell (Next.js
+// `/[type]/[code]` route resolving with no params at all), identical
+// across a header-less attempt and a spoofed-mobile-browser-User-Agent
+// attempt. That consistency — not a timeout, not a real error, the exact
+// same degraded response regardless of headers sent — has the signature
+// of deliberate anti-automation hardening at the edge (CloudFront/WAF,
 // likely keyed on Vercel's known cloud IP ranges rather than headers),
 // which is a legitimate thing for a Branch.io-style deferred-deep-link
 // service to do — its entire purpose is funneling real users into
 // installing the app, so auto-resolving it programmatically undermines
-// that. Kept as a harmless best-effort path (always returns null
-// gracefully) rather than removed, in case CricHeroes' behaviour here
-// ever changes, but do not sink more time into headers/spoofing for
-// this one — it isn't a bug to keep chasing.
+// that.
+//
+// Second attempt: the same resolution, proxied through the
+// `spartans-python` analytics microservice on Render
+// (POST /resolve-cricheroes-link, same MICROSERVICE_URL/SECRET as the
+// scorecard pipeline — see features/post-match-scorecard.md). Render's
+// outbound IP range is different from Vercel's, so this is a genuinely
+// separate test, not a repeat of the same blocked attempt — but it's not
+// guaranteed to succeed either; if CricHeroes' edge is blocking on
+// something other than IP range, this will fail identically. Both
+// attempts are kept as harmless best-effort — either can fail and the
+// save still succeeds with cricheroes_player_id left null.
 //
 // Best-effort throughout: any failure (timeout, no match found, network
 // error) returns null rather than throwing, so a save never fails because
@@ -106,7 +114,7 @@ function extractDirectId(text: string): string | null {
   return null
 }
 
-async function resolveShareLink(url: string): Promise<string | null> {
+async function resolveShareLinkDirect(url: string): Promise<string | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REDIRECT_TIMEOUT_MS)
   try {
@@ -127,7 +135,7 @@ async function resolveShareLink(url: string): Promise<string | null> {
       // Full body, not a truncated snippet — bodyLength has consistently
       // come back small (~1.4KB) for this share-link host, so there's no
       // real risk of an oversized log line here.
-      console.log('[cricheroesId] no ID found in share-link response', {
+      console.log('[cricheroesId] no ID found in direct share-link response', {
         requestUrl: url,
         finalUrl:   res.url,
         status:     res.status,
@@ -137,11 +145,52 @@ async function resolveShareLink(url: string): Promise<string | null> {
     }
     return id
   } catch (err) {
-    console.error('[cricheroesId] share-link resolution failed:', err)
+    console.error('[cricheroesId] direct share-link resolution failed:', err)
     return null
   } finally {
     clearTimeout(timer)
   }
+}
+
+// Render free-tier cold start can take ~30s if the microservice has spun
+// down from inactivity — see features/post-match-scorecard.md's Render
+// hosting note. Only reached as a fallback after the direct attempt
+// already failed, so the extra latency only ever applies to a save that
+// was already going to come back with cricheroes_player_id: null anyway.
+const MICROSERVICE_TIMEOUT_MS = 30_000
+
+async function resolveShareLinkViaMicroservice(url: string): Promise<string | null> {
+  const microserviceUrl    = process.env.MICROSERVICE_URL
+  const microserviceSecret = process.env.MICROSERVICE_SECRET
+  if (!microserviceUrl || !microserviceSecret) return null
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), MICROSERVICE_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${microserviceUrl}/resolve-cricheroes-link`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'x-secret': microserviceSecret },
+      body:    JSON.stringify({ url }),
+      signal:  controller.signal,
+    })
+    if (!res.ok) {
+      console.log('[cricheroesId] microservice resolution returned non-ok', { status: res.status })
+      return null
+    }
+    const data = await res.json()
+    return typeof data.player_id === 'string' ? data.player_id : null
+  } catch (err) {
+    console.error('[cricheroesId] microservice resolution failed:', err)
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function resolveShareLink(url: string): Promise<string | null> {
+  const direct = await resolveShareLinkDirect(url)
+  if (direct) return direct
+  return resolveShareLinkViaMicroservice(url)
 }
 
 // Never throws. Returns null for anything not a recognisable CricHeroes
