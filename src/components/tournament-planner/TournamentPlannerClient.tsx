@@ -97,17 +97,23 @@ function statCell(v: number | null | undefined): { text: string; dash: boolean }
   return v == null ? { text: '—', dash: true } : { text: String(v), dash: false }
 }
 
+// Same rolled-up figure as LeaderboardTable.tsx's fielding/MVP "Dismissals"
+// column — catches, run outs, and stumpings are all fielding dismissals.
+function dismissals(s: PlayerStatsTotals): number {
+  return s.catches + s.runOuts + s.stumpings
+}
+
 // Player Stats board column config — single source of truth for both the
 // sortable header row and each player row's cell order.
-type StatsSortKey = 'name' | 'matches' | 'runs' | 'battingAverage' | 'strikeRate' | 'wickets' | 'economy' | 'catches'
-const STAT_COLUMNS: { key: Exclude<StatsSortKey, 'name'>; label: string }[] = [
-  { key: 'matches',        label: 'M' },
-  { key: 'runs',           label: 'R' },
-  { key: 'battingAverage', label: 'Avg' },
-  { key: 'strikeRate',     label: 'SR' },
-  { key: 'wickets',        label: 'Wk' },
-  { key: 'economy',        label: 'Econ' },
-  { key: 'catches',        label: 'Ct' },
+type StatsSortKey = 'name' | 'matches' | 'runs' | 'battingAverage' | 'strikeRate' | 'wickets' | 'economy' | 'dismissals'
+const STAT_COLUMNS: { key: Exclude<StatsSortKey, 'name'>; label: string; value: (s: PlayerStatsTotals) => number | null }[] = [
+  { key: 'matches',        label: 'M',    value: s => s.matches },
+  { key: 'runs',           label: 'R',    value: s => s.runs },
+  { key: 'battingAverage', label: 'Avg',  value: s => s.battingAverage },
+  { key: 'strikeRate',     label: 'SR',   value: s => s.strikeRate },
+  { key: 'wickets',        label: 'Wk',   value: s => s.wickets },
+  { key: 'economy',        label: 'Econ', value: s => s.economy },
+  { key: 'dismissals',     label: 'Dis',  value: dismissals },
 ]
 
 // Same abbreviation CaptainsCornerGrid.tsx's MatrixView uses for its mobile
@@ -752,8 +758,9 @@ function TournamentBlock({
     if (!aStat && !bStat) return a.name.localeCompare(b.name)
     if (!aStat) return 1
     if (!bStat) return -1
-    const aVal = aStat[statsSortKey] ?? -Infinity
-    const bVal = bStat[statsSortKey] ?? -Infinity
+    const col = STAT_COLUMNS.find(c => c.key === statsSortKey)!
+    const aVal = col.value(aStat) ?? -Infinity
+    const bVal = col.value(bStat) ?? -Infinity
     return factor * (aVal - bVal) || a.name.localeCompare(b.name)
   })
 
@@ -973,7 +980,7 @@ function TournamentBlock({
                               <td colSpan={STAT_COLUMNS.length} className="text-[10.5px] italic text-stone-400 pr-2 py-1.5 text-right">No stats synced</td>
                             ) : (
                               STAT_COLUMNS.map(col => {
-                                const display = statCell(stat[col.key]).text
+                                const display = statCell(col.value(stat)).text
                                 return (
                                   <td key={col.key} className={`font-cinzel text-[11.5px] font-bold text-right pr-2 py-1.5 ${
                                     display === '—' ? 'text-stone-400' : 'text-ink'
