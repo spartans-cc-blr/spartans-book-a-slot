@@ -69,6 +69,20 @@ RLS: same "service-role only, no anon/authenticated policy" pattern as
 `features/post-match-scorecard.md` §5). Every read/write goes through
 `ANALYTICS_SUPABASE_KEY` inside Hub API routes only.
 
+**`cricheroes_player_id` snapshot** — `analytics-db/migrations/002_alias_cricheroes_player_id.sql`
+adds a nullable `cricheroes_player_id text` to both `player_name_aliases`
+and `match_name_overrides`, alongside `player_id`. Written by the same two
+paths that write `player_id` on these tables: the admin `confirm` flow
+(`POST /api/admin/player-reconciliation`) and the automatic
+`squad_disambiguation` path in `resolvePlayerName()`. In both cases it's
+re-derived server-side from the live Hub `players.cricheroes_player_id`
+at write time — never client-supplied, same posture as `player_id` itself.
+It's a snapshot, not live-synced: if the player links or changes their
+CricHeroes URL afterward, the alias/override row isn't retroactively
+updated. Nullable and best-effort — most Hub players still don't have a
+`cricheroes_player_id` (see §3.1's data-quality note), so a `NULL` here is
+expected, not an error state.
+
 ---
 
 ## 3.1 Hub-side CricHeroes Player ID (`players.cricheroes_player_id`)
@@ -165,6 +179,17 @@ excludes `ignored_names`, and buckets each distinct name:
 pending name, client-paced ~1.5s apart — same one-item-per-POST shape as
 `/admin/scorecard-backfill`, but a shorter delay since these are analytics-DB
 writes, not CricHeroes-courtesy fetches.
+
+**Missing-CricHeroes-ID prompt** — both the roster search picker and the
+fuzzy-suggestion buttons show a small ⚠ next to any Hub player who has no
+`cricheroes_player_id` on their profile. Clicking to confirm such a player
+triggers a `window.confirm()` explaining that the name→player resolution
+will still work correctly (Hub `player_id` is what actually drives
+stats/name-link consumers — see §5) but no CricHeroes profile ID will be
+captured on the alias/override row for this confirmation. The admin can
+proceed anyway (most historical confirms will hit this, since most
+`cricheroes_url` values predate direct-URL support — see §3.1) or cancel to
+go ask the player to link their profile first.
 
 ---
 

@@ -9,11 +9,12 @@ interface MatchRef {
 }
 
 interface Suggestion {
-  id:             string
-  name:           string
-  dist:           number
-  jersey_number:  string | number | null
-  cricheroes_url: string | null
+  id:                    string
+  name:                  string
+  dist:                  number
+  jersey_number:         string | number | null
+  cricheroes_url:        string | null
+  cricheroes_player_id:  string | null
 }
 
 interface NameEntry {
@@ -23,10 +24,11 @@ interface NameEntry {
 }
 
 interface RosterPlayer {
-  id:             string
-  name:           string
-  jersey_number:  string | number | null
-  cricheroes_url: string | null
+  id:                    string
+  name:                  string
+  jersey_number:         string | number | null
+  cricheroes_url:        string | null
+  cricheroes_player_id:  string | null
 }
 
 interface ReconciliationData {
@@ -84,8 +86,10 @@ function SearchPicker({
           <div key={p.id} className="flex items-center gap-1">
             <button
               onClick={() => onPick(p)}
+              title={p.cricheroes_player_id ? undefined : 'No linked CricHeroes profile ID on this player’s Hub profile'}
               className="flex-1 text-left px-2 py-1 rounded hover:bg-ink-4 font-rajdhani text-xs text-zinc-300">
               {p.name}{p.jersey_number != null ? ` · #${p.jersey_number}` : ''}
+              {!p.cricheroes_player_id && <span className="text-amber-500/80"> ⚠</span>}
             </button>
             {p.cricheroes_url && (
               <a
@@ -141,6 +145,21 @@ export default function PlayerReconciliationPage() {
   }
 
   async function confirmGlobal(name: string, player: RosterPlayer) {
+    // Prompt before confirming a match to a Hub player who hasn't linked a
+    // CricHeroes profile yet — the resolution still works (Hub player_id is
+    // what actually drives stats/name-link consumers), but
+    // cricheroes_player_id won't be captured on the alias row (see
+    // analytics-db/migrations/002_alias_cricheroes_player_id.sql), so it's
+    // worth the admin knowing before it's too late to reconsider.
+    if (!player.cricheroes_player_id) {
+      const proceed = window.confirm(
+        `${player.name} doesn't have a linked CricHeroes profile ID on their Hub profile.\n\n` +
+        `Confirming "${name}" → ${player.name} will still resolve their stats correctly, but no CricHeroes ` +
+        `profile ID will be recorded for this match. Continue anyway?`
+      )
+      if (!proceed) return
+    }
+
     setBusyName(name)
     try {
       await post({ mode: 'confirm', scorecard_name: name, player_id: player.id, scope: 'global' })
@@ -259,8 +278,10 @@ export default function PlayerReconciliationPage() {
                           <button
                             onClick={() => confirmGlobal(entry.scorecard_name, s)}
                             disabled={busyName === entry.scorecard_name}
+                            title={s.cricheroes_player_id ? undefined : 'No linked CricHeroes profile ID on this player’s Hub profile'}
                             className={`font-rajdhani text-xs bg-ink-4 border border-ink-5 hover:border-gold-dim hover:text-gold text-zinc-300 px-2.5 py-1 disabled:opacity-40 transition-colors ${s.cricheroes_url ? 'rounded-l' : 'rounded'}`}>
                             {s.name}{s.jersey_number != null ? ` #${s.jersey_number}` : ''}
+                            {!s.cricheroes_player_id && <span className="text-amber-500/80"> ⚠</span>}
                           </button>
                           {s.cricheroes_url && (
                             <a
