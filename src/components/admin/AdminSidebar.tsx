@@ -17,6 +17,7 @@ const NAV = [
   { href: '/matches/history',        label: 'Past Matches',     icon: '📜' },
   { href: '/admin/scorecard-backfill', label: 'Scorecard Backfill', icon: '📥' },
   { href: '/admin/player-reconciliation', label: 'Player Reconciliation', icon: '🪪' },
+  { href: '/admin/cricheroes-id-backfill', label: 'CricHeroes ID Backfill', icon: '🔗' },
   { href: '/tournament-planner',     label: 'Tournament Planner',   icon: '📊' },
   { href: '/admin/players',          label: 'Players',          icon: '🏏' },
   { href: '/gc-review',              label: 'GC Review',        icon: '⚖️' },
