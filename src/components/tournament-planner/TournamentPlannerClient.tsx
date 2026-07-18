@@ -97,6 +97,19 @@ function statCell(v: number | null | undefined): { text: string; dash: boolean }
   return v == null ? { text: '—', dash: true } : { text: String(v), dash: false }
 }
 
+// Player Stats board column config — single source of truth for both the
+// sortable header row and each player row's cell order.
+type StatsSortKey = 'name' | 'matches' | 'runs' | 'battingAverage' | 'strikeRate' | 'wickets' | 'economy' | 'catches'
+const STAT_COLUMNS: { key: Exclude<StatsSortKey, 'name'>; label: string }[] = [
+  { key: 'matches',        label: 'M' },
+  { key: 'runs',           label: 'R' },
+  { key: 'battingAverage', label: 'Avg' },
+  { key: 'strikeRate',     label: 'SR' },
+  { key: 'wickets',        label: 'Wk' },
+  { key: 'economy',        label: 'Econ' },
+  { key: 'catches',        label: 'Ct' },
+]
+
 function scrollToTournament(tournamentId: string) {
   document.getElementById(`tournament-block-${tournamentId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -660,6 +673,19 @@ function TournamentBlock({
 }) {
   const [open, setOpen]               = useState(false)
   const [playersOpen, setPlayersOpen] = useState(false)
+  const [statsSortKey, setStatsSortKey] = useState<StatsSortKey>('name')
+  const [statsSortDir, setStatsSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleStatsSort(key: StatsSortKey) {
+    if (key === statsSortKey) {
+      setStatsSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setStatsSortKey(key)
+      // Name defaults A→Z; every numeric column defaults highest-first —
+      // that's the direction someone clicking a stat header actually wants.
+      setStatsSortDir(key === 'name' ? 'asc' : 'desc')
+    }
+  }
 
   // A "view" click from the Captain Bandwidth cards bumps forceOpenToken —
   // expand this block even if the viewer had previously collapsed it manually
@@ -704,6 +730,22 @@ function TournamentBlock({
     new Set(games.map(g => g.format).filter((f): f is string => !!f))
   )
   const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
+
+  // Players with no synced stats always sort to the bottom, regardless of
+  // direction or column — "No stats synced" isn't a value on any stat's
+  // scale, so it shouldn't jump to the top under a descending numeric sort.
+  const sortedPlayers = [...players].sort((a, b) => {
+    const factor = statsSortDir === 'asc' ? 1 : -1
+    if (statsSortKey === 'name') return factor * a.name.localeCompare(b.name)
+    const aStat = stats[a.id] ?? null
+    const bStat = stats[b.id] ?? null
+    if (!aStat && !bStat) return a.name.localeCompare(b.name)
+    if (!aStat) return 1
+    if (!bStat) return -1
+    const aVal = aStat[statsSortKey] ?? -Infinity
+    const bVal = bStat[statsSortKey] ?? -Infinity
+    return factor * (aVal - bVal) || a.name.localeCompare(b.name)
+  })
 
   return (
     <div id={`tournament-block-${tournament.id}`} className="bg-white border border-parchment-3 rounded-2xl mb-4 overflow-hidden scroll-mt-24">
@@ -865,13 +907,14 @@ function TournamentBlock({
           {/* Player Stats — collapsible, sourced from announced squads.
               Stats are aggregated purely from THIS tournament's own synced
               matches via getLeaderboard({ tournamentId }) — never
-              career-wide analytics. Reuses the exact card + table schema as
-              Captains Corner's tap-to-expand "📊 Form" panel
-              (ContextStatsTable in CaptainsCornerGrid.tsx): navy gradient
-              card, gold top edge, M/R/Avg/SR/Wk/Econ/Ct columns. A player
-              can be represented here (they were in an announced squad) but
-              still show "No stats synced" if none of their matches in this
-              tournament have a scorecard reconciled yet. */}
+              career-wide analytics. Same M/R/Avg/SR/Wk/Econ/Ct column
+              schema as Captains Corner's tap-to-expand "📊 Form" panel
+              (ContextStatsTable in CaptainsCornerGrid.tsx), but recoloured
+              into this page's warm-light theme instead of that panel's navy
+              card. A player can be represented here (they were in an
+              announced squad) but still show "No stats synced" if none of
+              their matches in this tournament have a scorecard reconciled
+              yet — those rows always sort to the bottom. */}
           <div className="px-4 py-4 border-t border-parchment-3 mt-2">
             <button
               onClick={() => setPlayersOpen(v => !v)}
@@ -882,47 +925,48 @@ function TournamentBlock({
             </button>
             {playersOpen && (
               players.length > 0 ? (
-                <div
-                  className="rounded-lg border relative overflow-hidden px-3 py-2.5"
-                  style={{ background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)', borderColor: '#2D3748' }}
-                >
-                  <div
-                    className="absolute top-0 left-0 right-0 h-[2px]"
-                    style={{ background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }}
-                  />
+                <div className="rounded-lg border border-parchment-3 bg-white overflow-x-auto">
                   <table className="w-full" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     <thead>
-                      <tr>
-                        <th></th>
-                        {['M', 'R', 'Avg', 'SR', 'Wk', 'Econ', 'Ct'].map(h => (
-                          <th key={h} className="font-rajdhani text-[8.5px] font-bold uppercase tracking-wide text-right pb-1"
-                            style={{ color: '#6B7280' }}>
-                            {h}
+                      <tr className="border-b border-parchment-3">
+                        <th
+                          onClick={() => handleStatsSort('name')}
+                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-left pl-3 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
+                        >
+                          Player{statsSortKey === 'name' && (statsSortDir === 'asc' ? ' ▲' : ' ▼')}
+                        </th>
+                        {STAT_COLUMNS.map(col => (
+                          <th
+                            key={col.key}
+                            onClick={() => handleStatsSort(col.key)}
+                            className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pr-2 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
+                          >
+                            {col.label}{statsSortKey === col.key && (statsSortDir === 'asc' ? ' ▲' : ' ▼')}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {players.map(p => {
+                      {sortedPlayers.map(p => {
                         const stat = stats[p.id] ?? null
                         return (
-                          <tr key={p.id} style={{ borderTop: '1px solid rgba(45,55,72,0.6)' }}>
-                            <td className="font-rajdhani text-[11px] font-semibold py-1 pr-2 whitespace-nowrap" style={{ color: '#F9FAFB' }}>
-                              <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} className="text-[#93C5FD]" />
+                          <tr key={p.id} className="border-t border-parchment-3 first:border-t-0">
+                            <td className="font-rajdhani text-[11px] font-semibold text-ink pl-3 py-1.5 whitespace-nowrap">
+                              <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
                             </td>
                             {stat == null ? (
-                              <td colSpan={7} className="text-[10.5px] italic py-1 text-right" style={{ color: '#6B7280' }}>No stats synced</td>
+                              <td colSpan={STAT_COLUMNS.length} className="text-[10.5px] italic text-stone-400 pr-2 py-1.5 text-right">No stats synced</td>
                             ) : (
-                              [
-                                stat.matches, stat.runs, statCell(stat.battingAverage).text,
-                                statCell(stat.strikeRate).text, stat.wickets, statCell(stat.economy).text,
-                                stat.catches,
-                              ].map((v, i) => (
-                                <td key={i} className="font-cinzel text-[11.5px] font-bold text-right py-1"
-                                  style={{ color: v === '—' ? '#4B5563' : '#F9FAFB' }}>
-                                  {v}
-                                </td>
-                              ))
+                              STAT_COLUMNS.map(col => {
+                                const display = statCell(stat[col.key]).text
+                                return (
+                                  <td key={col.key} className={`font-cinzel text-[11.5px] font-bold text-right pr-2 py-1.5 ${
+                                    display === '—' ? 'text-stone-400' : 'text-ink'
+                                  }`}>
+                                    {display}
+                                  </td>
+                                )
+                              })
                             )}
                           </tr>
                         )
