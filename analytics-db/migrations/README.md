@@ -20,3 +20,4 @@ after applying.
 | File | Purpose |
 |---|---|
 | `001_player_identity_resolution.sql` | Adds nullable `player_id` to `batting_stats`/`bowling_stats`/`fielding_stats`/`team_list`, plus `player_name_aliases`, `match_name_overrides`, `ignored_names` — see `.claude/rules/features/player-identity-resolution.md` |
+| `002_alias_cricheroes_player_id.sql` | Adds nullable `cricheroes_player_id` to `player_name_aliases`/`match_name_overrides` — snapshots the Hub player's linked CricHeroes profile ID alongside `player_id` at confirmation time |

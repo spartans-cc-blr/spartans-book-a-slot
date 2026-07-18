@@ -80,7 +80,7 @@ export async function GET() {
     analytics.from('ignored_names').select('scorecard_name'),
     analytics.from('player_name_aliases').select('scorecard_name, player_id'),
     analytics.from('match_name_overrides').select('match_id, scorecard_name, player_id'),
-    hub.from('players').select('id, name, jersey_number, cricheroes_url'),
+    hub.from('players').select('id, name, jersey_number, cricheroes_url, cricheroes_player_id'),
   ])
 
   const rosterById = new Map((roster ?? []).map((p: any) => [p.id, p]))
@@ -128,6 +128,10 @@ export async function GET() {
       // against, so this just lets the admin open both profiles and
       // eyeball that it's the same person before confirming.
       cricheroes_url: rosterById.get(s.id)?.cricheroes_url ?? null,
+      // Surfaced so the UI can prompt the admin when confirming a match
+      // for a player who hasn't linked a CricHeroes profile yet — see
+      // features/player-identity-resolution.md §3.1.
+      cricheroes_player_id: rosterById.get(s.id)?.cricheroes_player_id ?? null,
     }))
     const entry = { scorecard_name: name, matches, suggestions }
     if (suggestions.length > 0) suggested.push(entry)
@@ -142,6 +146,7 @@ export async function GET() {
     // small club roster (~150), cheap to send whole.
     roster: (roster ?? []).map((p: any) => ({
       id: p.id, name: p.name, jersey_number: p.jersey_number, cricheroes_url: p.cricheroes_url,
+      cricheroes_player_id: p.cricheroes_player_id,
     })),
   })
 }
@@ -175,31 +180,36 @@ export async function POST(req: NextRequest) {
     const { scorecard_name, player_id, scope } = parsed.data
 
     // Never trust a client-supplied player_id — confirm it's a real Hub
-    // player before writing it anywhere in the analytics DB.
+    // player before writing it anywhere in the analytics DB. Also fetch
+    // cricheroes_player_id here (server-side, not client-supplied) so it
+    // can be snapshotted alongside player_id — see
+    // analytics-db/migrations/002_alias_cricheroes_player_id.sql.
     const { data: player, error: playerErr } = await hub
       .from('players')
-      .select('id')
+      .select('id, cricheroes_player_id')
       .eq('id', player_id)
       .maybeSingle()
     if (playerErr) return NextResponse.json({ error: playerErr.message }, { status: 500 })
     if (!player) return NextResponse.json({ error: 'player_id does not match a known Hub player' }, { status: 400 })
 
+    const cricheroes_player_id = player.cricheroes_player_id ?? null
+
     if (scope === 'global') {
       const { error } = await analytics
         .from('player_name_aliases')
-        .upsert({ scorecard_name, player_id }, { onConflict: 'scorecard_name' })
+        .upsert({ scorecard_name, player_id, cricheroes_player_id }, { onConflict: 'scorecard_name' })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
       const result = await backfillPlayerIdForName({ analytics, scorecardName: scorecard_name, playerId: player_id })
       if (result.error) return NextResponse.json({ error: result.error }, { status: 500 })
-      return NextResponse.json({ ok: true, updated: result.updated })
+      return NextResponse.json({ ok: true, updated: result.updated, cricheroes_player_id })
     }
 
     // Match-scoped override
     const { error } = await analytics
       .from('match_name_overrides')
       .upsert(
-        { match_id: scope.match_id, scorecard_name, player_id, resolved_via: 'admin' },
+        { match_id: scope.match_id, scorecard_name, player_id, resolved_via: 'admin', cricheroes_player_id },
         { onConflict: 'match_id,scorecard_name' }
       )
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

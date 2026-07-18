@@ -84,7 +84,7 @@ export async function resolvePlayerName(opts: {
   // them is in this match's squad.
   const { data: candidates } = await hub
     .from('players')
-    .select('id, name')
+    .select('id, name, cricheroes_player_id')
   const normalisedTarget = scorecardName.trim().toLowerCase()
   const nameMatches = (candidates ?? []).filter(
     p => (p.name ?? '').trim().toLowerCase() === normalisedTarget
@@ -109,7 +109,13 @@ export async function resolvePlayerName(opts: {
       if (inSquad.length === 1) {
         const resolvedId = inSquad[0].id
         await analytics.from('match_name_overrides').upsert(
-          { match_id: matchId, scorecard_name: scorecardName, player_id: resolvedId, resolved_via: 'squad_disambiguation' },
+          {
+            match_id: matchId,
+            scorecard_name: scorecardName,
+            player_id: resolvedId,
+            resolved_via: 'squad_disambiguation',
+            cricheroes_player_id: inSquad[0].cricheroes_player_id ?? null,
+          },
           { onConflict: 'match_id,scorecard_name' }
         )
         return { player_id: resolvedId, resolved_via: 'squad_disambiguation' }
