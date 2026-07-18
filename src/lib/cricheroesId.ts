@@ -10,14 +10,29 @@
 //              the short link itself; the server has to follow the
 //              redirect and read where it actually lands.
 //
-// Best-effort throughout: any failure (timeout, non-CricHeroes redirect
-// target, network error) returns null rather than throwing, so a save
-// never fails because CricHeroes (or this specific link) is unreachable.
+// Confirmed in production (2026-07-18): chshare.link does NOT do a real
+// HTTP 3xx redirect — fetch(url, { redirect: 'follow' }) returns 200 with
+// res.url unchanged (~700ms, not a timeout), meaning the actual
+// destination is embedded in the page and resolved client-side (JS
+// redirect / app-deep-link fallback page, the same pattern as Branch.io
+// or Firebase Dynamic Links). So resolution can't stop at res.url — it
+// has to fall back to scanning the response body text for the same
+// profile-URL pattern (covers a meta tag, embedded JSON, or a JS
+// redirect literal, whichever chshare.link actually uses, without
+// depending on its exact markup).
+//
+// Best-effort throughout: any failure (timeout, no match found, network
+// error) returns null rather than throwing, so a save never fails because
+// CricHeroes (or this specific link) is unreachable or unparseable.
 // Never call fetch() against an arbitrary client-supplied host — only
 // chshare.link is followed, everything else is a same-request regex or a
 // no-op.
 
 const DIRECT_PROFILE_ID_RE = /cricheroes\.(?:com|in)\/player-profile\/(\d+)\b/i
+
+// Share-link landing pages are small (link-preview HTML) — this is just
+// defensive insurance against ever regex-scanning something huge.
+const BODY_SCAN_LIMIT = 200_000
 
 const SHARE_LINK_HOST = 'chshare.link'
 const DIRECT_HOSTS = new Set(['cricheroes.com', 'cricheroes.in'])
@@ -55,7 +70,14 @@ async function resolveShareLink(url: string): Promise<string | null> {
   const timer = setTimeout(() => controller.abort(), REDIRECT_TIMEOUT_MS)
   try {
     const res = await fetch(url, { redirect: 'follow', signal: controller.signal })
-    return extractDirectId(res.url)
+
+    const fromRedirect = extractDirectId(res.url)
+    if (fromRedirect) return fromRedirect
+
+    // No real HTTP redirect happened (res.url === the short link itself) —
+    // fall back to scanning the page body for the destination.
+    const body = await res.text()
+    return extractDirectId(body.slice(0, BODY_SCAN_LIMIT))
   } catch (err) {
     console.error('[cricheroesId] share-link resolution failed:', err)
     return null
