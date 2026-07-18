@@ -110,12 +110,15 @@ async function resolveShareLink(url: string): Promise<string | null> {
       // but leaves nothing to debug from without this. Logged at info
       // level (not error) since a share link genuinely not resolving is
       // an expected, non-alarming outcome, not a system fault.
+      // Full body, not a truncated snippet — bodyLength has consistently
+      // come back small (~1.4KB) for this share-link host, so there's no
+      // real risk of an oversized log line here.
       console.log('[cricheroesId] no ID found in share-link response', {
-        requestUrl:  url,
-        finalUrl:    res.url,
-        status:      res.status,
-        bodyLength:  body.length,
-        bodySnippet: body.slice(0, 1000),
+        requestUrl: url,
+        finalUrl:   res.url,
+        status:     res.status,
+        bodyLength: body.length,
+        body,
       })
     }
     return id
