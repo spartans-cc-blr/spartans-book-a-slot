@@ -806,7 +806,7 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
       <tbody>
         {rows.map(row => (
           <tr key={row.label} style={{ borderTop: '1px solid rgba(45,55,72,0.6)' }}>
-            <td className="font-rajdhani text-[11px] font-semibold py-1 whitespace-nowrap" style={{ color: '#9CA3AF' }}>
+            <td className="font-rajdhani text-[11px] font-semibold py-1 whitespace-nowrap text-right" style={{ color: '#9CA3AF' }}>
               {row.icon} {row.label}
             </td>
             {row.totals == null ? (
