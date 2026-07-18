@@ -6,7 +6,7 @@
 
 import { useRouter } from 'next/navigation'
 
-export type LeaderboardCategory = 'runs' | 'wickets' | 'mvp'
+export type LeaderboardCategory = 'batting' | 'bowling' | 'fielding' | 'mvp'
 
 interface Props {
   years:        number[]
@@ -32,7 +32,7 @@ export function LeaderboardFilters({ years, tournaments, year, tournamentId, cat
   return (
     <div className="flex flex-wrap items-center gap-3 mb-5">
       <div className="flex gap-1">
-        {(['runs', 'wickets', 'mvp'] as const).map(c => (
+        {(['batting', 'bowling', 'fielding', 'mvp'] as const).map(c => (
           <button
             key={c}
             onClick={() => navigate({ category: c })}
