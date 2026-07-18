@@ -249,6 +249,7 @@ Full member directory.
 | `dob`, `jersey_name`, `jersey_number`, `blood_group` | Player-editable |
 | `primary_skill`, `secondary_skill` | Player-editable (17 options) |
 | `cricheroes_url` | Player-editable — **drives CricHeroes hyperlinks throughout the app** |
+| `cricheroes_player_id` | Server-derived only, never client-writable — numeric CricHeroes profile ID auto-extracted from `cricheroes_url` on save; see `features/player-identity-resolution.md` §3.1 |
 | `photo_url` | Set from Google OAuth on first sign-in |
 | `wallet_balance` | Admin-managed; shown amber if negative |
 | `dues_override` | Admin-managed boolean; allows player with negative balance to still mark availability |
@@ -551,6 +552,7 @@ Next.js API Routes (server-side)
 | supabase/migrations/009_push_subscriptions.sql | push_subscriptions table — one row per player per device |
 | `src/lib/playerIdentityResolution.ts` | `resolvePlayerName()` / `backfillPlayerIdForName()` — analytics-DB `player_name` → Hub `players.id` resolution; see `features/player-identity-resolution.md` |
 | `src/lib/nameMatch.ts` | Shared Levenshtein fuzzy-match helpers — extracted from `parse-announcement`, reused by player reconciliation |
+| `src/lib/cricheroesId.ts` | `resolveCricheroesPlayerId()` / `withCricheroesPlayerId()` — extracts `players.cricheroes_player_id` from `cricheroes_url` on save (direct regex or `chshare.link` redirect-follow); `isCricheroesUrl()` shared with `schemas.ts` validation. See `features/player-identity-resolution.md` §3.1 |
 | `src/app/api/admin/player-reconciliation/route.ts` | GET buckets pending scorecard names, POST confirms/ignores/reconciles |
 | `src/app/admin/player-reconciliation/page.tsx` | Admin reconciliation UI + "Run Reconciliation Pass" client loop |
 | `analytics-db/migrations/001_player_identity_resolution.sql` | Analytics DB (separate project) — `player_id` columns + alias/override/ignore tables |

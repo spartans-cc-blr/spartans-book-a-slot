@@ -80,7 +80,7 @@ export async function GET() {
     analytics.from('ignored_names').select('scorecard_name'),
     analytics.from('player_name_aliases').select('scorecard_name, player_id'),
     analytics.from('match_name_overrides').select('match_id, scorecard_name, player_id'),
-    hub.from('players').select('id, name, jersey_number'),
+    hub.from('players').select('id, name, jersey_number, cricheroes_url'),
   ])
 
   const rosterById = new Map((roster ?? []).map((p: any) => [p.id, p]))
@@ -122,7 +122,12 @@ export async function GET() {
 
     const suggestions = suggestPlayers(name, roster ?? []).map(s => ({
       ...s,
-      jersey_number: rosterById.get(s.id)?.jersey_number ?? null,
+      jersey_number:  rosterById.get(s.id)?.jersey_number ?? null,
+      // Manual cross-check aid only — never used for auto-matching. The
+      // scorecard PDF pipeline has no CricHeroes player ID to join
+      // against, so this just lets the admin open both profiles and
+      // eyeball that it's the same person before confirming.
+      cricheroes_url: rosterById.get(s.id)?.cricheroes_url ?? null,
     }))
     const entry = { scorecard_name: name, matches, suggestions }
     if (suggestions.length > 0) suggested.push(entry)
@@ -135,7 +140,9 @@ export async function GET() {
     no_match: noMatch,
     // Full roster for the manual search-and-pick fallback in the UI —
     // small club roster (~150), cheap to send whole.
-    roster: (roster ?? []).map((p: any) => ({ id: p.id, name: p.name, jersey_number: p.jersey_number })),
+    roster: (roster ?? []).map((p: any) => ({
+      id: p.id, name: p.name, jersey_number: p.jersey_number, cricheroes_url: p.cricheroes_url,
+    })),
   })
 }
 

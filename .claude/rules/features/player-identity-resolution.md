@@ -71,6 +71,55 @@ RLS: same "service-role only, no anon/authenticated policy" pattern as
 
 ---
 
+## 3.1 Hub-side CricHeroes Player ID (`players.cricheroes_player_id`)
+
+**A different, Hub-side identifier — not used for auto-matching.** Added
+July 2026 (`supabase/migrations/047_cricheroes_player_id.sql`) as a
+nullable `text` column, auto-extracted server-side from
+`players.cricheroes_url` whenever that field is saved. Never accepted
+directly from the client — `src/lib/cricheroesId.ts`'s
+`withCricheroesPlayerId()` derives it and both player-write routes
+(`/api/players/[id]` PATCH, `/api/players` POST/PATCH) explicitly strip
+any client-supplied `cricheroes_player_id` before calling it. A partial
+unique index prevents two Hub members from ever sharing one CricHeroes
+profile ID.
+
+Two URL shapes, two resolution paths:
+- **Direct** (`cricheroes.com/player-profile/<id>/...`) — plain regex
+  extraction, no network call.
+- **Share link** (`chshare.link/player/<code>`) — CricHeroes' own
+  short-link redirector. The ID isn't in the short link itself, so the
+  server does a bounded (6s), host-restricted (`chshare.link` only)
+  `fetch(url, { redirect: 'follow' })` and regexes the ID out of wherever
+  it actually lands. Best-effort throughout — any failure (timeout,
+  unreachable, non-CricHeroes redirect target) returns `null` rather than
+  failing the save; a player can always just re-save to retry.
+
+**Why this doesn't close the analytics-DB auto-matching gap:** the
+scorecard PDF pipeline (`spartans-python`, a separate repo) only extracts
+`player_name` text from CricHeroes' static scorecard PDF — there is no
+per-player CricHeroes ID anywhere in the analytics DB to join this Hub-side
+ID against. So today this is a **manual cross-check aid only**: the admin
+reconciliation UI (`/admin/player-reconciliation`) shows a ↗ link next to
+each suggested Hub player (and in the manual roster search) linking
+straight to their CricHeroes profile, so the admin can eyeball that it's
+really the same person before confirming — see §4. Whether real ID-based
+auto-matching is ever feasible would require investigating
+`spartans-python`'s parsing pipeline for an alternative CricHeroes source
+that does carry player IDs (e.g. a team roster endpoint) — not attempted
+as part of this work.
+
+**Data quality note:** most existing `cricheroes_url` values in the Hub
+predate this feature and are `chshare.link` share links (the WhatsApp
+"share my profile" format), not direct profile URLs — some were even
+saved with the whole share message pasted in, not just the URL. Existing
+rows are not backfilled by the migration; `cricheroes_player_id` populates
+passively as players next save their profile (or immediately for the
+handful of already-direct `cricheroes.com` URLs, backfilled once via a
+plain SQL regex — no network call needed for that subset).
+
+---
+
 ## 4. Admin Reconciliation — `/admin/player-reconciliation`
 
 Admin-only (`requireAdmin()`, same pattern as every other `/admin/*` route).

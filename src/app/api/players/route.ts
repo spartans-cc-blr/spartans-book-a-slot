@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { withCricheroesPlayerId } from '@/lib/cricheroesId'
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -32,25 +33,26 @@ export async function POST(request: Request) {
     blood_group, primary_skill, secondary_skill, referred_by,
     inducted_on, wallet_balance, cricheroes_url } = body
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
+  const insert = await withCricheroesPlayerId({
+    name,
+    gmail_id: gmail_id || null,
+    whatsapp: whatsapp || null,
+    dob: dob || null,
+    jersey_name: jersey_name || null,
+    jersey_number: jersey_number || null,
+    blood_group: blood_group || null,
+    primary_skill: primary_skill || null,
+    secondary_skill: secondary_skill || null,
+    referred_by: referred_by || null,
+    inducted_on: inducted_on || null,
+    wallet_balance: wallet_balance ?? 0,
+    cricheroes_url: cricheroes_url || null,
+    active: true,
+    is_captain: false,
+  })
   const { data, error } = await supabase
     .from('players')
-    .insert({
-      name,
-      gmail_id: gmail_id || null,
-      whatsapp: whatsapp || null,
-      dob: dob || null,
-      jersey_name: jersey_name || null,
-      jersey_number: jersey_number || null,
-      blood_group: blood_group || null,
-      primary_skill: primary_skill || null,
-      secondary_skill: secondary_skill || null,
-      referred_by: referred_by || null,
-      inducted_on: inducted_on || null,
-      wallet_balance: wallet_balance ?? 0,
-      cricheroes_url: cricheroes_url || null,
-      active: true,
-      is_captain: false,
-    })
+    .insert(insert)
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -86,9 +88,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
   }
 
+  const withDerivedId = await withCricheroesPlayerId(updates)
+
   const { data, error } = await supabase
     .from('players')
-    .update(updates)
+    .update(withDerivedId)
     .eq('id', id)
     .select()
     .single()

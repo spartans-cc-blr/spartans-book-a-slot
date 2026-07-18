@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
+import { withCricheroesPlayerId } from '@/lib/cricheroesId'
 
 const PLAYER_EDITABLE_FIELDS = new Set([
   'whatsapp',
@@ -41,7 +42,7 @@ export async function GET(
     .from('players')
     .select(`
       id, name, gmail_id, whatsapp, dob, jersey_name, jersey_number,
-      blood_group, primary_skill, secondary_skill, cricheroes_url, photo_url,
+      blood_group, primary_skill, secondary_skill, cricheroes_url, cricheroes_player_id, photo_url,
       wallet_balance, inducted_on, is_captain, status, active
     `)
     .eq('id', params.id)
@@ -91,15 +92,20 @@ export async function PATCH(
       updates[key] = value
     }
   }
+  // cricheroes_player_id is always server-derived from cricheroes_url —
+  // never accepted directly from the client, admin or not.
+  delete updates.cricheroes_player_id
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
   }
 
+  const withDerivedId = await withCricheroesPlayerId(updates)
+
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('players')
-    .update(updates)
+    .update(withDerivedId)
     .eq('id', params.id)
     .select()
     .single()

@@ -9,10 +9,11 @@ interface MatchRef {
 }
 
 interface Suggestion {
-  id:            string
-  name:          string
-  dist:          number
-  jersey_number: string | number | null
+  id:             string
+  name:           string
+  dist:           number
+  jersey_number:  string | number | null
+  cricheroes_url: string | null
 }
 
 interface NameEntry {
@@ -22,9 +23,10 @@ interface NameEntry {
 }
 
 interface RosterPlayer {
-  id:            string
-  name:          string
-  jersey_number: string | number | null
+  id:             string
+  name:           string
+  jersey_number:  string | number | null
+  cricheroes_url: string | null
 }
 
 interface ReconciliationData {
@@ -79,12 +81,23 @@ function SearchPicker({
       </div>
       <div className="flex flex-col gap-0.5 max-h-36 overflow-y-auto">
         {filtered.map(p => (
-          <button
-            key={p.id}
-            onClick={() => onPick(p)}
-            className="text-left px-2 py-1 rounded hover:bg-ink-4 font-rajdhani text-xs text-zinc-300">
-            {p.name}{p.jersey_number != null ? ` · #${p.jersey_number}` : ''}
-          </button>
+          <div key={p.id} className="flex items-center gap-1">
+            <button
+              onClick={() => onPick(p)}
+              className="flex-1 text-left px-2 py-1 rounded hover:bg-ink-4 font-rajdhani text-xs text-zinc-300">
+              {p.name}{p.jersey_number != null ? ` · #${p.jersey_number}` : ''}
+            </button>
+            {p.cricheroes_url && (
+              <a
+                href={p.cricheroes_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open this player's CricHeroes profile"
+                className="font-rajdhani text-xs text-zinc-600 hover:text-gold px-1.5 flex-shrink-0">
+                ↗
+              </a>
+            )}
+          </div>
         ))}
         {filtered.length === 0 && <p className="font-rajdhani text-xs text-zinc-600 px-2 py-1">No matches.</p>}
       </div>
@@ -242,13 +255,24 @@ export default function PlayerReconciliationPage() {
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {(entry.suggestions ?? []).map(s => (
-                        <button
-                          key={s.id}
-                          onClick={() => confirmGlobal(entry.scorecard_name, s)}
-                          disabled={busyName === entry.scorecard_name}
-                          className="font-rajdhani text-xs bg-ink-4 border border-ink-5 hover:border-gold-dim hover:text-gold text-zinc-300 px-2.5 py-1 rounded disabled:opacity-40 transition-colors">
-                          {s.name}{s.jersey_number != null ? ` #${s.jersey_number}` : ''}
-                        </button>
+                        <div key={s.id} className="flex items-stretch">
+                          <button
+                            onClick={() => confirmGlobal(entry.scorecard_name, s)}
+                            disabled={busyName === entry.scorecard_name}
+                            className={`font-rajdhani text-xs bg-ink-4 border border-ink-5 hover:border-gold-dim hover:text-gold text-zinc-300 px-2.5 py-1 disabled:opacity-40 transition-colors ${s.cricheroes_url ? 'rounded-l' : 'rounded'}`}>
+                            {s.name}{s.jersey_number != null ? ` #${s.jersey_number}` : ''}
+                          </button>
+                          {s.cricheroes_url && (
+                            <a
+                              href={s.cricheroes_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Open this player's CricHeroes profile — cross-check before confirming"
+                              className="font-rajdhani text-xs bg-ink-4 border border-l-0 border-ink-5 hover:border-gold-dim hover:text-gold text-zinc-500 px-2 py-1 rounded-r transition-colors">
+                              ↗
+                            </a>
+                          )}
+                        </div>
                       ))}
                       <button
                         onClick={() => setPickerFor(pickerFor === entry.scorecard_name ? null : entry.scorecard_name)}

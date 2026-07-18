@@ -1,5 +1,6 @@
 // src/lib/schemas.ts
 import { z } from 'zod'
+import { isCricheroesUrl } from '@/lib/cricheroesId'
 
 // ── SHARED CONSTANTS ────────────────────────────────────────────────────────
 
@@ -29,6 +30,17 @@ export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] a
 // a mistyped 5+ digit year (e.g. '12026-08-15'), which then throws
 // `RangeError: Invalid time value` out of date-fns when rendered.
 export const GAME_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
+// A previous version of this check was a loose substring regex
+// (`/chshare\.link|cricheroes\.in/`) that both rejected real
+// cricheroes.com profile URLs and would pass a lookalike host containing
+// that substring anywhere (e.g. cricheroes.in.attacker.example). Proper
+// hostname check instead — same allowlist src/lib/cricheroesId.ts treats
+// as the only hosts it will ever fetch server-side.
+export const cricheroesUrlSchema = z
+  .string()
+  .url('Must be a valid URL')
+  .refine(isCricheroesUrl, 'Must be a CricHeroes URL (cricheroes.com, cricheroes.in, or chshare.link)')
 
 // ── PLAYER SELF-EDIT (PATCH /api/players/[id]) ──────────────────────────────
 
@@ -60,10 +72,7 @@ export const playerSelfEditSchema = z.object({
   secondary_skill: z
     .enum(SKILLS)
     .optional(),
-  cricheroes_url: z
-    .string()
-    .url('Must be a valid URL')
-    .regex(/chshare\.link|cricheroes\.in/, 'Must be a CricHeroes URL')
+  cricheroes_url: cricheroesUrlSchema
     .optional()
     .or(z.literal('')),  // allow clearing the field
 })
