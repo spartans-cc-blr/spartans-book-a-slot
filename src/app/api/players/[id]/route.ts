@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 import { withCricheroesPlayerId } from '@/lib/cricheroesId'
+import { cricheroesUrlSchema } from '@/lib/schemas'
 
 const PLAYER_EDITABLE_FIELDS = new Set([
   'whatsapp',
@@ -83,6 +84,20 @@ export async function PATCH(
       )
     }
     body.jersey_number = jn
+  }
+
+  // Reject anything that isn't actually a CricHeroes URL up front — this is
+  // what let "Hey! Here is my Cricket profile... https://chshare.link/..."
+  // (the whole WhatsApp share message, not just the link) get saved
+  // unnoticed in the past. Empty string still allowed through to clear the field.
+  if (body.cricheroes_url) {
+    const parsed = cricheroesUrlSchema.safeParse(body.cricheroes_url)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? 'Invalid CricHeroes URL — paste just the link, not the whole share message' },
+        { status: 400 }
+      )
+    }
   }
 
   // If not admin, strip any fields not in the allowed set

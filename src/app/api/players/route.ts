@@ -3,6 +3,19 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { withCricheroesPlayerId } from '@/lib/cricheroesId'
+import { cricheroesUrlSchema } from '@/lib/schemas'
+
+function validateCricheroesUrl(url: unknown): NextResponse | null {
+  if (!url) return null
+  const parsed = cricheroesUrlSchema.safeParse(url)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Invalid CricHeroes URL — paste just the link, not the whole share message' },
+      { status: 400 }
+    )
+  }
+  return null
+}
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -33,6 +46,8 @@ export async function POST(request: Request) {
     blood_group, primary_skill, secondary_skill, referred_by,
     inducted_on, wallet_balance, cricheroes_url } = body
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
+  const urlErr = validateCricheroesUrl(cricheroes_url)
+  if (urlErr) return urlErr
   const insert = await withCricheroesPlayerId({
     name,
     gmail_id: gmail_id || null,
@@ -87,6 +102,9 @@ export async function PATCH(request: Request) {
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
   }
+
+  const urlErr = validateCricheroesUrl(updates.cricheroes_url)
+  if (urlErr) return urlErr
 
   const withDerivedId = await withCricheroesPlayerId(updates)
 
