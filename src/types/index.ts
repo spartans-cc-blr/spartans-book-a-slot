@@ -192,3 +192,26 @@ export interface BookingContextStats {
   ground:     PlayerStatsTotals | null
   format:     PlayerStatsTotals | null
 }
+
+// One row per match played, for the full player stats page
+// (/players/[id]/stats). Each of batting/bowling/fielding is null when the
+// player didn't bat/bowl/field a dismissal in that specific match — never a
+// zero-filled placeholder.
+export interface PlayerMatchHistoryRow {
+  matchId:        string
+  gameDate:       string | null
+  format:         string | null
+  tournamentName: string | null
+  opponentName:   string | null
+  matchResult:    string | null
+  batting: {
+    runs: number; balls: number; fours: number; sixes: number
+    notOut: boolean; strikeRate: number | null
+  } | null
+  bowling: {
+    overs: string | number; wickets: number; runsConceded: number; economy: number | null
+  } | null
+  fielding: {
+    catches: number; runOuts: number; stumpings: number
+  } | null
+}

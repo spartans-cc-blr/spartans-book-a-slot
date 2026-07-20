@@ -21,7 +21,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
-import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats } from '@/types'
+import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow } from '@/types'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -170,18 +170,100 @@ async function fetchAnalyticsRows(opts: {
   }
 }
 
-export async function getPlayerCareerStats(playerId: string): Promise<PlayerStatsTotals> {
-  const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: null })
-  const matchIds = new Set<string>(team.map((r: any) => r.match_id).filter(Boolean))
-  return aggregate(matchIds, batting, bowling, fielding)
-}
-
-export async function getPlayerSeasonStats(playerId: string, year: number): Promise<PlayerStatsTotals> {
-  const scoped = await getScopedMatchIds({ year })
+// General-purpose scoped aggregate — getPlayerCareerStats and
+// getPlayerSeasonStats are thin wrappers over this for their existing
+// call shapes; the full stats page (/players/[id]/stats) uses this
+// directly since it needs year AND tournament filters combined.
+export async function getPlayerStats(
+  playerId: string,
+  filters: { year?: number; tournamentId?: string } = {}
+): Promise<PlayerStatsTotals> {
+  const scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return emptyTotals()
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
   const matchIds = new Set<string>(team.map((r: any) => r.match_id).filter(Boolean))
   return aggregate(matchIds, batting, bowling, fielding)
+}
+
+export async function getPlayerCareerStats(playerId: string): Promise<PlayerStatsTotals> {
+  return getPlayerStats(playerId)
+}
+
+export async function getPlayerSeasonStats(playerId: string, year: number): Promise<PlayerStatsTotals> {
+  return getPlayerStats(playerId, { year })
+}
+
+// One row per match this player appeared in (via team_list), for the full
+// stats page's match-by-match breakdown. Batting/bowling/fielding lines are
+// per-match, not aggregated — a player with no batting/bowling/fielding row
+// for a given match (e.g. did not bat, never bowled) simply has that field
+// null, mirroring the did_not_bat/zero-overs filtering used elsewhere in
+// this file rather than showing a misleading 0.
+export async function getPlayerMatchHistory(
+  playerId: string,
+  filters: { year?: number; tournamentId?: string } = {}
+): Promise<PlayerMatchHistoryRow[]> {
+  const scoped = await getScopedMatchIds(filters)
+  if (scoped && scoped.length === 0) return []
+
+  const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
+  const matchIds = Array.from(new Set<string>(team.map((r: any) => r.match_id).filter(Boolean)))
+  if (matchIds.length === 0) return []
+
+  const analytics = createAnalyticsClient()
+  if (!analytics) throw new Error('Analytics database is not configured')
+  const { data: matchRows, error: matchErr } = await analytics
+    .from('match_stats').select('*').in('match_id', matchIds)
+  if (matchErr) throw new Error(matchErr.message)
+  const matchById = new Map((matchRows ?? []).map((m: any) => [m.match_id, m]))
+
+  const hub = createServiceClient()
+  const { data: bookingRows, error: bookingErr } = await hub
+    .from('bookings')
+    .select('match_id, game_date, format, tournament:tournaments(name)')
+    .in('match_id', matchIds)
+  if (bookingErr) throw new Error(bookingErr.message)
+  const bookingByMatchId = new Map((bookingRows ?? []).map((b: any) => [b.match_id, b]))
+
+  const battingByMatch  = new Map(batting.map((r: any) => [r.match_id, r]))
+  const bowlingByMatch  = new Map(bowling.map((r: any) => [r.match_id, r]))
+  const fieldingByMatch = new Map(fielding.map((r: any) => [r.match_id, r]))
+
+  const rows: PlayerMatchHistoryRow[] = matchIds.map(matchId => {
+    const m = matchById.get(matchId) as any
+    const booking = bookingByMatchId.get(matchId) as any
+    const bat = battingByMatch.get(matchId) as any
+    const bowl = bowlingByMatch.get(matchId) as any
+    const field = fieldingByMatch.get(matchId) as any
+
+    const battedThisMatch = bat && bat.dismissal_method !== 'did_not_bat'
+    const bowledThisMatch = bowl && num(bowl.overs) > 0
+
+    return {
+      matchId,
+      gameDate:        booking?.game_date ?? m?.match_date ?? null,
+      format:          booking?.format ?? null,
+      tournamentName:  Array.isArray(booking?.tournament) ? booking?.tournament[0]?.name : booking?.tournament?.name ?? m?.tournament_name ?? null,
+      opponentName:    m?.opponent_name ?? null,
+      matchResult:     m?.match_result ?? null,
+      batting: battedThisMatch ? {
+        runs: num(bat.runs), balls: num(bat.balls), fours: num(bat.fours), sixes: num(bat.sixes),
+        notOut: bat.not_out === 'Y',
+        strikeRate: num(bat.balls) > 0 ? round2((num(bat.runs) / num(bat.balls)) * 100) : null,
+      } : null,
+      bowling: bowledThisMatch ? {
+        overs: bowl.overs, wickets: num(bowl.wickets), runsConceded: num(bowl.runs),
+        economy: oversToBalls(num(bowl.overs)) > 0 ? round2(num(bowl.runs) / (oversToBalls(num(bowl.overs)) / 6)) : null,
+      } : null,
+      fielding: field ? {
+        catches: num(field.catches) + num(field.caught_behind),
+        runOuts: num(field.run_outs), stumpings: num(field.stumpings),
+      } : null,
+    }
+  })
+
+  rows.sort((a, b) => (b.gameDate ?? '').localeCompare(a.gameDate ?? ''))
+  return rows
 }
 
 export async function getLeaderboard(filters: { year?: number; tournamentId?: string } = {}): Promise<LeaderboardRow[]> {

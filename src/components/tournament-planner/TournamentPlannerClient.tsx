@@ -26,7 +26,7 @@ interface Booking {
     total_league_games: number | null
     cricheroes_points_table_url: string | null
     captain_id: string | null
-    captains: { id: string; name: string } | null
+    captains: { id: string; name: string; player_id: string | null } | null
   } | null
 }
 
@@ -34,7 +34,7 @@ interface Captain { id: string; name: string }
 
 interface TournamentPlayer { id: string; name: string; cricheroes_url: string | null }
 
-interface SquadCaptain { name: string; cricheroes_url: string | null }
+interface SquadCaptain { id: string; name: string; cricheroes_url: string | null }
 
 interface ViewerRole {
   isCaptain: boolean
@@ -811,7 +811,7 @@ function TournamentBlock({
               )}
             </div>
             <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
-              {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} className="text-blue-700" /> &nbsp;·&nbsp;</>}
+              {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} playerId={tournament.captains.player_id} className="text-blue-700" /> &nbsp;·&nbsp;</>}
               Avg gap: <span className="text-ink font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
             </p>
             <div className="flex gap-1.5 flex-wrap mt-2">
@@ -975,10 +975,10 @@ function TournamentBlock({
                           <tr key={p.id} className="border-t border-parchment-3 first:border-t-0">
                             <td className="font-rajdhani text-[11px] font-semibold text-ink text-right pl-3 pr-2 py-1.5 whitespace-nowrap">
                               <span className="hidden sm:inline">
-                                <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                                <PlayerNameLink name={p.name} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
                               </span>
                               <span className="sm:hidden">
-                                <PlayerNameLink name={mobileMatrixName(p.name)} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                                <PlayerNameLink name={mobileMatrixName(p.name)} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
                               </span>
                             </td>
                             {stat == null ? (
@@ -1107,7 +1107,7 @@ function MatchTabsSection({
                       <p className="text-xs text-stone-500 mt-0.5">
                         {showFormatOnRow && <>{g.format} · </>}Captain{' '}
                         {captain
-                          ? <PlayerNameLink name={captain.name} cricHeroesUrl={captain.cricheroes_url} className="text-blue-700" />
+                          ? <PlayerNameLink name={captain.name} playerId={captain.id} cricHeroesUrl={captain.cricheroes_url} className="text-blue-700" />
                           : 'Unassigned'}
                       </p>
                     </div>

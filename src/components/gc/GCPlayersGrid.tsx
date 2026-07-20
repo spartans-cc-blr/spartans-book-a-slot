@@ -4,6 +4,7 @@
 // Security: no write paths. wallet_balance, status are read-only display only.
 
 import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
 
 type Player = {
@@ -233,23 +234,26 @@ export function GCPlayersGrid({ players }: { players: Player[] }) {
               >
                 {/* Avatar + name */}
                 <div className="flex items-center gap-3">
-                  {p.photo_url ? (
-                    <img
-                      src={p.photo_url}
-                      alt={p.name}
-                      className="w-10 h-10 rounded-full object-cover border border-[#CBD5DC] flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-[#E1F5EE] border border-[#5DCAA5]
-                                    flex items-center justify-center flex-shrink-0">
-                      <span className="font-rajdhani text-sm font-bold text-[#0F6E56]">
-                        {initials(p.name)}
-                      </span>
-                    </div>
-                  )}
+                  <Link href={`/players/${p.id}/stats`} className="flex-shrink-0">
+                    {p.photo_url ? (
+                      <img
+                        src={p.photo_url}
+                        alt={p.name}
+                        className="w-10 h-10 rounded-full object-cover border border-[#CBD5DC]"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#E1F5EE] border border-[#5DCAA5]
+                                      flex items-center justify-center">
+                        <span className="font-rajdhani text-sm font-bold text-[#0F6E56]">
+                          {initials(p.name)}
+                        </span>
+                      </div>
+                    )}
+                  </Link>
                   <div className="min-w-0 flex-1">
                     <PlayerNameLink
                       name={p.name}
+                      playerId={p.id}
                       cricHeroesUrl={p.cricheroes_url}
                       className="font-rajdhani text-sm font-semibold text-[#0F6E56] block truncate leading-tight"
                     />

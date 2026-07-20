@@ -35,6 +35,21 @@ function findCricHeroesUrl(row: any, name: string, squad?: SquadRef[]): string |
   return byName?.cricheroes_url ?? null
 }
 
+// Same resolution order as findCricHeroesUrl — only ever resolves to a Hub
+// player_id for someone in this booking's own squad. Opponent players and
+// unreconciled scorecard rows return null and PlayerNameLink falls back to
+// the CricHeroes link above instead.
+function findPlayerId(row: any, name: string, squad?: SquadRef[]): string | null {
+  if (!squad) return null
+  const playerId = pickField(row, ['player_id'])
+  if (playerId) {
+    const byId = squad.find(p => p.player_id === playerId)
+    if (byId) return byId.player_id
+  }
+  const byName = squad.find(p => p.player_name?.trim().toLowerCase() === name?.trim().toLowerCase())
+  return byName?.player_id ?? null
+}
+
 export function ScorecardTables({
   batting, bowling, teamList, squad,
 }: {
@@ -99,7 +114,7 @@ export function ScorecardTables({
                 return (
                   <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
                     <td className="py-1 pr-2">
-                      <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                      <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
                     <td className="text-right px-1">{runs}</td>
                     <td className="text-right px-1">{num(row, ['balls', 'balls_faced'])}</td>
@@ -122,7 +137,7 @@ export function ScorecardTables({
               const name = pickField(row, ['player_name', 'name'])
               return (
                 <span key={name}>
-                  <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                  <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                   {i < didNotBatRows.length - 1 ? ',' : ''}
                 </span>
               )
@@ -152,7 +167,7 @@ export function ScorecardTables({
                 return (
                   <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
                     <td className="py-1 pr-2">
-                      <PlayerNameLink name={name} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                      <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
                     <td className="text-right px-1">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
                     <td className="text-right px-1">{wkts}</td>

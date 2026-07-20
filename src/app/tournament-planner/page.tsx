@@ -30,7 +30,7 @@ export default async function TournamentPlannerPage() {
         id, name, organiser_name, organiser_contact,
         total_league_games, cricheroes_points_table_url,
         captain_id,
-        captains!tournaments_captain_id_fkey(id, name)
+        captains!tournaments_captain_id_fkey(id, name, player_id)
       )
     `)
     .eq('status', 'confirmed')
@@ -68,7 +68,7 @@ export default async function TournamentPlannerPage() {
       total_league_games: number | null
       cricheroes_points_table_url: string | null
       captain_id: string | null
-      captains: { id: string; name: string } | null
+      captains: { id: string; name: string; player_id: string | null } | null
     } | null
   }>
 
@@ -95,7 +95,7 @@ export default async function TournamentPlannerPage() {
   const pastBookingIds = new Set(bookings.filter(b => b.game_date < today).map(b => b.id))
 
   const tournamentPlayersMap: Record<string, { id: string; name: string; cricheroes_url: string | null }[]> = {}
-  const bookingCaptainMap: Record<string, { name: string; cricheroes_url: string | null }> = {}
+  const bookingCaptainMap: Record<string, { id: string; name: string; cricheroes_url: string | null }> = {}
   for (const row of (squads ?? []) as any[]) {
     const player = Array.isArray(row.players) ? row.players[0] : row.players
     if (!player) continue
@@ -105,7 +105,7 @@ export default async function TournamentPlannerPage() {
       if (!list.some(p => p.id === player.id)) list.push(player)
     }
     if (row.is_captain) {
-      bookingCaptainMap[row.booking_id] = { name: player.name, cricheroes_url: player.cricheroes_url }
+      bookingCaptainMap[row.booking_id] = { id: player.id, name: player.name, cricheroes_url: player.cricheroes_url }
     }
   }
   for (const list of Object.values(tournamentPlayersMap)) {

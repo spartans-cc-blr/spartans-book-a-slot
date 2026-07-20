@@ -489,7 +489,7 @@ export function GCFeedbackClient({
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="font-rajdhani text-sm font-semibold text-[#1C1917]">
-                        <PlayerNameLink name={player.name} cricHeroesUrl={player.cricheroes_url} />
+                        <PlayerNameLink name={player.name} playerId={player.id} cricHeroesUrl={player.cricheroes_url} />
                       </div>
                       {player.primary_skill && (
                         <p className="font-rajdhani text-xs text-stone-400">{player.primary_skill}</p>
@@ -543,7 +543,7 @@ export function GCFeedbackClient({
                   Collecting Feedback
                 </p>
                 <h2 className="font-cinzel text-base font-bold text-[#1C1917]">
-                  <PlayerNameLink name={collectingFor.name} cricHeroesUrl={collectingFor.cricheroes_url} />
+                  <PlayerNameLink name={collectingFor.name} playerId={collectingFor.id} cricHeroesUrl={collectingFor.cricheroes_url} />
                 </h2>
                 {collectingFor.primary_skill && (
                   <p className="font-rajdhani text-xs text-stone-400">{collectingFor.primary_skill}</p>
