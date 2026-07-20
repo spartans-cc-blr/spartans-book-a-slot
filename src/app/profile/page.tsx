@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { SiteNav } from '@/components/ui/SiteNav'
 import type { PlayerStatsTotals } from '@/types'
 
@@ -381,6 +382,12 @@ export default function ProfilePage() {
             </span>
           )}
         </div>
+        {profile?.cricheroes_url && (
+          <a href={profile.cricheroes_url} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 font-rajdhani text-xs text-zinc-500 hover:text-gold underline decoration-dotted underline-offset-2 transition-colors mt-2">
+            View on CricHeroes ↗
+          </a>
+        )}
       </div>
 
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
@@ -390,11 +397,13 @@ export default function ProfilePage() {
           <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">Profile Photo</h2>
           <div className="flex items-center gap-5">
             <div className="relative flex-shrink-0">
-              <img
-                src={photoPreview ?? '/default-avatar.png'}
-                alt={profile?.name ?? ''}
-                className="w-20 h-20 rounded-full object-cover border-2 border-gold-dim"
-              />
+              <Link href={player?.playerId ? `/players/${player.playerId}/stats` : '#'}>
+                <img
+                  src={photoPreview ?? '/default-avatar.png'}
+                  alt={profile?.name ?? ''}
+                  className="w-20 h-20 rounded-full object-cover border-2 border-gold-dim"
+                />
+              </Link>
               {photoFile && (
                 <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-gold rounded-full flex items-center justify-center text-ink text-xs font-bold">
                   ✓
@@ -456,7 +465,15 @@ export default function ProfilePage() {
 
         {/* ── MY STATS ── */}
         <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">My Stats</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-cinzel text-sm text-gold font-semibold">My Stats</h2>
+            {player?.playerId && (
+              <Link href={`/players/${player.playerId}/stats`}
+                className="font-rajdhani text-xs text-zinc-500 hover:text-gold transition-colors">
+                Full stats →
+              </Link>
+            )}
+          </div>
           {!stats || stats.career.matches === 0 ? (
             <p className="font-rajdhani text-sm text-zinc-500">No stats yet.</p>
           ) : (

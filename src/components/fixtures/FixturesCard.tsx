@@ -453,7 +453,15 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
                     fontSize: '11px', color: '#D1D5DB', padding: '3px 0',
                   }}>
                     <span style={{ flex: 1 }}>
-                      {p.cricheroes_url ? (
+                      {p.id ? (
+                        <a
+                          href={`/players/${p.id}/stats`}
+                          onClick={e => e.stopPropagation()}
+                          style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: '#C9A84C55' }}
+                        >
+                          {p.name}
+                        </a>
+                      ) : p.cricheroes_url ? (
                         <a
                           href={p.cricheroes_url}
                           target="_blank"

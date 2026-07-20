@@ -25,7 +25,7 @@ interface Booking {
     total_league_games: number | null
     cricheroes_points_table_url: string | null
     captain_id: string | null
-    captains: { id: string; name: string } | null
+    captains: { id: string; name: string; player_id: string | null } | null
   } | null
 }
 
@@ -33,7 +33,7 @@ interface Captain { id: string; name: string }
 
 interface TournamentPlayer { id: string; name: string; cricheroes_url: string | null }
 
-interface SquadCaptain { name: string; cricheroes_url: string | null }
+interface SquadCaptain { id: string; name: string; cricheroes_url: string | null }
 
 interface ViewerRole {
   isCaptain: boolean
@@ -735,7 +735,7 @@ function TournamentBlock({
               )}
             </div>
             <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
-              {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} className="text-blue-700" /> &nbsp;·&nbsp;</>}
+              {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} playerId={tournament.captains.player_id} className="text-blue-700" /> &nbsp;·&nbsp;</>}
               Avg gap: <span className="text-ink font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
             </p>
             <div className="flex gap-1.5 flex-wrap mt-2">
@@ -864,7 +864,7 @@ function TournamentBlock({
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                   {players.map(p => (
                     <span key={p.id} className="text-xs text-stone-700 truncate">
-                      <PlayerNameLink name={p.name} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                      <PlayerNameLink name={p.name} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
                     </span>
                   ))}
                 </div>
@@ -974,7 +974,7 @@ function MatchTabsSection({
                       <p className="text-xs text-stone-500 mt-0.5">
                         {showFormatOnRow && <>{g.format} · </>}Captain{' '}
                         {captain
-                          ? <PlayerNameLink name={captain.name} cricHeroesUrl={captain.cricheroes_url} className="text-blue-700" />
+                          ? <PlayerNameLink name={captain.name} playerId={captain.id} cricHeroesUrl={captain.cricheroes_url} className="text-blue-700" />
                           : 'Unassigned'}
                       </p>
                     </div>

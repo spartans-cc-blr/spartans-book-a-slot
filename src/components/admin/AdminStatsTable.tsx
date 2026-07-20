@@ -130,7 +130,7 @@ export function AdminStatsTable({ rows, category }: { rows: LeaderboardRow[]; ca
                 <tr key={row.playerId} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
                   <td className="px-4 py-3 font-cinzel text-sm text-zinc-500">{i + 1}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-parchment">
-                    <PlayerNameLink name={row.playerName} cricHeroesUrl={row.cricheroesUrl} />
+                    <PlayerNameLink name={row.playerName} playerId={row.playerId} cricHeroesUrl={row.cricheroesUrl} />
                   </td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.matches}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.runs}</td>

@@ -776,6 +776,7 @@ function SquadPanel({
               <div className="flex items-center gap-2 min-w-0">
                 <PlayerNameLink
                   name={p.player_name}
+                  playerId={p.player_id}
                   cricHeroesUrl={p.cricheroes_url}
                   className="font-rajdhani text-sm text-zinc-300 truncate"
                 />
