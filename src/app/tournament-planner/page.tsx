@@ -4,7 +4,9 @@ import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { TournamentPlannerClient } from '@/components/tournament-planner/TournamentPlannerClient'
+import { getLeaderboard } from '@/lib/playerStats'
 import type { Metadata } from 'next'
+import type { PlayerStatsTotals } from '@/types'
 
 export const metadata: Metadata = { title: 'Tournament Planner — Spartans CC' }
 export const revalidate = 0
@@ -56,6 +58,7 @@ export default async function TournamentPlannerPage() {
     slot_time: string
     format: string | null
     cricheroes_url: string | null
+    match_id: string | null
     match_result: string | null
     tournament: {
       id: string
@@ -90,6 +93,7 @@ export default async function TournamentPlannerPage() {
   // feeds the captain badge on upcoming/today's fixtures, not just past ones.
   const bookingToTournamentId = new Map(bookings.map(b => [b.id, b.tournament?.id ?? null]))
   const pastBookingIds = new Set(bookings.filter(b => b.game_date < today).map(b => b.id))
+
   const tournamentPlayersMap: Record<string, { id: string; name: string; cricheroes_url: string | null }[]> = {}
   const bookingCaptainMap: Record<string, { id: string; name: string; cricheroes_url: string | null }> = {}
   for (const row of (squads ?? []) as any[]) {
@@ -106,6 +110,21 @@ export default async function TournamentPlannerPage() {
   }
   for (const list of Object.values(tournamentPlayersMap)) {
     list.sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  // Per-tournament player stats board — aggregated purely from THIS
+  // tournament's own synced matches via getLeaderboard({ tournamentId }),
+  // never career-wide analytics. Keyed by real Hub player_id (reconciled —
+  // see src/lib/playerIdentityResolution.ts), so a player represented in the
+  // squad above with no reconciled match for this tournament simply has no
+  // entry and the UI shows "No stats synced" instead of a zero row.
+  const tournamentIdsWithPlayers = Object.keys(tournamentPlayersMap)
+  const leaderboardsByTournament = await Promise.all(
+    tournamentIdsWithPlayers.map(async tid => [tid, await getLeaderboard({ tournamentId: tid })] as const)
+  )
+  const tournamentStatsMap: Record<string, Record<string, PlayerStatsTotals>> = {}
+  for (const [tid, rows] of leaderboardsByTournament) {
+    tournamentStatsMap[tid] = Object.fromEntries(rows.map(r => [r.playerId, r.stats]))
   }
 
   // 3. All active captains
@@ -145,6 +164,7 @@ export default async function TournamentPlannerPage() {
           captains={captains ?? []}
           today={today}
           tournamentPlayersMap={tournamentPlayersMap}
+          tournamentStatsMap={tournamentStatsMap}
           bookingCaptainMap={bookingCaptainMap}
           viewerRole={{
             isCaptain: !!user?.isCaptain,

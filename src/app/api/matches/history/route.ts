@@ -4,13 +4,17 @@
 // public. Reads still go through the service-role client (consistent with
 // the rest of the app — no client-side Supabase reads).
 //
-// Keyset (cursor) pagination ordered by (game_date desc, id desc) — chosen
-// over month-based paging because the "I Played" / "I Led" / tournament /
-// venue / format filters below can shrink the result set to a handful of
-// matches spread across years, which month-by-month browsing would make
-// tedious. `cursor` is `${game_date}_${booking_id}` of the last row already
-// seen; strictly validated before use since it's interpolated into a raw
-// PostgREST `.or()` filter string.
+// Keyset (cursor) pagination ordered by (game_date desc, slot_time desc, id
+// desc) — the latest game played (not just the latest date; a date can have
+// up to 3 slots) sits on top. Chosen over month-based paging because the
+// "I Played" / "I Led" / tournament / venue / format / result filters below
+// can shrink the result set to a handful of matches spread across years,
+// which month-by-month browsing would make tedious. `cursor` is
+// `${game_date}_${slot_time}_${booking_id}` of the last row already seen;
+// strictly validated before use since it's interpolated into a raw
+// PostgREST `.or()` filter string. `slot_time` is a Postgres enum whose
+// declared order (07:30 < 10:30 < 12:30 < 14:30) already matches
+// chronological order, so `.lt()`/`.eq()` on it behave correctly.
 //
 // Query params:
 //   cursor        — opaque pagination cursor from a previous response
@@ -18,6 +22,9 @@
 //   tournament_id — exact match
 //   venue         — exact match on bookings.venue (free-text ground/venue)
 //   format        — 'T20' | 'T30'
+//   result        — 'WON' | 'LOST' (whatever match_stats_cache.match_result
+//                   values actually exist) — requires a synced scorecard;
+//                   matches with no synced result are excluded when this is set
 //   mine=1        — only matches where the signed-in player is in the squad
 //   led=1         — only matches where the signed-in player was squad-level
 //                   captain or vice-captain (squad.is_captain / squad.is_vc —
@@ -35,7 +42,7 @@ import { createServiceClient } from '@/lib/supabase'
 
 const DEFAULT_LIMIT = 15
 const MAX_LIMIT = 50
-const CURSOR_RE = /^(\d{4}-\d{2}-\d{2})_([0-9a-fA-F-]{36})$/
+const CURSOR_RE = /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2})_([0-9a-fA-F-]{36})$/
 const MONTH_RE  = /^(\d{4})-(\d{2})$/
 
 function nextMonthStr(month: string): string {
@@ -114,6 +121,7 @@ export async function GET(req: NextRequest) {
   const tournamentId = params.get('tournament_id') || null
   const venue        = params.get('venue') || null
   const format       = params.get('format') || null
+  const result       = params.get('result') || null
   const mine         = params.get('mine') === '1'
   const led          = params.get('led') === '1'
   const cursor       = params.get('cursor') || null
@@ -121,9 +129,10 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // "I Played" / "I Led" narrow the result set to specific booking IDs via
-  // the squad table, looked up for the signed-in player only — never a
-  // client-supplied player_id.
+  // "I Played" / "I Led" / "result" all narrow the result set to specific
+  // booking IDs via a separate table lookup rather than a join on the main
+  // query — mirrors the existing mine/led pattern. When more than one of
+  // these is active, intersect rather than overwrite.
   let restrictToBookingIds: string[] | null = null
   if (mine || led) {
     if (!user?.playerId) return NextResponse.json({ matches: [], nextCursor: null, totalCount: 0 })
@@ -132,6 +141,20 @@ export async function GET(req: NextRequest) {
     const { data: squadRows, error: squadErr } = await squadQuery
     if (squadErr) return NextResponse.json({ error: squadErr.message }, { status: 500 })
     restrictToBookingIds = Array.from(new Set((squadRows ?? []).map(r => r.booking_id)))
+    if (restrictToBookingIds.length === 0) return NextResponse.json({ matches: [], nextCursor: null, totalCount: 0 })
+  }
+
+  if (result) {
+    const { data: resultRows, error: resultErr } = await supabase
+      .from('match_stats_cache')
+      .select('booking_id')
+      .eq('match_result', result)
+      .not('booking_id', 'is', null)
+    if (resultErr) return NextResponse.json({ error: resultErr.message }, { status: 500 })
+    const resultBookingIds = new Set((resultRows ?? []).map((r: any) => r.booking_id))
+    restrictToBookingIds = restrictToBookingIds
+      ? restrictToBookingIds.filter(id => resultBookingIds.has(id))
+      : Array.from(resultBookingIds)
     if (restrictToBookingIds.length === 0) return NextResponse.json({ matches: [], nextCursor: null, totalCount: 0 })
   }
 
@@ -164,6 +187,7 @@ export async function GET(req: NextRequest) {
       .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, venue, cricheroes_url, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))')
   )
     .order('game_date', { ascending: false })
+    .order('slot_time', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit)
 
@@ -171,8 +195,12 @@ export async function GET(req: NextRequest) {
   // into a raw filter string, so it must match this exact shape first.
   const cursorMatch = cursor?.match(CURSOR_RE)
   if (cursorMatch) {
-    const [, cursorDate, cursorId] = cursorMatch
-    query = query.or(`game_date.lt.${cursorDate},and(game_date.eq.${cursorDate},id.lt.${cursorId})`)
+    const [, cursorDate, cursorSlot, cursorId] = cursorMatch
+    query = query.or(
+      `game_date.lt.${cursorDate},` +
+      `and(game_date.eq.${cursorDate},slot_time.lt.${cursorSlot}),` +
+      `and(game_date.eq.${cursorDate},slot_time.eq.${cursorSlot},id.lt.${cursorId})`
+    )
   }
 
   const { data, error } = await query
@@ -240,7 +268,9 @@ export async function GET(req: NextRequest) {
   })
 
   const last = matches[matches.length - 1]
-  const nextCursor = matches.length === limit && last ? `${last.game_date}_${last.booking_id}` : null
+  const nextCursor = matches.length === limit && last
+    ? `${last.game_date}_${last.slot_time}_${last.booking_id}`
+    : null
 
   return NextResponse.json({ matches, nextCursor, totalCount: totalCount ?? 0 })
 }

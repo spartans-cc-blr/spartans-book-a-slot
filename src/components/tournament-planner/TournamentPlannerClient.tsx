@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { TournamentShareButton, WA_ICON } from './TournamentShareButton'
 import { ResultBadge } from '@/components/shared/ResultBadge'
+import type { PlayerStatsTotals } from '@/types'
 
 // ── Types ──────────────────────────────────────────────────────────
 interface Booking {
@@ -49,6 +50,10 @@ interface Props {
   today: string
   viewerRole: ViewerRole
   tournamentPlayersMap: Record<string, TournamentPlayer[]>
+  // Keyed by real Hub player_id (reconciled — see src/lib/playerIdentityResolution.ts),
+  // scoped purely to this tournament's own matches via getLeaderboard({ tournamentId }).
+  // Never career-wide stats.
+  tournamentStatsMap: Record<string, Record<string, PlayerStatsTotals>>
   bookingCaptainMap: Record<string, SquadCaptain>
 }
 
@@ -84,6 +89,41 @@ function staggerRows(pcts: number[], thresholdPct: number): number[] {
     lastPct = pct
     return row
   })
+}
+
+// Same helper as CaptainsCornerGrid.tsx's ContextStatsTable — null stats render
+// as a dash rather than a misleading zero.
+function statCell(v: number | null | undefined): { text: string; dash: boolean } {
+  return v == null ? { text: '—', dash: true } : { text: String(v), dash: false }
+}
+
+// Same rolled-up figure as LeaderboardTable.tsx's fielding/MVP "Dismissals"
+// column — catches, run outs, and stumpings are all fielding dismissals.
+function dismissals(s: PlayerStatsTotals): number {
+  return s.catches + s.runOuts + s.stumpings
+}
+
+// Player Stats board column config — single source of truth for both the
+// sortable header row and each player row's cell order.
+type StatsSortKey = 'name' | 'matches' | 'runs' | 'battingAverage' | 'strikeRate' | 'wickets' | 'economy' | 'dismissals'
+const STAT_COLUMNS: { key: Exclude<StatsSortKey, 'name'>; label: string; value: (s: PlayerStatsTotals) => number | null }[] = [
+  { key: 'matches',        label: 'M',    value: s => s.matches },
+  { key: 'runs',           label: 'R',    value: s => s.runs },
+  { key: 'battingAverage', label: 'Avg',  value: s => s.battingAverage },
+  { key: 'strikeRate',     label: 'SR',   value: s => s.strikeRate },
+  { key: 'wickets',        label: 'Wk',   value: s => s.wickets },
+  { key: 'economy',        label: 'Econ', value: s => s.economy },
+  { key: 'dismissals',     label: 'Dis',  value: dismissals },
+]
+
+// Same abbreviation CaptainsCornerGrid.tsx's MatrixView uses for its mobile
+// column headers ("First L.") — keeps the name column narrow enough that a
+// right-aligned M/R/Avg/SR/Wk/Econ/Ct row fits a portrait phone width
+// without horizontal scroll.
+function mobileMatrixName(name: string): string {
+  const parts = name.trim().split(' ').filter(Boolean)
+  if (parts.length === 1) return parts[0]
+  return parts[0] + ' ' + parts[parts.length - 1][0] + '.'
 }
 
 function scrollToTournament(tournamentId: string) {
@@ -634,7 +674,7 @@ function GameTimelineCard({ sortedGames, gaps, avgGap }: {
 
 // ── Tournament block ───────────────────────────────────────────────
 function TournamentBlock({
-  tournament, games, announcedSet, today, isAdmin, isGC, players, bookingCaptainMap, forceOpenToken,
+  tournament, games, announcedSet, today, isAdmin, isGC, players, stats, bookingCaptainMap, forceOpenToken,
 }: {
   tournament: NonNullable<Booking['tournament']>
   games: Booking[]
@@ -643,11 +683,25 @@ function TournamentBlock({
   isAdmin: boolean
   isGC: boolean
   players: TournamentPlayer[]
+  stats: Record<string, PlayerStatsTotals>
   bookingCaptainMap: Record<string, SquadCaptain>
   forceOpenToken?: number
 }) {
   const [open, setOpen]               = useState(false)
   const [playersOpen, setPlayersOpen] = useState(false)
+  const [statsSortKey, setStatsSortKey] = useState<StatsSortKey>('name')
+  const [statsSortDir, setStatsSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleStatsSort(key: StatsSortKey) {
+    if (key === statsSortKey) {
+      setStatsSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setStatsSortKey(key)
+      // Name defaults A→Z; every numeric column defaults highest-first —
+      // that's the direction someone clicking a stat header actually wants.
+      setStatsSortDir(key === 'name' ? 'asc' : 'desc')
+    }
+  }
 
   // A "view" click from the Captain Bandwidth cards bumps forceOpenToken —
   // expand this block even if the viewer had previously collapsed it manually
@@ -692,6 +746,23 @@ function TournamentBlock({
     new Set(games.map(g => g.format).filter((f): f is string => !!f))
   )
   const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
+
+  // Players with no synced stats always sort to the bottom, regardless of
+  // direction or column — "No stats synced" isn't a value on any stat's
+  // scale, so it shouldn't jump to the top under a descending numeric sort.
+  const sortedPlayers = [...players].sort((a, b) => {
+    const factor = statsSortDir === 'asc' ? 1 : -1
+    if (statsSortKey === 'name') return factor * a.name.localeCompare(b.name)
+    const aStat = stats[a.id] ?? null
+    const bStat = stats[b.id] ?? null
+    if (!aStat && !bStat) return a.name.localeCompare(b.name)
+    if (!aStat) return 1
+    if (!bStat) return -1
+    const col = STAT_COLUMNS.find(c => c.key === statsSortKey)!
+    const aVal = col.value(aStat) ?? -Infinity
+    const bVal = col.value(bStat) ?? -Infinity
+    return factor * (aVal - bVal) || a.name.localeCompare(b.name)
+  })
 
   return (
     <div id={`tournament-block-${tournament.id}`} className="bg-white border border-parchment-3 rounded-2xl mb-4 overflow-hidden scroll-mt-24">
@@ -850,23 +921,80 @@ function TournamentBlock({
             gamesLength={games.length}
           />
 
-          {/* Players represented — collapsible, sourced from announced squads */}
+          {/* Player Stats — collapsible, sourced from announced squads.
+              Stats are aggregated purely from THIS tournament's own synced
+              matches via getLeaderboard({ tournamentId }) — never
+              career-wide analytics. Same M/R/Avg/SR/Wk/Econ/Ct column
+              schema as Captains Corner's tap-to-expand "📊 Form" panel
+              (ContextStatsTable in CaptainsCornerGrid.tsx), but recoloured
+              into this page's warm-light theme instead of that panel's navy
+              card. A player can be represented here (they were in an
+              announced squad) but still show "No stats synced" if none of
+              their matches in this tournament have a scorecard reconciled
+              yet — those rows always sort to the bottom. */}
           <div className="px-4 py-4 border-t border-parchment-3 mt-2">
             <button
               onClick={() => setPlayersOpen(v => !v)}
               className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-stone-500 mb-2 w-full text-left"
             >
               <span>{playersOpen ? '▲' : '▶'}</span>
-              <span>Players represented — {players.length}</span>
+              <span>Player Stats — {players.length}</span>
             </button>
             {playersOpen && (
               players.length > 0 ? (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                  {players.map(p => (
-                    <span key={p.id} className="text-xs text-stone-700 truncate">
-                      <PlayerNameLink name={p.name} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
-                    </span>
-                  ))}
+                <div className="rounded-lg border border-parchment-3 bg-white overflow-x-auto">
+                  <table className="w-full" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    <thead>
+                      <tr className="border-b border-parchment-3">
+                        <th
+                          onClick={() => handleStatsSort('name')}
+                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pl-3 pr-2 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
+                        >
+                          Player{statsSortKey === 'name' && (statsSortDir === 'asc' ? ' ▲' : ' ▼')}
+                        </th>
+                        {STAT_COLUMNS.map(col => (
+                          <th
+                            key={col.key}
+                            onClick={() => handleStatsSort(col.key)}
+                            className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pr-2 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
+                          >
+                            {col.label}{statsSortKey === col.key && (statsSortDir === 'asc' ? ' ▲' : ' ▼')}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedPlayers.map(p => {
+                        const stat = stats[p.id] ?? null
+                        return (
+                          <tr key={p.id} className="border-t border-parchment-3 first:border-t-0">
+                            <td className="font-rajdhani text-[11px] font-semibold text-ink text-right pl-3 pr-2 py-1.5 whitespace-nowrap">
+                              <span className="hidden sm:inline">
+                                <PlayerNameLink name={p.name} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                              </span>
+                              <span className="sm:hidden">
+                                <PlayerNameLink name={mobileMatrixName(p.name)} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                              </span>
+                            </td>
+                            {stat == null ? (
+                              <td colSpan={STAT_COLUMNS.length} className="text-[10.5px] italic text-stone-400 pr-2 py-1.5 text-right">No stats synced</td>
+                            ) : (
+                              STAT_COLUMNS.map(col => {
+                                const display = statCell(col.value(stat)).text
+                                return (
+                                  <td key={col.key} className={`font-cinzel text-[11.5px] font-bold text-right pr-2 py-1.5 ${
+                                    display === '—' ? 'text-stone-400' : 'text-ink'
+                                  }`}>
+                                    {display}
+                                  </td>
+                                )
+                              })
+                            )}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               ) : (
                 <p className="text-xs text-stone-500">No announced squads yet for this tournament.</p>
@@ -1238,7 +1366,7 @@ function SlotBalanceByDay({
 
 // ── Root client component ──────────────────────────────────────────
 export function TournamentPlannerClient({
-  bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, bookingCaptainMap,
+  bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, tournamentStatsMap, bookingCaptainMap,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
   const [showUpcoming,  setShowUpcoming]  = useState(true)
@@ -1267,7 +1395,10 @@ export function TournamentPlannerClient({
     return map
   }, [bookings])
 
-  const sortedTournaments = useMemo(() =>
+  // Classified + sorted independent of the show/hide filters, so the filter
+  // cards below can display a true count per bucket regardless of which
+  // buckets are currently shown.
+  const classifiedTournaments = useMemo(() =>
     Array.from(tournamentMap.values())
       .map(({ tournament, games }) => {
         const totalLeague    = tournament.total_league_games ?? games.length
@@ -1292,14 +1423,24 @@ export function TournamentPlannerClient({
 
         return { tournament, games, isCompleted, isUpcoming, isOngoing, priorityRank }
       })
-      .filter(t => {
-        if (t.isCompleted) return showCompleted
-        if (t.isUpcoming)  return showUpcoming
-        if (t.isOngoing)   return showOngoing
-        return true
-      })
       .sort((a, b) => a.priorityRank - b.priorityRank || b.games.length - a.games.length),
-    [tournamentMap, today, showUpcoming, showOngoing, showCompleted]
+    [tournamentMap, today]
+  )
+
+  const tournamentCounts = useMemo(() => ({
+    upcoming:  classifiedTournaments.filter(t => t.isUpcoming).length,
+    ongoing:   classifiedTournaments.filter(t => t.isOngoing).length,
+    completed: classifiedTournaments.filter(t => t.isCompleted).length,
+  }), [classifiedTournaments])
+
+  const sortedTournaments = useMemo(() =>
+    classifiedTournaments.filter(t => {
+      if (t.isCompleted) return showCompleted
+      if (t.isUpcoming)  return showUpcoming
+      if (t.isOngoing)   return showOngoing
+      return true
+    }),
+    [classifiedTournaments, showUpcoming, showOngoing, showCompleted]
   )
 
   const isCaptainView    = viewerRole.isCaptain && !!viewerRole.captainId
@@ -1321,22 +1462,45 @@ export function TournamentPlannerClient({
         onViewTournament={handleViewTournament}
       />
 
-      {/* Tournament filter */}
-      <div className="flex items-center gap-5 mb-5 flex-wrap">
+      {/* Tournament filter — same stat-card look as the Upcoming/Unbooked
+          cards on each captain's bandwidth card above, rather than plain
+          checkboxes. Each card still toggles show/hide for its bucket —
+          same behaviour as before, just card-styled. */}
+      <div className="flex items-center gap-3 mb-5 flex-wrap">
         <span className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500">Show:</span>
-        {([
-          { label: 'Upcoming',  checked: showUpcoming,  set: setShowUpcoming  },
-          { label: 'Ongoing',   checked: showOngoing,   set: setShowOngoing   },
-          { label: 'Completed', checked: showCompleted, set: setShowCompleted },
-        ]).map(({ label, checked, set }) => (
-          <label key={label} className="flex items-center gap-2 cursor-pointer group">
-            <input type="checkbox" checked={checked} onChange={e => set(e.target.checked)}
-              className="accent-gold w-3.5 h-3.5 cursor-pointer" />
-            <span className={`font-rajdhani text-xs font-semibold tracking-wide transition-colors ${
-              checked ? 'text-ink' : 'text-stone-500'
-            }`}>{label}</span>
-          </label>
-        ))}
+        <button type="button" onClick={() => setShowUpcoming(v => !v)}
+          className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
+            showUpcoming ? 'bg-amber-50 border-amber-200' : 'bg-parchment-2 border-parchment-3 opacity-50 hover:opacity-75'
+          }`}>
+          <p className={`font-cinzel text-lg font-bold leading-tight ${showUpcoming ? 'text-amber-700' : 'text-stone-500'}`}>
+            {tournamentCounts.upcoming}
+          </p>
+          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showUpcoming ? 'text-amber-700' : 'text-stone-500'}`}>
+            Upcoming
+          </p>
+        </button>
+        <button type="button" onClick={() => setShowOngoing(v => !v)}
+          className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
+            showOngoing ? 'bg-emerald-50 border-emerald-200' : 'bg-parchment-2 border-parchment-3 opacity-50 hover:opacity-75'
+          }`}>
+          <p className={`font-cinzel text-lg font-bold leading-tight ${showOngoing ? 'text-emerald-700' : 'text-stone-500'}`}>
+            {tournamentCounts.ongoing}
+          </p>
+          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showOngoing ? 'text-emerald-700' : 'text-stone-500'}`}>
+            Ongoing
+          </p>
+        </button>
+        <button type="button" onClick={() => setShowCompleted(v => !v)}
+          className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
+            showCompleted ? 'bg-parchment-3 border-stone-300' : 'bg-parchment-2 border-parchment-3 opacity-50 hover:opacity-75'
+          }`}>
+          <p className={`font-cinzel text-lg font-bold leading-tight ${showCompleted ? 'text-stone-700' : 'text-stone-500'}`}>
+            {tournamentCounts.completed}
+          </p>
+          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showCompleted ? 'text-stone-700' : 'text-stone-500'}`}>
+            Completed
+          </p>
+        </button>
       </div>
 
       <section>
@@ -1362,6 +1526,7 @@ export function TournamentPlannerClient({
                     announcedSet={announcedSet} today={today}
                     isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC}
                     players={tournamentPlayersMap[tournament.id] ?? []}
+                    stats={tournamentStatsMap[tournament.id] ?? {}}
                     bookingCaptainMap={bookingCaptainMap}
                     forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
                 ))}
@@ -1375,6 +1540,7 @@ export function TournamentPlannerClient({
                 announcedSet={announcedSet} today={today}
                 isAdmin={viewerRole.isAdmin} isGC={viewerRole.isGC}
                 players={tournamentPlayersMap[tournament.id] ?? []}
+                stats={tournamentStatsMap[tournament.id] ?? {}}
                 bookingCaptainMap={bookingCaptainMap}
                 forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
             ))}

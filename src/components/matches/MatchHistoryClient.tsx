@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { ScorecardUploadButton, type ScorecardStatus } from '@/components/matches/ScorecardUploadButton'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
+import { ResultBadge } from '@/components/shared/ResultBadge'
 
 type BallType = 'red' | 'white' | 'pink'
 
@@ -52,6 +53,7 @@ interface FilterOptions {
   venues:      string[]
   formats:     string[]
   months:      string[]
+  results:     string[]
 }
 
 interface SquadPlayer {
@@ -184,19 +186,14 @@ function MapPinIcon({ size = 18 }: { size?: number }) {
   )
 }
 
-// Result is the headline of a completed match — it should read as the most
-// prominent thing on the card, more so than a passive "stats synced"
-// bookkeeping note. A win gets the celebratory solid-fill pill; anything
-// else (loss, tie, no result) is stated plainly in colour, no pill — the
-// pill reads as an achievement badge, so putting one on a loss made losses
-// look as "highlighted" as wins, which is exactly backwards.
-function resultBadgeStyle(result: string | null): { pill: boolean; bg: string; color: string; label: string } {
-  const r = (result ?? '').toLowerCase()
-  if (r.includes('win'))  return { pill: true,  bg: '#059669', color: '#FFFFFF', label: 'WON' }
-  if (r.includes('los'))  return { pill: false, bg: '',        color: '#F87171', label: 'LOST' }
-  if (r.includes('tie'))  return { pill: false, bg: '',        color: '#FBBF24', label: 'TIED' }
-  return { pill: false, bg: '', color: '#94A3B8', label: (result ?? 'NO RESULT').toUpperCase() }
-}
+// Result rendering itself now comes from the shared <ResultBadge> (same
+// component TournamentPlannerClient and TournamentShareCard use) instead of
+// a local duplicate — that duplicate is exactly the kind of drift
+// ResultBadge's own doc comment was written to prevent: this card's pill
+// used a bigger, squared-off shape (padding 4px 12px, borderRadius 6px) with
+// no border, while the shared one is a proper small rounded-full pill
+// (text-[10px], px-2 py-0.5) — same colours, different shape, so the two
+// surfaces didn't actually match.
 
 // Passive, read-only checkpoints in the scorecard_uploads lifecycle — shown
 // as a small icon + caption alongside CricHeroes/Ground, not as a standalone
@@ -233,12 +230,13 @@ export function MatchHistoryClient({
   viewerPlayerId: string | null
 }) {
   const [roleFilter, setRoleFilter]     = useState<RoleFilter>('all')
+  const [resultFilter, setResultFilter] = useState('')
   const [monthFilter, setMonthFilter]   = useState('')
   const [tournamentId, setTournamentId] = useState('')
   const [venue, setVenue]               = useState('')
   const [format, setFormat]             = useState('')
 
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ tournaments: [], venues: [], months: [], formats: ['T20', 'T30'] })
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ tournaments: [], venues: [], months: [], results: [], formats: ['T20', 'T30'] })
 
   const [matches, setMatches]         = useState<MatchSummary[]>([])
   const [nextCursor, setNextCursor]   = useState<string | null>(null)
@@ -259,6 +257,7 @@ export function MatchHistoryClient({
     if (cursor) p.set('cursor', cursor)
     if (roleFilter === 'played') p.set('mine', '1')
     if (roleFilter === 'led')    p.set('led', '1')
+    if (resultFilter) p.set('result', resultFilter)
     if (monthFilter)  p.set('month', monthFilter)
     if (tournamentId) p.set('tournament_id', tournamentId)
     if (venue)        p.set('venue', venue)
@@ -284,7 +283,7 @@ export function MatchHistoryClient({
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFilter, monthFilter, tournamentId, venue, format])
+  }, [roleFilter, resultFilter, monthFilter, tournamentId, venue, format])
 
   async function loadMore() {
     if (!nextCursor) return
@@ -302,16 +301,38 @@ export function MatchHistoryClient({
     }
   }
 
-  const hasActiveFilters = roleFilter !== 'all' || !!monthFilter || !!tournamentId || !!venue || !!format
+  const hasActiveFilters = roleFilter !== 'all' || !!resultFilter || !!monthFilter || !!tournamentId || !!venue || !!format
 
   function clearFilters() {
-    setRoleFilter('all'); setMonthFilter(''); setTournamentId(''); setVenue(''); setFormat('')
+    setRoleFilter('all'); setResultFilter(''); setMonthFilter(''); setTournamentId(''); setVenue(''); setFormat('')
   }
 
   return (
     <div className="space-y-4">
       {/* Filter bar — stacks on mobile, single row from sm up */}
       <div className="bg-ink-3 border border-ink-5 rounded px-4 py-3 space-y-3">
+        {/* Won/Lost — top of the filter bar, per request */}
+        {filterOptions.results.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {filterOptions.results.map(r => (
+              <button
+                key={r}
+                onClick={() => setResultFilter(prev => prev === r ? '' : r)}
+                className={`font-rajdhani text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full border transition-colors ${
+                  resultFilter === r
+                    ? r === 'WON'
+                      ? 'bg-emerald-900/40 border-emerald-700 text-emerald-400'
+                      : r === 'LOST'
+                        ? 'bg-crimson/20 border-red-800 text-red-400'
+                        : 'bg-gold/20 border-gold-dim text-gold'
+                    : 'bg-ink-4 border-ink-5 text-zinc-500 hover:text-zinc-300'
+                }`}>
+                {r === 'WON' ? 'Won' : r === 'LOST' ? 'Lost' : r}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Month chip strip — horizontally scrollable, independent of every
             other filter below (an AND'd param, not a replacement for them) */}
         {filterOptions.months.length > 0 && (
@@ -562,16 +583,10 @@ function MatchHistoryCard({
       {/* Result strip — only once stats have been synced. This is the
           headline of a completed match, so it gets the bordered/prominent
           treatment — a passive "stats synced" note should never outshine it. */}
-      {match.stats && (() => {
-        const badge = resultBadgeStyle(match.stats.match_result)
-        return (
+      {match.stats && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={badge.pill
-                ? { background: badge.bg, color: badge.color, fontSize: '13px', fontWeight: 800, padding: '4px 12px', borderRadius: '6px', letterSpacing: '0.06em' }
-                : { color: badge.color, fontSize: '13px', fontWeight: 800, letterSpacing: '0.06em' }}>
-                {badge.label}
-              </span>
+              {match.stats.match_result && <ResultBadge result={match.stats.match_result} />}
               <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{scoreLine(match.stats)}</span>
             </div>
             {(match.stats.top_bat || match.stats.top_bowl) && (
@@ -588,8 +603,7 @@ function MatchHistoryCard({
               </div>
             )}
           </div>
-        )
-      })()}
+      )}
 
       {/* Only the actionable states render here — no upload yet, or a stuck
           pending_parse needing retry. Once a status is confirmed (parsed,
