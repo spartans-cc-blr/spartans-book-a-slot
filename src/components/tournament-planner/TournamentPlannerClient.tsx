@@ -1395,7 +1395,10 @@ export function TournamentPlannerClient({
     return map
   }, [bookings])
 
-  const sortedTournaments = useMemo(() =>
+  // Classified + sorted independent of the show/hide filters, so the filter
+  // cards below can display a true count per bucket regardless of which
+  // buckets are currently shown.
+  const classifiedTournaments = useMemo(() =>
     Array.from(tournamentMap.values())
       .map(({ tournament, games }) => {
         const totalLeague    = tournament.total_league_games ?? games.length
@@ -1420,14 +1423,24 @@ export function TournamentPlannerClient({
 
         return { tournament, games, isCompleted, isUpcoming, isOngoing, priorityRank }
       })
-      .filter(t => {
-        if (t.isCompleted) return showCompleted
-        if (t.isUpcoming)  return showUpcoming
-        if (t.isOngoing)   return showOngoing
-        return true
-      })
       .sort((a, b) => a.priorityRank - b.priorityRank || b.games.length - a.games.length),
-    [tournamentMap, today, showUpcoming, showOngoing, showCompleted]
+    [tournamentMap, today]
+  )
+
+  const tournamentCounts = useMemo(() => ({
+    upcoming:  classifiedTournaments.filter(t => t.isUpcoming).length,
+    ongoing:   classifiedTournaments.filter(t => t.isOngoing).length,
+    completed: classifiedTournaments.filter(t => t.isCompleted).length,
+  }), [classifiedTournaments])
+
+  const sortedTournaments = useMemo(() =>
+    classifiedTournaments.filter(t => {
+      if (t.isCompleted) return showCompleted
+      if (t.isUpcoming)  return showUpcoming
+      if (t.isOngoing)   return showOngoing
+      return true
+    }),
+    [classifiedTournaments, showUpcoming, showOngoing, showCompleted]
   )
 
   const isCaptainView    = viewerRole.isCaptain && !!viewerRole.captainId
@@ -1449,22 +1462,45 @@ export function TournamentPlannerClient({
         onViewTournament={handleViewTournament}
       />
 
-      {/* Tournament filter */}
-      <div className="flex items-center gap-5 mb-5 flex-wrap">
+      {/* Tournament filter — same stat-card look as the Upcoming/Unbooked
+          cards on each captain's bandwidth card above, rather than plain
+          checkboxes. Each card still toggles show/hide for its bucket —
+          same behaviour as before, just card-styled. */}
+      <div className="flex items-center gap-3 mb-5 flex-wrap">
         <span className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500">Show:</span>
-        {([
-          { label: 'Upcoming',  checked: showUpcoming,  set: setShowUpcoming  },
-          { label: 'Ongoing',   checked: showOngoing,   set: setShowOngoing   },
-          { label: 'Completed', checked: showCompleted, set: setShowCompleted },
-        ]).map(({ label, checked, set }) => (
-          <label key={label} className="flex items-center gap-2 cursor-pointer group">
-            <input type="checkbox" checked={checked} onChange={e => set(e.target.checked)}
-              className="accent-gold w-3.5 h-3.5 cursor-pointer" />
-            <span className={`font-rajdhani text-xs font-semibold tracking-wide transition-colors ${
-              checked ? 'text-ink' : 'text-stone-500'
-            }`}>{label}</span>
-          </label>
-        ))}
+        <button type="button" onClick={() => setShowUpcoming(v => !v)}
+          className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
+            showUpcoming ? 'bg-amber-50 border-amber-200' : 'bg-parchment-2 border-parchment-3 opacity-50 hover:opacity-75'
+          }`}>
+          <p className={`font-cinzel text-lg font-bold leading-tight ${showUpcoming ? 'text-amber-700' : 'text-stone-500'}`}>
+            {tournamentCounts.upcoming}
+          </p>
+          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showUpcoming ? 'text-amber-700' : 'text-stone-500'}`}>
+            Upcoming
+          </p>
+        </button>
+        <button type="button" onClick={() => setShowOngoing(v => !v)}
+          className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
+            showOngoing ? 'bg-emerald-50 border-emerald-200' : 'bg-parchment-2 border-parchment-3 opacity-50 hover:opacity-75'
+          }`}>
+          <p className={`font-cinzel text-lg font-bold leading-tight ${showOngoing ? 'text-emerald-700' : 'text-stone-500'}`}>
+            {tournamentCounts.ongoing}
+          </p>
+          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showOngoing ? 'text-emerald-700' : 'text-stone-500'}`}>
+            Ongoing
+          </p>
+        </button>
+        <button type="button" onClick={() => setShowCompleted(v => !v)}
+          className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
+            showCompleted ? 'bg-parchment-3 border-stone-300' : 'bg-parchment-2 border-parchment-3 opacity-50 hover:opacity-75'
+          }`}>
+          <p className={`font-cinzel text-lg font-bold leading-tight ${showCompleted ? 'text-stone-700' : 'text-stone-500'}`}>
+            {tournamentCounts.completed}
+          </p>
+          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showCompleted ? 'text-stone-700' : 'text-stone-500'}`}>
+            Completed
+          </p>
+        </button>
       </div>
 
       <section>
