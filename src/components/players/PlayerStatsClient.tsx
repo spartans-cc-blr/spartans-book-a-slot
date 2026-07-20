@@ -8,6 +8,8 @@
 // would lengthen those cards.
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
+import { CricketBallIcon } from '@/components/ui/CricketBallIcon'
 import type { PlayerStatsTotals, PlayerMatchHistoryRow } from '@/types'
 
 interface PlayerInfo {
@@ -129,6 +131,13 @@ export function PlayerStatsClient({
               <Stat label="MVP Pts" value={scoped.mvpPoints.toFixed(2)} />
             </div>
           )}
+          {scoped.matches > 0 && (
+            <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-ink-5">
+              <MvpStat label="Batting MVP" value={scoped.battingMvp} color="text-emerald-400" />
+              <MvpStat label="Bowling MVP" value={scoped.bowlingMvp} color="text-blue-400" />
+              <MvpStat label="Fielding MVP" value={scoped.fieldingMvp} color="text-purple-400" />
+            </div>
+          )}
         </div>
 
         {/* Match by match */}
@@ -158,12 +167,22 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
+function MvpStat({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="text-center">
+      <p className="font-rajdhani text-[9px] font-bold tracking-widest uppercase text-zinc-600 mb-0.5">{label}</p>
+      <p className={`font-cinzel text-base font-bold ${color}`}>{value.toFixed(1)}</p>
+    </div>
+  )
+}
+
 function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
   const dateLabel = match.gameDate
     ? new Date(match.gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—'
-  return (
-    <div className="py-3">
+
+  const body = (
+    <>
       <div className="flex items-center justify-between gap-3 mb-1.5">
         <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
           {match.opponentName ? `vs ${match.opponentName}` : match.tournamentName ?? 'Match'}
@@ -180,8 +199,8 @@ function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
           </span>
         )}
         {match.bowling && (
-          <span>
-            🎳 {match.bowling.wickets}/{match.bowling.runsConceded} ({match.bowling.overs}ov
+          <span className="inline-flex items-center gap-1">
+            <CricketBallIcon size={12} /> {match.bowling.wickets}/{match.bowling.runsConceded} ({match.bowling.overs}ov
             {match.bowling.economy != null ? `, Eco ${match.bowling.economy.toFixed(1)}` : ''})
           </span>
         )}
@@ -195,6 +214,15 @@ function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
         )}
         {match.matchResult && <span className="text-zinc-600">{match.matchResult}</span>}
       </div>
-    </div>
+    </>
   )
+
+  if (match.bookingId) {
+    return (
+      <Link href={`/matches/history/${match.bookingId}`} className="block py-3 -mx-2 px-2 rounded hover:bg-ink-4 transition-colors">
+        {body}
+      </Link>
+    )
+  }
+  return <div className="py-3">{body}</div>
 }

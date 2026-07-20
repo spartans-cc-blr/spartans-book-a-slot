@@ -382,12 +382,20 @@ export default function ProfilePage() {
             </span>
           )}
         </div>
-        {profile?.cricheroes_url && (
-          <a href={profile.cricheroes_url} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 font-rajdhani text-xs text-zinc-500 hover:text-gold underline decoration-dotted underline-offset-2 transition-colors mt-2">
-            View on CricHeroes ↗
-          </a>
-        )}
+        <div className="flex items-center flex-wrap gap-3 mt-3">
+          {player?.playerId && (
+            <Link href={`/players/${player.playerId}/stats`}
+              className="inline-flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold hover:text-ink px-3 py-1.5 rounded transition-colors">
+              📊 View Full Stats
+            </Link>
+          )}
+          {profile?.cricheroes_url && (
+            <a href={profile.cricheroes_url} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 font-rajdhani text-xs text-zinc-500 hover:text-gold underline decoration-dotted underline-offset-2 transition-colors">
+              View on CricHeroes ↗
+            </a>
+          )}
+        </div>
       </div>
 
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
@@ -469,8 +477,8 @@ export default function ProfilePage() {
             <h2 className="font-cinzel text-sm text-gold font-semibold">My Stats</h2>
             {player?.playerId && (
               <Link href={`/players/${player.playerId}/stats`}
-                className="font-rajdhani text-xs text-zinc-500 hover:text-gold transition-colors">
-                Full stats →
+                className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold hover:bg-gold hover:text-ink px-3 py-1.5 rounded transition-colors">
+                Full Stats →
               </Link>
             )}
           </div>

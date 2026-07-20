@@ -166,6 +166,9 @@ export interface PlayerStatsTotals {
   runOuts:        number
   stumpings:      number
   mvpPoints:      number
+  battingMvp:     number
+  bowlingMvp:     number
+  fieldingMvp:    number
 }
 
 export interface LeaderboardRow {
@@ -173,6 +176,8 @@ export interface LeaderboardRow {
   playerName:    string
   cricheroesUrl: string | null
   stats:         PlayerStatsTotals
+  centuries:     number
+  halfCenturies: number
 }
 
 export interface RecentForm {
@@ -199,6 +204,7 @@ export interface BookingContextStats {
 // zero-filled placeholder.
 export interface PlayerMatchHistoryRow {
   matchId:        string
+  bookingId:      string | null
   gameDate:       string | null
   format:         string | null
   tournamentName: string | null

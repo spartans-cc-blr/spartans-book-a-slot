@@ -6,6 +6,7 @@ import { getLeaderboard } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { LeaderboardFilters, type LeaderboardCategory } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
+import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Leaderboard — Spartans CC' }
@@ -65,6 +66,8 @@ export default async function LeaderboardPage({
           tournamentId={tournamentId}
           category={category}
         />
+
+        <LeaderboardMilestones rows={rows} />
 
         <LeaderboardTable key={category} rows={rows} category={category} />
       </div>
