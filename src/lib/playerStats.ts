@@ -65,6 +65,7 @@ function emptyTotals(): PlayerStatsTotals {
     battingAverage: null, strikeRate: null, fours: 0, sixes: 0,
     wickets: 0, ballsBowled: 0, oversBowled: '0.0', runsConceded: 0, economy: null,
     catches: 0, runOuts: 0, stumpings: 0, mvpPoints: 0,
+    battingMvp: 0, bowlingMvp: 0, fieldingMvp: 0,
   }
 }
 
@@ -109,11 +110,14 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
 
   // mvp_score is present (and zero) on every row including did_not_bat /
   // never-bowled placeholders, so summing the unfiltered arrays is safe.
-  let mvp = 0
-  for (const r of batting)  mvp += num(r.mvp_score)
-  for (const r of bowling)  mvp += num(r.mvp_score)
-  for (const r of fielding) mvp += num(r.mvp_score)
-  t.mvpPoints = round2(mvp)
+  let battingMvp = 0, bowlingMvp = 0, fieldingMvp = 0
+  for (const r of batting)  battingMvp  += num(r.mvp_score)
+  for (const r of bowling)  bowlingMvp  += num(r.mvp_score)
+  for (const r of fielding) fieldingMvp += num(r.mvp_score)
+  t.battingMvp  = round2(battingMvp)
+  t.bowlingMvp  = round2(bowlingMvp)
+  t.fieldingMvp = round2(fieldingMvp)
+  t.mvpPoints   = round2(battingMvp + bowlingMvp + fieldingMvp)
 
   return t
 }
@@ -220,7 +224,7 @@ export async function getPlayerMatchHistory(
   const hub = createServiceClient()
   const { data: bookingRows, error: bookingErr } = await hub
     .from('bookings')
-    .select('match_id, game_date, format, tournament:tournaments(name)')
+    .select('id, match_id, game_date, format, tournament:tournaments(name)')
     .in('match_id', matchIds)
   if (bookingErr) throw new Error(bookingErr.message)
   const bookingByMatchId = new Map((bookingRows ?? []).map((b: any) => [b.match_id, b]))
@@ -241,6 +245,7 @@ export async function getPlayerMatchHistory(
 
     return {
       matchId,
+      bookingId:       booking?.id ?? null,
       gameDate:        booking?.game_date ?? m?.match_date ?? null,
       format:          booking?.format ?? null,
       tournamentName:  Array.isArray(booking?.tournament) ? booking?.tournament[0]?.name : booking?.tournament?.name ?? m?.tournament_name ?? null,
@@ -299,15 +304,27 @@ export async function getLeaderboard(filters: { year?: number; tournamentId?: st
     if (!player) continue
 
     const matchIds = new Set<string>((teamByPlayer.get(playerId) ?? []).map((r: any) => r.match_id).filter(Boolean))
+    const playerBatting = battingByPlayer.get(playerId) ?? []
     const stats = aggregate(
       matchIds,
-      battingByPlayer.get(playerId)  ?? [],
+      playerBatting,
       bowlingByPlayer.get(playerId)  ?? [],
       fieldingByPlayer.get(playerId) ?? [],
     )
     if (stats.matches === 0) continue
 
-    rows.push({ playerId, playerName: player.name, cricheroesUrl: player.cricheroes_url ?? null, stats })
+    // Innings-level milestones — did_not_bat rows excluded the same way
+    // aggregate() excludes them from runs/balls totals.
+    let centuries = 0
+    let halfCenturies = 0
+    for (const r of playerBatting) {
+      if ((r as any).dismissal_method === 'did_not_bat') continue
+      const runs = num((r as any).runs)
+      if (runs >= 100) centuries++
+      else if (runs >= 50) halfCenturies++
+    }
+
+    rows.push({ playerId, playerName: player.name, cricheroesUrl: player.cricheroes_url ?? null, stats, centuries, halfCenturies })
   }
   return rows
 }
