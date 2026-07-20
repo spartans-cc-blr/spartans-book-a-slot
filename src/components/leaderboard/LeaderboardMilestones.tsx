@@ -15,8 +15,21 @@
 import { PlayerNameLink } from '@/lib/playerLink'
 import type { LeaderboardRow } from '@/types'
 
-const MIN_MATCHES_FOR_RATE = 5
 const MIN_BALLS_FOR_ECONOMY = 30 // 5 overs
+
+// YTD qualification bar: 3 games per completed calendar quarter of the
+// selected season. Ratchets up as the season progresses (0 through Mar,
+// 3 from Apr, 6 from Jul, 9 from Oct) so early-season small samples don't
+// dominate a card, without needing a fixed flat minimum. A past, fully
+// completed season (or "All time") qualifies at the full-year bar (12).
+function minGamesThreshold(year: number | 'all'): number {
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  if (year === 'all' || year < currentYear) return 12
+  if (year > currentYear) return 0
+  const quartersCompleted = Math.floor(now.getMonth() / 3)
+  return quartersCompleted * 3
+}
 
 interface Milestone {
   label: string
@@ -40,26 +53,29 @@ function bestBy(rows: LeaderboardRow[], value: (r: LeaderboardRow) => number | n
   return best
 }
 
-export function LeaderboardMilestones({ rows }: { rows: LeaderboardRow[] }) {
+export function LeaderboardMilestones({ rows, year }: { rows: LeaderboardRow[]; year: number | 'all' }) {
   if (rows.length === 0) {
     return (
       <p className="font-rajdhani text-sm text-zinc-500 py-8 text-center">No stats for this filter yet.</p>
     )
   }
 
-  const topMVP     = bestBy(rows, r => r.stats.mvpPoints, () => true)
-  const topRuns     = bestBy(rows, r => r.stats.runs, () => true)
-  const topWickets  = bestBy(rows, r => r.stats.wickets, () => true)
-  const mostCenturies     = bestBy(rows, r => r.centuries, r => r.centuries > 0)
-  const mostHalfCenturies = bestBy(rows, r => r.halfCenturies, r => r.halfCenturies > 0)
-  const bestAverage = bestBy(rows, r => r.stats.battingAverage, r => r.stats.matches >= MIN_MATCHES_FOR_RATE)
-  const bestSR       = bestBy(rows, r => r.stats.strikeRate, r => r.stats.matches >= MIN_MATCHES_FOR_RATE)
-  const bestEconomy = bestBy(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY, true)
+  const minGames = minGamesThreshold(year)
+  const qualifiesOnGames = (r: LeaderboardRow) => r.stats.matches >= minGames
+
+  const topMVP     = bestBy(rows, r => r.stats.mvpPoints, qualifiesOnGames)
+  const topRuns     = bestBy(rows, r => r.stats.runs, qualifiesOnGames)
+  const topWickets  = bestBy(rows, r => r.stats.wickets, qualifiesOnGames)
+  const mostCenturies     = bestBy(rows, r => r.centuries, r => r.centuries > 0 && qualifiesOnGames(r))
+  const mostHalfCenturies = bestBy(rows, r => r.halfCenturies, r => r.halfCenturies > 0 && qualifiesOnGames(r))
+  const bestAverage = bestBy(rows, r => r.stats.battingAverage, qualifiesOnGames)
+  const bestSR       = bestBy(rows, r => r.stats.strikeRate, qualifiesOnGames)
+  const bestEconomy = bestBy(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && qualifiesOnGames(r), true)
 
   const milestones: Milestone[] = [
-    { label: 'Top MVP',        icon: '🏆', row: topMVP,     valueText: topMVP ? `${topMVP.stats.mvpPoints.toFixed(1)} pts` : '' },
-    { label: 'Top Scorer',     icon: '🏏', row: topRuns,     valueText: topRuns ? `${topRuns.stats.runs} runs` : '' },
-    { label: 'Top Wickets',    icon: '🎯', row: topWickets,  valueText: topWickets ? `${topWickets.stats.wickets} wkts` : '' },
+    { label: 'Leading MVP',         icon: '🏆', row: topMVP,     valueText: topMVP ? `${topMVP.stats.mvpPoints.toFixed(1)} pts` : '' },
+    { label: 'Leading Run Scorer',  icon: '🏏', row: topRuns,     valueText: topRuns ? `${topRuns.stats.runs} runs` : '' },
+    { label: 'Leading Wicket Taker', icon: '🎯', row: topWickets,  valueText: topWickets ? `${topWickets.stats.wickets} wkts` : '' },
     { label: 'Most 100s',      icon: '💯', row: mostCenturies,     valueText: mostCenturies ? `${mostCenturies.centuries} centuries` : '' },
     { label: 'Most 50s',       icon: '5️⃣0️⃣', row: mostHalfCenturies, valueText: mostHalfCenturies ? `${mostHalfCenturies.halfCenturies} fifties` : '' },
     { label: 'Best Average',   icon: '📊', row: bestAverage, valueText: bestAverage ? `Avg ${bestAverage.stats.battingAverage!.toFixed(1)}` : '' },

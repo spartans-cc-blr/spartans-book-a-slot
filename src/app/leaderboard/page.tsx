@@ -9,7 +9,7 @@ import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Leaderboard — Spartans CC' }
+export const metadata: Metadata = { title: 'Yours Statistically — Spartans CC' }
 export const revalidate = 0
 
 function isCategory(v: string | undefined): v is LeaderboardCategory {
@@ -55,7 +55,7 @@ export default async function LeaderboardPage({
           <span className="w-4 h-px bg-gold inline-block" />
           Performance
         </p>
-        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-parchment tracking-wide">Leaderboard</h1>
+        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-parchment tracking-wide">Yours Statistically</h1>
       </div>
 
       <div className="px-5 md:px-8 lg:px-10 py-6">
@@ -68,8 +68,12 @@ export default async function LeaderboardPage({
         />
 
         {category === 'milestones'
-          ? <LeaderboardMilestones rows={rows} />
+          ? <LeaderboardMilestones rows={rows} year={year} />
           : <LeaderboardTable key={category} rows={rows} category={category} />}
+
+        <p className="font-rajdhani text-xs text-zinc-500 text-center mt-8 px-4">
+          Stats are synced from CricHeroes, a third-party platform, on a best-effort basis. Small discrepancies may appear from time to time — we're actively working to catch these up.
+        </p>
       </div>
 
       <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
