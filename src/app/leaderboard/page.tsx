@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: 'Leaderboard — Spartans CC' }
 export const revalidate = 0
 
 function isCategory(v: string | undefined): v is LeaderboardCategory {
-  return v === 'batting' || v === 'bowling' || v === 'fielding' || v === 'mvp'
+  return v === 'milestones' || v === 'batting' || v === 'bowling' || v === 'fielding' || v === 'mvp'
 }
 
 export default async function LeaderboardPage({
@@ -31,7 +31,7 @@ export default async function LeaderboardPage({
   const yearParam = searchParams?.year
   const year: number | 'all' = yearParam === 'all' ? 'all' : (Number(yearParam) || currentYear)
   const tournamentId = searchParams?.tournament && searchParams.tournament !== 'all' ? searchParams.tournament : 'all'
-  const category: LeaderboardCategory = isCategory(searchParams?.category) ? searchParams!.category as LeaderboardCategory : 'batting'
+  const category: LeaderboardCategory = isCategory(searchParams?.category) ? searchParams!.category as LeaderboardCategory : 'milestones'
 
   const supabase = createServiceClient()
   const { data: tournaments } = await supabase
@@ -67,9 +67,9 @@ export default async function LeaderboardPage({
           category={category}
         />
 
-        <LeaderboardMilestones rows={rows} />
-
-        <LeaderboardTable key={category} rows={rows} category={category} />
+        {category === 'milestones'
+          ? <LeaderboardMilestones rows={rows} />
+          : <LeaderboardTable key={category} rows={rows} category={category} />}
       </div>
 
       <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
