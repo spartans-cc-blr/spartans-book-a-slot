@@ -298,7 +298,12 @@ function BandwidthSection({
         {/* Upcoming / Unbooked cards — replaced the old 3-segment stacked bar.
             Past matches already shows in the count line above and doesn't
             need a second, more prominent home here; upcoming vs. unbooked is
-            the pair that actually matters for bandwidth planning. */}
+            the pair that actually matters for bandwidth planning. A "Matches"
+            eyebrow precedes them since the page also has tournament-count
+            cards (the Show filter below) using the same visual language —
+            without it, these two numbers could be misread as tournament
+            counts rather than match counts. */}
+        <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-400 mb-1.5">Matches</p>
         <div className="grid grid-cols-2 gap-2 mb-2">
           <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
             <p className="font-cinzel text-lg font-bold text-amber-700 leading-tight">{scheduled.length}</p>
@@ -1378,11 +1383,6 @@ export function TournamentPlannerClient({
   // clicks on the same tournament) so a manually re-collapsed block reopens too.
   const [expandRequest, setExpandRequest] = useState<{ id: string; token: number } | null>(null)
   const expandTokenRef = useRef(0)
-  function handleViewTournament(tournamentId: string) {
-    expandTokenRef.current += 1
-    setExpandRequest({ id: tournamentId, token: expandTokenRef.current })
-    requestAnimationFrame(() => scrollToTournament(tournamentId))
-  }
 
   const tournamentMap = useMemo(() => {
     const map = new Map<string, { tournament: NonNullable<Booking['tournament']>; games: Booking[] }>()
@@ -1442,6 +1442,22 @@ export function TournamentPlannerClient({
     }),
     [classifiedTournaments, showUpcoming, showOngoing, showCompleted]
   )
+
+  function handleViewTournament(tournamentId: string) {
+    // A tournament under a captain's "By tournament" list is always
+    // upcoming or ongoing (see tournamentBreakdown's own outstanding>0 ||
+    // unbooked>0 filter in BandwidthSection) — but if the viewer has toggled
+    // that bucket's filter card off, the matching block below doesn't exist
+    // to scroll to. Force its bucket back on so "view" never dead-ends.
+    const entry = classifiedTournaments.find(t => t.tournament.id === tournamentId)
+    if (entry?.isUpcoming && !showUpcoming) setShowUpcoming(true)
+    if (entry?.isOngoing  && !showOngoing)  setShowOngoing(true)
+    if (entry?.isCompleted && !showCompleted) setShowCompleted(true)
+
+    expandTokenRef.current += 1
+    setExpandRequest({ id: tournamentId, token: expandTokenRef.current })
+    requestAnimationFrame(() => scrollToTournament(tournamentId))
+  }
 
   const isCaptainView    = viewerRole.isCaptain && !!viewerRole.captainId
   const myTournaments    = isCaptainView
