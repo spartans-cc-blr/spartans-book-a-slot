@@ -104,22 +104,23 @@ function dismissals(s: PlayerStatsTotals): number {
 }
 
 // Player Stats board column config — single source of truth for both the
-// sortable header row and each player row's cell order.
-type StatsSortKey = 'name' | 'matches' | 'runs' | 'battingAverage' | 'strikeRate' | 'wickets' | 'economy' | 'dismissals'
+// sortable header row and each player row's cell order. Kept to the five
+// headline numbers (no Avg/SR/Econ) so the table stays scannable at a
+// glance — MVP is the default sort since it's the one figure meant to rank
+// players against each other, the rest are supporting detail.
+type StatsSortKey = 'name' | 'matches' | 'runs' | 'wickets' | 'dismissals' | 'mvpPoints'
 const STAT_COLUMNS: { key: Exclude<StatsSortKey, 'name'>; label: string; value: (s: PlayerStatsTotals) => number | null }[] = [
-  { key: 'matches',        label: 'M',    value: s => s.matches },
-  { key: 'runs',           label: 'R',    value: s => s.runs },
-  { key: 'battingAverage', label: 'Avg',  value: s => s.battingAverage },
-  { key: 'strikeRate',     label: 'SR',   value: s => s.strikeRate },
-  { key: 'wickets',        label: 'Wk',   value: s => s.wickets },
-  { key: 'economy',        label: 'Econ', value: s => s.economy },
-  { key: 'dismissals',     label: 'Dis',  value: dismissals },
+  { key: 'matches',    label: 'M',   value: s => s.matches },
+  { key: 'runs',       label: 'R',   value: s => s.runs },
+  { key: 'wickets',    label: 'Wk',  value: s => s.wickets },
+  { key: 'dismissals', label: 'Dis', value: dismissals },
+  { key: 'mvpPoints',  label: 'MVP', value: s => s.mvpPoints },
 ]
 
 // Same abbreviation CaptainsCornerGrid.tsx's MatrixView uses for its mobile
 // column headers ("First L.") — keeps the name column narrow enough that a
-// right-aligned M/R/Avg/SR/Wk/Econ/Ct row fits a portrait phone width
-// without horizontal scroll.
+// right-aligned M/R/Wk/Dis/MVP row fits a portrait phone width without
+// horizontal scroll.
 function mobileMatrixName(name: string): string {
   const parts = name.trim().split(' ').filter(Boolean)
   if (parts.length === 1) return parts[0]
@@ -694,8 +695,8 @@ function TournamentBlock({
 }) {
   const [open, setOpen]               = useState(false)
   const [playersOpen, setPlayersOpen] = useState(false)
-  const [statsSortKey, setStatsSortKey] = useState<StatsSortKey>('name')
-  const [statsSortDir, setStatsSortDir] = useState<'asc' | 'desc'>('asc')
+  const [statsSortKey, setStatsSortKey] = useState<StatsSortKey>('mvpPoints')
+  const [statsSortDir, setStatsSortDir] = useState<'asc' | 'desc'>('desc')
 
   function handleStatsSort(key: StatsSortKey) {
     if (key === statsSortKey) {
@@ -929,11 +930,12 @@ function TournamentBlock({
           {/* Player Stats — collapsible, sourced from announced squads.
               Stats are aggregated purely from THIS tournament's own synced
               matches via getLeaderboard({ tournamentId }) — never
-              career-wide analytics. Same M/R/Avg/SR/Wk/Econ/Ct column
-              schema as Captains Corner's tap-to-expand "📊 Form" panel
-              (ContextStatsTable in CaptainsCornerGrid.tsx), but recoloured
-              into this page's warm-light theme instead of that panel's navy
-              card. A player can be represented here (they were in an
+              career-wide analytics. Trimmed to M/R/Wk/Dis/MVP — the
+              headline numbers — rather than Captains Corner's fuller
+              M/R/Avg/SR/Wk/Econ/Ct "Form" panel (ContextStatsTable in
+              CaptainsCornerGrid.tsx), sorted by MVP descending by default
+              since that's the one figure meant to rank players against
+              each other. A player can be represented here (they were in an
               announced squad) but still show "No stats synced" if none of
               their matches in this tournament have a scorecard reconciled
               yet — those rows always sort to the bottom. */}
