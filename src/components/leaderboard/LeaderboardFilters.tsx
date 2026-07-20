@@ -6,7 +6,11 @@
 
 import { useRouter } from 'next/navigation'
 
-export type LeaderboardCategory = 'batting' | 'bowling' | 'fielding' | 'mvp'
+// Table-backed categories — each renders a sortable LeaderboardTable.
+export type TableCategory = 'batting' | 'bowling' | 'fielding' | 'mvp'
+// 'milestones' is a peer tab, not a table — it renders LeaderboardMilestones
+// instead. It's the default landing tab (see src/app/leaderboard/page.tsx).
+export type LeaderboardCategory = 'milestones' | TableCategory
 
 interface Props {
   years:        number[]
@@ -31,14 +35,14 @@ export function LeaderboardFilters({ years, tournaments, year, tournamentId, cat
 
   return (
     <div className="flex flex-wrap items-center gap-3 mb-5">
-      <div className="flex gap-1">
-        {(['batting', 'bowling', 'fielding', 'mvp'] as const).map(c => (
+      <div className="flex gap-1 flex-wrap">
+        {(['milestones', 'batting', 'bowling', 'fielding', 'mvp'] as const).map(c => (
           <button
             key={c}
             onClick={() => navigate({ category: c })}
             className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors
               ${category === c ? 'bg-gold/20 border-gold-dim text-gold' : 'border-ink-5 text-zinc-500 hover:text-zinc-300'}`}>
-            {c === 'mvp' ? 'MVP' : c}
+            {c === 'mvp' ? 'MVP' : c === 'milestones' ? '🏆 Milestones' : c}
           </button>
         ))}
       </div>

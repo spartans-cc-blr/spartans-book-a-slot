@@ -291,7 +291,7 @@ export async function getLeaderboard(filters: { year?: number; tournamentId?: st
 
   const hub = createServiceClient()
   const ids = Array.from(playerIds)
-  const { data: players, error } = await hub.from('players').select('id, name, cricheroes_url').in('id', ids)
+  const { data: players, error } = await hub.from('players').select('id, name, cricheroes_url, photo_url').in('id', ids)
   if (error) throw new Error(error.message)
   const playerById = new Map((players ?? []).map((p: any) => [p.id, p]))
 
@@ -324,7 +324,7 @@ export async function getLeaderboard(filters: { year?: number; tournamentId?: st
       else if (runs >= 50) halfCenturies++
     }
 
-    rows.push({ playerId, playerName: player.name, cricheroesUrl: player.cricheroes_url ?? null, stats, centuries, halfCenturies })
+    rows.push({ playerId, playerName: player.name, cricheroesUrl: player.cricheroes_url ?? null, photoUrl: player.photo_url ?? null, stats, centuries, halfCenturies })
   }
   return rows
 }

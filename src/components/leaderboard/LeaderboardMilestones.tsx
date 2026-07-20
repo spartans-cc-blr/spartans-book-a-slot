@@ -1,7 +1,11 @@
-// Milestone highlight cards for /leaderboard — a quick "who's on top" strip
-// above the sortable table, computed entirely from the same LeaderboardRow[]
-// the page already fetched (no extra queries). Respects whatever
-// year/tournament filter is active, same as the table below it.
+// Milestone highlight cards — the "Milestones" tab on /leaderboard (the
+// default landing tab, see src/app/leaderboard/page.tsx). Computed entirely
+// from the same LeaderboardRow[] the page already fetched (no extra
+// queries). Respects whatever year/tournament filter is active.
+//
+// Styled to match FixturesCard.tsx's match-card treatment (dark gradient,
+// gold top accent bar, rounded corners, drop shadow) so the highlight strip
+// reads as the same visual language as the rest of the Hub.
 //
 // Qualification thresholds keep small-sample outliers (a single big innings,
 // a two-over spell) off the rate-stat cards — inspired by the equivalent
@@ -21,7 +25,7 @@ interface Milestone {
   valueText: string
 }
 
-function bestBy<T>(rows: LeaderboardRow[], value: (r: LeaderboardRow) => number | null, qualifies: (r: LeaderboardRow) => boolean, lowerIsBetter = false): LeaderboardRow | null {
+function bestBy(rows: LeaderboardRow[], value: (r: LeaderboardRow) => number | null, qualifies: (r: LeaderboardRow) => boolean, lowerIsBetter = false): LeaderboardRow | null {
   let best: LeaderboardRow | null = null
   let bestVal: number | null = null
   for (const r of rows) {
@@ -37,7 +41,11 @@ function bestBy<T>(rows: LeaderboardRow[], value: (r: LeaderboardRow) => number 
 }
 
 export function LeaderboardMilestones({ rows }: { rows: LeaderboardRow[] }) {
-  if (rows.length === 0) return null
+  if (rows.length === 0) {
+    return (
+      <p className="font-rajdhani text-sm text-zinc-500 py-8 text-center">No stats for this filter yet.</p>
+    )
+  }
 
   const topMVP     = bestBy(rows, r => r.stats.mvpPoints, () => true)
   const topRuns     = bestBy(rows, r => r.stats.runs, () => true)
@@ -59,20 +67,45 @@ export function LeaderboardMilestones({ rows }: { rows: LeaderboardRow[] }) {
     { label: 'Best Economy',   icon: '🔒', row: bestEconomy, valueText: bestEconomy ? `Econ ${bestEconomy.stats.economy!.toFixed(2)}` : '' },
   ].filter(m => m.row)
 
-  if (milestones.length === 0) return null
+  if (milestones.length === 0) {
+    return (
+      <p className="font-rajdhani text-sm text-zinc-500 py-8 text-center">No stats for this filter yet.</p>
+    )
+  }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {milestones.map(m => (
-        <div key={m.label} className="bg-ink-3 border border-ink-5 rounded p-3">
-          <div className="flex items-center justify-between mb-1.5">
+        <div key={m.label} style={{
+          background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
+          border: '1px solid #2D3748',
+          borderRadius: '12px',
+          padding: '12px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Gold top accent bar — matches FixturesCard.tsx */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
+
+          <div className="flex items-center justify-between mb-2">
             <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">{m.label}</p>
             <span className="text-sm leading-none">{m.icon}</span>
           </div>
-          <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
-            <PlayerNameLink name={m.row!.playerName} playerId={m.row!.playerId} cricHeroesUrl={m.row!.cricheroesUrl} />
-          </p>
-          <p className="font-cinzel text-xs text-gold mt-0.5">{m.valueText}</p>
+
+          <div className="flex items-center gap-2">
+            <img
+              src={m.row!.photoUrl ?? '/default-avatar.png'}
+              alt={m.row!.playerName}
+              className="w-8 h-8 rounded-full object-cover border border-gold-dim flex-shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
+                <PlayerNameLink name={m.row!.playerName} playerId={m.row!.playerId} cricHeroesUrl={m.row!.cricheroesUrl} />
+              </p>
+              <p className="font-cinzel text-xs text-gold mt-0.5">{m.valueText}</p>
+            </div>
+          </div>
         </div>
       ))}
     </div>

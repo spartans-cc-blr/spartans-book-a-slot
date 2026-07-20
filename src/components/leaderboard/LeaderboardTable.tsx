@@ -7,7 +7,7 @@
 import { useMemo, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import type { LeaderboardRow, PlayerStatsTotals } from '@/types'
-import type { LeaderboardCategory } from './LeaderboardFilters'
+import type { TableCategory } from './LeaderboardFilters'
 
 type SortKey =
   | 'matches' | 'runs' | 'battingAverage' | 'strikeRate'
@@ -36,7 +36,7 @@ function statValue(row: LeaderboardRow, key: SortKey): number | null {
   return (row.stats as any)[key] as number | null
 }
 
-const COLUMNS: Record<LeaderboardCategory, { key: SortKey; label: string }[]> = {
+const COLUMNS: Record<TableCategory, { key: SortKey; label: string }[]> = {
   batting: [
     { key: 'matches', label: 'M' },
     { key: 'runs', label: 'Runs' },
@@ -66,11 +66,11 @@ const COLUMNS: Record<LeaderboardCategory, { key: SortKey; label: string }[]> = 
   ],
 }
 
-const DEFAULT_SORT: Record<LeaderboardCategory, SortKey> = {
+const DEFAULT_SORT: Record<TableCategory, SortKey> = {
   batting: 'runs', bowling: 'wickets', fielding: 'dismissals', mvp: 'mvpPoints',
 }
 
-export function LeaderboardTable({ rows, category }: { rows: LeaderboardRow[]; category: LeaderboardCategory }) {
+export function LeaderboardTable({ rows, category }: { rows: LeaderboardRow[]; category: TableCategory }) {
   const [sortKey, setSortKey]   = useState<SortKey>(DEFAULT_SORT[category])
   const [sortDesc, setSortDesc] = useState(true)
 

@@ -175,6 +175,7 @@ export interface LeaderboardRow {
   playerId:      string
   playerName:    string
   cricheroesUrl: string | null
+  photoUrl:      string | null
   stats:         PlayerStatsTotals
   centuries:     number
   halfCenturies: number
