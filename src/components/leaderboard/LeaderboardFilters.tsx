@@ -39,10 +39,15 @@ export function LeaderboardFilters({ years, tournaments, year, tournamentId, cat
         {(['milestones', 'batting', 'bowling', 'fielding', 'mvp'] as const).map(c => (
           <button
             key={c}
-            onClick={() => navigate({ category: c })}
+            // Milestones is a career-wide/top-level view, not meaningful
+            // scoped to a single tournament — force the tournament filter
+            // back to "all" whenever this tab is selected (the select
+            // itself is also disabled below while this tab is active, so
+            // it can't be re-narrowed after the fact).
+            onClick={() => navigate(c === 'milestones' ? { category: c, tournament: 'all' } : { category: c })}
             className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors
               ${category === c ? 'bg-gold/20 border-gold-dim text-gold' : 'border-ink-5 text-zinc-500 hover:text-zinc-300'}`}>
-            {c === 'mvp' ? 'MVP' : c === 'milestones' ? '🏆 Milestones' : c}
+            {c === 'mvp' ? 'MVP' : c === 'milestones' ? '🥇 Milestones' : c}
           </button>
         ))}
       </div>
@@ -58,7 +63,9 @@ export function LeaderboardFilters({ years, tournaments, year, tournamentId, cat
       <select
         value={tournamentId}
         onChange={e => navigate({ tournament: e.target.value })}
-        className="form-input w-auto font-rajdhani text-xs py-1.5">
+        disabled={category === 'milestones'}
+        title={category === 'milestones' ? 'Milestones is a top-level view — not scoped to a tournament' : undefined}
+        className="form-input w-auto font-rajdhani text-xs py-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
         <option value="all">All tournaments</option>
         {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
       </select>
