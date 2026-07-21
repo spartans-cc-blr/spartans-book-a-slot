@@ -61,11 +61,13 @@ export function PlayerStatsClient({
 
   useEffect(() => { fetchScoped() }, [fetchScoped])
 
+  const isTournamentFiltered = tournamentId !== 'all'
+
   return (
     <>
-      <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
+      <div className="bg-white border-b border-parchment-3 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
+          style={{ background: 'radial-gradient(circle, rgba(217,119,6,0.08) 0%, transparent 70%)' }} />
         <div className="flex items-center gap-4">
           <img
             src={player.photo_url ?? '/default-avatar.png'}
@@ -77,10 +79,10 @@ export function PlayerStatsClient({
               <span className="w-4 h-px bg-gold inline-block" />
               Player Stats
             </p>
-            <h1 className="font-cinzel text-xl md:text-2xl font-bold text-parchment tracking-wide">{player.name}</h1>
+            <h1 className="font-cinzel text-xl md:text-2xl font-bold text-ink tracking-wide">{player.name}</h1>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {(player.jersey_name || player.jersey_number != null) && (
-                <span className="font-rajdhani text-xs text-zinc-500">
+                <span className="font-rajdhani text-xs text-stone-500">
                   {player.jersey_number != null && `#${player.jersey_number}`}
                   {player.jersey_number != null && player.jersey_name && ' · '}
                   {player.jersey_name}
@@ -88,7 +90,7 @@ export function PlayerStatsClient({
               )}
               {player.cricheroes_url && (
                 <a href={player.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                  className="font-rajdhani text-xs text-zinc-500 hover:text-gold underline decoration-dotted underline-offset-2 transition-colors">
+                  className="font-rajdhani text-xs text-stone-500 hover:text-gold-dim underline decoration-dotted underline-offset-2 transition-colors">
                   View on CricHeroes ↗
                 </a>
               )}
@@ -101,24 +103,24 @@ export function PlayerStatsClient({
         {/* Filters */}
         <div className="flex gap-2 flex-wrap mb-5">
           <select value={year} onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            className="font-rajdhani text-sm bg-ink-3 border border-ink-5 text-parchment rounded px-3 py-1.5">
+            className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5">
             <option value="all">All Years</option>
             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <select value={tournamentId} onChange={e => setTournamentId(e.target.value)}
-            className="font-rajdhani text-sm bg-ink-3 border border-ink-5 text-parchment rounded px-3 py-1.5">
+            className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5">
             <option value="all">All Tournaments</option>
             {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
 
         {/* Summary */}
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-5">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">
+        <div className="bg-white border border-parchment-3 rounded-2xl p-5 mb-5">
+          <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">
             {year === 'all' && tournamentId === 'all' ? 'Career' : 'Filtered'} Summary
           </h2>
           {scoped.matches === 0 ? (
-            <p className="font-rajdhani text-sm text-zinc-500">No matches for this filter.</p>
+            <p className="font-rajdhani text-sm text-stone-500">No matches for this filter.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <Stat label="Matches" value={String(scoped.matches)} />
@@ -132,24 +134,24 @@ export function PlayerStatsClient({
             </div>
           )}
           {scoped.matches > 0 && (
-            <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-ink-5">
-              <MvpStat label="Batting MVP" value={scoped.battingMvp} color="text-emerald-400" />
-              <MvpStat label="Bowling MVP" value={scoped.bowlingMvp} color="text-blue-400" />
-              <MvpStat label="Fielding MVP" value={scoped.fieldingMvp} color="text-purple-400" />
+            <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-parchment-3">
+              <MvpStat label="Batting MVP" value={scoped.battingMvp} color="text-emerald-600" />
+              <MvpStat label="Bowling MVP" value={scoped.bowlingMvp} color="text-blue-600" />
+              <MvpStat label="Fielding MVP" value={scoped.fieldingMvp} color="text-purple-600" />
             </div>
           )}
         </div>
 
         {/* Match by match */}
-        <div className="bg-ink-3 border border-ink-5 rounded p-5">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">Match History</h2>
+        <div className="bg-white border border-parchment-3 rounded-2xl p-5">
+          <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">Match History</h2>
           {loading ? (
-            <p className="font-rajdhani text-sm text-zinc-500">Loading…</p>
+            <p className="font-rajdhani text-sm text-stone-500">Loading…</p>
           ) : matches.length === 0 ? (
-            <p className="font-rajdhani text-sm text-zinc-500">No matches for this filter.</p>
+            <p className="font-rajdhani text-sm text-stone-500">No matches for this filter.</p>
           ) : (
-            <div className="divide-y divide-ink-5">
-              {matches.map(m => <MatchRow key={m.matchId} match={m} />)}
+            <div className="space-y-3">
+              {matches.map(m => <MatchRow key={m.matchId} match={m} tournamentFiltered={isTournamentFiltered} />)}
             </div>
           )}
         </div>
@@ -161,8 +163,8 @@ export function PlayerStatsClient({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-0.5">{label}</p>
-      <p className="font-cinzel text-lg font-bold text-parchment">{value}</p>
+      <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 mb-0.5">{label}</p>
+      <p className="font-cinzel text-lg font-bold text-ink">{value}</p>
     </div>
   )
 }
@@ -170,22 +172,41 @@ function Stat({ label, value }: { label: string; value: string }) {
 function MvpStat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="text-center">
-      <p className="font-rajdhani text-[9px] font-bold tracking-widest uppercase text-zinc-600 mb-0.5">{label}</p>
+      <p className="font-rajdhani text-[9px] font-bold tracking-widest uppercase text-stone-500 mb-0.5">{label}</p>
       <p className={`font-cinzel text-base font-bold ${color}`}>{value.toFixed(1)}</p>
     </div>
   )
 }
 
-function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
+function MatchRow({ match, tournamentFiltered }: { match: PlayerMatchHistoryRow; tournamentFiltered: boolean }) {
   const dateLabel = match.gameDate
     ? new Date(match.gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—'
 
+  // When filtered to a specific tournament, the opponent is the more useful
+  // headline (the tournament is already implied by the filter). Unfiltered,
+  // the opponent alone doesn't say much across many tournaments — name the
+  // tournament instead.
+  const primaryLabel = tournamentFiltered
+    ? (match.opponentName ? `vs ${match.opponentName}` : match.tournamentName ?? 'Match')
+    : (match.tournamentName ? `at ${match.tournamentName}` : (match.opponentName ? `vs ${match.opponentName}` : 'Match'))
+
   const body = (
-    <>
+    <div style={{
+      background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
+      border: '1px solid #2D3748',
+      borderRadius: '12px',
+      padding: '14px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* Gold top accent bar — matches FixturesCard.tsx */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
+
       <div className="flex items-center justify-between gap-3 mb-1.5">
         <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
-          {match.opponentName ? `vs ${match.opponentName}` : match.tournamentName ?? 'Match'}
+          {primaryLabel}
         </p>
         <span className="font-rajdhani text-xs text-zinc-500 whitespace-nowrap">
           {dateLabel}{match.format ? ` · ${match.format}` : ''}
@@ -214,15 +235,15 @@ function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
         )}
         {match.matchResult && <span className="text-zinc-600">{match.matchResult}</span>}
       </div>
-    </>
+    </div>
   )
 
   if (match.bookingId) {
     return (
-      <Link href={`/matches/history/${match.bookingId}`} className="block py-3 -mx-2 px-2 rounded hover:bg-ink-4 transition-colors">
+      <Link href={`/matches/history/${match.bookingId}`} className="block transition-transform hover:-translate-y-0.5">
         {body}
       </Link>
     )
   }
-  return <div className="py-3">{body}</div>
+  return body
 }
