@@ -44,7 +44,6 @@ interface Player {
   is_captain: boolean
   priority_pick: boolean
   cricheroes_url: string | null
-  active: boolean
   status: string
   is_fee_exempt: boolean
   recent_form?: { matches: number; runs: number; wickets: number } | null
@@ -915,11 +914,11 @@ function AddPlayerPanel({
                     key={p.id}
                     onClick={() => setSelectedPlayer(p)}
                     className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-ink-4 transition-colors text-left">
-                    <span className={`font-rajdhani text-sm font-semibold ${p.wallet_balance < 0 ? 'text-amber-400' : !p.active ? 'text-zinc-400' : 'text-parchment'}`}>
+                    <span className={`font-rajdhani text-sm font-semibold ${p.wallet_balance < 0 ? 'text-amber-400' : p.status !== 'active' ? 'text-zinc-400' : 'text-parchment'}`}>
                       {p.name}
                     </span>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      {!p.active && (
+                      {p.status !== 'active' && (
                         <span className="font-rajdhani text-[9px] font-bold bg-zinc-800 border border-zinc-700 text-zinc-500 px-1 py-px rounded-sm">
                           inactive
                         </span>

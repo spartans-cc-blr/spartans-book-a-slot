@@ -62,7 +62,6 @@ export async function POST(request: Request) {
     inducted_on: inducted_on || null,
     wallet_balance: wallet_balance ?? 0,
     cricheroes_url: cricheroes_url || null,
-    active: true,
     is_captain: false,
   })
   const { data, error } = await supabase

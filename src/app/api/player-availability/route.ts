@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   // ── GUARD 1: wallet dues ──────────────────────────────────────────────────
   const { data: playerRow, error: walletErr } = await supabase
     .from('players')
-    .select('wallet_balance, dues_override, active')
+    .select('wallet_balance, dues_override, status')
     .eq('id', player.playerId)
     .single()
 
@@ -113,9 +113,9 @@ export async function POST(req: NextRequest) {
     result = data
   }
 
-  // Auto-reactivate inactive players — fire and forget
-  if (!playerRow.active) {
-    supabase.from('players').update({ active: true }).eq('id', player.playerId).then(() => {})
+  // Auto-reactivate inactive players — fire and forget. Never touch expelled.
+  if (playerRow.status === 'inactive') {
+    supabase.from('players').update({ status: 'active' }).eq('id', player.playerId).then(() => {})
   }
 
   // Audit log — fire and forget

@@ -25,7 +25,6 @@ type Player = {
   referred_by: string | null
   inducted_on: string | null
   wallet_balance: number
-  active: boolean
   dues_override: boolean
   is_captain: boolean
   is_gc: boolean
@@ -165,10 +164,10 @@ export default function AdminPlayersPage() {
     const res = await fetch('/api/players', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status: 'expelled', active: false }),
+      body: JSON.stringify({ id, status: 'expelled' }),
     })
     if (res.ok) {
-      setPlayers(prev => prev.map(p => p.id === id ? { ...p, status: 'expelled', active: false } : p))
+      setPlayers(prev => prev.map(p => p.id === id ? { ...p, status: 'expelled' } : p))
     }
   }
 
@@ -194,7 +193,7 @@ export default function AdminPlayersPage() {
         <div>
           <h1 className="font-cinzel text-xl font-bold text-gold">Players</h1>
           <p className="font-rajdhani text-zinc-500 text-sm mt-1">
-            {players.filter(p => p.active).length} active players · {players.filter(p => isCurrentlyExempt(p.fee_exemptions)).length} currently fee-exempt
+            {players.filter(p => p.status === 'active').length} active players · {players.filter(p => isCurrentlyExempt(p.fee_exemptions)).length} currently fee-exempt
           </p>
         </div>
         <button onClick={() => { setShowAdd(v => !v); setError('') }}
@@ -336,7 +335,6 @@ export default function AdminPlayersPage() {
                         {/* Toggles */}
                         <div className="flex gap-4 mt-3">
                           {[
-                            { key: 'active', label: 'Active' },
                             { key: 'is_captain', label: 'Captain' },
                             { key: 'is_wrangler', label: 'Wrangler' },
                           ].map(({ key, label }) => (
@@ -491,7 +489,7 @@ export default function AdminPlayersPage() {
                     <td className="px-4 py-3">
                       <span className={`font-rajdhani text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm border
                         ${p.status === 'expelled' ? 'bg-red-950 border-red-800 text-red-400' :
-                          p.active ? 'bg-emerald-950 border-emerald-800 text-emerald-400' :
+                          p.status === 'active' ? 'bg-emerald-950 border-emerald-800 text-emerald-400' :
                           'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>
                         {p.status === 'expelled' ? 'Expelled' : p.status === 'active' ? 'Active' : 'Inactive'}
                       </span>

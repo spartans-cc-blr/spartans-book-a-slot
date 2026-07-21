@@ -31,7 +31,7 @@ export default async function GCPlayersPage() {
     .select(`
       id, name, photo_url, jersey_name, jersey_number,
       primary_skill, secondary_skill, cricheroes_url,
-      wallet_balance, inducted_on, is_captain, status, active
+      wallet_balance, inducted_on, is_captain, status
     `)
     .order('name', { ascending: true })
 
