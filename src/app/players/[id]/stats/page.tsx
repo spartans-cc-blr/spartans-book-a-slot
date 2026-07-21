@@ -38,7 +38,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
   if (!player) redirect('/')
 
   return (
-    <div className="min-h-screen bg-ink grain">
+    <div className="min-h-screen bg-parchment">
       <SiteNav isAdmin={!!user?.isAdmin} />
       <PlayerStatsClient
         player={player}
@@ -46,7 +46,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
         initialCareer={career}
         initialMatches={matches}
       />
-      <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
+      <footer className="border-t border-parchment-3 py-5 text-center font-rajdhani text-xs text-stone-500 mt-8">
         © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
       </footer>
     </div>
