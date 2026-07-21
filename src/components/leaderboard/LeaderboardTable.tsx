@@ -10,7 +10,7 @@ import type { LeaderboardRow, PlayerStatsTotals } from '@/types'
 import type { TableCategory } from './LeaderboardFilters'
 
 type SortKey =
-  | 'matches' | 'runs' | 'battingAverage' | 'strikeRate'
+  | 'matches' | 'battingInnings' | 'bowlingInnings' | 'runs' | 'battingAverage' | 'strikeRate'
   | 'wickets' | 'economy' | 'bowlingAverage' | 'bowlingStrikeRate'
   | 'catches' | 'runOuts' | 'stumpings' | 'dismissals' | 'mvpPoints'
 
@@ -39,12 +39,14 @@ function statValue(row: LeaderboardRow, key: SortKey): number | null {
 const COLUMNS: Record<TableCategory, { key: SortKey; label: string }[]> = {
   batting: [
     { key: 'matches', label: 'M' },
+    { key: 'battingInnings', label: 'Inn' },
     { key: 'runs', label: 'Runs' },
     { key: 'battingAverage', label: 'Avg' },
     { key: 'strikeRate', label: 'S/R' },
   ],
   bowling: [
     { key: 'matches', label: 'M' },
+    { key: 'bowlingInnings', label: 'Inn' },
     { key: 'wickets', label: 'Wkts' },
     { key: 'economy', label: 'Econ' },
     { key: 'bowlingAverage', label: 'Avg' },
