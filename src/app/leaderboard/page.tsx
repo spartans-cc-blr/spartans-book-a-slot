@@ -69,7 +69,7 @@ export default async function LeaderboardPage({
 
         {category === 'milestones'
           ? <LeaderboardMilestones rows={rows} year={year} />
-          : <LeaderboardTable key={category} rows={rows} category={category} />}
+          : <LeaderboardTable key={category} rows={rows} category={category} tournamentFiltered={tournamentId !== 'all'} />}
 
         <p className="font-rajdhani text-xs text-zinc-500 text-center mt-8 px-4">
           Stats are synced from CricHeroes, a third-party platform, on a best-effort basis. Small discrepancies may appear from time to time — we're actively working to catch these up.
