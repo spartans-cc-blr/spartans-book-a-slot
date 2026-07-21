@@ -136,6 +136,11 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                     <JerseyIcon colour="gold" size={16} />
                     Store Orders
                   </Link>
+                  <Link href="/wrangler/grounds"
+                    onClick={() => setGcOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors border-b border-ink-5">
+                    📍 Grounds
+                  </Link>
                   <GenerateInviteItem />
                 </div>
               )}
@@ -352,6 +357,10 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                   ${activePage === 'dugout' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
                 <JerseyIcon colour="gold" size={16} />
                 Store Orders
+              </Link>
+              <Link href="/wrangler/grounds" onClick={() => setOpen(false)}
+                className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4 text-zinc-400 hover:text-gold">
+                📍 Grounds
               </Link>
               <GenerateInviteItem mobile onClose={() => setOpen(false)} />
             </>

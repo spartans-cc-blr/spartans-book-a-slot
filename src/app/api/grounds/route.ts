@@ -10,6 +10,13 @@ async function requireWranglerOrAdmin() {
   return null
 }
 
+async function requireGCOrAdmin() {
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!user?.isGC && !user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
+  return null
+}
+
 export async function GET() {
   // Public — grounds are displayed on public fixtures cards
   const supabase = createServiceClient()
@@ -22,7 +29,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const deny = await requireWranglerOrAdmin()
+  const deny = await requireGCOrAdmin()
   if (deny) return deny
   const supabase = createServiceClient()
   const body = await request.json()
