@@ -88,6 +88,14 @@ function monthChipLabel(month: string): string {
   return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
+// Matches the server's own month bucketing (plain UTC date-string slicing,
+// no local-timezone conversion) so the default view lines up with the
+// month chip the server would actually return matches for.
+function currentMonthStr(): string {
+  const d = new Date()
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
 }
@@ -231,7 +239,11 @@ export function MatchHistoryClient({
 }) {
   const [roleFilter, setRoleFilter]     = useState<RoleFilter>('all')
   const [resultFilter, setResultFilter] = useState('')
-  const [monthFilter, setMonthFilter]   = useState('')
+  // Defaults to the current month rather than all-time — the unfiltered
+  // view was slow to load, and most visits are for "what happened
+  // recently" anyway. Explicitly deselecting the month chip still shows
+  // everything.
+  const [monthFilter, setMonthFilter]   = useState(currentMonthStr())
   const [tournamentId, setTournamentId] = useState('')
   const [venue, setVenue]               = useState('')
   const [format, setFormat]             = useState('')
@@ -301,10 +313,15 @@ export function MatchHistoryClient({
     }
   }
 
-  const hasActiveFilters = roleFilter !== 'all' || !!resultFilter || !!monthFilter || !!tournamentId || !!venue || !!format
+  // The current month is the default landing view, not a user-applied
+  // filter — only flag it as "active" (and offer "Clear filters") once it
+  // differs from that default.
+  const hasActiveFilters = roleFilter !== 'all' || !!resultFilter
+    || (!!monthFilter && monthFilter !== currentMonthStr())
+    || !!tournamentId || !!venue || !!format
 
   function clearFilters() {
-    setRoleFilter('all'); setResultFilter(''); setMonthFilter(''); setTournamentId(''); setVenue(''); setFormat('')
+    setRoleFilter('all'); setResultFilter(''); setMonthFilter(currentMonthStr()); setTournamentId(''); setVenue(''); setFormat('')
   }
 
   return (
@@ -407,7 +424,16 @@ export function MatchHistoryClient({
       )}
       {!loading && !error && matches.length === 0 && (
         <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">
-          {hasActiveFilters ? 'No matches found for these filters.' : 'No completed matches yet.'}
+          {hasActiveFilters ? (
+            'No matches found for these filters.'
+          ) : (
+            <>
+              No completed matches yet this month.{' '}
+              <button onClick={() => setMonthFilter('')} className="text-gold underline">
+                Show all matches
+              </button>
+            </>
+          )}
         </p>
       )}
 
