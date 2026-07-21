@@ -97,7 +97,13 @@ export function LeaderboardTable({ rows, category, tournamentFiltered }: {
     : null
 
   const excludedRows = zeroInningsFilter ? rows.filter(zeroInningsFilter) : []
-  const visibleRows  = zeroInningsFilter ? rows.filter(r => !zeroInningsFilter(r)) : rows
+  const preFilterRows = zeroInningsFilter ? rows.filter(r => !zeroInningsFilter(r)) : rows
+
+  // Fielding is opportunistic, not an innings you either get or don't — no
+  // "did not field" callout to match, just a plain filter, always applied
+  // (not just when tournament-scoped): a player with zero catches/run
+  // outs/stumpings for the current filter adds nothing to this table.
+  const visibleRows = category === 'fielding' ? preFilterRows.filter(r => dismissals(r.stats) >= 1) : preFilterRows
 
   const sorted = useMemo(() => {
     return [...visibleRows].sort((a, b) => {
