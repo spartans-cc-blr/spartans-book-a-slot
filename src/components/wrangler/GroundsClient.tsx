@@ -10,7 +10,7 @@ type Ground = {
   created_at: string
 }
 
-export default function AdminGroundsPage() {
+export function GroundsClient() {
   const [grounds,   setGrounds]   = useState<Ground[]>([])
   const [loading,   setLoading]   = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)

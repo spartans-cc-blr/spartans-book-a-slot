@@ -14,6 +14,7 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [gcOpen,       setGcOpen]       = useState(false)
   const [matchesOpen,  setMatchesOpen]  = useState(false)
+  const [wranglerOpen, setWranglerOpen] = useState(false)
   const { data: session, status }     = useSession()
 
   const player     = session?.user as any
@@ -42,10 +43,6 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
     // Tournament Planner — captains, GC, admin
     ...(isCaptain || isGC || isAdmin
       ? [{ href: '/tournament-planner', label: 'Tournaments', key: 'planner' }]
-      : []),
-    // Squad Backfill — wranglers & admin only
-    ...(isWrangler
-      ? [{ href: '/wrangler/backfill-squad', label: 'Squad Backfill', key: 'wrangler' }]
       : []),
     ...(isLoggedIn && !isExpelled
       ? [{ href: '/profile', label: 'My Profile', key: 'profile' }]
@@ -140,6 +137,35 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                     Store Orders
                   </Link>
                   <GenerateInviteItem />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Wrangler submenu — desktop */}
+          {isWrangler && (
+            <div className="relative ml-1"
+              onMouseEnter={() => setWranglerOpen(true)}
+              onMouseLeave={() => setWranglerOpen(false)}>
+              <button
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                  ${activePage === 'wrangler'
+                    ? 'text-gold border-gold'
+                    : 'text-zinc-500 border-transparent hover:text-gold'}`}>
+                Wrangler ⚒ <span className="text-[8px] mt-0.5">▾</span>
+              </button>
+              {wranglerOpen && (
+                <div className="absolute top-14 left-0 w-52 bg-ink-2 border border-ink-5 rounded-b shadow-xl z-50">
+                  <Link href="/wrangler/backfill-squad"
+                    onClick={() => setWranglerOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors border-b border-ink-5">
+                    🧩 Squad Backfill
+                  </Link>
+                  <Link href="/wrangler/grounds"
+                    onClick={() => setWranglerOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors">
+                    📍 Grounds
+                  </Link>
                 </div>
               )}
             </div>
@@ -328,6 +354,21 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
                 Store Orders
               </Link>
               <GenerateInviteItem mobile onClose={() => setOpen(false)} />
+            </>
+          )}
+          {isWrangler && (
+            <>
+              <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 pt-3">
+                Wrangler
+              </p>
+              <Link href="/wrangler/backfill-squad" onClick={() => setOpen(false)}
+                className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4 text-zinc-400 hover:text-gold">
+                🧩 Squad Backfill
+              </Link>
+              <Link href="/wrangler/grounds" onClick={() => setOpen(false)}
+                className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4 text-zinc-400 hover:text-gold">
+                📍 Grounds
+              </Link>
             </>
           )}
         </div>

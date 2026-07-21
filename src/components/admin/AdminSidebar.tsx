@@ -11,7 +11,6 @@ const NAV = [
   { href: '/admin/soft-blocks/new',  label: 'Soft Blocks',      icon: '🔒' },
   { href: '/admin/captains',         label: 'Captains',         icon: '👥', section: 'Master Data' },
   { href: '/admin/tournaments',      label: 'Tournaments',      icon: '🏆' },
-  { href: '/admin/grounds',          label: 'Grounds',          icon: '📍' },
   { href: '/schedule',               label: 'Organiser View',   icon: '🌐', section: 'Views' },
   { href: '/fixtures',               label: 'Upcoming Matches', icon: '🏏' },
   { href: '/matches/history',        label: 'Past Matches',     icon: '📜' },
