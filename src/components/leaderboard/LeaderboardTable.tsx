@@ -72,14 +72,35 @@ const DEFAULT_SORT: Record<TableCategory, SortKey> = {
   batting: 'runs', bowling: 'wickets', fielding: 'dismissals', mvp: 'mvpPoints',
 }
 
-export function LeaderboardTable({ rows, category }: { rows: LeaderboardRow[]; category: TableCategory }) {
+export function LeaderboardTable({ rows, category, tournamentFiltered }: {
+  rows: LeaderboardRow[]
+  category: TableCategory
+  tournamentFiltered: boolean
+}) {
   const [sortKey, setSortKey]   = useState<SortKey>(DEFAULT_SORT[category])
   const [sortDesc, setSortDesc] = useState(true)
 
   const columns = COLUMNS[category]
 
+  // Within a specific tournament, "matches" (squad appearances) can include
+  // players who never actually got an innings in that department — a
+  // batting-only player is still "in" every match for the bowling table's
+  // matches count, for instance. Scoped to a single tournament this reads as
+  // noise (Avg/S-R/Econ all blank for them), so they're pulled out of the
+  // sortable table and named below it instead, mirroring the "Did not bat"
+  // pattern used on individual match scorecards (see ScorecardTables.tsx).
+  // Left alone for the all-tournaments career view — there, showing every
+  // rostered player regardless of innings count is the expected behaviour.
+  const zeroInningsFilter: ((r: LeaderboardRow) => boolean) | null =
+    tournamentFiltered && category === 'batting' ? r => r.stats.battingInnings === 0
+    : tournamentFiltered && category === 'bowling' ? r => r.stats.bowlingInnings === 0
+    : null
+
+  const excludedRows = zeroInningsFilter ? rows.filter(zeroInningsFilter) : []
+  const visibleRows  = zeroInningsFilter ? rows.filter(r => !zeroInningsFilter(r)) : rows
+
   const sorted = useMemo(() => {
-    return [...rows].sort((a, b) => {
+    return [...visibleRows].sort((a, b) => {
       const av = statValue(a, sortKey)
       const bv = statValue(b, sortKey)
       if (av == null && bv == null) return 0
@@ -87,7 +108,7 @@ export function LeaderboardTable({ rows, category }: { rows: LeaderboardRow[]; c
       if (bv == null) return -1
       return sortDesc ? bv - av : av - bv
     })
-  }, [rows, sortKey, sortDesc])
+  }, [visibleRows, sortKey, sortDesc])
 
   function handleSort(key: SortKey) {
     if (key === sortKey) { setSortDesc(d => !d); return }
@@ -134,6 +155,17 @@ export function LeaderboardTable({ rows, category }: { rows: LeaderboardRow[]; c
           </tbody>
         </table>
       </div>
+      {excludedRows.length > 0 && (
+        <p className="px-4 py-2.5 border-t border-ink-5 font-rajdhani text-xs text-zinc-500 flex flex-wrap items-baseline gap-x-1">
+          <span className="text-zinc-600">{category === 'batting' ? 'Did not bat:' : 'Did not bowl:'}</span>
+          {excludedRows.map((row, i) => (
+            <span key={row.playerId}>
+              <PlayerNameLink name={row.playerName} playerId={row.playerId} cricHeroesUrl={row.cricheroesUrl} />
+              {i < excludedRows.length - 1 ? ',' : ''}
+            </span>
+          ))}
+        </p>
+      )}
     </div>
   )
 }
