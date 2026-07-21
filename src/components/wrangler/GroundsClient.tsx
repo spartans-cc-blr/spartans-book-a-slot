@@ -196,16 +196,30 @@ export function GroundsClient() {
                     <>
                       <td className="px-4 py-3 font-rajdhani font-semibold text-sm text-parchment">{g.name}</td>
                       <td className="px-4 py-3">
-                        <a href={g.maps_url} target="_blank" rel="noopener noreferrer"
-                          className="font-rajdhani text-xs text-emerald-500 hover:text-emerald-400 hover:underline">
-                          📍 Open Maps ↗
-                        </a>
+                        {g.maps_url ? (
+                          <a href={g.maps_url} target="_blank" rel="noopener noreferrer"
+                            className="font-rajdhani text-xs text-emerald-500 hover:text-emerald-400 hover:underline">
+                            📍 Open Maps ↗
+                          </a>
+                        ) : (
+                          <button onClick={() => startEdit(g)}
+                            className="font-rajdhani text-xs text-amber-500 hover:text-amber-400 hover:underline">
+                            ⚠ Not set — add link
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3">
-                        <a href={g.hospital_url} target="_blank" rel="noopener noreferrer"
-                          className="font-rajdhani text-xs text-red-400 hover:text-red-300 hover:underline">
-                          🏥 Open Hospital ↗
-                        </a>
+                        {g.hospital_url ? (
+                          <a href={g.hospital_url} target="_blank" rel="noopener noreferrer"
+                            className="font-rajdhani text-xs text-red-400 hover:text-red-300 hover:underline">
+                            🏥 Open Hospital ↗
+                          </a>
+                        ) : (
+                          <button onClick={() => startEdit(g)}
+                            className="font-rajdhani text-xs text-amber-500 hover:text-amber-400 hover:underline">
+                            ⚠ Not set — add link
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <button onClick={() => startEdit(g)}
