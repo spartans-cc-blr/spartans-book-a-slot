@@ -6,7 +6,7 @@
 //  - Rate limited by IP — no playerId to key on
 //  - All fields validated with Zod before any DB touch
 //  - gmail_id taken ONLY from session.user.email — never from request body
-//  - is_captain, is_gc, wallet_balance, active, status hardcoded server-side
+//  - is_captain, is_gc, wallet_balance, status hardcoded server-side
 //  - Token validated atomically: must exist + unused + not expired
 //  - Token marked consumed in same transaction as player insert
 
@@ -128,7 +128,6 @@ export async function POST(req: NextRequest) {
       primary_skill:  primary_skill || null,
       dob:            dob          || null,
       // ── hardcoded — never from body ──
-      active:         true,
       status:         'active',
       is_captain:     false,
       is_gc:          false,

@@ -240,6 +240,7 @@ These must be completed before any payment code is written:
 - [x] **`NEXTAUTH_URL` verification** — confirm this is explicitly set in Vercel production (not just derived) to prevent OAuth callback URL mismatches on custom domain.
 - [ ] **Payment webhook signature verification** — when Razorpay or Stripe is integrated, webhook payloads must be verified using the provider's signing secret before any database writes. Never trust the payload body alone.
 - [x] **`squad` table RLS** — enabled via migration 007. Blanket deny for anon/authenticated roles. All access via service role through API routes only.
+- [x] **RLS policies keyed on deprecated `players.active`** — `admin_full_squad`, `captain_manage_own_squad` (both on `squad`), and `captain_read_all_availability` (on `availability`) checked `p.active = true` on the *acting* captain/admin's own player row. Rewritten in `supabase/migrations/048_rls_status_not_active.sql` to check `p.status != 'expelled'` instead, matching the single-source-of-truth decision in `features/gc-players.md`. All application code paths reading/writing `players.active` were cleaned up in the same pass (see that doc's §13 for the file list); the `active` column itself is not yet dropped — see `supabase/migrations/049_drop_players_active_column.sql` (written, intentionally not applied).
 
 ---
 

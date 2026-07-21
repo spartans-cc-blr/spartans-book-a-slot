@@ -35,7 +35,7 @@ type Player = {
   id: string
   name: string
   is_captain: boolean
-  active: boolean
+  status: 'active' | 'inactive' | 'expelled'
   cricheroes_url: string | null
 }
 
@@ -84,7 +84,7 @@ export default function AdminCaptainsPage() {
 
   const activeCaptains     = captains.filter(c => c.active)
   const inactiveCaptains   = captains.filter(c => !c.active)
-  const captainPlayers     = allPlayers.filter(p => p.is_captain && p.active)
+  const captainPlayers     = allPlayers.filter(p => p.is_captain && p.status !== 'expelled')
   const linkedPlayerIds    = new Set(captains.map(c => c.player_id).filter(Boolean))
   const unlinkedCaptainPlayers = captainPlayers.filter(p => !linkedPlayerIds.has(p.id))
 

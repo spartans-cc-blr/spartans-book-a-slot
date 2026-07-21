@@ -377,9 +377,12 @@ function GenerateInviteItem({ mobile, onClose }: { mobile?: boolean; onClose?: (
 
 | Item | Notes |
 |---|---|
-| Migration 003 — drop `active` column | Blocked until four RLS policies (`read_active_players`, `captain_manage_own_squad`, `admin_full_squad`, `captain_read_all_availability`) are documented from Supabase Dashboard and rewritten in SQL |
-| `active` in auth.ts select | Remove `.select('... active ...')` once migration 003 ships |
-| Admin inline edit form | Remove `active` boolean toggle — deprecated field |
+| Migration "003" — RLS rewritten off `active` | ✅ Done (July 2026) — `supabase/migrations/048_rls_status_not_active.sql`. `read_active_players` had already been dropped separately (035); the remaining three (`captain_manage_own_squad`, `admin_full_squad`, `captain_read_all_availability`) now key on `status != 'expelled'` instead of `active = true`. Byte-for-byte identical otherwise; a DB-wide `pg_policies` scan confirmed no other policy references `active`. |
+| `active` in auth.ts select | Already clean — `auth.ts`'s player select never included `active` (verified by grep); no change needed. |
+| Admin inline edit form | ✅ Done — `active` boolean toggle removed from `src/app/admin/players/page.tsx`; it was already a no-op since `active` was never in the `PLAYER_COLUMNS` PATCH allowlist. |
+| `players.active` read/write cleanup across app code | ✅ Done — removed from: admin players page (badge styling, active-count, expel PATCH), admin captains page (promotion filter now `status !== 'expelled'`), `CaptainsCornerGrid.tsx` display logic, `captains-corner`/`gc-players` page selects, `GCPlayersGrid.tsx` type, and the hardcoded `active: true` defaults in `POST /api/players` and `POST /api/players/register`. Auto-reactivation bug fixed in `/api/player-availability` — it was flipping `active` instead of `status`, so a returning inactive player never actually got `status = 'active'` back except via the next cron run. |
+| Migration 002 not checked into repo | ⚠️ Confirmed during this pass — `002_consolidate_player_status.sql` was applied directly to the live project (via Supabase MCP) but no such file exists in `supabase/migrations/`. Same drift pattern as the incident documented in `features/availability-nudge.md` §6, just inverted (applied but not committed, vs. merged but not applied). Not reconstructed as part of this change since it's already fully applied; flagging so a future migrations audit doesn't assume it's missing from the DB too. |
+| `players.active` column itself | Not yet dropped — `supabase/migrations/049_drop_players_active_column.sql` is written but intentionally **not applied**. Drop only after the above has been live a few days and re-verified (no RLS policy or app code references `active` — both confirmed clean at time of writing). |
 | Offline withdrawal blind spot | Bounded to one 30-day window. Mitigated by captain discipline logging `L` in Hub |
 
 ---

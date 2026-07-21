@@ -20,7 +20,6 @@ type Player = {
   inducted_on: string | null
   is_captain: boolean
   status: string
-  active: boolean
 }
 
 type StatusFilter = 'active' | 'inactive' | 'expelled' | 'all'
