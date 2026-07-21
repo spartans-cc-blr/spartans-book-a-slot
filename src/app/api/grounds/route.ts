@@ -3,10 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 
-async function requireAdmin() {
+async function requireWranglerOrAdmin() {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
-  if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
+  if (!user?.isWrangler && !user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
   return null
 }
 
@@ -22,7 +22,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const deny = await requireAdmin()
+  const deny = await requireWranglerOrAdmin()
   if (deny) return deny
   const supabase = createServiceClient()
   const body = await request.json()
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const deny = await requireAdmin()
+  const deny = await requireWranglerOrAdmin()
   if (deny) return deny
   const supabase = createServiceClient()
   const body = await request.json()
