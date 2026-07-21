@@ -123,7 +123,9 @@ export function PlayerStatsClient({
             <p className="font-rajdhani text-sm text-stone-500">No matches for this filter.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <Stat label="Matches" value={String(scoped.matches)} />
+              <Stat label="Matches" value={String(scoped.matches)}
+                caption={scoped.battingInnings !== scoped.matches || scoped.bowlingInnings !== scoped.matches
+                  ? `Bat ${scoped.battingInnings} · Bowl ${scoped.bowlingInnings}` : undefined} />
               <Stat label="Runs" value={String(scoped.runs)} />
               <Stat label="Avg" value={scoped.battingAverage?.toFixed(2) ?? '—'} />
               <Stat label="S/R" value={scoped.strikeRate?.toFixed(2) ?? '—'} />
@@ -160,11 +162,12 @@ export function PlayerStatsClient({
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, caption }: { label: string; value: string; caption?: string }) {
   return (
     <div>
       <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 mb-0.5">{label}</p>
       <p className="font-cinzel text-lg font-bold text-ink">{value}</p>
+      {caption && <p className="font-rajdhani text-[10px] text-stone-400 mt-0.5">{caption}</p>}
     </div>
   )
 }

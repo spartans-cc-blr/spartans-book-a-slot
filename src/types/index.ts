@@ -150,6 +150,8 @@ export const BLOCK_REASONS = [
 
 export interface PlayerStatsTotals {
   matches:        number
+  battingInnings: number
+  bowlingInnings: number
   runs:           number
   balls:          number
   notOuts:        number

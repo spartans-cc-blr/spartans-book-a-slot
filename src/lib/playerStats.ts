@@ -61,7 +61,7 @@ function ballsToOversString(balls: number): string {
 
 function emptyTotals(): PlayerStatsTotals {
   return {
-    matches: 0, runs: 0, balls: 0, notOuts: 0,
+    matches: 0, battingInnings: 0, bowlingInnings: 0, runs: 0, balls: 0, notOuts: 0,
     battingAverage: null, strikeRate: null, fours: 0, sixes: 0,
     wickets: 0, ballsBowled: 0, oversBowled: '0.0', runsConceded: 0, economy: null,
     catches: 0, runOuts: 0, stumpings: 0, mvpPoints: 0,
@@ -73,10 +73,13 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
   const t = emptyTotals()
   t.matches = matchIds.size
 
-  // did_not_bat rows are zero-filled placeholders written for every squad
-  // member who didn't get an innings — excluded here the same way
-  // ScorecardTables.tsx excludes them from the batting table.
-  const battingRows = batting.filter(r => r.dismissal_method !== 'did_not_bat')
+  // batting_stats/bowling_stats carry a zero-filled placeholder row for
+  // every squad member regardless of whether they actually got an innings
+  // (see analytics-db/migrations/003_batting_bowling_innings_flags.sql) —
+  // batted/did_bowl are the explicit ground-truth flags for that, written
+  // by spartans-python at parse time. Filtering on them here mirrors what
+  // ScorecardTables.tsx does with the same placeholder rows for display.
+  const battingRows = batting.filter(r => r.batted)
   for (const r of battingRows) {
     t.runs  += num(r.runs)
     t.balls += num(r.balls)
@@ -84,18 +87,18 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
     t.sixes += num(r.sixes)
     if (r.not_out === 'Y') t.notOuts += 1
   }
+  t.battingInnings = battingRows.length
   const dismissals = battingRows.length - t.notOuts
   t.battingAverage = dismissals > 0 ? round2(t.runs / dismissals) : null
   t.strikeRate     = t.balls > 0 ? round2((t.runs / t.balls) * 100) : null
 
-  // overs > 0 excludes players who were in the squad but never bowled —
-  // mirrors ScorecardTables.tsx's bowling-table filter.
-  const bowlingRows = bowling.filter(r => num(r.overs) > 0)
+  const bowlingRows = bowling.filter(r => r.did_bowl)
   for (const r of bowlingRows) {
     t.wickets      += num(r.wickets)
     t.runsConceded += num(r.runs)
     t.ballsBowled  += oversToBalls(num(r.overs))
   }
+  t.bowlingInnings = bowlingRows.length
   t.oversBowled = ballsToOversString(t.ballsBowled)
   t.economy = t.ballsBowled > 0 ? round2(t.runsConceded / (t.ballsBowled / 6)) : null
 
@@ -240,8 +243,8 @@ export async function getPlayerMatchHistory(
     const bowl = bowlingByMatch.get(matchId) as any
     const field = fieldingByMatch.get(matchId) as any
 
-    const battedThisMatch = bat && bat.dismissal_method !== 'did_not_bat'
-    const bowledThisMatch = bowl && num(bowl.overs) > 0
+    const battedThisMatch = bat && bat.batted
+    const bowledThisMatch = bowl && bowl.did_bowl
 
     return {
       matchId,
@@ -313,12 +316,13 @@ export async function getLeaderboard(filters: { year?: number; tournamentId?: st
     )
     if (stats.matches === 0) continue
 
-    // Innings-level milestones — did_not_bat rows excluded the same way
-    // aggregate() excludes them from runs/balls totals.
+    // Innings-level milestones — placeholder (batted = false) rows
+    // excluded the same way aggregate() excludes them from runs/balls
+    // totals.
     let centuries = 0
     let halfCenturies = 0
     for (const r of playerBatting) {
-      if ((r as any).dismissal_method === 'did_not_bat') continue
+      if (!(r as any).batted) continue
       const runs = num((r as any).runs)
       if (runs >= 100) centuries++
       else if (runs >= 50) halfCenturies++
@@ -338,8 +342,8 @@ export async function getRecentForm(playerIds: string[], matchCount: number = 5)
 
   const [teamRes, battingRes, bowlingRes] = await Promise.all([
     analytics.from('team_list').select('match_id, player_id').in('player_id', playerIds),
-    analytics.from('batting_stats').select('match_id, player_id, runs, dismissal_method').in('player_id', playerIds),
-    analytics.from('bowling_stats').select('match_id, player_id, wickets, overs').in('player_id', playerIds),
+    analytics.from('batting_stats').select('match_id, player_id, runs, batted').in('player_id', playerIds),
+    analytics.from('bowling_stats').select('match_id, player_id, wickets, did_bowl').in('player_id', playerIds),
   ])
   if (teamRes.error)    throw new Error(teamRes.error.message)
   if (battingRes.error) throw new Error(battingRes.error.message)
@@ -371,11 +375,11 @@ export async function getRecentForm(playerIds: string[], matchCount: number = 5)
 
     let runs = 0
     for (const r of battingByPlayer.get(playerId) ?? []) {
-      if (recent.has((r as any).match_id) && (r as any).dismissal_method !== 'did_not_bat') runs += num((r as any).runs)
+      if (recent.has((r as any).match_id) && (r as any).batted) runs += num((r as any).runs)
     }
     let wickets = 0
     for (const r of bowlingByPlayer.get(playerId) ?? []) {
-      if (recent.has((r as any).match_id) && num((r as any).overs) > 0) wickets += num((r as any).wickets)
+      if (recent.has((r as any).match_id) && (r as any).did_bowl) wickets += num((r as any).wickets)
     }
 
     result[playerId] = { matches: recent.size, runs, wickets }
