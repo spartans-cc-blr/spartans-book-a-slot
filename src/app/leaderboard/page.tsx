@@ -36,8 +36,8 @@ export default async function LeaderboardPage({
   // logic) — both checked, or the param absent/invalid, both mean "no
   // restriction" and are treated identically.
   const formatParam = searchParams?.format
-  const restrictedFormats: string[] | undefined = formatParam === 'T20' || formatParam === 'T30' ? [formatParam] : undefined
-  const formats: Set<Format> = new Set(restrictedFormats as Format[] | undefined ?? ['T20', 'T30'])
+  const restrictedFormats: Format[] | undefined = formatParam === 'T20' || formatParam === 'T30' ? [formatParam] : undefined
+  const formats: Set<Format> = new Set(restrictedFormats ?? (['T20', 'T30'] as Format[]))
 
   // Tournament/Ground option lists are themselves scoped by the current
   // Format selection, so picking T20-only immediately narrows both
