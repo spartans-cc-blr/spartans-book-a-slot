@@ -33,13 +33,7 @@ export async function GET(req: NextRequest) {
 
   const { data: bookings, error } = await supabase
     .from('bookings')
-    .select(`
-      id, game_date, slot_time, format, opponent_name, match_id,
-      scorecard_uploads(status, error_message),
-      tournament:tournaments!bookings_tournament_id_fkey(
-        id, name, ground:grounds(id, name)
-      )
-    `)
+    .select('id, game_date, slot_time, format, opponent_name, match_id, scorecard_uploads(status, error_message)')
     .eq('status', 'confirmed')
     .lt('game_date', today)
     .not('match_id', 'is', null)
@@ -53,10 +47,6 @@ export async function GET(req: NextRequest) {
       // this as a single object — but a defensive array check costs
       // nothing and avoids a footgun if that ever changes.
       const su = Array.isArray(b.scorecard_uploads) ? b.scorecard_uploads[0] : b.scorecard_uploads
-      const tournament = Array.isArray(b.tournament) ? b.tournament[0] : b.tournament
-      const ground = tournament?.ground
-        ? (Array.isArray(tournament.ground) ? tournament.ground[0] : tournament.ground)
-        : null
       return {
         booking_id:      b.id,
         game_date:       b.game_date,
@@ -64,10 +54,6 @@ export async function GET(req: NextRequest) {
         format:          b.format,
         opponent_name:   b.opponent_name,
         match_id:        b.match_id,
-        tournament_id:   tournament?.id ?? null,
-        tournament_name: tournament?.name ?? null,
-        ground_id:       ground?.id ?? null,
-        ground_name:     ground?.name ?? null,
         current_status:  su?.status ?? null,
         error_message:   su?.error_message ?? null,
       }

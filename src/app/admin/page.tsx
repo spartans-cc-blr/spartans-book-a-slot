@@ -2,19 +2,23 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import Link from 'next/link'
-import { format, parseISO, startOfDay, addDays } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import type { Booking } from '@/types'
 import NLPBookingBar from '@/components/admin/NLPBookingBar'
+import { DashboardBookingsTabs, type DashboardBookingRow } from '@/components/admin/DashboardBookingsTabs'
 
 export const revalidate = 0  // Always fresh for admin
 
-// A single malformed game_date (e.g. a mistyped year) must never crash the
-// whole dashboard for every admin — fall back to the raw value instead.
-function formatGameDate(gameDate: string): string {
-  try {
-    return format(parseISO(gameDate), 'EEE d MMM')
-  } catch {
-    return `Invalid date (${gameDate})`
+function toDashboardRow(b: any): DashboardBookingRow {
+  return {
+    id:              b.id,
+    game_date:       b.game_date,
+    slot_time:       b.slot_time,
+    format:          b.format ?? null,
+    status:          b.status,
+    block_reason:    b.block_reason ?? null,
+    captain_name:    b.tournament?.captains?.name ?? null,
+    tournament_name: b.tournament?.name ?? null,
   }
 }
 
@@ -26,26 +30,41 @@ export default async function AdminDashboard({
   const session  = await getServerSession(authOptions)
   const supabase = createServiceClient()
   const today    = format(new Date(), 'yyyy-MM-dd')
-    
+
+  const tournamentSelect = `
+    id, game_date, slot_time, format, status, venue, opponent_name, block_reason, notes, created_at, updated_at, tournament_id,
+    tournament:tournaments!bookings_tournament_id_fkey(
+      id, name, captains!tournaments_captain_id_fkey(id, name)
+    )
+  `
+
   // Upcoming confirmed bookings + soft blocks
   const { data: bookings } = await supabase
     .from('bookings')
-    .select(`
-      id, game_date, slot_time, format, status, venue, opponent_name, block_reason, notes, created_at, updated_at, tournament_id,
-      tournament:tournaments!bookings_tournament_id_fkey(
-        id, name, captains!tournaments_captain_id_fkey(id, name)
-      )
-    `)
+    .select(tournamentSelect)
     .neq('status', 'cancelled')
     .gte('game_date', today)
     .order('game_date')
     .order('slot_time')
     .limit(100) as { data: Booking[] | null }
 
+  // Past bookings — the only place a completed match's admin edit page
+  // (Post-Match panel: reset upload, sync stats, apply fees) is reachable
+  // from, since scorecard-backfill and match history intentionally don't
+  // link there — see the "Practice games" ground-stats investigation for
+  // why that gap mattered in practice.
+  const { data: pastBookings } = await supabase
+    .from('bookings')
+    .select(tournamentSelect)
+    .neq('status', 'cancelled')
+    .lt('game_date', today)
+    .order('game_date', { ascending: false })
+    .order('slot_time', { ascending: false })
+    .limit(100) as { data: Booking[] | null }
 
   const { data: captains }     = await supabase.from('captains').select('id, name').eq('active', true).order('name')
-const { data: grounds }      = await supabase.from('grounds').select('id, name').order('name')
-const { data: tournamentsMd } = await supabase.from('tournaments').select('id, name').eq('active', true).order('name')
+  const { data: grounds }      = await supabase.from('grounds').select('id, name').order('name')
+  const { data: tournamentsMd } = await supabase.from('tournaments').select('id, name').eq('active', true).order('name')
 
   // This weekend games count
   const day = new Date().getDay()
@@ -55,8 +74,6 @@ const { data: tournamentsMd } = await supabase.from('tournaments').select('id, n
     b => (b.game_date === sat || b.game_date === sun) && b.status === 'confirmed'
   )
   const softBlocks = (bookings ?? []).filter(b => b.status === 'soft_block')
-
-  
 
   return (
     <div>
@@ -79,7 +96,7 @@ const { data: tournamentsMd } = await supabase.from('tournaments').select('id, n
           ✓ Booking saved successfully.
         </div>
       )}
-      
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {[
@@ -96,101 +113,43 @@ const { data: tournamentsMd } = await supabase.from('tournaments').select('id, n
         ))}
       </div>
 
-      {/* Upcoming bookings */}
-        {/* NLP Command Bar */}
-  <div className="mb-5">
-    <NLPBookingBar
-      captains={captains ?? []}
-      grounds={grounds ?? []}
-      tournaments={tournamentsMd ?? []}
-      upcomingBookings={(bookings ?? [])
-        .filter(b => b.status !== 'cancelled')
-        .map(b => ({
-          id: b.id,
-          game_date: b.game_date,
-          slot_time: b.slot_time,
-          format: b.format ?? null,
-          status: b.status,
-          captain_name: (b as any).tournament?.captains?.name ?? null,
-          tournament_name: (b as any).tournament?.name ?? null,
-        }))}
-    />
-  </div>
+      {/* NLP Command Bar */}
+      <div className="mb-5">
+        <NLPBookingBar
+          captains={captains ?? []}
+          grounds={grounds ?? []}
+          tournaments={tournamentsMd ?? []}
+          upcomingBookings={(bookings ?? [])
+            .filter(b => b.status !== 'cancelled')
+            .map(b => ({
+              id: b.id,
+              game_date: b.game_date,
+              slot_time: b.slot_time,
+              format: b.format ?? null,
+              status: b.status,
+              captain_name: (b as any).tournament?.captains?.name ?? null,
+              tournament_name: (b as any).tournament?.name ?? null,
+            }))}
+        />
+      </div>
 
-  <div className="flex items-center justify-between mb-3">
-    <h2 className="font-cinzel text-sm font-semibold text-gold flex items-center gap-2">
-      <span className="w-1 h-4 bg-crimson rounded-sm inline-block" /> Upcoming Bookings
-    </h2>
-    <div className="flex gap-2">
-      <Link href="/admin/soft-blocks/new"
-        className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold px-3 py-1.5 rounded hover:bg-gold/10 transition-colors">
-        🔒 Soft Block
-      </Link>
-      <Link href="/admin/bookings/new"
-        className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark text-white px-3 py-1.5 rounded transition-colors">
-        ＋ New Booking
-      </Link>
-    </div>
-  </div>
-
-      <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-ink-5 bg-ink-4">
-                {['Date', 'Slot', 'Format', 'Captain', 'Tournament', 'Status', ''].map(h => (
-                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(bookings ?? []).length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No upcoming bookings.</td></tr>
-              )}
-              {(bookings ?? []).map(b => (
-                <tr key={b.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
-                  <td className="px-4 py-3 font-rajdhani font-semibold text-sm text-parchment whitespace-nowrap">
-                    {formatGameDate(b.game_date)}
-                  </td>
-                  <td className="px-4 py-3 font-cinzel text-sm text-parchment">{b.slot_time}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{b.format ?? '—'}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{(b as any).tournament?.captains?.name ?? '—'}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400 max-w-[140px] truncate">
-                    {b.status === 'soft_block' ? b.block_reason : (b as any).tournament?.name ?? '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={b.status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <Link href={`/admin/bookings/${b.id}`}
-                        className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
-                        Edit
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="flex items-center justify-end mb-3">
+        <div className="flex gap-2">
+          <Link href="/admin/soft-blocks/new"
+            className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold px-3 py-1.5 rounded hover:bg-gold/10 transition-colors">
+            🔒 Soft Block
+          </Link>
+          <Link href="/admin/bookings/new"
+            className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark text-white px-3 py-1.5 rounded transition-colors">
+            ＋ New Booking
+          </Link>
         </div>
       </div>
+
+      <DashboardBookingsTabs
+        upcoming={(bookings ?? []).map(toDashboardRow)}
+        past={(pastBookings ?? []).map(toDashboardRow)}
+      />
     </div>
-  )
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const cfg = {
-    confirmed:  'bg-emerald-950 border-emerald-800 text-emerald-400',
-    soft_block: 'bg-yellow-950 border-yellow-800 text-yellow-500',
-    cancelled:  'bg-zinc-900 border-zinc-700 text-zinc-500',
-  }[status] ?? 'bg-ink-4 border-ink-5 text-zinc-500'
-
-  return (
-    <span className={`font-rajdhani text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm border ${cfg}`}>
-      {status.replace('_', ' ')}
-    </span>
   )
 }

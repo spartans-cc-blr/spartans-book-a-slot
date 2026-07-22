@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 
 interface Booking {
@@ -10,10 +9,6 @@ interface Booking {
   format:         string | null
   opponent_name:  string | null
   match_id:       string
-  tournament_id:   string | null
-  tournament_name: string | null
-  ground_id:       string | null
-  ground_name:     string | null
   current_status: string | null
   error_message:  string | null
 }
@@ -67,8 +62,6 @@ function RunStatusBadge({ status }: { status: RowStatus }) {
   )
 }
 
-const ALL = '__all__'
-
 export default function ScorecardBackfillPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -76,14 +69,12 @@ export default function ScorecardBackfillPage() {
   const [loadError, setLoadError] = useState('')
   const [running, setRunning]   = useState(false)
   const [results, setResults]   = useState<Record<string, { status: RowStatus; message?: string }>>({})
+  const [resetting, setResetting] = useState<Set<string>>(new Set())
 
-  // Filters
-  const [matchIdQuery, setMatchIdQuery]       = useState('')
-  const [tournamentFilter, setTournamentFilter] = useState(ALL)
-  const [groundFilter, setGroundFilter]       = useState(ALL)
-  const [formatFilter, setFormatFilter]       = useState(ALL)
+  const [matchIdQuery, setMatchIdQuery] = useState('')
 
-  useEffect(() => {
+  function load() {
+    setLoading(true)
     fetch('/api/admin/scorecard-backfill')
       .then(res => res.json())
       .then(data => {
@@ -99,36 +90,15 @@ export default function ScorecardBackfillPage() {
       })
       .catch(() => setLoadError('Network error'))
       .finally(() => setLoading(false))
-  }, [])
+  }
 
-  const tournamentOptions = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const b of bookings) if (b.tournament_id) map.set(b.tournament_id, b.tournament_name ?? b.tournament_id)
-    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
-  }, [bookings])
-
-  const groundOptions = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const b of bookings) if (b.ground_id) map.set(b.ground_id, b.ground_name ?? b.ground_id)
-    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
-  }, [bookings])
-
-  const formatOptions = useMemo(() => {
-    return Array.from(new Set(bookings.map(b => b.format).filter(Boolean))) as string[]
-  }, [bookings])
+  useEffect(load, [])
 
   const filtered = useMemo(() => {
     const q = matchIdQuery.trim().toLowerCase()
-    return bookings.filter(b => {
-      if (q && !b.match_id.toLowerCase().includes(q)) return false
-      if (tournamentFilter !== ALL && b.tournament_id !== tournamentFilter) return false
-      if (groundFilter !== ALL && b.ground_id !== groundFilter) return false
-      if (formatFilter !== ALL && b.format !== formatFilter) return false
-      return true
-    })
-  }, [bookings, matchIdQuery, tournamentFilter, groundFilter, formatFilter])
-
-  const hasActiveFilter = matchIdQuery.trim() !== '' || tournamentFilter !== ALL || groundFilter !== ALL || formatFilter !== ALL
+    if (!q) return bookings
+    return bookings.filter(b => b.match_id.toLowerCase().includes(q))
+  }, [bookings, matchIdQuery])
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -182,6 +152,29 @@ export default function ScorecardBackfillPage() {
     setRunning(false)
   }
 
+  async function resetUpload(b: Booking) {
+    const feesWarning = b.current_status === 'fees_applied'
+      ? '\n\n⚠ Fees have already been applied for this match — resetting the upload does NOT reverse any wallet debits.'
+      : ''
+    if (!confirm(`This clears the scorecard upload record for this booking so it can be re-fetched from scratch.${feesWarning}\n\nContinue?`)) return
+
+    setResetting(prev => new Set(prev).add(b.booking_id))
+    try {
+      const res = await fetch(`/api/admin/matches/${b.booking_id}/post-match`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error ?? 'Reset failed'); return }
+      setBookings(prev => prev.map(row =>
+        row.booking_id === b.booking_id ? { ...row, current_status: null, error_message: null } : row
+      ))
+      setSelected(prev => new Set(prev).add(b.booking_id))
+      setResults(prev => { const next = { ...prev }; delete next[b.booking_id]; return next })
+    } catch {
+      alert('Network error')
+    } finally {
+      setResetting(prev => { const next = new Set(prev); next.delete(b.booking_id); return next })
+    }
+  }
+
   const selectedInFiltered = filtered.filter(b => selected.has(b.booking_id))
   const selectedFeesApplied = selectedInFiltered.filter(b => b.current_status === 'fees_applied')
 
@@ -209,65 +202,20 @@ export default function ScorecardBackfillPage() {
 
       {!loading && !loadError && bookings.length > 0 && (
         <>
-          <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4 flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[160px]">
-              <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-zinc-500">
-                Match ID
-              </label>
-              <input
-                value={matchIdQuery}
-                onChange={e => setMatchIdQuery(e.target.value)}
-                placeholder="e.g. 21868467"
-                className="w-full mt-1 bg-ink-4 border border-ink-5 rounded px-2.5 py-1.5 font-rajdhani text-sm text-zinc-200"
-              />
-            </div>
-            <div className="flex-1 min-w-[160px]">
-              <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-zinc-500">
-                Tournament
-              </label>
-              <select
-                value={tournamentFilter}
-                onChange={e => setTournamentFilter(e.target.value)}
-                className="w-full mt-1 bg-ink-4 border border-ink-5 rounded px-2.5 py-1.5 font-rajdhani text-sm text-zinc-200">
-                <option value={ALL}>All tournaments</option>
-                {tournamentOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-              </select>
-            </div>
-            <div className="flex-1 min-w-[160px]">
-              <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-zinc-500">
-                Ground
-              </label>
-              <select
-                value={groundFilter}
-                onChange={e => setGroundFilter(e.target.value)}
-                className="w-full mt-1 bg-ink-4 border border-ink-5 rounded px-2.5 py-1.5 font-rajdhani text-sm text-zinc-200">
-                <option value={ALL}>All grounds</option>
-                {groundOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-              </select>
-            </div>
-            <div className="min-w-[120px]">
-              <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-zinc-500">
-                Format
-              </label>
-              <select
-                value={formatFilter}
-                onChange={e => setFormatFilter(e.target.value)}
-                className="w-full mt-1 bg-ink-4 border border-ink-5 rounded px-2.5 py-1.5 font-rajdhani text-sm text-zinc-200">
-                <option value={ALL}>All formats</option>
-                {formatOptions.map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
-            </div>
-            {hasActiveFilter && (
-              <button
-                onClick={() => { setMatchIdQuery(''); setTournamentFilter(ALL); setGroundFilter(ALL); setFormatFilter(ALL) }}
-                className="font-rajdhani text-xs font-semibold text-zinc-500 hover:text-gold px-2 py-1.5 transition-colors">
-                Clear filters
-              </button>
-            )}
+          <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4">
+            <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-zinc-500">
+              Match ID
+            </label>
+            <input
+              value={matchIdQuery}
+              onChange={e => setMatchIdQuery(e.target.value)}
+              placeholder="e.g. 21868467"
+              className="w-full mt-1 bg-ink-4 border border-ink-5 rounded px-2.5 py-1.5 font-rajdhani text-sm text-zinc-200 max-w-xs"
+            />
           </div>
 
           {filtered.length === 0 ? (
-            <p className="font-rajdhani text-sm text-zinc-600">No matches found for the current filters.</p>
+            <p className="font-rajdhani text-sm text-zinc-600">No matches found for that match_id.</p>
           ) : (
             <>
               <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
@@ -280,7 +228,7 @@ export default function ScorecardBackfillPage() {
                   </button>
                   <p className="font-rajdhani text-sm text-zinc-400">
                     {selectedInFiltered.length} of {filtered.length} shown selected
-                    {hasActiveFilter && ` (${bookings.length} total)`}
+                    {matchIdQuery && ` (${bookings.length} total)`}
                     {hasRun && ` · ${successCount} done, ${failedCount} failed`}
                   </p>
                 </div>
@@ -296,7 +244,7 @@ export default function ScorecardBackfillPage() {
                 <div className="bg-blue-950/30 border border-blue-800 text-blue-300 font-rajdhani text-sm px-4 py-3 rounded mb-4">
                   ⚠ {selectedFeesApplied.length} selected match{selectedFeesApplied.length > 1 ? 'es' : ''} already
                   {selectedFeesApplied.length > 1 ? ' have' : ' has'} fees applied. Re-running will re-fetch and
-                  re-sync stats only — fees are never re-applied here. Do not click &ldquo;Apply Fees&rdquo; again for
+                  re-sync stats only — fees are never re-applied here. Do not re-apply fees for
                   {selectedFeesApplied.length > 1 ? ' these matches' : ' this match'} afterwards, or players get
                   double-charged.
                 </div>
@@ -306,6 +254,7 @@ export default function ScorecardBackfillPage() {
                 {filtered.map(b => {
                   const result = results[b.booking_id]
                   const status: RowStatus = result?.status ?? 'idle'
+                  const isResetting = resetting.has(b.booking_id)
                   return (
                     <div key={b.booking_id} className="bg-ink-3 border border-ink-5 rounded px-4 py-3 flex items-center gap-3">
                       <input
@@ -320,9 +269,6 @@ export default function ScorecardBackfillPage() {
                           {b.game_date} · {b.slot_time} {b.format ?? ''} · vs {b.opponent_name ?? 'TBD'}
                           <span className="text-zinc-600"> · match_id {b.match_id}</span>
                         </p>
-                        <p className="font-rajdhani text-xs text-zinc-600 mt-0.5">
-                          {b.tournament_name ?? 'No tournament'}{b.ground_name ? ` · ${b.ground_name}` : ''}
-                        </p>
                         {(result?.message || (status === 'idle' && b.error_message)) && (
                           <p className="font-rajdhani text-xs text-red-400 mt-0.5">
                             {result?.message ?? b.error_message}
@@ -331,11 +277,13 @@ export default function ScorecardBackfillPage() {
                       </div>
                       <CurrentStatusBadge status={b.current_status} />
                       <RunStatusBadge status={status} />
-                      <Link
-                        href={`/admin/bookings/${b.booking_id}`}
-                        className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors flex-shrink-0">
-                        Edit ↗
-                      </Link>
+                      <button
+                        onClick={() => resetUpload(b)}
+                        disabled={running || isResetting || !b.current_status}
+                        title={!b.current_status ? 'Nothing to reset — never uploaded' : 'Clear the upload record so it can be re-fetched from scratch'}
+                        className="font-rajdhani text-xs text-zinc-600 hover:text-crimson border border-ink-5 hover:border-crimson px-2 py-1 rounded transition-colors flex-shrink-0 disabled:opacity-40 disabled:hover:text-zinc-600 disabled:hover:border-ink-5">
+                        {isResetting ? 'Resetting…' : 'Reset Upload'}
+                      </button>
                     </div>
                   )
                 })}

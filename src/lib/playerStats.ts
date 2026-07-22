@@ -461,9 +461,22 @@ export async function getRecentForm(playerIds: string[], matchCount: number = 5)
 // through the same bookings.match_id <-> analytics-DB match_id bridge used
 // everywhere else in this file:
 //   tournament — every match in this exact tournament
-//   ground     — every match played at tournaments sharing this booking's
-//                ground (tournaments.ground_id), falling back to an exact
-//                bookings.venue match when the tournament has no ground set
+//   ground     — the UNION of (a) every match under a tournament sharing
+//                this booking's ground (tournaments.ground_id) and (b)
+//                every match whose own free-text bookings.venue matches
+//                this ground's name. Both signals are needed, not either/
+//                or: a generic umbrella tournament like "Practice games"
+//                intentionally has no ground_id of its own (its matches
+//                span many physical grounds), so it only shows up via
+//                venue text — while a properly-tagged tournament like
+//                "BlendIn Challengers 3.0" has ground_id set and its
+//                matches often have no venue text at all. A real incident
+//                (a player's Blendin practice match invisible to the
+//                Blendin Challengers 3.0 ground-stats panel) is exactly a
+//                match that only the venue-text signal could find; fixing
+//                it required unioning both rather than treating venue as a
+//                fallback used only when this booking's own tournament has
+//                no ground_id.
 //   format     — every match of this booking's format (T20/T30), across
 //                every tournament and ground
 // A scope with zero qualifying matches (or zero of them featuring this
@@ -480,7 +493,9 @@ async function matchIdsForFilter(filter: {
   let query = hub.from('bookings').select('match_id').not('match_id', 'is', null)
   if (filter.tournamentId)   query = query.eq('tournament_id', filter.tournamentId)
   if (filter.tournamentIdIn) query = query.in('tournament_id', filter.tournamentIdIn)
-  if (filter.venue)          query = query.eq('venue', filter.venue)
+  // Case-insensitive — CricHeroes/admin-entered venue text and the ground's
+  // own name aren't guaranteed to agree on casing.
+  if (filter.venue)          query = query.ilike('venue', filter.venue)
   if (filter.format)         query = query.eq('format', filter.format)
 
   const { data, error } = await query
@@ -500,31 +515,39 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
   const hub = createServiceClient()
   const { data: booking, error } = await hub
     .from('bookings')
-    .select('tournament_id, format, venue, tournament:tournaments(ground_id)')
+    .select('tournament_id, format, venue, tournament:tournaments(ground_id, ground:grounds(name))')
     .eq('id', bookingId)
     .single()
   if (error) throw new Error(error.message)
   if (!booking) throw new Error('Booking not found')
 
   const tournamentId = booking.tournament_id as string | null
-  const groundId      = (booking as any).tournament?.ground_id as string | null
+  const tournamentRow = (booking as any).tournament
+  const groundId      = tournamentRow?.ground_id as string | null
+  const groundName    = tournamentRow?.ground?.name as string | null
   const venue         = booking.venue as string | null
   const format        = booking.format as string | null
 
-  let groundTournamentIds: string[] | null = null
+  let groundTournamentIds: string[] = []
   if (groundId) {
     const { data: tournaments, error: tErr } = await hub.from('tournaments').select('id').eq('ground_id', groundId)
     if (tErr) throw new Error(tErr.message)
     groundTournamentIds = (tournaments ?? []).map((t: any) => t.id)
   }
 
-  const [tournamentMatchIds, groundMatchIds, formatMatchIds] = await Promise.all([
+  // Prefer the ground's own name for the venue-text match (covers every
+  // booking recorded under that ground regardless of which tournament it's
+  // under); fall back to this booking's own venue only when the tournament
+  // has no ground linked at all.
+  const venueToMatch = groundName ?? venue ?? null
+
+  const [tournamentMatchIds, groundByTournament, groundByVenue, formatMatchIds] = await Promise.all([
     tournamentId ? matchIdsForFilter({ tournamentId }) : Promise.resolve([]),
-    groundTournamentIds
-      ? (groundTournamentIds.length ? matchIdsForFilter({ tournamentIdIn: groundTournamentIds }) : Promise.resolve([]))
-      : (venue ? matchIdsForFilter({ venue }) : Promise.resolve([])),
+    groundTournamentIds.length ? matchIdsForFilter({ tournamentIdIn: groundTournamentIds }) : Promise.resolve([]),
+    venueToMatch ? matchIdsForFilter({ venue: venueToMatch }) : Promise.resolve([]),
     format ? matchIdsForFilter({ format }) : Promise.resolve([]),
   ])
+  const groundMatchIds = Array.from(new Set([...groundByTournament, ...groundByVenue]))
 
   const [tournament, ground, formatStats] = await Promise.all([
     scopedPlayerStats(playerId, tournamentMatchIds),
