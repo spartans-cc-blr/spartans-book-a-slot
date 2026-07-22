@@ -125,24 +125,91 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
   return t
 }
 
-// Resolves a {year, tournamentId} filter to a concrete list of Hub
-// bookings.match_id values. Returns null when neither filter is set — the
-// caller should treat null as "no restriction" (all-time, all-tournament).
-// Returns [] when filters are set but match nothing; the caller MUST
-// short-circuit on an empty array rather than passing it to `.in()`, since
-// an empty `.in()` array does not behave as "match nothing" in every
-// Supabase/PostgREST version and this is safer made explicit.
-async function getScopedMatchIds(filters: { year?: number; tournamentId?: string }): Promise<string[] | null> {
-  if (!filters.year && !filters.tournamentId) return null
+// Resolves a {year, tournamentId, groundId, formats} filter to a concrete
+// list of Hub bookings.match_id values. Returns null when nothing is set —
+// the caller should treat null as "no restriction" (all-time, all
+// tournaments, all grounds, all formats). Returns [] when filters are set
+// but match nothing; the caller MUST short-circuit on an empty array rather
+// than passing it to `.in()`, since an empty `.in()` array does not behave
+// as "match nothing" in every Supabase/PostgREST version and this is safer
+// made explicit.
+//
+// `formats` only restricts when it names a strict subset (length 1 today,
+// since there are only two known formats) — callers pass undefined/empty
+// for "no restriction" rather than the full ['T20','T30'] list, so this
+// never has to special-case "all formats explicitly named".
+async function getScopedMatchIds(filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] }): Promise<string[] | null> {
+  const hasFormatRestriction = !!filters.formats && filters.formats.length > 0
+  if (!filters.year && !filters.tournamentId && !filters.groundId && !hasFormatRestriction) return null
 
   const hub = createServiceClient()
-  let query = hub.from('bookings').select('match_id').not('match_id', 'is', null)
+  let query = hub.from('bookings').select('match_id, tournament_id').not('match_id', 'is', null)
   if (filters.tournamentId) query = query.eq('tournament_id', filters.tournamentId)
   if (filters.year) query = query.gte('game_date', `${filters.year}-01-01`).lte('game_date', `${filters.year}-12-31`)
+  if (hasFormatRestriction) query = query.in('format', filters.formats!)
+
+  // Ground isn't a direct column on a booking — it hangs off the
+  // tournament (tournaments.ground_id). Same resolution chain already used
+  // by getPlayerBookingContextStats() below: resolve which tournaments
+  // share this ground, then constrain to bookings under those tournaments.
+  if (filters.groundId) {
+    const { data: groundTournaments, error: gErr } = await hub.from('tournaments').select('id').eq('ground_id', filters.groundId)
+    if (gErr) throw new Error(gErr.message)
+    const ids = (groundTournaments ?? []).map((t: any) => t.id)
+    if (ids.length === 0) return []
+    query = query.in('tournament_id', ids)
+  }
 
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return Array.from(new Set<string>((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+}
+
+// Tournament and ground option lists for the /leaderboard filter bar,
+// scoped by the currently-selected Format(s). Unrestricted (both formats,
+// or the param omitted) returns the same "every tournament/ground" list as
+// before this feature existed — no bookings scan needed. Restricted to a
+// single format, only tournaments/grounds that actually have a synced
+// match (match_id set) in that format are returned, so the Tournament/
+// Ground dropdowns never offer a combination the leaderboard would then
+// show as empty.
+export async function getFilterOptions(formats?: string[]): Promise<{
+  tournaments: { id: string; name: string }[]
+  grounds:     { id: string; name: string }[]
+}> {
+  const hub = createServiceClient()
+
+  if (!formats || formats.length === 0) {
+    const [{ data: tournaments, error: tErr }, { data: grounds, error: gErr }] = await Promise.all([
+      hub.from('tournaments').select('id, name').order('name', { ascending: true }),
+      hub.from('grounds').select('id, name').order('name', { ascending: true }),
+    ])
+    if (tErr) throw new Error(tErr.message)
+    if (gErr) throw new Error(gErr.message)
+    return { tournaments: tournaments ?? [], grounds: grounds ?? [] }
+  }
+
+  const { data: bookings, error } = await hub
+    .from('bookings')
+    .select('tournament:tournaments(id, name, ground:grounds(id, name))')
+    .in('format', formats)
+    .not('match_id', 'is', null)
+    .not('tournament_id', 'is', null)
+  if (error) throw new Error(error.message)
+
+  const tournamentMap = new Map<string, { id: string; name: string }>()
+  const groundMap = new Map<string, { id: string; name: string }>()
+  for (const row of bookings ?? []) {
+    const t = (row as any).tournament
+    if (!t) continue
+    tournamentMap.set(t.id, { id: t.id, name: t.name })
+    if (t.ground) groundMap.set(t.ground.id, { id: t.ground.id, name: t.ground.name })
+  }
+
+  return {
+    tournaments: Array.from(tournamentMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
+    grounds:     Array.from(groundMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
+  }
 }
 
 async function fetchAnalyticsRows(opts: {
@@ -274,7 +341,7 @@ export async function getPlayerMatchHistory(
   return rows
 }
 
-export async function getLeaderboard(filters: { year?: number; tournamentId?: string } = {}): Promise<LeaderboardRow[]> {
+export async function getLeaderboard(filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}): Promise<LeaderboardRow[]> {
   const scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return []
 

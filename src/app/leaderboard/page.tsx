@@ -1,10 +1,9 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { createServiceClient } from '@/lib/supabase'
-import { getLeaderboard } from '@/lib/playerStats'
+import { getLeaderboard, getFilterOptions } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { LeaderboardFilters, type LeaderboardCategory } from '@/components/leaderboard/LeaderboardFilters'
+import { LeaderboardFilters, type LeaderboardCategory, type Format } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import type { Metadata } from 'next'
@@ -19,7 +18,7 @@ function isCategory(v: string | undefined): v is LeaderboardCategory {
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams?: { year?: string; tournament?: string; category?: string }
+  searchParams?: { year?: string; tournament?: string; ground?: string; category?: string; format?: string }
 }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
@@ -30,18 +29,35 @@ export default async function LeaderboardPage({
   const currentYear = new Date().getFullYear()
   const yearParam = searchParams?.year
   const year: number | 'all' = yearParam === 'all' ? 'all' : (Number(yearParam) || currentYear)
-  const tournamentId = searchParams?.tournament && searchParams.tournament !== 'all' ? searchParams.tournament : 'all'
   const category: LeaderboardCategory = isCategory(searchParams?.category) ? searchParams!.category as LeaderboardCategory : 'milestones'
 
-  const supabase = createServiceClient()
-  const { data: tournaments } = await supabase
-    .from('tournaments')
-    .select('id, name')
-    .order('name', { ascending: true })
+  // Format is checkboxes, not a single-select: only a strict one-format
+  // restriction is ever encoded in the URL (see LeaderboardFilters' toggle
+  // logic) — both checked, or the param absent/invalid, both mean "no
+  // restriction" and are treated identically.
+  const formatParam = searchParams?.format
+  const restrictedFormats: string[] | undefined = formatParam === 'T20' || formatParam === 'T30' ? [formatParam] : undefined
+  const formats: Set<Format> = new Set(restrictedFormats as Format[] | undefined ?? ['T20', 'T30'])
+
+  // Tournament/Ground option lists are themselves scoped by the current
+  // Format selection, so picking T20-only immediately narrows both
+  // dropdowns to tournaments/grounds that actually have a T20 match.
+  const { tournaments, grounds } = await getFilterOptions(restrictedFormats)
+
+  const tournamentParam = searchParams?.tournament && searchParams.tournament !== 'all' ? searchParams.tournament : 'all'
+  const groundParam = searchParams?.ground && searchParams.ground !== 'all' ? searchParams.ground : 'all'
+  // If a previously-selected Tournament/Ground falls outside the current
+  // Format-scoped list (e.g. it only ever played T30 and the captain just
+  // restricted to T20), fall back to "All" rather than showing a <select>
+  // with no matching option or silently querying an inconsistent combo.
+  const tournamentId = tournamentParam === 'all' || tournaments.some(t => t.id === tournamentParam) ? tournamentParam : 'all'
+  const groundId = groundParam === 'all' || grounds.some(g => g.id === groundParam) ? groundParam : 'all'
 
   const rows = await getLeaderboard({
     year: year === 'all' ? undefined : year,
     tournamentId: tournamentId === 'all' ? undefined : tournamentId,
+    groundId: groundId === 'all' ? undefined : groundId,
+    formats: restrictedFormats,
   })
 
   return (
@@ -61,9 +77,12 @@ export default async function LeaderboardPage({
       <div className="px-5 md:px-8 lg:px-10 py-6">
         <LeaderboardFilters
           years={[currentYear, currentYear - 1, currentYear - 2]}
-          tournaments={tournaments ?? []}
+          tournaments={tournaments}
+          grounds={grounds}
           year={year}
           tournamentId={tournamentId}
+          groundId={groundId}
+          formats={formats}
           category={category}
         />
 
