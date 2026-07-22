@@ -22,21 +22,72 @@ interface Preview {
 const SLOT_TIMES = ['07:30', '10:30', '12:30', '14:30'] as const
 const FORMATS = ['T20', 'T30'] as const
 
-// Flags any player who's on the team roster (team_lists) but whose bowling
-// entry came back empty in player_stats — the exact signature of the
-// first-bowler-row parsing bug (see field_extractors.py's
-// _extract_bowling_stats): the player exists, but their figures never made
-// it out of the extraction loop. Doesn't imply they didn't bowl — only that
-// this is worth a manual cross-check against the real scorecard.
-function findEmptyBowlingEntries(preview: Preview): { team: string; player: string }[] {
+// A player with an empty bowling entry is NOT on its own evidence of a bug —
+// most of a roster genuinely never bowls in a given match, and that produces
+// the identical {} signature as the real first-bowler-row extraction bug
+// (see field_extractors.py's _extract_bowling_stats). To tell the two apart
+// without needing the actual CricHeroes scorecard, cross-reference the
+// OPPOSING team's batting dismissal text: `player_stats[team][player]
+// .batting.status` holds the raw CricHeroes dismissal string (e.g. "c
+// Fielder b Bowler", "b Bowler", "lbw b Bowler") — the same field
+// dismissal_parser.py's DismissalParser parses server-side. If a flagged
+// player's name appears as the bowler in any of those, they demonstrably
+// took a wicket in the real match, so an empty bowling row for them can only
+// mean the extraction dropped it — a genuine bug, not a non-bowler.
+function extractBowlerFromDismissal(status: string): string | null {
+  const s = (status ?? '').trim()
+  if (!s || /not out/i.test(s)) return null
+  if (/^lbw\s+b\s+/i.test(s)) return s.replace(/^lbw\s+b\s+/i, '').trim()
+  if (/^b\s+/i.test(s)) return s.replace(/^b\s+/i, '').trim()
+  let m = s.match(/c\s*&\s*b\s+(.+)/i)
+  if (m) return m[1].trim()
+  m = s.match(/c\s*†\s*.+?\s+b\s+(.+)/i)
+  if (m) return m[1].trim()
+  m = s.match(/st\s*†?\s*.+?\s+b\s+(.+)/i)
+  if (m) return m[1].trim()
+  m = s.match(/^c\s+.+?\s+b\s+(.+)/i)
+  if (m) return m[1].trim()
+  return null
+}
+
+const normName = (n: string) => n.trim().toLowerCase()
+
+interface EmptyBowlingEntry {
+  team:   string
+  player: string
+  // true if the opposing team's batting dismissals name this player as the
+  // bowler despite their own bowling row coming back empty — strong
+  // evidence of a real extraction bug rather than a player who just never
+  // bowled that match.
+  likelyBug: boolean
+}
+
+function findEmptyBowlingEntries(preview: Preview): EmptyBowlingEntry[] {
   if (!preview.player_stats || !preview.team_lists) return []
-  const flagged: { team: string; player: string }[] = []
+  const teams = Object.keys(preview.team_lists)
+
+  // Bowler names mentioned in each team's own batting dismissals — i.e. the
+  // bowlers who dismissed THAT team's batsmen, which are the opposing team's
+  // bowlers.
+  const dismissedByBowlerPerTeam = new Map<string, Set<string>>()
+  for (const team of teams) {
+    const names = new Set<string>()
+    for (const stats of Object.values(preview.player_stats[team] ?? {})) {
+      const bowler = extractBowlerFromDismissal((stats as any)?.batting?.status ?? '')
+      if (bowler) names.add(normName(bowler))
+    }
+    dismissedByBowlerPerTeam.set(team, names)
+  }
+
+  const flagged: EmptyBowlingEntry[] = []
   for (const [team, roster] of Object.entries(preview.team_lists)) {
     const teamStats = preview.player_stats[team] ?? {}
+    const otherTeam = teams.find(t => t !== team)
+    const mentionedBowlers = otherTeam ? dismissedByBowlerPerTeam.get(otherTeam) ?? new Set() : new Set<string>()
     for (const player of roster) {
       const bowling = teamStats[player]?.bowling
       if (bowling && Object.keys(bowling).length === 0) {
-        flagged.push({ team, player })
+        flagged.push({ team, player, likelyBug: mentionedBowlers.has(normName(player)) })
       }
     }
   }
@@ -168,12 +219,27 @@ export default function BookingBackfillPage() {
               <p className="font-rajdhani text-xs text-zinc-600">CricHeroes tournament tag: {preview.tournament_name}</p>
             )}
 
-            {findEmptyBowlingEntries(preview).length > 0 && (
-              <p className="font-rajdhani text-xs text-amber-400">
-                ⚠ On the roster but bowling figures came back empty from extraction — cross-check against the real
-                scorecard: {findEmptyBowlingEntries(preview).map(f => f.player).join(', ')}
-              </p>
-            )}
+            {(() => {
+              const flagged = findEmptyBowlingEntries(preview)
+              const likelyBugs = flagged.filter(f => f.likelyBug)
+              const probablyFine = flagged.filter(f => !f.likelyBug)
+              return (
+                <>
+                  {likelyBugs.length > 0 && (
+                    <p className="font-rajdhani text-xs text-red-400">
+                      ⚠ Credited with a wicket in the opponent&apos;s dismissals but their own bowling row is empty —
+                      near-certain extraction bug: {likelyBugs.map(f => f.player).join(', ')}
+                    </p>
+                  )}
+                  {probablyFine.length > 0 && (
+                    <p className="font-rajdhani text-xs text-zinc-600">
+                      On the roster with no bowling figures and not credited with any wicket — most likely just
+                      didn&apos;t bowl this match, not flagged as a bug: {probablyFine.map(f => f.player).join(', ')}
+                    </p>
+                  )}
+                </>
+              )
+            })()}
 
             {(preview.player_stats || preview.team_lists) && (
               <details className="font-rajdhani text-xs text-zinc-500">
