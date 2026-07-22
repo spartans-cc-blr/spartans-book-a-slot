@@ -15,10 +15,33 @@ interface Preview {
   match_type:      string | null
   game_date:       string | null
   match_result:    string | null
+  player_stats:    Record<string, Record<string, any>> | null
+  team_lists:      Record<string, string[]> | null
 }
 
 const SLOT_TIMES = ['07:30', '10:30', '12:30', '14:30'] as const
 const FORMATS = ['T20', 'T30'] as const
+
+// Flags any player who's on the team roster (team_lists) but whose bowling
+// entry came back empty in player_stats — the exact signature of the
+// first-bowler-row parsing bug (see field_extractors.py's
+// _extract_bowling_stats): the player exists, but their figures never made
+// it out of the extraction loop. Doesn't imply they didn't bowl — only that
+// this is worth a manual cross-check against the real scorecard.
+function findEmptyBowlingEntries(preview: Preview): { team: string; player: string }[] {
+  if (!preview.player_stats || !preview.team_lists) return []
+  const flagged: { team: string; player: string }[] = []
+  for (const [team, roster] of Object.entries(preview.team_lists)) {
+    const teamStats = preview.player_stats[team] ?? {}
+    for (const player of roster) {
+      const bowling = teamStats[player]?.bowling
+      if (bowling && Object.keys(bowling).length === 0) {
+        flagged.push({ team, player })
+      }
+    }
+  }
+  return flagged
+}
 
 export default function BookingBackfillPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([])
@@ -143,6 +166,22 @@ export default function BookingBackfillPage() {
             </p>
             {preview.tournament_name && (
               <p className="font-rajdhani text-xs text-zinc-600">CricHeroes tournament tag: {preview.tournament_name}</p>
+            )}
+
+            {findEmptyBowlingEntries(preview).length > 0 && (
+              <p className="font-rajdhani text-xs text-amber-400">
+                ⚠ On the roster but bowling figures came back empty from extraction — cross-check against the real
+                scorecard: {findEmptyBowlingEntries(preview).map(f => f.player).join(', ')}
+              </p>
+            )}
+
+            {(preview.player_stats || preview.team_lists) && (
+              <details className="font-rajdhani text-xs text-zinc-500">
+                <summary className="cursor-pointer hover:text-zinc-300">Raw player_stats / team_lists (debug)</summary>
+                <pre className="mt-1 max-h-64 overflow-auto bg-ink-3 border border-ink-5 rounded p-2 text-[11px] leading-snug whitespace-pre-wrap">
+                  {JSON.stringify({ team_lists: preview.team_lists, player_stats: preview.player_stats }, null, 2)}
+                </pre>
+              </details>
             )}
 
             {!preview.game_date ? (

@@ -27,6 +27,12 @@ export interface BackfillPreview {
   match_type:      string | null
   game_date:       string | null // YYYY-MM-DD, best-effort parsed from CricHeroes' "date" text
   match_result:    string | null
+  // Raw per-player breakdown straight from the microservice, unfiltered —
+  // surfaced so a stuck/zeroed player row (e.g. an extraction bug in
+  // field_extractors.py) can be diagnosed from a dry-run preview alone,
+  // without needing to add debug logging on the Python side first.
+  player_stats:    Record<string, Record<string, any>> | null
+  team_lists:      Record<string, string[]> | null
 }
 
 async function callMicroservice(matchId: string, dryRun: boolean): Promise<any> {
@@ -81,6 +87,8 @@ export async function previewBackfillMatch(matchId: string): Promise<BackfillPre
     match_type:      md.match_type ?? null,
     game_date,
     match_result:    md.result ?? parsed?.match_result ?? null,
+    player_stats:    parsed?.player_stats ?? null,
+    team_lists:      parsed?.team_lists ?? null,
   }
 }
 
