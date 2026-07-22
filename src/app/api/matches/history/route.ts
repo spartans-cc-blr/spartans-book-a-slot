@@ -20,7 +20,20 @@
 //   cursor        — opaque pagination cursor from a previous response
 //   limit         — page size, default 15, max 50
 //   tournament_id — exact match
-//   venue         — exact match on bookings.venue (free-text ground/venue)
+//   ground_id     — resolves to bookings via the UNION of (a) its
+//                   tournament's linked ground (tournaments.ground_id) and
+//                   (b) its own free-text venue matching that ground's name
+//                   (case-insensitive) — same two-signal pattern as
+//                   getScopedMatchIds()/getPlayerBookingContextStats() in
+//                   src/lib/playerStats.ts. Fixes a real undercount: a
+//                   ground filter built from raw bookings.venue text alone
+//                   split "Blendin Cricket Ground" and "Blendin Cricket
+//                   Ground, Bengaluru (Bangalore)" into two buckets even
+//                   though both are the same physical ground.
+//   venue         — exact match on bookings.venue — fallback for genuine
+//                   one-off venues with no grounds-table row; the client
+//                   only sends this for options in filters' `venues` list,
+//                   never for anything that resolved to a `grounds` entry
 //   format        — 'T20' | 'T30'
 //   result        — 'WON' | 'LOST' (whatever match_stats_cache.match_result
 //                   values actually exist) — requires a synced scorecard;
@@ -119,6 +132,7 @@ export async function GET(req: NextRequest) {
   const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), MAX_LIMIT) : DEFAULT_LIMIT
 
   const tournamentId = params.get('tournament_id') || null
+  const groundId     = params.get('ground_id') || null
   const venue        = params.get('venue') || null
   const format       = params.get('format') || null
   const result       = params.get('result') || null
@@ -155,6 +169,41 @@ export async function GET(req: NextRequest) {
     restrictToBookingIds = restrictToBookingIds
       ? restrictToBookingIds.filter(id => resultBookingIds.has(id))
       : Array.from(resultBookingIds)
+    if (restrictToBookingIds.length === 0) return NextResponse.json({ matches: [], nextCursor: null, totalCount: 0 })
+  }
+
+  // Ground filter — resolved to booking IDs via the same union-of-signals
+  // pattern as getScopedMatchIds() (src/lib/playerStats.ts), not a raw
+  // `.eq('venue', ...)` on the main query — see the header comment above.
+  if (groundId) {
+    const [{ data: ground, error: groundErr }, { data: groundTournaments, error: tErr }] = await Promise.all([
+      supabase.from('grounds').select('name').eq('id', groundId).maybeSingle(),
+      supabase.from('tournaments').select('id').eq('ground_id', groundId),
+    ])
+    if (groundErr) return NextResponse.json({ error: groundErr.message }, { status: 500 })
+    if (tErr) return NextResponse.json({ error: tErr.message }, { status: 500 })
+
+    const groundTournamentIds = (groundTournaments ?? []).map((t: any) => t.id)
+    const groundName = ground?.name ?? null
+
+    const [byTournament, byVenue] = await Promise.all([
+      groundTournamentIds.length
+        ? supabase.from('bookings').select('id').eq('status', 'confirmed').lt('game_date', today).in('tournament_id', groundTournamentIds)
+        : Promise.resolve({ data: [] as { id: string }[], error: null }),
+      groundName
+        ? supabase.from('bookings').select('id').eq('status', 'confirmed').lt('game_date', today).ilike('venue', groundName)
+        : Promise.resolve({ data: [] as { id: string }[], error: null }),
+    ])
+    if (byTournament.error) return NextResponse.json({ error: byTournament.error.message }, { status: 500 })
+    if (byVenue.error) return NextResponse.json({ error: byVenue.error.message }, { status: 500 })
+
+    const groundBookingIds = new Set<string>()
+    for (const b of byTournament.data ?? []) groundBookingIds.add(b.id)
+    for (const b of byVenue.data ?? []) groundBookingIds.add(b.id)
+
+    restrictToBookingIds = restrictToBookingIds
+      ? restrictToBookingIds.filter(id => groundBookingIds.has(id))
+      : Array.from(groundBookingIds)
     if (restrictToBookingIds.length === 0) return NextResponse.json({ matches: [], nextCursor: null, totalCount: 0 })
   }
 

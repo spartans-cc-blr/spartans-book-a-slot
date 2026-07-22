@@ -50,6 +50,7 @@ type RoleFilter = 'all' | 'played' | 'led'
 
 interface FilterOptions {
   tournaments: { id: string; name: string }[]
+  grounds:     { id: string; name: string }[]
   venues:      string[]
   formats:     string[]
   months:      string[]
@@ -245,10 +246,13 @@ export function MatchHistoryClient({
   // everything.
   const [monthFilter, setMonthFilter]   = useState(currentMonthStr())
   const [tournamentId, setTournamentId] = useState('')
-  const [venue, setVenue]               = useState('')
+  // Encodes the selected ground option: 'g:<ground_id>' for a resolved
+  // grounds-table entry, 'v:<venue text>' for a raw fallback venue with no
+  // grounds row (a genuine one-off away venue) — see buildParams().
+  const [groundSelection, setGroundSelection] = useState('')
   const [format, setFormat]             = useState('')
 
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ tournaments: [], venues: [], months: [], results: [], formats: ['T20', 'T30'] })
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ tournaments: [], grounds: [], venues: [], months: [], results: [], formats: ['T20', 'T30'] })
 
   const [matches, setMatches]         = useState<MatchSummary[]>([])
   const [nextCursor, setNextCursor]   = useState<string | null>(null)
@@ -272,7 +276,8 @@ export function MatchHistoryClient({
     if (resultFilter) p.set('result', resultFilter)
     if (monthFilter)  p.set('month', monthFilter)
     if (tournamentId) p.set('tournament_id', tournamentId)
-    if (venue)        p.set('venue', venue)
+    if (groundSelection.startsWith('g:')) p.set('ground_id', groundSelection.slice(2))
+    else if (groundSelection.startsWith('v:')) p.set('venue', groundSelection.slice(2))
     if (format)       p.set('format', format)
     return p.toString()
   }
@@ -295,7 +300,7 @@ export function MatchHistoryClient({
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFilter, resultFilter, monthFilter, tournamentId, venue, format])
+  }, [roleFilter, resultFilter, monthFilter, tournamentId, groundSelection, format])
 
   async function loadMore() {
     if (!nextCursor) return
@@ -318,10 +323,10 @@ export function MatchHistoryClient({
   // differs from that default.
   const hasActiveFilters = roleFilter !== 'all' || !!resultFilter
     || (!!monthFilter && monthFilter !== currentMonthStr())
-    || !!tournamentId || !!venue || !!format
+    || !!tournamentId || !!groundSelection || !!format
 
   function clearFilters() {
-    setRoleFilter('all'); setResultFilter(''); setMonthFilter(currentMonthStr()); setTournamentId(''); setVenue(''); setFormat('')
+    setRoleFilter('all'); setResultFilter(''); setMonthFilter(currentMonthStr()); setTournamentId(''); setGroundSelection(''); setFormat('')
   }
 
   return (
@@ -393,10 +398,13 @@ export function MatchHistoryClient({
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
-          <select value={venue} onChange={e => setVenue(e.target.value)} className="form-input text-xs">
+          <select value={groundSelection} onChange={e => setGroundSelection(e.target.value)} className="form-input text-xs">
             <option value="">All grounds</option>
+            {filterOptions.grounds.map(g => (
+              <option key={g.id} value={`g:${g.id}`}>{g.name}</option>
+            ))}
             {filterOptions.venues.map(v => (
-              <option key={v} value={v}>{v}</option>
+              <option key={v} value={`v:${v}`}>{v}</option>
             ))}
           </select>
           <select value={format} onChange={e => setFormat(e.target.value)} className="form-input text-xs">
