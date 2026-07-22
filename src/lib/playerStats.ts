@@ -143,26 +143,53 @@ async function getScopedMatchIds(filters: { year?: number; tournamentId?: string
   if (!filters.year && !filters.tournamentId && !filters.groundId && !hasFormatRestriction) return null
 
   const hub = createServiceClient()
-  let query = hub.from('bookings').select('match_id, tournament_id').not('match_id', 'is', null)
-  if (filters.tournamentId) query = query.eq('tournament_id', filters.tournamentId)
-  if (filters.year) query = query.gte('game_date', `${filters.year}-01-01`).lte('game_date', `${filters.year}-12-31`)
-  if (hasFormatRestriction) query = query.in('format', filters.formats!)
 
-  // Ground isn't a direct column on a booking — it hangs off the
-  // tournament (tournaments.ground_id). Same resolution chain already used
-  // by getPlayerBookingContextStats() below: resolve which tournaments
-  // share this ground, then constrain to bookings under those tournaments.
-  if (filters.groundId) {
-    const { data: groundTournaments, error: gErr } = await hub.from('tournaments').select('id').eq('ground_id', filters.groundId)
-    if (gErr) throw new Error(gErr.message)
-    const ids = (groundTournaments ?? []).map((t: any) => t.id)
-    if (ids.length === 0) return []
-    query = query.in('tournament_id', ids)
+  function baseQuery() {
+    let q = hub.from('bookings').select('match_id').not('match_id', 'is', null)
+    if (filters.tournamentId) q = q.eq('tournament_id', filters.tournamentId)
+    if (filters.year) q = q.gte('game_date', `${filters.year}-01-01`).lte('game_date', `${filters.year}-12-31`)
+    if (hasFormatRestriction) q = q.in('format', filters.formats!)
+    return q
   }
 
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-  return Array.from(new Set<string>((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+  if (!filters.groundId) {
+    const { data, error } = await baseQuery()
+    if (error) throw new Error(error.message)
+    return Array.from(new Set<string>((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+  }
+
+  // Ground isn't a direct column on a booking — resolve it as the UNION of
+  // (a) bookings under a tournament sharing this ground_id and (b)
+  // bookings whose own free-text venue matches this ground's name. (a)
+  // alone misses a ground_id-less umbrella tournament like "Practice
+  // games" (intentionally has no fixed ground_id — its matches span many
+  // physical grounds) whose individual bookings are only ever tagged via
+  // venue text. Real incident: a player's practice match at Blendin was
+  // invisible to the leaderboard's Ground filter until this fix, even
+  // though the identical booking already showed up correctly in Captains'
+  // Corner's ground-scoped Form panel (getPlayerBookingContextStats()
+  // above, which unions the same two signals).
+  const [{ data: ground, error: groundErr }, { data: groundTournaments, error: tErr }] = await Promise.all([
+    hub.from('grounds').select('name').eq('id', filters.groundId).maybeSingle(),
+    hub.from('tournaments').select('id').eq('ground_id', filters.groundId),
+  ])
+  if (groundErr) throw new Error(groundErr.message)
+  if (tErr) throw new Error(tErr.message)
+
+  const groundName = ground?.name ?? null
+  const tournamentIds = (groundTournaments ?? []).map((t: any) => t.id)
+
+  const [byTournament, byVenue] = await Promise.all([
+    tournamentIds.length ? baseQuery().in('tournament_id', tournamentIds) : Promise.resolve({ data: [] as any[], error: null }),
+    groundName ? baseQuery().ilike('venue', groundName) : Promise.resolve({ data: [] as any[], error: null }),
+  ])
+  if (byTournament.error) throw new Error(byTournament.error.message)
+  if (byVenue.error) throw new Error(byVenue.error.message)
+
+  const matchIds = new Set<string>()
+  for (const b of byTournament.data ?? []) if (b.match_id) matchIds.add(b.match_id)
+  for (const b of byVenue.data ?? []) if (b.match_id) matchIds.add(b.match_id)
+  return Array.from(matchIds)
 }
 
 // Tournament and ground option lists for the /leaderboard filter bar,
