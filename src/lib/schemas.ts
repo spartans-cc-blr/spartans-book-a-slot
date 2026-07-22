@@ -166,3 +166,29 @@ export const playerReconciliationRequestSchema = z.discriminatedUnion('mode', [
   playerReconciliationIgnoreSchema,
   playerReconciliationReconcileSchema,
 ])
+
+// ── BOOKING BACKFILL (POST /api/admin/booking-backfill) ────────────────────
+// Creates a Hub `bookings` row for a match that happened but was never
+// entered into Hub at all (predates the portal, or was simply missed) — a
+// different gap from scorecardBackfill.ts, which assumes the booking
+// already exists. See src/lib/bookingBackfill.ts.
+
+const backfillMatchIdField = z.string().min(1, 'match_id is required').max(30)
+
+export const bookingBackfillPreviewSchema = z.object({
+  dry_run:  z.literal(true),
+  match_id: backfillMatchIdField,
+})
+
+export const bookingBackfillConfirmSchema = z.object({
+  dry_run:       z.literal(false),
+  match_id:      backfillMatchIdField,
+  tournament_id: z.string().uuid('tournament_id must be a valid UUID'),
+  format:        z.enum(['T20', 'T30']),
+  slot_time:     z.enum(['07:30', '10:30', '12:30', '14:30']),
+})
+
+export const bookingBackfillRequestSchema = z.discriminatedUnion('dry_run', [
+  bookingBackfillPreviewSchema,
+  bookingBackfillConfirmSchema,
+])
