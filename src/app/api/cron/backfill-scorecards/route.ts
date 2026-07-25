@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
   const { data: bookings, error } = await supabase
     .from('bookings')
-    .select('id, opponent_name, game_date, match_id, scorecard_uploads(status)')
+    .select('id, opponent_name, game_date, match_id, scorecard_uploads(status, needs_reconciliation)')
     .eq('status', 'confirmed')
     .lt('game_date', today)
     .not('match_id', 'is', null)
@@ -54,13 +54,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const eligible = (bookings ?? [])
+  // A booking is eligible either the normal way (never synced) or because a
+  // captain/VC/wrangler/admin flagged it for reconciliation — see
+  // features/post-match-scorecard.md and flag-reconciliation/route.ts. A
+  // flagged booking jumps the queue (sorted first) since a human already
+  // singled it out as wrong, ahead of routine never-synced backlog.
+  const withFlag = (bookings ?? [])
     .map((b: any) => ({
       ...b,
       su: Array.isArray(b.scorecard_uploads) ? b.scorecard_uploads[0] : b.scorecard_uploads,
     }))
-    .filter(b => !b.su || !['synced', 'fees_applied'].includes(b.su.status))
-    .slice(0, MAX_PER_RUN)
+    .filter(b => !b.su || !['synced', 'fees_applied'].includes(b.su.status) || b.su.needs_reconciliation)
+
+  const eligible = [
+    ...withFlag.filter(b => b.su?.needs_reconciliation),
+    ...withFlag.filter(b => !b.su?.needs_reconciliation),
+  ].slice(0, MAX_PER_RUN)
 
   if (eligible.length === 0) {
     return NextResponse.json({ processed: 0, succeeded: 0, failed: 0, results: [] })

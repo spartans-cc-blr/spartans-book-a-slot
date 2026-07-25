@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   const { data: bookings, error } = await supabase
     .from('bookings')
-    .select('id, game_date, slot_time, format, opponent_name, match_id, scorecard_uploads(status, error_message)')
+    .select('id, game_date, slot_time, format, opponent_name, match_id, scorecard_uploads(status, error_message, verified, needs_reconciliation, reconciliation_note, reconciliation_flagged_by, reconciliation_flagged_at)')
     .eq('status', 'confirmed')
     .lt('game_date', today)
     .not('match_id', 'is', null)
@@ -41,24 +41,55 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({
-    bookings: (bookings ?? []).map((b: any) => {
-      // scorecard_uploads.booking_id is UNIQUE, so PostgREST should embed
-      // this as a single object — but a defensive array check costs
-      // nothing and avoids a footgun if that ever changes.
-      const su = Array.isArray(b.scorecard_uploads) ? b.scorecard_uploads[0] : b.scorecard_uploads
-      return {
-        booking_id:      b.id,
-        game_date:       b.game_date,
-        slot_time:       b.slot_time,
-        format:          b.format,
-        opponent_name:   b.opponent_name,
-        match_id:        b.match_id,
-        current_status:  su?.status ?? null,
-        error_message:   su?.error_message ?? null,
-      }
-    }),
+  // scorecard_uploads has several FK columns to players (uploaded_by,
+  // fees_applied_by, verified_by, reconciliation_flagged_by) — an embedded
+  // `players(...)` select would hit the FK-ambiguity error documented in
+  // security.md, so flagger names are resolved via a separate batched
+  // lookup instead, same pattern as ledRes/rolesRes in matches/history.
+  const flaggedByIds = Array.from(new Set(
+    (bookings ?? [])
+      .map((b: any) => (Array.isArray(b.scorecard_uploads) ? b.scorecard_uploads[0] : b.scorecard_uploads)?.reconciliation_flagged_by)
+      .filter(Boolean)
+  ))
+  const { data: flaggers } = flaggedByIds.length
+    ? await supabase.from('players').select('id, name').in('id', flaggedByIds)
+    : { data: [] as { id: string; name: string }[] }
+  const flaggerName = new Map((flaggers ?? []).map((p: any) => [p.id, p.name]))
+
+  const rows = (bookings ?? []).map((b: any) => {
+    // scorecard_uploads.booking_id is UNIQUE, so PostgREST should embed
+    // this as a single object — but a defensive array check costs
+    // nothing and avoids a footgun if that ever changes.
+    const su = Array.isArray(b.scorecard_uploads) ? b.scorecard_uploads[0] : b.scorecard_uploads
+    return {
+      booking_id:      b.id,
+      game_date:       b.game_date,
+      slot_time:       b.slot_time,
+      format:          b.format,
+      opponent_name:   b.opponent_name,
+      match_id:        b.match_id,
+      current_status:  su?.status ?? null,
+      error_message:   su?.error_message ?? null,
+      verified:                       su?.verified ?? false,
+      needs_reconciliation:           su?.needs_reconciliation ?? false,
+      reconciliation_note:            su?.reconciliation_note ?? null,
+      reconciliation_flagged_at:      su?.reconciliation_flagged_at ?? null,
+      reconciliation_flagged_by_name: su?.reconciliation_flagged_by ? (flaggerName.get(su.reconciliation_flagged_by) ?? null) : null,
+    }
   })
+
+  // Flagged rows first (oldest flag first — most overdue), everything else
+  // keeps the query's own game_date-desc order. Array.sort is a stable sort,
+  // so returning 0 for the non-flagged group preserves that order exactly.
+  rows.sort((a, b) => {
+    if (a.needs_reconciliation !== b.needs_reconciliation) return a.needs_reconciliation ? -1 : 1
+    if (a.needs_reconciliation && b.needs_reconciliation) {
+      return (a.reconciliation_flagged_at ?? '').localeCompare(b.reconciliation_flagged_at ?? '')
+    }
+    return 0
+  })
+
+  return NextResponse.json({ bookings: rows })
 }
 
 export async function POST(req: NextRequest) {

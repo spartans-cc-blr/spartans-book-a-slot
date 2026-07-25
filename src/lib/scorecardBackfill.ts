@@ -126,5 +126,33 @@ export async function backfillOneBooking(bookingId: string): Promise<BackfillRes
     }
   }
 
+  // A successful re-sync is what "resolves" a reconciliation flag — the
+  // whole point of flagging was "the stats look wrong", and a fresh sync
+  // just replaced them. Only fires when a flag was actually present (the
+  // .eq('needs_reconciliation', true) makes this a no-op, with no log
+  // noise, on the overwhelming majority of runs where nothing was flagged).
+  // See src/app/api/matches/[id]/flag-reconciliation/route.ts for the
+  // human-driven flag/resolve paths this mirrors.
+  const { data: clearedFlag } = await supabase
+    .from('scorecard_uploads')
+    .update({
+      needs_reconciliation:      false,
+      reconciliation_note:       null,
+      reconciliation_flagged_by: null,
+      reconciliation_flagged_at: null,
+    })
+    .eq('booking_id', bookingId)
+    .eq('needs_reconciliation', true)
+    .select('id')
+
+  if (clearedFlag && clearedFlag.length > 0) {
+    await supabase.from('scorecard_reconciliation_log').insert({
+      booking_id: bookingId,
+      action:     'resolved',
+      note:       'Auto-resolved — scorecard re-fetched and re-synced successfully',
+      actor_id:   null, // null = system, not a human admin action
+    })
+  }
+
   return { booking_id: bookingId, match_id: booking.match_id, ok: true, parsed: true, synced: true }
 }

@@ -11,6 +11,11 @@ interface Booking {
   match_id:       string
   current_status: string | null
   error_message:  string | null
+  verified:                       boolean
+  needs_reconciliation:           boolean
+  reconciliation_note:            string | null
+  reconciliation_flagged_at:      string | null
+  reconciliation_flagged_by_name: string | null
 }
 
 type RowStatus = 'idle' | 'processing' | 'success' | 'failed'
@@ -84,8 +89,13 @@ export default function ScorecardBackfillPage() {
         // Only pre-select rows that genuinely need a run — an already
         // synced/fees_applied match is visible and filterable here, but
         // re-running it is a deliberate choice, not the default action.
+        // Flagged rows are the exception: they're pre-selected regardless
+        // of current_status, since a flag exists specifically to get a
+        // match re-run.
         setSelected(new Set(
-          rows.filter(b => !['synced', 'fees_applied'].includes(b.current_status ?? '')).map(b => b.booking_id)
+          rows
+            .filter(b => b.needs_reconciliation || !['synced', 'fees_applied'].includes(b.current_status ?? ''))
+            .map(b => b.booking_id)
         ))
       })
       .catch(() => setLoadError('Network error'))
@@ -150,6 +160,25 @@ export default function ScorecardBackfillPage() {
       }
     }
     setRunning(false)
+  }
+
+  async function resolveFlag(b: Booking) {
+    if (!confirm(`Clear the reconciliation flag on this match WITHOUT re-running it — use this only for a false alarm.\n\nContinue?`)) return
+    setResetting(prev => new Set(prev).add(b.booking_id))
+    try {
+      const res = await fetch(`/api/matches/${b.booking_id}/flag-reconciliation`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error ?? 'Resolve failed'); return }
+      setBookings(prev => prev.map(row =>
+        row.booking_id === b.booking_id
+          ? { ...row, needs_reconciliation: false, reconciliation_note: null, reconciliation_flagged_at: null, reconciliation_flagged_by_name: null }
+          : row
+      ))
+    } catch {
+      alert('Network error')
+    } finally {
+      setResetting(prev => { const next = new Set(prev); next.delete(b.booking_id); return next })
+    }
   }
 
   async function resetUpload(b: Booking) {
@@ -250,48 +279,131 @@ export default function ScorecardBackfillPage() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                {filtered.map(b => {
-                  const result = results[b.booking_id]
-                  const status: RowStatus = result?.status ?? 'idle'
-                  const isResetting = resetting.has(b.booking_id)
-                  return (
-                    <div key={b.booking_id} className="bg-ink-3 border border-ink-5 rounded px-4 py-3 flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(b.booking_id)}
-                        disabled={running}
-                        onChange={() => toggle(b.booking_id)}
-                        className="flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-rajdhani text-sm text-zinc-300">
-                          {b.game_date} · {b.slot_time} {b.format ?? ''} · vs {b.opponent_name ?? 'TBD'}
-                          <span className="text-zinc-600"> · match_id {b.match_id}</span>
-                        </p>
-                        {(result?.message || (status === 'idle' && b.error_message)) && (
-                          <p className="font-rajdhani text-xs text-red-400 mt-0.5">
-                            {result?.message ?? b.error_message}
-                          </p>
-                        )}
+              {(() => {
+                const flagged = filtered.filter(b => b.needs_reconciliation)
+                const rest    = filtered.filter(b => !b.needs_reconciliation)
+                return (
+                  <>
+                    {flagged.length > 0 && (
+                      <div className="mb-4">
+                        <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-amber-400 mb-2">
+                          ⚠ Needs Reconciliation ({flagged.length})
+                        </h2>
+                        <div className="space-y-2">
+                          {flagged.map(b => (
+                            <BookingRow
+                              key={b.booking_id}
+                              booking={b}
+                              selected={selected.has(b.booking_id)}
+                              running={running}
+                              result={results[b.booking_id]}
+                              isResetting={resetting.has(b.booking_id)}
+                              onToggle={() => toggle(b.booking_id)}
+                              onReset={() => resetUpload(b)}
+                              onResolveFlag={() => resolveFlag(b)}
+                            />
+                          ))}
+                        </div>
                       </div>
-                      <CurrentStatusBadge status={b.current_status} />
-                      <RunStatusBadge status={status} />
-                      <button
-                        onClick={() => resetUpload(b)}
-                        disabled={running || isResetting || !b.current_status}
-                        title={!b.current_status ? 'Nothing to reset — never uploaded' : 'Clear the upload record so it can be re-fetched from scratch'}
-                        className="font-rajdhani text-xs text-zinc-600 hover:text-crimson border border-ink-5 hover:border-crimson px-2 py-1 rounded transition-colors flex-shrink-0 disabled:opacity-40 disabled:hover:text-zinc-600 disabled:hover:border-ink-5">
-                        {isResetting ? 'Resetting…' : 'Reset Upload'}
-                      </button>
+                    )}
+
+                    {flagged.length > 0 && rest.length > 0 && (
+                      <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">
+                        All Matches
+                      </h2>
+                    )}
+
+                    <div className="space-y-2">
+                      {rest.map(b => (
+                        <BookingRow
+                          key={b.booking_id}
+                          booking={b}
+                          selected={selected.has(b.booking_id)}
+                          running={running}
+                          result={results[b.booking_id]}
+                          isResetting={resetting.has(b.booking_id)}
+                          onToggle={() => toggle(b.booking_id)}
+                          onReset={() => resetUpload(b)}
+                          onResolveFlag={() => resolveFlag(b)}
+                        />
+                      ))}
                     </div>
-                  )
-                })}
-              </div>
+                  </>
+                )
+              })()}
             </>
           )}
         </>
       )}
+    </div>
+  )
+}
+
+function BookingRow({
+  booking: b, selected, running, result, isResetting, onToggle, onReset, onResolveFlag,
+}: {
+  booking:     Booking
+  selected:    boolean
+  running:     boolean
+  result:      { status: RowStatus; message?: string } | undefined
+  isResetting: boolean
+  onToggle:      () => void
+  onReset:       () => void
+  onResolveFlag: () => void
+}) {
+  const status: RowStatus = result?.status ?? 'idle'
+  return (
+    <div className={`border rounded px-4 py-3 flex items-center gap-3 ${
+      b.needs_reconciliation ? 'bg-amber-950/20 border-amber-800/60' : 'bg-ink-3 border-ink-5'
+    }`}>
+      <input
+        type="checkbox"
+        checked={selected}
+        disabled={running}
+        onChange={onToggle}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 min-w-0">
+        <p className="font-rajdhani text-sm text-zinc-300">
+          {b.game_date} · {b.slot_time} {b.format ?? ''} · vs {b.opponent_name ?? 'TBD'}
+          <span className="text-zinc-600"> · match_id {b.match_id}</span>
+          {b.verified && <span className="ml-2 text-emerald-400 text-xs">✓ Verified</span>}
+        </p>
+        {(result?.message || (status === 'idle' && b.error_message)) && (
+          <p className="font-rajdhani text-xs text-red-400 mt-0.5">
+            {result?.message ?? b.error_message}
+          </p>
+        )}
+        {b.needs_reconciliation && (
+          <div className="mt-1.5">
+            <p className="font-rajdhani text-xs text-amber-300">
+              🚩 {b.reconciliation_note}
+            </p>
+            <p className="font-rajdhani text-[10px] text-zinc-500">
+              Flagged by {b.reconciliation_flagged_by_name ?? 'someone'}
+              {b.reconciliation_flagged_at ? ` on ${new Date(b.reconciliation_flagged_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+            </p>
+          </div>
+        )}
+      </div>
+      <CurrentStatusBadge status={b.current_status} />
+      <RunStatusBadge status={status} />
+      {b.needs_reconciliation && (
+        <button
+          onClick={onResolveFlag}
+          disabled={running || isResetting}
+          title="Clear this flag without re-running the backfill — use only for a false alarm"
+          className="font-rajdhani text-xs text-zinc-600 hover:text-amber-400 border border-ink-5 hover:border-amber-700 px-2 py-1 rounded transition-colors flex-shrink-0 disabled:opacity-40">
+          Resolve
+        </button>
+      )}
+      <button
+        onClick={onReset}
+        disabled={running || isResetting || !b.current_status}
+        title={!b.current_status ? 'Nothing to reset — never uploaded' : 'Clear the upload record so it can be re-fetched from scratch'}
+        className="font-rajdhani text-xs text-zinc-600 hover:text-crimson border border-ink-5 hover:border-crimson px-2 py-1 rounded transition-colors flex-shrink-0 disabled:opacity-40 disabled:hover:text-zinc-600 disabled:hover:border-ink-5">
+        {isResetting ? 'Resetting…' : 'Reset Upload'}
+      </button>
     </div>
   )
 }

@@ -192,3 +192,20 @@ export const bookingBackfillRequestSchema = z.discriminatedUnion('dry_run', [
   bookingBackfillPreviewSchema,
   bookingBackfillConfirmSchema,
 ])
+
+// ── SCORECARD VERIFICATION & RECONCILIATION ─────────────────────────────────
+// POST /api/matches/[id]/verify-scorecard
+// POST/DELETE /api/matches/[id]/flag-reconciliation
+// See .claude/rules/features/post-match-scorecard.md
+
+export const flagReconciliationSchema = z.object({
+  note: z
+    .string()
+    .min(3, 'Note must be at least 3 characters')
+    .max(500, 'Note max 500 characters')
+    .trim(),
+})
+
+export const resolveReconciliationSchema = z.object({
+  note: z.string().max(500, 'Note max 500 characters').trim().optional(),
+})

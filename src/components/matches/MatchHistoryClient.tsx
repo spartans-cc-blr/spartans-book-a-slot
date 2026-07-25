@@ -44,6 +44,11 @@ interface MatchSummary {
   can_upload:      boolean
   stats:           StatsSummary | null
   roles_complete:  boolean
+  verified:                       boolean
+  needs_reconciliation:           boolean
+  reconciliation_note:            string | null
+  reconciliation_flagged_at:      string | null
+  reconciliation_flagged_by_name: string | null
 }
 
 type RoleFilter = 'all' | 'played' | 'led'
@@ -455,19 +460,56 @@ export function MatchHistoryClient({
         </p>
       )}
 
-      <div className="space-y-3">
-        {matches.map(m => (
-          <MatchHistoryCard
-            key={m.booking_id}
-            match={m}
-            canEditRoles={canEditRoles}
-            canEditTournament={canEditTournament}
-            onScorecardStatusChange={(bookingId, status) =>
-              setMatches(prev => prev.map(x => x.booking_id === bookingId ? { ...x, scorecard_status: status } : x))
-            }
-          />
-        ))}
-      </div>
+      {/* Flagged matches pinned above the rest — scoped to whatever page is
+          currently loaded (this list is cursor-paginated, so a flag on a
+          match many pages back won't jump here until that page is loaded;
+          the admin backfill page at /admin/scorecard-backfill has the full,
+          unpaginated view across every flagged match). */}
+      {(() => {
+        const flagged = matches.filter(m => m.needs_reconciliation)
+        const rest    = matches.filter(m => !m.needs_reconciliation)
+        function patchMatch(bookingId: string, patch: Partial<MatchSummary>) {
+          setMatches(prev => prev.map(x => x.booking_id === bookingId ? { ...x, ...patch } : x))
+        }
+        return (
+          <>
+            {flagged.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-amber-400">
+                  ⚠ Needs Reconciliation
+                </h2>
+                {flagged.map(m => (
+                  <MatchHistoryCard
+                    key={m.booking_id}
+                    match={m}
+                    canEditRoles={canEditRoles}
+                    canEditTournament={canEditTournament}
+                    onScorecardStatusChange={(bookingId, status) => patchMatch(bookingId, { scorecard_status: status })}
+                    onMatchPatch={patchMatch}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="space-y-3">
+              {flagged.length > 0 && rest.length > 0 && (
+                <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">
+                  All Matches
+                </h2>
+              )}
+              {rest.map(m => (
+                <MatchHistoryCard
+                  key={m.booking_id}
+                  match={m}
+                  canEditRoles={canEditRoles}
+                  canEditTournament={canEditTournament}
+                  onScorecardStatusChange={(bookingId, status) => patchMatch(bookingId, { scorecard_status: status })}
+                  onMatchPatch={patchMatch}
+                />
+              ))}
+            </div>
+          </>
+        )
+      })()}
 
       {!loading && nextCursor && (
         <div className="text-center pt-2">
@@ -484,12 +526,13 @@ export function MatchHistoryClient({
 }
 
 function MatchHistoryCard({
-  match, canEditRoles, canEditTournament, onScorecardStatusChange,
+  match, canEditRoles, canEditTournament, onScorecardStatusChange, onMatchPatch,
 }: {
   match: MatchSummary
   canEditRoles: boolean
   canEditTournament: boolean
   onScorecardStatusChange: (bookingId: string, status: ScorecardStatus) => void
+  onMatchPatch: (bookingId: string, patch: Partial<MatchSummary>) => void
 }) {
   const [squadOpen, setSquadOpen]     = useState(false)
   const [detail, setDetail]           = useState<MatchDetail | null>(null)
@@ -614,6 +657,21 @@ function MatchHistoryCard({
         ) : null}
       </div>
 
+      {/* Reconciliation banner — deliberately placed above the result strip
+          so it's the first thing anyone sees on a flagged match, not a
+          detail buried after the score. */}
+      {match.needs_reconciliation && (
+        <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(180, 83, 9, 0.5)', borderRadius: '8px', padding: '8px 10px' }}>
+          <p style={{ fontSize: '11px', fontWeight: 700, color: '#FBBF24' }}>🚩 Needs Reconciliation</p>
+          <p style={{ fontSize: '11px', color: '#FCD34D', marginTop: '2px' }}>{match.reconciliation_note}</p>
+          <p style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '2px' }}>
+            Flagged by {match.reconciliation_flagged_by_name ?? 'someone'}
+            {match.reconciliation_flagged_at ? ` on ${new Date(match.reconciliation_flagged_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+            {' '}· queued for re-fetch
+          </p>
+        </div>
+      )}
+
       {/* Result strip — only once stats have been synced. This is the
           headline of a completed match, so it gets the bordered/prominent
           treatment — a passive "stats synced" note should never outshine it. */}
@@ -693,6 +751,14 @@ function MatchHistoryCard({
         </>
       )}
 
+      {/* Verify / flag-for-reconciliation controls — same audience as
+          upload/sync (captain/VC for this booking, or wrangler/admin for
+          any), only once there are actual synced stats to check against
+          CricHeroes. */}
+      {match.can_upload && ['synced', 'fees_applied'].includes(match.scorecard_status ?? '') && (
+        <ReconciliationControls match={match} onMatchPatch={onMatchPatch} />
+      )}
+
       {/* Collapsible squad — once the scorecard is synced AND C/VC/WK are
           all set, this panel is redundant (the scorecard already lists
           who played, and roles never need touching again). Kept visible
@@ -758,6 +824,114 @@ function MatchHistoryCard({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function ReconciliationControls({
+  match, onMatchPatch,
+}: {
+  match: MatchSummary
+  onMatchPatch: (bookingId: string, patch: Partial<MatchSummary>) => void
+}) {
+  const [flagOpen, setFlagOpen] = useState(false)
+  const [note, setNote]         = useState(match.reconciliation_note ?? '')
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
+
+  async function markVerified() {
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/matches/${match.booking_id}/verify-scorecard`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Failed to verify'); return }
+      onMatchPatch(match.booking_id, { verified: true })
+    } catch {
+      setError('Network error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function submitFlag() {
+    if (note.trim().length < 3) { setError('Note must be at least 3 characters'); return }
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/matches/${match.booking_id}/flag-reconciliation`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ note: note.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Failed to flag'); return }
+      onMatchPatch(match.booking_id, {
+        needs_reconciliation: true,
+        reconciliation_note:  note.trim(),
+        verified:             false,
+      })
+      setFlagOpen(false)
+    } catch {
+      setError('Network error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Already flagged — no further self-service action here. The flag
+  // clears itself automatically the next time this booking is re-fetched
+  // and re-synced (see scorecardBackfill.ts); an admin can also clear it
+  // manually without reprocessing from /admin/scorecard-backfill.
+  if (match.needs_reconciliation) {
+    return (
+      <p style={{ fontSize: '10px', color: '#6B7280' }}>
+        Flagged for reconciliation — will clear automatically once re-synced.
+      </p>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {match.verified ? (
+          <span style={{ fontSize: '10px', color: '#34D399' }}>✓ Verified against CricHeroes</span>
+        ) : (
+          <button onClick={markVerified} disabled={saving}
+            className="font-rajdhani text-[10px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
+            {saving ? 'Saving…' : '✓ Mark Verified'}
+          </button>
+        )}
+        <button onClick={() => setFlagOpen(v => !v)} disabled={saving}
+          className="font-rajdhani text-[10px] font-bold tracking-wide text-amber-400 hover:text-amber-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
+          🚩 Flag for Reconciliation
+        </button>
+      </div>
+
+      {flagOpen && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="What looks wrong compared to CricHeroes?"
+            maxLength={500}
+            rows={2}
+            className="w-full bg-ink-4 border border-ink-5 rounded px-2 py-1.5 font-rajdhani text-xs text-zinc-200"
+          />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={submitFlag} disabled={saving || note.trim().length < 3}
+              className="font-rajdhani text-[10px] font-bold tracking-wide bg-amber-950/40 border border-amber-800 text-amber-400 hover:bg-amber-900/40 disabled:opacity-40 px-2.5 py-1 rounded transition-colors">
+              {saving ? 'Submitting…' : 'Submit Flag'}
+            </button>
+            <button onClick={() => setFlagOpen(false)} disabled={saving}
+              className="font-rajdhani text-[10px] font-semibold text-zinc-500 hover:text-zinc-300 disabled:opacity-40 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <p style={{ fontSize: '10px', color: '#F87171' }}>{error}</p>}
     </div>
   )
 }

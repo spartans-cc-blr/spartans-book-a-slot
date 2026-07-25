@@ -263,7 +263,7 @@ export async function GET(req: NextRequest) {
   // below. Role coverage drives whether the Squad collapsible even needs to
   // be shown on a card that already has synced stats (see roles_complete).
   const [uploadsRes, statsRes, ledRes, rolesRes] = bookingIds.length ? await Promise.all([
-    supabase.from('scorecard_uploads').select('booking_id, status, uploaded_at').in('booking_id', bookingIds),
+    supabase.from('scorecard_uploads').select('booking_id, status, uploaded_at, verified, needs_reconciliation, reconciliation_note, reconciliation_flagged_by, reconciliation_flagged_at').in('booking_id', bookingIds),
     supabase.from('match_stats_cache').select('booking_id, match_result, team_total, team_wickets, team_overs, opponent_total, opponent_wickets, opponent_overs, batting, bowling').in('booking_id', bookingIds),
     user?.playerId
       ? supabase.from('squad').select('booking_id').eq('player_id', user.playerId).in('booking_id', bookingIds).or('is_captain.eq.true,is_vc.eq.true')
@@ -274,6 +274,19 @@ export async function GET(req: NextRequest) {
   const uploadByBooking = new Map((uploadsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const statsByBooking  = new Map((statsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const ledBookingIds   = new Set((ledRes.data ?? []).map((r: any) => r.booking_id))
+
+  // scorecard_uploads has several FK columns to players (uploaded_by,
+  // fees_applied_by, verified_by, reconciliation_flagged_by) — an embedded
+  // `players(...)` select would hit the FK-ambiguity error documented in
+  // security.md, so flagger names are resolved via this separate batched
+  // lookup instead, same pattern as the ledRes/rolesRes queries above.
+  const flaggedByIds = Array.from(new Set(
+    (uploadsRes.data ?? []).map((r: any) => r.reconciliation_flagged_by).filter(Boolean)
+  ))
+  const { data: flaggers } = flaggedByIds.length
+    ? await supabase.from('players').select('id, name').in('id', flaggedByIds)
+    : { data: [] as { id: string; name: string }[] }
+  const flaggerName = new Map((flaggers ?? []).map((p: any) => [p.id, p.name]))
 
   // roles_complete: at least one squad row for the booking has is_captain,
   // one has is_vc, and one has is_wk. Computed per-booking from the flat
@@ -308,6 +321,11 @@ export async function GET(req: NextRequest) {
       // Never trust the client — eligibility is derived from the session's
       // own role flags plus a server-side squad lookup, never client params.
       can_upload: !!user?.isWrangler || !!user?.isAdmin || ledBookingIds.has(b.id),
+      verified:                       upload?.verified ?? false,
+      needs_reconciliation:           upload?.needs_reconciliation ?? false,
+      reconciliation_note:            upload?.reconciliation_note ?? null,
+      reconciliation_flagged_at:      upload?.reconciliation_flagged_at ?? null,
+      reconciliation_flagged_by_name: upload?.reconciliation_flagged_by ? (flaggerName.get(upload.reconciliation_flagged_by) ?? null) : null,
       stats: statsRow ? summarizeStats(statsRow) : null,
       roles_complete: (() => {
         const r = rolesByBooking.get(b.id)
