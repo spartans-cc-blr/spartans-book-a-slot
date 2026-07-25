@@ -188,6 +188,20 @@ function CricHeroesIcon({ size = 20 }: { size?: number }) {
   )
 }
 
+// Scalloped-seal "verified" badge — the familiar shape from Twitter/X and
+// similar platforms (two overlapping rounded squares offset 45° to form an
+// 8-point rosette, with a checkmark inside) rather than a bare tick, so a
+// verified match reads as a distinct status badge, not just a checked box.
+function VerifiedBadge({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="3" width="16" height="16" rx="4" fill="#059669" />
+      <rect x="3" y="3" width="16" height="16" rx="4" fill="#059669" transform="rotate(45 11 11)" />
+      <path d="M6.8 11.3l3 3 5.6-6.4" stroke="white" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  )
+}
+
 // Mirrors src/components/fixtures/FixturesCard.tsx's MapPinIcon exactly, so
 // the ground link reads as the same affordance across both cards.
 function MapPinIcon({ size = 18 }: { size?: number }) {
@@ -891,17 +905,25 @@ function ReconciliationControls({
     )
   }
 
+  // Already verified — the whole point of flagging is "something looks
+  // wrong", which contradicts a standing "confirmed correct." Once
+  // verified, there's nothing left to offer here; the flag action only
+  // reappears if verified is ever cleared server-side.
+  if (match.verified) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#34D399' }}>
+        <VerifiedBadge size={14} /> Verified against CricHeroes
+      </span>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {match.verified ? (
-          <span style={{ fontSize: '10px', color: '#34D399' }}>✓ Verified against CricHeroes</span>
-        ) : (
-          <button onClick={markVerified} disabled={saving}
-            className="font-rajdhani text-[10px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
-            {saving ? 'Saving…' : '✓ Mark Verified'}
-          </button>
-        )}
+        <button onClick={markVerified} disabled={saving}
+          className="font-rajdhani text-[10px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
+          {saving ? 'Saving…' : 'Mark Verified'}
+        </button>
         <button onClick={() => setFlagOpen(v => !v)} disabled={saving}
           className="font-rajdhani text-[10px] font-bold tracking-wide text-amber-400 hover:text-amber-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
           🚩 Flag for Reconciliation

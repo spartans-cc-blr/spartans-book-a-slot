@@ -25,6 +25,18 @@ type RowStatus = 'idle' | 'processing' | 'success' | 'failed'
 // requests rather than firing them all at once).
 const DELAY_BETWEEN_MS = 4000
 
+// Scalloped-seal "verified" badge — mirrors VerifiedBadge in
+// MatchHistoryClient.tsx so the same match reads identically here.
+function VerifiedBadge({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="3" width="16" height="16" rx="4" fill="#059669" />
+      <rect x="3" y="3" width="16" height="16" rx="4" fill="#059669" transform="rotate(45 11 11)" />
+      <path d="M6.8 11.3l3 3 5.6-6.4" stroke="white" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  )
+}
+
 const RUN_STATUS_CONFIG: Record<RowStatus, { label: string; className: string }> = {
   idle:       { label: 'Pending',   className: 'bg-ink-4 border-ink-5 text-zinc-500' },
   processing: { label: 'Fetching…', className: 'bg-amber-950/40 border-amber-800 text-amber-400' },
@@ -367,7 +379,11 @@ function BookingRow({
         <p className="font-rajdhani text-sm text-zinc-300">
           {b.game_date} · {b.slot_time} {b.format ?? ''} · vs {b.opponent_name ?? 'TBD'}
           <span className="text-zinc-600"> · match_id {b.match_id}</span>
-          {b.verified && <span className="ml-2 text-emerald-400 text-xs">✓ Verified</span>}
+          {b.verified && (
+            <span className="ml-2 inline-flex items-center gap-1 text-emerald-400 text-xs align-middle">
+              <VerifiedBadge /> Verified
+            </span>
+          )}
         </p>
         {(result?.message || (status === 'idle' && b.error_message)) && (
           <p className="font-rajdhani text-xs text-red-400 mt-0.5">
