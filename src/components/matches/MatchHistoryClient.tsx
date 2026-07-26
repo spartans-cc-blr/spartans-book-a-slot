@@ -189,6 +189,21 @@ function CricHeroesIcon({ size = 20 }: { size?: number }) {
   )
 }
 
+// The one real, clickable CricHeroes icon reused inline wherever a verify
+// line references it (VerifiedStatusLine below, and the action line in
+// ReconciliationControls) — opens match.cricheroes_url in a new tab,
+// independent of whatever verify/notify action sits next to it. Renders a
+// plain, non-interactive icon when there's no URL to link to.
+function CricHeroesInlineLink({ url, size = 16 }: { url: string | null; size?: number }) {
+  const icon = <CricHeroesIcon size={size} />
+  if (!url) return icon
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes" style={{ display: 'inline-flex', lineHeight: 0 }}>
+      {icon}
+    </a>
+  )
+}
+
 // Scalloped-seal "verified" badge — the familiar shape from Twitter/X and
 // similar platforms (two overlapping rounded squares offset 45° to form an
 // 8-point rosette, with a checkmark inside) rather than a bare tick, so a
@@ -200,6 +215,21 @@ function VerifiedBadge({ size = 15 }: { size?: number }) {
       <rect x="3" y="3" width="16" height="16" rx="4" fill="#059669" transform="rotate(45 11 11)" />
       <path d="M6.8 11.3l3 3 5.6-6.4" stroke="white" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </svg>
+  )
+}
+
+// Read-only "verified" announcement — shown to every viewer of a verified
+// match, not just the captain/VC/wrangler/admin audience that could set it.
+// Once verified there's nothing actionable left, so this is the same line
+// for everyone; see the render call site in MatchHistoryCard for how it's
+// kept separate from the privileged ReconciliationControls.
+function VerifiedStatusLine({ cricheroesUrl }: { cricheroesUrl: string | null }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#34D399' }}>
+        <VerifiedBadge size={14} /> Stats verified with <CricHeroesInlineLink url={cricheroesUrl} />
+      </span>
+    </div>
   )
 }
 
@@ -258,7 +288,14 @@ export function MatchHistoryClient({
   canEditTournament: boolean
   viewerPlayerId: string | null
 }) {
-  const [roleFilter, setRoleFilter]     = useState<RoleFilter>('all')
+  // Defaults to "I Played" for registered players — a much smaller result
+  // set than the full club history, so the page's first paint is faster.
+  // Falls back to 'all' for a viewer with no playerId (organiser/unmatched
+  // Gmail) since the API returns an empty list for 'played'/'led' without
+  // one, and the role-filter chips themselves aren't even rendered for
+  // that viewer (see the viewerPlayerId-gated block below) — 'all' is the
+  // only filter such a viewer can actually reach anyway.
+  const [roleFilter, setRoleFilter]     = useState<RoleFilter>(viewerPlayerId ? 'played' : 'all')
   const [resultFilter, setResultFilter] = useState('')
   // Defaults to the current month rather than all-time — the unfiltered
   // view was slow to load, and most visits are for "what happened
@@ -564,16 +601,18 @@ function MatchHistoryCard({
 
   const ballType = match.ball_type ?? 'red'
   const showSyncIndicator = match.can_upload && !!match.scorecard_status && match.scorecard_status !== 'pending_parse'
-  // Whether ReconciliationControls (below) will render its own CricHeroes
-  // icon — true for both its "verified" and "not yet verified" branches,
-  // false for the flagged branch (which has no icon) or when the block
-  // isn't rendered at all. When true, the icon row's separate CricHeroes
-  // link is hidden — that same icon is repurposed into the verify line
-  // instead of showing twice, rather than adding a second, non-interactive
-  // decorative copy of it.
-  const verifyRowHasCricHeroesLink = match.can_upload
+  // Whether the verify area below will render its own CricHeroes icon —
+  // either the universal "Stats verified with" line (any viewer, once
+  // verified) or, for captain/VC/wrangler/admin only, the "Mark Scorecard
+  // as Verified" action line (not yet verified, not flagged — the flagged
+  // branch has no icon). When true, the icon row's separate CricHeroes
+  // link is hidden — that same icon is repurposed below instead of
+  // rendering a second, non-interactive decorative copy of it.
+  const showsPrivilegedVerifyAction = match.can_upload
     && ['synced', 'fees_applied'].includes(match.scorecard_status ?? '')
     && !match.needs_reconciliation
+    && !match.verified
+  const verifyRowHasCricHeroesLink = match.verified || showsPrivilegedVerifyAction
 
   // Squad detail is also needed to resolve CricHeroes links in the
   // scorecard tables, so either panel opening triggers the same fetch.
@@ -658,14 +697,17 @@ function MatchHistoryCard({
       <div>
         <div style={{ fontSize: '15px', fontWeight: 700, color: '#F5F5F5', lineHeight: 1.3, marginBottom: '3px' }}>
           {/* Links into "Yours Statistically" (/leaderboard) pre-filtered to
-              this tournament — category defaults to batting (milestones
-              ignores/resets tournament scoping, see LeaderboardFilters.tsx)
-              and year is forced to 'all' so a tournament spanning outside
-              the current calendar year isn't silently hidden by the page's
-              own current-year default. */}
+              this tournament — category defaults to mvp (milestones ignores/
+              resets tournament scoping, see LeaderboardFilters.tsx) and year
+              is forced to 'all' so a tournament spanning outside the current
+              calendar year isn't silently hidden by the page's own
+              current-year default. Underlined in gold — same hyperlink
+              convention as the tournament name → CricHeroes points table
+              link on FixturesCard.tsx — so it reads as clickable at a glance
+              rather than blending into the plain white heading text. */}
           {match.tournament_id ? (
-            <Link href={`/leaderboard?tournament=${match.tournament_id}&category=batting&year=all`}
-              style={{ color: '#F5F5F5', textDecoration: 'none' }}
+            <Link href={`/leaderboard?tournament=${match.tournament_id}&category=mvp&year=all`}
+              style={{ color: '#F5F5F5', textDecoration: 'underline', textDecorationColor: '#C9A84C', textUnderlineOffset: '3px' }}
               title="View stats for this tournament">
               {match.tournament_name ?? 'Unassigned'}
             </Link>
@@ -790,11 +832,17 @@ function MatchHistoryCard({
         </>
       )}
 
-      {/* Verify / flag-for-reconciliation controls — same audience as
+      {/* Verified status — visible to every viewer, not just the
+          captain/VC/wrangler/admin audience that can act on it. Once a
+          scorecard is verified there's nothing left to do with it, so this
+          is the same read-only line for everyone. */}
+      {match.verified && <VerifiedStatusLine cricheroesUrl={match.cricheroes_url} />}
+
+      {/* Mark-verified / notify-discrepancy controls — same audience as
           upload/sync (captain/VC for this booking, or wrangler/admin for
-          any), only once there are actual synced stats to check against
-          CricHeroes. */}
-      {match.can_upload && ['synced', 'fees_applied'].includes(match.scorecard_status ?? '') && (
+          any). Renders either the flagged info line or the action line;
+          never both, and never once verified (covered above instead). */}
+      {match.can_upload && (match.needs_reconciliation || showsPrivilegedVerifyAction) && (
         <ReconciliationControls match={match} onMatchPatch={onMatchPatch} />
       )}
 
@@ -930,35 +978,10 @@ function ReconciliationControls({
     )
   }
 
-  // The CricHeroes icon here is the SAME functional link as the icon row's
-  // (open match.cricheroes_url in a new tab) — repurposed into this line
-  // instead of duplicated, per verifyRowHasCricHeroesLink in the parent
-  // hiding the icon-row copy whenever this renders. Independently
-  // clickable in both branches below; never part of the verify/checkbox
-  // click target.
-  const cricheroesIcon = match.cricheroes_url ? (
-    <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
-      style={{ display: 'inline-flex', lineHeight: 0 }}>
-      <CricHeroesIcon size={16} />
-    </a>
-  ) : (
-    <CricHeroesIcon size={16} />
-  )
-
-  // Already verified — the whole point of reporting a discrepancy is
-  // "something looks wrong," which contradicts a standing "confirmed
-  // correct." Once verified, that action no longer renders; it only
-  // reappears if verified is ever cleared server-side.
-  if (match.verified) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#34D399' }}>
-          <VerifiedBadge size={14} /> Scorecard verified with {cricheroesIcon}
-        </span>
-      </div>
-    )
-  }
-
+  // match.verified is never true here — the parent only renders this
+  // component while showsPrivilegedVerifyAction or needs_reconciliation
+  // holds, both of which require !match.verified. See VerifiedStatusLine
+  // for the (always-rendered, any-viewer) verified state.
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -976,7 +999,7 @@ function ReconciliationControls({
           className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition-colors">
           {saving ? 'Saving…' : 'Mark Scorecard as Verified with'}
         </span>
-        {cricheroesIcon}
+        <CricHeroesInlineLink url={match.cricheroes_url} />
       </div>
 
       <button onClick={() => setFlagOpen(v => !v)} disabled={saving}
