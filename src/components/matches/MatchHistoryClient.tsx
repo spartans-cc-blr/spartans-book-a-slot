@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { ScorecardUploadButton, type ScorecardStatus } from '@/components/matches/ScorecardUploadButton'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
@@ -202,14 +203,14 @@ function VerifiedBadge({ size = 15 }: { size?: number }) {
   )
 }
 
-// Mirrors src/components/fixtures/FixturesCard.tsx's MapPinIcon exactly, so
-// the ground link reads as the same affordance across both cards.
-function MapPinIcon({ size = 18 }: { size?: number }) {
+// Bell — "notify" affordance for reporting a stats discrepancy. Uses
+// currentColor so it inherits whatever text colour the caller sets.
+function NotifyIcon({ size = 13 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
-        fill="#34A853" stroke="#1E7A3A" strokeWidth="0.5"/>
-      <circle cx="12" cy="9" r="2.5" fill="white" opacity="0.9"/>
+      <path d="M12 2a6 6 0 0 0-6 6v3.09c0 .58-.2 1.14-.57 1.59L4 15h16l-1.43-2.32a2.5 2.5 0 0 1-.57-1.59V8a6 6 0 0 0-6-6z"
+        fill="currentColor" />
+      <path d="M9.5 18a2.5 2.5 0 0 0 5 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />
     </svg>
   )
 }
@@ -223,14 +224,14 @@ function MapPinIcon({ size = 18 }: { size?: number }) {
 // (text-[10px], px-2 py-0.5) — same colours, different shape, so the two
 // surfaces didn't actually match.
 
-// Passive, read-only checkpoints in the scorecard_uploads lifecycle — shown
-// as a small icon + caption alongside CricHeroes/Ground, not as a standalone
-// highlighted box. Only the actionable states (no upload yet, or a stuck
-// pending_parse needing retry) still render as ScorecardUploadButton above.
+// Passive, read-only checkpoint for the one scorecard_uploads state that
+// isn't already covered by the verification row below (ReconciliationControls
+// only renders once status reaches synced/fees_applied). 'synced' and
+// 'fees_applied' used to duplicate that same information here as a plain
+// "Stats synced"/"Fees applied" caption — redundant once the verification
+// row exists, so only the pre-verification-eligible 'parsed' state remains.
 const SYNC_INDICATOR: Partial<Record<ScorecardStatus, { icon: string; label: string; color: string }>> = {
-  parsed:        { icon: '⏳', label: 'Awaiting sync', color: '#9CA3AF' },
-  synced:        { icon: '✓',  label: 'Stats synced',  color: '#6B7280' },
-  fees_applied:  { icon: '✓',  label: 'Fees applied',  color: '#6B7280' },
+  parsed: { icon: '⏳', label: 'Awaiting sync', color: '#9CA3AF' },
 }
 
 function ScorecardSyncIndicator({ status }: { status: ScorecardStatus }) {
@@ -646,7 +647,21 @@ function MatchHistoryCard({
       {/* Tournament + opponent */}
       <div>
         <div style={{ fontSize: '15px', fontWeight: 700, color: '#F5F5F5', lineHeight: 1.3, marginBottom: '3px' }}>
-          {match.tournament_name ?? 'Unassigned'}
+          {/* Links into "Yours Statistically" (/leaderboard) pre-filtered to
+              this tournament — category defaults to batting (milestones
+              ignores/resets tournament scoping, see LeaderboardFilters.tsx)
+              and year is forced to 'all' so a tournament spanning outside
+              the current calendar year isn't silently hidden by the page's
+              own current-year default. */}
+          {match.tournament_id ? (
+            <Link href={`/leaderboard?tournament=${match.tournament_id}&category=batting&year=all`}
+              style={{ color: '#F5F5F5', textDecoration: 'none' }}
+              title="View stats for this tournament">
+              {match.tournament_name ?? 'Unassigned'}
+            </Link>
+          ) : (
+            match.tournament_name ?? 'Unassigned'
+          )}
         </div>
         <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
           vs <span style={{ color: '#D1D5DB', fontWeight: 500 }}>{match.opponent_name || 'TBD'}</span>
@@ -676,10 +691,12 @@ function MatchHistoryCard({
           detail buried after the score. */}
       {match.needs_reconciliation && (
         <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(180, 83, 9, 0.5)', borderRadius: '8px', padding: '8px 10px' }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#FBBF24' }}>🚩 Needs Reconciliation</p>
+          <p style={{ fontSize: '11px', fontWeight: 700, color: '#FBBF24', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <NotifyIcon size={12} /> Stats Discrepancy Reported
+          </p>
           <p style={{ fontSize: '11px', color: '#FCD34D', marginTop: '2px' }}>{match.reconciliation_note}</p>
           <p style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '2px' }}>
-            Flagged by {match.reconciliation_flagged_by_name ?? 'someone'}
+            Reported by {match.reconciliation_flagged_by_name ?? 'someone'}
             {match.reconciliation_flagged_at ? ` on ${new Date(match.reconciliation_flagged_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
             {' '}· queued for re-fetch
           </p>
@@ -737,9 +754,11 @@ function MatchHistoryCard({
         </div>
       )}
 
-      {/* Icons row — sync status (subtle, replaces the old ball/jersey
-          icons), CricHeroes, and ground. Hidden entirely when none apply. */}
-      {(showSyncIndicator || match.cricheroes_url || match.ground?.maps_url) && (
+      {/* Icons row — sync status (subtle) and CricHeroes. The Ground icon
+          was removed here — the ground name under the opponent above is
+          already the clickable affordance for opening the map, so a second
+          identical link further down the card was pure redundancy. */}
+      {(showSyncIndicator || match.cricheroes_url) && (
         <>
           <div style={{ height: '1px', background: '#2D3748' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -747,13 +766,6 @@ function MatchHistoryCard({
               <ScorecardSyncIndicator status={match.scorecard_status} />
             )}
             <div style={{ flex: 1 }} />
-            {match.ground?.maps_url && (
-              <a href={match.ground.maps_url} target="_blank" rel="noopener noreferrer" title="Open ground in Google Maps"
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
-                <MapPinIcon size={22} />
-                <span style={{ fontSize: '9px', color: '#6B7280' }}>Ground</span>
-              </a>
-            )}
             {match.cricheroes_url && (
               <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
@@ -899,39 +911,42 @@ function ReconciliationControls({
   // manually without reprocessing from /admin/scorecard-backfill.
   if (match.needs_reconciliation) {
     return (
-      <p style={{ fontSize: '10px', color: '#6B7280' }}>
-        Flagged for reconciliation — will clear automatically once re-synced.
+      <p style={{ fontSize: '10px', color: '#6B7280', textAlign: 'right' }}>
+        Discrepancy reported — will clear automatically once re-synced.
       </p>
     )
   }
 
-  // Already verified — the whole point of flagging is "something looks
-  // wrong", which contradicts a standing "confirmed correct." Once
-  // verified, there's nothing left to offer here; the flag action only
+  // Already verified — the whole point of reporting a discrepancy is
+  // "something looks wrong," which contradicts a standing "confirmed
+  // correct." Once verified, that action no longer renders; it only
   // reappears if verified is ever cleared server-side.
   if (match.verified) {
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#34D399' }}>
-        <VerifiedBadge size={14} /> Verified against CricHeroes
-      </span>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#34D399' }}>
+          <VerifiedBadge size={14} /> Scorecard verified with <CricHeroesIcon size={16} />
+        </span>
+      </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <button onClick={markVerified} disabled={saving}
-          className="font-rajdhani text-[10px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
-          {saving ? 'Saving…' : 'Mark Verified'}
-        </button>
-        <button onClick={() => setFlagOpen(v => !v)} disabled={saving}
-          className="font-rajdhani text-[10px] font-bold tracking-wide text-amber-400 hover:text-amber-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
-          🚩 Flag for Reconciliation
-        </button>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+      <button onClick={markVerified} disabled={saving}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+        className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
+        {saving ? 'Saving…' : <>Mark Scorecard as Verified with <CricHeroesIcon size={16} /></>}
+      </button>
+
+      <button onClick={() => setFlagOpen(v => !v)} disabled={saving}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+        className="font-rajdhani text-[10px] font-bold tracking-wide text-amber-400 hover:text-amber-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
+        <NotifyIcon size={12} /> Notify stats discrepancy
+      </button>
 
       {flagOpen && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px', width: '100%' }}>
           <textarea
             value={note}
             onChange={e => setNote(e.target.value)}
@@ -940,10 +955,10 @@ function ReconciliationControls({
             rows={2}
             className="w-full bg-ink-4 border border-ink-5 rounded px-2 py-1.5 font-rajdhani text-xs text-zinc-200"
           />
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button onClick={submitFlag} disabled={saving || note.trim().length < 3}
               className="font-rajdhani text-[10px] font-bold tracking-wide bg-amber-950/40 border border-amber-800 text-amber-400 hover:bg-amber-900/40 disabled:opacity-40 px-2.5 py-1 rounded transition-colors">
-              {saving ? 'Submitting…' : 'Submit Flag'}
+              {saving ? 'Submitting…' : 'Submit'}
             </button>
             <button onClick={() => setFlagOpen(false)} disabled={saving}
               className="font-rajdhani text-[10px] font-semibold text-zinc-500 hover:text-zinc-300 disabled:opacity-40 transition-colors">
