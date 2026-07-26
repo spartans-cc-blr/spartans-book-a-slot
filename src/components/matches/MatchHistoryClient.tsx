@@ -564,6 +564,16 @@ function MatchHistoryCard({
 
   const ballType = match.ball_type ?? 'red'
   const showSyncIndicator = match.can_upload && !!match.scorecard_status && match.scorecard_status !== 'pending_parse'
+  // Whether ReconciliationControls (below) will render its own CricHeroes
+  // icon — true for both its "verified" and "not yet verified" branches,
+  // false for the flagged branch (which has no icon) or when the block
+  // isn't rendered at all. When true, the icon row's separate CricHeroes
+  // link is hidden — that same icon is repurposed into the verify line
+  // instead of showing twice, rather than adding a second, non-interactive
+  // decorative copy of it.
+  const verifyRowHasCricHeroesLink = match.can_upload
+    && ['synced', 'fees_applied'].includes(match.scorecard_status ?? '')
+    && !match.needs_reconciliation
 
   // Squad detail is also needed to resolve CricHeroes links in the
   // scorecard tables, so either panel opening triggers the same fetch.
@@ -757,8 +767,11 @@ function MatchHistoryCard({
       {/* Icons row — sync status (subtle) and CricHeroes. The Ground icon
           was removed here — the ground name under the opponent above is
           already the clickable affordance for opening the map, so a second
-          identical link further down the card was pure redundancy. */}
-      {(showSyncIndicator || match.cricheroes_url) && (
+          identical link further down the card was pure redundancy. The
+          CricHeroes icon is hidden here whenever the verification row below
+          is about to show it instead (verifyRowHasCricHeroesLink) — same
+          reasoning as Ground: one real, clickable icon, reused, not two. */}
+      {(showSyncIndicator || (match.cricheroes_url && !verifyRowHasCricHeroesLink)) && (
         <>
           <div style={{ height: '1px', background: '#2D3748' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -766,7 +779,7 @@ function MatchHistoryCard({
               <ScorecardSyncIndicator status={match.scorecard_status} />
             )}
             <div style={{ flex: 1 }} />
-            {match.cricheroes_url && (
+            {match.cricheroes_url && !verifyRowHasCricHeroesLink && (
               <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
                 <CricHeroesIcon size={22} />
@@ -917,6 +930,21 @@ function ReconciliationControls({
     )
   }
 
+  // The CricHeroes icon here is the SAME functional link as the icon row's
+  // (open match.cricheroes_url in a new tab) — repurposed into this line
+  // instead of duplicated, per verifyRowHasCricHeroesLink in the parent
+  // hiding the icon-row copy whenever this renders. Independently
+  // clickable in both branches below; never part of the verify/checkbox
+  // click target.
+  const cricheroesIcon = match.cricheroes_url ? (
+    <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
+      style={{ display: 'inline-flex', lineHeight: 0 }}>
+      <CricHeroesIcon size={16} />
+    </a>
+  ) : (
+    <CricHeroesIcon size={16} />
+  )
+
   // Already verified — the whole point of reporting a discrepancy is
   // "something looks wrong," which contradicts a standing "confirmed
   // correct." Once verified, that action no longer renders; it only
@@ -925,7 +953,7 @@ function ReconciliationControls({
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#34D399' }}>
-          <VerifiedBadge size={14} /> Scorecard verified with <CricHeroesIcon size={16} />
+          <VerifiedBadge size={14} /> Scorecard verified with {cricheroesIcon}
         </span>
       </div>
     )
@@ -933,11 +961,23 @@ function ReconciliationControls({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
-      <button onClick={markVerified} disabled={saving}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-        className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
-        {saving ? 'Saving…' : <>Mark Scorecard as Verified with <CricHeroesIcon size={16} /></>}
-      </button>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+        <input
+          type="checkbox"
+          checked={false}
+          disabled={saving}
+          onChange={markVerified}
+          title="Mark scorecard as verified"
+          style={{ accentColor: '#34D399', cursor: saving ? 'default' : 'pointer' }}
+        />
+        <span
+          onClick={() => !saving && markVerified()}
+          style={{ cursor: saving ? 'default' : 'pointer' }}
+          className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition-colors">
+          {saving ? 'Saving…' : 'Mark Scorecard as Verified with'}
+        </span>
+        {cricheroesIcon}
+      </div>
 
       <button onClick={() => setFlagOpen(v => !v)} disabled={saving}
         style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
