@@ -10,7 +10,12 @@ type Ground = {
   created_at: string
 }
 
-export function GroundsClient() {
+interface GroundsClientProps {
+  canAdd:  boolean // create new grounds — GC or admin
+  canEdit: boolean // edit existing grounds — wrangler or admin
+}
+
+export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
   const [grounds,   setGrounds]   = useState<Ground[]>([])
   const [loading,   setLoading]   = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -28,6 +33,7 @@ export function GroundsClient() {
   }, [])
 
   function startEdit(g: Ground) {
+    if (!canEdit) return
     setEditingId(g.id)
     setEditForm({ name: g.name, maps_url: g.maps_url, hospital_url: g.hospital_url })
     setError('')
@@ -81,14 +87,16 @@ export function GroundsClient() {
           <h1 className="font-cinzel text-xl font-bold text-gold">Grounds</h1>
           <p className="font-rajdhani text-zinc-500 text-sm mt-1">Manage grounds — Google Maps link and nearest hospital link.</p>
         </div>
-        <button onClick={() => { setShowAdd(v => !v); setError('') }}
-          className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark text-white px-3 py-1.5 rounded transition-colors">
-          {showAdd ? '✕ Cancel' : '＋ Add Ground'}
-        </button>
+        {canAdd && (
+          <button onClick={() => { setShowAdd(v => !v); setError('') }}
+            className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark text-white px-3 py-1.5 rounded transition-colors">
+            {showAdd ? '✕ Cancel' : '＋ Add Ground'}
+          </button>
+        )}
       </div>
 
       {/* Add form */}
-      {showAdd && (
+      {canAdd && showAdd && (
         <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-6 space-y-4">
           <h2 className="font-cinzel text-sm text-gold font-semibold">New Ground</h2>
           <div className="grid sm:grid-cols-2 gap-4">
@@ -138,22 +146,22 @@ export function GroundsClient() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-ink-5 bg-ink-4">
-                {['Ground', 'Maps Link', 'Hospital Link', ''].map(h => (
+                {['Ground', 'Maps Link', 'Hospital Link', ...(canEdit ? [''] : [])].map(h => (
                   <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={4} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">Loading...</td></tr>
+                <tr><td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">Loading...</td></tr>
               )}
               {!loading && grounds.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No grounds added yet.</td></tr>
+                <tr><td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No grounds added yet.</td></tr>
               )}
               {grounds.map(g => (
                 <tr key={g.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
                   {editingId === g.id ? (
-                    <td colSpan={4} className="px-4 py-4">
+                    <td colSpan={canEdit ? 4 : 3} className="px-4 py-4">
                       <div className="grid sm:grid-cols-2 gap-3">
                         <div className="sm:col-span-2">
                           <label className="form-label">Ground Name</label>
@@ -201,11 +209,13 @@ export function GroundsClient() {
                             className="font-rajdhani text-xs text-emerald-500 hover:text-emerald-400 hover:underline">
                             📍 Open Maps ↗
                           </a>
-                        ) : (
+                        ) : canEdit ? (
                           <button onClick={() => startEdit(g)}
                             className="font-rajdhani text-xs text-amber-500 hover:text-amber-400 hover:underline">
                             ⚠ Not set — add link
                           </button>
+                        ) : (
+                          <span className="font-rajdhani text-xs text-amber-500">⚠ Not set</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -214,19 +224,23 @@ export function GroundsClient() {
                             className="font-rajdhani text-xs text-red-400 hover:text-red-300 hover:underline">
                             🏥 Open Hospital ↗
                           </a>
-                        ) : (
+                        ) : canEdit ? (
                           <button onClick={() => startEdit(g)}
                             className="font-rajdhani text-xs text-amber-500 hover:text-amber-400 hover:underline">
                             ⚠ Not set — add link
                           </button>
+                        ) : (
+                          <span className="font-rajdhani text-xs text-amber-500">⚠ Not set</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => startEdit(g)}
-                          className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
-                          Edit
-                        </button>
-                      </td>
+                      {canEdit && (
+                        <td className="px-4 py-3">
+                          <button onClick={() => startEdit(g)}
+                            className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
+                            Edit
+                          </button>
+                        </td>
+                      )}
                     </>
                   )}
                 </tr>
