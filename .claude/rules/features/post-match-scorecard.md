@@ -137,6 +137,16 @@ Unchanged from the original plan — fully implemented, no action needed:
 | **Sync stats from analytics DB** | ✅ (own match) | ✅ (own match) | ✅ | ✅ |
 | Apply match fees | ❌ | ❌ | ❌ | ✅ only |
 | Run the one-time backfill page | ❌ | ❌ | ❌ | ✅ only |
+| Edit an existing ground (maps/hospital link) | ❌ | ❌ | ✅ | ✅ |
+| Create a new ground | ❌ | ❌ | ❌ (GC only, not wrangler) | ✅ |
+
+> **Grounds management (added July 2026):** wrangler also covers editing
+> the `grounds` master-data table at `/wrangler/grounds`, reached via the
+> new "Wrangler ⚒" nav dropdown (`src/components/ui/SiteNav.tsx`) that
+> Squad Backfill also moved under. *Creating* a new ground is intentionally
+> kept out of the wrangler role — it's GC/admin only, same tier as adding a
+> tournament or captain. See `features/wrangler-grounds-menu.md` for the
+> full permission split and the nav changes.
 
 > **Change from the original plan:** "Sync stats" was originally admin-only.
 > It's now open to the same audience as upload — a match's captain/VC, or
