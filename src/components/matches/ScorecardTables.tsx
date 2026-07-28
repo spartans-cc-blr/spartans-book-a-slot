@@ -106,7 +106,7 @@ export function ScorecardTables({
             </colgroup>
             <thead>
               <tr className="text-zinc-600 border-b border-ink-5">
-                <th className="text-left py-1 pr-2">Player</th>
+                <th className="text-center py-1 pr-2">Player</th>
                 <th className="text-center px-1">R</th>
                 <th className="text-center px-1">B</th>
                 <th className="text-center px-1">4s</th>
@@ -121,7 +121,7 @@ export function ScorecardTables({
                 const isTop = topBatRuns > 0 && runs === topBatRuns
                 return (
                   <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
-                    <td className="py-1 pr-2">
+                    <td className="text-right py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
                     <td className="text-center px-1">{runs}</td>
@@ -168,7 +168,7 @@ export function ScorecardTables({
             </colgroup>
             <thead>
               <tr className="text-zinc-600 border-b border-ink-5">
-                <th className="text-left py-1 pr-2">Player</th>
+                <th className="text-center py-1 pr-2">Player</th>
                 <th className="text-center px-1">O</th>
                 <th className="text-center px-1">Dots</th>
                 <th className="text-center px-1">R</th>
@@ -183,7 +183,7 @@ export function ScorecardTables({
                 const isTop = topBowlWkts > 0 && wkts === topBowlWkts
                 return (
                   <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
-                    <td className="py-1 pr-2">
+                    <td className="text-right py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
                     <td className="text-center px-1">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
