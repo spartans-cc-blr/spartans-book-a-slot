@@ -434,6 +434,7 @@ and `year=all` specifically.
 | Standalone match page's `canAct` mirrors the API auth exactly | ✅ Page-local gating in `/matches/history/[bookingId]/page.tsx` is a display convenience only; `verify-scorecard`/`flag-reconciliation` re-check independently regardless of what the page renders |
 | Wrangler-only share button visibility | ✅ Gated to `isWrangler` specifically (not paired with `isAdmin` like every other wrangler affordance in this app) — deliberate scoping, see Section 15 |
 | `top_performers[].whatsapp` never sent to a non-privileged viewer | ✅ Redacted to `null` server-side in `/api/matches/history` unless `isWrangler \|\| isAdmin` — same posture as `emergency_contact_phone`, never relies on the client just not rendering it — see Section 15 |
+| Share-list MVP scoping never narrows real access | ✅ `computeMatchMVP()` only changes what's serialized as `top_performers` (the share button's input) — `can_verify` and `canActOnScorecard()` still key off the tie-inclusive `computeTopPerformers()`, so a tied top batter/bowler who isn't picked as the share target keeps their own verify/flag access — see Section 15 |
 
 ---
 
@@ -449,7 +450,7 @@ and `year=all` specifically.
 | `src/app/api/admin/scorecard-backfill/route.ts` | One-time backfill: GET lists eligible bookings, POST processes one |
 | `src/app/admin/scorecard-backfill/page.tsx` | Admin UI driving the client-side backfill loop |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron |
-| `src/app/api/matches/history/route.ts` | Paginated match list — `can_upload`, `can_verify`, `top_performers`, `roles_complete`, `scorecard_status`, `ground` join |
+| `src/app/api/matches/history/route.ts` | Paginated match list — `can_upload`, `can_verify`, `top_performers`, `roles_complete`, `scorecard_status`, `ground` join. `top_performers` is built from `computeMatchMVP()` (single match MVP); `can_verify` still uses `computeTopPerformers()` (tie-inclusive) — see Section 15 |
 | `src/app/api/matches/history/[bookingId]/route.ts` | Squad detail for one booking |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Full batting/bowling/fielding/team_list |
 | `src/app/api/matches/history/[bookingId]/roles/route.ts` | Correct C/VC/WK post-hoc |
@@ -466,7 +467,7 @@ and `year=all` specifically.
 | `src/app/api/matches/[id]/verify-scorecard/route.ts` | Mark scorecard verified (see Section 14; auth widened to top performers in Section 15) |
 | `src/app/api/matches/[id]/flag-reconciliation/route.ts` | Report/resolve a stats discrepancy (see Section 14; auth widened to top performers in Section 15) |
 | `src/app/matches/history/[bookingId]/page.tsx` | Standalone shareable match page — now also renders the verify/flag block (Section 15), not just a read-only scorecard |
-| `src/lib/matchTopPerformers.ts` | Top-performer computation + resolution (Section 15) |
+| `src/lib/matchTopPerformers.ts` | Top-performer computation + resolution (Section 15) — `computeTopPerformers()`/`resolveMatchTopPerformers()` for authorization (tie-inclusive), `computeMatchMVP()`/`resolveMatchMVP()` for the single-target share list |
 | `src/lib/scorecardAuth.ts` | Shared `canActOnScorecard()` auth helper (Section 15) |
 | `src/components/matches/ScorecardVerifyPanel.tsx` | Shared verify/flag UI, extracted from `MatchHistoryClient.tsx` (Section 15) |
 | `src/components/matches/MatchVerifyBlock.tsx` | Standalone page's client state wrapper (Section 15) |
@@ -475,6 +476,7 @@ and `year=all` specifically.
 | `spartans-python/scripts/import_to_supabase.py` | `raise_on_error` param added — silent-failure bug fix |
 | `spartans-python/utils/csv_writers.py` | `HOUSE_NAME = "SPARTANS"` constant — house system is defunct, replaced the old per-player house lookup |
 | `spartans-python/utils/field_config.py` | `PDFLayoutConfig.LAYOUT_RULES` corrected to pages 3,4 (was 2,3) — see Section 3.1 note; the real cause of bowling/fielding always coming back empty |
+| `spartans-python/utils/mvp_calculator.py` | Source of the `mvp_score` formula (`MVPCalculator`) written into `batting_stats`/`bowling_stats`/`fielding_stats` at parse time — untouched, but now the reference implementation `computeMatchMVP()` (Hub side) mirrors the *sum* of, not the formula itself — see Section 15 |
 
 ---
 
@@ -659,6 +661,13 @@ scorecard gets no permission on any other match. Access is recomputed live
 from `match_stats_cache` on every request, never granted-and-stored, so it
 can't go stale or be revoked-and-forgotten.
 
+> **Updated 28 Jul 2026:** the paragraph above still describes
+> *authorization* exactly as shipped — `canActOnScorecard()`/`can_verify`
+> remain tie-inclusive (every player tied for top runs or top wickets keeps
+> real verify/flag access). What changed is which of them the wrangler's
+> share button actually messages — see "Share target — narrowed to a single
+> match MVP" below.
+
 ### "Top performer" — reuses the existing scorecard highlight, doesn't invent a new one
 
 `src/lib/matchTopPerformers.ts`'s `computeTopPerformers()` is a direct port
@@ -679,6 +688,57 @@ and simply aren't grantable — there's no Hub account to grant to.
 An all-rounder who tops both batting and bowling in the same match is one
 performer, not two — the share button (below) dedupes by `player_id` and
 combines both stat lines into one message.
+
+**As of 28 Jul 2026, `computeTopPerformers()` feeds authorization only**
+(`can_verify` / `canActOnScorecard()`) — it no longer feeds the share
+button's target list. See the next subsection.
+
+### Share target — narrowed to a single match MVP (added 28 Jul 2026)
+
+`computeTopPerformers()` above is intentionally tie-inclusive — a match
+with three bowlers tied at 2 wickets each surfaces all three as
+`top_performer`s, because that's correct for *authorization* (any of them
+genuinely earned verify/flag rights). It turned out to be the wrong input
+for the wrangler's **share list** though: a real match hit exactly this
+case (three bowlers tied at 2/16, 2/26, 2/17) and the "Request top
+performer to verify" panel showed three separate WhatsApp targets for one
+scorecard, when the ask should go to one person — the actual match MVP,
+not everyone who happened to tie on one raw stat.
+
+`computeMatchMVP()` (same file) is the fix. It sums the CricHeroes MVP
+formula's `mvp_score` column — already computed per player per stat
+category by spartans-python's `MVPCalculator` (`utils/mvp_calculator.py`)
+at parse time and already flowing into `match_stats_cache.batting` /
+`.bowling` / `.fielding` unchanged — across all three categories for each
+player, and returns only the strict-max total. `computeMatchMVP()` does
+**not** re-derive the MVP formula itself (batting-position strength,
+strike-rate bonuses, wicket value by match type, multi-wicket and maiden
+bonuses, fielding assist multipliers) — that stays a single source of
+truth inside `spartans-python`; the Hub side only sums the `mvp_score`
+values that formula already wrote. Ties are only ever a genuine exact-float
+match, which the formula's various bonuses make vanishingly rare in
+practice — realistically this returns exactly one performer per match.
+
+Deliberately scoped to **this booking's own squad only**: a row that can't
+be resolved to a Hub `player_id` (almost always an opponent) is excluded
+before the max is taken, not filtered out afterwards. `computeTopPerformers()`
+tolerates an unresolvable top-tied entry because its other ties usually
+still include an own-team player; a single MVP pick has no such fallback —
+without this scoping, a genuine match-wide MVP on the opposing side (who
+has no Hub account to grant access to or message) could silently zero out
+the whole share list even when one of our own players had a very good day.
+
+This does **not** change who is allowed to verify or flag a scorecard —
+`can_verify` and `canActOnScorecard()` both still key off the tie-inclusive
+`computeTopPerformers()` result (see the update note in the previous
+subsection), so the other tied bowlers who aren't picked as the share
+target keep their own real access if they open the match page directly.
+Only the array serialized as `top_performers` in `/api/matches/history` —
+which is what `PerformerShareButton` iterates — is now MVP-scoped. The
+match-card highlight line (top batter + top bowler, via `summarizeStats()`
+in the same route) is a separate, always-unrelated computation and is
+unaffected either way — a match still visibly credits its top batter and
+top bowler there even when one of them isn't the share target.
 
 ### Authorization — `src/lib/scorecardAuth.ts`
 
@@ -701,7 +761,10 @@ function — see the rows added to Section 10's checklist. A top performer
 can do everything a captain/VC could already do on their own match: mark
 verified, or flag a discrepancy with a note. Nothing about `fees_applied`,
 scorecard upload, or sync eligibility (`can_upload`) is widened by this —
-those stay exactly as scoped in Sections 4 and 7.
+those stay exactly as scoped in Sections 4 and 7. This function is
+unaffected by the MVP narrowing above — it still resolves via
+`resolveMatchTopPerformers()`/`computeTopPerformers()`, not
+`computeMatchMVP()`.
 
 ### Where the performer actually acts — the standalone match page
 
@@ -732,21 +795,28 @@ that one booking (no list to patch into).
 `GET /api/matches/history` gained two new per-booking fields:
 
 - `can_verify: boolean` — `can_upload` OR the signed-in viewer is this
-  match's own resolved top performer. **Deliberately a separate field, not
-  a widened `can_upload`** — a top performer gets verify/flag rights only,
+  match's own resolved top performer (tie-inclusive — see
+  `computeTopPerformers()` above). **Deliberately a separate field, not a
+  widened `can_upload`** — a top performer gets verify/flag rights only,
   never scorecard upload/sync rights, which stay scoped to captain/VC/
   wrangler/admin exactly as before.
 - `top_performers: { player_id, name, reason, statLine, whatsapp }[]` —
-  this match's resolved top scorer/wicket-taker(s), computed from the same
-  `batting`/`bowling` arrays already fetched for `summarizeStats()`, plus
-  one new batched `squad` roster query (`player_id, players(name,
-  whatsapp)` per booking on the page, same one-round-trip-for-the-whole-page
-  pattern as the existing `rolesRes` query) to resolve names to Hub player
-  IDs. `whatsapp` is fetched for every booking regardless of viewer but
-  redacted to `null` in the response unless the viewer is
-  `isWrangler || isAdmin` — the share button that actually uses it is
-  wrangler-only, but the API response is redacted independently rather
-  than trusting the client to just not render it (same posture as
+  **as of 28 Jul 2026, this match's single MVP** (see "Share target —
+  narrowed to a single match MVP" above), computed by `computeMatchMVP()`
+  from the `batting`/`bowling`/`fielding` arrays already fetched for
+  `summarizeStats()`, plus the same batched `squad` roster query
+  (`player_id, players(name, whatsapp)` per booking on the page, same
+  one-round-trip-for-the-whole-page pattern as the existing `rolesRes`
+  query) used to resolve names to Hub player IDs. Note this field is now
+  computed from a *different* function than the one driving `can_verify`
+  directly above — `can_verify` intentionally stayed on the broader
+  tie-inclusive `performers` result computed in the same route, not on
+  this narrowed array, so narrowing the share list couldn't accidentally
+  narrow real access too. `whatsapp` is fetched for every booking
+  regardless of viewer but redacted to `null` in the response unless the
+  viewer is `isWrangler || isAdmin` — the share button that actually uses
+  it is wrangler-only, but the API response is redacted independently
+  rather than trusting the client to just not render it (same posture as
   `emergency_contact_phone` elsewhere in this app: "never returned to
   client" for a non-privileged role).
 
@@ -760,9 +830,12 @@ are untouched, still `can_upload`-gated).
 `MatchHistoryCard` only when `isWrangler` (deliberately narrower than the
 usual `isWrangler || isAdmin` pairing used everywhere else in this app —
 an explicit product decision, not an oversight) and the match has at least
-one resolved top performer and isn't already verified or flagged. Button
-label: **"Request top performer to verify"**. Tapping it opens a small
-panel per resolved performer with:
+one resolved top performer and isn't already verified or flagged. As of
+28 Jul 2026 that list is the single match MVP (occasionally an all-rounder
+combining a batting and a bowling line into one row, or — vanishingly
+rarely — a genuine exact-float tie), not the full tie-inclusive top-scorer/
+top-bowler set. Button label: **"Request top performer to verify"**.
+Tapping it opens a small panel per resolved performer with:
 
 - an italicised preview of the exact message text (see below), shown
   inline so the wrangler can read it before sending anything — added
@@ -836,24 +909,28 @@ eligibility — only the two actions Section 14 already exposed to
 captain/VC. `top_performers[].whatsapp` is redacted to `null` server-side
 for any viewer who isn't `isWrangler || isAdmin`, regardless of what the
 share button itself would or wouldn't render — see the `can_verify`
-section above.
+section above. The MVP narrowing added 28 Jul 2026 only changes which
+player(s) a wrangler is nudged to message — it never widens or narrows the
+real `can_verify`/`canActOnScorecard()` grant, which stays on the separate,
+tie-inclusive `computeTopPerformers()` path.
 
 ### File Map additions
 
 | File | Role |
 |---|---|
-| `src/lib/matchTopPerformers.ts` | `computeTopPerformers()` (pure, mirrors `ScorecardTables.tsx`'s `isTop` highlight) + `resolveMatchTopPerformers()` (server-side, for routes without batting/bowling already in memory) |
+| `src/lib/matchTopPerformers.ts` | `computeTopPerformers()` (pure, mirrors `ScorecardTables.tsx`'s `isTop` highlight; feeds authorization) + `resolveMatchTopPerformers()` (server-side auth resolver) + `computeMatchMVP()` (pure, sums `mvp_score` across batting/bowling/fielding per squad member, strict-max; feeds the share list) + `resolveMatchMVP()` (server-side MVP resolver, for any future caller with only a `booking_id`) |
 | `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking auth for verify-scorecard and flag-reconciliation, now including the top-performer grant |
 | `src/components/matches/ScorecardVerifyPanel.tsx` | Extracted shared UI (icons, `VerifiedStatusLine`, `ReconciliationControls`) — used by both `MatchHistoryClient.tsx` and the standalone match page |
 | `src/components/matches/MatchVerifyBlock.tsx` | Client state wrapper for the standalone page's verify block |
-| `src/components/matches/PerformerShareButton.tsx` | Wrangler-only share button — WhatsApp icon per resolved top performer, auto-targeted to their own number |
+| `src/components/matches/PerformerShareButton.tsx` | Wrangler-only share button — WhatsApp icon per resolved top performer (single match MVP as of 28 Jul 2026), auto-targeted to their own number |
 | `src/components/matches/BallIcon.tsx` | Red/white/pink cricket ball icon, extracted out of `MatchHistoryClient.tsx` so `PerformerShareButton.tsx`'s wicket-taker row uses the same icon as the card's own top-bowler line, not a generic emoji |
 
 ### Pending
 
 | Item | Notes |
 |---|---|
-| No known gaps yet | Fresh as of this pass — worth a follow-up note here once a real top performer has actually verified or flagged a scorecard through this path. |
+| Share list surfaced every tied top scorer/bowler instead of one MVP | ✅ Fixed 28 Jul 2026 — see "Share target — narrowed to a single match MVP" above. `computeMatchMVP()` added to `matchTopPerformers.ts`; `top_performers` in `/api/matches/history` now built from it instead of the tie-inclusive `computeTopPerformers()`. `can_verify`/`canActOnScorecard()` deliberately left unchanged. |
+| No other known gaps | Fresh as of this pass — worth a follow-up note here once a real top performer has actually verified or flagged a scorecard through this path. |
 
 > **Incident (28 Jul 2026) — stale `match_stats_cache` silently hid the
 > verify/share controls on a already-`synced` match, with no self-service
