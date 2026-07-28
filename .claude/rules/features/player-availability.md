@@ -277,14 +277,15 @@ The `.eq('active', false)` condition on the update means it is a true no-op for 
 
 Availability is **hard-locked** for players once a slot is frozen. No warnings, no notification flows, no player autonomy exceptions. Captains manage any post-lock pool changes directly via the captain proxy route.
 
-### Two independent freeze triggers (additive)
+### Three independent freeze triggers (additive)
 
 | Trigger | Condition | When |
 |---|---|---|
 | **Thursday cron** | Blanket lock on all confirmed Sat/Sun slots | Every Thursday at 08:00 IST (02:30 UTC) — no Y-count condition |
 | **GC submission** | Squad status reaches `pending_approval`, `approved`, or `announced` | Whenever captain submits squad for GC review |
+| **Squad draft save** | `POST /api/squad` saves a non-empty draft, for a booking in the weekend currently open for selection | Whenever a captain first drafts a squad for that weekend (see §10.1) |
 
-Either trigger is sufficient to freeze the slot. A slot locked by the Thursday cron and subsequently submitted for GC approval remains locked by both — the union applies.
+Any trigger is sufficient to freeze the slot. A slot locked by more than one trigger (e.g. Thursday cron fires, then GC approval follows) remains locked by all of them — the union applies.
 
 ### Player behaviour matrix
 
@@ -319,6 +320,44 @@ async function checkFreeze(supabase, booking_id): Promise<string | null> {
 ```
 
 Called in both POST and DELETE handlers. Skipped when `session.isCaptain || session.isGC || session.isAdmin`.
+
+### §10.1 — Squad-draft-save implementation — `src/app/api/squad/route.ts`
+
+`POST /api/squad` (the captain's save-draft route, see `features/squad-selection.md`) also
+sets `bookings.availability_locked = true` — a squad being actively drafted freezes the
+booking immediately, without waiting for the Thursday cron or a GC submission. Two
+conditions must both hold:
+
+```typescript
+// Only when the draft actually has players:
+if (player_ids.length > 0) {
+  await supabase
+    .from('bookings')
+    .update({ availability_locked: true })
+    .eq('id', booking_id)
+}
+```
+
+and, upstream of that, the first-draft time gate only allows creating a squad for a
+booking whose own `game_date` falls in the weekend currently open for selection
+(Thu 8am IST → Sun), via `getActiveLockWeekend()` — not just "today is Thu–Sun."
+
+> ⚠️ **Incident (28 Jul 2026) — this trigger existed undocumented and unscoped since
+> squad selection shipped, and it froze a booking more than a week early.**
+> Captains Corner lists up to 20 upcoming confirmed bookings across multiple future
+> weekends (`src/app/captains-corner/page.tsx`), and the original time gate only
+> checked *today's* day-of-week — never which weekend the target booking belonged to.
+> The lock write itself also fired unconditionally, even for an empty save
+> (`player_ids: []`). Together this meant a captain interacting with any visible
+> slot card — including one for a weekend still a week-plus out — immediately froze
+> that booking's player availability, with no GC step and sometimes no actual squad
+> behind it. Caught when the Aug 1 2026 07:30 game showed `availability_locked = true`
+> with **zero** rows in `squad` for that booking (confirmed via direct DB query — no
+> `squad_audit` row either, since audit only fires on reopening an already-`LOCKED_STATUSES`
+> squad, not on a first empty draft). Root cause and fix: both conditions above —
+> `getActiveLockWeekend()` scoping on the time gate, and the `player_ids.length > 0`
+> guard on the lock write. The one already-affected booking was manually unlocked in
+> Supabase as a one-off data fix, separate from the code fix.
 
 ### Cron implementation — `src/app/api/cron/lock-availability/route.ts`
 

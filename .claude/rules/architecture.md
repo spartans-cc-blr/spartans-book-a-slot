@@ -217,7 +217,7 @@ Primary scheduling record.
 | `organiser_name` | text | External organiser (reservations) |
 | `organiser_phone` | text | WhatsApp for expiry warnings |
 | `notes` | text | Internal admin notes — never shown publicly |
-| `availability_locked` | boolean | Thursday blanket-lock flag; set by cron at 08:00 IST for all confirmed Sat/Sun slots; blocks all player writes (POST + DELETE); captains/GC/admin bypass |
+| `availability_locked` | boolean | Freeze flag; blocks all player writes (POST + DELETE); captains/GC/admin bypass. Set by three triggers (additive): Thursday cron at 08:00 IST for all confirmed Sat/Sun slots; GC submission (squad reaches `pending_approval`+); or `POST /api/squad` saving a non-empty draft for a booking in the weekend currently open for selection. See `features/player-availability.md` §10 |
 | `created_at` / `updated_at` | timestamptz | Auto-managed |
  
 **Unique constraint:** `UNIQUE(game_date, slot_time) WHERE status != 'cancelled'`
