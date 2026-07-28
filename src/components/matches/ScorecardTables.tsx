@@ -99,10 +99,10 @@ export function ScorecardTables({
             <thead>
               <tr className="text-zinc-600 border-b border-ink-5">
                 <th className="text-left py-1 pr-2">Player</th>
-                <th className="text-right px-1">R</th>
-                <th className="text-right px-1">B</th>
-                <th className="text-right px-1">4s</th>
-                <th className="text-right px-1">6s</th>
+                <th className="text-center px-1">R</th>
+                <th className="text-center px-1">B</th>
+                <th className="text-center px-1">4s</th>
+                <th className="text-center px-1">6s</th>
                 <th className="text-right pl-1">SR</th>
               </tr>
             </thead>
@@ -116,10 +116,10 @@ export function ScorecardTables({
                     <td className="py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
-                    <td className="text-right px-1">{runs}</td>
-                    <td className="text-right px-1">{num(row, ['balls', 'balls_faced'])}</td>
-                    <td className="text-right px-1">{num(row, ['fours', '4s'])}</td>
-                    <td className="text-right px-1">{num(row, ['sixes', '6s'])}</td>
+                    <td className="text-center px-1">{runs}</td>
+                    <td className="text-center px-1">{num(row, ['balls', 'balls_faced'])}</td>
+                    <td className="text-center px-1">{num(row, ['fours', '4s'])}</td>
+                    <td className="text-center px-1">{num(row, ['sixes', '6s'])}</td>
                     <td className="text-right pl-1">{pickField(row, ['strike_rate', 'sr']) ?? '—'}</td>
                   </tr>
                 )
@@ -153,10 +153,10 @@ export function ScorecardTables({
             <thead>
               <tr className="text-zinc-600 border-b border-ink-5">
                 <th className="text-left py-1 pr-2">Player</th>
-                <th className="text-right px-1">O</th>
-                <th className="text-right px-1">Dots</th>
-                <th className="text-right px-1">R</th>
-                <th className="text-right px-1">W</th>
+                <th className="text-center px-1">O</th>
+                <th className="text-center px-1">Dots</th>
+                <th className="text-center px-1">R</th>
+                <th className="text-center px-1">W</th>
                 <th className="text-right pl-1">Eco</th>
               </tr>
             </thead>
@@ -170,10 +170,10 @@ export function ScorecardTables({
                     <td className="py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
-                    <td className="text-right px-1">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
-                    <td className="text-right px-1">{num(row, ['dots'])}</td>
-                    <td className="text-right px-1">{num(row, ['runs', 'runs_conceded'])}</td>
-                    <td className="text-right px-1">{wkts}</td>
+                    <td className="text-center px-1">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
+                    <td className="text-center px-1">{num(row, ['dots'])}</td>
+                    <td className="text-center px-1">{num(row, ['runs', 'runs_conceded'])}</td>
+                    <td className="text-center px-1">{wkts}</td>
                     <td className="text-right pl-1">{pickField(row, ['economy', 'eco']) ?? '—'}</td>
                   </tr>
                 )
