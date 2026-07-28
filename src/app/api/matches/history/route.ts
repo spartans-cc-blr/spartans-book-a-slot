@@ -52,7 +52,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { computeTopPerformers, type SquadRef } from '@/lib/matchTopPerformers'
+import { computeTopPerformers, computeMatchMVP, type SquadRef } from '@/lib/matchTopPerformers'
 
 const DEFAULT_LIMIT = 15
 const MAX_LIMIT = 50
@@ -265,7 +265,10 @@ export async function GET(req: NextRequest) {
   // be shown on a card that already has synced stats (see roles_complete).
   const [uploadsRes, statsRes, ledRes, rolesRes, rosterRes] = bookingIds.length ? await Promise.all([
     supabase.from('scorecard_uploads').select('booking_id, status, uploaded_at, verified, needs_reconciliation, reconciliation_note, reconciliation_flagged_by, reconciliation_flagged_at').in('booking_id', bookingIds),
-    supabase.from('match_stats_cache').select('booking_id, match_result, team_total, team_wickets, team_overs, opponent_total, opponent_wickets, opponent_overs, batting, bowling').in('booking_id', bookingIds),
+    // `fielding` is included alongside batting/bowling — computeMatchMVP()
+    // (below) sums mvp_score across all three stat categories, not just
+    // batting/bowling like the tie-inclusive computeTopPerformers() does.
+    supabase.from('match_stats_cache').select('booking_id, match_result, team_total, team_wickets, team_overs, opponent_total, opponent_wickets, opponent_overs, batting, bowling, fielding').in('booking_id', bookingIds),
     user?.playerId
       ? supabase.from('squad').select('booking_id').eq('player_id', user.playerId).in('booking_id', bookingIds).or('is_captain.eq.true,is_vc.eq.true')
       : Promise.resolve({ data: [] as { booking_id: string }[], error: null }),
@@ -325,13 +328,22 @@ export async function GET(req: NextRequest) {
   const matches = (data ?? []).map((b: any) => {
     const upload = uploadByBooking.get(b.id)
     const statsRow = statsByBooking.get(b.id)
-    // Top scorer / top wicket-taker for this match, resolved to a Hub
-    // player_id where possible — same isTop logic already shown as gold
-    // text on the scorecard tables. Feeds can_verify below (auth) and
-    // top_performers (the wrangler-only share button's data). Empty when
-    // stats haven't synced yet — nothing to compute against.
+    // Tie-inclusive top scorer / top wicket-taker for this match, resolved
+    // to a Hub player_id where possible — same isTop logic already shown as
+    // gold text on the scorecard tables. Feeds can_verify below (auth)
+    // ONLY — deliberately kept broad (every tied player), since this is
+    // granting real verify/flag access, not picking who to message.
     const performers = statsRow
       ? computeTopPerformers(statsRow.batting ?? [], statsRow.bowling ?? [], squadByBooking.get(b.id) ?? [])
+      : []
+    // The single match MVP — sums the CricHeroes MVP formula's mvp_score
+    // across batting + bowling + fielding for each of this booking's own
+    // squad members (see matchTopPerformers.ts). This, not `performers`
+    // above, is what feeds top_performers / the wrangler-only share
+    // button — a match can have several players tied for top runs or top
+    // wickets, but should only ever nudge the one actual MVP.
+    const mvpPerformers = statsRow
+      ? computeMatchMVP(statsRow.batting ?? [], statsRow.bowling ?? [], statsRow.fielding ?? [], squadByBooking.get(b.id) ?? [])
       : []
     const canUpload = !!user?.isWrangler || !!user?.isAdmin || ledBookingIds.has(b.id)
     return {
@@ -353,15 +365,18 @@ export async function GET(req: NextRequest) {
       // own role flags plus a server-side squad lookup, never client params.
       can_upload: canUpload,
       // Same audience as can_upload, plus this viewer if they're this
-      // match's own resolved top performer — see matchTopPerformers.ts.
-      // Deliberately NOT folded into can_upload itself: a top performer
-      // gets verify/flag rights only, never upload/sync rights.
+      // match's own resolved top performer (tie-inclusive top scorer/
+      // wicket-taker — see matchTopPerformers.ts). Deliberately NOT folded
+      // into can_upload itself: a top performer gets verify/flag rights
+      // only, never upload/sync rights. Intentionally NOT narrowed to the
+      // single MVP below — a tied top batter/bowler who isn't the match MVP
+      // still keeps this access.
       can_verify: canUpload || (!!user?.playerId && performers.some(p => p.player_id === user.playerId)),
       // whatsapp is never sent to a non-wrangler/admin viewer — the share
       // button itself is also gated to that audience, but the API
       // response is redacted independently rather than relying on the
       // client to just not render it.
-      top_performers: performers.map(p => ({
+      top_performers: mvpPerformers.map(p => ({
         player_id: p.player_id, name: p.name, reason: p.reason, statLine: p.statLine,
         whatsapp: canSeeWhatsapp ? p.whatsapp : null,
       })),
