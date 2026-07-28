@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import { WA_ICON } from '@/components/tournament-planner/TournamentShareButton'
+import { BallIcon, type BallType } from '@/components/matches/BallIcon'
 
 export interface TopPerformerInfo {
   player_id: string | null
@@ -70,11 +71,12 @@ function dedupePerformers(performers: TopPerformerInfo[]): TopPerformerInfo[] {
   return Array.from(byPlayer.values())
 }
 
-function PerformerRow({ bookingId, performer, gameDate, tournamentName }: {
+function PerformerRow({ bookingId, performer, gameDate, tournamentName, ballType }: {
   bookingId:      string
   performer:      TopPerformerInfo
   gameDate:       string
   tournamentName: string | null
+  ballType:       BallType
 }) {
   function url() {
     return `${window.location.origin}/matches/history/${bookingId}`
@@ -97,8 +99,8 @@ function PerformerRow({ bookingId, performer, gameDate, tournamentName }: {
     <div style={{ padding: '6px 0', borderBottom: '1px solid #1F2937' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ minWidth: 0 }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#F5F5F5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {performer.reason === 'top_scorer' ? '🏏' : '🎳'} {performer.name}
+          <p style={{ fontSize: '11px', fontWeight: 700, color: '#F5F5F5', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {performer.reason === 'top_scorer' ? '🏏' : <BallIcon type={ballType} size={12} />} {performer.name}
           </p>
           <p style={{ fontSize: '10px', color: '#6B7280' }}>{performer.statLine}</p>
         </div>
@@ -120,11 +122,12 @@ function PerformerRow({ bookingId, performer, gameDate, tournamentName }: {
   )
 }
 
-export function PerformerShareButton({ bookingId, performers, gameDate, tournamentName }: {
+export function PerformerShareButton({ bookingId, performers, gameDate, tournamentName, ballType }: {
   bookingId:      string
   performers:     TopPerformerInfo[]
   gameDate:       string
   tournamentName: string | null
+  ballType:       BallType
 }) {
   const [open, setOpen] = useState(false)
   const resolved = dedupePerformers(performers)
@@ -141,7 +144,7 @@ export function PerformerShareButton({ bookingId, performers, gameDate, tourname
       {open && (
         <div style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid #2D3748', borderRadius: '8px', padding: '4px 10px' }}>
           {resolved.map(p => (
-            <PerformerRow key={p.player_id} bookingId={bookingId} performer={p} gameDate={gameDate} tournamentName={tournamentName} />
+            <PerformerRow key={p.player_id} bookingId={bookingId} performer={p} gameDate={gameDate} tournamentName={tournamentName} ballType={ballType} />
           ))}
         </div>
       )}

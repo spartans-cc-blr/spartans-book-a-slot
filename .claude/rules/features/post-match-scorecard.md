@@ -846,7 +846,8 @@ section above.
 | `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking auth for verify-scorecard and flag-reconciliation, now including the top-performer grant |
 | `src/components/matches/ScorecardVerifyPanel.tsx` | Extracted shared UI (icons, `VerifiedStatusLine`, `ReconciliationControls`) — used by both `MatchHistoryClient.tsx` and the standalone match page |
 | `src/components/matches/MatchVerifyBlock.tsx` | Client state wrapper for the standalone page's verify block |
-| `src/components/matches/PerformerShareButton.tsx` | Wrangler-only share button — WhatsApp + copy-link per resolved top performer |
+| `src/components/matches/PerformerShareButton.tsx` | Wrangler-only share button — WhatsApp icon per resolved top performer, auto-targeted to their own number |
+| `src/components/matches/BallIcon.tsx` | Red/white/pink cricket ball icon, extracted out of `MatchHistoryClient.tsx` so `PerformerShareButton.tsx`'s wicket-taker row uses the same icon as the card's own top-bowler line, not a generic emoji |
 
 ### Pending
 
