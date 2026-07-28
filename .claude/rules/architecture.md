@@ -139,7 +139,7 @@ Access here is genuinely mixed per-route rather than one role — see
  
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/matches/history` | GET | Any signed-in, non-expelled member | Paginated past-match list; computes `can_upload` and `roles_complete` server-side |
+| `/api/matches/history` | GET | Any signed-in, non-expelled member | Paginated past-match list; computes `can_upload`, `can_verify`, `top_performers`, `roles_complete`, `scorecard_status`, `ground` join server-side |
 | `/api/matches/history/[bookingId]` | GET | Any signed-in member | Squad detail for one booking |
 | `/api/matches/history/[bookingId]/scorecard` | GET | Any signed-in member | Full batting/bowling/fielding/team_list — stats aren't sensitive |
 | `/api/matches/history/[bookingId]/roles` | PATCH | GC/admin/wrangler | Correct C/VC/WK post-hoc |
