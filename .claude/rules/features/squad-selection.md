@@ -258,6 +258,15 @@ These are distinct. A player with `players.is_captain = false` can be designated
 - Deletes **all** existing rows for the booking regardless of status, then re-inserts with role flags
 - Hard cap of 12 enforced server-side
 - Validates that captain/vc/wk player IDs are all within `player_ids`
+- **Time gate (first draft only):** creating a squad where none exists yet is blocked Mon–Wed and
+  before Thu 8am IST, and — as of 28 Jul 2026 — also requires the booking's own `game_date` to be
+  in the weekend the Thu 8am–Sun window is currently governing (`getActiveLockWeekend()`).
+  Editing an already-existing draft is always allowed regardless of window.
+- **Lock on draft save:** sets `bookings.availability_locked = true` the moment a *non-empty*
+  draft is saved — this is a third freeze trigger alongside the Thursday cron and GC submission.
+  See `features/player-availability.md` §10/§10.1 for the full freeze design and a 28 Jul 2026
+  incident write-up (this trigger was previously unscoped and could freeze a future weekend's
+  booking over a week early, or freeze one with an empty/never-submitted squad).
 ### `POST /api/squad/submit` — submit for GC review
  
 - Auth: captain or admin
