@@ -6,6 +6,10 @@ import { PlayerNameLink } from '@/lib/playerLink'
 import { ScorecardUploadButton, type ScorecardStatus } from '@/components/matches/ScorecardUploadButton'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { ResultBadge } from '@/components/shared/ResultBadge'
+import {
+  CricHeroesIcon, CricHeroesInlineLink, VerifiedStatusLine, ReconciliationControls, NotifyIcon,
+} from '@/components/matches/ScorecardVerifyPanel'
+import { PerformerShareButton, type TopPerformerInfo } from '@/components/matches/PerformerShareButton'
 
 type BallType = 'red' | 'white' | 'pink'
 
@@ -43,6 +47,13 @@ interface MatchSummary {
   scorecard_status:      ScorecardStatus | null
   scorecard_uploaded_at: string | null
   can_upload:      boolean
+  // Same audience as can_upload, plus this match's own resolved top
+  // performer (batting or bowling) acting on this one booking — see
+  // matchTopPerformers.ts / scorecardAuth.ts. Never widen can_upload
+  // itself for this: a top performer gets verify/flag rights only, not
+  // scorecard upload/sync rights.
+  can_verify:      boolean
+  top_performers:  TopPerformerInfo[]
   stats:           StatsSummary | null
   roles_complete:  boolean
   verified:                       boolean
@@ -182,68 +193,12 @@ function BallIcon({ type, size = 20 }: { type: BallType; size?: number }) {
   return <RedBall size={size} />
 }
 
-function CricHeroesIcon({ size = 20 }: { size?: number }) {
-  return (
-    <img src="/cricheroes-logo.jpg" alt="CricHeroes" width={size} height={size}
-      style={{ borderRadius: '50%', objectFit: 'cover' }} />
-  )
-}
-
-// The one real, clickable CricHeroes icon reused inline wherever a verify
-// line references it (VerifiedStatusLine below, and the action line in
-// ReconciliationControls) — opens match.cricheroes_url in a new tab,
-// independent of whatever verify/notify action sits next to it. Renders a
-// plain, non-interactive icon when there's no URL to link to.
-function CricHeroesInlineLink({ url, size = 16 }: { url: string | null; size?: number }) {
-  const icon = <CricHeroesIcon size={size} />
-  if (!url) return icon
-  return (
-    <a href={url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes" style={{ display: 'inline-flex', lineHeight: 0 }}>
-      {icon}
-    </a>
-  )
-}
-
-// Scalloped-seal "verified" badge — the familiar shape from Twitter/X and
-// similar platforms (two overlapping rounded squares offset 45° to form an
-// 8-point rosette, with a checkmark inside) rather than a bare tick, so a
-// verified match reads as a distinct status badge, not just a checked box.
-function VerifiedBadge({ size = 15 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="3" width="16" height="16" rx="4" fill="#059669" />
-      <rect x="3" y="3" width="16" height="16" rx="4" fill="#059669" transform="rotate(45 11 11)" />
-      <path d="M6.8 11.3l3 3 5.6-6.4" stroke="white" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    </svg>
-  )
-}
-
-// Read-only "verified" announcement — shown to every viewer of a verified
-// match, not just the captain/VC/wrangler/admin audience that could set it.
-// Once verified there's nothing actionable left, so this is the same line
-// for everyone; see the render call site in MatchHistoryCard for how it's
-// kept separate from the privileged ReconciliationControls.
-function VerifiedStatusLine({ cricheroesUrl }: { cricheroesUrl: string | null }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#34D399' }}>
-        <VerifiedBadge size={14} /> Stats verified with <CricHeroesInlineLink url={cricheroesUrl} />
-      </span>
-    </div>
-  )
-}
-
-// Bell — "notify" affordance for reporting a stats discrepancy. Uses
-// currentColor so it inherits whatever text colour the caller sets.
-function NotifyIcon({ size = 13 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2a6 6 0 0 0-6 6v3.09c0 .58-.2 1.14-.57 1.59L4 15h16l-1.43-2.32a2.5 2.5 0 0 1-.57-1.59V8a6 6 0 0 0-6-6z"
-        fill="currentColor" />
-      <path d="M9.5 18a2.5 2.5 0 0 0 5 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />
-    </svg>
-  )
-}
+// CricHeroesIcon, CricHeroesInlineLink, VerifiedBadge, VerifiedStatusLine,
+// NotifyIcon, and ReconciliationControls all now live in
+// ScorecardVerifyPanel.tsx — shared with the standalone
+// /matches/history/[bookingId] page so the two surfaces can't drift on what
+// a "verify this scorecard" action looks like. See that file for the
+// original doc comments on each.
 
 // Result rendering itself now comes from the shared <ResultBadge> (same
 // component TournamentPlannerClient and TournamentShareCard use) instead of
@@ -282,11 +237,15 @@ function scoreLine(stats: StatsSummary): string {
 }
 
 export function MatchHistoryClient({
-  canEditRoles, canEditTournament, viewerPlayerId,
+  canEditRoles, canEditTournament, viewerPlayerId, isWrangler,
 }: {
   canEditRoles: boolean
   canEditTournament: boolean
   viewerPlayerId: string | null
+  // Gates the "Share for verification" button only — deliberately narrower
+  // than canEditRoles (which also includes GC). Admin sees it too, same
+  // house convention as every other wrangler-gated affordance in this app.
+  isWrangler: boolean
 }) {
   // Defaults to "I Played" for registered players — a much smaller result
   // set than the full club history, so the page's first paint is faster.
@@ -536,6 +495,7 @@ export function MatchHistoryClient({
                     match={m}
                     canEditRoles={canEditRoles}
                     canEditTournament={canEditTournament}
+                    isWrangler={isWrangler}
                     onScorecardStatusChange={(bookingId, status) => patchMatch(bookingId, { scorecard_status: status })}
                     onMatchPatch={patchMatch}
                   />
@@ -554,6 +514,7 @@ export function MatchHistoryClient({
                   match={m}
                   canEditRoles={canEditRoles}
                   canEditTournament={canEditTournament}
+                  isWrangler={isWrangler}
                   onScorecardStatusChange={(bookingId, status) => patchMatch(bookingId, { scorecard_status: status })}
                   onMatchPatch={patchMatch}
                 />
@@ -578,11 +539,12 @@ export function MatchHistoryClient({
 }
 
 function MatchHistoryCard({
-  match, canEditRoles, canEditTournament, onScorecardStatusChange, onMatchPatch,
+  match, canEditRoles, canEditTournament, isWrangler, onScorecardStatusChange, onMatchPatch,
 }: {
   match: MatchSummary
   canEditRoles: boolean
   canEditTournament: boolean
+  isWrangler: boolean
   onScorecardStatusChange: (bookingId: string, status: ScorecardStatus) => void
   onMatchPatch: (bookingId: string, patch: Partial<MatchSummary>) => void
 }) {
@@ -603,16 +565,20 @@ function MatchHistoryCard({
   const showSyncIndicator = match.can_upload && !!match.scorecard_status && match.scorecard_status !== 'pending_parse'
   // Whether the verify area below will render its own CricHeroes icon —
   // either the universal "Stats verified with" line (any viewer, once
-  // verified) or, for captain/VC/wrangler/admin only, the "Mark Scorecard
-  // as Verified" action line (not yet verified, not flagged — the flagged
-  // branch has no icon). When true, the icon row's separate CricHeroes
-  // link is hidden — that same icon is repurposed below instead of
-  // rendering a second, non-interactive decorative copy of it.
-  const showsPrivilegedVerifyAction = match.can_upload
+  // verified) or, for captain/VC/wrangler/admin/top-performer only, the
+  // "Mark Scorecard as Verified" action line (not yet verified, not
+  // flagged — the flagged branch has no icon). When true, the icon row's
+  // separate CricHeroes link is hidden — that same icon is repurposed
+  // below instead of rendering a second, non-interactive decorative copy.
+  const showsVerifyAction = match.can_verify
     && ['synced', 'fees_applied'].includes(match.scorecard_status ?? '')
     && !match.needs_reconciliation
     && !match.verified
-  const verifyRowHasCricHeroesLink = match.verified || showsPrivilegedVerifyAction
+  const verifyRowHasCricHeroesLink = match.verified || showsVerifyAction
+  // Wrangler-only share affordance — never shown once already verified
+  // (nothing left to ask the performer to do) or flagged (no actionable
+  // control on the receiving end either, see ReconciliationControls).
+  const showsPerformerShare = isWrangler && showsVerifyAction && match.top_performers.some(p => p.player_id)
 
   // Squad detail is also needed to resolve CricHeroes links in the
   // scorecard tables, so either panel opening triggers the same fetch.
@@ -838,12 +804,27 @@ function MatchHistoryCard({
           is the same read-only line for everyone. */}
       {match.verified && <VerifiedStatusLine cricheroesUrl={match.cricheroes_url} />}
 
-      {/* Mark-verified / notify-discrepancy controls — same audience as
-          upload/sync (captain/VC for this booking, or wrangler/admin for
-          any). Renders either the flagged info line or the action line;
-          never both, and never once verified (covered above instead). */}
-      {match.can_upload && (match.needs_reconciliation || showsPrivilegedVerifyAction) && (
-        <ReconciliationControls match={match} onMatchPatch={onMatchPatch} />
+      {/* Mark-verified / notify-discrepancy controls — captain/VC for this
+          booking, wrangler/admin for any booking, or this match's own
+          resolved top performer for this booking alone (match.can_verify —
+          see matchTopPerformers.ts). Renders either the flagged info line
+          or the action line; never both, and never once verified (covered
+          above instead). */}
+      {match.can_verify && (match.needs_reconciliation || showsVerifyAction) && (
+        <ReconciliationControls
+          match={match}
+          onPatch={patch => onMatchPatch(match.booking_id, patch)}
+        />
+      )}
+
+      {/* Wrangler-only convenience — a direct link to the standalone match
+          page for whoever topped batting/bowling, pre-filled with a
+          congratulatory WhatsApp message asking them to verify. Does not
+          grant anything itself — canActOnScorecard() already grants the
+          performer verify/flag rights independently of whether anyone
+          ever taps this button. */}
+      {showsPerformerShare && (
+        <PerformerShareButton bookingId={match.booking_id} performers={match.top_performers} />
       )}
 
       {/* Collapsible squad — once the scorecard is synced AND C/VC/WK are
@@ -911,127 +892,6 @@ function MatchHistoryCard({
           )}
         </div>
       )}
-    </div>
-  )
-}
-
-function ReconciliationControls({
-  match, onMatchPatch,
-}: {
-  match: MatchSummary
-  onMatchPatch: (bookingId: string, patch: Partial<MatchSummary>) => void
-}) {
-  const [flagOpen, setFlagOpen] = useState(false)
-  const [note, setNote]         = useState(match.reconciliation_note ?? '')
-  const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState('')
-
-  async function markVerified() {
-    setSaving(true)
-    setError('')
-    try {
-      const res = await fetch(`/api/matches/${match.booking_id}/verify-scorecard`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Failed to verify'); return }
-      onMatchPatch(match.booking_id, { verified: true })
-    } catch {
-      setError('Network error')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function submitFlag() {
-    if (note.trim().length < 3) { setError('Note must be at least 3 characters'); return }
-    setSaving(true)
-    setError('')
-    try {
-      const res = await fetch(`/api/matches/${match.booking_id}/flag-reconciliation`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ note: note.trim() }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Failed to flag'); return }
-      onMatchPatch(match.booking_id, {
-        needs_reconciliation: true,
-        reconciliation_note:  note.trim(),
-        verified:             false,
-      })
-      setFlagOpen(false)
-    } catch {
-      setError('Network error')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // Already flagged — no further self-service action here. The flag
-  // clears itself automatically the next time this booking is re-fetched
-  // and re-synced (see scorecardBackfill.ts); an admin can also clear it
-  // manually without reprocessing from /admin/scorecard-backfill.
-  if (match.needs_reconciliation) {
-    return (
-      <p style={{ fontSize: '10px', color: '#6B7280', textAlign: 'right' }}>
-        Discrepancy reported — will clear automatically once re-synced.
-      </p>
-    )
-  }
-
-  // match.verified is never true here — the parent only renders this
-  // component while showsPrivilegedVerifyAction or needs_reconciliation
-  // holds, both of which require !match.verified. See VerifiedStatusLine
-  // for the (always-rendered, any-viewer) verified state.
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-        <input
-          type="checkbox"
-          checked={false}
-          disabled={saving}
-          onChange={markVerified}
-          title="Mark scorecard as verified"
-          style={{ accentColor: '#34D399', cursor: saving ? 'default' : 'pointer' }}
-        />
-        <span
-          onClick={() => !saving && markVerified()}
-          style={{ cursor: saving ? 'default' : 'pointer' }}
-          className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition-colors">
-          {saving ? 'Saving…' : 'Mark Scorecard as Verified with'}
-        </span>
-        <CricHeroesInlineLink url={match.cricheroes_url} />
-      </div>
-
-      <button onClick={() => setFlagOpen(v => !v)} disabled={saving}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-        className="font-rajdhani text-[10px] font-bold tracking-wide text-amber-400 hover:text-amber-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
-        <NotifyIcon size={12} /> Notify stats discrepancy
-      </button>
-
-      {flagOpen && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px', width: '100%' }}>
-          <textarea
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            placeholder="What looks wrong compared to CricHeroes?"
-            maxLength={500}
-            rows={2}
-            className="w-full bg-ink-4 border border-ink-5 rounded px-2 py-1.5 font-rajdhani text-xs text-zinc-200"
-          />
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button onClick={submitFlag} disabled={saving || note.trim().length < 3}
-              className="font-rajdhani text-[10px] font-bold tracking-wide bg-amber-950/40 border border-amber-800 text-amber-400 hover:bg-amber-900/40 disabled:opacity-40 px-2.5 py-1 rounded transition-colors">
-              {saving ? 'Submitting…' : 'Submit'}
-            </button>
-            <button onClick={() => setFlagOpen(false)} disabled={saving}
-              className="font-rajdhani text-[10px] font-semibold text-zinc-500 hover:text-zinc-300 disabled:opacity-40 transition-colors">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {error && <p style={{ fontSize: '10px', color: '#F87171' }}>{error}</p>}
     </div>
   )
 }

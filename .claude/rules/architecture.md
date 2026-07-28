@@ -146,8 +146,8 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/matches/history/[bookingId]/tournament` | PATCH | Admin | Reassign tournament post-hoc |
 | `/api/matches/[id]/scorecard` | POST | Captain/VC (own booking) or wrangler/admin | Manual PDF upload — streamed progress, `%PDF` magic-byte + 10MB validation |
 | `/api/admin/sync-match-stats` | POST | Captain/VC (own booking) or wrangler/admin | Manual "Sync Stats" trigger — despite the `/admin/` path, **not** admin-only; re-derives the per-booking squad check server-side |
-| `/api/matches/[id]/verify-scorecard` | POST | Captain/VC (own booking) or wrangler/admin | Marks a synced scorecard as manually checked against CricHeroes; requires `status IN ('synced','fees_applied')`, blocked while flagged — see `features/post-match-scorecard.md` §14 |
-| `/api/matches/[id]/flag-reconciliation` | POST, DELETE | POST: captain/VC (own booking) or wrangler/admin. DELETE: admin only | POST reports a stats discrepancy with a required note, re-queuing the booking into the backfill pipeline; DELETE clears the flag without reprocessing (false-alarm override) |
+| `/api/matches/[id]/verify-scorecard` | POST | Captain/VC (own booking), wrangler/admin, or this match's own resolved top performer (own booking only) | Marks a synced scorecard as manually checked against CricHeroes; requires `status IN ('synced','fees_applied')`, blocked while flagged — see `features/post-match-scorecard.md` §14/§15 |
+| `/api/matches/[id]/flag-reconciliation` | POST, DELETE | POST: captain/VC (own booking), wrangler/admin, or this match's own resolved top performer (own booking only). DELETE: admin only | POST reports a stats discrepancy with a required note, re-queuing the booking into the backfill pipeline; DELETE clears the flag without reprocessing (false-alarm override) |
 | `/api/admin/matches/[id]/post-match` | GET, DELETE | Admin | Admin Post-Match panel feed; DELETE resets a stuck/wrong upload |
 | `/api/admin/scorecard-backfill` | GET, POST | Admin | One-time catch-up: list eligible bookings, process one per POST |
 | `/api/admin/player-reconciliation` | GET, POST | Admin | Resolves analytics-DB `player_name` strings to Hub `players.id` — GET buckets pending names, POST confirms/ignores/reconciles; see `features/player-identity-resolution.md` |
@@ -569,8 +569,10 @@ Next.js API Routes (server-side)
 | public/sw.js | Service worker — PWA caching + push notification display + notificationclick handler |
 | `src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` | `/matches/history` — past-match list, `MatchHistoryCard` (result badge, subtle sync status, ground/CricHeroes links, Did-not-bat line) |
 | `src/app/api/matches/[id]/scorecard/route.ts` | Manual scorecard PDF upload — streamed progress, per-booking captain/VC or wrangler/admin auth |
-| `src/app/api/matches/[id]/verify-scorecard/route.ts` | Marks a scorecard verified against CricHeroes — same per-booking auth as upload/sync; see `features/post-match-scorecard.md` §14 |
+| `src/app/api/matches/[id]/verify-scorecard/route.ts` | Marks a scorecard verified against CricHeroes — per-booking auth via `canActOnScorecard()` (captain/VC/wrangler/admin, or this match's own top performer); see `features/post-match-scorecard.md` §14/§15 |
 | `src/app/api/matches/[id]/flag-reconciliation/route.ts` | POST reports a stats discrepancy (Zod-validated note), re-queuing into the backfill pipeline; DELETE is an admin-only clear-without-reprocessing override |
+| `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking verify/flag auth, includes the top-performer grant; see `features/post-match-scorecard.md` §15 |
+| `src/lib/matchTopPerformers.ts` | Resolves a match's top scorer/wicket-taker to a Hub `player_id`; see `features/post-match-scorecard.md` §15 |
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path |
 | `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — CricHeroes direct-fetch pipeline; chains parse → sync; never touches fees; also auto-clears a reconciliation flag on a successful re-sync |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron — see `features/post-match-scorecard.md` |

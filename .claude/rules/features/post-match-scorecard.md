@@ -430,6 +430,9 @@ and `year=all` specifically.
 | Reconciliation note validated server-side | ✅ Zod (`flagReconciliationSchema`/`resolveReconciliationSchema`, `src/lib/schemas.ts`), 3–500 chars |
 | `verified`/`needs_reconciliation` mutually exclusive | ✅ Enforced server-side in both routes (flagging clears `verified`; verifying is rejected while flagged), not just in the UI |
 | `scorecard_reconciliation_log` RLS | ✅ Blanket deny, service-role only — same pattern as `scorecard_uploads` |
+| Top-performer verify/flag grant re-derived server-side per booking | ✅ `canActOnScorecard()` (`src/lib/scorecardAuth.ts`) recomputes from `match_stats_cache` + `squad` on every call — never trusted from the client, never a standing role, never widens `can_upload`/fees — see Section 15 |
+| Standalone match page's `canAct` mirrors the API auth exactly | ✅ Page-local gating in `/matches/history/[bookingId]/page.tsx` is a display convenience only; `verify-scorecard`/`flag-reconciliation` re-check independently regardless of what the page renders |
+| Wrangler-only share button visibility | ✅ Gated to `isWrangler` specifically (not paired with `isAdmin` like every other wrangler affordance in this app) — deliberate scoping, see Section 15 |
 
 ---
 
@@ -445,7 +448,7 @@ and `year=all` specifically.
 | `src/app/api/admin/scorecard-backfill/route.ts` | One-time backfill: GET lists eligible bookings, POST processes one |
 | `src/app/admin/scorecard-backfill/page.tsx` | Admin UI driving the client-side backfill loop |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron |
-| `src/app/api/matches/history/route.ts` | Paginated match list — `can_upload`, `roles_complete`, `scorecard_status`, `ground` join |
+| `src/app/api/matches/history/route.ts` | Paginated match list — `can_upload`, `can_verify`, `top_performers`, `roles_complete`, `scorecard_status`, `ground` join |
 | `src/app/api/matches/history/[bookingId]/route.ts` | Squad detail for one booking |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Full batting/bowling/fielding/team_list |
 | `src/app/api/matches/history/[bookingId]/roles/route.ts` | Correct C/VC/WK post-hoc |
@@ -459,8 +462,14 @@ and `year=all` specifically.
 | `supabase/migrations/045_scorecard_uploads.sql` | `scorecard_uploads` table + enum (reconstructed — see Section 5) |
 | `supabase/migrations/046_enable_rls_scorecard_tables.sql` | RLS fix (see Section 5) |
 | `supabase/migrations/051_scorecard_verification_reconciliation.sql` | `scorecard_uploads` verify/reconciliation columns + `scorecard_reconciliation_log` table (see Section 14) |
-| `src/app/api/matches/[id]/verify-scorecard/route.ts` | Mark scorecard verified (see Section 14) |
-| `src/app/api/matches/[id]/flag-reconciliation/route.ts` | Report/resolve a stats discrepancy (see Section 14) |
+| `src/app/api/matches/[id]/verify-scorecard/route.ts` | Mark scorecard verified (see Section 14; auth widened to top performers in Section 15) |
+| `src/app/api/matches/[id]/flag-reconciliation/route.ts` | Report/resolve a stats discrepancy (see Section 14; auth widened to top performers in Section 15) |
+| `src/app/matches/history/[bookingId]/page.tsx` | Standalone shareable match page — now also renders the verify/flag block (Section 15), not just a read-only scorecard |
+| `src/lib/matchTopPerformers.ts` | Top-performer computation + resolution (Section 15) |
+| `src/lib/scorecardAuth.ts` | Shared `canActOnScorecard()` auth helper (Section 15) |
+| `src/components/matches/ScorecardVerifyPanel.tsx` | Shared verify/flag UI, extracted from `MatchHistoryClient.tsx` (Section 15) |
+| `src/components/matches/MatchVerifyBlock.tsx` | Standalone page's client state wrapper (Section 15) |
+| `src/components/matches/PerformerShareButton.tsx` | Wrangler-only share button (Section 15) |
 | `spartans-python/api.py` | FastAPI wrapper — `/parse-scorecard`, `/fetch-and-parse-scorecard`, `/health` |
 | `spartans-python/scripts/import_to_supabase.py` | `raise_on_error` param added — silent-failure bug fix |
 | `spartans-python/utils/csv_writers.py` | `HOUSE_NAME = "SPARTANS"` constant — house system is defunct, replaced the old per-player house lookup |
@@ -626,6 +635,165 @@ See the rows added to Section 11 — `verify-scorecard/route.ts`,
 | Item | Notes |
 |---|---|
 | No known gaps yet | Feature is fresh as of this pass — worth a follow-up note here once it's been exercised through a real cycle (a captain flags something for real, the cron/backfill picks it up, it auto-resolves). |
+
+---
+
+## 15. Top-Performer Verification Access (added 2026-07-28)
+
+### Why
+
+Section 14's verify/flag audience (captain/VC of the booking, or
+wrangler/admin for any booking) doesn't scale well as the only recruiting
+pool for manual verification — wranglers already have plenty to do, and a
+match's captain/VC aren't necessarily the best-placed people to notice a
+scorecard discrepancy. This extends the same two actions (mark verified /
+flag a discrepancy) to **this match's own top performer** — whoever topped
+batting (most runs) or bowling (most wickets) *for that match alone* — on
+the theory that the standout player already has a reason to look closely at
+their own scorecard, and asking them doubles as a small recognition
+gesture.
+
+Deliberately **not** a standing role: a player who topped one match's
+scorecard gets no permission on any other match. Access is recomputed live
+from `match_stats_cache` on every request, never granted-and-stored, so it
+can't go stale or be revoked-and-forgotten.
+
+### "Top performer" — reuses the existing scorecard highlight, doesn't invent a new one
+
+`src/lib/matchTopPerformers.ts`'s `computeTopPerformers()` is a direct port
+of the `isTop` logic `ScorecardTables.tsx` already used to render gold text
+on the highest run-scorer and highest wicket-taker — same filters (skip
+`did_not_bat` / zero-overs rows), same strict-max comparison, same
+all-ties-included behaviour (a tied top score highlights every player who
+hit it, not an arbitrary single "winner" — unlike `summarizeStats()`'s
+single-pick reduce in the history list route, which stays as its own
+display-only convenience and is intentionally not reused for this). Each
+row is resolved to a Hub `player_id` the same way `ScorecardTables.tsx`
+already resolves CricHeroes links: prefer the analytics row's own
+`player_id` (set once reconciled, see `player-identity-resolution.md`),
+else fall back to a case-insensitive name match against the booking's own
+squad. Opponent players and unreconciled rows resolve to `player_id: null`
+and simply aren't grantable — there's no Hub account to grant to.
+
+An all-rounder who tops both batting and bowling in the same match is one
+performer, not two — the share button (below) dedupes by `player_id` and
+combines both stat lines into one message.
+
+### Authorization — `src/lib/scorecardAuth.ts`
+
+`canActOnScorecard(supabase, bookingId, user)` replaces the auth blocks
+that used to live separately (and had started to drift) inside
+`verify-scorecard` and `flag-reconciliation`. Three independent ways in,
+any one sufficient:
+
+1. `isWrangler || isAdmin` — any booking
+2. captain/VC of **this** booking (`squad` row lookup scoped to
+   `booking_id` + `player_id`, never a role-only check)
+3. this booking's own resolved top performer (`resolveMatchTopPerformers()`,
+   the server-side counterpart of `computeTopPerformers()` for routes that
+   only have a `booking_id` in hand, not the batting/bowling arrays already
+   in memory)
+
+Both `POST /api/matches/[id]/verify-scorecard` and
+`POST`/`DELETE /api/matches/[id]/flag-reconciliation` call this same
+function — see the rows added to Section 10's checklist. A top performer
+can do everything a captain/VC could already do on their own match: mark
+verified, or flag a discrepancy with a note. Nothing about `fees_applied`,
+scorecard upload, or sync eligibility (`can_upload`) is widened by this —
+those stay exactly as scoped in Sections 4 and 7.
+
+### Where the performer actually acts — the standalone match page
+
+`/matches/history/[bookingId]/page.tsx` (previously a read-only share page
+with no verify/flag controls at all) now renders the same
+`VerifiedStatusLine` / `ReconciliationControls` blocks the list page's
+`MatchHistoryCard` does, gated by a page-local `canAct` boolean that
+mirrors `canActOnScorecard()` exactly (server-recomputed from data already
+fetched for the page — no extra round trip). This is deliberate: it's the
+link a wrangler's share button (below) points a top performer at, so the
+destination needed the actual controls, not just a read-only scorecard.
+
+To avoid the two surfaces (list card, standalone page) drifting on what
+"verify this scorecard" looks like, the shared UI —
+`CricHeroesIcon`/`CricHeroesInlineLink`/`VerifiedBadge`/`NotifyIcon`/
+`VerifiedStatusLine`/`ReconciliationControls` — was extracted out of
+`MatchHistoryClient.tsx` into `src/components/matches/ScorecardVerifyPanel.tsx`,
+and both surfaces import from there now. `ReconciliationControls` takes a
+minimal `VerifiableMatch` shape (`booking_id`, `cricheroes_url`,
+`needs_reconciliation`, `reconciliation_note`) rather than the list page's
+full `MatchSummary`, and an `onPatch(patch)` callback instead of
+`onMatchPatch(bookingId, patch)` — the standalone page's own
+`MatchVerifyBlock.tsx` is a small client wrapper holding local state for
+that one booking (no list to patch into).
+
+### `can_verify` — a narrower sibling of `can_upload`, not a widening of it
+
+`GET /api/matches/history` gained two new per-booking fields:
+
+- `can_verify: boolean` — `can_upload` OR the signed-in viewer is this
+  match's own resolved top performer. **Deliberately a separate field, not
+  a widened `can_upload`** — a top performer gets verify/flag rights only,
+  never scorecard upload/sync rights, which stay scoped to captain/VC/
+  wrangler/admin exactly as before.
+- `top_performers: { player_id, name, reason, statLine }[]` — this match's
+  resolved top scorer/wicket-taker(s), computed from the same
+  `batting`/`bowling` arrays already fetched for `summarizeStats()`, plus
+  one new batched `squad` roster query (`player_id, players(name)` per
+  booking on the page, same one-round-trip-for-the-whole-page pattern as
+  the existing `rolesRes` query) to resolve names to Hub player IDs.
+
+`MatchHistoryCard`'s verify/flag block now gates on `match.can_verify`
+instead of `match.can_upload` (upload/sync buttons elsewhere on the card
+are untouched, still `can_upload`-gated).
+
+### Share button — wrangler-only, WhatsApp-first
+
+`src/components/matches/PerformerShareButton.tsx`, rendered on
+`MatchHistoryCard` only when `isWrangler` (deliberately narrower than the
+usual `isWrangler || isAdmin` pairing used everywhere else in this app —
+an explicit product decision, not an oversight) and the match has at least
+one resolved top performer and isn't already verified or flagged. Opens a
+small panel per resolved performer with:
+
+- a WhatsApp share (`wa.me/?text=...`, destination-free — same pattern as
+  every other WhatsApp nudge in this app, e.g. `CaptainsCornerGrid`'s
+  submit-for-review nudge; the wrangler picks the recipient themselves)
+  pre-filled with a congratulatory message naming their stat line and
+  asking them to verify or flag, plus a direct link to
+  `/matches/history/<bookingId>`
+- a plain "Copy link" fallback, same `navigator.clipboard` pattern as
+  `GearDetailShare.tsx` / `TournamentShareButton.tsx`
+
+The button doesn't grant anything itself — `canActOnScorecard()` already
+grants the performer access independently of whether anyone ever taps
+share. It exists purely so a wrangler doesn't have to explain "go to
+Past Matches, find the card, expand it, tap verify" over WhatsApp by hand.
+
+### Security (vibe-security)
+
+See the rows added to Section 10's checklist. In particular: the
+top-performer grant is re-derived server-side on every request from
+`match_stats_cache` + `squad` (never trusted from the client or from
+anything the list/detail API responses send down), is scoped to the one
+booking it was computed for, and never widens `can_upload`/fee/sync
+eligibility — only the two actions Section 14 already exposed to
+captain/VC.
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/lib/matchTopPerformers.ts` | `computeTopPerformers()` (pure, mirrors `ScorecardTables.tsx`'s `isTop` highlight) + `resolveMatchTopPerformers()` (server-side, for routes without batting/bowling already in memory) |
+| `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking auth for verify-scorecard and flag-reconciliation, now including the top-performer grant |
+| `src/components/matches/ScorecardVerifyPanel.tsx` | Extracted shared UI (icons, `VerifiedStatusLine`, `ReconciliationControls`) — used by both `MatchHistoryClient.tsx` and the standalone match page |
+| `src/components/matches/MatchVerifyBlock.tsx` | Client state wrapper for the standalone page's verify block |
+| `src/components/matches/PerformerShareButton.tsx` | Wrangler-only share button — WhatsApp + copy-link per resolved top performer |
+
+### Pending
+
+| Item | Notes |
+|---|---|
+| No known gaps yet | Fresh as of this pass — worth a follow-up note here once a real top performer has actually verified or flagged a scorecard through this path. |
 
 ---
 
