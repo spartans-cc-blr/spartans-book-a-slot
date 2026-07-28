@@ -18,6 +18,9 @@ export interface TopPerformerInfo {
   name:      string
   reason:    'top_scorer' | 'top_wicket_taker'
   statLine:  string
+  // Redacted to null server-side for any viewer who isn't a wrangler/admin
+  // — see the whatsapp field on /api/matches/history's top_performers.
+  whatsapp:  string | null
 }
 
 // Same short-date convention as availability-nudge.md's design constraint
@@ -73,20 +76,21 @@ function PerformerRow({ bookingId, performer, gameDate, tournamentName }: {
   gameDate:       string
   tournamentName: string | null
 }) {
-  const [copied, setCopied] = useState(false)
-
   function url() {
     return `${window.location.origin}/matches/history/${bookingId}`
   }
 
+  // Opens WhatsApp addressed directly to the performer's own number
+  // (players.whatsapp) rather than the destination-free wa.me/?text=...
+  // pattern used elsewhere in this app — this message is only ever meant
+  // for this one person, unlike a group nudge where the sender picks the
+  // recipient. Falls back to the destination-free link when the player
+  // has no WhatsApp number on file, so the button still does something
+  // useful rather than being silently dead.
   function openWhatsApp() {
-    window.open(`https://wa.me/?text=${encodeURIComponent(buildMessage(performer, gameDate, tournamentName, url()))}`, '_blank')
-  }
-
-  async function copyLink() {
-    await navigator.clipboard.writeText(url())
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    const digits = performer.whatsapp?.replace(/\D/g, '') || null
+    const text = encodeURIComponent(buildMessage(performer, gameDate, tournamentName, url()))
+    window.open(digits ? `https://wa.me/${digits}?text=${text}` : `https://wa.me/?text=${text}`, '_blank')
   }
 
   return (
@@ -98,20 +102,15 @@ function PerformerRow({ bookingId, performer, gameDate, tournamentName }: {
           </p>
           <p style={{ fontSize: '10px', color: '#6B7280' }}>{performer.statLine}</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-          <button onClick={openWhatsApp} title="Send via WhatsApp"
-            className="text-emerald-400 hover:text-emerald-300 transition-colors">
-            {WA_ICON}
-          </button>
-          <button onClick={copyLink} title="Copy link"
-            className="font-rajdhani text-[10px] font-bold text-zinc-400 hover:text-zinc-200 transition-colors">
-            {copied ? 'Copied!' : 'Copy link'}
-          </button>
-        </div>
+        <button onClick={openWhatsApp} style={{ flexShrink: 0 }}
+          title={performer.whatsapp ? `Send to ${performer.name} on WhatsApp` : 'Send via WhatsApp (no number on file — pick a recipient)'}
+          className="text-emerald-400 hover:text-emerald-300 transition-colors">
+          {WA_ICON}
+        </button>
       </div>
       {/* Message preview — what actually goes out via WhatsApp, minus the
           link itself (which needs window.location, only available inside
-          the click handlers below, not safe to read during render). Shown
+          the click handler above, not safe to read during render). Shown
           so the wrangler can see the personalised text before sending it,
           not just the performer's name and stat line. */}
       <p style={{ fontSize: '10px', color: '#9CA3AF', fontStyle: 'italic', whiteSpace: 'pre-line', marginTop: '4px', lineHeight: 1.4 }}>

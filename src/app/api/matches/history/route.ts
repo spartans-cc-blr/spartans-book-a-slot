@@ -270,21 +270,30 @@ export async function GET(req: NextRequest) {
       ? supabase.from('squad').select('booking_id').eq('player_id', user.playerId).in('booking_id', bookingIds).or('is_captain.eq.true,is_vc.eq.true')
       : Promise.resolve({ data: [] as { booking_id: string }[], error: null }),
     supabase.from('squad').select('booking_id, is_captain, is_vc, is_wk').in('booking_id', bookingIds),
-    // Squad roster (player_id + name) per booking — feeds top-performer
-    // name→player_id resolution below (matchTopPerformers.ts). Batched
-    // once for the whole page rather than per-card, same pattern as
-    // rolesRes just above.
-    supabase.from('squad').select('booking_id, player_id, players(name)').in('booking_id', bookingIds),
+    // Squad roster (player_id + name + whatsapp) per booking — feeds
+    // top-performer name→player_id resolution below
+    // (matchTopPerformers.ts). Batched once for the whole page rather
+    // than per-card, same pattern as rolesRes just above. whatsapp is
+    // fetched here regardless of viewer — it's redacted per-viewer below,
+    // right before the response is built, same posture as can_upload/
+    // can_verify being derived per-viewer from data fetched once.
+    supabase.from('squad').select('booking_id, player_id, players(name, whatsapp)').in('booking_id', bookingIds),
   ]) : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }]
 
   const uploadByBooking = new Map((uploadsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const statsByBooking  = new Map((statsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const ledBookingIds   = new Set((ledRes.data ?? []).map((r: any) => r.booking_id))
 
+  const canSeeWhatsapp = !!user?.isWrangler || !!user?.isAdmin
+
   const squadByBooking = new Map<string, SquadRef[]>()
   for (const row of (rosterRes.data ?? [])) {
     const list = squadByBooking.get((row as any).booking_id) ?? []
-    list.push({ player_id: (row as any).player_id, player_name: (row as any).players?.name ?? '' })
+    list.push({
+      player_id:   (row as any).player_id,
+      player_name: (row as any).players?.name ?? '',
+      whatsapp:    (row as any).players?.whatsapp ?? null,
+    })
     squadByBooking.set((row as any).booking_id, list)
   }
 
@@ -348,7 +357,14 @@ export async function GET(req: NextRequest) {
       // Deliberately NOT folded into can_upload itself: a top performer
       // gets verify/flag rights only, never upload/sync rights.
       can_verify: canUpload || (!!user?.playerId && performers.some(p => p.player_id === user.playerId)),
-      top_performers: performers.map(p => ({ player_id: p.player_id, name: p.name, reason: p.reason, statLine: p.statLine })),
+      // whatsapp is never sent to a non-wrangler/admin viewer — the share
+      // button itself is also gated to that audience, but the API
+      // response is redacted independently rather than relying on the
+      // client to just not render it.
+      top_performers: performers.map(p => ({
+        player_id: p.player_id, name: p.name, reason: p.reason, statLine: p.statLine,
+        whatsapp: canSeeWhatsapp ? p.whatsapp : null,
+      })),
       verified:                       upload?.verified ?? false,
       needs_reconciliation:           upload?.needs_reconciliation ?? false,
       reconciliation_note:            upload?.reconciliation_note ?? null,

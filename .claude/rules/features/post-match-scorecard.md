@@ -433,6 +433,7 @@ and `year=all` specifically.
 | Top-performer verify/flag grant re-derived server-side per booking | ✅ `canActOnScorecard()` (`src/lib/scorecardAuth.ts`) recomputes from `match_stats_cache` + `squad` on every call — never trusted from the client, never a standing role, never widens `can_upload`/fees — see Section 15 |
 | Standalone match page's `canAct` mirrors the API auth exactly | ✅ Page-local gating in `/matches/history/[bookingId]/page.tsx` is a display convenience only; `verify-scorecard`/`flag-reconciliation` re-check independently regardless of what the page renders |
 | Wrangler-only share button visibility | ✅ Gated to `isWrangler` specifically (not paired with `isAdmin` like every other wrangler affordance in this app) — deliberate scoping, see Section 15 |
+| `top_performers[].whatsapp` never sent to a non-privileged viewer | ✅ Redacted to `null` server-side in `/api/matches/history` unless `isWrangler \|\| isAdmin` — same posture as `emergency_contact_phone`, never relies on the client just not rendering it — see Section 15 |
 
 ---
 
@@ -735,12 +736,19 @@ that one booking (no list to patch into).
   a widened `can_upload`** — a top performer gets verify/flag rights only,
   never scorecard upload/sync rights, which stay scoped to captain/VC/
   wrangler/admin exactly as before.
-- `top_performers: { player_id, name, reason, statLine }[]` — this match's
-  resolved top scorer/wicket-taker(s), computed from the same
+- `top_performers: { player_id, name, reason, statLine, whatsapp }[]` —
+  this match's resolved top scorer/wicket-taker(s), computed from the same
   `batting`/`bowling` arrays already fetched for `summarizeStats()`, plus
-  one new batched `squad` roster query (`player_id, players(name)` per
-  booking on the page, same one-round-trip-for-the-whole-page pattern as
-  the existing `rolesRes` query) to resolve names to Hub player IDs.
+  one new batched `squad` roster query (`player_id, players(name,
+  whatsapp)` per booking on the page, same one-round-trip-for-the-whole-page
+  pattern as the existing `rolesRes` query) to resolve names to Hub player
+  IDs. `whatsapp` is fetched for every booking regardless of viewer but
+  redacted to `null` in the response unless the viewer is
+  `isWrangler || isAdmin` — the share button that actually uses it is
+  wrangler-only, but the API response is redacted independently rather
+  than trusting the client to just not render it (same posture as
+  `emergency_contact_phone` elsewhere in this app: "never returned to
+  client" for a non-privileged role).
 
 `MatchHistoryCard`'s verify/flag block now gates on `match.can_verify`
 instead of `match.can_upload` (upload/sync buttons elsewhere on the card
@@ -760,13 +768,18 @@ panel per resolved performer with:
   inline so the wrangler can read it before sending anything — added
   after the first cut only showed the performer's name and stat line,
   leaving the actual wording invisible until WhatsApp opened
-- a WhatsApp share (`wa.me/?text=...`, destination-free — same pattern as
-  every other WhatsApp nudge in this app, e.g. `CaptainsCornerGrid`'s
-  submit-for-review nudge; the wrangler picks the recipient themselves),
-  plus a direct link to `/matches/history/<bookingId>` appended after the
+- a single WhatsApp icon (no separate "Copy link" button) that opens
+  `wa.me/<digits>?text=...` addressed directly to the performer's own
+  `players.whatsapp` number (digits-only, non-digit characters stripped
+  defensively) with the message pre-filled — unlike every other WhatsApp
+  nudge in this app (all destination-free `wa.me/?text=...`, sender picks
+  the recipient), this message is only ever meant for one specific person,
+  so auto-targeting is the right call here. Falls back to the
+  destination-free form when the performer has no WhatsApp number on
+  file, so the icon still does something rather than being dead — the
+  tooltip says so explicitly in that case
+- a direct link to `/matches/history/<bookingId>` appended after the
   message text
-- a plain "Copy link" fallback, same `navigator.clipboard` pattern as
-  `GearDetailShare.tsx` / `TournamentShareButton.tsx`
 
 **Message content** — `buildMessageText()` addresses the performer by
 **first name only** (`firstName()` splits on whitespace — "Hi Kushal,"
@@ -820,7 +833,10 @@ top-performer grant is re-derived server-side on every request from
 anything the list/detail API responses send down), is scoped to the one
 booking it was computed for, and never widens `can_upload`/fee/sync
 eligibility — only the two actions Section 14 already exposed to
-captain/VC.
+captain/VC. `top_performers[].whatsapp` is redacted to `null` server-side
+for any viewer who isn't `isWrangler || isAdmin`, regardless of what the
+share button itself would or wouldn't render — see the `can_verify`
+section above.
 
 ### File Map additions
 

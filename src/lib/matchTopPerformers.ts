@@ -14,6 +14,11 @@ import { createServiceClient } from '@/lib/supabase'
 export interface SquadRef {
   player_id:   string
   player_name: string
+  // Optional — callers that only need the auth check (scorecardAuth.ts)
+  // never fetch it; callers that build the wrangler-only share message
+  // (PerformerShareButton.tsx) do. Never sent to a non-wrangler/admin
+  // viewer — see the per-viewer redaction in /api/matches/history.
+  whatsapp?:   string | null
 }
 
 export type TopPerformerReason = 'top_scorer' | 'top_wicket_taker'
@@ -23,6 +28,7 @@ export interface TopPerformer {
   name:      string
   reason:    TopPerformerReason
   statLine:  string
+  whatsapp:  string | null
 }
 
 // Analytics DB field names aren't part of this repo's schema, so every
@@ -42,15 +48,17 @@ function num(row: any, keys: string[]): number {
 // analytics row's own player_id (set once reconciled, see
 // playerIdentityResolution.ts) over a case-insensitive name match against
 // this booking's squad. Opponent players and unreconciled rows resolve to
-// null and are simply not grantable access.
-function resolvePlayerId(row: any, name: string, squad: SquadRef[]): string | null {
+// null and are simply not grantable access. Returns the whole matched
+// squad row (not just the id) so callers can also pull whatsapp off it
+// without a second lookup.
+function resolveSquadMatch(row: any, name: string, squad: SquadRef[]): SquadRef | null {
   const rowPlayerId = pickField(row, ['player_id'])
   if (rowPlayerId) {
     const byId = squad.find(p => p.player_id === rowPlayerId)
-    if (byId) return byId.player_id
+    if (byId) return byId
   }
   const byName = squad.find(p => p.player_name?.trim().toLowerCase() === name?.trim().toLowerCase())
-  return byName?.player_id ?? null
+  return byName ?? null
 }
 
 export function computeTopPerformers(batting: any[], bowling: any[], squad: SquadRef[]): TopPerformer[] {
@@ -67,12 +75,14 @@ export function computeTopPerformers(batting: any[], bowling: any[], squad: Squa
   if (topBatRuns > 0) {
     for (const row of battingRows) {
       if (num(row, ['runs', 'total_runs']) !== topBatRuns) continue
-      const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
+      const name  = pickField(row, ['player_name', 'name']) ?? 'Unknown'
+      const match = resolveSquadMatch(row, name, squad)
       performers.push({
-        player_id: resolvePlayerId(row, name, squad),
+        player_id: match?.player_id ?? null,
         name,
         reason:    'top_scorer',
         statLine:  `${topBatRuns} runs (${num(row, ['balls', 'balls_faced'])}b)`,
+        whatsapp:  match?.whatsapp ?? null,
       })
     }
   }
@@ -80,12 +90,14 @@ export function computeTopPerformers(batting: any[], bowling: any[], squad: Squa
   if (topBowlWkts > 0) {
     for (const row of bowlingRows) {
       if (num(row, ['wickets', 'wickets_taken']) !== topBowlWkts) continue
-      const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
+      const name  = pickField(row, ['player_name', 'name']) ?? 'Unknown'
+      const match = resolveSquadMatch(row, name, squad)
       performers.push({
-        player_id: resolvePlayerId(row, name, squad),
+        player_id: match?.player_id ?? null,
         name,
         reason:    'top_wicket_taker',
         statLine:  `${topBowlWkts}/${num(row, ['runs', 'runs_conceded'])} (${pickField(row, ['overs', 'overs_bowled']) ?? '—'} ov)`,
+        whatsapp:  match?.whatsapp ?? null,
       })
     }
   }
