@@ -326,8 +326,14 @@ Nav bar stays dark (`bg-ink-2`). Only page content uses slate-teal.
 ```tsx
 <Link href="/gc-review"  ...>⚖ Squad Review</Link>
 <Link href="/gc-players" ...>👤 Players</Link>
+<Link href="/wrangler/grounds" ...>📍 Grounds</Link>
 <GenerateInviteItem />
 ```
+
+`/wrangler/grounds` is added here (not only under the Wrangler ⚒ dropdown)
+so a GC member who isn't also a wrangler still has a nav path to it — GC
+can create new grounds there even without wrangler's edit access. See
+`features/wrangler-grounds-menu.md`.
 
 ### Mobile drawer
 
@@ -339,6 +345,7 @@ Nav bar stays dark (`bg-ink-2`). Only page content uses slate-teal.
       className={`... ${activePage === 'gc-players' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
       👤 Players
     </Link>
+    <Link href="/wrangler/grounds" onClick={() => setOpen(false)} ...>📍 Grounds</Link>
     <GenerateInviteItem mobile onClose={() => setOpen(false)} />
   </>
 )}

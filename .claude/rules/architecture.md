@@ -1,7 +1,7 @@
 # Spartans Hub — System Map
  
 **Spartans CC BLR · hub.spartanscricketclub.in**
-**Last updated: June 2026 · Synced from project knowledge base**
+**Last updated: July 2026 · Synced from project knowledge base**
  
 ---
  
@@ -36,7 +36,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | **Player** | Google OAuth | `/fixtures`, `/profile` | Mark Y/O/E/L availability (**N removed** — blank = not available), view announced squad, edit own profile |
 | **Captain** | Google OAuth + `is_captain` | `/fixtures`, `/captains-corner`, `/tournament-planner`, `/profile` | All player actions + full availability breakdown, squad selection & announcement, captain bandwidth view |
 | **GC (Governing Council)** | Google OAuth + `is_gc` | `/gc-review`, `/tournament-planner` | Approve or return submitted squads; tournament pace overview |
-| **Data Wrangler** | Google OAuth + `is_wrangler` | `/wrangler/backfill-squad`, `/matches/history` | Upload/sync scorecards for any match (not just own), backfill squad rows from WhatsApp announcements. Admin-writable flag only — see `features/post-match-scorecard.md` |
+| **Data Wrangler** | Google OAuth + `is_wrangler` | `/wrangler/backfill-squad`, `/wrangler/grounds`, `/matches/history` | Upload/sync scorecards for any match (not just own), backfill squad rows from WhatsApp announcements, edit existing grounds (not create — see `features/wrangler-grounds-menu.md`). Admin-writable flag only — see `features/post-match-scorecard.md` |
 | **Admin (Coordinator)** | Google OAuth + `ADMIN_EMAILS` env var | `/admin/**`, `/tournament-planner`, all above | Full booking CRUD, player management, override all workflows |
  
 > **Security note (vibe-security audit):** `isAdmin` is derived from an environment variable — not the database — making it tamper-proof. `isCaptain` and `isGC` are DB-sourced flags written into the JWT at sign-in. Middleware enforces role checks on every protected route server-side.
@@ -76,11 +76,12 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 |---|---|---|
 | `/gc-review` | Server → `GCReviewClient` (client) | `bookings`, `availability`, `squad` (pending/approved/announced) |
  
-### Wrangler Routes (`isWrangler` or `isAdmin`)
+### Wrangler Routes (`isWrangler` or `isAdmin`; `/wrangler/grounds` also allows `isGC`)
  
 | Route | Component | Data source |
 |---|---|---|
 | `/wrangler/backfill-squad` | Server → client form | Parses WhatsApp squad announcement text, backfills `squad` rows for a booking |
+| `/wrangler/grounds` | Server → `GroundsClient` (client) | `grounds` table — wrangler/admin can edit existing rows, GC/admin can also create new ones; see `features/wrangler-grounds-menu.md` |
  
 ### Admin Routes (`isAdmin`)
  
@@ -92,7 +93,6 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/admin/players` | Full player directory management |
 | `/admin/captains` | Captain master data |
 | `/admin/tournaments` | Tournament master data (includes `total_league_games` and `cricheroes_points_table_url` inputs) |
-| `/admin/grounds` | Grounds master data (name, Maps URL, hospital URL) |
 | `/admin/soft-blocks/new` | Create reservation (soft block) |
 | `/admin/scorecard-backfill` | One-time catch-up UI — fetches scorecards directly from CricHeroes for past matches never uploaded; see `features/post-match-scorecard.md` |
 | `/admin/player-reconciliation` | Resolves analytics-DB scorecard `player_name` strings to Hub `players.id` — suggestions, confirm/ignore, "Run Reconciliation Pass"; see `features/player-identity-resolution.md` |
@@ -106,6 +106,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
 | `/api/availability` | GET | None | Slot availability grid with booking rules applied |
+| `/api/grounds` | GET | None | Grounds list (`id, name, maps_url, hospital_url`) — displayed on public fixture cards. Writes are not public: POST is `isGC \|\| isAdmin` (create), PATCH is `isWrangler \|\| isAdmin` (edit) — see `features/wrangler-grounds-menu.md` |
  
 ### Player APIs
  
@@ -212,13 +213,13 @@ Primary scheduling record.
 | `opponent_name` | text | Opposing team |
 | `match_id` | text | CricHeroes match reference |
 | `cricheroes_url` | text | Direct CricHeroes match link |
-| `match_time` | text | Actual start time (may differ from slot) |
+| `match_time` | text | Actual start time (may differ from slot). Admin booking form defaults this to `slot_time + 15 min` once a slot is picked, unless already saved or manually overridden — see §8.1 |
 | `match_stage` | text | Group / Knockout etc. |
 | `reserved_until` | timestamptz | 48 hr expiry for `soft_block` |
 | `organiser_name` | text | External organiser (reservations) |
 | `organiser_phone` | text | WhatsApp for expiry warnings |
 | `notes` | text | Internal admin notes — never shown publicly |
-| `availability_locked` | boolean | Thursday blanket-lock flag; set by cron at 08:00 IST for all confirmed Sat/Sun slots; blocks all player writes (POST + DELETE); captains/GC/admin bypass |
+| `availability_locked` | boolean | Freeze flag; blocks all player writes (POST + DELETE); captains/GC/admin bypass. Set by three triggers (additive): Thursday cron at 08:00 IST for all confirmed Sat/Sun slots; GC submission (squad reaches `pending_approval`+); or `POST /api/squad` saving a non-empty draft for a booking in the weekend currently open for selection. See `features/player-availability.md` §10 |
 | `created_at` / `updated_at` | timestamptz | Auto-managed |
  
 **Unique constraint:** `UNIQUE(game_date, slot_time) WHERE status != 'cancelled'`
@@ -235,7 +236,7 @@ Primary scheduling record.
 > `total_league_games` — used by Tournament Planner for bandwidth and pace signals. `vc_captain_id` — links the vice-captain for this tournament (FK → `captains.id`); used in share card and bandwidth view. `cricheroes_points_table_url` — optional URL to the CricHeroes points table for this tournament; when set, the tournament name renders as a hyperlink on fixture cards (`FixturesCard.tsx`) and the Tournament Planner page (`TournamentPlannerClient.tsx`), helping captains and players track standings.
  
 #### `grounds`
-`id, name, maps_url, hospital_url` — joined into fixture cards and squad announcement text.
+`id, name, maps_url, hospital_url` — joined into fixture cards and squad announcement text. Managed at `/wrangler/grounds` (not `/admin/*`) — create is `isGC || isAdmin`, edit is `isWrangler || isAdmin`; see `features/wrangler-grounds-menu.md`.
  
 ### Sprint 2 Tables (Live)
  
@@ -335,12 +336,28 @@ All rules live in `src/lib/validation.ts`. Called from both the API (on save) an
 ```
 Admin → /admin/bookings/new
   → Validate rules (R1–R6) via /api/validate (live)
+  → Match Start Time auto-fills to slot_time + 15 min once a slot is picked
   → POST /api/bookings → DB write (service role)
   → [soft_block] reserved_until = now() + 48hr
   → [confirmed] WhatsApp notify buttons (organiser + captain)
   → Cron at 18:30 UTC deletes expired soft_blocks
 ```
- 
+
+> **Match Start Time default (added July 2026):** both `/admin/bookings/new`
+> and `/admin/bookings/[id]` auto-fill the Match Start Time field to
+> `slot_time + 15 min` (a local `defaultMatchTime()` helper in each page)
+> the moment a slot is picked — on the edit page this also applies on load,
+> for any existing booking whose `match_time` is still null. A
+> `matchTimeTouched` flag stops the default from ever overwriting a value
+> the admin typed themselves, or one already saved in the DB. This is a
+> client-side UX default only — nothing server-side changed, and
+> `POST /api/bookings` / `PATCH /api/bookings/[id]` still happily accept
+> `match_time: null`. The value feeds straight into the announcement
+> reporting-time calc (`match_time − 15 min`) — see
+> `features/squad-selection.md` §6. Existing bookings created before this
+> shipped are unaffected until their edit page is opened and saved — no
+> DB backfill was run.
+
 ### 8.2 Player Availability Flow
 ```
 Player → /fixtures → Google sign-in
@@ -565,6 +582,8 @@ Next.js API Routes (server-side)
 | `src/app/api/admin/player-reconciliation/route.ts` | GET buckets pending scorecard names, POST confirms/ignores/reconciles |
 | `src/app/admin/player-reconciliation/page.tsx` | Admin reconciliation UI + "Run Reconciliation Pass" client loop |
 | `analytics-db/migrations/001_player_identity_resolution.sql` | Analytics DB (separate project) — `player_id` columns + alias/override/ignore tables |
+| `src/app/wrangler/grounds/page.tsx` + `src/components/wrangler/GroundsClient.tsx` | `/wrangler/grounds` — grounds management, moved off `/admin/*`; `canAdd`/`canEdit` props gate GC-vs-wrangler UI; see `features/wrangler-grounds-menu.md` |
+| `src/app/api/grounds/route.ts` | GET public; POST `isGC \|\| isAdmin`; PATCH `isWrangler \|\| isAdmin` |
  
 ---
  

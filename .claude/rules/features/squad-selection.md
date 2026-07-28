@@ -192,7 +192,7 @@ squad_selection_announcement.md
 
 # Squad Selection & Announcement — Feature Summary
  
-**Spartans Hub · Sprint 2 · Last updated: June 2026**
+**Spartans Hub · Sprint 2 · Last updated: July 2026**
  
 ---
  
@@ -258,6 +258,15 @@ These are distinct. A player with `players.is_captain = false` can be designated
 - Deletes **all** existing rows for the booking regardless of status, then re-inserts with role flags
 - Hard cap of 12 enforced server-side
 - Validates that captain/vc/wk player IDs are all within `player_ids`
+- **Time gate (first draft only):** creating a squad where none exists yet is blocked Mon–Wed and
+  before Thu 8am IST, and — as of 28 Jul 2026 — also requires the booking's own `game_date` to be
+  in the weekend the Thu 8am–Sun window is currently governing (`getActiveLockWeekend()`).
+  Editing an already-existing draft is always allowed regardless of window.
+- **Lock on draft save:** sets `bookings.availability_locked = true` the moment a *non-empty*
+  draft is saved — this is a third freeze trigger alongside the Thursday cron and GC submission.
+  See `features/player-availability.md` §10/§10.1 for the full freeze design and a 28 Jul 2026
+  incident write-up (this trigger was previously unscoped and could freeze a future weekend's
+  booking over a week early, or freeze one with an empty/never-submitted squad).
 ### `POST /api/squad/submit` — submit for GC review
  
 - Auth: captain or admin
@@ -362,7 +371,7 @@ Accessible to `isGC` or `isAdmin`. GC members see it via the "GC Review" nav lin
  
 ### `src/lib/announcement.ts`
  
-Standalone announcement builder used by `GCReviewClient`. Produces the full WhatsApp message format:
+Standalone announcement builder. **⚠️ Not currently imported or called anywhere in the app** — confirmed by grepping the codebase (July 2026): `GCReviewClient.tsx` does not reference it, and no other component does either. The line below and the table in §6 previously claimed it was "used by `GCReviewClient`" — that was inaccurate and has been corrected. It is effectively dead code today; kept in the repo in case a future GC-side share flow revives it. Produces the full WhatsApp message format:
  
 ```
 📅 Date
@@ -388,11 +397,13 @@ Announced squad display for all logged-in players. Squad section collapsed by de
 | Location | Function | Used for |
 |---|---|---|
 | `CaptainsCornerGrid.tsx` | `buildAnnouncementText()` | Captain's Copy + WhatsApp buttons — **official announcement path** |
-| `src/lib/announcement.ts` | `buildSquadAnnouncement()` | Available to `GCReviewClient` for convenience only |
+| `src/lib/announcement.ts` | `buildSquadAnnouncement()` | ⚠️ Unused — not imported anywhere (verified July 2026); see note in §5 |
  
 **Important:** Announcement is the captain's responsibility exclusively. The GC's role is approve or return — not distribute. The WhatsApp button in `GCReviewClient` after a decision is a nudge to notify the captain of the outcome, not to share the squad publicly.
  
-Both `buildAnnouncementText()` and `buildSquadAnnouncement()` produce the same full WhatsApp format using `match_time ?? slot_time` minus 15 minutes for reporting time, and include ground, maps URL, hospital, jersey type, CricHeroes match URL, and the match card link (`/fixtures/[id]`).
+Both `buildAnnouncementText()` and `buildSquadAnnouncement()` produce the same full WhatsApp format using `match_time ?? slot_time` minus 15 minutes for reporting time, and include ground, maps URL, hospital, jersey type, CricHeroes match URL, and the match card link (`/fixtures/[id]`) — though only `buildAnnouncementText()` is actually reachable from the running app today (see §5).
+
+**Where `match_time` comes from:** as of July 2026, `/admin/bookings/new` and `/admin/bookings/[id]` default this field to `slot_time + 15 min` the moment a slot is picked, unless already set or manually overridden — see `architecture.md` §8.1. So the `match_time ?? slot_time` fallback above now mostly only matters for bookings created before that default shipped. The reporting-time subtraction itself (`− 15 min`, in both `formatReportingTime()` implementations) was independently re-verified against the code this same session and is correct as documented — no change was needed there.
  
 ---
  

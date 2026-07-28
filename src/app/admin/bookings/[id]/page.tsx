@@ -67,6 +67,14 @@ const RULES = [
   { rule: 'R6', label: '12:30 overlap' },
 ]
 
+function defaultMatchTime(slot: SlotTime): string {
+  const [h, m] = slot.split(':').map(Number)
+  const total = h * 60 + m + 15
+  const nh = Math.floor(total / 60) % 24
+  const nm = total % 60
+  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
+}
+
 export default function BookingDetailPage() {
   const router = useRouter()
   const { id } = useParams<{ id: string }>()
@@ -90,6 +98,7 @@ export default function BookingDetailPage() {
   const [venue,         setVenue]         = useState('')
   const [matchId,       setMatchId]       = useState('')
   const [matchTime,     setMatchTime]     = useState('')
+  const [matchTimeTouched, setMatchTimeTouched] = useState(false)
   const [opponentName,  setOpponentName]  = useState('')
   const [cricheroes,    setCricheroes]    = useState('')
   const [notes,         setNotes]         = useState('')
@@ -131,7 +140,8 @@ export default function BookingDetailPage() {
         setSlotTime(b.slot_time)
         setVenue(b.venue ?? '')
         setMatchId(b.match_id ?? '')
-        setMatchTime(b.match_time ?? '')
+        setMatchTime(b.match_time ?? defaultMatchTime(b.slot_time))
+        setMatchTimeTouched(b.match_time != null)
         setOpponentName(b.opponent_name ?? '')
         setCricheroes(b.cricheroes_url ?? '')
         setNotes(b.notes ?? '')
@@ -143,6 +153,12 @@ export default function BookingDetailPage() {
         setLoading(false)
       })
   }, [id])
+
+  useEffect(() => {
+    if (slotTime && !matchTimeTouched) {
+      setMatchTime(defaultMatchTime(slotTime))
+    }
+  }, [slotTime, matchTimeTouched])
 
   const today = new Date().toISOString().split('T')[0]
   const isPostMatchEligible = !!booking && booking.status === 'confirmed' && booking.game_date < today
@@ -602,10 +618,11 @@ export default function BookingDetailPage() {
                 </div>
                 <div>
                   <label className="form-label">Match Start Time</label>
-                  <input type="time" value={matchTime} onChange={e => setMatchTime(e.target.value)}
+                  <input type="time" value={matchTime}
+                    onChange={e => { setMatchTime(e.target.value); setMatchTimeTouched(true) }}
                     className="form-input" />
                   <p className="font-rajdhani text-xs text-zinc-600 mt-1">
-                    Organiser's confirmed match start time — may differ from slot time.
+                    Defaults to 15 min after slot time — edit if the organiser confirms a different start time.
                   </p>
                 </div>
                 <div>

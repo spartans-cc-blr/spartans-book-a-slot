@@ -13,6 +13,14 @@ import { SLOT_TIMES, SLOT_FORMATS } from '@/types'
 
 type BookingMode = 'confirmed' | 'reserved'
 
+function defaultMatchTime(slot: SlotTime): string {
+  const [h, m] = slot.split(':').map(Number)
+  const total = h * 60 + m + 15
+  const nh = Math.floor(total / 60) % 24
+  const nm = total % 60
+  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
+}
+
 const RULES: { rule: string; label: string }[] = [
   { rule: 'R1', label: 'Max 3 games per weekend' },
   { rule: 'R2', label: 'Captain leading another tournament this weekend' },
@@ -40,6 +48,7 @@ export default function NewBookingPage() {
   const [matchId,       setMatchId]       = useState('')
   const [cricHeroesUrl, setCricHeroesUrl] = useState('')
   const [matchTime,     setMatchTime]     = useState('')
+  const [matchTimeTouched, setMatchTimeTouched] = useState(false)
 
   // Reservation-only fields
   const [organiserName,  setOrganiserName]  = useState('')
@@ -74,7 +83,7 @@ export default function NewBookingPage() {
   useEffect(() => {
     setGameDate(''); setSlotTime(''); setFormat(''); setNotes('')
     setTournamentId(''); setVenue('')
-    setOpponentName(''); setMatchId(''); setCricHeroesUrl(''); setMatchTime('')
+    setOpponentName(''); setMatchId(''); setCricHeroesUrl(''); setMatchTime(''); setMatchTimeTouched(false)
     setOrganiserName(''); setOrganiserPhone('')
     setShowAddTournament(false); setNewTournamentName(''); setNewTournamentOrg('')
     setNewTournamentBall('red'); setNewTournamentGround('')
@@ -161,6 +170,12 @@ export default function NewBookingPage() {
   }, [mode, gameDate, format, slotTime, tournamentId])
 
   useEffect(() => { validate() }, [validate])
+
+  useEffect(() => {
+    if (mode === 'confirmed' && slotTime && !matchTimeTouched) {
+      setMatchTime(defaultMatchTime(slotTime))
+    }
+  }, [mode, slotTime, matchTimeTouched])
 
   const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'warn')
   const availableSlots = format ? SLOT_TIMES.filter(t => SLOT_FORMATS[t].includes(format as GameFormat)) : SLOT_TIMES
@@ -482,10 +497,11 @@ export default function NewBookingPage() {
                   </div>
                   <div>
                     <label className="form-label">Match Start Time</label>
-                    <input type="time" value={matchTime} onChange={e => setMatchTime(e.target.value)}
+                    <input type="time" value={matchTime}
+                      onChange={e => { setMatchTime(e.target.value); setMatchTimeTouched(true) }}
                       className="form-input" />
                     <p className="font-rajdhani text-xs text-zinc-600 mt-1">
-                      Organiser's confirmed start time — may differ from slot time.
+                      Defaults to 15 min after slot time — edit if the organiser confirms a different start time.
                     </p>
                   </div>
                 </FormCard>

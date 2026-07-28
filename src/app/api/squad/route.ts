@@ -18,6 +18,26 @@ async function requireCaptain() {
 // reverted to draft by a plain save — see POST below.
 const LOCKED_STATUSES = ['pending_approval', 'approved', 'announced']
 
+// The weekend currently "open" for squad selection: the Sat/Sun governed by
+// the most recent Thursday on/before now (mirrors the lock-availability
+// cron's own thursday+2/+3 calc, but anchored to the Thursday that just
+// passed rather than the next one — the window stays open Thu 8am IST
+// through Sunday for that Thursday's own weekend).
+function getActiveLockWeekend(nowIST: Date) {
+  const dow = nowIST.getDay()   // 0=Sun .. 6=Sat
+  const daysSinceThursday = (dow - 4 + 7) % 7
+  const thursday = new Date(nowIST)
+  thursday.setDate(nowIST.getDate() - daysSinceThursday)
+  const saturday = new Date(thursday)
+  saturday.setDate(thursday.getDate() + 2)
+  const sunday = new Date(saturday)
+  sunday.setDate(saturday.getDate() + 1)
+  return {
+    saturday: saturday.toISOString().split('T')[0],
+    sunday:   sunday.toISOString().split('T')[0],
+  }
+}
+
 function buildCurrentSnapshot(rows: SquadVersionRow[]) {
   return {
     player_ids: rows.map(r => r.player_id),
@@ -127,7 +147,11 @@ export async function POST(req: NextRequest) {
   // Time gate — only applies when no squad exists yet for this booking.
   // Editing an existing draft (any status) is always allowed.
   // Window: blocked Mon–Wed and Thursday before 08:00 IST; allowed
-  // Thursday 08:00 IST onward through Sunday.
+  // Thursday 08:00 IST onward through Sunday — but only for the booking
+  // whose own game_date is the weekend that window governs. Without this,
+  // Captains Corner's up-to-20-bookings view lets a captain draft (and
+  // thereby freeze — see the lock write below) a squad for a weekend
+  // still over a week out, well before that weekend's own Thursday.
   if (currentRows.length === 0) {
     const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000)
     const day     = nowIST.getDay()   // 0=Sun .. 6=Sat
@@ -136,6 +160,21 @@ export async function POST(req: NextRequest) {
     if (isBlockedWindow) {
       return NextResponse.json(
         { error: 'Squad selection opens Thursday 08:00 IST' },
+        { status: 403 }
+      )
+    }
+
+    const { data: bookingRow } = await supabase
+      .from('bookings')
+      .select('game_date')
+      .eq('id', booking_id)
+      .single()
+    const activeWeekend = getActiveLockWeekend(nowIST)
+    const isActiveWeekend = !!bookingRow &&
+      (bookingRow.game_date === activeWeekend.saturday || bookingRow.game_date === activeWeekend.sunday)
+    if (!isActiveWeekend) {
+      return NextResponse.json(
+        { error: 'Squad selection for this match opens on the Thursday before its own weekend' },
         { status: 403 }
       )
     }
@@ -211,11 +250,15 @@ export async function POST(req: NextRequest) {
     finalRows = rows
   }
 
-  // Lock availability the moment a squad is drafted
-  await supabase
-    .from('bookings')
-    .update({ availability_locked: true })
-    .eq('id', booking_id)
+  // Lock availability the moment a squad is drafted — only when there's an
+  // actual squad. An empty save (player_ids: []) is not a draft in progress
+  // and must not freeze the booking on its own.
+  if (player_ids.length > 0) {
+    await supabase
+      .from('bookings')
+      .update({ availability_locked: true })
+      .eq('id', booking_id)
+  }
 
   // Audit the reopen — a real status transition (locked → draft) caused by
   // this route, not just an ordinary in-draft resave. Reuses the 'returned'
