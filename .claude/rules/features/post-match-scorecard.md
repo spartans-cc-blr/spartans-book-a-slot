@@ -752,17 +752,45 @@ are untouched, still `can_upload`-gated).
 `MatchHistoryCard` only when `isWrangler` (deliberately narrower than the
 usual `isWrangler || isAdmin` pairing used everywhere else in this app —
 an explicit product decision, not an oversight) and the match has at least
-one resolved top performer and isn't already verified or flagged. Opens a
-small panel per resolved performer with:
+one resolved top performer and isn't already verified or flagged. Button
+label: **"Request top performer to verify"**. Tapping it opens a small
+panel per resolved performer with:
 
+- an italicised preview of the exact message text (see below), shown
+  inline so the wrangler can read it before sending anything — added
+  after the first cut only showed the performer's name and stat line,
+  leaving the actual wording invisible until WhatsApp opened
 - a WhatsApp share (`wa.me/?text=...`, destination-free — same pattern as
   every other WhatsApp nudge in this app, e.g. `CaptainsCornerGrid`'s
-  submit-for-review nudge; the wrangler picks the recipient themselves)
-  pre-filled with a congratulatory message naming their stat line and
-  asking them to verify or flag, plus a direct link to
-  `/matches/history/<bookingId>`
+  submit-for-review nudge; the wrangler picks the recipient themselves),
+  plus a direct link to `/matches/history/<bookingId>` appended after the
+  message text
 - a plain "Copy link" fallback, same `navigator.clipboard` pattern as
   `GearDetailShare.tsx` / `TournamentShareButton.tsx`
+
+**Message content** — `buildMessageText()` addresses the performer by
+name and names the match's date and tournament explicitly (never "today"
+— a wrangler could easily send this a day or two after the match), using
+the same short-date convention as `availability-nudge.md`'s design
+constraint ("Sun 19 Jul", not a relative phrase):
+
+```
+Hi <name>,
+
+🏆 Great knock in <tournament> on <Sun 19 Jul>! <statLine> — well played 👏
+
+Since you were the standout performer with the bat that day, could you
+spare a minute to check the scorecard matches CricHeroes and mark it
+verified (or flag anything that looks off)?
+
+<link>
+```
+
+Falls back to just the date (drops the "in \<tournament\>" clause) when the
+booking has no tournament assigned. "knock"/"bat" swap to "spell"/"ball"
+for a top wicket-taker. An all-rounder who tops both gets one row with
+both stat lines combined (see `dedupePerformers()`) rather than two
+separate messages.
 
 The button doesn't grant anything itself — `canActOnScorecard()` already
 grants the performer access independently of whether anyone ever taps
