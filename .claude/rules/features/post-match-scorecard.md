@@ -855,6 +855,36 @@ section above.
 |---|---|
 | No known gaps yet | Fresh as of this pass — worth a follow-up note here once a real top performer has actually verified or flagged a scorecard through this path. |
 
+> **Incident (28 Jul 2026) — stale `match_stats_cache` silently hid the
+> verify/share controls on a already-`synced` match, with no self-service
+> way to fix it.** The 11 Jul PSG Champions Trophy match (vs Republic Of
+> Whitefield CC) synced on 14 Jul — *before* five of its scorecard names
+> ("Sagar", "Ashish Gupta", "Kathiresh", "Nagarjun H", "DS Sakketha") were
+> reconciled via `/admin/player-reconciliation`. `player-identity-resolution.md`
+> §5 already documents that rows synced before reconciliation carry
+> `player_id: null` "until the next sync" — but there was no UI path to
+> trigger that next sync once a booking was already `synced`:
+> `ScorecardUploadButton`/the "Sync Stats" button (`MatchHistoryClient.tsx`,
+> the admin Post-Match panel) only rendered for `parsed` status, and
+> `/admin/scorecard-backfill` only lists bookings not yet
+> `synced`/`fees_applied`. Result: `computeTopPerformers()` couldn't resolve
+> a `player_id` for either the top scorer or top wicket-taker (the
+> analytics-scraped names don't exactly match the squad's full names, so the
+> case-insensitive fallback also missed), `top_performers.some(p =>
+> p.player_id)` was false, and `showsPerformerShare` never rendered even for
+> the wrangler viewing it — despite `can_verify`/`showsVerifyAction` being
+> true the whole time. Fixed by re-syncing that one booking (idempotent —
+> `syncMatchStatsForBooking()` just re-reads the analytics DB, which by then
+> had all five names correctly aliased) and by adding a permanent secondary
+> "Re-sync stats from Analytics DB" affordance for `can_upload` viewers
+> whenever `scorecard_status === 'synced'`, in both `MatchHistoryClient.tsx`
+> and the admin Post-Match panel (`src/app/admin/bookings/[id]/page.tsx`) —
+> deliberately **not** offered once `fees_applied`, matching a second fix in
+> `matchStatsSync.ts` itself: the status-flip at the end of a sync now has
+> `.neq('status', 'fees_applied')`, so a re-sync can never regress the
+> forward-only status machine back to `synced` and make a fees-applied
+> booking look eligible for another fee debit.
+
 ---
 
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*

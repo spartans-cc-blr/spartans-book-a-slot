@@ -705,6 +705,23 @@ function MatchHistoryCard({
         </div>
       )}
 
+      {/* A match can be re-synced after it's already 'synced' — e.g. a
+          player_name gets reconciled (see player-identity-resolution.md)
+          after the first sync, so the cached batting/bowling rows here are
+          still missing player_id and can't resolve a top performer. Never
+          offered once fees are applied — matchStatsSync.ts refuses to
+          regress that status anyway, so there's nothing for a re-sync to
+          fix there beyond what's already cached. */}
+      {match.scorecard_status === 'synced' && match.can_upload && (
+        <div>
+          <button onClick={handleSyncStats} disabled={syncLoading}
+            className="font-rajdhani text-[10px] font-semibold text-zinc-500 hover:text-gold disabled:opacity-40 underline underline-offset-2 transition-colors">
+            {syncLoading ? 'Re-syncing…' : 'Re-sync stats from Analytics DB'}
+          </button>
+          {syncError && <p className="font-rajdhani text-[10px] text-red-400 mt-1">{syncError}</p>}
+        </div>
+      )}
+
       {/* Icons row — sync status (subtle) and CricHeroes. The Ground icon
           was removed here — the ground name under the opponent above is
           already the clickable affordance for opening the map, so a second

@@ -82,10 +82,16 @@ export async function syncMatchStatsForBooking(
 
   if (cacheErr) return { ok: false, error: cacheErr.message }
 
+  // Status is forward-only (pending_parse → parsed → synced → fees_applied
+  // — see architecture.md §6). A re-sync (e.g. to pick up a player_name
+  // reconciled after the first sync — see player-identity-resolution.md
+  // §5) must never regress an already-fees_applied booking back to
+  // 'synced', which would make it look eligible for another fee debit.
   const { error: statusErr } = await supabase
     .from('scorecard_uploads')
     .update({ status: 'synced' })
     .eq('booking_id', bookingId)
+    .neq('status', 'fees_applied')
 
   if (statusErr) return { ok: false, error: statusErr.message }
 

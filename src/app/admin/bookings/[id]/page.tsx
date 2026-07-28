@@ -676,6 +676,18 @@ export default function BookingDetailPage() {
                         {syncLoading ? 'Syncing…' : 'Sync Stats from Analytics DB'}
                       </button>
                     )}
+                    {/* Re-sync an already-synced booking — e.g. to pick up a
+                        player_name reconciled (player-identity-resolution.md)
+                        after the first sync, whose cached batting/bowling rows
+                        are still missing player_id. Not offered once fees are
+                        applied; matchStatsSync.ts also refuses to regress that
+                        status, so this stays a no-op risk-free action. */}
+                    {postMatch.upload.status === 'synced' && (
+                      <button onClick={handleSyncStats} disabled={syncLoading}
+                        className="font-rajdhani text-xs font-semibold text-zinc-500 hover:text-gold disabled:opacity-40 underline underline-offset-2 transition-colors">
+                        {syncLoading ? 'Re-syncing…' : 'Re-sync Stats from Analytics DB'}
+                      </button>
+                    )}
                     {syncError && <p className="font-rajdhani text-xs text-red-400">{syncError}</p>}
 
                     {/* Admin override — clears a stuck/wrong upload so it can be
