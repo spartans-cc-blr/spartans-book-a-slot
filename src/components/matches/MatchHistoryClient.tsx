@@ -824,7 +824,12 @@ function MatchHistoryCard({
           performer verify/flag rights independently of whether anyone
           ever taps this button. */}
       {showsPerformerShare && (
-        <PerformerShareButton bookingId={match.booking_id} performers={match.top_performers} />
+        <PerformerShareButton
+          bookingId={match.booking_id}
+          performers={match.top_performers}
+          gameDate={match.game_date}
+          tournamentName={match.tournament_name}
+        />
       )}
 
       {/* Collapsible squad — once the scorecard is synced AND C/VC/WK are
