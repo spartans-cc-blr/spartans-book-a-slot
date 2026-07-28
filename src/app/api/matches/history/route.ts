@@ -52,6 +52,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { computeTopPerformers, type SquadRef } from '@/lib/matchTopPerformers'
 
 const DEFAULT_LIMIT = 15
 const MAX_LIMIT = 50
@@ -262,18 +263,30 @@ export async function GET(req: NextRequest) {
   // batched into one round-trip each rather than per-row, and merged in JS
   // below. Role coverage drives whether the Squad collapsible even needs to
   // be shown on a card that already has synced stats (see roles_complete).
-  const [uploadsRes, statsRes, ledRes, rolesRes] = bookingIds.length ? await Promise.all([
+  const [uploadsRes, statsRes, ledRes, rolesRes, rosterRes] = bookingIds.length ? await Promise.all([
     supabase.from('scorecard_uploads').select('booking_id, status, uploaded_at, verified, needs_reconciliation, reconciliation_note, reconciliation_flagged_by, reconciliation_flagged_at').in('booking_id', bookingIds),
     supabase.from('match_stats_cache').select('booking_id, match_result, team_total, team_wickets, team_overs, opponent_total, opponent_wickets, opponent_overs, batting, bowling').in('booking_id', bookingIds),
     user?.playerId
       ? supabase.from('squad').select('booking_id').eq('player_id', user.playerId).in('booking_id', bookingIds).or('is_captain.eq.true,is_vc.eq.true')
       : Promise.resolve({ data: [] as { booking_id: string }[], error: null }),
     supabase.from('squad').select('booking_id, is_captain, is_vc, is_wk').in('booking_id', bookingIds),
-  ]) : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }]
+    // Squad roster (player_id + name) per booking — feeds top-performer
+    // name→player_id resolution below (matchTopPerformers.ts). Batched
+    // once for the whole page rather than per-card, same pattern as
+    // rolesRes just above.
+    supabase.from('squad').select('booking_id, player_id, players(name)').in('booking_id', bookingIds),
+  ]) : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }]
 
   const uploadByBooking = new Map((uploadsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const statsByBooking  = new Map((statsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const ledBookingIds   = new Set((ledRes.data ?? []).map((r: any) => r.booking_id))
+
+  const squadByBooking = new Map<string, SquadRef[]>()
+  for (const row of (rosterRes.data ?? [])) {
+    const list = squadByBooking.get((row as any).booking_id) ?? []
+    list.push({ player_id: (row as any).player_id, player_name: (row as any).players?.name ?? '' })
+    squadByBooking.set((row as any).booking_id, list)
+  }
 
   // scorecard_uploads has several FK columns to players (uploaded_by,
   // fees_applied_by, verified_by, reconciliation_flagged_by) — an embedded
@@ -303,6 +316,15 @@ export async function GET(req: NextRequest) {
   const matches = (data ?? []).map((b: any) => {
     const upload = uploadByBooking.get(b.id)
     const statsRow = statsByBooking.get(b.id)
+    // Top scorer / top wicket-taker for this match, resolved to a Hub
+    // player_id where possible — same isTop logic already shown as gold
+    // text on the scorecard tables. Feeds can_verify below (auth) and
+    // top_performers (the wrangler-only share button's data). Empty when
+    // stats haven't synced yet — nothing to compute against.
+    const performers = statsRow
+      ? computeTopPerformers(statsRow.batting ?? [], statsRow.bowling ?? [], squadByBooking.get(b.id) ?? [])
+      : []
+    const canUpload = !!user?.isWrangler || !!user?.isAdmin || ledBookingIds.has(b.id)
     return {
       booking_id:      b.id,
       game_date:       b.game_date,
@@ -320,7 +342,13 @@ export async function GET(req: NextRequest) {
       scorecard_uploaded_at: upload?.uploaded_at ?? null,
       // Never trust the client — eligibility is derived from the session's
       // own role flags plus a server-side squad lookup, never client params.
-      can_upload: !!user?.isWrangler || !!user?.isAdmin || ledBookingIds.has(b.id),
+      can_upload: canUpload,
+      // Same audience as can_upload, plus this viewer if they're this
+      // match's own resolved top performer — see matchTopPerformers.ts.
+      // Deliberately NOT folded into can_upload itself: a top performer
+      // gets verify/flag rights only, never upload/sync rights.
+      can_verify: canUpload || (!!user?.playerId && performers.some(p => p.player_id === user.playerId)),
+      top_performers: performers.map(p => ({ player_id: p.player_id, name: p.name, reason: p.reason, statLine: p.statLine })),
       verified:                       upload?.verified ?? false,
       needs_reconciliation:           upload?.needs_reconciliation ?? false,
       reconciliation_note:            upload?.reconciliation_note ?? null,

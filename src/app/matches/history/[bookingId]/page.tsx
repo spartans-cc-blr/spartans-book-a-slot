@@ -5,6 +5,9 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
+import { computeTopPerformers } from '@/lib/matchTopPerformers'
+import { MatchVerifyBlock } from '@/components/matches/MatchVerifyBlock'
+import { NotifyIcon, VerifiedStatusLine } from '@/components/matches/ScorecardVerifyPanel'
 
 export const revalidate = 0
 
@@ -65,10 +68,10 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   const tournament = Array.isArray(booking.tournament) ? booking.tournament[0] ?? null : booking.tournament
   const ground = tournament?.ground ? (Array.isArray(tournament.ground) ? tournament.ground[0] ?? null : tournament.ground) : null
 
-  const [{ data: squadRows }, statsRes] = await Promise.all([
+  const [{ data: squadRows }, statsRes, uploadRes] = await Promise.all([
     supabase
       .from('squad')
-      .select('player_id, players(name, cricheroes_url)')
+      .select('player_id, is_captain, is_vc, players(name, cricheroes_url)')
       .eq('booking_id', booking.id),
     booking.match_id
       ? supabase
@@ -77,6 +80,16 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
           .eq('match_id', booking.match_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // scorecard_uploads has several FK columns to players (uploaded_by,
+    // fees_applied_by, verified_by, reconciliation_flagged_by) — an
+    // embedded players(...) select hits the FK-ambiguity error documented
+    // in security.md, so the flagger's name is resolved separately below
+    // instead, same pattern as the list route.
+    supabase
+      .from('scorecard_uploads')
+      .select('status, verified, needs_reconciliation, reconciliation_note, reconciliation_flagged_by, reconciliation_flagged_at')
+      .eq('booking_id', booking.id)
+      .maybeSingle(),
   ])
 
   const squad = (squadRows ?? []).map((r: any) => ({
@@ -86,6 +99,33 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   }))
 
   const stats = statsRes.data
+  const upload = uploadRes.data
+
+  const { data: flagger } = upload?.reconciliation_flagged_by
+    ? await supabase.from('players').select('name').eq('id', upload.reconciliation_flagged_by).maybeSingle()
+    : { data: null as { name: string } | null }
+
+  // Top scorer / top wicket-taker for this match, resolved to a Hub
+  // player_id where possible — identical logic to the gold-text highlight
+  // in ScorecardTables and to the history list route (matchTopPerformers.ts),
+  // computed here from data already fetched above rather than a second
+  // round trip.
+  const performers = stats
+    ? computeTopPerformers(stats.batting ?? [], stats.bowling ?? [], squad)
+    : []
+
+  const viewerSquadRow = (squadRows ?? []).find((r: any) => r.player_id === user?.playerId)
+  // vibe-security: mirrors canActOnScorecard() exactly — wrangler/admin
+  // (any booking), captain/VC for this booking, or this match's own
+  // resolved top performer for this booking alone. Only gates which UI
+  // renders here; the API routes re-derive this independently and never
+  // trust the client either way.
+  const canAct = !!user?.isWrangler || !!user?.isAdmin
+    || !!viewerSquadRow?.is_captain || !!viewerSquadRow?.is_vc
+    || performers.some(p => p.player_id === user?.playerId)
+
+  const eligibleToVerify = !!upload && ['synced', 'fees_applied'].includes(upload.status) && !upload.needs_reconciliation
+  const showVerifyBlock = !upload?.verified && canAct && (upload?.needs_reconciliation || eligibleToVerify)
 
   return (
     <>
@@ -129,6 +169,23 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
             )}
           </div>
 
+          {/* Reconciliation banner — visible to every viewer, placed above
+              the result strip so it's the first thing anyone sees on a
+              flagged match. Mirrors MatchHistoryCard's banner exactly. */}
+          {upload?.needs_reconciliation && (
+            <div className="mb-2" style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(180, 83, 9, 0.5)', borderRadius: '8px', padding: '8px 10px' }}>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#FBBF24', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <NotifyIcon size={12} /> Stats Discrepancy Reported
+              </p>
+              <p style={{ fontSize: '11px', color: '#FCD34D', marginTop: '2px' }}>{upload.reconciliation_note}</p>
+              <p style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '2px' }}>
+                Reported by {flagger?.name ?? 'someone'}
+                {upload.reconciliation_flagged_at ? ` on ${new Date(upload.reconciliation_flagged_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+                {' '}· queued for re-fetch
+              </p>
+            </div>
+          )}
+
           {stats && (() => {
             const badge = resultBadgeStyle(stats.match_result)
             return (
@@ -150,6 +207,32 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
             </a>
           )}
         </div>
+
+        {/* Verified status — visible to every viewer, not just the
+            audience that can act on it. Once verified there's nothing
+            left to do, so this is the same read-only line for everyone. */}
+        {upload?.verified && (
+          <div className="mt-3">
+            <VerifiedStatusLine cricheroesUrl={booking.cricheroes_url} />
+          </div>
+        )}
+
+        {/* Mark-verified / notify-discrepancy controls — captain/VC for
+            this match, wrangler/admin for any match, or this match's own
+            resolved top performer for this match alone (see
+            matchTopPerformers.ts / scorecardAuth.ts). This is the surface
+            a wrangler's "Share for verification" link on /matches/history
+            points a top performer at. */}
+        {showVerifyBlock && (
+          <div className="mt-3">
+            <MatchVerifyBlock
+              bookingId={booking.id}
+              cricheroesUrl={booking.cricheroes_url}
+              initialNeedsReconciliation={!!upload?.needs_reconciliation}
+              initialReconciliationNote={upload?.reconciliation_note ?? null}
+            />
+          </div>
+        )}
 
         <div className="mt-5">
           {stats ? (

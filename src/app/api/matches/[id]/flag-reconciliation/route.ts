@@ -1,6 +1,8 @@
-// POST   /api/matches/[id]/flag-reconciliation — captain/VC (own booking) or
-//        wrangler/admin (any booking) flags a scorecard as needing a second
-//        look, with a required note explaining why. This widens scorecard
+// POST   /api/matches/[id]/flag-reconciliation — captain/VC (own booking),
+//        wrangler/admin (any booking), or this match's own resolved top
+//        performer (own booking only — see matchTopPerformers.ts) flags a
+//        scorecard as needing a second look, with a required note
+//        explaining why. This widens scorecard
 //        backfill eligibility (see src/lib/scorecardBackfill.ts, the daily
 //        cron, and /admin/scorecard-backfill) to reprocess the booking
 //        regardless of its current status — including fees_applied, which
@@ -15,7 +17,9 @@
 //
 // vibe-security: same per-booking auth pattern as /api/matches/[id]/scorecard
 // and /api/matches/[id]/verify-scorecard — captain/VC checked against THIS
-// booking's squad row, never role-only.
+// booking's squad row, never role-only. canActOnScorecard() (shared with
+// verify-scorecard) also grants this match's own resolved top performer,
+// re-derived server-side every call — never trusted from the client.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -23,17 +27,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 import { flagReconciliationSchema, resolveReconciliationSchema } from '@/lib/schemas'
-
-async function canActOnBooking(supabase: ReturnType<typeof createServiceClient>, bookingId: string, user: any): Promise<boolean> {
-  if (user.isWrangler || user.isAdmin) return true
-  const { data: squadRow } = await supabase
-    .from('squad')
-    .select('is_captain, is_vc')
-    .eq('booking_id', bookingId)
-    .eq('player_id', user.playerId)
-    .maybeSingle()
-  return !!squadRow?.is_captain || !!squadRow?.is_vc
-}
+import { canActOnScorecard } from '@/lib/scorecardAuth'
 
 export async function POST(
   req: NextRequest,
@@ -49,7 +43,7 @@ export async function POST(
   const supabase = createServiceClient()
   const bookingId = params.id
 
-  if (!(await canActOnBooking(supabase, bookingId, user))) {
+  if (!(await canActOnScorecard(supabase, bookingId, user))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

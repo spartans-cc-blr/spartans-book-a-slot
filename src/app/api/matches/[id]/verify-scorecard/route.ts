@@ -1,20 +1,25 @@
 // POST /api/matches/[id]/verify-scorecard
-// Captain/VC (own booking) or wrangler/admin (any booking) confirms they've
-// manually checked the synced stats against the real CricHeroes scorecard
-// and they're correct. Pure confidence flag — never reprocesses anything,
-// never touches the forward-only scorecard_uploads.status column. Mirrors
-// the exact per-booking auth pattern from /api/matches/[id]/scorecard.
+// Captain/VC (own booking), wrangler/admin (any booking), or this match's
+// own resolved top performer (own booking only — see matchTopPerformers.ts)
+// confirms they've manually checked the synced stats against the real
+// CricHeroes scorecard and they're correct. Pure confidence flag — never
+// reprocesses anything, never touches the forward-only
+// scorecard_uploads.status column. Mirrors the exact per-booking auth
+// pattern from /api/matches/[id]/scorecard.
 //
-// vibe-security: the captain/VC check is a `squad` table lookup scoped to
-// THIS booking_id + THIS player_id — never just "is this player a captain
-// anywhere". is_wrangler/is_admin bypass the per-booking check but still
-// require an authenticated session with a valid playerId.
+// vibe-security: canActOnScorecard() re-derives every branch server-side —
+// the captain/VC check is a `squad` lookup scoped to THIS booking_id + THIS
+// player_id, and the top-performer check is re-computed from
+// match_stats_cache + squad, never trusted from the client. is_wrangler/
+// is_admin bypass the per-booking check but still require an authenticated
+// session with a valid playerId.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
+import { canActOnScorecard } from '@/lib/scorecardAuth'
 
 export async function POST(
   req: NextRequest,
@@ -30,17 +35,8 @@ export async function POST(
   const supabase = createServiceClient()
   const bookingId = params.id
 
-  if (!user.isWrangler && !user.isAdmin) {
-    const { data: squadRow } = await supabase
-      .from('squad')
-      .select('is_captain, is_vc')
-      .eq('booking_id', bookingId)
-      .eq('player_id', user.playerId)
-      .maybeSingle()
-
-    if (!squadRow?.is_captain && !squadRow?.is_vc) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  if (!(await canActOnScorecard(supabase, bookingId, user))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { data: upload, error: fetchErr } = await supabase
