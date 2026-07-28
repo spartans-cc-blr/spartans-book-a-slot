@@ -769,19 +769,22 @@ panel per resolved performer with:
   `GearDetailShare.tsx` / `TournamentShareButton.tsx`
 
 **Message content** — `buildMessageText()` addresses the performer by
-name and names the match's date and tournament explicitly (never "today"
-— a wrangler could easily send this a day or two after the match), using
-the same short-date convention as `availability-nudge.md`'s design
-constraint ("Sun 19 Jul", not a relative phrase):
+**first name only** (`firstName()` splits on whitespace — "Hi Kushal,"
+not "Hi Kushal Vidya,", which read like a database field rather than a
+person greeting them) and names the match's date and tournament
+explicitly (never "today" — a wrangler could easily send this a day or
+two after the match), using the same short-date convention as
+`availability-nudge.md`'s design constraint ("Sun 19 Jul", not a relative
+phrase):
 
 ```
-Hi <name>,
+Hi <first name>,
 
 🏆 Great knock in <tournament> on <Sun 19 Jul>! <statLine> — well played 👏
 
-Since you were the standout performer with the bat that day, could you
-spare a minute to check the scorecard matches CricHeroes and mark it
-verified (or flag anything that looks off)?
+Even as you rejoice in the moment, could you help us out by checking the
+scorecard matches CricHeroes and marking it verified (or flagging
+anything that looks off)?
 
 <link>
 ```

@@ -28,17 +28,23 @@ function formatMatchDate(dateStr: string): string {
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
+// First name only — "Hi Kushal," reads as a person addressing them, not a
+// database field. Trims first in case a name was saved with leading/
+// trailing whitespace.
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0]
+}
+
 // Pure — no window access, so it's safe to call during render for the
 // on-screen preview (see PerformerRow). The URL is appended separately by
 // buildMessage() only inside the click handlers, where window.location is
 // actually available.
 function buildMessageText(performer: TopPerformerInfo, gameDate: string, tournamentName: string | null): string {
-  const activity  = performer.reason === 'top_scorer' ? 'knock' : 'spell'
-  const withWhat  = performer.reason === 'top_scorer' ? 'bat' : 'ball'
-  const occasion  = tournamentName
+  const activity = performer.reason === 'top_scorer' ? 'knock' : 'spell'
+  const occasion = tournamentName
     ? `in ${tournamentName} on ${formatMatchDate(gameDate)}`
     : `on ${formatMatchDate(gameDate)}`
-  return `Hi ${performer.name},\n\n🏆 Great ${activity} ${occasion}! ${performer.statLine} — well played 👏\n\nSince you were the standout performer with the ${withWhat} that day, could you spare a minute to check the scorecard matches CricHeroes and mark it verified (or flag anything that looks off)?`
+  return `Hi ${firstName(performer.name)},\n\n🏆 Great ${activity} ${occasion}! ${performer.statLine} — well played 👏\n\nEven as you rejoice in the moment, could you help us out by checking the scorecard matches CricHeroes and marking it verified (or flagging anything that looks off)?`
 }
 
 function buildMessage(performer: TopPerformerInfo, gameDate: string, tournamentName: string | null, url: string): string {
