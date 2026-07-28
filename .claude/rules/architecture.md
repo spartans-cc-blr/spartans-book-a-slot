@@ -61,7 +61,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Route | Component | Data source |
 |---|---|---|
 | `/profile` | Server + client form | `players` (own row only — IDOR protected) |
-| `/matches/history` | Server → `MatchHistoryClient` (client) | `bookings` (past confirmed), `scorecard_uploads`, `match_stats_cache`, `squad`; upload/sync actions gated per-booking to captain/VC/wrangler/admin — see `features/post-match-scorecard.md` |
+| `/matches/history` | Server → `MatchHistoryClient` (client) | `bookings` (past confirmed), `scorecard_uploads`, `match_stats_cache`, `squad`; upload/sync/verify/flag actions gated per-booking to captain/VC/wrangler/admin, but the verified status itself is visible to every viewer — see `features/post-match-scorecard.md` §14 |
  
 ### Captain Routes (`isCaptain` or `isAdmin`)
  
@@ -145,6 +145,8 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/matches/history/[bookingId]/tournament` | PATCH | Admin | Reassign tournament post-hoc |
 | `/api/matches/[id]/scorecard` | POST | Captain/VC (own booking) or wrangler/admin | Manual PDF upload — streamed progress, `%PDF` magic-byte + 10MB validation |
 | `/api/admin/sync-match-stats` | POST | Captain/VC (own booking) or wrangler/admin | Manual "Sync Stats" trigger — despite the `/admin/` path, **not** admin-only; re-derives the per-booking squad check server-side |
+| `/api/matches/[id]/verify-scorecard` | POST | Captain/VC (own booking) or wrangler/admin | Marks a synced scorecard as manually checked against CricHeroes; requires `status IN ('synced','fees_applied')`, blocked while flagged — see `features/post-match-scorecard.md` §14 |
+| `/api/matches/[id]/flag-reconciliation` | POST, DELETE | POST: captain/VC (own booking) or wrangler/admin. DELETE: admin only | POST reports a stats discrepancy with a required note, re-queuing the booking into the backfill pipeline; DELETE clears the flag without reprocessing (false-alarm override) |
 | `/api/admin/matches/[id]/post-match` | GET, DELETE | Admin | Admin Post-Match panel feed; DELETE resets a stuck/wrong upload |
 | `/api/admin/scorecard-backfill` | GET, POST | Admin | One-time catch-up: list eligible bookings, process one per POST |
 | `/api/admin/player-reconciliation` | GET, POST | Admin | Resolves analytics-DB `player_name` strings to Hub `players.id` — GET buckets pending names, POST confirms/ignores/reconciles; see `features/player-identity-resolution.md` |
@@ -280,8 +282,12 @@ Full member directory.
 **Status machine:** `draft → pending_approval → approved → announced` (with GC return path back to `draft`)
  
 #### `scorecard_uploads`
-`id, booking_id FK (unique), match_id, status, uploaded_by FK, uploaded_at, fees_applied_at, fees_applied_by FK, error_message`
-`status` enum: `pending_parse → parsed → synced → fees_applied`, forward-only. One row per booking. **RLS enabled, no anon/authenticated policies** — service role only (fixed 2026-07-15, was previously disabled — see `features/post-match-scorecard.md` §5). See that doc for the full lifecycle and why `fees_applied` is always a separate manual step.
+`id, booking_id FK (unique), match_id, status, uploaded_by FK, uploaded_at, fees_applied_at, fees_applied_by FK, error_message, verified, verified_by FK, verified_at, needs_reconciliation, reconciliation_note, reconciliation_flagged_by FK, reconciliation_flagged_at`
+`status` enum: `pending_parse → parsed → synced → fees_applied`, forward-only. One row per booking. **RLS enabled, no anon/authenticated policies** — service role only (fixed 2026-07-15, was previously disabled — see `features/post-match-scorecard.md` §5). See that doc for the full lifecycle and why `fees_applied` is always a separate manual step. `verified`/`needs_reconciliation` are two independent, mutually-exclusive flags added by migration `051_scorecard_verification_reconciliation.sql` — layered on top of `status`, never rewinding it and never touching `fees_applied` — see `features/post-match-scorecard.md` §14.
+ 
+#### `scorecard_reconciliation_log`
+`id, booking_id FK, action ('flagged'|'resolved'), note, actor_id FK (nullable — null = system, e.g. an auto-resolve on re-sync), created_at`
+Immutable audit trail for the verify/reconciliation flow above, same insert-only pattern as `availability_audit`. **RLS enabled, no anon/authenticated policies.** Migration `051_scorecard_verification_reconciliation.sql`.
  
 #### `match_stats_cache`
 `match_id PK, booking_id FK, match_result, team_total/wickets/overs, opponent_total/wickets/overs, opponent_name, ground, tournament_name, match_date, batting/bowling/fielding/team_list (jsonb arrays), synced_at, synced_by FK`
@@ -468,6 +474,7 @@ Next.js API Routes (server-side)
 | `fee_exemptions` | ❌ Locked | ❌ Locked | Service role only |
 | `squad` | ❌ *(RLS must be enabled before public exposure)* | ❌ | Service role only |
 | `scorecard_uploads` | ❌ Locked | ❌ Locked | Service role only *(RLS enabled 2026-07-15 — was previously disabled, see `features/post-match-scorecard.md` §5)* |
+| `scorecard_reconciliation_log` | ❌ Locked | ❌ Locked | Service role only |
 | `match_stats_cache` | ❌ Locked | ❌ Locked | Service role only *(same fix, same date)* |
 | `family_sessions` *(planned)* | ❌ Locked | ❌ Locked | Service role only |
  
@@ -545,8 +552,10 @@ Next.js API Routes (server-side)
 | public/sw.js | Service worker — PWA caching + push notification display + notificationclick handler |
 | `src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` | `/matches/history` — past-match list, `MatchHistoryCard` (result badge, subtle sync status, ground/CricHeroes links, Did-not-bat line) |
 | `src/app/api/matches/[id]/scorecard/route.ts` | Manual scorecard PDF upload — streamed progress, per-booking captain/VC or wrangler/admin auth |
+| `src/app/api/matches/[id]/verify-scorecard/route.ts` | Marks a scorecard verified against CricHeroes — same per-booking auth as upload/sync; see `features/post-match-scorecard.md` §14 |
+| `src/app/api/matches/[id]/flag-reconciliation/route.ts` | POST reports a stats discrepancy (Zod-validated note), re-queuing into the backfill pipeline; DELETE is an admin-only clear-without-reprocessing override |
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path |
-| `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — CricHeroes direct-fetch pipeline; chains parse → sync; never touches fees |
+| `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — CricHeroes direct-fetch pipeline; chains parse → sync; never touches fees; also auto-clears a reconciliation flag on a successful re-sync |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron — see `features/post-match-scorecard.md` |
 | `src/app/admin/scorecard-backfill/page.tsx` | One-time admin catch-up UI, client-driven sequential loop |
 | supabase/migrations/009_push_subscriptions.sql | push_subscriptions table — one row per player per device |

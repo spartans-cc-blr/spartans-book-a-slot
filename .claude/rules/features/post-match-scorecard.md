@@ -23,6 +23,11 @@ seamless end-to-end for the automated path; **applying match fees is a
 permanently separate, explicit, manual admin action** — nothing in this
 feature ever triggers a wallet debit on its own. See Section 6.
 
+Once a scorecard is synced, a captain/VC/wrangler/admin can additionally
+mark it **verified** against the real CricHeroes page, or **flag it for
+reconciliation** if something looks wrong — two independent flags layered
+on top of the status machine above, never rewinding it. See Section 14.
+
 ---
 
 ## 2. Permanent Limitations (revised)
@@ -135,7 +140,9 @@ Unchanged from the original plan — fully implemented, no action needed:
 | Upload scorecard | ✅ | ✅ | ✅ (any match) | ✅ |
 | View completed matches / scorecards | ✅ | ✅ | ✅ | ✅ |
 | **Sync stats from analytics DB** | ✅ (own match) | ✅ (own match) | ✅ | ✅ |
+| **Verify scorecard / report discrepancy** | ✅ (own match) | ✅ (own match) | ✅ | ✅ |
 | Apply match fees | ❌ | ❌ | ❌ | ✅ only |
+| Clear a reconciliation flag without reprocessing | ❌ | ❌ | ❌ | ✅ only |
 | Run the one-time backfill page | ❌ | ❌ | ❌ | ✅ only |
 
 > **Change from the original plan:** "Sync stats" was originally admin-only.
@@ -218,6 +225,8 @@ that state.
 |---|---|---|---|
 | `/api/matches/[id]/scorecard` | POST | Captain/VC (own booking) or wrangler/admin | Manual PDF upload. Streams newline-delimited JSON progress events (`recording` → `sending` → `finalizing` → `done`/`error`) so a slow parse shows exactly where it's stuck. 45s microservice timeout, `maxDuration=60` (Hobby ceiling). Magic-byte PDF validation (`%PDF`), 10MB cap, both enforced server-side. |
 | `/api/admin/sync-match-stats` | POST | Captain/VC (own booking) or wrangler/admin | Manual "Sync Stats" trigger. Thin wrapper around `syncMatchStatsForBooking()` (shared with the automated path). |
+| `/api/matches/[id]/verify-scorecard` | POST | Captain/VC (own booking) or wrangler/admin | Marks the scorecard as manually checked against CricHeroes. Requires `status IN ('synced','fees_applied')`; rejected while flagged. See Section 14. |
+| `/api/matches/[id]/flag-reconciliation` | POST, DELETE | POST: captain/VC (own booking) or wrangler/admin. DELETE: admin only | POST reports a discrepancy with a required note, re-queuing the booking into the backfill pipeline and clearing any prior `verified`. DELETE clears the flag without reprocessing — a false-alarm override. See Section 14. |
 | `/api/admin/matches/[id]/post-match` | GET, DELETE | Admin only | Feeds the admin Post-Match panel (upload status + uploader name + stats preview). DELETE resets a stuck/wrong `scorecard_uploads` row — admin-only override, never reverses a fee debit. |
 | `/api/admin/scorecard-backfill` | GET, POST | Admin only | GET lists past confirmed bookings with a `match_id` that aren't yet `synced`/`fees_applied`. POST processes exactly one booking per call — the admin page drives the loop client-side, paced ~4s apart, never server-side (a single Vercel invocation can't safely loop a whole historical backlog). |
 | `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Daily cron. See Section 8. |
@@ -256,6 +265,13 @@ matching the wrangler's own `download_scorecard.py` etiquette) — the server
 route only ever processes one booking per request, since a single Vercel
 invocation can't safely absorb an entire historical backlog.
 
+Since Section 14, the page splits into a **⚠ Needs Reconciliation** section
+(flagged bookings, oldest flag first, pre-selected regardless of their
+current `status`) above the regular list, each row showing the note and who
+flagged it, with an admin-only **Resolve** action that clears the flag
+without re-running the fetch (a false-alarm override, distinct from "Reset
+Upload").
+
 ### `/api/cron/backfill-scorecards` — twice daily, self-healing
 Runs at 07:00 and 19:00 IST (`vercel.json`: `"30 1,13 * * *"` — widened
 from once daily on 2026-07-16 to help drain the backlog described below;
@@ -266,6 +282,13 @@ of being permanently skipped. `MAX_PER_RUN = 3` bounds each individual run
 (lowered from 5, see incident below); a backlog beyond that drains a few
 more per run until clear. Pushes a GC notification on completion (success
 count, or failures with reasons).
+
+Eligibility (added with Section 14's verification/reconciliation feature):
+a booking also qualifies here if `needs_reconciliation` is true, regardless
+of its `status` — a human-reported discrepancy jumps the queue ahead of
+routine never-synced backlog (flagged bookings are sorted first within the
+`MAX_PER_RUN` slice). `backfillOneBooking()` clears the flag itself on a
+successful re-sync, so there's no separate "un-flag" step needed here.
 
 > **Incident (2026-07-16) — this route had never actually fired
 > automatically, and separately, its per-run cap was too high.** Two
@@ -315,21 +338,27 @@ any future cron that does need one.
 A win gets a solid green pill (`WON`, celebratory). A loss, tie, or
 no-result renders as **plain coloured text, no pill** — a bordered badge on
 every outcome made a loss read as visually "achieved" as a win, which is
-backwards. The scorecard's sync lifecycle (`parsed` / `synced` /
-`fees_applied`) is intentionally the quietest thing on the card: a small
-icon + caption (`⏳ Awaiting sync`, `✓ Stats synced`, `✓ Fees applied`) sat
-inline in the icon row, not a standalone highlighted box — it used to be a
-bordered badge and was outshining the actual match result, so it moved.
+backwards. The scorecard's sync lifecycle is intentionally the quietest
+thing on the card: originally a small icon + caption (`⏳ Awaiting sync`,
+`✓ Stats synced`, `✓ Fees applied`) sat inline in the icon row rather than a
+standalone highlighted box (a bordered badge used to outshine the actual
+match result). Since Section 14, only `⏳ Awaiting sync` (`parsed`) still
+renders here — `synced`/`fees_applied` are superseded by the verify line
+below the icon row, which already implies "stats are synced" as a
+precondition, so the old captions there were redundant.
 
 ### Icon row
-Left to right: the subtle sync indicator described above (when
-`can_upload` and a status exists), a spacer, then Ground (mirrors
-`FixturesCard`'s `MapPinIcon`, opens Google Maps), then CricHeroes —
-Ground intentionally comes before CricHeroes here, the reverse of
-`FixturesCard`'s order. Hidden entirely if none of the three apply. Ball/
-jersey icons were removed from this card (they're still on `FixturesCard`
-for upcoming fixtures; here they added nothing a completed-match viewer
-needed).
+Left to right: the subtle sync indicator described above (`parsed` only,
+when `can_upload`), a spacer, then CricHeroes. **Ground was removed
+entirely** — the ground name under the opponent (`@ <ground>`) was already
+the clickable Maps link, so a second identical icon further down the card
+was pure duplication. **CricHeroes is also hidden here** whenever the
+verify line below is about to show the same icon instead (see Section 14's
+`CricHeroesInlineLink` / `verifyRowHasCricHeroesLink`) — one real,
+clickable icon per card, never two copies of it. Hidden entirely if
+neither applies. Ball/jersey icons were removed from this card earlier
+(they're still on `FixturesCard` for upcoming fixtures; here they added
+nothing a completed-match viewer needed).
 
 ### "Did not bat" line
 The batting table filters out players who didn't face a ball — that's the
@@ -350,15 +379,27 @@ server-side in `/api/matches/history` from the `squad` table (at least one
 ### Actionable vs. passive states — where each renders
 `ScorecardUploadButton` (file picker / "Processing…" spinner / "Stuck?
 Retry upload") only renders for the two states that need a human action:
-no upload yet, or a stuck `pending_parse`. Every later state
-(`parsed`/`synced`/`fees_applied`) is passive and renders as the subtle
-icon-row indicator instead — see above.
+no upload yet, or a stuck `pending_parse`. `parsed` is passive and renders
+as the subtle icon-row indicator. `synced`/`fees_applied` are passive too,
+but render via the verify line described in Section 14 instead of the
+icon row.
 
 ### Ground link
 `match.ground` comes from a `tournaments → grounds` join added to
 `/api/matches/history` specifically for this card, mirroring
 `FixturesCard`'s pattern exactly. Falls back to the booking's free-text
-`venue` column when no ground record is linked to the tournament.
+`venue` column when no ground record is linked to the tournament. This is
+now the card's only ground affordance — see the Icon row note above.
+
+### Tournament name — hyperlink to "Yours Statistically"
+Underlined in gold (same convention as `FixturesCard`'s tournament →
+CricHeroes-points-table link), linking to `/leaderboard` pre-filtered to
+`?tournament=<id>&category=mvp&year=all`. See Section 14 for why `mvp`
+and `year=all` specifically.
+
+### Default filters — faster first paint
+`roleFilter` defaults to `'played'` ("I Played") for a viewer with a
+`playerId`, rather than `'all'` — see Section 14.
 
 ---
 
@@ -375,6 +416,10 @@ icon-row indicator instead — see above.
 | Fee-exempt players skipped server-side | ✅ Pre-existing behaviour in `/api/fees/apply`, untouched |
 | `match_stats_cache` / `scorecard_uploads` RLS | ✅ **Fixed 2026-07-15** — see Section 5. Was disabled since table creation; closed via migration `046`. |
 | CricHeroes direct-fetch endpoint auth | ✅ Server-to-server only (`MICROSERVICE_SECRET` header), never called from the browser |
+| Verify/flag auth is per-booking, not just role | ✅ Same `squad` lookup pattern reused in `verify-scorecard`/`flag-reconciliation` — see Section 14 |
+| Reconciliation note validated server-side | ✅ Zod (`flagReconciliationSchema`/`resolveReconciliationSchema`, `src/lib/schemas.ts`), 3–500 chars |
+| `verified`/`needs_reconciliation` mutually exclusive | ✅ Enforced server-side in both routes (flagging clears `verified`; verifying is rejected while flagged), not just in the UI |
+| `scorecard_reconciliation_log` RLS | ✅ Blanket deny, service-role only — same pattern as `scorecard_uploads` |
 
 ---
 
@@ -403,6 +448,9 @@ icon-row indicator instead — see above.
 | `supabase/migrations/044_match_stats_cache.sql` | `match_stats_cache` table (reconstructed — see Section 5) |
 | `supabase/migrations/045_scorecard_uploads.sql` | `scorecard_uploads` table + enum (reconstructed — see Section 5) |
 | `supabase/migrations/046_enable_rls_scorecard_tables.sql` | RLS fix (see Section 5) |
+| `supabase/migrations/051_scorecard_verification_reconciliation.sql` | `scorecard_uploads` verify/reconciliation columns + `scorecard_reconciliation_log` table (see Section 14) |
+| `src/app/api/matches/[id]/verify-scorecard/route.ts` | Mark scorecard verified (see Section 14) |
+| `src/app/api/matches/[id]/flag-reconciliation/route.ts` | Report/resolve a stats discrepancy (see Section 14) |
 | `spartans-python/api.py` | FastAPI wrapper — `/parse-scorecard`, `/fetch-and-parse-scorecard`, `/health` |
 | `spartans-python/scripts/import_to_supabase.py` | `raise_on_error` param added — silent-failure bug fix |
 | `spartans-python/utils/csv_writers.py` | `HOUSE_NAME = "SPARTANS"` constant — house system is defunct, replaced the old per-player house lookup |
@@ -445,6 +493,129 @@ MICROSERVICE_SECRET  = <same value as Hub's MICROSERVICE_SECRET>
 | Wrong PDF uploaded — admin override | ✅ Done — "Reset Upload" / `DELETE /api/admin/matches/[id]/post-match` |
 | `import_from_dict` on `SupabaseImporter` | ✅ Done, live on Render |
 | CricHeroes match URL backfill for pre-existing bookings | ⏳ See `pending-backlog.md` E-3 — separate, ongoing coordinator task |
+
+---
+
+## 14. Scorecard Verification & Reconciliation (added 2026-07-28)
+
+### Overview
+
+A manual "does this match the real CricHeroes scorecard?" check, layered on
+top of everything above without touching the forward-only `status` column
+(`pending_parse → parsed → synced → fees_applied`) and without ever
+reversing an applied fee. Two independent, **mutually exclusive** flags:
+
+- **Verified** — a captain/VC (own booking) or wrangler/admin (any booking)
+  confirms the synced stats match CricHeroes. Pure confidence flag, no
+  reprocessing.
+- **Flagged for reconciliation** — the same audience reports a discrepancy
+  with a required note. This re-queues the booking into the existing
+  backfill pipeline (Section 8) regardless of its current status —
+  including `fees_applied`, which the reprocessing itself never touches —
+  and jumps that queue ahead of routine never-synced backlog. Clears
+  itself automatically the next time the booking re-syncs successfully; an
+  admin can also clear it manually without reprocessing (a false-alarm
+  override).
+
+Flagging clears any prior `verified`; verifying is rejected server-side
+while flagged — so a match is never both at once.
+
+### Database — migration `051_scorecard_verification_reconciliation.sql`
+
+New columns on `scorecard_uploads`: `verified boolean`, `verified_by`,
+`verified_at`, `needs_reconciliation boolean`, `reconciliation_note`,
+`reconciliation_flagged_by`, `reconciliation_flagged_at`.
+
+New immutable audit table, same insert-only pattern as `availability_audit`:
+
+```sql
+CREATE TABLE scorecard_reconciliation_log (
+  id, booking_id, action ('flagged'|'resolved'), note,
+  actor_id  -- nullable; null = system (e.g. an auto-resolve on re-sync)
+  created_at
+)
+```
+
+RLS enabled on the new table, no anon/authenticated policies — same
+blanket-deny pattern as `scorecard_uploads` itself (Section 5).
+
+### API Routes
+
+See the rows added to Section 7's table:
+`POST /api/matches/[id]/verify-scorecard` and
+`POST`/`DELETE /api/matches/[id]/flag-reconciliation`.
+
+### Backfill integration
+
+`backfillOneBooking()` (`src/lib/scorecardBackfill.ts`) clears
+`needs_reconciliation` and writes a `'resolved'` audit row (`actor_id:
+null`) the moment a re-sync succeeds — no admin click needed in the common
+case. `/api/cron/backfill-scorecards`'s eligibility query widens from "not
+yet synced" to include any `needs_reconciliation = true` booking regardless
+of status, sorted first (Section 8). `/api/admin/scorecard-backfill` does
+the same widening/sorting and additionally surfaces the note, who flagged
+it, and when, in its own "⚠ Needs Reconciliation" section above the regular
+list — with an admin-only "Resolve" action that clears the flag without
+re-running the fetch.
+
+### UI — `MatchHistoryCard`
+
+- **Any viewer**, once verified: a read-only right-aligned line — "Stats
+  verified with [CricHeroes icon]" — using a scalloped-seal "verified"
+  badge (`VerifiedBadge`; the familiar Twitter/X shape — two rounded
+  squares offset 45° with a checkmark) rather than a bare tick. **Not**
+  gated to `can_upload` — everyone should be able to see a scorecard's
+  been checked, not just the people who could check it.
+- **Captain/VC/wrangler/admin only**, while not yet verified and not
+  flagged: a checkbox prefixed to "Mark Scorecard as Verified with
+  [CricHeroes icon]" — ticking it (or clicking the text) calls the verify
+  route. Underneath, "🔔 Notify stats discrepancy" (renamed during
+  development from an earlier "Flag for Reconciliation" + 🚩) opens a note
+  field and calls the flag route. This whole block disappears the moment
+  the match is verified — see the always-visible line above instead.
+- **The CricHeroes icon is one real, independently-clickable link**
+  (`CricHeroesInlineLink`) reused across both lines above — opens the
+  match's CricHeroes page in a new tab, unrelated to the verify/notify
+  action sitting next to it. The icon row's own separate CricHeroes link
+  (Section 9) is hidden whenever one of these lines is about to show the
+  same icon, so a card never shows two copies of it.
+- **Flagged**: a banner above the result strip ("🔔 Stats Discrepancy
+  Reported" + the note + who/when) visible to every viewer, plus a small
+  "will clear automatically once re-synced" line for the privileged
+  audience in the same spot the checkbox/notify controls would otherwise
+  render.
+- **Ground icon removed** from the icon row (Section 9) — the ground name
+  under the opponent was already the clickable Maps link.
+- **Tournament name is now a hyperlink** (Section 9) into `/leaderboard`
+  ("Yours Statistically"), pre-filtered to
+  `?tournament=<id>&category=mvp&year=all`. `year=all` because the
+  leaderboard page's own default is the current calendar year, which would
+  otherwise silently hide an older tournament; `category=mvp` rather than
+  `milestones` because the Milestones tab resets/ignores tournament scoping
+  entirely (see `LeaderboardFilters.tsx`).
+- **`roleFilter` on `/matches/history` now defaults to `'played'`** ("I
+  Played") for a viewer with a `playerId`, instead of `'all'` — a much
+  smaller default result set, for a faster first paint. Falls back to
+  `'all'` for a viewer with no `playerId` (the "I Played"/"I Led" chips
+  aren't even rendered for them, and the API returns nothing for those
+  filters without one).
+
+### Security (vibe-security)
+
+See the rows added to Section 10's checklist — per-booking auth reused
+from the upload/sync routes, Zod-validated note, server-side mutual
+exclusivity, and RLS on the new table.
+
+### File Map additions
+
+See the rows added to Section 11 — `verify-scorecard/route.ts`,
+`flag-reconciliation/route.ts`, and migration `051`.
+
+### Pending
+
+| Item | Notes |
+|---|---|
+| No known gaps yet | Feature is fresh as of this pass — worth a follow-up note here once it's been exercised through a real cycle (a captain flags something for real, the cron/backfill picks it up, it auto-resolves). |
 
 ---
 

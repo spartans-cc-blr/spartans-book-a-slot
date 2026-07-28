@@ -179,6 +179,16 @@ Never `text-[9px]` or `text-[10px]`.
 - Sat: `bg-blue-100 text-blue-700 border border-blue-300`
 - Sun: `bg-pink-100 text-pink-700 border border-pink-300`
 
+### "Verified" badge (scorecard verification, `/matches/history`)
+Scalloped-seal shape — two rounded squares (`rx=4`) offset 45° from each
+other, overlaid to form an 8-point rosette, with a white checkmark path on
+top. Fill `#059669` (emerald). This is the familiar Twitter/X verified
+look, in the app's own success colour rather than Twitter blue. Use this
+shape (not a bare `✓`/tick) anywhere a "this has been manually verified"
+status needs an icon — see `VerifiedBadge` in
+`src/components/matches/MatchHistoryClient.tsx` for the reference SVG, and
+`features/post-match-scorecard.md` §14 for where it's used.
+
 ### Slot time / format pills
 `bg-parchment-3 text-ink-3 border border-ink-5`
 
