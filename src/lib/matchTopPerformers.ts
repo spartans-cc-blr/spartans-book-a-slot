@@ -1,13 +1,26 @@
-// Resolves a match's "top performer(s)" — the same highlight already shown
-// to every viewer as gold text in ScorecardTables.tsx (top run-scorer, top
-// wicket-taker), just also resolved to a Hub player_id so it can be used as
-// an authorization input, not only a display cue. Deliberately reuses that
-// exact isTop logic (strict max, all ties included) rather than introducing
-// a separate combined-score model, so "why can this player verify" always
-// matches "why is this name gold on the scorecard".
+// Resolves a match's "top performer(s)" for two distinct, deliberately
+// decoupled purposes:
 //
-// See features/post-match-scorecard.md §14/§15 for how this feeds the
-// verify-scorecard / flag-reconciliation per-booking auth check.
+//   1. computeTopPerformers() / resolveMatchTopPerformers() — the same
+//      highlight already shown to every viewer as gold text in
+//      ScorecardTables.tsx (top run-scorer, top wicket-taker, all ties
+//      included), also resolved to a Hub player_id so it can be used as an
+//      authorization input. Feeds canActOnScorecard() (scorecardAuth.ts) and
+//      the standalone match page's canAct check — deliberately kept broad,
+//      since it's granting real verify/flag access, not just picking who to
+//      message.
+//
+//   2. computeMatchMVP() — the single match MVP, using the exact same
+//      formula spartans-python's MVPCalculator already computes per player
+//      per stat category (batting/bowling/fielding mvp_score columns,
+//      already synced into match_stats_cache — see
+//      features/post-match-scorecard.md). This is what the wrangler-only
+//      "Request top performer to verify" share button now uses — a match
+//      can have several players tied for top runs or top wickets, but
+//      should only ever nudge ONE person. can_verify / canActOnScorecard
+//      access is NOT narrowed to this — a tied top batter/bowler who isn't
+//      the MVP still keeps verify/flag rights, same as before; only the
+//      share list itself is now MVP-scoped.
 
 import { createServiceClient } from '@/lib/supabase'
 
@@ -130,4 +143,129 @@ export async function resolveMatchTopPerformers(
   }))
 
   return computeTopPerformers(statsRow.batting ?? [], statsRow.bowling ?? [], squad)
+}
+
+// ── Match MVP (single performer) ────────────────────────────────────────
+//
+// Sums the mvp_score column spartans-python's MVPCalculator already writes
+// per player per stat category (batting_stats.mvp_score,
+// bowling_stats.mvp_score, fielding_stats.mvp_score — see
+// utils/mvp_calculator.py and utils/csv_writers.py in spartans-python),
+// mirroring MVPCalculator.calculate_match_mvp()'s
+// batting_mvp + bowling_mvp + fielding_mvp exactly rather than re-deriving
+// the underlying formula in TypeScript — that formula is intricate (batting
+// position strength, strike-rate bonuses, wicket-value-by-match-type,
+// multi-wicket bonuses, fielding assist multipliers) and already computed
+// once, correctly, at parse time; duplicating it here would be a second
+// place for it to drift out of sync.
+//
+// Deliberately scoped to THIS booking's own squad — a row that can't be
+// resolved to a Hub player_id (almost always an opponent) is excluded
+// before the max is taken, not just filtered out afterwards. Without this,
+// a genuine match-wide MVP on the opposing side (who has no Hub account to
+// grant access to or message) could silently starve the list down to zero
+// even when one of our own players was the best Spartans performer that
+// day. This differs from computeTopPerformers() above, which computes its
+// max match-wide and only resolves player_id afterwards — that function
+// tolerates an unresolvable top-tied entry because the other ties usually
+// still include an own-team player; a single MVP pick has no such fallback.
+function pickReason(battingMvp: number, bowlingMvp: number): TopPerformerReason {
+  return battingMvp >= bowlingMvp ? 'top_scorer' : 'top_wicket_taker'
+}
+
+export function computeMatchMVP(batting: any[], bowling: any[], fielding: any[], squad: SquadRef[]): TopPerformer[] {
+  interface Agg {
+    match:       SquadRef
+    name:        string
+    total:       number
+    battingMvp:  number
+    bowlingMvp:  number
+    battingLine: string | null
+    bowlingLine: string | null
+  }
+
+  const totals = new Map<string, Agg>() // keyed by player_id — only squad members are ever candidates
+
+  function ensure(row: any, name: string): Agg | null {
+    const match = resolveSquadMatch(row, name, squad)
+    if (!match?.player_id) return null
+    let agg = totals.get(match.player_id)
+    if (!agg) {
+      agg = { match, name: match.player_name || name, total: 0, battingMvp: 0, bowlingMvp: 0, battingLine: null, bowlingLine: null }
+      totals.set(match.player_id, agg)
+    }
+    return agg
+  }
+
+  const battingRows = (batting ?? []).filter(row =>
+    pickField(row, ['dismissal_method']) !== 'did_not_bat' && num(row, ['balls', 'balls_faced']) > 0
+  )
+  for (const row of battingRows) {
+    const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
+    const agg = ensure(row, name)
+    if (!agg) continue
+    const mvp = num(row, ['mvp_score'])
+    agg.total += mvp
+    agg.battingMvp += mvp
+    agg.battingLine = `${num(row, ['runs', 'total_runs'])} runs (${num(row, ['balls', 'balls_faced'])}b)`
+  }
+
+  const bowlingRows = (bowling ?? []).filter(row => num(row, ['overs', 'overs_bowled']) > 0)
+  for (const row of bowlingRows) {
+    const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
+    const agg = ensure(row, name)
+    if (!agg) continue
+    const mvp = num(row, ['mvp_score'])
+    agg.total += mvp
+    agg.bowlingMvp += mvp
+    agg.bowlingLine = `${num(row, ['wickets', 'wickets_taken'])}/${num(row, ['runs', 'runs_conceded'])} (${pickField(row, ['overs', 'overs_bowled']) ?? '—'} ov)`
+  }
+
+  for (const row of (fielding ?? [])) {
+    const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
+    const agg = ensure(row, name)
+    if (!agg) continue
+    agg.total += num(row, ['mvp_score'])
+  }
+
+  const maxTotal = Array.from(totals.values()).reduce((max, a) => Math.max(max, a.total), 0)
+  if (maxTotal <= 0) return []
+
+  // Ties are only ever a genuine exact-float match — realistically rare
+  // given the formula's SR/position/maiden bonuses, but handled the same
+  // way computeTopPerformers() handles a tied top score, for consistency.
+  return Array.from(totals.values())
+    .filter(a => Math.abs(a.total - maxTotal) < 0.005)
+    .map(a => ({
+      player_id: a.match.player_id,
+      name:      a.name,
+      reason:    pickReason(a.battingMvp, a.bowlingMvp),
+      statLine:  [a.battingLine, a.bowlingLine].filter(Boolean).join(' & ') || `MVP score ${maxTotal.toFixed(1)}`,
+      whatsapp:  a.match.whatsapp ?? null,
+    }))
+}
+
+// Server-side resolver mirroring resolveMatchTopPerformers() above, for any
+// future caller that only has a booking_id in hand and needs the MVP pick
+// rather than the tie-inclusive top-scorer/top-wicket-taker set. The
+// history list route (/api/matches/history/route.ts) already has
+// batting/bowling/fielding + squad in memory per booking and calls
+// computeMatchMVP() directly instead of paying for this extra round trip.
+export async function resolveMatchMVP(
+  supabase: ReturnType<typeof createServiceClient>,
+  bookingId: string
+): Promise<TopPerformer[]> {
+  const [{ data: statsRow }, { data: squadRows }] = await Promise.all([
+    supabase.from('match_stats_cache').select('batting, bowling, fielding').eq('booking_id', bookingId).maybeSingle(),
+    supabase.from('squad').select('player_id, players(name, whatsapp)').eq('booking_id', bookingId),
+  ])
+  if (!statsRow) return []
+
+  const squad: SquadRef[] = (squadRows ?? []).map((r: any) => ({
+    player_id:   r.player_id,
+    player_name: r.players?.name ?? '',
+    whatsapp:    r.players?.whatsapp ?? null,
+  }))
+
+  return computeMatchMVP(statsRow.batting ?? [], statsRow.bowling ?? [], statsRow.fielding ?? [], squad)
 }
