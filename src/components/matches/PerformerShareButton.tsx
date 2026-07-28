@@ -44,7 +44,7 @@ function buildMessageText(performer: TopPerformerInfo, gameDate: string, tournam
   const occasion = tournamentName
     ? `in ${tournamentName} on ${formatMatchDate(gameDate)}`
     : `on ${formatMatchDate(gameDate)}`
-  return `Hi ${firstName(performer.name)},\n\n🏆 Great ${activity} ${occasion}! ${performer.statLine} — well played 👏\n\nEven as you rejoice in the moment, could you help us out by checking the scorecard matches CricHeroes and marking it verified (or flagging anything that looks off)?`
+  return `Hi ${firstName(performer.name)},\n\n🏆 Great ${activity} ${occasion}! ${performer.statLine} — well played 👏\n\nEven as you relive the moment, could you help us out by checking the *full match scorecard* on the Hub against CricHeroes — not just your own numbers — and mark it verified (or flag anything that looks off)?`
 }
 
 function buildMessage(performer: TopPerformerInfo, gameDate: string, tournamentName: string | null, url: string): string {

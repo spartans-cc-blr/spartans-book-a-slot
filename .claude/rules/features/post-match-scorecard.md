@@ -782,12 +782,24 @@ Hi <first name>,
 
 🏆 Great knock in <tournament> on <Sun 19 Jul>! <statLine> — well played 👏
 
-Even as you rejoice in the moment, could you help us out by checking the
-scorecard matches CricHeroes and marking it verified (or flagging
-anything that looks off)?
+Even as you relive the moment, could you help us out by checking the
+*full match scorecard* on the Hub against CricHeroes — not just your own
+numbers — and mark it verified (or flag anything that looks off)?
 
 <link>
 ```
+
+"Relive" over "rejoice": "rejoice in the moment" reads more formal/
+declarative for a casual WhatsApp message, and — since this can be sent a
+day or two after the match, never assumed to be "today" — "relive" fits a
+look-back better than "rejoice", which implies celebrating something still
+happening. "Not just your own numbers" was added after a real ambiguity:
+the message is built entirely around the performer's individual stat line,
+so without an explicit disclaimer a reader could easily assume the ask is
+"check your own score is right" rather than "check the whole team's
+scorecard on the Hub against CricHeroes." `*full match scorecard*` uses
+WhatsApp's own `*bold*` markdown so the clarifying phrase actually stands
+out in the sent message, not just in the source.
 
 Falls back to just the date (drops the "in \<tournament\>" clause) when the
 booking has no tournament assigned. "knock"/"bat" swap to "spell"/"ball"
