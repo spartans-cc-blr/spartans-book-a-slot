@@ -97,11 +97,11 @@ export function ScorecardTables({
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-xs font-rajdhani">
             <colgroup>
-              <col className="w-[32%]" />
-              <col className="w-[13.6%]" />
-              <col className="w-[13.6%]" />
-              <col className="w-[13.6%]" />
-              <col className="w-[13.6%]" />
+              <col className="w-[50.4%]" />
+              <col className="w-[9%]" />
+              <col className="w-[9%]" />
+              <col className="w-[9%]" />
+              <col className="w-[9%]" />
               <col className="w-[13.6%]" />
             </colgroup>
             <thead>
@@ -159,11 +159,11 @@ export function ScorecardTables({
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-xs font-rajdhani">
             <colgroup>
-              <col className="w-[32%]" />
-              <col className="w-[13.6%]" />
-              <col className="w-[13.6%]" />
-              <col className="w-[13.6%]" />
-              <col className="w-[13.6%]" />
+              <col className="w-[50.4%]" />
+              <col className="w-[9%]" />
+              <col className="w-[9%]" />
+              <col className="w-[9%]" />
+              <col className="w-[9%]" />
               <col className="w-[13.6%]" />
             </colgroup>
             <thead>
