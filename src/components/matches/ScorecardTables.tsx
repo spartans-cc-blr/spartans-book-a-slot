@@ -95,7 +95,15 @@ export function ScorecardTables({
       <div>
         <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Batting</p>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs font-rajdhani">
+          <table className="w-full table-fixed text-xs font-rajdhani">
+            <colgroup>
+              <col className="w-[32%]" />
+              <col className="w-[13.6%]" />
+              <col className="w-[13.6%]" />
+              <col className="w-[13.6%]" />
+              <col className="w-[13.6%]" />
+              <col className="w-[13.6%]" />
+            </colgroup>
             <thead>
               <tr className="text-zinc-600 border-b border-ink-5">
                 <th className="text-left py-1 pr-2">Player</th>
@@ -149,7 +157,15 @@ export function ScorecardTables({
       <div>
         <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Bowling</p>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs font-rajdhani">
+          <table className="w-full table-fixed text-xs font-rajdhani">
+            <colgroup>
+              <col className="w-[32%]" />
+              <col className="w-[13.6%]" />
+              <col className="w-[13.6%]" />
+              <col className="w-[13.6%]" />
+              <col className="w-[13.6%]" />
+              <col className="w-[13.6%]" />
+            </colgroup>
             <thead>
               <tr className="text-zinc-600 border-b border-ink-5">
                 <th className="text-left py-1 pr-2">Player</th>
