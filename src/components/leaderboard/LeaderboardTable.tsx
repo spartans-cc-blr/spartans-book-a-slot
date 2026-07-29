@@ -33,6 +33,17 @@ function statValue(row: LeaderboardRow, key: SortKey): number | null {
   return (row.stats as any)[key] as number | null
 }
 
+// Rate/points columns always render to two decimal places, even a whole
+// number like 6 — integer counts (matches, innings, wickets, catches, etc.)
+// stay bare rather than becoming "6.00".
+const DECIMAL_KEYS = new Set<SortKey>([
+  'battingAverage', 'strikeRate', 'economy', 'bowlingAverage', 'bowlingStrikeRate', 'mvpPoints',
+])
+function formatStatValue(v: number | null, key: SortKey): string {
+  if (v == null) return '—'
+  return DECIMAL_KEYS.has(key) ? v.toFixed(2) : String(v)
+}
+
 const COLUMNS: Record<TableCategory, { key: SortKey; label: string }[]> = {
   batting: [
     { key: 'matches', label: 'M' },
@@ -150,7 +161,7 @@ export function LeaderboardTable({ rows, category, tournamentFiltered }: {
                 {columns.map(col => (
                   <td key={col.key}
                     className={`px-4 py-3 font-rajdhani text-sm ${sortKey === col.key ? 'text-gold font-bold' : 'text-zinc-400'}`}>
-                    {statValue(row, col.key) ?? '—'}
+                    {formatStatValue(statValue(row, col.key), col.key)}
                   </td>
                 ))}
               </tr>

@@ -92,9 +92,11 @@ function staggerRows(pcts: number[], thresholdPct: number): number[] {
 }
 
 // Same helper as CaptainsCornerGrid.tsx's ContextStatsTable — null stats render
-// as a dash rather than a misleading zero.
-function statCell(v: number | null | undefined): { text: string; dash: boolean } {
-  return v == null ? { text: '—', dash: true } : { text: String(v), dash: false }
+// as a dash rather than a misleading zero. `decimals` is only set for
+// columns whose value is a genuine rate/points figure (mvpPoints) — integer
+// counts (matches/runs/wickets/dismissals) must stay bare, not "5.00".
+function statCell(v: number | null | undefined, decimals = false): { text: string; dash: boolean } {
+  return v == null ? { text: '—', dash: true } : { text: decimals ? v.toFixed(2) : String(v), dash: false }
 }
 
 // Same rolled-up figure as LeaderboardTable.tsx's fielding/MVP "Dismissals"
@@ -109,12 +111,12 @@ function dismissals(s: PlayerStatsTotals): number {
 // glance — MVP is the default sort since it's the one figure meant to rank
 // players against each other, the rest are supporting detail.
 type StatsSortKey = 'name' | 'matches' | 'runs' | 'wickets' | 'dismissals' | 'mvpPoints'
-const STAT_COLUMNS: { key: Exclude<StatsSortKey, 'name'>; label: string; value: (s: PlayerStatsTotals) => number | null }[] = [
+const STAT_COLUMNS: { key: Exclude<StatsSortKey, 'name'>; label: string; value: (s: PlayerStatsTotals) => number | null; decimals?: boolean }[] = [
   { key: 'matches',    label: 'M',   value: s => s.matches },
   { key: 'runs',       label: 'R',   value: s => s.runs },
   { key: 'wickets',    label: 'Wk',  value: s => s.wickets },
   { key: 'dismissals', label: 'Dis', value: dismissals },
-  { key: 'mvpPoints',  label: 'MVP', value: s => s.mvpPoints },
+  { key: 'mvpPoints',  label: 'MVP', value: s => s.mvpPoints, decimals: true },
 ]
 
 // Same abbreviation CaptainsCornerGrid.tsx's MatrixView uses for its mobile
@@ -987,7 +989,7 @@ function TournamentBlock({
                               <td colSpan={STAT_COLUMNS.length} className="text-[10.5px] italic text-stone-400 pr-2 py-1.5 text-right">No stats synced</td>
                             ) : (
                               STAT_COLUMNS.map(col => {
-                                const display = statCell(col.value(stat)).text
+                                const display = statCell(col.value(stat), col.decimals).text
                                 return (
                                   <td key={col.key} className={`font-cinzel text-[11.5px] font-bold text-right pr-2 py-1.5 ${
                                     display === '—' ? 'text-stone-400' : 'text-ink'

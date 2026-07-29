@@ -134,14 +134,14 @@ export function AdminStatsTable({ rows, category }: { rows: LeaderboardRow[]; ca
                   </td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.matches}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.runs}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.battingAverage ?? '—'}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.strikeRate ?? '—'}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.battingAverage != null ? row.stats.battingAverage.toFixed(2) : '—'}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.strikeRate != null ? row.stats.strikeRate.toFixed(2) : '—'}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.wickets}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.economy ?? '—'}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.economy != null ? row.stats.economy.toFixed(2) : '—'}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.catches}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.runOuts}</td>
                   <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.stumpings}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.mvpPoints}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.mvpPoints.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

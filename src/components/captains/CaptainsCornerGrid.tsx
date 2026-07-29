@@ -776,7 +776,7 @@ function SelectablePlayerRow({
 
 // ── ContextStatsTable — tournament/ground/format rows × M/R/Avg/SR/Wk/Econ/BSR/Dis ──
 function statCell(v: number | null | undefined): { text: string; dash: boolean } {
-  return v == null ? { text: '—', dash: true } : { text: String(v), dash: false }
+  return v == null ? { text: '—', dash: true } : { text: v.toFixed(2), dash: false }
 }
 
 function ContextStatsTable({ stats }: { stats: BookingContextStats }) {

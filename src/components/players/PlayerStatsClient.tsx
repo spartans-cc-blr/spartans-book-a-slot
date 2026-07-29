@@ -176,7 +176,7 @@ function MvpStat({ label, value, color }: { label: string; value: number; color:
   return (
     <div className="text-center">
       <p className="font-rajdhani text-[9px] font-bold tracking-widest uppercase text-stone-500 mb-0.5">{label}</p>
-      <p className={`font-cinzel text-base font-bold ${color}`}>{value.toFixed(1)}</p>
+      <p className={`font-cinzel text-base font-bold ${color}`}>{value.toFixed(2)}</p>
     </div>
   )
 }
@@ -219,13 +219,13 @@ function MatchRow({ match, tournamentFiltered }: { match: PlayerMatchHistoryRow;
         {match.batting && (
           <span>
             🏏 {match.batting.runs}{match.batting.notOut ? '*' : ''} ({match.batting.balls}b
-            {match.batting.strikeRate != null ? `, SR ${match.batting.strikeRate.toFixed(1)}` : ''})
+            {match.batting.strikeRate != null ? `, SR ${match.batting.strikeRate.toFixed(2)}` : ''})
           </span>
         )}
         {match.bowling && (
           <span className="inline-flex items-center gap-1">
             <CricketBallIcon size={12} /> {match.bowling.wickets}/{match.bowling.runsConceded} ({match.bowling.overs}ov
-            {match.bowling.economy != null ? `, Eco ${match.bowling.economy.toFixed(1)}` : ''})
+            {match.bowling.economy != null ? `, Eco ${match.bowling.economy.toFixed(2)}` : ''})
           </span>
         )}
         {match.fielding && (match.fielding.catches + match.fielding.runOuts + match.fielding.stumpings > 0) && (

@@ -73,13 +73,13 @@ export function LeaderboardMilestones({ rows, year }: { rows: LeaderboardRow[]; 
   const bestEconomy = bestBy(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && qualifiesOnGames(r), true)
 
   const milestones: Milestone[] = [
-    { label: 'Leading MVP',         icon: '🏆', row: topMVP,     valueText: topMVP ? `${topMVP.stats.mvpPoints.toFixed(1)} pts` : '' },
+    { label: 'Leading MVP',         icon: '🏆', row: topMVP,     valueText: topMVP ? `${topMVP.stats.mvpPoints.toFixed(2)} pts` : '' },
     { label: 'Leading Run Scorer',  icon: '🏏', row: topRuns,     valueText: topRuns ? `${topRuns.stats.runs} runs` : '' },
     { label: 'Leading Wicket Taker', icon: '🎯', row: topWickets,  valueText: topWickets ? `${topWickets.stats.wickets} wkts` : '' },
     { label: 'Most 100s',      icon: '💯', row: mostCenturies,     valueText: mostCenturies ? `${mostCenturies.centuries} centuries` : '' },
     { label: 'Most 50s',       icon: '5️⃣0️⃣', row: mostHalfCenturies, valueText: mostHalfCenturies ? `${mostHalfCenturies.halfCenturies} fifties` : '' },
-    { label: 'Best Average',   icon: '📊', row: bestAverage, valueText: bestAverage ? `Avg ${bestAverage.stats.battingAverage!.toFixed(1)}` : '' },
-    { label: 'Highest S/R',    icon: '⚡', row: bestSR,       valueText: bestSR ? `SR ${bestSR.stats.strikeRate!.toFixed(1)}` : '' },
+    { label: 'Best Average',   icon: '📊', row: bestAverage, valueText: bestAverage ? `Avg ${bestAverage.stats.battingAverage!.toFixed(2)}` : '' },
+    { label: 'Highest S/R',    icon: '⚡', row: bestSR,       valueText: bestSR ? `SR ${bestSR.stats.strikeRate!.toFixed(2)}` : '' },
     { label: 'Best Economy',   icon: '🔒', row: bestEconomy, valueText: bestEconomy ? `Econ ${bestEconomy.stats.economy!.toFixed(2)}` : '' },
   ].filter(m => m.row)
 
