@@ -155,9 +155,9 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 }
 
-function ShareIcon() {
+function ShareIcon({ size = 13 }: { size?: number }) {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
       <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" stroke="currentColor" strokeWidth="2"
         strokeLinecap="round" strokeLinejoin="round"/>
@@ -166,6 +166,34 @@ function ShareIcon() {
       <line x1="12" y1="2" x2="12" y2="15" stroke="currentColor" strokeWidth="2"
         strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
+  )
+}
+
+// ── Shareable-match link — reused by FixturesAvailability so the icon
+// can render on the response row instead of the tournament-name row.
+export function FixtureShareButton({ bookingId, size = 13 }: { bookingId: string; size?: number }) {
+  return (
+    <a
+      href={`/fixtures/${bookingId}`}
+      title="Share this match"
+      onClick={e => {
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          e.preventDefault()
+          navigator.share({
+            title: 'Spartans Match',
+            url: `${window.location.origin}/fixtures/${bookingId}`,
+          }).catch(() => {})
+        }
+      }}
+      style={{
+        display: 'inline-flex', alignItems: 'center', flexShrink: 0,
+        color: '#4B5563', textDecoration: 'none',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.color = '#9CA3AF')}
+      onMouseLeave={e => (e.currentTarget.style.color = '#4B5563')}
+    >
+      <ShareIcon size={size} />
+    </a>
   )
 }
 
@@ -246,22 +274,6 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             : slotLabel(slot_time)}
         </span>
         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-          <span style={{
-            background: "#1E3A5F", color: "#93C5FD",
-            fontSize: "10px", fontWeight: 700,
-            padding: "2px 8px", borderRadius: "999px",
-            letterSpacing: "0.08em"
-          }}>{format}</span>
-          {match_stage && (
-            <span style={{
-              background: '#2d1f00', color: '#f59e0b',
-              fontSize: '10px', fontWeight: 700,
-              padding: '2px 8px', borderRadius: '999px',
-              letterSpacing: '0.06em', border: '1px solid #d97706',
-            }}>
-              {stageIcon(match_stage)} {match_stage}
-            </span>
-          )}
           {matchStatus === 'in_progress' && (
             <span style={{
               background: '#0d2b18', color: '#4ade80',
@@ -270,6 +282,13 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
               letterSpacing: '0.06em', border: '1px solid #166534',
             }}>● IN PROGRESS</span>
           )}
+          {/* Format pill always renders last so it consistently sits in the top-right corner */}
+          <span style={{
+            background: "#1E3A5F", color: "#93C5FD",
+            fontSize: "10px", fontWeight: 700,
+            padding: "2px 8px", borderRadius: "999px",
+            letterSpacing: "0.08em"
+          }}>{format}</span>
         </div>
       </div>
 
@@ -288,43 +307,37 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
           ) : (
             <span style={{ fontWeight: 700, color: '#F5F5F5' }}>{tournament?.name}</span>
           )}
-          {booking.id && (
-            <a
-              href={`/fixtures/${booking.id}`}
-              title="Share this match"
-              onClick={e => {
-                if (typeof navigator !== 'undefined' && navigator.share) {
-                  e.preventDefault()
-                  navigator.share({
-                    title: 'Spartans Match',
-                    url: `${window.location.origin}/fixtures/${booking.id}`,
-                  }).catch(() => {})
-                }
-              }}
-              style={{
-                display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-                color: '#4B5563', textDecoration: 'none',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#9CA3AF')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#4B5563')}
-            >
-              <ShareIcon />
-            </a>
-          )}
         </div>
         <div style={{ fontSize: "12px", color: "#9CA3AF" }}>
           vs <span style={{ color: "#D1D5DB", fontWeight: 500 }}>{opponent_name || "TBD"}</span>
         </div>
-        {ground?.name && (
-          <div style={{ fontSize: "11px", color: "#6B7280", marginTop: "4px" }}>
-            {'@ '}
-            {ground.maps_url ? (
-              <a href={ground.maps_url} target="_blank" rel="noopener noreferrer"
-                style={{ color: "#34A853", textDecoration: "none" }}>
-                {ground.name}
-              </a>
-            ) : (
-              <span>{ground.name}</span>
+        {(ground?.name || match_stage) && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", gap: "8px" }}>
+            <div style={{ fontSize: "11px", color: "#6B7280" }}>
+              {ground?.name && (
+                <>
+                  {'@ '}
+                  {ground.maps_url ? (
+                    <a href={ground.maps_url} target="_blank" rel="noopener noreferrer"
+                      style={{ color: "#34A853", textDecoration: "none" }}>
+                      {ground.name}
+                    </a>
+                  ) : (
+                    <span>{ground.name}</span>
+                  )}
+                </>
+              )}
+            </div>
+            {match_stage && (
+              <span style={{
+                background: '#2d1f00', color: '#f59e0b',
+                fontSize: '10px', fontWeight: 700,
+                padding: '2px 8px', borderRadius: '999px',
+                letterSpacing: '0.06em', border: '1px solid #d97706',
+                flexShrink: 0,
+              }}>
+                {stageIcon(match_stage)} {match_stage}
+              </span>
             )}
           </div>
         )}

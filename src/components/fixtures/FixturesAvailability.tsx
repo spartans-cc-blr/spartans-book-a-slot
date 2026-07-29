@@ -5,6 +5,7 @@
 // Blocked buttons are visibly disabled — grey with strikethrough cursor — not invisible.
 
 import { signIn } from 'next-auth/react'
+import { FixtureShareButton } from './FixturesCard'
 
 type AvailKey  = 'Y' | 'O' | 'E' | 'L'
 type AvailCode = AvailKey | null
@@ -127,14 +128,17 @@ export function FixturesAvailability({
         <span style={{ fontSize: '11px', color: '#6B7280', fontFamily: "'DM Sans', sans-serif" }}>
           Sign in to submit your availability
         </span>
-        <button onClick={() => signIn('google')} style={{
-          fontSize: '11px', fontWeight: 700, color: '#C9A84C',
-          border: '1px solid #C9A84C', borderRadius: '6px',
-          padding: '4px 10px', background: 'transparent', cursor: 'pointer',
-          fontFamily: "'DM Sans', sans-serif",
-        }}>
-          Sign in
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          <button onClick={() => signIn('google')} style={{
+            fontSize: '11px', fontWeight: 700, color: '#C9A84C',
+            border: '1px solid #C9A84C', borderRadius: '6px',
+            padding: '4px 10px', background: 'transparent', cursor: 'pointer',
+            fontFamily: "'DM Sans', sans-serif",
+          }}>
+            Sign in
+          </button>
+          <FixtureShareButton bookingId={bookingId} />
+        </div>
       </div>
     )
   }
@@ -203,15 +207,18 @@ export function FixturesAvailability({
         </div>
       </div>
 
-      {/* Hint for active code */}
-      {activeBtn && !error && !saving && (
-        <p style={{
-          fontSize: '10px', color: activeBtn.activeColor, opacity: 0.7,
-          marginTop: '6px', fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4,
-        }}>
-          {activeBtn.hint}
-        </p>
-      )}
+      {/* Hint for active code — share icon lives on this row, bottom right */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', gap: '8px' }}>
+        {activeBtn && !error && !saving ? (
+          <p style={{
+            fontSize: '10px', color: activeBtn.activeColor, opacity: 0.7,
+            fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4,
+          }}>
+            {activeBtn.hint}
+          </p>
+        ) : <span />}
+        <FixtureShareButton bookingId={bookingId} />
+      </div>
 
       {/* Frozen slot notice */}
 {slotLocked && !squadAnnounced && (

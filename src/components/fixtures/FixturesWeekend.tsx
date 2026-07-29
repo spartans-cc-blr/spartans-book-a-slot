@@ -4,7 +4,7 @@
 // Owns a single shared weekendResponses state so validation is live across all cards.
 
 import { useState } from 'react'
-import { FixturesCard } from '@/components/fixtures/FixturesCard'
+import { FixturesCard, FixtureShareButton } from '@/components/fixtures/FixturesCard'
 import { FixturesAvailability } from '@/components/fixtures/FixturesAvailability'
 
 type AvailKey = 'Y' | 'O' | 'E' | 'L'
@@ -111,10 +111,12 @@ export function FixturesWeekendGroup({
               marginTop: '-6px', padding: '10px 16px',
              background: '#111827', border: '1px solid #2D3748',
               borderTop: 'none', borderRadius: '0 0 12px 12px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
             }}>
               <p style={{ fontSize: '11px', color: '#92400e', fontFamily: "'DM Sans', sans-serif" }}>
                 ⚠ Outstanding dues — contact admin to update availability
               </p>
+              <FixtureShareButton bookingId={b.id} />
             </div>
           ) : (
           <FixturesAvailability
