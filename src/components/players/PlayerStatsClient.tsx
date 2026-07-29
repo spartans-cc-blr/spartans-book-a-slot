@@ -126,27 +126,29 @@ export function PlayerStatsClient({
 
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-3xl mx-auto">
         {/* Filters */}
-        <div className="flex gap-2 flex-wrap items-center mb-5">
-          <select value={year} onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5">
-            <option value="all">All Years</option>
-            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+        <div className="flex flex-col gap-2 mb-5">
+          <div className="flex gap-2 items-center flex-shrink-0">
+            <select value={year} onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5 flex-shrink-0">
+              <option value="all">All Years</option>
+              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
+              ${formats.has('T20') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={formats.has('T20')} onChange={() => toggleFormat('T20')} className="accent-gold" />
+              T20
+            </label>
+            <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
+              ${formats.has('T30') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={formats.has('T30')} onChange={() => toggleFormat('T30')} className="accent-gold" />
+              T30
+            </label>
+          </div>
           <select value={groundId} onChange={e => setGroundId(e.target.value)}
-            className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5">
+            className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5 w-full">
             <option value="all">All Grounds</option>
             {grounds.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
-          <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none
-            ${formats.has('T20') ? 'text-gold-dim' : 'text-stone-500'}`}>
-            <input type="checkbox" checked={formats.has('T20')} onChange={() => toggleFormat('T20')} className="accent-gold" />
-            T20
-          </label>
-          <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none
-            ${formats.has('T30') ? 'text-gold-dim' : 'text-stone-500'}`}>
-            <input type="checkbox" checked={formats.has('T30')} onChange={() => toggleFormat('T30')} className="accent-gold" />
-            T30
-          </label>
         </div>
 
         {/* Summary */}
