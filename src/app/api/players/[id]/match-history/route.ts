@@ -4,7 +4,7 @@
 // and its scorecard routes ("stats aren't sensitive"). Not IDOR-restricted
 // to self, unlike /api/players/[id]/stats (the compact /profile summary).
 //
-// vibe-security: read-only, no write path. Year/tournament filters are
+// vibe-security: read-only, no write path. Year/ground/format filters are
 // parsed server-side; an invalid year falls back to unfiltered rather than
 // erroring, since this only narrows a read.
 
@@ -27,9 +27,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { searchParams } = new URL(req.url)
   const yearParam = searchParams.get('year')
-  const tournamentId = searchParams.get('tournament') || undefined
+  const groundId = searchParams.get('ground') || undefined
+  const formatParam = searchParams.get('format') || undefined
   const year = yearParam ? Number(yearParam) : undefined
-  const filters = { year: Number.isFinite(year) && year ? year : undefined, tournamentId }
+  const filters = {
+    year: Number.isFinite(year) && year ? year : undefined,
+    groundId,
+    // Only a single-format restriction is ever sent (mirrors /leaderboard's
+    // convention — absent/both-checked means "no restriction").
+    formats: formatParam ? [formatParam] : undefined,
+  }
 
   const supabase = createServiceClient()
   const { data: player, error: playerErr } = await supabase

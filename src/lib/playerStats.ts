@@ -276,10 +276,10 @@ async function fetchAnalyticsRows(opts: {
 // General-purpose scoped aggregate — getPlayerCareerStats and
 // getPlayerSeasonStats are thin wrappers over this for their existing
 // call shapes; the full stats page (/players/[id]/stats) uses this
-// directly since it needs year AND tournament filters combined.
+// directly since it needs year, ground, AND format filters combined.
 export async function getPlayerStats(
   playerId: string,
-  filters: { year?: number; tournamentId?: string } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
 ): Promise<PlayerStatsTotals> {
   const scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return emptyTotals()
@@ -304,7 +304,7 @@ export async function getPlayerSeasonStats(playerId: string, year: number): Prom
 // this file rather than showing a misleading 0.
 export async function getPlayerMatchHistory(
   playerId: string,
-  filters: { year?: number; tournamentId?: string } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
 ): Promise<PlayerMatchHistoryRow[]> {
   const scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return []

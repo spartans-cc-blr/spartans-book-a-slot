@@ -1,11 +1,17 @@
 'use client'
-// Full player stats page — career + filtered (year/tournament) summary,
+// Full player stats page — career + filtered (year/ground/format) summary,
 // plus a match-by-match batting/bowling/fielding breakdown. Reachable via
 // PlayerNameLink (see src/lib/playerLink.tsx) wherever a Hub player's name
 // appears, and via avatar on /profile (own) and the GC Players grid.
 // Not linked from Captains' Corner by design, and squad panels only ever
 // get a small avatar icon into this page — never the name-link swap that
 // would lengthen those cards.
+//
+// Ground (not Tournament) is the filter here, and Format is a pair of
+// T20/T30 checkboxes — same convention as /leaderboard's filter bar
+// (src/components/leaderboard/LeaderboardFilters.tsx): both checked means
+// no restriction, unchecking one scopes to the other, and unchecking both
+// snaps back to both checked rather than showing zero results.
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
@@ -26,22 +32,25 @@ interface PlayerInfo {
 const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2]
 
+type Format = 'T20' | 'T30'
+
 export function PlayerStatsClient({
-  player, tournaments, initialCareer, initialMatches,
+  player, grounds, initialCareer, initialMatches,
 }: {
   player: PlayerInfo
-  tournaments: { id: string; name: string }[]
+  grounds: { id: string; name: string }[]
   initialCareer: PlayerStatsTotals
   initialMatches: PlayerMatchHistoryRow[]
 }) {
   const [year, setYear] = useState<number | 'all'>('all')
-  const [tournamentId, setTournamentId] = useState<string>('all')
+  const [groundId, setGroundId] = useState<string>('all')
+  const [formats, setFormats] = useState<Set<Format>>(new Set<Format>(['T20', 'T30']))
   const [scoped, setScoped] = useState<PlayerStatsTotals>(initialCareer)
   const [matches, setMatches] = useState<PlayerMatchHistoryRow[]>(initialMatches)
   const [loading, setLoading] = useState(false)
 
   const fetchScoped = useCallback(async () => {
-    if (year === 'all' && tournamentId === 'all') {
+    if (year === 'all' && groundId === 'all' && formats.size === 2) {
       setScoped(initialCareer)
       setMatches(initialMatches)
       return
@@ -49,7 +58,8 @@ export function PlayerStatsClient({
     setLoading(true)
     const params = new URLSearchParams()
     if (year !== 'all') params.set('year', String(year))
-    if (tournamentId !== 'all') params.set('tournament', tournamentId)
+    if (groundId !== 'all') params.set('ground', groundId)
+    if (formats.size === 1) params.set('format', Array.from(formats)[0])
     const res = await fetch(`/api/players/${player.id}/match-history?${params.toString()}`)
     if (res.ok) {
       const d = await res.json()
@@ -57,11 +67,26 @@ export function PlayerStatsClient({
       setMatches(d.matches)
     }
     setLoading(false)
-  }, [year, tournamentId, player.id, initialCareer, initialMatches])
+  }, [year, groundId, formats, player.id, initialCareer, initialMatches])
 
   useEffect(() => { fetchScoped() }, [fetchScoped])
 
-  const isTournamentFiltered = tournamentId !== 'all'
+  function toggleFormat(fmt: Format) {
+    setFormats(prev => {
+      const next = new Set(prev)
+      if (next.has(fmt)) {
+        next.delete(fmt)
+        // Never persist an all-unchecked state — snap back to both rather
+        // than showing zero results.
+        if (next.size === 0) { next.add('T20'); next.add('T30') }
+      } else {
+        next.add(fmt)
+      }
+      return next
+    })
+  }
+
+  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1
 
   return (
     <>
@@ -101,23 +126,33 @@ export function PlayerStatsClient({
 
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-3xl mx-auto">
         {/* Filters */}
-        <div className="flex gap-2 flex-wrap mb-5">
+        <div className="flex gap-2 flex-wrap items-center mb-5">
           <select value={year} onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
             className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5">
             <option value="all">All Years</option>
             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <select value={tournamentId} onChange={e => setTournamentId(e.target.value)}
+          <select value={groundId} onChange={e => setGroundId(e.target.value)}
             className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5">
-            <option value="all">All Tournaments</option>
-            {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            <option value="all">All Grounds</option>
+            {grounds.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
+          <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none
+            ${formats.has('T20') ? 'text-gold-dim' : 'text-stone-500'}`}>
+            <input type="checkbox" checked={formats.has('T20')} onChange={() => toggleFormat('T20')} className="accent-gold" />
+            T20
+          </label>
+          <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none
+            ${formats.has('T30') ? 'text-gold-dim' : 'text-stone-500'}`}>
+            <input type="checkbox" checked={formats.has('T30')} onChange={() => toggleFormat('T30')} className="accent-gold" />
+            T30
+          </label>
         </div>
 
         {/* Summary */}
         <div className="bg-white border border-parchment-3 rounded-2xl p-5 mb-5">
           <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">
-            {year === 'all' && tournamentId === 'all' ? 'Career' : 'Filtered'} Summary
+            {isFiltered ? 'Filtered' : 'Career'} Summary
           </h2>
           {scoped.matches === 0 ? (
             <p className="font-rajdhani text-sm text-stone-500">No matches for this filter.</p>
@@ -153,7 +188,7 @@ export function PlayerStatsClient({
             <p className="font-rajdhani text-sm text-stone-500">No matches for this filter.</p>
           ) : (
             <div className="space-y-3">
-              {matches.map(m => <MatchRow key={m.matchId} match={m} tournamentFiltered={isTournamentFiltered} />)}
+              {matches.map(m => <MatchRow key={m.matchId} match={m} />)}
             </div>
           )}
         </div>
@@ -181,18 +216,15 @@ function MvpStat({ label, value, color }: { label: string; value: number; color:
   )
 }
 
-function MatchRow({ match, tournamentFiltered }: { match: PlayerMatchHistoryRow; tournamentFiltered: boolean }) {
+function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
   const dateLabel = match.gameDate
     ? new Date(match.gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—'
 
-  // When filtered to a specific tournament, the opponent is the more useful
-  // headline (the tournament is already implied by the filter). Unfiltered,
-  // the opponent alone doesn't say much across many tournaments — name the
-  // tournament instead.
-  const primaryLabel = tournamentFiltered
-    ? (match.opponentName ? `vs ${match.opponentName}` : match.tournamentName ?? 'Match')
-    : (match.tournamentName ? `at ${match.tournamentName}` : (match.opponentName ? `vs ${match.opponentName}` : 'Match'))
+  // The filter bar scopes by ground now, not tournament — the tournament
+  // name is never implied by the active filter, so it's always the more
+  // useful headline (a ground can host many different tournaments).
+  const primaryLabel = match.tournamentName ? `at ${match.tournamentName}` : (match.opponentName ? `vs ${match.opponentName}` : 'Match')
 
   const body = (
     <div style={{

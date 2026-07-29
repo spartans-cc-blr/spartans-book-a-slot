@@ -26,11 +26,11 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
   if (user?.playerStatus === 'expelled') redirect('/')
 
   const supabase = createServiceClient()
-  const [{ data: player }, { data: tournaments }, career, matches] = await Promise.all([
+  const [{ data: player }, { data: grounds }, career, matches] = await Promise.all([
     supabase.from('players')
       .select('id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, cricheroes_url')
       .eq('id', params.id).single(),
-    supabase.from('tournaments').select('id, name').order('name', { ascending: true }),
+    supabase.from('grounds').select('id, name').order('name', { ascending: true }),
     getPlayerStats(params.id),
     getPlayerMatchHistory(params.id),
   ])
@@ -42,7 +42,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
       <SiteNav isAdmin={!!user?.isAdmin} />
       <PlayerStatsClient
         player={player}
-        tournaments={tournaments ?? []}
+        grounds={grounds ?? []}
         initialCareer={career}
         initialMatches={matches}
       />
