@@ -14,13 +14,11 @@ type SortKey =
   | 'wickets' | 'economy' | 'bowlingAverage' | 'bowlingStrikeRate'
   | 'catches' | 'runOuts' | 'stumpings' | 'dismissals' | 'mvpPoints'
 
-// Bowling average/strike rate aren't precomputed on PlayerStatsTotals (only
-// the batting versions are) — derived here from the fields that are.
+// Bowling average isn't precomputed on PlayerStatsTotals (bowling strike
+// rate is — see src/lib/playerStats.ts) — derived here from the fields
+// that are.
 function bowlingAverage(s: PlayerStatsTotals): number | null {
   return s.wickets > 0 ? Math.round((s.runsConceded / s.wickets) * 100) / 100 : null
-}
-function bowlingStrikeRate(s: PlayerStatsTotals): number | null {
-  return s.wickets > 0 ? Math.round((s.ballsBowled / s.wickets) * 100) / 100 : null
 }
 // Combined fielding dismissals — catches, run outs, and stumpings all count
 // toward MVP, so the MVP tab shows one rolled-up figure rather than catches
@@ -30,9 +28,8 @@ function dismissals(s: PlayerStatsTotals): number {
 }
 
 function statValue(row: LeaderboardRow, key: SortKey): number | null {
-  if (key === 'bowlingAverage')    return bowlingAverage(row.stats)
-  if (key === 'bowlingStrikeRate') return bowlingStrikeRate(row.stats)
-  if (key === 'dismissals')        return dismissals(row.stats)
+  if (key === 'bowlingAverage') return bowlingAverage(row.stats)
+  if (key === 'dismissals')     return dismissals(row.stats)
   return (row.stats as any)[key] as number | null
 }
 

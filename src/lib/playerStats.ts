@@ -64,6 +64,7 @@ function emptyTotals(): PlayerStatsTotals {
     matches: 0, battingInnings: 0, bowlingInnings: 0, runs: 0, balls: 0, notOuts: 0,
     battingAverage: null, strikeRate: null, fours: 0, sixes: 0,
     wickets: 0, ballsBowled: 0, oversBowled: '0.0', runsConceded: 0, economy: null,
+    bowlingStrikeRate: null,
     catches: 0, runOuts: 0, stumpings: 0, mvpPoints: 0,
     battingMvp: 0, bowlingMvp: 0, fieldingMvp: 0,
   }
@@ -101,6 +102,7 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
   t.bowlingInnings = bowlingRows.length
   t.oversBowled = ballsToOversString(t.ballsBowled)
   t.economy = t.ballsBowled > 0 ? round2(t.runsConceded / (t.ballsBowled / 6)) : null
+  t.bowlingStrikeRate = t.wickets > 0 ? round2(t.ballsBowled / t.wickets) : null
 
   // catches + caught_behind are both genuine catch dismissals (the latter
   // specifically behind the stumps) — combined into one "catches" figure
