@@ -766,6 +766,71 @@ unaffected by the MVP narrowing above — it still resolves via
 `resolveMatchTopPerformers()`/`computeTopPerformers()`, not
 `computeMatchMVP()`.
 
+### Known gap — the top-performer grant requires a populated `squad`
+
+`resolveSquadMatch()` (`src/lib/matchTopPerformers.ts`) is the only place a
+scorecard row gets turned into a Hub `player_id`, and both of its branches
+depend on the `squad` array passed in:
+
+```ts
+function resolveSquadMatch(row, name, squad) {
+  const rowPlayerId = pickField(row, ['player_id'])
+  if (rowPlayerId) {
+    const byId = squad.find(p => p.player_id === rowPlayerId)  // still needs squad
+    if (byId) return byId
+  }
+  const byName = squad.find(p => p.player_name...=== name...)  // name fallback, also needs squad
+  return byName ?? null
+}
+```
+
+Note the first branch: even when the analytics row already carries a
+`player_id` resolved via `player_name_aliases`/`match_name_overrides` (see
+`player-identity-resolution.md`), the code doesn't trust that value
+directly — it still requires finding that same `player_id` inside the
+`squad` array before returning a match. If a booking has **no `squad`
+rows at all** (e.g. it was never staffed through Captains Corner, or its
+squad was wiped/never backfilled), `squad` is `[]`, so both branches
+return `null` for every batting/bowling row — regardless of how well the
+name is already reconciled.
+
+Knock-on effects, all traced through the actual code, not just this
+route:
+
+- `resolveMatchTopPerformers()` → every performer resolves to
+  `player_id: null` → `topPerformerPlayerIds()` returns an empty `Set` →
+  the third path in `canActOnScorecard()`
+  (`topPerformerPlayerIds(performers).has(user.playerId)`) is
+  unconditionally `false`. No one can gain verify/flag access as "the top
+  performer" on a squad-less booking.
+- The **second** path in `canActOnScorecard()` — captain/VC of the
+  booking — is a `squad` row lookup scoped to `booking_id` + `player_id`
+  and *also* fails with zero squad rows, so nobody qualifies as captain/VC
+  either.
+- `computeMatchMVP()` uses the same `resolveSquadMatch()`/`ensure()` gate,
+  so `PerformerShareButton`'s "Request top performer to verify" list would
+  also come back empty for a squad-less booking.
+
+**Net effect:** with no squad, `canActOnScorecard()` (and therefore
+`can_verify`, `verify-scorecard`, `flag-reconciliation`) only succeeds via
+the first path — `isWrangler || isAdmin`. This is consistent with the rest
+of the feature (a `squad` row is how the app knows who was in the team at
+all), but it's worth flagging explicitly here because a scorecard can be
+synced and displayed on `/matches/history` without ever having a squad
+(e.g. matches predating squad selection, or ones only reached via the
+CricHeroes-fetch backfill path) — those matches silently reduce to
+wrangler/admin-only verification with no UI cue explaining why the
+verify/flag controls and share button aren't showing up.
+
+Not yet fixed — flagged here so it isn't mistaken for a live bug report.
+The fastest path to closing it, if it's ever prioritized, is populating
+`squad` for the booking (e.g. via `/wrangler/backfill-squad`) rather than
+changing `resolveSquadMatch()` itself, since requiring squad membership to
+grant access is the correct security posture — the alternative (trusting
+a bare `player_id` off the analytics row with no squad cross-check) would
+let anyone whose name happens to alias-match get access even for a match
+they were never part of.
+
 ### Where the performer actually acts — the standalone match page
 
 `/matches/history/[bookingId]/page.tsx` (previously a read-only share page
