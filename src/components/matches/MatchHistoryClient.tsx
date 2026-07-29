@@ -105,6 +105,27 @@ function monthChipLabel(month: string): string {
   return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
+// Month-only label for pills inside the year-grouped picker, where the year
+// is already shown once as the group heading.
+function monthOnlyLabel(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', { month: 'short', timeZone: 'UTC' })
+}
+
+// filterOptions.months arrives sorted most-recent-first with each year's
+// months contiguous, so a simple running-group walk (no Map needed) keeps
+// that order intact.
+function groupMonthsByYear(months: string[]): { year: string; months: string[] }[] {
+  const groups: { year: string; months: string[] }[] = []
+  for (const month of months) {
+    const year = month.slice(0, 4)
+    const last = groups[groups.length - 1]
+    if (last && last.year === year) last.months.push(month)
+    else groups.push({ year, months: [month] })
+  }
+  return groups
+}
+
 // Matches the server's own month bucketing (plain UTC date-string slicing,
 // no local-timezone conversion) so the default view lines up with the
 // month chip the server would actually return matches for.
@@ -194,6 +215,7 @@ export function MatchHistoryClient({
   // recently" anyway. Explicitly deselecting the month chip still shows
   // everything.
   const [monthFilter, setMonthFilter]   = useState(currentMonthStr())
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
   const [tournamentId, setTournamentId] = useState('')
   // Encodes the selected ground option: 'g:<ground_id>' for a resolved
   // grounds-table entry, 'v:<venue text>' for a raw fallback venue with no
@@ -278,6 +300,22 @@ export function MatchHistoryClient({
     setRoleFilter('all'); setResultFilter(''); setMonthFilter(currentMonthStr()); setTournamentId(''); setGroundSelection(''); setFormat('')
   }
 
+  // Month stepper — filterOptions.months is sorted most-recent-first, so
+  // index 0 is newest. "Older" moves toward the end of the array, "newer"
+  // moves toward index 0. Both arrows are disabled once monthFilter is ''
+  // (All time) — stepping only makes sense from a specific month.
+  const monthIndex  = filterOptions.months.indexOf(monthFilter)
+  const hasMonth    = monthIndex !== -1
+  const canGoNewer  = hasMonth && monthIndex > 0
+  const canGoOlder  = hasMonth && monthIndex < filterOptions.months.length - 1
+  function goNewerMonth() { if (canGoNewer) setMonthFilter(filterOptions.months[monthIndex - 1]) }
+  function goOlderMonth() { if (canGoOlder) setMonthFilter(filterOptions.months[monthIndex + 1]) }
+  function selectMonth(month: string) {
+    setMonthFilter(prev => prev === month ? '' : month)
+    setMonthPickerOpen(false)
+  }
+  const monthGroups = groupMonthsByYear(filterOptions.months)
+
   return (
     <div className="space-y-4">
       {/* Filter bar — stacks on mobile, single row from sm up */}
@@ -304,22 +342,70 @@ export function MatchHistoryClient({
           </div>
         )}
 
-        {/* Month chip strip — horizontally scrollable, independent of every
-            other filter below (an AND'd param, not a replacement for them) */}
+        {/* Month navigator — a stepper for adjacent months plus a
+            tap-to-expand picker grouped by year, independent of every other
+            filter below (an AND'd param, not a replacement for them).
+            Replaces a horizontally-scrolling pill row that only ever grew
+            longer as match history accumulated. */}
         {filterOptions.months.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
-            {filterOptions.months.map(month => (
+          <div>
+            <div className="flex items-center gap-2 bg-ink-4 border border-ink-5 rounded-full px-2 py-1.5">
               <button
-                key={month}
-                onClick={() => setMonthFilter(prev => prev === month ? '' : month)}
-                className={`font-rajdhani text-xs font-bold tracking-wide px-3 py-1.5 rounded-full border whitespace-nowrap flex-shrink-0 transition-colors ${
-                  monthFilter === month
-                    ? 'bg-gold/20 border-gold-dim text-gold'
-                    : 'bg-ink-4 border-ink-5 text-zinc-500 hover:text-zinc-300'
-                }`}>
-                {monthChipLabel(month)}
+                onClick={goOlderMonth}
+                disabled={!canGoOlder}
+                aria-label="Older month"
+                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
+                ‹
               </button>
-            ))}
+              <button
+                onClick={() => setMonthPickerOpen(v => !v)}
+                className="flex-1 flex items-center justify-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide text-gold py-1">
+                {monthFilter ? monthChipLabel(monthFilter) : 'All time'}
+                <span className="text-zinc-500 text-[10px]">{monthPickerOpen ? '▲' : '▾'}</span>
+              </button>
+              <button
+                onClick={goNewerMonth}
+                disabled={!canGoNewer}
+                aria-label="Newer month"
+                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
+                ›
+              </button>
+            </div>
+
+            {monthPickerOpen && (
+              <div className="mt-2 bg-ink-4 border border-ink-5 rounded-lg p-3 space-y-3">
+                <button
+                  onClick={() => { setMonthFilter(''); setMonthPickerOpen(false) }}
+                  className={`font-rajdhani text-xs font-bold tracking-wide px-3 py-1.5 rounded-full border transition-colors ${
+                    !monthFilter
+                      ? 'bg-gold/20 border-gold-dim text-gold'
+                      : 'bg-ink-3 border-ink-5 text-zinc-500 hover:text-zinc-300'
+                  }`}>
+                  All time
+                </button>
+                {monthGroups.map(group => (
+                  <div key={group.year} className="space-y-1.5">
+                    <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-600">
+                      {group.year}
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {group.months.map(month => (
+                        <button
+                          key={month}
+                          onClick={() => selectMonth(month)}
+                          className={`font-rajdhani text-xs font-bold tracking-wide px-3 py-1.5 rounded-full border transition-colors ${
+                            monthFilter === month
+                              ? 'bg-gold/20 border-gold-dim text-gold'
+                              : 'bg-ink-3 border-ink-5 text-zinc-500 hover:text-zinc-300'
+                          }`}>
+                          {monthOnlyLabel(month)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
