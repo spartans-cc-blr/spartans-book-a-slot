@@ -164,6 +164,7 @@ export interface PlayerStatsTotals {
   oversBowled:    string        // display form, e.g. "12.4" (12 overs, 4 balls)
   runsConceded:   number
   economy:        number | null
+  bowlingStrikeRate: number | null   // balls per wicket
   catches:        number
   runOuts:        number
   stumpings:      number

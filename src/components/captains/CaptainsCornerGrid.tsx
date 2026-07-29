@@ -774,7 +774,7 @@ function SelectablePlayerRow({
   )
 }
 
-// ── ContextStatsTable — tournament/ground/format rows × M/R/Avg/SR/Wk/Econ/Dis ──
+// ── ContextStatsTable — tournament/ground/format rows × M/R/Avg/SR/Wk/Econ/BSR/Dis ──
 function statCell(v: number | null | undefined): { text: string; dash: boolean } {
   return v == null ? { text: '—', dash: true } : { text: String(v), dash: false }
 }
@@ -794,7 +794,7 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
       <thead>
         <tr>
           <th></th>
-          {['M', 'R', 'Avg', 'SR', 'Wk', 'Econ', 'Dis'].map(h => (
+          {['M', 'R', 'Avg', 'SR', 'Wk', 'Econ', 'BSR', 'Dis'].map(h => (
             <th key={h} className="font-rajdhani text-[8.5px] font-bold uppercase tracking-wide text-right pb-1"
               style={{ color: '#6B7280' }}>
               {h}
@@ -809,11 +809,12 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
               {row.icon} {row.label}
             </td>
             {row.totals == null ? (
-              <td colSpan={7} className="text-[10.5px] italic py-1" style={{ color: '#6B7280' }}>No matches yet</td>
+              <td colSpan={8} className="text-[10.5px] italic py-1" style={{ color: '#6B7280' }}>No matches yet</td>
             ) : (
               [
                 row.totals.matches, row.totals.runs, statCell(row.totals.battingAverage).text,
                 statCell(row.totals.strikeRate).text, row.totals.wickets, statCell(row.totals.economy).text,
+                statCell(row.totals.bowlingStrikeRate).text,
                 row.totals.catches + row.totals.runOuts + row.totals.stumpings,
               ].map((v, i) => (
                 <td key={i} className="font-cinzel text-[11.5px] font-bold text-right py-1"
