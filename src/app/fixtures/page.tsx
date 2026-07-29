@@ -238,12 +238,6 @@ export default async function FixturesPage() {
         <p className="text-muted text-sm md:text-base max-w-xl leading-relaxed font-rajdhani">
           Confirmed matches for Spartans CC. Mark your availability below each card.
         </p>
-        {isCaptain && (
-          <a href="/captains-corner"
-            className="mt-3 inline-flex items-center gap-2 font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold px-4 py-2 rounded hover:bg-gold/20 transition-colors">
-            ⚔ Captains Corner →
-          </a>
-        )}
       </div>
 
       {/* Not registered */}
