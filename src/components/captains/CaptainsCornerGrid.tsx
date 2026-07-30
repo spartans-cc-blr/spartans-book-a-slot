@@ -34,7 +34,6 @@ interface Booking {
 interface Player {
   id: string
   name: string
-  whatsapp?: string | null
   jersey_name: string | null
   jersey_number: number | null
   wallet_balance: number
@@ -267,7 +266,7 @@ function buildAnnouncementText(
     ground?.hospital_url ? `*Nearest hospital:*\n${ground.hospital_url}` : null,
     ``,
     squadCaptain
-      ? `📞 Captain: ${[squadCaptain.name, squadCaptain.whatsapp].filter(Boolean).join(' · ')}`
+      ? `📞 Captain: ${squadCaptain.name}`
       : null,
     `🔗 Match card: ${process.env.NEXT_PUBLIC_BASE_URL ?? 'https://hub.spartanscricketclub.in'}/fixtures/${booking.id}`,
     ``,

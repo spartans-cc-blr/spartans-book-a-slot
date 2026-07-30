@@ -72,7 +72,7 @@ export default async function CaptainsCornerPage() {
   // ── Fetch all non expelled players ───────────────────────────────
   const { data: players } = await supabase
     .from('players')
-    .select('id, name, whatsapp, jersey_name, jersey_number, wallet_balance, dues_override, primary_skill, is_captain, priority_pick, cricheroes_url, status, fee_exemptions(start_date, end_date)')
+    .select('id, name, jersey_name, jersey_number, wallet_balance, dues_override, primary_skill, is_captain, priority_pick, cricheroes_url, status, fee_exemptions(start_date, end_date)')
     .neq('status', 'expelled')
     .order('name', { ascending: true })
 
