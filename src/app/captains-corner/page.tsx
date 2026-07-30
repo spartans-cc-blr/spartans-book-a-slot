@@ -222,10 +222,6 @@ export default async function CaptainsCornerPage() {
         <p className="text-muted text-sm max-w-xl leading-relaxed font-rajdhani">
           Showing Y / O / E responses. N and L are hidden. Amber names have outstanding dues.
         </p>
-        <a href="/fixtures"
-          className="mt-3 inline-flex items-center gap-1.5 font-rajdhani text-xs text-zinc-500 hover:text-gold transition-colors">
-          ← Back to Fixtures
-        </a>
       </div>
 
       {/* Legend */}
