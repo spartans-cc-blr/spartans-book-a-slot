@@ -24,8 +24,6 @@ interface Booking {
   opponent_name: string | null
   match_time: string | null
   cricheroes_url: string | null
-  captain_name: string | null      // ADD
-  captain_whatsapp: string | null  // ADD
   tournament: {
      name: string
      ball_type: string
@@ -36,6 +34,7 @@ interface Booking {
 interface Player {
   id: string
   name: string
+  whatsapp?: string | null
   jersey_name: string | null
   jersey_number: number | null
   wallet_balance: number
@@ -226,8 +225,9 @@ function buildAnnouncementText(
   const suffix = [,'st','nd','rd'][((day % 100 - 20) % 10) || day % 100 > 10 ? 0 : day % 10] ?? 'th'
   const dateStr = `${day}${suffix} ${d.toLocaleDateString('en-IN', { month: 'long' })} (${d.toLocaleDateString('en-IN', { weekday: 'long' })})`
 
-  const squadPlayers = players.filter(p => selected.has(p.id))
-  const playerLines  = squadPlayers.map((p, i) => {
+  const squadPlayers  = players.filter(p => selected.has(p.id))
+  const squadCaptain  = squadPlayers.find(p => roles.captain === p.id) ?? null
+  const playerLines   = squadPlayers.map((p, i) => {
     const tags: string[] = []
     const mr = matchRoles[p.id]
     if (mr && includeMatchRoles) tags.push(MATCH_ROLE_LABEL[mr])
@@ -236,6 +236,11 @@ function buildAnnouncementText(
     if (roles.vc === p.id)       tags.push('VC')
     return `${i + 1}. ${p.name}${tags.length ? ` (${tags.join(', ')})` : ''}`
   }).join('\n')
+  // Remaining slots (squad cap is 12) rendered as open, one per line, right after the player list
+  const openSlotLines = Array.from(
+    { length: Math.max(0, 12 - squadPlayers.length) },
+    (_, i) => `${squadPlayers.length + i + 1}. _OPEN — slot available_`
+  ).join('\n')
 
   const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
   const jersey       = ballType === 'white' ? 'Colours' : 'Whites'
@@ -253,7 +258,7 @@ function buildAnnouncementText(
     ``,
     `*Team*`,
     playerLines,
-squadPlayers.length === 11 ? `12. _OPEN — one slot available_` : null,
+    openSlotLines || null,
     ``,
     booking.opponent_name ? `*Opponent:* ${booking.opponent_name}` : null,
     ``,
@@ -261,8 +266,8 @@ squadPlayers.length === 11 ? `12. _OPEN — one slot available_` : null,
     ``,
     ground?.hospital_url ? `*Nearest hospital:*\n${ground.hospital_url}` : null,
     ``,
-    booking.captain_name || booking.captain_whatsapp
-      ? `📞 Captain: ${[booking.captain_name, booking.captain_whatsapp].filter(Boolean).join(' · ')}`
+    squadCaptain
+      ? `📞 Captain: ${[squadCaptain.name, squadCaptain.whatsapp].filter(Boolean).join(' · ')}`
       : null,
     `🔗 Match card: ${process.env.NEXT_PUBLIC_BASE_URL ?? 'https://hub.spartanscricketclub.in'}/fixtures/${booking.id}`,
     ``,

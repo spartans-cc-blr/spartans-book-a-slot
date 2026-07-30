@@ -49,9 +49,6 @@ export default async function CaptainsCornerPage() {
   if (!session) redirect('/login')
   if (!user?.isCaptain && !user?.isAdmin) redirect('/fixtures')
 
-  const captainName     = user?.name ?? null
-  const captainWhatsapp = user?.whatsapp ?? null
-
   const supabase = createServiceClient()
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
@@ -75,7 +72,7 @@ export default async function CaptainsCornerPage() {
   // ── Fetch all non expelled players ───────────────────────────────
   const { data: players } = await supabase
     .from('players')
-    .select('id, name, jersey_name, jersey_number, wallet_balance, dues_override, primary_skill, is_captain, priority_pick, cricheroes_url, status, fee_exemptions(start_date, end_date)')
+    .select('id, name, whatsapp, jersey_name, jersey_number, wallet_balance, dues_override, primary_skill, is_captain, priority_pick, cricheroes_url, status, fee_exemptions(start_date, end_date)')
     .neq('status', 'expelled')
     .order('name', { ascending: true })
 
@@ -263,11 +260,7 @@ export default async function CaptainsCornerPage() {
               <CaptainsCornerGrid
                 key={wk}
                 weekLabel={weekend.label}
-                bookings={(weekend.bookings ?? []).map(b => ({
-                  ...b,
-                  captain_name:     captainName,
-                  captain_whatsapp: captainWhatsapp,
-                })) as any}
+                bookings={(weekend.bookings ?? []) as any}
                 players={playersWithExempt as any}
                 availMap={availMap}
                 initialSquadMap={initialSquadMap}
