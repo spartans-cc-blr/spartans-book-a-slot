@@ -995,6 +995,7 @@ tie-inclusive `computeTopPerformers()` path.
 | Item | Notes |
 |---|---|
 | Share list surfaced every tied top scorer/bowler instead of one MVP | ✅ Fixed 28 Jul 2026 — see "Share target — narrowed to a single match MVP" above. `computeMatchMVP()` added to `matchTopPerformers.ts`; `top_performers` in `/api/matches/history` now built from it instead of the tie-inclusive `computeTopPerformers()`. `can_verify`/`canActOnScorecard()` deliberately left unchanged. |
+| `computeMatchMVP()` picked the wrong player when the true MVP's scorecard name didn't byte-match their squad name | ✅ Fixed 31 Jul 2026 — see the incident write-up below. Resolution order flipped: max-then-resolve, not resolve-then-max. |
 | No other known gaps | Fresh as of this pass — worth a follow-up note here once a real top performer has actually verified or flagged a scorecard through this path. |
 
 > **Incident (28 Jul 2026) — stale `match_stats_cache` silently hid the
@@ -1026,6 +1027,41 @@ tie-inclusive `computeTopPerformers()` path.
 > `.neq('status', 'fees_applied')`, so a re-sync can never regress the
 > forward-only status machine back to `synced` and make a fees-applied
 > booking look eligible for another fee debit.
+
+> **Incident (31 Jul 2026) — `computeMatchMVP()` surfaced the wrong player
+> as match MVP on a real match, not just an empty share list.** A club
+> coordinator asked why Tejas Lengade (MVP score 2.3) was shown as the top
+> performer for the 12 Apr Blendin practice game (booking `13b951c8`) when
+> Keshav Renganathan (33 runs + 2 wickets, true MVP 6.74) and Aarit
+> Srivatsava (45 runs, MVP 4.5) clearly outscored him. Root cause: the
+> first cut of `computeMatchMVP()` (see the 28 Jul entry above and the
+> function's own header comment) resolved each scorecard name to a Hub
+> `player_id` **before** taking the max, dropping any candidate that
+> couldn't resolve. Keshav's and Aarit's CricHeroes scorecard names
+> ("Keshav", "Aarit S") don't byte-match their full Hub squad names
+> ("Keshav Renganathan", "Aarit Srivatsava") — a case
+> `player-identity-resolution.md`'s alias table already had covered
+> correctly, but this booking's `match_stats_cache` predated that
+> reconciliation and was still carrying `player_id: null` for every row
+> (the exact same stale-cache class as the 28 Jul incident above, just
+> with a worse symptom this time: instead of an empty share list, the
+> function silently substituted a lesser, resolvable candidate — Tejas,
+> whose scorecard name happens to equal his squad name exactly — and
+> reported him as "the MVP" with full confidence). Confirmed via direct
+> query: `batting_stats`/`bowling_stats`/`fielding_stats` in the analytics
+> DB already had correct `player_id`s reconciled for every name in this
+> match; only the Hub-side `match_stats_cache` copy was stale. Fixed two
+> ways: (1) `computeMatchMVP()` now mirrors `computeTopPerformers()`'s
+> order of operations — sum and max across *all* scorecard names first,
+> resolve `player_id` only on the winner(s) afterward, so an unresolvable
+> winner now correctly yields no share target instead of a wrong one; see
+> the updated header comment on `computeMatchMVP()` for the full
+> before/after; (2) this one booking's `match_stats_cache` was manually
+> re-synced from the analytics DB so it now carries the correct
+> `player_id`s — confirmed Keshav now resolves correctly as MVP 6.74.
+> Take-away, same as 28 Jul's: a name being present in
+> `player_name_aliases` doesn't mean every match that name appears in has
+> picked it up yet — only a sync after the alias existed does that.
 
 ---
 
