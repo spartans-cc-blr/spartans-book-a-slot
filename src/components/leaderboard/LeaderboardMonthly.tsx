@@ -28,6 +28,7 @@
 import { useRouter } from 'next/navigation'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { bestBy, MIN_BALLS_FOR_ECONOMY } from './LeaderboardMilestones'
+import { PlayerAvatar } from './PlayerAvatar'
 import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
 interface Milestone {
@@ -70,11 +71,7 @@ function RowIdentity({ photoUrl, playerId, playerName, cricheroesUrl, format, to
 }) {
   return (
     <>
-      <img
-        src={photoUrl ?? '/default-avatar.png'}
-        alt={playerName}
-        className="w-8 h-8 rounded-full object-cover border border-gold-dim flex-shrink-0"
-      />
+      <PlayerAvatar photoUrl={photoUrl} name={playerName} />
       <div className="min-w-0 flex-1">
         <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
           <PlayerNameLink name={playerName} playerId={playerId} cricHeroesUrl={cricheroesUrl} />
@@ -158,7 +155,7 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
     { label: 'Top Wicket Taker', icon: '🎯', row: topWickets,  valueText: topWickets ? `${topWickets.stats.wickets} wkts` : '' },
     { label: 'Best Average',   icon: '📊', row: bestAverage, valueText: bestAverage ? `Avg ${bestAverage.stats.battingAverage!.toFixed(2)}` : '' },
     { label: 'Highest S/R',    icon: '⚡', row: bestSR,       valueText: bestSR ? `SR ${bestSR.stats.strikeRate!.toFixed(2)}` : '' },
-    { label: 'Best Economy',   icon: '🔒', row: bestEconomy, valueText: bestEconomy ? `Econ ${bestEconomy.stats.economy!.toFixed(2)}` : '' },
+    { label: 'Best Economy',   icon: '🛡️', row: bestEconomy, valueText: bestEconomy ? `Econ ${bestEconomy.stats.economy!.toFixed(2)}` : '' },
   ].filter(m => m.row)
 
   const noInnings = centuries.length === 0 && halfCenturies.length === 0 && fiveWicketHauls.length === 0 && threeWicketHauls.length === 0
@@ -190,11 +187,7 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
               </div>
 
               <div className="flex items-center gap-2">
-                <img
-                  src={m.row!.photoUrl ?? '/default-avatar.png'}
-                  alt={m.row!.playerName}
-                  className="w-8 h-8 rounded-full object-cover border border-gold-dim flex-shrink-0"
-                />
+                <PlayerAvatar photoUrl={m.row!.photoUrl} name={m.row!.playerName} />
                 <div className="min-w-0">
                   <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
                     <PlayerNameLink name={m.row!.playerName} playerId={m.row!.playerId} cricHeroesUrl={m.row!.cricheroesUrl} />

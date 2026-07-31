@@ -1,8 +1,8 @@
 'use client'
 // Filter bar for /leaderboard. Grouped nav tree, two branches:
 //
-//   🏆 Honor Board  — Overall (career milestones, unchanged) · Monthly (new)
-//   📋 Detailed     — MVP / Bat / Bowl / Field (the sortable tables)
+//   Honor Board — Overall (career milestones, unchanged) · Monthly (new)
+//   Detailed    — MVP / Bat / Bowl / Field (the sortable tables)
 //
 //   Row 1 — Honor Board / Detailed, then Year (only rendered for Detailed
 //           or Honor Board → Overall — Monthly has its own month stepper
@@ -186,8 +186,8 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
     <div className="flex flex-col gap-2 mb-5">
       {/* Row 1 — Honor Board, Detailed, then Year (Detailed / Overall only) */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => selectTopGroup('honor')} className={pillClass(topGroup === 'honor')}>🏆 Honor Board</button>
-        <button onClick={() => selectTopGroup('detailed')} className={pillClass(topGroup === 'detailed')}>📋 Detailed</button>
+        <button onClick={() => selectTopGroup('honor')} className={pillClass(topGroup === 'honor')}>Honor Board</button>
+        <button onClick={() => selectTopGroup('detailed')} className={pillClass(topGroup === 'detailed')}>Detailed</button>
         {showYear && (
           <select
             value={String(year)}
@@ -204,7 +204,7 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <button onClick={() => selectHonorSub('overall')} className={pillClass(category === 'overall')}>Overall</button>
-            <button onClick={() => selectHonorSub('monthly')} className={pillClass(category === 'monthly')}>📅 Monthly</button>
+            <button onClick={() => selectHonorSub('monthly')} className={pillClass(category === 'monthly')}>Monthly</button>
           </div>
           {formatCheckboxes}
         </div>
