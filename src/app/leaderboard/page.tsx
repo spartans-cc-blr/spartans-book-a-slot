@@ -7,6 +7,8 @@ import { LeaderboardFilters, type LeaderboardCategory, type Format } from '@/com
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
+import { LeaderboardGlossary } from '@/components/leaderboard/LeaderboardGlossary'
+import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Yours Statistically — Spartans CC' }
@@ -69,6 +71,8 @@ export default async function LeaderboardPage({
   // with no matching option or silently querying an inconsistent combo.
   const tournamentId = tournamentParam === 'all' || tournaments.some(t => t.id === tournamentParam) ? tournamentParam : 'all'
   const groundId = groundParam === 'all' || grounds.some(g => g.id === groundParam) ? groundParam : 'all'
+  const tournamentName = tournamentId === 'all' ? null : (tournaments.find(t => t.id === tournamentId)?.name ?? null)
+  const groundName = groundId === 'all' ? null : (grounds.find(g => g.id === groundId)?.name ?? null)
 
   // Monthly is scoped by month alone (no tournament/ground — see
   // LeaderboardFilters' Honor Board treatment); every other view keeps the
@@ -83,6 +87,13 @@ export default async function LeaderboardPage({
       })
 
   const monthlyPerformances = category === 'monthly' ? await getMonthlyPerformances(month) : null
+
+  const glossaryTitle = category === 'overall' ? 'Overall'
+    : category === 'monthly' ? 'Monthly'
+    : detailedGlossaryTitle(category)
+  const glossaryEntries = category === 'overall' ? buildOverallGlossary(year, tournamentName, groundName)
+    : category === 'monthly' ? buildMonthlyGlossary(monthLabel(month))
+    : buildDetailedGlossary(category)
 
   return (
     <div className="min-h-screen bg-ink grain">
@@ -113,7 +124,7 @@ export default async function LeaderboardPage({
         />
 
         {category === 'overall' ? (
-          <LeaderboardMilestones rows={rows} year={year} />
+          <LeaderboardMilestones rows={rows} year={year} scoped={!!(tournamentName || groundName)} />
         ) : category === 'monthly' ? (
           <LeaderboardMonthly
             rows={rows}
@@ -130,6 +141,8 @@ export default async function LeaderboardPage({
         <p className="font-rajdhani text-xs text-zinc-500 text-center mt-8 px-4">
           Stats are synced from CricHeroes, a third-party platform, on a best-effort basis. Small discrepancies may appear from time to time — we're actively working to catch these up.
         </p>
+
+        <LeaderboardGlossary title={glossaryTitle} entries={glossaryEntries} />
       </div>
 
       <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">

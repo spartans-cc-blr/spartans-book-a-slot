@@ -139,12 +139,15 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
     navigate({ format: next.size === 1 ? Array.from(next)[0] : '' })
   }
 
-  // Honor Board is a career-wide (Overall) or month-scoped (Monthly) view,
-  // not meaningfully tied to a single tournament or ground — force both
-  // back to "all" whenever either sub-tab is selected, same reasoning the
-  // old Milestones tab already used.
+  // Monthly is a strictly month-scoped view — its own stepper is the
+  // timeframe control, so tournament/ground get forced back to "all" (and
+  // hidden entirely, see Row 3 below) whenever it's selected. Overall does
+  // allow tournament/ground scoping (with a loosened qualification bar —
+  // see minGamesThreshold() in LeaderboardMilestones.tsx), so switching to
+  // it deliberately does NOT reset them — whatever was selected on
+  // Detailed carries over.
   function selectHonorSub(sub: HonorCategory) {
-    navigate({ category: sub, tournament: 'all', ground: 'all' })
+    navigate(sub === 'monthly' ? { category: sub, tournament: 'all', ground: 'all' } : { category: sub })
   }
   function selectDetailedSub(sub: TableCategory) {
     navigate({ category: sub })
@@ -219,12 +222,12 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
         </div>
       )}
 
-      {/* Row 3 — Tournament, Ground. Hidden (not just disabled) for the
-          whole Honor Board branch — neither Overall nor Monthly is ever
-          scoped by tournament/ground, so a greyed-out, permanently
-          unusable control was just clutter, not a helpful "here's what
-          you could filter by" hint. */}
-      {topGroup === 'detailed' && (
+      {/* Row 3 — Tournament, Ground. Hidden (not just disabled, which was
+          just clutter) for Monthly only — it's strictly month-scoped.
+          Shown for Detailed (unchanged) and now for Overall too — see
+          selectHonorSub() above and the loosened qualification bar in
+          LeaderboardMilestones.tsx. */}
+      {!isMonthly && (
         <div className="grid grid-cols-2 gap-2">
           <select
             value={tournamentId}

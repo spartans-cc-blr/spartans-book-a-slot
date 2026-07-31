@@ -23,7 +23,17 @@ export const MIN_BALLS_FOR_ECONOMY = 30 // 5 overs — also used by LeaderboardM
 // 3 from Apr, 6 from Jul, 9 from Oct) so early-season small samples don't
 // dominate a card, without needing a fixed flat minimum. A past, fully
 // completed season (or "All time") qualifies at the full-year bar (12).
-function minGamesThreshold(year: number | 'all'): number {
+//
+// That ratchet assumes club-wide pace (every game the club plays, not one
+// tournament's worth) — scoped to a single tournament or ground, most
+// players would never clear it, since a tournament might only run 6-10
+// games all season. `scoped` (true once a Tournament/Ground filter is
+// applied) drops the bar to the same "played at least once" floor the
+// Monthly view already uses, rather than showing empty cards for most
+// tournaments. Exported so src/lib/leaderboardGlossary.ts can quote the
+// exact number actually in effect.
+export function minGamesThreshold(year: number | 'all', scoped: boolean): number {
+  if (scoped) return 1
   const now = new Date()
   const currentYear = now.getFullYear()
   if (year === 'all' || year < currentYear) return 12
@@ -57,14 +67,14 @@ export function bestBy(rows: LeaderboardRow[], value: (r: LeaderboardRow) => num
   return best
 }
 
-export function LeaderboardMilestones({ rows, year }: { rows: LeaderboardRow[]; year: number | 'all' }) {
+export function LeaderboardMilestones({ rows, year, scoped }: { rows: LeaderboardRow[]; year: number | 'all'; scoped: boolean }) {
   if (rows.length === 0) {
     return (
       <p className="font-rajdhani text-sm text-zinc-500 py-8 text-center">No stats for this filter yet.</p>
     )
   }
 
-  const minGames = minGamesThreshold(year)
+  const minGames = minGamesThreshold(year, scoped)
   const qualifiesOnGames = (r: LeaderboardRow) => r.stats.matches >= minGames
 
   const topMVP     = bestBy(rows, r => r.stats.mvpPoints, qualifiesOnGames)
