@@ -297,9 +297,11 @@ async function fetchAnalyticsRows(opts: {
 // directly since it needs year, ground, AND format filters combined.
 export async function getPlayerStats(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean } = {}
 ): Promise<PlayerStatsTotals> {
-  const scoped = await getScopedMatchIds(filters)
+  let scoped = await getScopedMatchIds(filters)
+  if (scoped && scoped.length === 0) return emptyTotals()
+  scoped = await applyCaptainFilter(playerId, scoped, filters.asCaptain)
   if (scoped && scoped.length === 0) return emptyTotals()
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
   const matchIds = new Set<string>(team.map((r: any) => r.match_id).filter(Boolean))
@@ -322,9 +324,11 @@ export async function getPlayerSeasonStats(playerId: string, year: number): Prom
 // this file rather than showing a misleading 0.
 export async function getPlayerMatchHistory(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean } = {}
 ): Promise<PlayerMatchHistoryRow[]> {
-  const scoped = await getScopedMatchIds(filters)
+  let scoped = await getScopedMatchIds(filters)
+  if (scoped && scoped.length === 0) return []
+  scoped = await applyCaptainFilter(playerId, scoped, filters.asCaptain)
   if (scoped && scoped.length === 0) return []
 
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
@@ -686,6 +690,38 @@ async function matchIdsForFilter(filter: {
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return Array.from(new Set<string>((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+}
+
+// match_id values for every confirmed booking where this player was the
+// match-specific captain (squad.is_captain — see features/squad-selection.md;
+// this is NOT players.is_captain, the permanent club-captain flag). Used by
+// the "As Captain" filter on /players/[id]/stats, intersected with whatever
+// year/ground/format scope is already active rather than replacing it.
+async function getCaptainMatchIds(playerId: string): Promise<string[]> {
+  const hub = createServiceClient()
+  const { data: squadRows, error: squadErr } = await hub
+    .from('squad').select('booking_id').eq('player_id', playerId).eq('is_captain', true)
+  if (squadErr) throw new Error(squadErr.message)
+  const bookingIds = Array.from(new Set<string>((squadRows ?? []).map((r: any) => r.booking_id).filter(Boolean)))
+  if (bookingIds.length === 0) return []
+
+  const { data: bookings, error: bookErr } = await hub
+    .from('bookings').select('match_id').in('id', bookingIds).eq('status', 'confirmed').not('match_id', 'is', null)
+  if (bookErr) throw new Error(bookErr.message)
+  return Array.from(new Set<string>((bookings ?? []).map((b: any) => b.match_id).filter(Boolean)))
+}
+
+// Intersects the already-scoped match_id list (or, if unscoped, the full
+// captain list) with this player's captain match_ids. Returns null only when
+// asCaptain isn't set at all — same "no restriction" contract as
+// getScopedMatchIds — otherwise always a concrete (possibly empty) array.
+async function applyCaptainFilter(playerId: string, scoped: string[] | null, asCaptain?: boolean): Promise<string[] | null> {
+  if (!asCaptain) return scoped
+  const captainMatchIds = await getCaptainMatchIds(playerId)
+  if (captainMatchIds.length === 0) return []
+  if (!scoped) return captainMatchIds
+  const captainSet = new Set(captainMatchIds)
+  return scoped.filter(id => captainSet.has(id))
 }
 
 async function scopedPlayerStats(playerId: string, matchIds: string[]): Promise<PlayerStatsTotals | null> {

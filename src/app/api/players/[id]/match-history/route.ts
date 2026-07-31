@@ -29,6 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const yearParam = searchParams.get('year')
   const groundId = searchParams.get('ground') || undefined
   const formatParam = searchParams.get('format') || undefined
+  const asCaptain = searchParams.get('captain') === '1'
   const year = yearParam ? Number(yearParam) : undefined
   const filters = {
     year: Number.isFinite(year) && year ? year : undefined,
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // Only a single-format restriction is ever sent (mirrors /leaderboard's
     // convention — absent/both-checked means "no restriction").
     formats: formatParam ? [formatParam] : undefined,
+    asCaptain,
   }
 
   const supabase = createServiceClient()
