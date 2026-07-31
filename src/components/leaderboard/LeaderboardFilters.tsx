@@ -105,7 +105,10 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
   const isMonthly = category === 'monthly'
   // Year shows for Detailed and for Honor Board → Overall — both are
   // genuinely year-scoped views. Monthly has its own, more specific
-  // timeframe control (the stepper below) instead.
+  // timeframe control (the stepper below) instead. Once a Tournament is
+  // picked it's disabled (not hidden — the layout stays put) rather than
+  // combined with Year, since narrowing an already-specific tournament
+  // down to one year on top would usually just produce an empty result.
   const showYear = topGroup === 'detailed' || category === 'overall'
 
   function navigate(next: Partial<{ year: string; month: string; tournament: string; ground: string; category: string; format: string }>) {
@@ -195,7 +198,9 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
           <select
             value={String(year)}
             onChange={e => navigate({ year: e.target.value })}
-            className="form-input w-auto font-rajdhani text-xs py-1.5 flex-shrink-0">
+            disabled={tournamentId !== 'all'}
+            title={tournamentId !== 'all' ? 'A tournament is already selected — every one of its games is shown, regardless of year' : undefined}
+            className="form-input w-auto font-rajdhani text-xs py-1.5 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
             <option value="all">All time</option>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
@@ -231,7 +236,7 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
         <div className="grid grid-cols-2 gap-2">
           <select
             value={tournamentId}
-            onChange={e => navigate({ tournament: e.target.value })}
+            onChange={e => navigate({ tournament: e.target.value, ...(e.target.value !== 'all' ? { year: 'all' } : {}) })}
             className={`form-input font-rajdhani text-xs py-1.5 ${SELECT_TRUNCATE}`}>
             <option value="all">All tournaments</option>
             {tournaments.map(t => <option key={t.id} value={t.id} title={t.name}>{t.name}</option>)}
