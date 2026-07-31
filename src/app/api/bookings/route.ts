@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { validateBooking } from '@/lib/validation'
-import { GAME_DATE_REGEX } from '@/lib/schemas'
+import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
 import type { CreateBookingRequest } from '@/types'
 
 
@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   // vibe-security: strip captain_id if client sends it — captain is always derived from tournament
-  const { captain_id: _dropped, ...safeBody } = body
+  // vibe-security: overrides is parsed separately below (Zod-validated) — never spread into the insert
+  const { captain_id: _dropped, overrides: rawOverrides, ...safeBody } = body
   const {
     game_date, slot_time, format, tournament_id,
     venue, notes, opponent_name, match_id, cricheroes_url,
@@ -65,6 +66,13 @@ export async function POST(req: NextRequest) {
   if (!GAME_DATE_REGEX.test(game_date)) {
     return NextResponse.json({ error: 'game_date must be in YYYY-MM-DD format' }, { status: 400 })
   }
+
+  const overridesParsed = bookingRuleOverridesSchema.safeParse(rawOverrides)
+  if (!overridesParsed.success) {
+    return NextResponse.json({ error: overridesParsed.error.issues[0]?.message ?? 'Invalid overrides' }, { status: 400 })
+  }
+  const overrides = overridesParsed.data ?? []
+  const overriddenRules = new Set(overrides.map(o => o.rule))
 
   const supabase = createServiceClient()
 
@@ -94,7 +102,8 @@ export async function POST(req: NextRequest) {
     existing,
     (tournament.captains as any)?.name ?? 'This captain',
     tournament.name,
-    tournament.captain_id ?? null
+    tournament.captain_id ?? null,
+    overriddenRules
   )
 
   if (!result.valid) {
@@ -125,6 +134,35 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Log every rule the admin actually overrode (only ones that genuinely
+  // fired — see validateBooking's `overridden` list, not just whatever the
+  // client sent) as an immutable audit row. A booking created by bypassing
+  // a rule must never exist without its reason logged, so a failure here
+  // rolls the booking back rather than silently dropping the audit trail.
+  if (result.overridden && result.overridden.length > 0) {
+    const reasonByRule = new Map(overrides.map(o => [o.rule, o.reason]))
+    const overrideRows = result.overridden.map(e => ({
+      booking_id:          data.id,
+      rule:                e.rule,
+      rule_message:        e.message,
+      reason:              reasonByRule.get(e.rule) ?? '',
+      overridden_by:       user.playerId ?? null,
+      overridden_by_email: user.email ?? 'unknown',
+    }))
+
+    const { error: overrideError } = await supabase
+      .from('booking_rule_overrides')
+      .insert(overrideRows)
+
+    if (overrideError) {
+      await supabase.from('bookings').delete().eq('id', data.id)
+      return NextResponse.json(
+        { error: `Booking not created — could not log rule override (${overrideError.message}). Please retry.` },
+        { status: 500 }
+      )
+    }
+  }
 
   return NextResponse.json({ booking: data }, { status: 201 })
 }

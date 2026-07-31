@@ -157,7 +157,7 @@ Access here is genuinely mixed per-route rather than one role — see
  
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/bookings` | GET, POST, PATCH, DELETE | Admin | Booking CRUD | PATCH clears availability rows when game_date or slot_time changes
+| `/api/bookings` | GET, POST, PATCH, DELETE | Admin | Booking CRUD | PATCH clears availability rows when game_date or slot_time changes; POST/PATCH both accept an optional `overrides: {rule, reason}[]` for admin-only R1-R6 bypass — see §7.1
 | `/api/bookings/reserve` | POST | Admin | Create soft_block reservation |
 | `/api/validate` | POST | Admin | Live rule validation during booking form entry; accepts optional exclude_id to exclude current booking from R4 self-conflict on edit
 | `/api/captains` | GET, POST, PATCH | Admin | Captain master data |
@@ -290,6 +290,10 @@ Full member directory.
 `id, booking_id FK, action ('flagged'|'resolved'), note, actor_id FK (nullable — null = system, e.g. an auto-resolve on re-sync), created_at`
 Immutable audit trail for the verify/reconciliation flow above, same insert-only pattern as `availability_audit`. **RLS enabled, no anon/authenticated policies.** Migration `051_scorecard_verification_reconciliation.sql`.
  
+#### `booking_rule_overrides`
+`id, booking_id FK, rule ('R1'..'R6'), rule_message, reason, overridden_by FK (nullable), overridden_by_email, created_at`
+Immutable audit trail for admin-only R1–R6 overrides — see §7.1. One row per overridden rule per booking. **RLS enabled, no anon/authenticated policies.** Migration `052_booking_rule_overrides.sql`.
+ 
 #### `match_stats_cache`
 `match_id PK, booking_id FK, match_result, team_total/wickets/overs, opponent_total/wickets/overs, opponent_name, ground, tournament_name, match_date, batting/bowling/fielding/team_list (jsonb arrays), synced_at, synced_by FK`
 Read-through cache of the separate analytics Supabase project — source of truth stays there. **RLS enabled, no anon/authenticated policies** (same fix as above). See `features/post-match-scorecard.md`.
@@ -327,6 +331,52 @@ All rules live in `src/lib/validation.ts`. Called from both the API (on save) an
 |---|---|
 | T30 | 07:30, 12:30 |
 | T20 | 07:30, 10:30, 14:30 |
+
+### 7.1 Admin-only rule overrides (added July 2026)
+
+Since admin is the only role that ever books a game, any of R1/R3/R4/R5/R6
+(the hard-error rules — R2 was already a non-blocking warning) can be
+overridden on a per-rule basis from `/admin/bookings/new` and
+`/admin/bookings/[id]`, each override requiring its own reason that's
+logged permanently. This exists for cases like a certain-to-happen
+knockout/semifinal needing to go live on the Hub (so players can mark
+availability) while a clashing game is still pending cancellation with its
+organiser — not a general-purpose bypass.
+
+- **UI** — `src/components/admin/RuleCheckStrip.tsx`, a shared horizontal
+  R1-R6 chip row placed directly above the Confirm/Save button on both
+  pages (moved off the old vertical sidebar/mid-form panel so pass/fail is
+  visible right where the admin commits). A failing rule's chip gets an
+  "Override" toggle; toggling it opens a required reason textarea (min 3
+  characters). `ruleChecksAllPassed()` in the same file is the shared gate
+  used for the Confirm/Save button's `disabled` state — a rule counts as
+  clear once it's `pass`/`warn`, or `fail` with a reason typed.
+- **`POST /api/bookings`** (create) — accepts `overrides: {rule, reason}[]`
+  (Zod-validated, `bookingRuleOverridesSchema` in `src/lib/schemas.ts`).
+  `validateBooking()` takes a 6th `overriddenRules: Set<string>` param and
+  splits its raw error list into still-`blocking` errors (only these fail
+  `result.valid`) vs `overridden` ones — only rules that *actually* fired
+  get logged, regardless of what the client sent. On successful insert, one
+  `booking_rule_overrides` row is written per overridden rule; if that
+  insert fails, the just-created booking is deleted and the request 500s —
+  a booking created by bypassing a rule must never exist without its
+  reason logged.
+- **`PATCH /api/bookings/[id]`** (edit) — this route has never re-run
+  `validateBooking()` server-side (edits aren't rule-checked the way
+  creates are — a pre-existing gap, not changed here). Its `overrides`
+  field is therefore a best-effort *acknowledgement* log only: the client
+  freezes the rule message it displayed (since the server doesn't
+  recompute one here) and a log-write failure doesn't block the save,
+  since nothing was actually blocked to begin with. The Confirm button
+  (reservation → confirmed) was also changed to gate on `!allPassed`,
+  which it didn't before — previously it ignored rule state entirely.
+- **`booking_rule_overrides`** — `supabase/migrations/052_booking_rule_overrides.sql`.
+  One row per overridden rule per booking: `rule`, `rule_message` (frozen
+  at override time), `reason`, `overridden_by` (nullable FK to `players`,
+  since `isAdmin` doesn't require a `players` row — see §9), and
+  `overridden_by_email` (always present, durable identity either way).
+  RLS enabled, no anon/authenticated policies — service role only, same
+  blanket-deny pattern as every other table in this app.
  
 ---
  
@@ -496,6 +546,7 @@ Next.js API Routes (server-side)
 | `scorecard_uploads` | ❌ Locked | ❌ Locked | Service role only *(RLS enabled 2026-07-15 — was previously disabled, see `features/post-match-scorecard.md` §5)* |
 | `scorecard_reconciliation_log` | ❌ Locked | ❌ Locked | Service role only |
 | `match_stats_cache` | ❌ Locked | ❌ Locked | Service role only *(same fix, same date)* |
+| `booking_rule_overrides` | ❌ Locked | ❌ Locked | Service role only — see §7.1 |
 | `family_sessions` *(planned)* | ❌ Locked | ❌ Locked | Service role only |
  
 ### Security Checklist Status (vibe-security audit)
@@ -546,7 +597,8 @@ Next.js API Routes (server-side)
 | `src/lib/auth.ts` | NextAuth config; JWT callback enriches token with player context; email lowercased; Google photo seeded on first sign-in; `session.maxAge` + `jwt.maxAge` aligned to 30 days |
 | `src/lib/rateLimit.ts` | Upstash Redis sliding-window rate limiter; `RATE_LIMITS` presets: `playerWrite` (20/min), `captainWrite` (30/min), `adminWrite` (60/min), `publicRead` (100/min) |
 | `src/lib/supabase.ts` | Three client factories: browser (anon), server (anon), service (bypasses RLS) |
-| `src/lib/validation.ts` | Booking rules engine R1–R6; used by both API and client |
+| `src/lib/validation.ts` | Booking rules engine R1–R6; used by both API and client; `validateBooking()`'s optional `overriddenRules` param splits errors into still-blocking vs admin-overridden — see §7.1 |
+| `src/components/admin/RuleCheckStrip.tsx` | Shared horizontal R1-R6 rule-check row + admin override UI, used by both `/admin/bookings/new` and `/admin/bookings/[id]`; `ruleChecksAllPassed()` is the shared Confirm/Save button gate — see §7.1 |
 | `src/middleware.ts` | Route protection; redirects unauthenticated/unauthorised requests |
 | `src/app/fixtures/page.tsx` | Main fixtures server component; fetches bookings, availability, squad; includes `cricheroes_points_table_url` in tournament select |
 | `src/app/captains-corner/page.tsx` | Captain-only server page; feeds `CaptainsCornerGrid` |

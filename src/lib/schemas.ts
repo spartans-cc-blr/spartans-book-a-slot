@@ -209,3 +209,23 @@ export const flagReconciliationSchema = z.object({
 export const resolveReconciliationSchema = z.object({
   note: z.string().max(500, 'Note max 500 characters').trim().optional(),
 })
+
+// ── BOOKING RULE OVERRIDES (admin-only) ─────────────────────────────────────
+// POST /api/bookings, PATCH /api/bookings/[id] — see booking_rule_overrides
+// and .claude/rules/architecture.md §7 (R1-R6 rules engine)
+
+export const bookingRuleOverrideSchema = z.object({
+  rule: z.enum(['R1', 'R2', 'R3', 'R4', 'R5', 'R6']),
+  reason: z
+    .string()
+    .min(3, 'Override reason must be at least 3 characters')
+    .max(500, 'Override reason max 500 characters')
+    .trim(),
+  // Only used by PATCH /api/bookings/[id] (which never re-runs
+  // validateBooking server-side) to log the exact rule message the admin
+  // saw client-side at the time they overrode it. POST /api/bookings
+  // ignores this field entirely and freezes the message it computed itself.
+  message: z.string().max(500).trim().optional(),
+})
+
+export const bookingRuleOverridesSchema = z.array(bookingRuleOverrideSchema).max(6).optional()

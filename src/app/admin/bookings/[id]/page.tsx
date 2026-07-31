@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import type { Booking, GameFormat, SlotTime } from '@/types'
+import type { Booking, GameFormat, SlotTime, RuleCheckItem } from '@/types'
 import { SLOT_TIMES, SLOT_FORMATS } from '@/types'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
+import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 
 type ScorecardUploadStatus = 'pending_parse' | 'parsed' | 'synced' | 'fees_applied'
 
@@ -80,12 +81,12 @@ export default function BookingDetailPage() {
   const [saving,       setSaving]       = useState(false)
   const [saveError,    setSaveError]    = useState('')
   const [saveSuccess,  setSaveSuccess]  = useState(false)
-  type RuleStatus = 'pending' | 'pass' | 'warn' | 'fail'
-  type RuleCheck  = { rule: string; label: string; status: RuleStatus; message: string }
 
-  const [ruleChecks, setRuleChecks] = useState<RuleCheck[]>(
-    RULES.map(r => ({ ...r, status: 'pending' as RuleStatus, message: 'Waiting for input...' }))
+  const [ruleChecks, setRuleChecks] = useState<RuleCheckItem[]>(
+    RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' }))
   )
+  // Admin-only: rule -> reason. Presence of a key = admin has overridden that rule.
+  const [overrides, setOverrides] = useState<Record<string, string>>({})
 
   // Editable fields
   const [tournamentId,  setTournamentId]  = useState('')
@@ -329,16 +330,34 @@ export default function BookingDetailPage() {
     const result = await res.json()
     const errorMap   = Object.fromEntries(result.errors?.map((e: any) => [e.rule, e.message]) ?? [])
     const warningMap = Object.fromEntries(result.warnings?.map((e: any) => [e.rule, e.message]) ?? [])
-    setRuleChecks(RULES.map(r => ({
+    const next: RuleCheckItem[] = RULES.map(r => ({
       ...r,
-      status:  errorMap[r.rule] ? 'fail' : warningMap[r.rule] ? 'warn' : 'pass',
+      status:  (errorMap[r.rule] ? 'fail' : warningMap[r.rule] ? 'warn' : 'pass') as RuleCheckItem['status'],
       message: errorMap[r.rule] ?? warningMap[r.rule] ?? '✓ Passed',
-    })))
+    }))
+    setRuleChecks(next)
+    // Drop any override reason for a rule that's no longer actually failing.
+    const stillFailing = new Set(next.filter(r => r.status === 'fail').map(r => r.rule))
+    setOverrides(prev => Object.fromEntries(Object.entries(prev).filter(([rule]) => stillFailing.has(rule))))
   }, [gameDate, format, slotTime, tournamentId, id])
 
   useEffect(() => { validate() }, [validate])
 
-  const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'warn')
+  function handleOverrideToggle(rule: string) {
+    setOverrides(prev => {
+      if (rule in prev) {
+        const { [rule]: _dropped, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [rule]: '' }
+    })
+  }
+
+  function handleOverrideReasonChange(rule: string, reason: string) {
+    setOverrides(prev => ({ ...prev, [rule]: reason }))
+  }
+
+  const allPassed = ruleChecksAllPassed(ruleChecks, overrides)
 
   async function handleSave(extraFields?: Record<string, any>) {
     setSaving(true)
@@ -362,6 +381,11 @@ export default function BookingDetailPage() {
         organiser_name:  organiserName || null,
         organiser_phone: organiserPhone || null,
         match_fee_override: matchFeeOverride ? parseInt(matchFeeOverride) : null,
+        overrides: Object.entries(overrides).map(([rule, reason]) => ({
+          rule,
+          reason,
+          message: ruleChecks.find(r => r.rule === rule)?.message,
+        })),
         ...extraFields,
       }),
     })
@@ -570,23 +594,6 @@ export default function BookingDetailPage() {
             </div>
           </FormCard>
 
-          <div className="bg-ink-3 border border-ink-5 rounded p-4">
-            <p className="font-cinzel text-xs text-gold mb-3">Rule Checks</p>
-            <div className="space-y-1.5">
-              {ruleChecks.map(r => (
-                <div key={r.rule} className="flex items-start gap-2 font-rajdhani text-xs">
-                  <span className={r.status === 'fail' ? 'text-red-400' : r.status === 'warn' ? 'text-yellow-400' : r.status === 'pass' ? 'text-emerald-400' : 'text-zinc-600'}>
-                    {r.status === 'fail' ? '✗' : r.status === 'warn' ? '⚠' : r.status === 'pass' ? '✓' : '·'}
-                  </span>
-                  <span className="text-zinc-500">{r.label}</span>
-                  {(r.status === 'fail' || r.status === 'warn') && (
-                    <span className={r.status === 'fail' ? 'text-red-400' : 'text-yellow-400'}>— {r.message}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Match Details — only visible when a tournament is selected */}
           {tournamentId && (
             <FormCard title="Match Details">
@@ -767,6 +774,10 @@ export default function BookingDetailPage() {
               ✓ Saved successfully.
             </div>
           )}
+
+          {/* Live Rule Check — horizontal, directly above the save/confirm buttons */}
+          <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
+
           <div className="flex gap-3 justify-between">
             <button onClick={handleCancel}
               className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 px-4 py-2.5 rounded transition-colors">
@@ -778,7 +789,7 @@ export default function BookingDetailPage() {
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
               {isReservation && (
-                <button onClick={handleConfirm} disabled={saving || !tournamentId || !format}
+                <button onClick={handleConfirm} disabled={saving || !tournamentId || !format || !allPassed}
                   className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors">
                   {saving ? 'Confirming...' : '✓ Confirm Booking'}
                 </button>

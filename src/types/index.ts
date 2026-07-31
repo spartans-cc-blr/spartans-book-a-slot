@@ -103,6 +103,14 @@ export interface CreateBookingRequest {
   exclude_id?:    string
 }
 
+// Admin-only rule override — one entry per rule the admin is knowingly
+// bypassing, each requiring its own reason. See
+// features (architecture.md §7 rules engine) and booking_rule_overrides.
+export interface RuleOverrideInput {
+  rule:   ValidationError['rule']
+  reason: string
+}
+
 export interface CreateSoftBlockRequest {
   game_date:    string
   slot_time:    SlotTime
@@ -111,9 +119,10 @@ export interface CreateSoftBlockRequest {
 }
 
 export interface ValidationResult {
-  valid:    boolean
-  errors:   ValidationError[]
-  warnings: ValidationError[]
+  valid:      boolean
+  errors:     ValidationError[]
+  warnings:   ValidationError[]
+  overridden?: ValidationError[]   // rules that failed but were admin-overridden — see RuleOverrideInput
 }
 
 export interface ValidationError {
@@ -126,7 +135,7 @@ export interface ValidationError {
 export interface RuleCheckItem {
   rule:    string
   label:   string
-  status:  'pass' | 'fail' | 'pending' | 'warn'
+  status:  'pass' | 'fail' | 'pending' | 'warn' | 'override'
   message: string
 }
 

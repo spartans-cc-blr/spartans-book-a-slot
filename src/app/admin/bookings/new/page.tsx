@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Tournament, SlotTime, GameFormat, ValidationResult, RuleCheckItem } from '@/types'
+import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 
 type Ground = { id: string; name: string; maps_url: string; hospital_url: string }
 type TournamentWithCaptain = Tournament & {
@@ -66,6 +67,8 @@ export default function NewBookingPage() {
   const [ruleChecks,  setRuleChecks]  = useState<RuleCheckItem[]>(
     RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' }))
   )
+  // Admin-only: rule -> reason. Presence of a key = admin has overridden that rule.
+  const [overrides,   setOverrides]   = useState<Record<string, string>>({})
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState('')
 
@@ -85,6 +88,7 @@ export default function NewBookingPage() {
     setNewTournamentBall('red'); setNewTournamentGround('')
     setSubmitError('')
     setRuleChecks(RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' })))
+    setOverrides({})
     setMatchStage('')
   }, [mode])
 
@@ -158,14 +162,33 @@ export default function NewBookingPage() {
     const result: ValidationResult = await res.json()
     const errorMap   = Object.fromEntries(result.errors.map(e => [e.rule, e.message]))
     const warningMap = Object.fromEntries((result.warnings ?? []).map(e => [e.rule, e.message]))
-    setRuleChecks(RULES.map(r => ({
+    const next = RULES.map(r => ({
       ...r,
-      status:  errorMap[r.rule] ? 'fail' : warningMap[r.rule] ? 'warn' : 'pass',
+      status:  (errorMap[r.rule] ? 'fail' : warningMap[r.rule] ? 'warn' : 'pass') as RuleCheckItem['status'],
       message: errorMap[r.rule] ?? warningMap[r.rule] ?? '✓ Passed',
-    })))
+    }))
+    setRuleChecks(next)
+    // Drop any override reason for a rule that's no longer actually failing
+    // (e.g. the admin fixed the date instead) — nothing to bypass anymore.
+    const stillFailing = new Set(next.filter(r => r.status === 'fail').map(r => r.rule))
+    setOverrides(prev => Object.fromEntries(Object.entries(prev).filter(([rule]) => stillFailing.has(rule))))
   }, [mode, gameDate, format, slotTime, tournamentId])
 
   useEffect(() => { validate() }, [validate])
+
+  function handleOverrideToggle(rule: string) {
+    setOverrides(prev => {
+      if (rule in prev) {
+        const { [rule]: _dropped, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [rule]: '' }
+    })
+  }
+
+  function handleOverrideReasonChange(rule: string, reason: string) {
+    setOverrides(prev => ({ ...prev, [rule]: reason }))
+  }
 
   useEffect(() => {
     if (mode === 'confirmed' && slotTime && !matchTimeTouched) {
@@ -173,7 +196,7 @@ export default function NewBookingPage() {
     }
   }, [mode, slotTime, matchTimeTouched])
 
-  const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'warn')
+  const allPassed = ruleChecksAllPassed(ruleChecks, overrides)
   const availableSlots = format ? SLOT_TIMES.filter(t => SLOT_FORMATS[t].includes(format as GameFormat)) : SLOT_TIMES
   const reservationReady = mode === 'reserved' && gameDate && slotTime && organiserName.trim().length > 0
 
@@ -225,6 +248,7 @@ export default function NewBookingPage() {
           match_stage:    matchStage || null,
           cricheroes_url: cricHeroesUrl || null,
           match_time:     matchTime || null,
+          overrides: Object.entries(overrides).map(([rule, reason]) => ({ rule, reason })),
         }),
       })
       if (res.ok) {
@@ -527,6 +551,13 @@ export default function NewBookingPage() {
             </div>
           )}
 
+          {/* Live Rule Check — horizontal, directly above the confirm button */}
+          {mode === 'confirmed' ? (
+            <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
+          ) : (
+            <p className="font-rajdhani text-xs text-zinc-600">Rule checks are skipped for reservations. Only date and slot are required.</p>
+          )}
+
           <div className="flex gap-3 justify-end">
             <button onClick={() => router.push('/admin')}
               className="font-rajdhani text-sm font-bold tracking-wide border border-ink-5 text-zinc-500 hover:text-zinc-300 px-5 py-2.5 rounded transition-colors">
@@ -541,42 +572,10 @@ export default function NewBookingPage() {
           </div>
         </div>
 
-        {/* Right: Rule panel */}
+        {/* Right: Summary panel */}
         <div>
-          <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden sticky top-20">
-            <div className="bg-ink-4 px-4 py-3 border-b border-ink-5">
-              <p className="font-cinzel text-sm text-gold">⚖ Live Rule Check</p>
-            </div>
-            {mode === 'reserved' ? (
-              <div className="px-4 py-4">
-                <p className="font-rajdhani text-xs text-zinc-500">Rule checks are skipped for reservations. Only date and slot are required.</p>
-              </div>
-            ) : (
-              <>
-                {ruleChecks.map(r => (
-                  <div key={r.rule} className="px-4 py-3 border-b border-ink-4 flex gap-3 items-start">
-                    <span className="text-sm mt-0.5 flex-shrink-0">
-                      {r.status === 'pass' ? '✅' : r.status === 'fail' ? '❌' : r.status === 'warn' ? '⚠️' : '⏳'}
-                    </span>
-                    <div>
-                      <p className={`font-rajdhani text-xs font-bold ${r.status === 'pass' ? 'text-emerald-400' : r.status === 'fail' ? 'text-red-400' : r.status === 'warn' ? 'text-yellow-400' : 'text-zinc-600'}`}>
-                        {r.rule}: {r.label}
-                      </p>
-                      <p className="font-rajdhani text-xs text-zinc-600 mt-0.5">{r.message}</p>
-                    </div>
-                  </div>
-                ))}
-                <div className="px-4 py-3 bg-ink-4">
-                  {allPassed
-                    ? <p className="font-rajdhani text-xs text-emerald-400 font-bold">✓ All rules passed. Ready to confirm.</p>
-                    : <p className="font-rajdhani text-xs text-zinc-600">Fix the issues above before confirming.</p>}
-                </div>
-              </>
-            )}
-          </div>
-
           {gameDate && slotTime && (
-            <div className="mt-4 bg-ink-3 border border-ink-5 rounded p-4">
+            <div className="bg-ink-3 border border-ink-5 rounded p-4">
               <p className="font-cinzel text-xs text-gold mb-3">
                 {mode === 'confirmed' ? 'Booking Summary' : 'Reservation Summary'}
               </p>
