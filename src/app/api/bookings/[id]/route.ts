@@ -14,19 +14,36 @@ export async function GET(
 
   const supabase = createServiceClient()
 
-  const { data, error } = await supabase
-    .from('bookings')
-    .select(`
-      *,
-      tournament:tournaments!bookings_tournament_id_fkey(
-        *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
-      )
-    `)
-    .eq('id', params.id)
-    .single()
+  const [{ data, error }, { data: overrideRows }] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select(`
+        *,
+        tournament:tournaments!bookings_tournament_id_fkey(
+          *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
+        )
+      `)
+      .eq('id', params.id)
+      .single(),
+    supabase
+      .from('booking_rule_overrides')
+      .select('rule, reason, created_at')
+      .eq('booking_id', params.id)
+      .order('created_at', { ascending: false }),
+  ])
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ booking: data })
+
+  // Most recent reason per rule — pre-fills the edit page's override box so
+  // an admin reopening an already-overridden booking doesn't have to retype
+  // it. Only matters for rules still actually failing; the page itself
+  // drops any rule that isn't (see ruleChecks pruning in the edit page).
+  const overrides: Record<string, string> = {}
+  for (const row of overrideRows ?? []) {
+    if (!(row.rule in overrides)) overrides[row.rule] = row.reason
+  }
+
+  return NextResponse.json({ booking: data, overrides })
 }
 
 // ── PATCH /api/bookings/[id] ──────────────────────────────────────

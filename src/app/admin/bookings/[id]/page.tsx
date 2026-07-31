@@ -87,6 +87,10 @@ export default function BookingDetailPage() {
   )
   // Admin-only: rule -> reason. Presence of a key = admin has overridden that rule.
   const [overrides, setOverrides] = useState<Record<string, string>>({})
+  // Snapshot of the most recent reason already logged per rule (from
+  // booking_rule_overrides, fetched on load). Used only to avoid re-logging
+  // an identical override on every unrelated "Save Changes" click.
+  const [loggedOverrides, setLoggedOverrides] = useState<Record<string, string>>({})
 
   // Editable fields
   const [tournamentId,  setTournamentId]  = useState('')
@@ -147,6 +151,11 @@ export default function BookingDetailPage() {
         setGameDate(b.game_date ?? '')
         setMatchStage(b.match_stage ?? '')
         setMatchFeeOverride((b as any).match_fee_override != null ? String((b as any).match_fee_override) : '')
+        // Pre-fill any previously-logged override reason (booking_rule_overrides).
+        // The rule-check effect below prunes any entry that isn't actually
+        // failing anymore, so a resolved conflict won't leave a stale reason box.
+        setOverrides(d.overrides ?? {})
+        setLoggedOverrides(d.overrides ?? {})
         setLoading(false)
       })
   }, [id])
@@ -363,6 +372,11 @@ export default function BookingDetailPage() {
     setSaving(true)
     setSaveError('')
     setSaveSuccess(false)
+    // Only log a rule as overridden if it's new or the reason actually
+    // changed since last logged — otherwise every unrelated "Save Changes"
+    // click would re-log an identical row for a rule the admin already
+    // explained on a previous save.
+    const overridesToLog = Object.entries(overrides).filter(([rule, reason]) => loggedOverrides[rule] !== reason)
     const res = await fetch(`/api/bookings/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -381,7 +395,7 @@ export default function BookingDetailPage() {
         organiser_name:  organiserName || null,
         organiser_phone: organiserPhone || null,
         match_fee_override: matchFeeOverride ? parseInt(matchFeeOverride) : null,
-        overrides: Object.entries(overrides).map(([rule, reason]) => ({
+        overrides: overridesToLog.map(([rule, reason]) => ({
           rule,
           reason,
           message: ruleChecks.find(r => r.rule === rule)?.message,
@@ -390,6 +404,9 @@ export default function BookingDetailPage() {
       }),
     })
     if (res.ok) {
+      if (overridesToLog.length > 0) {
+        setLoggedOverrides(prev => ({ ...prev, ...Object.fromEntries(overridesToLog) }))
+      }
       setSaveSuccess(true)
       setTimeout(() => router.push('/admin?saved=1'), 1500)
     } else {

@@ -370,6 +370,16 @@ organiser — not a general-purpose bypass.
   since nothing was actually blocked to begin with. The Confirm button
   (reservation → confirmed) was also changed to gate on `!allPassed`,
   which it didn't before — previously it ignored rule state entirely.
+- **Reopening an already-overridden booking** — `GET /api/bookings/[id]`
+  also returns `overrides: Record<rule, reason>`, the latest logged reason
+  per rule from `booking_rule_overrides`. The edit page seeds both its live
+  `overrides` state and a `loggedOverrides` snapshot from this, so the
+  reason box is pre-filled instead of the admin having to retype it every
+  time they reopen the booking; the existing rule-check effect still prunes
+  any rule that isn't genuinely failing anymore. `handleSave` diffs
+  `overrides` against `loggedOverrides` and only sends rules that are new or
+  whose reason text actually changed — otherwise every unrelated field edit
+  would re-log an identical override row on each save.
 - **`booking_rule_overrides`** — `supabase/migrations/052_booking_rule_overrides.sql`.
   One row per overridden rule per booking: `rule`, `rule_message` (frozen
   at override time), `reason`, `overridden_by` (nullable FK to `players`,
