@@ -159,40 +159,54 @@ export async function resolveMatchTopPerformers(
 // once, correctly, at parse time; duplicating it here would be a second
 // place for it to drift out of sync.
 //
-// Deliberately scoped to THIS booking's own squad — a row that can't be
-// resolved to a Hub player_id (almost always an opponent) is excluded
-// before the max is taken, not just filtered out afterwards. Without this,
-// a genuine match-wide MVP on the opposing side (who has no Hub account to
-// grant access to or message) could silently starve the list down to zero
-// even when one of our own players was the best Spartans performer that
-// day. This differs from computeTopPerformers() above, which computes its
-// max match-wide and only resolves player_id afterwards — that function
-// tolerates an unresolvable top-tied entry because the other ties usually
-// still include an own-team player; a single MVP pick has no such fallback.
+// IMPORTANT — max first, resolve second (fixed 31 Jul 2026): totals are
+// grouped and maxed by the raw scorecard player_name (normalised), exactly
+// like computeTopPerformers() above, and player_id resolution only happens
+// afterward on the winner(s). An earlier version filtered candidates down
+// to "already squad-resolved" BEFORE taking the max — that produced a
+// wrong-but-confident answer on a real match (a Blendin practice game,
+// 12 Apr): the true MVP by total score had scorecard names ("Keshav",
+// "Aarit S") that don't byte-match their full Hub squad names ("Keshav
+// Renganathan", "Aarit Srivatsava") because this booking's
+// match_stats_cache predates their player_identity-resolution.md
+// reconciliation (same stale-cache class as the incident documented in
+// post-match-scorecard.md §15), so pre-filtering silently dropped both of
+// them and picked the highest score among whichever handful of players
+// happened to have an exact squad-name match — a real, verifiably wrong
+// "MVP". Resolving after the max (like computeTopPerformers()) means an
+// unresolvable winner now correctly yields no share target rather than
+// substituting a lesser candidate. Squad-only opponents are handled the
+// same way this already worked for computeTopPerformers(): they simply
+// resolve to player_id: null and produce no grantable/messageable target
+// — never a fabricated winner.
 function pickReason(battingMvp: number, bowlingMvp: number): TopPerformerReason {
   return battingMvp >= bowlingMvp ? 'top_scorer' : 'top_wicket_taker'
 }
 
 export function computeMatchMVP(batting: any[], bowling: any[], fielding: any[], squad: SquadRef[]): TopPerformer[] {
   interface Agg {
-    match:       SquadRef
     name:        string
     total:       number
     battingMvp:  number
     bowlingMvp:  number
     battingLine: string | null
     bowlingLine: string | null
+    bestRow:     any // prefers a row carrying a resolved player_id, for resolveSquadMatch below
   }
 
-  const totals = new Map<string, Agg>() // keyed by player_id — only squad members are ever candidates
+  // Keyed by normalised player_name — the analytics DB's own
+  // UNIQUE(match_id, player_name) constraint on each stat table means this
+  // is exactly the same identity key those tables already use.
+  const totals = new Map<string, Agg>()
 
-  function ensure(row: any, name: string): Agg | null {
-    const match = resolveSquadMatch(row, name, squad)
-    if (!match?.player_id) return null
-    let agg = totals.get(match.player_id)
+  function ensure(name: string, row: any): Agg {
+    const key = name.trim().toLowerCase()
+    let agg = totals.get(key)
     if (!agg) {
-      agg = { match, name: match.player_name || name, total: 0, battingMvp: 0, bowlingMvp: 0, battingLine: null, bowlingLine: null }
-      totals.set(match.player_id, agg)
+      agg = { name, total: 0, battingMvp: 0, bowlingMvp: 0, battingLine: null, bowlingLine: null, bestRow: row }
+      totals.set(key, agg)
+    } else if (!pickField(agg.bestRow, ['player_id']) && pickField(row, ['player_id'])) {
+      agg.bestRow = row
     }
     return agg
   }
@@ -202,8 +216,7 @@ export function computeMatchMVP(batting: any[], bowling: any[], fielding: any[],
   )
   for (const row of battingRows) {
     const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
-    const agg = ensure(row, name)
-    if (!agg) continue
+    const agg = ensure(name, row)
     const mvp = num(row, ['mvp_score'])
     agg.total += mvp
     agg.battingMvp += mvp
@@ -213,8 +226,7 @@ export function computeMatchMVP(batting: any[], bowling: any[], fielding: any[],
   const bowlingRows = (bowling ?? []).filter(row => num(row, ['overs', 'overs_bowled']) > 0)
   for (const row of bowlingRows) {
     const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
-    const agg = ensure(row, name)
-    if (!agg) continue
+    const agg = ensure(name, row)
     const mvp = num(row, ['mvp_score'])
     agg.total += mvp
     agg.bowlingMvp += mvp
@@ -223,8 +235,7 @@ export function computeMatchMVP(batting: any[], bowling: any[], fielding: any[],
 
   for (const row of (fielding ?? [])) {
     const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
-    const agg = ensure(row, name)
-    if (!agg) continue
+    const agg = ensure(name, row)
     agg.total += num(row, ['mvp_score'])
   }
 
@@ -236,13 +247,16 @@ export function computeMatchMVP(batting: any[], bowling: any[], fielding: any[],
   // way computeTopPerformers() handles a tied top score, for consistency.
   return Array.from(totals.values())
     .filter(a => Math.abs(a.total - maxTotal) < 0.005)
-    .map(a => ({
-      player_id: a.match.player_id,
-      name:      a.name,
-      reason:    pickReason(a.battingMvp, a.bowlingMvp),
-      statLine:  [a.battingLine, a.bowlingLine].filter(Boolean).join(' & ') || `MVP score ${maxTotal.toFixed(1)}`,
-      whatsapp:  a.match.whatsapp ?? null,
-    }))
+    .map(a => {
+      const match = resolveSquadMatch(a.bestRow, a.name, squad)
+      return {
+        player_id: match?.player_id ?? null,
+        name:      match?.player_name || a.name,
+        reason:    pickReason(a.battingMvp, a.bowlingMvp),
+        statLine:  [a.battingLine, a.bowlingLine].filter(Boolean).join(' & ') || `MVP score ${maxTotal.toFixed(1)}`,
+        whatsapp:  match?.whatsapp ?? null,
+      }
+    })
 }
 
 // Server-side resolver mirroring resolveMatchTopPerformers() above, for any
