@@ -119,6 +119,8 @@ export default async function LeaderboardPage({
             rows={rows}
             centuries={monthlyPerformances!.centuries}
             halfCenturies={monthlyPerformances!.halfCenturies}
+            fiveWicketHauls={monthlyPerformances!.fiveWicketHauls}
+            threeWicketHauls={monthlyPerformances!.threeWicketHauls}
             monthLabel={monthLabel(month)}
           />
         ) : (

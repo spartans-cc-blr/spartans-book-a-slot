@@ -1,12 +1,22 @@
+'use client'
 // "Monthly" sub-tab under Honor Board on /leaderboard — see
 // src/app/leaderboard/page.tsx. Same six-stat card treatment as
 // LeaderboardMilestones ("Overall"), but scoped to a single month rather
-// than a year, with two differences agreed with the club coordinator:
+// than a year, plus four innings lists below, agreed with the club
+// coordinator:
 //   1. "Leading X" becomes "Top X" — Best Average / Highest S/R / Best
 //      Economy already read fine and are left as-is.
-//   2. Most 100s / Most 50s are not single "who has the most" cards here —
-//      every qualifying century and half-century in the month is listed,
-//      since a month can genuinely have more than one.
+//   2. Every qualifying century/half-century/5-for/3-for in the month is
+//      listed individually rather than a single "who has the most" card —
+//      a month can genuinely have more than one of each.
+//   3. Each row shows the tournament, not the opponent — a straight swap.
+//   4. Each row is a whole-row link to its match page
+//      (/matches/history/[bookingId]), same tab, so the browser back
+//      button returns here. The player's own name link is preserved
+//      inside via the existing stopPropagation convention (PlayerNameLink)
+//      rather than nesting two <a> tags, which isn't valid HTML — click
+//      the name to go to the player, click anywhere else in the row to go
+//      to the match.
 //
 // Qualification is deliberately much looser than Milestones' quarterly-
 // ratchet minGamesThreshold(): a club month is realistically 1-4 games per
@@ -15,9 +25,10 @@
 // sample (MIN_BALLS_FOR_ECONOMY) for the same reason it does on Milestones
 // — a two-ball spell shouldn't win "best economy".
 
+import { useRouter } from 'next/navigation'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { bestBy, MIN_BALLS_FOR_ECONOMY } from './LeaderboardMilestones'
-import type { LeaderboardRow, MonthlyInnings } from '@/types'
+import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
 interface Milestone {
   label: string
@@ -31,56 +42,105 @@ function formatShortDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
-function InningsRow({ innings }: { innings: MonthlyInnings }) {
+// Whole-row click target for the match page. Not a real <a> — the row
+// already contains PlayerNameLink, a genuine nested anchor, and browsers
+// don't support <a> inside <a> (the outer tag silently closes early). A
+// clickable div with the same stopPropagation convention already used
+// elsewhere in this app (CaptainsCornerGrid's SelectablePlayerRow, etc.)
+// gets the same same-tab/back-button behaviour without invalid markup.
+function ClickableRow({ bookingId, children }: { bookingId: string | null; children: React.ReactNode }) {
+  const router = useRouter()
+  const base = 'flex items-center gap-3 px-4 py-2.5 border-b border-ink-4 last:border-b-0'
+  if (!bookingId) return <div className={base}>{children}</div>
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 border-b border-ink-4 last:border-b-0">
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={() => router.push(`/matches/history/${bookingId}`)}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push(`/matches/history/${bookingId}`) }}
+      className={`${base} cursor-pointer hover:bg-ink-4 transition-colors`}>
+      {children}
+    </div>
+  )
+}
+
+function RowIdentity({ photoUrl, playerId, playerName, cricheroesUrl, format, tournamentName }: {
+  photoUrl: string | null; playerId: string; playerName: string; cricheroesUrl: string | null
+  format: string | null; tournamentName: string | null
+}) {
+  return (
+    <>
       <img
-        src={innings.photoUrl ?? '/default-avatar.png'}
-        alt={innings.playerName}
+        src={photoUrl ?? '/default-avatar.png'}
+        alt={playerName}
         className="w-8 h-8 rounded-full object-cover border border-gold-dim flex-shrink-0"
       />
       <div className="min-w-0 flex-1">
         <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
-          <PlayerNameLink name={innings.playerName} playerId={innings.playerId} cricHeroesUrl={innings.cricheroesUrl} />
+          <PlayerNameLink name={playerName} playerId={playerId} cricHeroesUrl={cricheroesUrl} />
         </p>
         <p className="font-rajdhani text-xs text-zinc-500 truncate">
-          {innings.format && (
+          {format && (
             <span className="inline-block text-[9px] font-bold bg-ink-4 border border-ink-5 text-zinc-400 rounded px-1 py-0.5 mr-1.5 align-middle">
-              {innings.format}
+              {format}
             </span>
           )}
-          {innings.opponentName ? `vs ${innings.opponentName}` : 'Opponent —'}
+          {tournamentName ?? 'Tournament —'}
         </p>
       </div>
+    </>
+  )
+}
+
+function BattingInningsRow({ innings }: { innings: MonthlyInnings }) {
+  return (
+    <ClickableRow bookingId={innings.bookingId}>
+      <RowIdentity {...innings} />
       <div className="text-right flex-shrink-0">
         <p className="font-cinzel text-sm text-gold whitespace-nowrap">
           {innings.runs}{innings.notOut ? '*' : ''} ({innings.balls})
         </p>
         <p className="font-rajdhani text-[10px] text-zinc-600 whitespace-nowrap">{formatShortDate(innings.gameDate)}</p>
       </div>
-    </div>
+    </ClickableRow>
   )
 }
 
-function InningsPanel({ icon, label, items }: { icon: string; label: string; items: MonthlyInnings[] }) {
+function BowlingInningsRow({ innings }: { innings: MonthlyBowlingInnings }) {
+  return (
+    <ClickableRow bookingId={innings.bookingId}>
+      <RowIdentity {...innings} />
+      <div className="text-right flex-shrink-0">
+        <p className="font-cinzel text-sm text-gold whitespace-nowrap">
+          {innings.wickets}/{innings.runsConceded} ({innings.overs} ov)
+        </p>
+        <p className="font-rajdhani text-[10px] text-zinc-600 whitespace-nowrap">{formatShortDate(innings.gameDate)}</p>
+      </div>
+    </ClickableRow>
+  )
+}
+
+function InningsPanel({ icon, label, count, children }: { icon: string; label: string; count: number; children: React.ReactNode }) {
   return (
     <div className="bg-ink-3 border border-ink-5 rounded-lg overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-ink-5">
         <span className="text-sm leading-none">{icon}</span>
         <span className="font-rajdhani text-xs font-bold tracking-wide text-parchment flex-1">{label}</span>
-        <span className="font-cinzel text-[10px] text-gold bg-gold/10 border border-gold-dim rounded-full px-2 py-0.5">{items.length}</span>
+        <span className="font-cinzel text-[10px] text-gold bg-gold/10 border border-gold-dim rounded-full px-2 py-0.5">{count}</span>
       </div>
-      {items.length === 0
+      {count === 0
         ? <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">No {label.toLowerCase()} this month yet.</p>
-        : items.map(i => <InningsRow key={i.playerId + i.gameDate} innings={i} />)}
+        : children}
     </div>
   )
 }
 
-export function LeaderboardMonthly({ rows, centuries, halfCenturies, monthLabel }: {
+export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketHauls, threeWicketHauls, monthLabel }: {
   rows: LeaderboardRow[]
   centuries: MonthlyInnings[]
   halfCenturies: MonthlyInnings[]
+  fiveWicketHauls: MonthlyBowlingInnings[]
+  threeWicketHauls: MonthlyBowlingInnings[]
   monthLabel: string
 }) {
   const qualifies = (r: LeaderboardRow) => r.stats.matches >= 1
@@ -101,7 +161,8 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, monthLabel 
     { label: 'Best Economy',   icon: '🔒', row: bestEconomy, valueText: bestEconomy ? `Econ ${bestEconomy.stats.economy!.toFixed(2)}` : '' },
   ].filter(m => m.row)
 
-  if (rows.length === 0 && centuries.length === 0 && halfCenturies.length === 0) {
+  const noInnings = centuries.length === 0 && halfCenturies.length === 0 && fiveWicketHauls.length === 0 && threeWicketHauls.length === 0
+  if (rows.length === 0 && noInnings) {
     return (
       <p className="font-rajdhani text-sm text-zinc-500 py-8 text-center">No stats for {monthLabel} yet.</p>
     )
@@ -146,8 +207,21 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, monthLabel 
         </div>
       )}
 
-      <InningsPanel icon="💯" label="Centuries" items={centuries} />
-      <InningsPanel icon="5️⃣0️⃣" label="Half-Centuries" items={halfCenturies} />
+      <InningsPanel icon="💯" label="Centuries" count={centuries.length}>
+        {centuries.map(i => <BattingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
+      </InningsPanel>
+
+      <InningsPanel icon="5️⃣0️⃣" label="Half-Centuries" count={halfCenturies.length}>
+        {halfCenturies.map(i => <BattingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
+      </InningsPanel>
+
+      <InningsPanel icon="🎳" label="5-Wicket Hauls" count={fiveWicketHauls.length}>
+        {fiveWicketHauls.map(i => <BowlingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
+      </InningsPanel>
+
+      <InningsPanel icon="🎯" label="3-Wicket Hauls" count={threeWicketHauls.length}>
+        {threeWicketHauls.map(i => <BowlingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
+      </InningsPanel>
     </div>
   )
 }

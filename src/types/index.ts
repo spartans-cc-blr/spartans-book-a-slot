@@ -190,11 +190,14 @@ export interface RecentForm {
   wickets: number
 }
 
-// One qualifying 50+/100+ innings for the /leaderboard "Monthly" view — see
+// One qualifying 50+/100+ innings, or one qualifying 3+/5+ wicket bowling
+// innings, for the /leaderboard "Monthly" view — see
 // src/lib/playerStats.ts getMonthlyPerformances(). Unlike LeaderboardRow
-// (aggregated across every match in scope), this is a single match's
-// batting line, since Monthly lists every century/half-century rather than
-// crowning one "most" winner.
+// (aggregated across every match in scope), these are single-match lines,
+// since Monthly lists every century/half-century/5-for/3-for rather than
+// crowning one "most" winner. `bookingId` links the row to its match page
+// (/matches/history/[bookingId]) — null only if the booking behind an
+// already-synced match_id was later deleted.
 export interface MonthlyInnings {
   playerId:       string
   playerName:     string
@@ -204,9 +207,23 @@ export interface MonthlyInnings {
   balls:          number
   notOut:         boolean
   gameDate:       string | null
-  opponentName:   string | null
   format:         string | null
   tournamentName: string | null
+  bookingId:      string | null
+}
+
+export interface MonthlyBowlingInnings {
+  playerId:       string
+  playerName:     string
+  cricheroesUrl:  string | null
+  photoUrl:       string | null
+  wickets:        number
+  runsConceded:   number
+  overs:          string | number
+  gameDate:       string | null
+  format:         string | null
+  tournamentName: string | null
+  bookingId:      string | null
 }
 
 // Per-booking context stats for Captains' Corner's tap-to-expand "Form"

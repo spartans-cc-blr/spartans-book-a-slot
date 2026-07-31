@@ -21,7 +21,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
-import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings } from '@/types'
+import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -453,38 +453,59 @@ export async function getAvailableMonths(): Promise<string[]> {
   return Array.from(months).sort((a, b) => b.localeCompare(a))
 }
 
-// Every individual 50+ innings in a given month, split into centuries and
-// half-centuries — the Monthly view lists each one rather than crowning a
-// single "most centuries" winner the way the year-scoped Milestones cards
-// do (see LeaderboardMilestones.tsx). Sorted highest score first, most
-// recent date as the tiebreak.
-export async function getMonthlyPerformances(month: string): Promise<{ centuries: MonthlyInnings[]; halfCenturies: MonthlyInnings[] }> {
+type MonthlyPerformances = {
+  centuries:        MonthlyInnings[]
+  halfCenturies:    MonthlyInnings[]
+  fiveWicketHauls:  MonthlyBowlingInnings[]
+  threeWicketHauls: MonthlyBowlingInnings[]
+}
+const EMPTY_MONTHLY_PERFORMANCES: MonthlyPerformances = { centuries: [], halfCenturies: [], fiveWicketHauls: [], threeWicketHauls: [] }
+
+function resolveTournamentName(booking: any): string | null {
+  return Array.isArray(booking?.tournament) ? (booking.tournament[0]?.name ?? null) : (booking?.tournament?.name ?? null)
+}
+
+// Every individual 50+ batting innings and 3+ wicket bowling innings in a
+// given month, split into centuries/half-centuries and 5-for/3-for bands
+// (each pair mutually exclusive by score, same convention as the
+// year-scoped Milestones cards' centuries/halfCenturies split) — the
+// Monthly view lists each one rather than crowning a single "most" winner.
+// Sorted best performance first, most recent date as the tiebreak.
+export async function getMonthlyPerformances(month: string): Promise<MonthlyPerformances> {
   const scoped = await getScopedMatchIds({ month })
-  if (!scoped || scoped.length === 0) return { centuries: [], halfCenturies: [] }
+  if (!scoped || scoped.length === 0) return EMPTY_MONTHLY_PERFORMANCES
 
   const analytics = createAnalyticsClient()
   if (!analytics) throw new Error('Analytics database is not configured')
-  const { data: battingRows, error } = await analytics
-    .from('batting_stats').select('*').in('match_id', scoped).not('player_id', 'is', null)
-  if (error) throw new Error(error.message)
+  const [{ data: battingRows, error: battErr }, { data: bowlingRows, error: bowlErr }] = await Promise.all([
+    analytics.from('batting_stats').select('*').in('match_id', scoped).not('player_id', 'is', null),
+    analytics.from('bowling_stats').select('*').in('match_id', scoped).not('player_id', 'is', null),
+  ])
+  if (battErr) throw new Error(battErr.message)
+  if (bowlErr) throw new Error(bowlErr.message)
 
-  const qualifying = (battingRows ?? []).filter((r: any) => r.batted && num(r.runs) >= 50)
-  if (qualifying.length === 0) return { centuries: [], halfCenturies: [] }
+  const qualifyingBatting = (battingRows ?? []).filter((r: any) => r.batted && num(r.runs) >= 50)
+  const qualifyingBowling = (bowlingRows ?? []).filter((r: any) => r.did_bowl && num(r.wickets) >= 3)
+  if (qualifyingBatting.length === 0 && qualifyingBowling.length === 0) return EMPTY_MONTHLY_PERFORMANCES
 
-  const matchIds  = Array.from(new Set<string>(qualifying.map((r: any) => r.match_id)))
-  const playerIds = Array.from(new Set<string>(qualifying.map((r: any) => r.player_id)))
+  // One shared bookings + players fetch for both bands — cheaper than
+  // fetching separately, and `id` (booking id) rides along for free
+  // alongside the fields already needed for date/format/tournament, so
+  // the match-page link costs nothing extra on top of this query.
+  const matchIds  = Array.from(new Set<string>([...qualifyingBatting, ...qualifyingBowling].map((r: any) => r.match_id)))
+  const playerIds = Array.from(new Set<string>([...qualifyingBatting, ...qualifyingBowling].map((r: any) => r.player_id)))
 
   const hub = createServiceClient()
-  const [{ data: bookings, error: bErr }, { data: players, error: pErr }] = await Promise.all([
-    hub.from('bookings').select('match_id, game_date, format, opponent_name, tournament:tournaments(name)').in('match_id', matchIds),
+  const [{ data: bookings, error: bookErr }, { data: players, error: pErr }] = await Promise.all([
+    hub.from('bookings').select('id, match_id, game_date, format, tournament:tournaments(name)').in('match_id', matchIds),
     hub.from('players').select('id, name, cricheroes_url, photo_url').in('id', playerIds),
   ])
-  if (bErr) throw new Error(bErr.message)
+  if (bookErr) throw new Error(bookErr.message)
   if (pErr) throw new Error(pErr.message)
   const bookingByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b]))
   const playerById     = new Map((players ?? []).map((p: any) => [p.id, p]))
 
-  const innings: MonthlyInnings[] = qualifying
+  const battingInnings: MonthlyInnings[] = qualifyingBatting
     .filter((r: any) => playerById.has(r.player_id)) // reconciled to a player_id no longer in Hub — skip, same guard as getLeaderboard
     .map((r: any) => {
       const booking = bookingByMatch.get(r.match_id) as any
@@ -498,17 +519,41 @@ export async function getMonthlyPerformances(month: string): Promise<{ centuries
         balls:          num(r.balls),
         notOut:         r.not_out === 'Y',
         gameDate:       booking?.game_date ?? null,
-        opponentName:   booking?.opponent_name ?? null,
         format:         booking?.format ?? null,
-        tournamentName: Array.isArray(booking?.tournament) ? booking?.tournament[0]?.name : booking?.tournament?.name ?? null,
+        tournamentName: resolveTournamentName(booking),
+        bookingId:      booking?.id ?? null,
       }
     })
+  battingInnings.sort((a, b) => b.runs - a.runs || (b.gameDate ?? '').localeCompare(a.gameDate ?? ''))
 
-  innings.sort((a, b) => b.runs - a.runs || (b.gameDate ?? '').localeCompare(a.gameDate ?? ''))
+  const bowlingInnings: MonthlyBowlingInnings[] = qualifyingBowling
+    .filter((r: any) => playerById.has(r.player_id))
+    .map((r: any) => {
+      const booking = bookingByMatch.get(r.match_id) as any
+      const player  = playerById.get(r.player_id) as any
+      return {
+        playerId:       r.player_id,
+        playerName:     player.name,
+        cricheroesUrl:  player.cricheroes_url ?? null,
+        photoUrl:       player.photo_url ?? null,
+        wickets:        num(r.wickets),
+        runsConceded:   num(r.runs),
+        overs:          r.overs,
+        gameDate:       booking?.game_date ?? null,
+        format:         booking?.format ?? null,
+        tournamentName: resolveTournamentName(booking),
+        bookingId:      booking?.id ?? null,
+      }
+    })
+  // Most wickets first; fewer runs conceded (better economy) breaks a tie
+  // on wickets, most recent date breaks a tie on both.
+  bowlingInnings.sort((a, b) => b.wickets - a.wickets || a.runsConceded - b.runsConceded || (b.gameDate ?? '').localeCompare(a.gameDate ?? ''))
 
   return {
-    centuries:     innings.filter(i => i.runs >= 100),
-    halfCenturies: innings.filter(i => i.runs >= 50 && i.runs < 100),
+    centuries:        battingInnings.filter(i => i.runs >= 100),
+    halfCenturies:    battingInnings.filter(i => i.runs >= 50 && i.runs < 100),
+    fiveWicketHauls:  bowlingInnings.filter(i => i.wickets >= 5),
+    threeWicketHauls: bowlingInnings.filter(i => i.wickets >= 3 && i.wickets < 5),
   }
 }
 
