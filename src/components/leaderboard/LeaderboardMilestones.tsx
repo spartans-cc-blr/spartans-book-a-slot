@@ -15,7 +15,7 @@
 import { PlayerNameLink } from '@/lib/playerLink'
 import type { LeaderboardRow } from '@/types'
 
-const MIN_BALLS_FOR_ECONOMY = 30 // 5 overs
+export const MIN_BALLS_FOR_ECONOMY = 30 // 5 overs — also used by LeaderboardMonthly.tsx
 
 // YTD qualification bar: 3 games per completed calendar quarter of the
 // selected season. Ratchets up as the season progresses (0 through Mar,
@@ -38,7 +38,10 @@ interface Milestone {
   valueText: string
 }
 
-function bestBy(rows: LeaderboardRow[], value: (r: LeaderboardRow) => number | null, qualifies: (r: LeaderboardRow) => boolean, lowerIsBetter = false): LeaderboardRow | null {
+// Exported for reuse by LeaderboardMonthly.tsx, which needs the same
+// "find the qualifying row with the best value" primitive but with a much
+// simpler (single-month) qualification bar than minGamesThreshold() below.
+export function bestBy(rows: LeaderboardRow[], value: (r: LeaderboardRow) => number | null, qualifies: (r: LeaderboardRow) => boolean, lowerIsBetter = false): LeaderboardRow | null {
   let best: LeaderboardRow | null = null
   let bestVal: number | null = null
   for (const r of rows) {

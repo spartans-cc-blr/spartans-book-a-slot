@@ -21,7 +21,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
-import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow } from '@/types'
+import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings } from '@/types'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -127,9 +127,9 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
   return t
 }
 
-// Resolves a {year, tournamentId, groundId, formats} filter to a concrete
-// list of Hub bookings.match_id values. Returns null when nothing is set —
-// the caller should treat null as "no restriction" (all-time, all
+// Resolves a {year|month, tournamentId, groundId, formats} filter to a
+// concrete list of Hub bookings.match_id values. Returns null when nothing
+// is set — the caller should treat null as "no restriction" (all-time, all
 // tournaments, all grounds, all formats). Returns [] when filters are set
 // but match nothing; the caller MUST short-circuit on an empty array rather
 // than passing it to `.in()`, since an empty `.in()` array does not behave
@@ -140,16 +140,27 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
 // since there are only two known formats) — callers pass undefined/empty
 // for "no restriction" rather than the full ['T20','T30'] list, so this
 // never has to special-case "all formats explicitly named".
-async function getScopedMatchIds(filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] }): Promise<string[] | null> {
+//
+// `month` ('YYYY-MM', for the leaderboard's Monthly view) and `year` are
+// never combined by any caller today — Monthly scopes by month alone, every
+// other view scopes by year alone — so `month` simply takes precedence
+// when both happen to be set, rather than trying to intersect the two.
+async function getScopedMatchIds(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] }): Promise<string[] | null> {
   const hasFormatRestriction = !!filters.formats && filters.formats.length > 0
-  if (!filters.year && !filters.tournamentId && !filters.groundId && !hasFormatRestriction) return null
+  if (!filters.year && !filters.month && !filters.tournamentId && !filters.groundId && !hasFormatRestriction) return null
 
   const hub = createServiceClient()
 
   function baseQuery() {
     let q = hub.from('bookings').select('match_id').not('match_id', 'is', null)
     if (filters.tournamentId) q = q.eq('tournament_id', filters.tournamentId)
-    if (filters.year) q = q.gte('game_date', `${filters.year}-01-01`).lte('game_date', `${filters.year}-12-31`)
+    if (filters.month) {
+      const [y, m] = filters.month.split('-').map(Number)
+      const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate() // day 0 of next month = last day of this month
+      q = q.gte('game_date', `${filters.month}-01`).lte('game_date', `${filters.month}-${String(lastDay).padStart(2, '0')}`)
+    } else if (filters.year) {
+      q = q.gte('game_date', `${filters.year}-01-01`).lte('game_date', `${filters.year}-12-31`)
+    }
     if (hasFormatRestriction) q = q.in('format', filters.formats!)
     return q
   }
@@ -370,7 +381,7 @@ export async function getPlayerMatchHistory(
   return rows
 }
 
-export async function getLeaderboard(filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}): Promise<LeaderboardRow[]> {
+export async function getLeaderboard(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] } = {}): Promise<LeaderboardRow[]> {
   const scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return []
 
@@ -427,6 +438,78 @@ export async function getLeaderboard(filters: { year?: number; tournamentId?: st
     rows.push({ playerId, playerName: player.name, cricheroesUrl: player.cricheroes_url ?? null, photoUrl: player.photo_url ?? null, stats, centuries, halfCenturies })
   }
   return rows
+}
+
+// Distinct 'YYYY-MM' months that have at least one confirmed, synced
+// booking — feeds the month stepper on /leaderboard's Monthly view, most
+// recent first. Mirrors the same distinct-month derivation
+// /api/matches/history/filters already does over bookings, scoped here to
+// bookings with a match_id (the leaderboard only ever has data for those).
+export async function getAvailableMonths(): Promise<string[]> {
+  const hub = createServiceClient()
+  const { data, error } = await hub.from('bookings').select('game_date').not('match_id', 'is', null)
+  if (error) throw new Error(error.message)
+  const months = new Set<string>((data ?? []).map((b: any) => (b.game_date as string).slice(0, 7)))
+  return Array.from(months).sort((a, b) => b.localeCompare(a))
+}
+
+// Every individual 50+ innings in a given month, split into centuries and
+// half-centuries — the Monthly view lists each one rather than crowning a
+// single "most centuries" winner the way the year-scoped Milestones cards
+// do (see LeaderboardMilestones.tsx). Sorted highest score first, most
+// recent date as the tiebreak.
+export async function getMonthlyPerformances(month: string): Promise<{ centuries: MonthlyInnings[]; halfCenturies: MonthlyInnings[] }> {
+  const scoped = await getScopedMatchIds({ month })
+  if (!scoped || scoped.length === 0) return { centuries: [], halfCenturies: [] }
+
+  const analytics = createAnalyticsClient()
+  if (!analytics) throw new Error('Analytics database is not configured')
+  const { data: battingRows, error } = await analytics
+    .from('batting_stats').select('*').in('match_id', scoped).not('player_id', 'is', null)
+  if (error) throw new Error(error.message)
+
+  const qualifying = (battingRows ?? []).filter((r: any) => r.batted && num(r.runs) >= 50)
+  if (qualifying.length === 0) return { centuries: [], halfCenturies: [] }
+
+  const matchIds  = Array.from(new Set<string>(qualifying.map((r: any) => r.match_id)))
+  const playerIds = Array.from(new Set<string>(qualifying.map((r: any) => r.player_id)))
+
+  const hub = createServiceClient()
+  const [{ data: bookings, error: bErr }, { data: players, error: pErr }] = await Promise.all([
+    hub.from('bookings').select('match_id, game_date, format, opponent_name, tournament:tournaments(name)').in('match_id', matchIds),
+    hub.from('players').select('id, name, cricheroes_url, photo_url').in('id', playerIds),
+  ])
+  if (bErr) throw new Error(bErr.message)
+  if (pErr) throw new Error(pErr.message)
+  const bookingByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b]))
+  const playerById     = new Map((players ?? []).map((p: any) => [p.id, p]))
+
+  const innings: MonthlyInnings[] = qualifying
+    .filter((r: any) => playerById.has(r.player_id)) // reconciled to a player_id no longer in Hub — skip, same guard as getLeaderboard
+    .map((r: any) => {
+      const booking = bookingByMatch.get(r.match_id) as any
+      const player  = playerById.get(r.player_id) as any
+      return {
+        playerId:       r.player_id,
+        playerName:     player.name,
+        cricheroesUrl:  player.cricheroes_url ?? null,
+        photoUrl:       player.photo_url ?? null,
+        runs:           num(r.runs),
+        balls:          num(r.balls),
+        notOut:         r.not_out === 'Y',
+        gameDate:       booking?.game_date ?? null,
+        opponentName:   booking?.opponent_name ?? null,
+        format:         booking?.format ?? null,
+        tournamentName: Array.isArray(booking?.tournament) ? booking?.tournament[0]?.name : booking?.tournament?.name ?? null,
+      }
+    })
+
+  innings.sort((a, b) => b.runs - a.runs || (b.gameDate ?? '').localeCompare(a.gameDate ?? ''))
+
+  return {
+    centuries:     innings.filter(i => i.runs >= 100),
+    halfCenturies: innings.filter(i => i.runs >= 50 && i.runs < 100),
+  }
 }
 
 export async function getRecentForm(playerIds: string[], matchCount: number = 5): Promise<Record<string, RecentForm | null>> {

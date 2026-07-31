@@ -190,6 +190,25 @@ export interface RecentForm {
   wickets: number
 }
 
+// One qualifying 50+/100+ innings for the /leaderboard "Monthly" view — see
+// src/lib/playerStats.ts getMonthlyPerformances(). Unlike LeaderboardRow
+// (aggregated across every match in scope), this is a single match's
+// batting line, since Monthly lists every century/half-century rather than
+// crowning one "most" winner.
+export interface MonthlyInnings {
+  playerId:       string
+  playerName:     string
+  cricheroesUrl:  string | null
+  photoUrl:       string | null
+  runs:           number
+  balls:          number
+  notOut:         boolean
+  gameDate:       string | null
+  opponentName:   string | null
+  format:         string | null
+  tournamentName: string | null
+}
+
 // Per-booking context stats for Captains' Corner's tap-to-expand "Form"
 // panel — see src/lib/playerStats.ts getPlayerBookingContextStats() and
 // src/app/api/captains-corner/context-stats/route.ts. Each field is null
