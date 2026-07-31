@@ -155,7 +155,7 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
   // to Overall and lose the selected month.
   function selectTopGroup(top: 'honor' | 'detailed') {
     if (top === 'honor' && topGroup !== 'honor') selectHonorSub('overall')
-    if (top === 'detailed' && topGroup !== 'detailed') selectDetailedSub('batting')
+    if (top === 'detailed' && topGroup !== 'detailed') selectDetailedSub('mvp')
   }
 
   const earliestMonth = months.length ? months[months.length - 1] : currentMonthStr()

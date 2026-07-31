@@ -29,6 +29,8 @@ import { useRouter } from 'next/navigation'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { bestBy, MIN_BALLS_FOR_ECONOMY } from './LeaderboardMilestones'
 import { PlayerAvatar } from './PlayerAvatar'
+import { BallIcon } from '@/components/matches/BallIcon'
+import { WicketIcon } from './WicketIcon'
 import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
 interface Milestone {
@@ -117,11 +119,11 @@ function BowlingInningsRow({ innings }: { innings: MonthlyBowlingInnings }) {
   )
 }
 
-function InningsPanel({ icon, label, count, children }: { icon: string; label: string; count: number; children: React.ReactNode }) {
+function InningsPanel({ icon, label, count, children }: { icon: React.ReactNode; label: string; count: number; children: React.ReactNode }) {
   return (
     <div className="bg-ink-3 border border-ink-5 rounded-lg overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-ink-5">
-        <span className="text-sm leading-none">{icon}</span>
+        <span className="inline-flex items-center leading-none">{icon}</span>
         <span className="font-rajdhani text-xs font-bold tracking-wide text-parchment flex-1">{label}</span>
         <span className="font-cinzel text-[10px] text-gold bg-gold/10 border border-gold-dim rounded-full px-2 py-0.5">{count}</span>
       </div>
@@ -208,11 +210,11 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
         {halfCenturies.map(i => <BattingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
       </InningsPanel>
 
-      <InningsPanel icon="🎳" label="5-Wicket Hauls" count={fiveWicketHauls.length}>
+      <InningsPanel icon={<BallIcon type="gold" size={16} />} label="5-Wicket Hauls" count={fiveWicketHauls.length}>
         {fiveWicketHauls.map(i => <BowlingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
       </InningsPanel>
 
-      <InningsPanel icon="🎯" label="3-Wicket Hauls" count={threeWicketHauls.length}>
+      <InningsPanel icon={<WicketIcon size={16} />} label="3-Wicket Hauls" count={threeWicketHauls.length}>
         {threeWicketHauls.map(i => <BowlingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
       </InningsPanel>
     </div>

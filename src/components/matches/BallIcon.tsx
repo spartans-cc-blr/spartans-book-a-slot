@@ -4,7 +4,7 @@
 // import the same component instead of one falling back to a generic
 // bowling-alley emoji that doesn't match the rest of the app.
 
-export type BallType = 'red' | 'white' | 'pink'
+export type BallType = 'red' | 'white' | 'pink' | 'gold'
 
 function RedBall({ size = 20 }: { size?: number }) {
   return (
@@ -69,8 +69,35 @@ function PinkBall({ size = 20 }: { size?: number }) {
   )
 }
 
+// Not a real cricket ball colour — repurposes the same seam/shading
+// treatment as the red/white/pink balls, in the app's own gold accent
+// (--gold / --gold-light / --gold-dim), for /leaderboard's 5-Wicket Hauls
+// panel icon (a cricket-ball shape reads better there than the ten-pin
+// bowling emoji it replaced, which isn't a cricket icon at all).
+function GoldBall({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="mh-gb" cx="38%" cy="30%" r="62%">
+          <stop offset="0%" stopColor="#F5D78E"/><stop offset="35%" stopColor="#C9A84C"/>
+          <stop offset="75%" stopColor="#8A6A1F"/><stop offset="100%" stopColor="#4A3A12"/>
+        </radialGradient>
+        <clipPath id="mh-gc"><circle cx="30" cy="30" r="28"/></clipPath>
+      </defs>
+      <circle cx="30" cy="30" r="28" fill="url(#mh-gb)"/>
+      <g transform="rotate(-30 30 30)" clipPath="url(#mh-gc)">
+        <line x1="2" y1="30" x2="58" y2="30" stroke="#4A3A12" strokeWidth="3"/>
+        <line x1="2" y1="24" x2="58" y2="24" stroke="#FBEFD2" strokeWidth="1" strokeDasharray="3 2.5"/>
+        <line x1="2" y1="36" x2="58" y2="36" stroke="#FBEFD2" strokeWidth="1" strokeDasharray="3 2.5"/>
+      </g>
+      <ellipse cx="21" cy="17" rx="9" ry="5" fill="white" opacity="0.25" transform="rotate(-30 21 17)"/>
+    </svg>
+  )
+}
+
 export function BallIcon({ type, size = 20 }: { type: BallType; size?: number }) {
   if (type === 'white') return <WhiteBall size={size} />
   if (type === 'pink')  return <PinkBall size={size} />
+  if (type === 'gold')  return <GoldBall size={size} />
   return <RedBall size={size} />
 }
