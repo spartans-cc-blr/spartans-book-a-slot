@@ -213,7 +213,7 @@ Primary scheduling record.
 | `opponent_name` | text | Opposing team |
 | `match_id` | text | CricHeroes match reference |
 | `cricheroes_url` | text | Direct CricHeroes match link |
-| `match_time` | text | Actual start time (may differ from slot). Admin booking form defaults this to `slot_time + 15 min` once a slot is picked, unless already saved or manually overridden — see §8.1 |
+| `match_time` | text | Actual start time (may differ from slot). Admin booking form defaults this to the chosen `slot_time` once a slot is picked, unless already saved or manually overridden — see §8.1 |
 | `match_stage` | text | Group / Knockout etc. |
 | `reserved_until` | timestamptz | 48 hr expiry for `soft_block` |
 | `organiser_name` | text | External organiser (reservations) |
@@ -336,27 +336,30 @@ All rules live in `src/lib/validation.ts`. Called from both the API (on save) an
 ```
 Admin → /admin/bookings/new
   → Validate rules (R1–R6) via /api/validate (live)
-  → Match Start Time auto-fills to slot_time + 15 min once a slot is picked
+  → Match Start Time auto-fills to the chosen slot_time once a slot is picked
   → POST /api/bookings → DB write (service role)
   → [soft_block] reserved_until = now() + 48hr
   → [confirmed] WhatsApp notify buttons (organiser + captain)
   → Cron at 18:30 UTC deletes expired soft_blocks
 ```
 
-> **Match Start Time default (added July 2026):** both `/admin/bookings/new`
-> and `/admin/bookings/[id]` auto-fill the Match Start Time field to
-> `slot_time + 15 min` (a local `defaultMatchTime()` helper in each page)
-> the moment a slot is picked — on the edit page this also applies on load,
-> for any existing booking whose `match_time` is still null. A
-> `matchTimeTouched` flag stops the default from ever overwriting a value
-> the admin typed themselves, or one already saved in the DB. This is a
-> client-side UX default only — nothing server-side changed, and
+> **Match Start Time default (added July 2026, changed 31 Jul 2026):** both
+> `/admin/bookings/new` and `/admin/bookings/[id]` auto-fill the Match Start
+> Time field to the chosen `slot_time` itself (a local `defaultMatchTime()`
+> helper in each page — originally `slot_time + 15 min`, changed to return
+> `slot` unmodified after the +15 default was found to be the wrong default
+> in practice) the moment a slot is picked — on the edit page this also
+> applies on load, for any existing booking whose `match_time` is still
+> null. A `matchTimeTouched` flag stops the default from ever overwriting a
+> value the admin typed themselves, or one already saved in the DB. This is
+> a client-side UX default only — nothing server-side changed, and
 > `POST /api/bookings` / `PATCH /api/bookings/[id]` still happily accept
 > `match_time: null`. The value feeds straight into the announcement
 > reporting-time calc (`match_time − 15 min`) — see
-> `features/squad-selection.md` §6. Existing bookings created before this
-> shipped are unaffected until their edit page is opened and saved — no
-> DB backfill was run.
+> `features/squad-selection.md` §6, so reporting time is now 15 minutes
+> earlier relative to `match_time` than it was under the old +15 default.
+> Existing bookings created before this shipped are unaffected until their
+> edit page is opened and saved — no DB backfill was run.
 
 ### 8.2 Player Availability Flow
 ```

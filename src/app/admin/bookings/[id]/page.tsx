@@ -68,11 +68,7 @@ const RULES = [
 ]
 
 function defaultMatchTime(slot: SlotTime): string {
-  const [h, m] = slot.split(':').map(Number)
-  const total = h * 60 + m + 15
-  const nh = Math.floor(total / 60) % 24
-  const nm = total % 60
-  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
+  return slot
 }
 
 export default function BookingDetailPage() {
