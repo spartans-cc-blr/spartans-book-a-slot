@@ -219,27 +219,29 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
         </div>
       )}
 
-      {/* Row 3 — Tournament, Ground (disabled for the whole Honor Board branch) */}
-      <div className="grid grid-cols-2 gap-2">
-        <select
-          value={tournamentId}
-          onChange={e => navigate({ tournament: e.target.value })}
-          disabled={topGroup === 'honor'}
-          title={topGroup === 'honor' ? 'Honor Board is a top-level view — not scoped to a tournament' : undefined}
-          className={`form-input font-rajdhani text-xs py-1.5 disabled:opacity-50 disabled:cursor-not-allowed ${SELECT_TRUNCATE}`}>
-          <option value="all">All tournaments</option>
-          {tournaments.map(t => <option key={t.id} value={t.id} title={t.name}>{t.name}</option>)}
-        </select>
-        <select
-          value={groundId}
-          onChange={e => navigate({ ground: e.target.value })}
-          disabled={topGroup === 'honor'}
-          title={topGroup === 'honor' ? 'Honor Board is a top-level view — not scoped to a ground' : undefined}
-          className={`form-input font-rajdhani text-xs py-1.5 disabled:opacity-50 disabled:cursor-not-allowed ${SELECT_TRUNCATE}`}>
-          <option value="all">All grounds</option>
-          {grounds.map(g => <option key={g.id} value={g.id} title={g.name}>{g.name}</option>)}
-        </select>
-      </div>
+      {/* Row 3 — Tournament, Ground. Hidden (not just disabled) for the
+          whole Honor Board branch — neither Overall nor Monthly is ever
+          scoped by tournament/ground, so a greyed-out, permanently
+          unusable control was just clutter, not a helpful "here's what
+          you could filter by" hint. */}
+      {topGroup === 'detailed' && (
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            value={tournamentId}
+            onChange={e => navigate({ tournament: e.target.value })}
+            className={`form-input font-rajdhani text-xs py-1.5 ${SELECT_TRUNCATE}`}>
+            <option value="all">All tournaments</option>
+            {tournaments.map(t => <option key={t.id} value={t.id} title={t.name}>{t.name}</option>)}
+          </select>
+          <select
+            value={groundId}
+            onChange={e => navigate({ ground: e.target.value })}
+            className={`form-input font-rajdhani text-xs py-1.5 ${SELECT_TRUNCATE}`}>
+            <option value="all">All grounds</option>
+            {grounds.map(g => <option key={g.id} value={g.id} title={g.name}>{g.name}</option>)}
+          </select>
+        </div>
+      )}
 
       {/* Row 4 — month stepper, Monthly only */}
       {isMonthly && (
