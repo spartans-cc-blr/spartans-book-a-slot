@@ -15,6 +15,7 @@ interface Booking {
   slot_time: string
   format: string | null
   cricheroes_url: string | null
+  opponent_name: string | null
   // Resolved server-side from match_stats_cache — null until a scorecard is
   // synced for this match, even for a game that's already been played.
   match_result: string | null
@@ -1107,7 +1108,10 @@ function MatchTabsSection({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13.5px] font-bold text-ink">{format(d, 'EEE')} · {g.slot_time}</p>
-                      {g.match_result && <div className="mt-0.5"><ResultBadge result={g.match_result} /></div>}
+                      <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+                        {g.match_result && <ResultBadge result={g.match_result} />}
+                        <span className="text-xs text-stone-500">vs <span className="text-ink font-semibold">{g.opponent_name || 'TBD'}</span></span>
+                      </div>
                       <p className="text-xs text-stone-500 mt-0.5">
                         {showFormatOnRow && <>{g.format} · </>}Captain{' '}
                         {captain
@@ -1145,6 +1149,7 @@ function MatchTabsSection({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13.5px] font-bold text-ink">{format(d, 'EEE')} · {g.slot_time}</p>
+                      <p className="text-xs text-stone-500 mt-0.5">vs <span className="text-ink font-semibold">{g.opponent_name || 'TBD'}</span></p>
                       {showFormatOnRow && <p className="text-xs text-stone-500 mt-0.5">{g.format}</p>}
                     </div>
                     <span className={`${c.bg} ${c.text} text-[11.5px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 text-center`}>

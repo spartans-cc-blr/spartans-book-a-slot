@@ -25,7 +25,7 @@ export default async function TournamentPlannerPage() {
   const { data: rawBookings } = await supabase
     .from('bookings')
     .select(`
-      id, game_date, slot_time, format, cricheroes_url, match_id,
+      id, game_date, slot_time, format, cricheroes_url, match_id, opponent_name,
       tournament:tournaments!bookings_tournament_id_fkey(
         id, name, organiser_name, organiser_contact,
         total_league_games, cricheroes_points_table_url,
@@ -60,6 +60,7 @@ export default async function TournamentPlannerPage() {
     cricheroes_url: string | null
     match_id: string | null
     match_result: string | null
+    opponent_name: string | null
     tournament: {
       id: string
       name: string
