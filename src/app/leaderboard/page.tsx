@@ -44,8 +44,11 @@ export default async function LeaderboardPage({
   const year: number | 'all' = yearParam === 'all' ? 'all' : (Number(yearParam) || currentYear)
   const category: LeaderboardCategory = isCategory(searchParams?.category) ? searchParams!.category as LeaderboardCategory : 'overall'
 
+  // Clamped to the current month — a hand-edited URL (?month=2026-12)
+  // shouldn't be able to request a month that hasn't happened yet.
   const monthParam = searchParams?.month
-  const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentMonthStr()
+  const requestedMonth = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentMonthStr()
+  const month = requestedMonth > currentMonthStr() ? currentMonthStr() : requestedMonth
 
   // Format is checkboxes, not a single-select: only a strict one-format
   // restriction is ever encoded in the URL (see LeaderboardFilters' toggle

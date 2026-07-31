@@ -445,9 +445,15 @@ export async function getLeaderboard(filters: { year?: number; month?: string; t
 // recent first. Mirrors the same distinct-month derivation
 // /api/matches/history/filters already does over bookings, scoped here to
 // bookings with a match_id (the leaderboard only ever has data for those).
+//
+// Capped at today — a future booking can already have a match_id set
+// (admins sometimes attach the CricHeroes match link ahead of time), which
+// would otherwise surface a not-yet-played month in the stepper's picker
+// with nothing in it.
 export async function getAvailableMonths(): Promise<string[]> {
+  const today = new Date().toISOString().split('T')[0]
   const hub = createServiceClient()
-  const { data, error } = await hub.from('bookings').select('game_date').not('match_id', 'is', null)
+  const { data, error } = await hub.from('bookings').select('game_date').not('match_id', 'is', null).lte('game_date', today)
   if (error) throw new Error(error.message)
   const months = new Set<string>((data ?? []).map((b: any) => (b.game_date as string).slice(0, 7)))
   return Array.from(months).sort((a, b) => b.localeCompare(a))
