@@ -152,7 +152,13 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
   const hub = createServiceClient()
 
   function baseQuery() {
-    let q = hub.from('bookings').select('match_id').not('match_id', 'is', null)
+    // Cancelled bookings are excluded — a rescheduled match's old slot is
+    // cancelled rather than deleted, but keeps the same match_id, so
+    // without this a match can leak into every month/year/tournament its
+    // now-stale cancelled attempts happened to be booked for, on top of
+    // the one it actually got played in. Confirmed, real incident: see
+    // getMonthlyPerformances()'s comment below.
+    let q = hub.from('bookings').select('match_id').not('match_id', 'is', null).eq('status', 'confirmed')
     if (filters.tournamentId) q = q.eq('tournament_id', filters.tournamentId)
     if (filters.month) {
       const [y, m] = filters.month.split('-').map(Number)
@@ -235,6 +241,7 @@ export async function getFilterOptions(formats?: string[]): Promise<{
     .in('format', formats)
     .not('match_id', 'is', null)
     .not('tournament_id', 'is', null)
+    .eq('status', 'confirmed')
   if (error) throw new Error(error.message)
 
   const tournamentMap = new Map<string, { id: string; name: string }>()
@@ -332,10 +339,15 @@ export async function getPlayerMatchHistory(
   const matchById = new Map((matchRows ?? []).map((m: any) => [m.match_id, m]))
 
   const hub = createServiceClient()
+  // .eq('status', 'confirmed') — a match_id can be shared with an old,
+  // cancelled (rescheduled-away) booking; without this, whichever row
+  // Postgres happens to return last for that match_id wins the Map below,
+  // which can silently swap in the wrong date/tournament.
   const { data: bookingRows, error: bookingErr } = await hub
     .from('bookings')
     .select('id, match_id, game_date, format, tournament:tournaments(name)')
     .in('match_id', matchIds)
+    .eq('status', 'confirmed')
   if (bookingErr) throw new Error(bookingErr.message)
   const bookingByMatchId = new Map((bookingRows ?? []).map((b: any) => [b.match_id, b]))
 
@@ -449,11 +461,13 @@ export async function getLeaderboard(filters: { year?: number; month?: string; t
 // Capped at today — a future booking can already have a match_id set
 // (admins sometimes attach the CricHeroes match link ahead of time), which
 // would otherwise surface a not-yet-played month in the stepper's picker
-// with nothing in it.
+// with nothing in it. Also excludes cancelled bookings — see
+// getMonthlyPerformances()'s comment for why a stale, rescheduled-away
+// booking can't just be left in.
 export async function getAvailableMonths(): Promise<string[]> {
   const today = new Date().toISOString().split('T')[0]
   const hub = createServiceClient()
-  const { data, error } = await hub.from('bookings').select('game_date').not('match_id', 'is', null).lte('game_date', today)
+  const { data, error } = await hub.from('bookings').select('game_date').not('match_id', 'is', null).eq('status', 'confirmed').lte('game_date', today)
   if (error) throw new Error(error.message)
   const months = new Set<string>((data ?? []).map((b: any) => (b.game_date as string).slice(0, 7)))
   return Array.from(months).sort((a, b) => b.localeCompare(a))
@@ -502,8 +516,16 @@ export async function getMonthlyPerformances(month: string): Promise<MonthlyPerf
   const playerIds = Array.from(new Set<string>([...qualifyingBatting, ...qualifyingBowling].map((r: any) => r.player_id)))
 
   const hub = createServiceClient()
+  // .eq('status', 'confirmed') — real incident: a match rescheduled twice
+  // (Apr -> Jun -> Jul) left two cancelled bookings behind, each still
+  // carrying the same match_id as the eventual confirmed Jul booking.
+  // getScopedMatchIds() already excludes those from a given month's scope
+  // (so the match itself no longer wrongly appears under April/June), but
+  // this join needs the same filter too — otherwise a cancelled booking
+  // sharing the match_id can still win the Map below and show the wrong
+  // date/tournament for a performance that *did* correctly qualify.
   const [{ data: bookings, error: bookErr }, { data: players, error: pErr }] = await Promise.all([
-    hub.from('bookings').select('id, match_id, game_date, format, tournament:tournaments(name)').in('match_id', matchIds),
+    hub.from('bookings').select('id, match_id, game_date, format, tournament:tournaments(name)').in('match_id', matchIds).eq('status', 'confirmed'),
     hub.from('players').select('id, name, cricheroes_url, photo_url').in('id', playerIds),
   ])
   if (bookErr) throw new Error(bookErr.message)
@@ -587,7 +609,7 @@ export async function getRecentForm(playerIds: string[], matchCount: number = 5)
   let dateByMatch = new Map<string, string>()
   if (matchIds.length > 0) {
     const hub = createServiceClient()
-    const { data: bookings, error } = await hub.from('bookings').select('match_id, game_date').in('match_id', matchIds)
+    const { data: bookings, error } = await hub.from('bookings').select('match_id, game_date').in('match_id', matchIds).eq('status', 'confirmed')
     if (error) throw new Error(error.message)
     dateByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b.game_date]))
   }
@@ -653,7 +675,7 @@ async function matchIdsForFilter(filter: {
   format?:          string
 }): Promise<string[]> {
   const hub = createServiceClient()
-  let query = hub.from('bookings').select('match_id').not('match_id', 'is', null)
+  let query = hub.from('bookings').select('match_id').not('match_id', 'is', null).eq('status', 'confirmed')
   if (filter.tournamentId)   query = query.eq('tournament_id', filter.tournamentId)
   if (filter.tournamentIdIn) query = query.in('tournament_id', filter.tournamentIdIn)
   // Case-insensitive — CricHeroes/admin-entered venue text and the ground's
