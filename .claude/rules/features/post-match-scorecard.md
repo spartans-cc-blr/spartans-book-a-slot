@@ -378,6 +378,23 @@ the squad that day. A line under the batting table lists everyone from
 same way every other player name is — mirrors CricHeroes's own scorecard
 convention.
 
+### Fielding table (added 1 Aug 2026)
+A third table, `ScorecardTables.tsx`, rendered underneath Bowling: Player /
+Ct / St / RO / Total. Sourced from `match_stats_cache.fielding` (already
+being synced and returned by `/api/matches/history/[bookingId]/scorecard` —
+it just wasn't rendered anywhere until now). `Ct` sums the analytics DB's
+`catches` and `caught_behind` fields — both display as a plain "catch" on
+a real scorecard, the DB just tracks keeper catches separately from
+fielder catches. `RO` is `run_outs`, already the total credited to that
+player regardless of whether they were the thrower or collector — the
+`assisted_run_out_thrower`/`assisted_run_out_collector` fields are a
+breakdown of that same number, not additional dismissals. `Total` is the
+sum of all four. Rows with zero total are filtered out (same spirit as the
+did-not-bat/did-not-bowl filters), and the whole table is hidden if no
+player has a fielding dismissal — unlike Batting/Bowling, which always
+render with a "No data" fallback row. Top fielder (by total dismissals) is
+gold-highlighted, same convention as top batter/top bowler.
+
 ### Squad collapsible — hidden once redundant
 Only shown when `!match.stats || !match.roles_complete` — i.e. hidden once
 the scorecard has synced stats *and* C/VC/WK are all set, since at that
@@ -457,7 +474,7 @@ and `year=all` specifically.
 | `src/app/api/matches/history/[bookingId]/tournament/route.ts` | Reassign tournament post-hoc |
 | `src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` | `/matches/history` page — filters, pagination, `MatchHistoryCard` |
 | `src/components/matches/ScorecardUploadButton.tsx` | Upload button + actionable-state UI only (no-upload / stuck pending_parse) |
-| `src/components/matches/ScorecardTables.tsx` | Batting/bowling tables + "Did not bat" line |
+| `src/components/matches/ScorecardTables.tsx` | Batting/bowling/fielding tables + "Did not bat" line |
 | `src/app/admin/bookings/[id]/page.tsx` | Admin booking edit page — Post-Match panel |
 | `supabase/migrations/042_add_wrangler_role.sql` | `players.is_wrangler` |
 | `supabase/migrations/044_match_stats_cache.sql` | `match_stats_cache` table (reconstructed — see Section 5) |
