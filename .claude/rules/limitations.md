@@ -79,6 +79,17 @@ IST-aware day check — see `lock-availability`'s `route.ts` for the pattern.
 But even that workaround only addresses the day-of-week restriction, not
 Hobby's broader invocation unreliability.
 
+**Separate, permanent constraint: one invocation per day per cron job.**
+Vercel Hobby does not allow a single `vercel.json` cron entry to fire more
+than once a day, full stop — there's no way to express `"30 6,13 * * *"`
+(twice daily) on the Vercel side the way GitHub Actions can. This is why
+`vercel.json`'s entry for `/api/cron/backfill-scorecards` has only ever
+carried one time of day; it was never an oversight or drift from an
+intended twice-daily config there. Any cron on this project that genuinely
+needs multiple fires per day (`backfill-scorecards` at 12:00 & 19:00 IST)
+must rely on its GitHub Actions workflow for the additional fire(s) —
+`vercel.json` can only ever cover one of them as a backup.
+
 **Fix (implemented 2026-07-16):** all five crons now have a matching
 GitHub Actions workflow in `.github/workflows/cron-*.yml` that calls the
 same endpoint with the same `CRON_SECRET` on the same intended schedule,

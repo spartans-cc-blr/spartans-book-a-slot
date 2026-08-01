@@ -283,9 +283,14 @@ without re-running the fetch (a false-alarm override, distinct from "Reset
 Upload").
 
 ### `/api/cron/backfill-scorecards` — twice daily, self-healing
-Runs at 12:00 and 19:00 IST (GitHub Actions: `"30 6,13 * * *"`; `vercel.json`
-carries a single-fire backup at `"30 6 * * *"` — the 12:00 slot only, not
-twice-daily on the Vercel side). Moved off the original 07:00 slot on
+Runs at 12:00 and 19:00 IST (GitHub Actions: `"30 6,13 * * *"`). `vercel.json`
+carries a single-fire backup at `"30 13 * * *"` (19:00 IST only) — **Vercel
+Hobby caps cron jobs at one invocation per day per job**, so it was never
+possible to mirror both slots there; this is also why `vercel.json` only
+ever had one entry for this route in the first place, not a drift from an
+intended twice-daily config. 19:00 was chosen over 12:00 for the single
+Vercel-side backup since it's the slot more likely to already have a
+CricHeroes scorecard to fetch. Moved off the original 07:00 slot on
 2026-08-01: no games are ever played between 19:00 and 07:00 IST, so a
 07:00 run never had any new backlog the prior 19:00 run hadn't already seen
 — it was pure dead time. 12:00 additionally gives CricHeroes room to
