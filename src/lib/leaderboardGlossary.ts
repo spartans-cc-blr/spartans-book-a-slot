@@ -6,7 +6,7 @@
 // fixed glossary would drift out of sync with what's on screen. Each
 // builder below quotes the real number currently in effect.
 
-import { minGamesThreshold, MIN_BALLS_FOR_ECONOMY } from '@/components/leaderboard/LeaderboardMilestones'
+import { minGamesThreshold, minDismissalsThreshold, MIN_BALLS_FOR_ECONOMY } from '@/lib/leaderboardMilestones'
 import type { TableCategory } from '@/components/leaderboard/LeaderboardFilters'
 
 export interface GlossaryEntry {
@@ -23,17 +23,29 @@ function scopeDescriptor(year: number | 'all', tournamentName: string | null, gr
 export function buildOverallGlossary(year: number | 'all', tournamentName: string | null, groundName: string | null): GlossaryEntry[] {
   const scoped = !!(tournamentName || groundName)
   const minGames = minGamesThreshold(year, scoped)
+  const minDismissals = minDismissalsThreshold(year, scoped)
   const scope = scopeDescriptor(year, tournamentName, groundName)
   const qualifier = `at least ${minGames} game${minGames === 1 ? '' : 's'} ${scope}`
-  return [
+  const entries: GlossaryEntry[] = [
     { term: 'Leading MVP', definition: `Highest total MVP points (batting, bowling, and fielding contributions combined) among players with ${qualifier}.` },
     { term: 'Leading Run Scorer', definition: `Most runs scored among players with ${qualifier}.` },
     { term: 'Leading Wicket Taker', definition: `Most wickets taken among players with ${qualifier}.` },
-    { term: 'Most 100s / Most 50s', definition: `Most centuries / half-centuries scored among players with ${qualifier}.` },
+    { term: 'Most Dismissals', definition: `Most fielding dismissals (catches + run outs + stumpings combined) among players with ${qualifier} — only shown once the leader has reached ${minDismissals} dismissal${minDismissals === 1 ? '' : 's'} ${scope}. A full season of 50 is considered a genuinely good year in the field; that bar is prorated by quarter for a season still in progress.` },
+    { term: 'Most 100s', definition: year === 'all'
+        ? `Most centuries scored among players with ${qualifier}.`
+        : `Only shown when a player has scored more than one century ${scope} — with everyone else tied at just one, that's not a real "most" yet. See every individual century in the Centuries list below instead.` },
+    { term: 'Most 50s', definition: `Most half-centuries scored among players with ${qualifier}.` },
     { term: 'Best Average', definition: `Highest batting average — runs ÷ dismissals, not-out innings excluded — among players with ${qualifier}.` },
     { term: 'Highest S/R', definition: `Highest batting strike rate — runs per 100 balls faced — among players with ${qualifier}.` },
     { term: 'Best Economy', definition: `Fewest runs conceded per over among bowlers who bowled at least ${MIN_BALLS_FOR_ECONOMY} balls (${MIN_BALLS_FOR_ECONOMY / 6} overs) ${scope}.` },
   ]
+  if (year !== 'all') {
+    entries.push(
+      { term: 'Centuries', definition: `Every individual batting innings of 100+ runs ${scope} — every one, not just the highest. Tap a row to open that match.` },
+      { term: '5-Wicket Hauls', definition: `Every bowling innings of 5 or more wickets ${scope}. Tap a row to open that match.` },
+    )
+  }
+  return entries
 }
 
 export function buildMonthlyGlossary(monthLabel: string): GlossaryEntry[] {

@@ -24,6 +24,6 @@
     },
     { "path": "/api/cron/sync-player-status",   "schedule": "30 20 * * *" },
     { "path": "/api/cron/availability-nudge",   "schedule": "15 15 * * 0-3" },
-    { "path": "/api/cron/backfill-scorecards",  "schedule": "30 1 * * *" }
+    { "path": "/api/cron/backfill-scorecards",  "schedule": "30 13 * * *" }
 ]
 }

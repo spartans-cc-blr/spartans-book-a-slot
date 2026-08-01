@@ -200,10 +200,11 @@ export interface RecentForm {
 }
 
 // One qualifying 50+/100+ innings, or one qualifying 3+/5+ wicket bowling
-// innings, for the /leaderboard "Monthly" view — see
-// src/lib/playerStats.ts getMonthlyPerformances(). Unlike LeaderboardRow
+// innings, for the /leaderboard "Monthly" view and the "Overall" view's
+// year-scoped Centuries/5-Wicket Hauls bands — see
+// src/lib/playerStats.ts getPerformances(). Unlike LeaderboardRow
 // (aggregated across every match in scope), these are single-match lines,
-// since Monthly lists every century/half-century/5-for/3-for rather than
+// since both views list every century/half-century/5-for/3-for rather than
 // crowning one "most" winner. `bookingId` links the row to its match page
 // (/matches/history/[bookingId]) — null only if the booking behind an
 // already-synced match_id was later deleted.
