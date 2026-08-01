@@ -122,7 +122,7 @@ export default function BookingDetailPage() {
   const [feeError,         setFeeError]          = useState('')
   const [feeConfirming,    setFeeConfirming]     = useState(false)
   const [scorecardOpen,    setScorecardOpen]     = useState(false)
-  const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[]; team_list?: any[] } | null>(null)
+  const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[]; fielding?: any[]; team_list?: any[] } | null>(null)
   const [scorecardSquad,   setScorecardSquad]    = useState<{ player_id: string; player_name: string; cricheroes_url: string | null }[] | undefined>(undefined)
   const [scorecardLoading, setScorecardLoading]  = useState(false)
   const [scorecardError,   setScorecardError]    = useState('')
@@ -745,7 +745,7 @@ export default function BookingDetailPage() {
                         {scorecardLoading && <p className="font-rajdhani text-xs text-zinc-600">Loading…</p>}
                         {scorecardError && <p className="font-rajdhani text-xs text-red-400">{scorecardError}</p>}
                         {scorecard && (
-                          <ScorecardTables batting={scorecard.batting} bowling={scorecard.bowling} teamList={scorecard.team_list} squad={scorecardSquad} />
+                          <ScorecardTables batting={scorecard.batting} bowling={scorecard.bowling} fielding={scorecard.fielding} teamList={scorecard.team_list} squad={scorecardSquad} />
                         )}
                       </div>
                     )}

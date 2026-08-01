@@ -927,6 +927,7 @@ function MatchHistoryCard({
                 <ScorecardTables
                   batting={scorecard.batting}
                   bowling={scorecard.bowling}
+                  fielding={scorecard.fielding}
                   teamList={scorecard.team_list}
                   squad={detail?.squad}
                 />
