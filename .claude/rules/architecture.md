@@ -62,6 +62,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 |---|---|---|
 | `/profile` | Server + client form | `players` (own row only — IDOR protected) |
 | `/matches/history` | Server → `MatchHistoryClient` (client) | `bookings` (past confirmed), `scorecard_uploads`, `match_stats_cache`, `squad`; upload/sync/verify/flag actions gated per-booking to captain/VC/wrangler/admin, but the verified status itself is visible to every viewer — see `features/post-match-scorecard.md` §14 |
+| `/leaderboard` | Server → `LeaderboardMilestones`/`LeaderboardMonthly`/`LeaderboardTable` (client) | Analytics DB (`batting_stats`/`bowling_stats`/`fielding_stats`/`team_list`) via `src/lib/playerStats.ts`, joined to Hub `players`; year/month/tournament/ground/format filters — see `features/leaderboard.md` |
  
 ### Captain Routes (`isCaptain` or `isAdmin`)
  
@@ -649,6 +650,14 @@ Next.js API Routes (server-side)
 | `src/app/api/admin/player-reconciliation/route.ts` | GET buckets pending scorecard names, POST confirms/ignores/reconciles |
 | `src/app/admin/player-reconciliation/page.tsx` | Admin reconciliation UI + "Run Reconciliation Pass" client loop |
 | `analytics-db/migrations/001_player_identity_resolution.sql` | Analytics DB (separate project) — `player_id` columns + alias/override/ignore tables |
+| `src/app/leaderboard/page.tsx` | `/leaderboard` ("Yours Statistically") — any signed-in, non-expelled member; year/month/tournament/ground/format filters; see `features/leaderboard.md` |
+| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()`, `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()` — shared analytics-DB query layer, also used by Captains' Corner recent-form |
+| `src/lib/leaderboardMilestones.ts` | Plain (non-`'use client'`) module — `minGamesThreshold()`, `minDismissalsThreshold()`, `bestBy()`/`bestByAll()`, `totalDismissals()`; deliberately kept free of React/JSX so server-only callers like `leaderboardGlossary.ts` can import it safely — see `features/leaderboard.md` |
+| `src/lib/leaderboardGlossary.ts` | Builds the "What do these numbers mean?" entries at the bottom of `/leaderboard`, quoting the real thresholds currently in effect |
+| `src/components/leaderboard/LeaderboardMilestones.tsx` | "Overall" tab — milestone cards (tie-inclusive) + year-scoped collapsible Centuries/5-Wicket Hauls bands; see `features/leaderboard.md` |
+| `src/components/leaderboard/LeaderboardMonthly.tsx` | "Monthly" tab — single-winner cards + always-open Centuries/Half-Centuries/5-for/3-for panels |
+| `src/components/leaderboard/InningsRow.tsx` | Shared clickable-row-to-match-page primitives (`ClickableRow`, `BattingInningsRow`, `BowlingInningsRow`), used by both Milestones and Monthly |
+| `src/components/leaderboard/LeaderboardTable.tsx` | Batting/Bowling/Fielding/MVP detailed-columns tabs |
 | `src/app/wrangler/grounds/page.tsx` + `src/components/wrangler/GroundsClient.tsx` | `/wrangler/grounds` — grounds management, moved off `/admin/*`; `canAdd`/`canEdit` props gate GC-vs-wrangler UI; see `features/wrangler-grounds-menu.md` |
 | `src/app/api/grounds/route.ts` | GET public; POST `isGC \|\| isAdmin`; PATCH `isWrangler \|\| isAdmin` |
  
