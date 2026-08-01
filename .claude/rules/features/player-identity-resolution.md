@@ -199,7 +199,14 @@ go ask the player to link their profile first.
   `select('*')` on all four analytics tables, so `player_id` flows into
   `match_stats_cache`'s jsonb columns automatically once reconciled. Rows
   synced before reconciliation just carry `player_id: null` until the next
-  sync — expected, not a bug.
+  sync — expected, not a bug. In practice this "expected" gap turned out to
+  be much larger than assumed: an audit on 2026-08-01 found 63 of ~65
+  synced bookings carrying at least one stale `player_id: null` for a name
+  that *was* already resolved on the analytics side — see
+  `features/post-match-scorecard.md` §15's 1 Aug 2026 incident write-up for
+  the fleet-wide bulk-patch and its take-away (there is still no
+  automated re-sync-on-reconcile hook, so this can recur for any newly
+  confirmed alias/override).
 - `src/components/matches/ScorecardTables.tsx` — `findCricHeroesUrl()`
   prefers a `player_id` match against the booking's squad, falling back to
   the old case-insensitive name match only when `player_id` is absent

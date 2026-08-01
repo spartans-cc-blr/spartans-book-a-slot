@@ -515,6 +515,7 @@ MICROSERVICE_SECRET  = <same value as Hub's MICROSERVICE_SECRET>
 | Wrong PDF uploaded — admin override | ✅ Done — "Reset Upload" / `DELETE /api/admin/matches/[id]/post-match` |
 | `import_from_dict` on `SupabaseImporter` | ✅ Done, live on Render |
 | CricHeroes match URL backfill for pre-existing bookings | ⏳ See `pending-backlog.md` E-3 — separate, ongoing coordinator task |
+| `match_stats_cache` carrying stale `player_id: null` for names reconciled in the analytics DB *after* that booking last synced — 63 of ~65 bookings affected | ✅ Bulk-patched 2026-08-01 — see Section 15's second incident write-up. No automated re-sync-on-reconcile hook exists yet, so this class of drift can recur for any newly-confirmed alias/override until one is built |
 
 ---
 
@@ -996,6 +997,7 @@ tie-inclusive `computeTopPerformers()` path.
 |---|---|
 | Share list surfaced every tied top scorer/bowler instead of one MVP | ✅ Fixed 28 Jul 2026 — see "Share target — narrowed to a single match MVP" above. `computeMatchMVP()` added to `matchTopPerformers.ts`; `top_performers` in `/api/matches/history` now built from it instead of the tie-inclusive `computeTopPerformers()`. `can_verify`/`canActOnScorecard()` deliberately left unchanged. |
 | `computeMatchMVP()` picked the wrong player when the true MVP's scorecard name didn't byte-match their squad name | ✅ Fixed 31 Jul 2026 — see the incident write-up below. Resolution order flipped: max-then-resolve, not resolve-then-max. |
+| Same stale-`match_stats_cache` root cause, fleet-wide | ✅ Audited and bulk-fixed 1 Aug 2026 — see the second incident write-up below. 63 of ~65 synced bookings were affected; all patched in one pass. |
 | No other known gaps | Fresh as of this pass — worth a follow-up note here once a real top performer has actually verified or flagged a scorecard through this path. |
 
 > **Incident (28 Jul 2026) — stale `match_stats_cache` silently hid the
@@ -1062,6 +1064,65 @@ tie-inclusive `computeTopPerformers()` path.
 > Take-away, same as 28 Jul's: a name being present in
 > `player_name_aliases` doesn't mean every match that name appears in has
 > picked it up yet — only a sync after the alias existed does that.
+
+> **Incident (1 Aug 2026) — the 31 Jul root cause turned out to be
+> fleet-wide, not a one-off on a single booking.** After fixing the 12 Apr
+> and 18 Apr Blendin matches individually, a full audit was run across
+> every row in `match_stats_cache`: for each booking, count how many
+> `batting`/`bowling`/`fielding`/`team_list` entries still carry
+> `player_id: null` despite the analytics DB's own `batting_stats` /
+> `bowling_stats` / `fielding_stats` / `team_list` rows for that same
+> `(match_id, player_name)` already having a resolved `player_id`. **63 of
+> the ~65 synced bookings** had at least one such row — the same class of
+> drift as both incidents above (a scorecard nickname like "Siva", "Uday",
+> "Sagar", "Kathiresh", "Venkat R", "Trinadh Gondu", or "Ganapathy
+> Rajeswaran" gets reconciled in the analytics DB sometime *after* that
+> booking's Hub-side cache was last synced, and nothing re-syncs it
+> automatically). This had been silently suppressing or misdirecting the
+> MVP share target on the large majority of match history, not just the
+> two reported cases.
+>
+> **Fix — a database-side patch, not a re-sync loop.** Re-running
+> `syncMatchStatsForBooking()` 63 times (the "correct", ordinary path) was
+> considered but skipped in favour of a direct, one-shot SQL correction:
+> a lookup of every `(match_id, player_name, player_id)` triple already
+> resolved in the analytics DB (744 rows across the affected matches) was
+> joined against `match_stats_cache` and used to patch *only* the missing
+> `player_id` key inside each existing JSON array element — every other
+> field (runs, balls, `mvp_score`, etc.) was left untouched, and `synced_at`
+> was bumped to record the correction. This was deliberately narrower than
+> a full re-sync: it fixes exactly the known symptom (stale `player_id`)
+> without re-pulling or overwriting anything else from the analytics DB in
+> the same pass.
+>
+> **Verification, not just execution.** A follow-up null-count sweep
+> across all bookings confirmed the fix, and also caught its own gap: one
+> row (`Nirmal Kumar`, match `23938237`, the same 18 Apr booking from the
+> incident above) was still stale after the bulk patch even though the
+> analytics DB had a resolved `player_id` for it in all four tables —
+> the earlier 744-row extraction had missed this one row for reasons not
+> fully root-caused (not a name-formatting issue — the string matched
+> byte-for-byte). Patched individually once found. The remaining 16
+> matches with a leftover null (one player each, two in one case) were
+> cross-checked directly against the analytics DB and confirmed to have
+> **no** resolution there either, in any of the four stat tables — names
+> like "Shivam Malhotra", "KARAN", "Jenish", "Nitish", "Selva" read as
+> opponent-team players who were never Hub members, not a caching bug.
+> These are expected `player_id: null` and need no action (an admin could
+> optionally mark them `ignored_names` via `/admin/player-reconciliation`
+> to keep them off future reconciliation queues, but nothing depends on
+> that).
+>
+> **Take-away for next time this class of bug is suspected:** don't
+> assume a reported stale-cache symptom is isolated to the one booking a
+> user noticed. `player_name_aliases`/`match_name_overrides` reconciliation
+> in the analytics DB and `match_stats_cache` syncs on the Hub side are two
+> independently-timed operations with no trigger linking them — a booking
+> synced even a day before its scorecard names were reconciled will carry
+> this drift indefinitely until something re-syncs or patches it. There is
+> still no automated re-sync-on-reconcile hook; each new alias/override
+> confirmed via `/admin/player-reconciliation` can leave every
+> already-synced match containing that name freshly stale again.
 
 ---
 
