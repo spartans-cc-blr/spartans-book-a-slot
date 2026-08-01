@@ -50,11 +50,20 @@ function findPlayerId(row: any, name: string, squad?: SquadRef[]): string | null
   return byName?.player_id ?? null
 }
 
+// catches + caught_behind (keeper catches are stored separately from
+// fielder catches in the analytics DB, but both display as a plain "catch"
+// on a scorecard) + stumpings + run_outs (already the total run-outs
+// credited to this player, regardless of thrower/collector role).
+function fieldingTotal(row: any): number {
+  return num(row, ['catches']) + num(row, ['caught_behind']) + num(row, ['stumpings']) + num(row, ['run_outs'])
+}
+
 export function ScorecardTables({
-  batting, bowling, teamList, squad,
+  batting, bowling, fielding, teamList, squad,
 }: {
   batting: any[]
   bowling: any[]
+  fielding?: any[]
   teamList?: any[]
   squad?: SquadRef[]
 }) {
@@ -69,8 +78,14 @@ export function ScorecardTables({
   )
   const bowlingRows = bowling.filter(row => num(row, ['overs', 'overs_bowled']) > 0)
 
+  // Most players in a squad had zero fielding involvement in a given match —
+  // only show rows with at least one dismissal, same spirit as filtering
+  // out did-not-bat / did-not-bowl rows above.
+  const fieldingRows = (fielding ?? []).filter(row => fieldingTotal(row) > 0)
+
   const topBatRuns  = battingRows.reduce((max, r) => Math.max(max, num(r, ['runs', 'total_runs'])), 0)
   const topBowlWkts = bowlingRows.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
+  const topFieldingTotal = fieldingRows.reduce((max, r) => Math.max(max, fieldingTotal(r)), 0)
 
   // The batting table filters out players who didn't bat, so on its own it
   // can't answer "who else was in the squad that day" — team_list (the full
@@ -201,6 +216,53 @@ export function ScorecardTables({
           </table>
         </div>
       </div>
+
+      {fieldingRows.length > 0 && (
+        <div>
+          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Fielding</p>
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed text-xs font-rajdhani">
+              <colgroup>
+                <col className="w-[50.4%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[13.6%]" />
+              </colgroup>
+              <thead>
+                <tr className="text-zinc-600 border-b border-ink-5">
+                  <th className="text-center py-1 pr-2">Player</th>
+                  <th className="text-center px-1">Ct</th>
+                  <th className="text-center px-1">St</th>
+                  <th className="text-center px-1">RO</th>
+                  <th className="text-right pl-1">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fieldingRows.map((row, i) => {
+                  const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
+                  const catches = num(row, ['catches']) + num(row, ['caught_behind'])
+                  const stumpings = num(row, ['stumpings'])
+                  const runOuts = num(row, ['run_outs'])
+                  const total = fieldingTotal(row)
+                  const isTop = topFieldingTotal > 0 && total === topFieldingTotal
+                  return (
+                    <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
+                      <td className="text-right py-1 pr-2">
+                        <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                      </td>
+                      <td className="text-center px-1">{catches}</td>
+                      <td className="text-center px-1">{stumpings}</td>
+                      <td className="text-center px-1">{runOuts}</td>
+                      <td className="text-right pl-1">{total}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
