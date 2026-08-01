@@ -55,6 +55,30 @@ export function minGamesThreshold(year: number | 'all', scoped: boolean): number
   return quartersCompleted * 3
 }
 
+// Same shape as minGamesThreshold() above, but for "Most Dismissals"
+// (catches + run outs + stumpings): 50 fielding dismissals across a full
+// season is a genuinely good year behind the stumps/in the field, prorated
+// to 12 per completed calendar quarter for a season still in progress
+// (50 / 4 = 12.5, rounded down so the bar stays honest rather than
+// generous). Without this, "Most Dismissals" would crown whoever has the
+// most catches in the first few weeks of a new year off a trivially small
+// sample — the same problem the century-card gating above exists to avoid.
+// `scoped` drops to a token floor of 1 — a single tournament/ground is too
+// short a sample for a 50-dismissal target to ever realistically clear.
+export function minDismissalsThreshold(year: number | 'all', scoped: boolean): number {
+  if (scoped) return 1
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  if (year === 'all' || year < currentYear) return 50
+  if (year > currentYear) return 0
+  const quartersCompleted = Math.floor(now.getMonth() / 3)
+  return quartersCompleted * 12
+}
+
+function totalDismissals(r: LeaderboardRow): number {
+  return r.stats.catches + r.stats.runOuts + r.stats.stumpings
+}
+
 interface Milestone {
   key: string
   label: string
@@ -145,6 +169,7 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
   const topMVP     = bestByAll(rows, r => r.stats.mvpPoints, qualifiesOnGames)
   const topRuns     = bestByAll(rows, r => r.stats.runs, qualifiesOnGames)
   const topWickets  = bestByAll(rows, r => r.stats.wickets, qualifiesOnGames)
+  const mostDismissals    = bestByAll(rows, totalDismissals, r => totalDismissals(r) > 0 && qualifiesOnGames(r))
   const mostCenturies     = bestByAll(rows, r => r.centuries, r => r.centuries > 0 && qualifiesOnGames(r))
   const mostHalfCenturies = bestByAll(rows, r => r.halfCenturies, r => r.halfCenturies > 0 && qualifiesOnGames(r))
   const bestAverage = bestByAll(rows, r => r.stats.battingAverage, qualifiesOnGames)
@@ -159,6 +184,14 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
   // no collapsible list as a fallback, so the tied-cards treatment stays.
   const centuryCardRows = !showInningsBands || (mostCenturies[0]?.centuries ?? 0) > 1 ? mostCenturies : []
 
+  // "Most Dismissals" only earns a card once the leader clears
+  // minDismissalsThreshold() — same idea as the century gate above, applied
+  // unconditionally (not just for a specific year) since there's no
+  // collapsible list fallback for fielding dismissals to defer to.
+  const dismissalsThreshold = minDismissalsThreshold(year, scoped)
+  const topDismissalsValue = mostDismissals[0] ? totalDismissals(mostDismissals[0]) : 0
+  const dismissalsCardRows = topDismissalsValue >= dismissalsThreshold ? mostDismissals : []
+
   // One card per tied player, not one card per category — a genuine tie on
   // centuries (both players with 2+) still renders as multiple "Most 100s"
   // cards instead of silently picking a single "winner".
@@ -170,6 +203,7 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
     ...toMilestones('Leading MVP',          '🏆', topMVP,     r => `${r.stats.mvpPoints.toFixed(2)} pts`),
     ...toMilestones('Leading Run Scorer',   '🏏', topRuns,     r => `${r.stats.runs} runs`),
     ...toMilestones('Leading Wicket Taker', '🎯', topWickets,  r => `${r.stats.wickets} wkts`),
+    ...toMilestones('Most Dismissals',      '🧤', dismissalsCardRows, r => `${totalDismissals(r)} dismissals`),
     ...toMilestones('Most 100s',            '💯', centuryCardRows,   r => `${r.centuries} centuries`),
     ...toMilestones('Most 50s',             '5️⃣0️⃣', mostHalfCenturies, r => `${r.halfCenturies} fifties`),
     ...toMilestones('Best Average',         '📊', bestAverage, r => `Avg ${r.stats.battingAverage!.toFixed(2)}`),
