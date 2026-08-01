@@ -91,8 +91,8 @@ Captain / VC / Wrangler opens match                 │  no browser needed)
 in /matches/history                                 │
         │                                            │
         ▼                                            ▼
-"Upload Scorecard" → file picker            Daily cron (07:00 IST) or
-        │                                    /admin/scorecard-backfill
+"Upload Scorecard" → file picker            Twice-daily cron (12:00/19:00
+        │                                    IST) or /admin/scorecard-backfill
         ▼                                            │
 POST /api/matches/[id]/scorecard             backfillOneBooking()
   (streamed progress events)                  (src/lib/scorecardBackfill.ts)
