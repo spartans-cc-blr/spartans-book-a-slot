@@ -308,18 +308,6 @@ export default function BookingDetailPage() {
     } catch { /* invalid URL — ignore */ }
   }, [cricheroes])
 
-  useEffect(() => {
-    if (!slotTime) return
-    setMatchTime(prev => {
-      if (prev) return prev
-      const [h, m] = slotTime.split(':').map(Number)
-      const total  = h * 60 + m - 15
-      const hh     = String(Math.floor(total / 60)).padStart(2, '0')
-      const mm     = String(total % 60).padStart(2, '0')
-      return `${hh}:${mm}`
-    })
-  }, [slotTime])
-
   const validate = useCallback(async () => {
     if (!gameDate || !format || !slotTime || !tournamentId) {
       setRuleChecks(RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Fill all fields to check.' })))
