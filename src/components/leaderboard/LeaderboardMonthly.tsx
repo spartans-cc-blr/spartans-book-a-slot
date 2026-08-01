@@ -25,10 +25,10 @@
 // sample (MIN_BALLS_FOR_ECONOMY) for the same reason it does on Milestones
 // — a two-ball spell shouldn't win "best economy".
 
-import { useRouter } from 'next/navigation'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { bestBy, MIN_BALLS_FOR_ECONOMY } from './LeaderboardMilestones'
 import { PlayerAvatar } from './PlayerAvatar'
+import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
 import { BallIcon } from '@/components/matches/BallIcon'
 import { WicketIcon } from './WicketIcon'
 import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
@@ -38,85 +38,6 @@ interface Milestone {
   icon: string
   row: LeaderboardRow | null
   valueText: string
-}
-
-function formatShortDate(dateStr: string | null): string {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
-}
-
-// Whole-row click target for the match page. Not a real <a> — the row
-// already contains PlayerNameLink, a genuine nested anchor, and browsers
-// don't support <a> inside <a> (the outer tag silently closes early). A
-// clickable div with the same stopPropagation convention already used
-// elsewhere in this app (CaptainsCornerGrid's SelectablePlayerRow, etc.)
-// gets the same same-tab/back-button behaviour without invalid markup.
-function ClickableRow({ bookingId, children }: { bookingId: string | null; children: React.ReactNode }) {
-  const router = useRouter()
-  const base = 'flex items-center gap-3 px-4 py-2.5 border-b border-ink-4 last:border-b-0'
-  if (!bookingId) return <div className={base}>{children}</div>
-  return (
-    <div
-      role="link"
-      tabIndex={0}
-      onClick={() => router.push(`/matches/history/${bookingId}`)}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push(`/matches/history/${bookingId}`) }}
-      className={`${base} cursor-pointer hover:bg-ink-4 transition-colors`}>
-      {children}
-    </div>
-  )
-}
-
-function RowIdentity({ photoUrl, playerId, playerName, cricheroesUrl, format, tournamentName }: {
-  photoUrl: string | null; playerId: string; playerName: string; cricheroesUrl: string | null
-  format: string | null; tournamentName: string | null
-}) {
-  return (
-    <>
-      <PlayerAvatar photoUrl={photoUrl} name={playerName} />
-      <div className="min-w-0 flex-1">
-        <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
-          <PlayerNameLink name={playerName} playerId={playerId} cricHeroesUrl={cricheroesUrl} />
-        </p>
-        <p className="font-rajdhani text-xs text-zinc-500 truncate">
-          {format && (
-            <span className="inline-block text-[9px] font-bold bg-ink-4 border border-ink-5 text-zinc-400 rounded px-1 py-0.5 mr-1.5 align-middle">
-              {format}
-            </span>
-          )}
-          {tournamentName ?? 'Tournament —'}
-        </p>
-      </div>
-    </>
-  )
-}
-
-function BattingInningsRow({ innings }: { innings: MonthlyInnings }) {
-  return (
-    <ClickableRow bookingId={innings.bookingId}>
-      <RowIdentity {...innings} />
-      <div className="text-right flex-shrink-0">
-        <p className="font-cinzel text-sm text-gold whitespace-nowrap">
-          {innings.runs}{innings.notOut ? '*' : ''} ({innings.balls})
-        </p>
-        <p className="font-rajdhani text-[10px] text-zinc-600 whitespace-nowrap">{formatShortDate(innings.gameDate)}</p>
-      </div>
-    </ClickableRow>
-  )
-}
-
-function BowlingInningsRow({ innings }: { innings: MonthlyBowlingInnings }) {
-  return (
-    <ClickableRow bookingId={innings.bookingId}>
-      <RowIdentity {...innings} />
-      <div className="text-right flex-shrink-0">
-        <p className="font-cinzel text-sm text-gold whitespace-nowrap">
-          {innings.wickets}/{innings.runsConceded} ({innings.overs} ov)
-        </p>
-        <p className="font-rajdhani text-[10px] text-zinc-600 whitespace-nowrap">{formatShortDate(innings.gameDate)}</p>
-      </div>
-    </ClickableRow>
-  )
 }
 
 function InningsPanel({ icon, label, count, children }: { icon: React.ReactNode; label: string; count: number; children: React.ReactNode }) {

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getLeaderboard, getFilterOptions, getAvailableMonths, getMonthlyPerformances } from '@/lib/playerStats'
+import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { LeaderboardFilters, type LeaderboardCategory, type Format } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
@@ -80,16 +80,24 @@ export default async function LeaderboardPage({
   // Monthly is scoped by month alone (no tournament/ground — see
   // LeaderboardFilters' Honor Board treatment); every other view keeps the
   // existing year/tournament/ground/format scoping.
+  const overallFilters = {
+    year: year === 'all' ? undefined : year,
+    tournamentId: tournamentId === 'all' ? undefined : tournamentId,
+    groundId: groundId === 'all' ? undefined : groundId,
+    formats: restrictedFormats,
+  }
+
   const rows = category === 'monthly'
     ? await getLeaderboard({ month, formats: restrictedFormats })
-    : await getLeaderboard({
-        year: year === 'all' ? undefined : year,
-        tournamentId: tournamentId === 'all' ? undefined : tournamentId,
-        groundId: groundId === 'all' ? undefined : groundId,
-        formats: restrictedFormats,
-      })
+    : await getLeaderboard(overallFilters)
 
-  const monthlyPerformances = category === 'monthly' ? await getMonthlyPerformances(month) : null
+  const monthlyPerformances = category === 'monthly' ? await getPerformances({ month }) : null
+
+  // Individual centuries/5-wicket-hauls list for the Overall tab's
+  // collapsible bands — only fetched for a specific year (not "All Time"),
+  // matching the same scope as `rows` above. Not fetched for "All" — that
+  // view keeps the plain tied-cards Most 100s treatment instead.
+  const yearlyPerformances = category === 'overall' && year !== 'all' ? await getPerformances(overallFilters) : null
 
   const glossaryTitle = category === 'overall' ? 'Overall'
     : category === 'monthly' ? 'Monthly'
@@ -127,7 +135,13 @@ export default async function LeaderboardPage({
         />
 
         {category === 'overall' ? (
-          <LeaderboardMilestones rows={rows} year={year} scoped={!!(tournamentName || groundName)} />
+          <LeaderboardMilestones
+            rows={rows}
+            year={year}
+            scoped={!!(tournamentName || groundName)}
+            centuries={yearlyPerformances?.centuries ?? null}
+            fiveWicketHauls={yearlyPerformances?.fiveWicketHauls ?? null}
+          />
         ) : category === 'monthly' ? (
           <LeaderboardMonthly
             rows={rows}

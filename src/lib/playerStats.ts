@@ -157,7 +157,7 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
     // without this a match can leak into every month/year/tournament its
     // now-stale cancelled attempts happened to be booked for, on top of
     // the one it actually got played in. Confirmed, real incident: see
-    // getMonthlyPerformances()'s comment below.
+    // getPerformances()'s comment below.
     let q = hub.from('bookings').select('match_id').not('match_id', 'is', null).eq('status', 'confirmed')
     if (filters.tournamentId) q = q.eq('tournament_id', filters.tournamentId)
     if (filters.month) {
@@ -466,7 +466,7 @@ export async function getLeaderboard(filters: { year?: number; month?: string; t
 // (admins sometimes attach the CricHeroes match link ahead of time), which
 // would otherwise surface a not-yet-played month in the stepper's picker
 // with nothing in it. Also excludes cancelled bookings — see
-// getMonthlyPerformances()'s comment for why a stale, rescheduled-away
+// getPerformances()'s comment for why a stale, rescheduled-away
 // booking can't just be left in.
 export async function getAvailableMonths(): Promise<string[]> {
   const today = new Date().toISOString().split('T')[0]
@@ -477,27 +477,31 @@ export async function getAvailableMonths(): Promise<string[]> {
   return Array.from(months).sort((a, b) => b.localeCompare(a))
 }
 
-type MonthlyPerformances = {
+type Performances = {
   centuries:        MonthlyInnings[]
   halfCenturies:    MonthlyInnings[]
   fiveWicketHauls:  MonthlyBowlingInnings[]
   threeWicketHauls: MonthlyBowlingInnings[]
 }
-const EMPTY_MONTHLY_PERFORMANCES: MonthlyPerformances = { centuries: [], halfCenturies: [], fiveWicketHauls: [], threeWicketHauls: [] }
+const EMPTY_PERFORMANCES: Performances = { centuries: [], halfCenturies: [], fiveWicketHauls: [], threeWicketHauls: [] }
 
 function resolveTournamentName(booking: any): string | null {
   return Array.isArray(booking?.tournament) ? (booking.tournament[0]?.name ?? null) : (booking?.tournament?.name ?? null)
 }
 
-// Every individual 50+ batting innings and 3+ wicket bowling innings in a
-// given month, split into centuries/half-centuries and 5-for/3-for bands
-// (each pair mutually exclusive by score, same convention as the
-// year-scoped Milestones cards' centuries/halfCenturies split) — the
-// Monthly view lists each one rather than crowning a single "most" winner.
-// Sorted best performance first, most recent date as the tiebreak.
-export async function getMonthlyPerformances(month: string): Promise<MonthlyPerformances> {
-  const scoped = await getScopedMatchIds({ month })
-  if (!scoped || scoped.length === 0) return EMPTY_MONTHLY_PERFORMANCES
+// Every individual 50+ batting innings and 3+ wicket bowling innings within
+// the given scope, split into centuries/half-centuries and 5-for/3-for
+// bands (each pair mutually exclusive by score) — lists each one rather
+// than crowning a single "most" winner. Sorted best performance first,
+// most recent date as the tiebreak. Takes the same filter shape as
+// getLeaderboard()/getScopedMatchIds() — used both for the Monthly view
+// (scoped by `month`) and for the year-scoped Milestones "Centuries" /
+// "5-Wicket Hauls" collapsible lists (scoped by `year` + whatever
+// tournament/ground/format filter is active), since 100s and 5-fors are
+// rare enough that a whole year's worth is still a reasonably short list.
+export async function getPerformances(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] }): Promise<Performances> {
+  const scoped = await getScopedMatchIds(filters)
+  if (!scoped || scoped.length === 0) return EMPTY_PERFORMANCES
 
   const analytics = createAnalyticsClient()
   if (!analytics) throw new Error('Analytics database is not configured')
@@ -510,7 +514,7 @@ export async function getMonthlyPerformances(month: string): Promise<MonthlyPerf
 
   const qualifyingBatting = (battingRows ?? []).filter((r: any) => r.batted && num(r.runs) >= 50)
   const qualifyingBowling = (bowlingRows ?? []).filter((r: any) => r.did_bowl && num(r.wickets) >= 3)
-  if (qualifyingBatting.length === 0 && qualifyingBowling.length === 0) return EMPTY_MONTHLY_PERFORMANCES
+  if (qualifyingBatting.length === 0 && qualifyingBowling.length === 0) return EMPTY_PERFORMANCES
 
   // One shared bookings + players fetch for both bands — cheaper than
   // fetching separately, and `id` (booking id) rides along for free
