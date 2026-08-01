@@ -6,7 +6,7 @@
 // fixed glossary would drift out of sync with what's on screen. Each
 // builder below quotes the real number currently in effect.
 
-import { minGamesThreshold, minDismissalsThreshold, MIN_BALLS_FOR_ECONOMY } from '@/components/leaderboard/LeaderboardMilestones'
+import { minGamesThreshold, minDismissalsThreshold, MIN_BALLS_FOR_ECONOMY } from '@/lib/leaderboardMilestones'
 import type { TableCategory } from '@/components/leaderboard/LeaderboardFilters'
 
 export interface GlossaryEntry {

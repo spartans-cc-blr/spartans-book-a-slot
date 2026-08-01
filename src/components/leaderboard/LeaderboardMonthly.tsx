@@ -26,7 +26,7 @@
 // — a two-ball spell shouldn't win "best economy".
 
 import { PlayerNameLink } from '@/lib/playerLink'
-import { bestBy, MIN_BALLS_FOR_ECONOMY } from './LeaderboardMilestones'
+import { bestBy, MIN_BALLS_FOR_ECONOMY } from '@/lib/leaderboardMilestones'
 import { PlayerAvatar } from './PlayerAvatar'
 import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
 import { BallIcon } from '@/components/matches/BallIcon'
