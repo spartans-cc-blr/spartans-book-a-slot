@@ -283,9 +283,14 @@ without re-running the fetch (a false-alarm override, distinct from "Reset
 Upload").
 
 ### `/api/cron/backfill-scorecards` — twice daily, self-healing
-Runs at 07:00 and 19:00 IST (`vercel.json`: `"30 1,13 * * *"` — widened
-from once daily on 2026-07-16 to help drain the backlog described below;
-drop back to once-daily once it's clear). Queries **all** past unsynced
+Runs at 12:00 and 19:00 IST (GitHub Actions: `"30 6,13 * * *"`; `vercel.json`
+carries a single-fire backup at `"30 6 * * *"` — the 12:00 slot only, not
+twice-daily on the Vercel side). Moved off the original 07:00 slot on
+2026-08-01: no games are ever played between 19:00 and 07:00 IST, so a
+07:00 run never had any new backlog the prior 19:00 run hadn't already seen
+— it was pure dead time. 12:00 additionally gives CricHeroes room to
+publish the day's morning-slot (07:30/10:30) scorecards before the fetch
+attempt runs. Queries **all** past unsynced
 bookings with a `match_id`, not just "yesterday" — so a run that's cut
 short, or a match that keeps failing, just rolls into the next run instead
 of being permanently skipped. `MAX_PER_RUN = 3` bounds each individual run

@@ -178,7 +178,7 @@ Access here is genuinely mixed per-route rather than one role — see
 |---|---|---|---|
 | `/api/cron/expire-reservations` | GET | `CRON_SECRET` bearer | Daily at 18:30 UTC — delete expired `soft_block` rows |
 | `/api/cron/lock-availability` | GET | `CRON_SECRET` bearer | Fires daily (Vercel Hobby can't restrict cron by day-of-week — see `limitations.md`); route itself gates to Thursday IST via an in-code check before blanket-locking all confirmed Sat/Sun bookings for the upcoming weekend |
-| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Twice daily, 07:00 & 19:00 IST — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 3/run; see `features/post-match-scorecard.md` |
+| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Twice daily, 12:00 & 19:00 IST (moved off 07:00 on 2026-08-01 — no games are played 19:00–07:00 IST, so that slot was dead time) — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 3/run; see `features/post-match-scorecard.md` |
 | `/api/cron/sync-player-status` | GET | `CRON_SECRET` bearer | Daily at 02:00 IST — recomputes every non-expelled player's `active`/`inactive` status from 42-day availability signal; see `features/gc-players.md` |
 | `/api/cron/availability-nudge` | GET | `CRON_SECRET` bearer | Sun–Wed at 20:45 IST — personalised push reminders for `nextLockWeekend` gaps; see `features/availability-nudge.md` |
 
