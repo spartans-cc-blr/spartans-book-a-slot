@@ -43,28 +43,44 @@ export function minGamesThreshold(year: number | 'all', scoped: boolean): number
 }
 
 interface Milestone {
+  key: string
   label: string
   icon: string
-  row: LeaderboardRow | null
+  row: LeaderboardRow
   valueText: string
 }
 
-// Exported for reuse by LeaderboardMonthly.tsx, which needs the same
-// "find the qualifying row with the best value" primitive but with a much
-// simpler (single-month) qualification bar than minGamesThreshold() below.
-export function bestBy(rows: LeaderboardRow[], value: (r: LeaderboardRow) => number | null, qualifies: (r: LeaderboardRow) => boolean, lowerIsBetter = false): LeaderboardRow | null {
-  let best: LeaderboardRow | null = null
+// Returns every row tied for the best value, not just the first one
+// encountered — a plain single-winner reduce silently picks whichever tied
+// player happens to come first in `rows`' iteration order (an accident of
+// the analytics DB query, not a real ranking), which is exactly what
+// produced a misleading "Most 100s" card when three players were tied on
+// centuries. Ties on the same value are collected together and reset on
+// any strictly better value.
+export function bestByAll(rows: LeaderboardRow[], value: (r: LeaderboardRow) => number | null, qualifies: (r: LeaderboardRow) => boolean, lowerIsBetter = false): LeaderboardRow[] {
+  let best: LeaderboardRow[] = []
   let bestVal: number | null = null
   for (const r of rows) {
     if (!qualifies(r)) continue
     const v = value(r)
     if (v == null) continue
     if (bestVal == null || (lowerIsBetter ? v < bestVal : v > bestVal)) {
-      best = r
+      best = [r]
       bestVal = v
+    } else if (v === bestVal) {
+      best.push(r)
     }
   }
   return best
+}
+
+// Exported for reuse by LeaderboardMonthly.tsx, which needs the same
+// "find the qualifying row with the best value" primitive but with a much
+// simpler (single-month) qualification bar than minGamesThreshold() below.
+// Kept single-winner (first tied row) for that call site — ties are rarer
+// on the monthly view and it wasn't part of this fix.
+export function bestBy(rows: LeaderboardRow[], value: (r: LeaderboardRow) => number | null, qualifies: (r: LeaderboardRow) => boolean, lowerIsBetter = false): LeaderboardRow | null {
+  return bestByAll(rows, value, qualifies, lowerIsBetter)[0] ?? null
 }
 
 export function LeaderboardMilestones({ rows, year, scoped }: { rows: LeaderboardRow[]; year: number | 'all'; scoped: boolean }) {
@@ -77,25 +93,32 @@ export function LeaderboardMilestones({ rows, year, scoped }: { rows: Leaderboar
   const minGames = minGamesThreshold(year, scoped)
   const qualifiesOnGames = (r: LeaderboardRow) => r.stats.matches >= minGames
 
-  const topMVP     = bestBy(rows, r => r.stats.mvpPoints, qualifiesOnGames)
-  const topRuns     = bestBy(rows, r => r.stats.runs, qualifiesOnGames)
-  const topWickets  = bestBy(rows, r => r.stats.wickets, qualifiesOnGames)
-  const mostCenturies     = bestBy(rows, r => r.centuries, r => r.centuries > 0 && qualifiesOnGames(r))
-  const mostHalfCenturies = bestBy(rows, r => r.halfCenturies, r => r.halfCenturies > 0 && qualifiesOnGames(r))
-  const bestAverage = bestBy(rows, r => r.stats.battingAverage, qualifiesOnGames)
-  const bestSR       = bestBy(rows, r => r.stats.strikeRate, qualifiesOnGames)
-  const bestEconomy = bestBy(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && qualifiesOnGames(r), true)
+  const topMVP     = bestByAll(rows, r => r.stats.mvpPoints, qualifiesOnGames)
+  const topRuns     = bestByAll(rows, r => r.stats.runs, qualifiesOnGames)
+  const topWickets  = bestByAll(rows, r => r.stats.wickets, qualifiesOnGames)
+  const mostCenturies     = bestByAll(rows, r => r.centuries, r => r.centuries > 0 && qualifiesOnGames(r))
+  const mostHalfCenturies = bestByAll(rows, r => r.halfCenturies, r => r.halfCenturies > 0 && qualifiesOnGames(r))
+  const bestAverage = bestByAll(rows, r => r.stats.battingAverage, qualifiesOnGames)
+  const bestSR       = bestByAll(rows, r => r.stats.strikeRate, qualifiesOnGames)
+  const bestEconomy = bestByAll(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && qualifiesOnGames(r), true)
+
+  // One card per tied player, not one card per category — a 3-way tie on
+  // centuries now renders as three "Most 100s" cards instead of silently
+  // picking a single "winner".
+  function toMilestones(label: string, icon: string, tied: LeaderboardRow[], valueText: (r: LeaderboardRow) => string): Milestone[] {
+    return tied.map(row => ({ key: `${label}-${row.playerId}`, label, icon, row, valueText: valueText(row) }))
+  }
 
   const milestones: Milestone[] = [
-    { label: 'Leading MVP',         icon: '🏆', row: topMVP,     valueText: topMVP ? `${topMVP.stats.mvpPoints.toFixed(2)} pts` : '' },
-    { label: 'Leading Run Scorer',  icon: '🏏', row: topRuns,     valueText: topRuns ? `${topRuns.stats.runs} runs` : '' },
-    { label: 'Leading Wicket Taker', icon: '🎯', row: topWickets,  valueText: topWickets ? `${topWickets.stats.wickets} wkts` : '' },
-    { label: 'Most 100s',      icon: '💯', row: mostCenturies,     valueText: mostCenturies ? `${mostCenturies.centuries} centuries` : '' },
-    { label: 'Most 50s',       icon: '5️⃣0️⃣', row: mostHalfCenturies, valueText: mostHalfCenturies ? `${mostHalfCenturies.halfCenturies} fifties` : '' },
-    { label: 'Best Average',   icon: '📊', row: bestAverage, valueText: bestAverage ? `Avg ${bestAverage.stats.battingAverage!.toFixed(2)}` : '' },
-    { label: 'Highest S/R',    icon: '⚡', row: bestSR,       valueText: bestSR ? `SR ${bestSR.stats.strikeRate!.toFixed(2)}` : '' },
-    { label: 'Best Economy',   icon: '🛡️', row: bestEconomy, valueText: bestEconomy ? `Econ ${bestEconomy.stats.economy!.toFixed(2)}` : '' },
-  ].filter(m => m.row)
+    ...toMilestones('Leading MVP',          '🏆', topMVP,     r => `${r.stats.mvpPoints.toFixed(2)} pts`),
+    ...toMilestones('Leading Run Scorer',   '🏏', topRuns,     r => `${r.stats.runs} runs`),
+    ...toMilestones('Leading Wicket Taker', '🎯', topWickets,  r => `${r.stats.wickets} wkts`),
+    ...toMilestones('Most 100s',            '💯', mostCenturies,     r => `${r.centuries} centuries`),
+    ...toMilestones('Most 50s',             '5️⃣0️⃣', mostHalfCenturies, r => `${r.halfCenturies} fifties`),
+    ...toMilestones('Best Average',         '📊', bestAverage, r => `Avg ${r.stats.battingAverage!.toFixed(2)}`),
+    ...toMilestones('Highest S/R',          '⚡', bestSR,       r => `SR ${r.stats.strikeRate!.toFixed(2)}`),
+    ...toMilestones('Best Economy',         '🛡️', bestEconomy, r => `Econ ${r.stats.economy!.toFixed(2)}`),
+  ]
 
   if (milestones.length === 0) {
     return (
@@ -106,7 +129,7 @@ export function LeaderboardMilestones({ rows, year, scoped }: { rows: Leaderboar
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {milestones.map(m => (
-        <div key={m.label} style={{
+        <div key={m.key} style={{
           background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
           border: '1px solid #2D3748',
           borderRadius: '12px',
@@ -124,10 +147,10 @@ export function LeaderboardMilestones({ rows, year, scoped }: { rows: Leaderboar
           </div>
 
           <div className="flex items-center gap-2">
-            <PlayerAvatar photoUrl={m.row!.photoUrl} name={m.row!.playerName} />
+            <PlayerAvatar photoUrl={m.row.photoUrl} name={m.row.playerName} />
             <div className="min-w-0">
               <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
-                <PlayerNameLink name={m.row!.playerName} playerId={m.row!.playerId} cricHeroesUrl={m.row!.cricheroesUrl} />
+                <PlayerNameLink name={m.row.playerName} playerId={m.row.playerId} cricHeroesUrl={m.row.cricheroesUrl} />
               </p>
               <p className="font-cinzel text-xs text-gold mt-0.5">{m.valueText}</p>
             </div>
