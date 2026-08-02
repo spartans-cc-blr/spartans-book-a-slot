@@ -5,13 +5,14 @@
 // page, and only once an admin has flipped tournaments.organiser_self_service
 // on for that tournament (off by default for every tournament).
 //
-// The organiser never picks a slot_time — only ever one of the fully-open
-// dates the share page already showed them (mirroring getSuggestedOpenDates'
-// own "only a wide-open day counts" rule, re-checked here against live data
-// so a date taken between page-load and click is caught, not silently
-// double-booked). A slot_time/format is picked server-side from this
-// tournament's own recent format mix, walked through the same validateBooking
-// engine (R1-R7) every other booking path uses.
+// The organiser reserves one of the specific slot-bucket recommendations
+// getSuggestedSlotDates() already computed (see suggestedSlots.ts) — day,
+// slot_time, and format all come from that suggestion, not picked here.
+// Because each suggestion is already scoped to one exact slot, a day that
+// already has a *different* slot booked is not a problem — only that one
+// slot needs to still be free. Re-validated live against the same
+// validateBooking engine (R1-R7) every other booking path uses, so a slot
+// taken between page-load and click is caught, not silently double-booked.
 //
 // Creates a soft_block (48h), never a confirmed booking — an admin still
 // does the final confirm from /admin/bookings/[id], which already shows
@@ -22,7 +23,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { validateBooking } from '@/lib/validation'
 import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 import { GAME_DATE_REGEX } from '@/lib/schemas'
-import { SLOT_TIMES, SLOT_FORMATS, ORGANISER_SELF_SERVICE_REASON } from '@/types'
+import { SLOT_TIMES, ORGANISER_SELF_SERVICE_REASON } from '@/types'
 import type { CreateBookingRequest, GameFormat, SlotTime } from '@/types'
 
 export async function POST(
@@ -33,12 +34,20 @@ export async function POST(
   const body = await req.json().catch(() => null)
 
   const game_date = body?.game_date
+  const slot_time = body?.slot_time
+  const format    = body?.format
   const organiser_name  = typeof body?.organiser_name  === 'string' ? body.organiser_name.trim()  : ''
   const organiser_phone = typeof body?.organiser_phone === 'string' ? body.organiser_phone.trim() : ''
   const phoneDigits = organiser_phone.replace(/\D/g, '')
 
   if (!game_date || !GAME_DATE_REGEX.test(game_date)) {
     return NextResponse.json({ error: 'game_date must be in YYYY-MM-DD format' }, { status: 400 })
+  }
+  if (!SLOT_TIMES.includes(slot_time)) {
+    return NextResponse.json({ error: 'Invalid slot_time' }, { status: 400 })
+  }
+  if (format !== 'T20' && format !== 'T30') {
+    return NextResponse.json({ error: 'Invalid format' }, { status: 400 })
   }
   if (organiser_name.length < 2) {
     return NextResponse.json({ error: 'Please enter a name.' }, { status: 400 })
@@ -65,78 +74,44 @@ export async function POST(
     return NextResponse.json({ error: 'Self-service reservations are not enabled for this tournament.' }, { status: 403 })
   }
 
-  const [{ data: existingRaw }, { data: ownGames }] = await Promise.all([
-    supabase
-      .from('bookings')
-      .select('*, tournament:tournaments!bookings_tournament_id_fkey(id, name, captain_id)')
-      .neq('status', 'cancelled'),
-    supabase
-      .from('bookings')
-      .select('format')
-      .eq('tournament_id', tournamentId)
-      .eq('status', 'confirmed'),
-  ])
+  const { data: existingRaw, error: existingErr } = await supabase
+    .from('bookings')
+    .select('*, tournament:tournaments!bookings_tournament_id_fkey(id, name, captain_id)')
+    .neq('status', 'cancelled')
+
+  if (existingErr) return NextResponse.json({ error: existingErr.message }, { status: 500 })
 
   const existing = (existingRaw ?? []).map((b: any) => ({
     ...b,
     tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
   }))
 
-  // Mirror getSuggestedOpenDates' own invariant: only a genuinely wide-open
-  // day (no booking of any kind, any slot_time) is reservable this way — if
-  // anything landed on this date since the share page was rendered, it's no
-  // longer valid and the client should move to its next candidate.
-  const bookedToday = existing.some((b: any) => b.game_date === game_date)
-  if (bookedToday) {
-    return NextResponse.json({ error: 'That date was just taken.', taken: true }, { status: 409 })
+  const candidateBooking: CreateBookingRequest = {
+    game_date,
+    slot_time: slot_time as SlotTime,
+    format: format as GameFormat,
+    tournament_id: tournamentId,
+    block_reason: ORGANISER_SELF_SERVICE_REASON,
   }
 
-  const activeFormats = Array.from(
-    new Set((ownGames ?? []).map((g: any) => g.format).filter(Boolean))
-  ) as GameFormat[]
-  const formatPreference: GameFormat[] = activeFormats.length ? activeFormats : ['T20', 'T30']
+  const result = validateBooking(
+    candidateBooking,
+    existing,
+    (tournament.captains as any)?.name ?? 'This captain',
+    tournament.name,
+    tournament.captain_id ?? null
+  )
 
-  const slotCandidates: { slot_time: SlotTime; format: GameFormat }[] = []
-  for (const slot of SLOT_TIMES) {
-    for (const fmt of SLOT_FORMATS[slot]) {
-      if (formatPreference.includes(fmt)) slotCandidates.push({ slot_time: slot, format: fmt })
-    }
-  }
-
-  const captainName = (tournament.captains as any)?.name ?? 'This captain'
-  let picked: { slot_time: SlotTime; format: GameFormat } | null = null
-
-  for (const candidate of slotCandidates) {
-    const candidateBooking: CreateBookingRequest = {
-      game_date,
-      slot_time: candidate.slot_time,
-      format: candidate.format,
-      tournament_id: tournamentId,
-      block_reason: ORGANISER_SELF_SERVICE_REASON,
-    }
-    const result = validateBooking(
-      candidateBooking,
-      existing,
-      captainName,
-      tournament.name,
-      tournament.captain_id ?? null
-    )
-    if (result.valid && result.warnings.length === 0) {
-      picked = candidate
-      break
-    }
-  }
-
-  if (!picked) {
-    return NextResponse.json({ error: 'That date is no longer available.', taken: true }, { status: 409 })
+  if (!result.valid || result.warnings.length > 0) {
+    return NextResponse.json({ error: 'That slot was just taken.', taken: true }, { status: 409 })
   }
 
   const { data, error } = await supabase
     .from('bookings')
     .insert({
       game_date,
-      slot_time:      picked.slot_time,
-      format:         picked.format,
+      slot_time,
+      format,
       tournament_id:  tournamentId,
       block_reason:   ORGANISER_SELF_SERVICE_REASON,
       status:         'soft_block',

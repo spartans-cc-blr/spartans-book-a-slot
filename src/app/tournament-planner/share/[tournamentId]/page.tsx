@@ -3,17 +3,17 @@
 import { createServiceClient } from '@/lib/supabase'
 import { redirect } from 'next/navigation'
 import { TournamentShareCard } from '@/components/tournament-planner/TournamentShareCard'
-import { getSuggestedOpenDates } from '@/lib/suggestedSlots'
+import { getSuggestedOpenDates, getSuggestedSlotDates } from '@/lib/suggestedSlots'
+import type { SuggestedDate, SuggestedSlotBucket } from '@/lib/suggestedSlots'
 import type { Metadata } from 'next'
 
 // Fixed regardless of the tournament's own unbooked count — this is a
 // "here's what's open soon" nudge for the organiser, not an exhaustive
 // booking plan (the GC/Admin suggested-slots panel is the exhaustive one).
-// Self-service tournaments show a couple more — declining one there just
-// advances client-side through this same list, no extra round trip, so a
-// slightly longer list means fewer "no more open dates" dead ends.
+// Only used for non-self-service tournaments' plain WhatsApp-enquiry list —
+// self-service tournaments use getSuggestedSlotDates instead, which returns
+// one entry per deficient slot bucket rather than a capped flat list.
 const SHARE_CARD_SUGGESTION_COUNT = 3
-const SHARE_CARD_SUGGESTION_COUNT_SELF_SERVICE = 5
 
 export const revalidate = 300 // 5 min cache — public page
 
@@ -79,14 +79,21 @@ export default async function TournamentSharePage({
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 
-  // Next fully-open dates — same algorithm as the GC/Admin suggested-slots
-  // panel (src/lib/suggestedSlots.ts), just capped at a fixed count here
-  // rather than the tournament's full unbooked count.
-  const suggestionCount = rawTournament.organiser_self_service
-    ? SHARE_CARD_SUGGESTION_COUNT_SELF_SERVICE
-    : SHARE_CARD_SUGGESTION_COUNT
-  const suggestedResult = await getSuggestedOpenDates(params.tournamentId, suggestionCount)
-  const suggestedDates  = suggestedResult.ok ? suggestedResult.suggestions : []
+  // Self-service tournaments get one recommendation per deficient slot
+  // bucket (getSuggestedSlotDates — see src/lib/suggestedSlots.ts), matching
+  // the same count/target slot balance shown further down this card.
+  // Everyone else keeps the plain "here's what's open soon" day list feeding
+  // a WhatsApp enquiry link. Only one of the two is ever fetched.
+  let suggestedDates: SuggestedDate[] = []
+  let suggestedBuckets: SuggestedSlotBucket[] = []
+
+  if (rawTournament.organiser_self_service) {
+    const bucketResult = await getSuggestedSlotDates(params.tournamentId)
+    suggestedBuckets = bucketResult.ok ? bucketResult.buckets : []
+  } else {
+    const dateResult = await getSuggestedOpenDates(params.tournamentId, SHARE_CARD_SUGGESTION_COUNT)
+    suggestedDates = dateResult.ok ? dateResult.suggestions : []
+  }
 
   return (
     <div className="min-h-screen bg-parchment px-4 py-8 max-w-2xl mx-auto">
@@ -104,6 +111,7 @@ export default async function TournamentSharePage({
         bookings={bookings}
         today={today}
         suggestedDates={suggestedDates}
+        suggestedBuckets={suggestedBuckets}
         waNumber={process.env.NEXT_PUBLIC_WA_NUMBER ?? ''}
       />
 

@@ -1,5 +1,6 @@
 import { parseISO, differenceInDays, format } from 'date-fns'
-import type { SuggestedDate } from '@/lib/suggestedSlots'
+import type { SuggestedDate, SuggestedSlotBucket } from '@/lib/suggestedSlots'
+import { distributeSlotTargets } from '@/lib/slotTargets'
 import { ResultBadge } from '@/components/shared/ResultBadge'
 import { OrganiserSelfService } from './OrganiserSelfService'
 
@@ -50,15 +51,19 @@ interface Tournament {
 }
 
 export function TournamentShareCard({
-  tournament, bookings, today, suggestedDates, waNumber,
+  tournament, bookings, today, suggestedDates, suggestedBuckets, waNumber,
 }: {
   tournament: Tournament
   bookings: Booking[]
   today: string
   // Next fully-open dates (see src/lib/suggestedSlots.ts) — a booking
   // enquiry link is shown per date so the organiser can reach the club
-  // directly from this card, mirroring /schedule's enquiry links.
+  // directly from this card, mirroring /schedule's enquiry links. Only
+  // populated for non-self-service tournaments.
   suggestedDates: SuggestedDate[]
+  // One entry per deficient slot bucket (see getSuggestedSlotDates) — only
+  // populated for self-service tournaments, feeds OrganiserSelfService.
+  suggestedBuckets: SuggestedSlotBucket[]
   waNumber: string
 }) {
   const sorted     = [...bookings].sort((a, b) => a.game_date.localeCompare(b.game_date))
@@ -98,6 +103,14 @@ export function TournamentShareCard({
 
   const formats         = Array.from(new Set(sorted.map(g => g.format).filter((f): f is string => !!f)))
   const activeFormats   = formats.length === 0 ? ['T20', 'T30'] : formats
+
+  // Even split of totalLeague across every slot valid for this tournament's
+  // format(s) — same distributeSlotTargets formula the internal Tournament
+  // Planner uses to show "count/target" (e.g. 2/3) instead of a bare count.
+  const validSlotKeys = ALL_SLOTS
+    .filter(s => s.validFor.some(f => activeFormats.includes(f)))
+    .map(s => `${s.day}-${s.time}` as SlotKey)
+  const slotTargets = distributeSlotTargets(validSlotKeys, totalLeague)
 
   // Enquiry link to the club for one of the fully-open suggested dates —
   // no slot_time is named (mirrors the private planner's suggested-slots
@@ -222,35 +235,35 @@ export function TournamentShareCard({
           ))}
         </div>
 
-        {/* Next available dates — fully open days only (see
-            src/lib/suggestedSlots.ts). Self-service tournaments get the
-            interactive reserve/decline flow; everyone else keeps the plain
-            WhatsApp enquiry link, mirroring /schedule's pattern. Only shown
-            when there's actually something left to book. */}
-        {unbooked > 0 && suggestedDates.length > 0 && (
-          tournament.organiser_self_service ? (
-            <OrganiserSelfService tournamentId={tournament.id} suggestedDates={suggestedDates} waNumber={waNumber} />
-          ) : (
-            <div className="mt-3 pt-3 border-t border-parchment-3">
-              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-2">
-                Next available dates
-              </p>
-              <div className="flex flex-col gap-1.5">
-                {suggestedDates.map(s => (
-                  <a key={s.game_date} href={suggestedDateWaLink(s)} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 hover:bg-emerald-100 transition-colors">
-                    <span className="font-rajdhani text-xs font-semibold text-emerald-800">
-                      {s.day} {format(parseISO(s.game_date), 'd MMM')}
-                    </span>
-                    <span className="flex items-center gap-1.5 text-emerald-700">
-                      {WA_ICON}
-                      <span className="font-rajdhani text-[11px] font-bold">Book this date</span>
-                    </span>
-                  </a>
-                ))}
-              </div>
+        {/* Next available dates. Self-service tournaments get the
+            interactive per-slot-bucket reserve/decline flow (one card per
+            slot below its target — see getSuggestedSlotDates); everyone
+            else keeps the plain fully-open-day WhatsApp enquiry link,
+            mirroring /schedule's pattern. Only shown when there's actually
+            something left to book. */}
+        {unbooked > 0 && tournament.organiser_self_service && suggestedBuckets.length > 0 && (
+          <OrganiserSelfService tournamentId={tournament.id} buckets={suggestedBuckets} waNumber={waNumber} />
+        )}
+        {unbooked > 0 && !tournament.organiser_self_service && suggestedDates.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-parchment-3">
+            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-2">
+              Next available dates
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {suggestedDates.map(s => (
+                <a key={s.game_date} href={suggestedDateWaLink(s)} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 hover:bg-emerald-100 transition-colors">
+                  <span className="font-rajdhani text-xs font-semibold text-emerald-800">
+                    {s.day} {format(parseISO(s.game_date), 'd MMM')}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-emerald-700">
+                    {WA_ICON}
+                    <span className="font-rajdhani text-[11px] font-bold">Book this date</span>
+                  </span>
+                </a>
+              ))}
             </div>
-          )
+          </div>
         )}
       </div>
 
@@ -305,11 +318,15 @@ export function TournamentShareCard({
         )
       })()}
 
-      {/* Slot balance — day-grouped cards with horizontal bars, identical to
-          the private planner's SlotBalanceByDay (TournamentPlannerClient.tsx) */}
+      {/* Slot balance — day-grouped cards with horizontal bars, count/target
+          matching the internal Tournament Planner's SlotBalanceByDay
+          (TournamentPlannerClient.tsx) exactly. */}
       <div className="px-4 pt-3 pb-2">
-        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">
+        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-1">
           Slot balance
+        </p>
+        <p className="font-rajdhani text-[11px] text-stone-500 mb-2.5">
+          Target per slot is the league's total games split evenly across every valid slot.
         </p>
         <div className="flex flex-col gap-3">
           {(['Sat', 'Sun'] as const).map(day => {
@@ -321,18 +338,22 @@ export function TournamentShareCard({
                 {rows.map(s => {
                   const k: SlotKey = `${s.day}-${s.time}`
                   const count      = slotCounts[k]
-                  const pct        = count > 0 ? Math.max(12, Math.round((count / maxSlotCount) * 100)) : 0
+                  const target     = slotTargets[k] ?? 0
+                  const metTarget  = target > 0 && count >= target
+                  const pct        = target > 0
+                    ? Math.max(count > 0 ? 12 : 0, Math.round((Math.min(count, target) / target) * 100))
+                    : (count > 0 ? Math.max(12, Math.round((count / maxSlotCount) * 100)) : 0)
                   return (
                     <div key={k} className="flex items-center gap-3 py-1.5 border-t border-parchment-2 first:border-t-0">
                       <span className="w-[52px] flex-shrink-0 text-[12.5px] font-semibold text-stone-700">{s.time}</span>
                       <div className="flex-1 h-2 bg-parchment-2 rounded-full overflow-hidden">
                         {count > 0 && (
-                          <div className={`h-full rounded-full ${count === maxSlotCount ? 'bg-emerald-600' : 'bg-amber-600'}`}
+                          <div className={`h-full rounded-full ${metTarget ? 'bg-emerald-600' : 'bg-amber-600'}`}
                             style={{ width: `${pct}%` }} />
                         )}
                       </div>
-                      <span className="w-[18px] flex-shrink-0 text-sm font-extrabold text-ink text-right">
-                        {count}
+                      <span className="w-[42px] flex-shrink-0 text-sm font-extrabold text-ink text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {target > 0 ? `${count}/${target}` : count}
                       </span>
                     </div>
                   )

@@ -44,8 +44,11 @@
 // any month whose suggestion count already exceeds R3's real cap so a
 // caller can tell the organiser only some of them are actually bookable.
 
+import { parseISO } from 'date-fns'
 import { createServiceClient } from '@/lib/supabase'
 import { validateBooking, getYearMonth } from '@/lib/validation'
+import { ALL_SLOTS, distributeSlotTargets } from '@/lib/slotTargets'
+import type { SlotKey } from '@/lib/slotTargets'
 import type { CreateBookingRequest, GameFormat, SlotTime } from '@/types'
 
 const SLOT_DEFS: { time: SlotTime; validFor: GameFormat[] }[] = [
@@ -292,4 +295,216 @@ export async function getSuggestedOpenDates(
   const suggestedDates: SuggestedDate[] = suggestions.map(s => ({ game_date: s.game_date, day: s.day }))
 
   return { ok: true, suggestions: suggestedDates, monthlyCap: R3_MONTHLY_CAP, overCapMonths }
+}
+
+// ── getSuggestedSlotDates — per-bucket suggestion engine ────────────────
+//
+// A newer, more specific sibling of getSuggestedOpenDates above, built for
+// the organiser self-service flow. Rather than "here are some fully open
+// days, any time would work," this suggests one specific date PER SLOT
+// BUCKET (e.g. "Sat 10:30" or "Sun 07:30") that's currently below its even
+// share of this tournament's total league games — mirroring the slot
+// balance already shown in the internal Tournament Planner (see
+// distributeSlotTargets / src/lib/slotTargets.ts) and the finalized mockup
+// this was designed against.
+//
+// Because each suggestion names an exact slot_time, a day that already has
+// a DIFFERENT slot booked is not excluded the way it is in
+// getSuggestedOpenDates — only that one specific slot needs to be free and
+// pass R1-R7. Suggestions are still selected incrementally (each accepted
+// pick folded into the working set before the next bucket is checked) so
+// two bucket suggestions can never jointly violate R1's weekend cap.
+
+export interface SuggestedSlotBucket {
+  day: 'Sat' | 'Sun'
+  slot_time: SlotTime
+  format: GameFormat
+  game_date: string
+  current: number
+  target: number
+}
+
+export type SuggestedSlotDatesResult =
+  | { ok: true; buckets: SuggestedSlotBucket[] }
+  | { ok: false; error: string; status: number }
+
+export async function getSuggestedSlotDates(tournamentId: string): Promise<SuggestedSlotDatesResult> {
+  const supabase = createServiceClient()
+
+  const { data: tournament, error: tErr } = await supabase
+    .from('tournaments')
+    .select('id, name, captain_id, total_league_games, captains!tournaments_captain_id_fkey(id, name)')
+    .eq('id', tournamentId)
+    .single()
+
+  if (tErr || !tournament) return { ok: false, error: 'Tournament not found', status: 404 }
+
+  const thisTournamentCaptainId = tournament.captain_id ?? null
+  const captainName = (tournament.captains as any)?.name ?? 'This captain'
+  const tournamentName = tournament.name
+
+  const { data: ownGames, error: ownErr } = await supabase
+    .from('bookings')
+    .select('game_date, slot_time, format')
+    .eq('tournament_id', tournamentId)
+    .eq('status', 'confirmed')
+
+  if (ownErr) return { ok: false, error: ownErr.message, status: 500 }
+
+  const totalLeague = tournament.total_league_games ?? (ownGames ?? []).length
+  const activeFormatsRaw = Array.from(
+    new Set((ownGames ?? []).map(g => g.format).filter((f): f is GameFormat => !!f))
+  )
+  const activeFormats: GameFormat[] = activeFormatsRaw.length ? activeFormatsRaw : ['T20', 'T30']
+
+  const validSlots = ALL_SLOTS.filter(s => s.validFor.some(f => activeFormats.includes(f)))
+  const validKeys = validSlots.map(s => `${s.day}-${s.time}` as SlotKey)
+  const targets = distributeSlotTargets(validKeys, totalLeague)
+
+  const slotCounts = {} as Record<SlotKey, number>
+  validKeys.forEach(k => { slotCounts[k] = 0 })
+  for (const g of ownGames ?? []) {
+    const dow = parseISO(g.game_date).getDay()
+    const day = dow === 6 ? 'Sat' : dow === 0 ? 'Sun' : null
+    if (!day) continue
+    const k = `${day}-${g.slot_time}` as SlotKey
+    if (slotCounts[k] !== undefined) slotCounts[k]++
+  }
+
+  const deficientSlots = validSlots.filter(s => {
+    const k = `${s.day}-${s.time}` as SlotKey
+    return slotCounts[k] < (targets[k] ?? 0)
+  })
+
+  if (deficientSlots.length === 0) return { ok: true, buckets: [] }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  let firstSat = addDays(today, (6 - today.getDay() + 7) % 7)
+  if (toISODate(firstSat) === toISODate(today)) firstSat = addDays(firstSat, 7)
+  const horizonEnd = addDays(firstSat, HORIZON_WEEKS * 7)
+
+  const { data: existingRaw, error: existingErr } = await supabase
+    .from('bookings')
+    .select('*, tournament:tournaments!bookings_tournament_id_fkey(id, name, captain_id)')
+    .neq('status', 'cancelled')
+    .gte('game_date', toISODate(firstSat))
+    .lte('game_date', toISODate(horizonEnd))
+
+  if (existingErr) return { ok: false, error: existingErr.message, status: 500 }
+
+  const existing = (existingRaw ?? []).map((b: any) => ({
+    ...b,
+    tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
+  }))
+
+  const working = [...existing]
+  const buckets: SuggestedSlotBucket[] = []
+
+  for (const slotDef of deficientSlots) {
+    const format = slotDef.validFor.find(f => activeFormats.includes(f)) ?? slotDef.validFor[0]
+    let found: string | null = null
+
+    for (let d = new Date(firstSat); d <= horizonEnd; d = addDays(d, 1)) {
+      const dow = d.getDay()
+      const dayLabel = dow === 6 ? 'Sat' : dow === 0 ? 'Sun' : null
+      if (dayLabel !== slotDef.day) continue
+      const dateStr = toISODate(d)
+
+      const candidate: CreateBookingRequest = {
+        game_date: dateStr, slot_time: slotDef.time, format, tournament_id: tournamentId,
+      }
+      const result = validateBooking(candidate, working, captainName, tournamentName, thisTournamentCaptainId)
+      if (result.valid && result.warnings.length === 0) {
+        found = dateStr
+        break
+      }
+    }
+
+    if (!found) continue // nothing compliant for this bucket within the horizon
+
+    const k = `${slotDef.day}-${slotDef.time}` as SlotKey
+    buckets.push({
+      day: slotDef.day, slot_time: slotDef.time, format,
+      game_date: found, current: slotCounts[k], target: targets[k],
+    })
+    working.push({
+      id: `candidate-slot-${buckets.length}`,
+      game_date: found, slot_time: slotDef.time, format,
+      venue: null, tournament_id: tournamentId, status: 'confirmed',
+      block_reason: null, notes: null,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      tournament: { captain_id: thisTournamentCaptainId } as any,
+    } as any)
+  }
+
+  return { ok: true, buckets }
+}
+
+// ── findNextSlotDate — single-bucket lookup for the "decline" step ──────
+//
+// Given a specific slot bucket already offered to an organiser (and any
+// dates they've already declined for that same bucket), finds the next
+// compliant date beyond those exclusions. Shares the same search logic as
+// getSuggestedSlotDates' inner loop, but for exactly one bucket rather than
+// every deficient one — used by /api/tournaments/[id]/organiser-next-slot,
+// which has nothing else to recompute once the organiser is already mid-flow
+// on one particular bucket.
+export async function findNextSlotDate(
+  tournamentId: string,
+  day: 'Sat' | 'Sun',
+  slotTime: SlotTime,
+  format: GameFormat,
+  excludeDates: string[]
+): Promise<{ ok: true; game_date: string | null } | { ok: false; error: string; status: number }> {
+  const supabase = createServiceClient()
+
+  const { data: tournament, error: tErr } = await supabase
+    .from('tournaments')
+    .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name)')
+    .eq('id', tournamentId)
+    .single()
+
+  if (tErr || !tournament) return { ok: false, error: 'Tournament not found', status: 404 }
+
+  const captainName = (tournament.captains as any)?.name ?? 'This captain'
+  const excluded = new Set(excludeDates)
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  let firstSat = addDays(today, (6 - today.getDay() + 7) % 7)
+  if (toISODate(firstSat) === toISODate(today)) firstSat = addDays(firstSat, 7)
+  const horizonEnd = addDays(firstSat, HORIZON_WEEKS * 7)
+
+  const { data: existingRaw, error: existingErr } = await supabase
+    .from('bookings')
+    .select('*, tournament:tournaments!bookings_tournament_id_fkey(id, name, captain_id)')
+    .neq('status', 'cancelled')
+    .gte('game_date', toISODate(firstSat))
+    .lte('game_date', toISODate(horizonEnd))
+
+  if (existingErr) return { ok: false, error: existingErr.message, status: 500 }
+
+  const existing = (existingRaw ?? []).map((b: any) => ({
+    ...b,
+    tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
+  }))
+
+  for (let d = new Date(firstSat); d <= horizonEnd; d = addDays(d, 1)) {
+    const dow = d.getDay()
+    const dayLabel = dow === 6 ? 'Sat' : dow === 0 ? 'Sun' : null
+    if (dayLabel !== day) continue
+    const dateStr = toISODate(d)
+    if (excluded.has(dateStr)) continue
+
+    const candidate: CreateBookingRequest = {
+      game_date: dateStr, slot_time: slotTime, format, tournament_id: tournamentId,
+    }
+    const result = validateBooking(candidate, existing, captainName, tournament.name, tournament.captain_id ?? null)
+    if (result.valid && result.warnings.length === 0) {
+      return { ok: true, game_date: dateStr }
+    }
+  }
+
+  return { ok: true, game_date: null }
 }
