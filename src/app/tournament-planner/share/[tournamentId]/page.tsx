@@ -6,10 +6,14 @@ import { TournamentShareCard } from '@/components/tournament-planner/TournamentS
 import { getSuggestedOpenDates } from '@/lib/suggestedSlots'
 import type { Metadata } from 'next'
 
-// Fixed at 3 regardless of the tournament's own unbooked count — this is a
+// Fixed regardless of the tournament's own unbooked count — this is a
 // "here's what's open soon" nudge for the organiser, not an exhaustive
 // booking plan (the GC/Admin suggested-slots panel is the exhaustive one).
+// Self-service tournaments show a couple more — declining one there just
+// advances client-side through this same list, no extra round trip, so a
+// slightly longer list means fewer "no more open dates" dead ends.
 const SHARE_CARD_SUGGESTION_COUNT = 3
+const SHARE_CARD_SUGGESTION_COUNT_SELF_SERVICE = 5
 
 export const revalidate = 300 // 5 min cache — public page
 
@@ -39,7 +43,7 @@ export default async function TournamentSharePage({
   // silently and made every booking fetch below return nothing).
   const { data: rawTournament } = await supabase
     .from('tournaments')
-    .select('id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, captains!tournaments_captain_id_fkey(id, name)')
+    .select('id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, organiser_self_service, captains!tournaments_captain_id_fkey(id, name)')
     .eq('id', params.tournamentId)
     .single()
 
@@ -76,9 +80,12 @@ export default async function TournamentSharePage({
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 
   // Next fully-open dates — same algorithm as the GC/Admin suggested-slots
-  // panel (src/lib/suggestedSlots.ts), just capped at a fixed 3 here rather
-  // than the tournament's full unbooked count.
-  const suggestedResult = await getSuggestedOpenDates(params.tournamentId, SHARE_CARD_SUGGESTION_COUNT)
+  // panel (src/lib/suggestedSlots.ts), just capped at a fixed count here
+  // rather than the tournament's full unbooked count.
+  const suggestionCount = rawTournament.organiser_self_service
+    ? SHARE_CARD_SUGGESTION_COUNT_SELF_SERVICE
+    : SHARE_CARD_SUGGESTION_COUNT
+  const suggestedResult = await getSuggestedOpenDates(params.tournamentId, suggestionCount)
   const suggestedDates  = suggestedResult.ok ? suggestedResult.suggestions : []
 
   return (

@@ -153,12 +153,18 @@ export const BLOCK_REASONS = [
   'Club Event',
   'Reserved for Knockout (pending confirmation)',
   'Practice / Internal Game',
+  'Reserved via organiser self-service (pending confirmation)',
   'Other',
 ] as const
 
 // Referenced by validation.ts (R7) and the soft-blocks admin flow — kept as
 // one named constant so the two never drift out of sync with each other.
 export const KNOCKOUT_HOLD_REASON: string = BLOCK_REASONS[1]
+
+// Written by the public organiser self-service reserve route — never
+// user-editable, this is the marker an admin's booking-list view uses to
+// spot a hold that came from that flow rather than an internal block.
+export const ORGANISER_SELF_SERVICE_REASON: string = BLOCK_REASONS[3]
 
 // ── Player performance stats (analytics DB, see src/lib/playerStats.ts) ───
 

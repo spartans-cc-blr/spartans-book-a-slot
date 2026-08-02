@@ -18,6 +18,7 @@ type Tournament = {
   match_fee: number | null
   captain_id: string | null
   captains: Captain | null
+  organiser_self_service: boolean
 }
 
 const BALL_LABELS = { red: '🔴 Red', white: '⚪ White', pink: '🩷 Pink' }
@@ -60,6 +61,7 @@ export default function AdminTournamentsPage() {
       ball_type: t.ball_type, ground_id: t.ground_id ?? '',
       active: t.active, total_league_games: t.total_league_games,
       match_fee: t.match_fee, captain_id: t.captain_id ?? '',
+      organiser_self_service: t.organiser_self_service,
     })
     setError('')
   }
@@ -301,6 +303,17 @@ export default function AdminTournamentsPage() {
                             placeholder="https://cricheroes.in/tournament/..."
                             className="form-input"
                           />
+                        </div>
+                        <div className="flex items-center gap-2 pt-1">
+                          <input
+                            type="checkbox"
+                            id={`self-service-${t.id}`}
+                            checked={editForm.organiser_self_service ?? false}
+                            onChange={e => setEditForm(f => ({ ...f, organiser_self_service: e.target.checked }))}
+                          />
+                          <label htmlFor={`self-service-${t.id}`} className="font-rajdhani text-sm text-zinc-400">
+                            Allow organiser self-service reservations on the public share page
+                          </label>
                         </div>
                         <div>
                           <label className="form-label">Total League Games</label>

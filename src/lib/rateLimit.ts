@@ -61,4 +61,9 @@ export const RATE_LIMITS = {
   captainWrite: { prefix: 'cw', limit: 30, windowSecs: 60 },
   adminWrite:   { prefix: 'aw', limit: 60, windowSecs: 60 },
   publicRead:   { prefix: 'pr', limit: 100, windowSecs: 60 },
+  // Fully unauthenticated write path (organiser self-service reserve /
+  // attach-match-URL) — no session to key off, so callers pass an
+  // identifier combining tournament_id + phone. Deliberately tighter than
+  // every other write preset since this is the app's first public write.
+  organiserWrite: { prefix: 'ow', limit: 8, windowSecs: 3600 },
 } as const

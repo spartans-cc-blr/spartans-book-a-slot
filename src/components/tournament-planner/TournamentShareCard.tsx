@@ -1,6 +1,7 @@
 import { parseISO, differenceInDays, format } from 'date-fns'
 import type { SuggestedDate } from '@/lib/suggestedSlots'
 import { ResultBadge } from '@/components/shared/ResultBadge'
+import { OrganiserSelfService } from './OrganiserSelfService'
 
 // This is a Server Component (no 'use client'), so the icon is inlined
 // here rather than imported from TournamentShareButton.tsx (a client
@@ -44,6 +45,7 @@ interface Tournament {
   organiser_contact: string | null
   total_league_games: number | null
   vc_captain_id: string | null
+  organiser_self_service: boolean
   captain: { id: string; name: string } | null
 }
 
@@ -221,29 +223,34 @@ export function TournamentShareCard({
         </div>
 
         {/* Next available dates — fully open days only (see
-            src/lib/suggestedSlots.ts), each with a booking enquiry link to
-            the club, mirroring /schedule's WhatsApp enquiry pattern. Only
-            shown when there's actually something left to book. */}
+            src/lib/suggestedSlots.ts). Self-service tournaments get the
+            interactive reserve/decline flow; everyone else keeps the plain
+            WhatsApp enquiry link, mirroring /schedule's pattern. Only shown
+            when there's actually something left to book. */}
         {unbooked > 0 && suggestedDates.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-parchment-3">
-            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-2">
-              Next available dates
-            </p>
-            <div className="flex flex-col gap-1.5">
-              {suggestedDates.map(s => (
-                <a key={s.game_date} href={suggestedDateWaLink(s)} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 hover:bg-emerald-100 transition-colors">
-                  <span className="font-rajdhani text-xs font-semibold text-emerald-800">
-                    {s.day} {format(parseISO(s.game_date), 'd MMM')}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-emerald-700">
-                    {WA_ICON}
-                    <span className="font-rajdhani text-[11px] font-bold">Book this date</span>
-                  </span>
-                </a>
-              ))}
+          tournament.organiser_self_service ? (
+            <OrganiserSelfService tournamentId={tournament.id} suggestedDates={suggestedDates} waNumber={waNumber} />
+          ) : (
+            <div className="mt-3 pt-3 border-t border-parchment-3">
+              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-2">
+                Next available dates
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {suggestedDates.map(s => (
+                  <a key={s.game_date} href={suggestedDateWaLink(s)} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 hover:bg-emerald-100 transition-colors">
+                    <span className="font-rajdhani text-xs font-semibold text-emerald-800">
+                      {s.day} {format(parseISO(s.game_date), 'd MMM')}
+                    </span>
+                    <span className="flex items-center gap-1.5 text-emerald-700">
+                      {WA_ICON}
+                      <span className="font-rajdhani text-[11px] font-bold">Book this date</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
             </div>
-          </div>
+          )
         )}
       </div>
 
