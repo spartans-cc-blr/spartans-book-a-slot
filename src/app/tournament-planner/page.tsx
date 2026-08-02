@@ -7,6 +7,7 @@ import { TournamentPlannerClient } from '@/components/tournament-planner/Tournam
 import { getLeaderboard } from '@/lib/playerStats'
 import type { Metadata } from 'next'
 import type { PlayerStatsTotals } from '@/types'
+import { KNOCKOUT_HOLD_REASON } from '@/types'
 
 export const metadata: Metadata = { title: 'Tournament Planner — Spartans CC' }
 export const revalidate = 0
@@ -127,6 +128,27 @@ export default async function TournamentPlannerPage() {
     tournamentStatsMap[tid] = Object.fromEntries(rows.map(r => [r.playerId, r.stats]))
   }
 
+  // Admin-only, read-only knockout awareness — existing Knockout-reason
+  // soft-block holds, keyed by tournament. Creation happens on
+  // /admin/soft-blocks/new; this is purely a display lookup. Only fetched
+  // for admins since nobody else can see or act on this section anyway.
+  const knockoutHoldsByTournament: Record<string, { game_date: string; slot_time: string }> = {}
+  if (user?.isAdmin) {
+    const { data: knockoutRows } = await supabase
+      .from('bookings')
+      .select('tournament_id, game_date, slot_time')
+      .eq('block_reason', KNOCKOUT_HOLD_REASON)
+      .neq('status', 'cancelled')
+      .not('tournament_id', 'is', null)
+      .order('game_date', { ascending: true })
+
+    for (const row of knockoutRows ?? []) {
+      if (row.tournament_id && !knockoutHoldsByTournament[row.tournament_id]) {
+        knockoutHoldsByTournament[row.tournament_id] = { game_date: row.game_date, slot_time: row.slot_time }
+      }
+    }
+  }
+
   // 3. All active captains
   const { data: captains } = await supabase
     .from('captains')
@@ -166,6 +188,7 @@ export default async function TournamentPlannerPage() {
           tournamentPlayersMap={tournamentPlayersMap}
           tournamentStatsMap={tournamentStatsMap}
           bookingCaptainMap={bookingCaptainMap}
+          knockoutHoldsByTournament={knockoutHoldsByTournament}
           viewerRole={{
             isCaptain: !!user?.isCaptain,
             isGC:      !!user?.isGC,

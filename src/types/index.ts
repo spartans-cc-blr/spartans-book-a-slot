@@ -101,6 +101,7 @@ export interface CreateBookingRequest {
   match_time?:    string | null
   cricheroes_url?: string | null
   exclude_id?:    string
+  block_reason?:  string | null  // set when this candidate is itself a soft-block hold (e.g. a Knockout hold) — read by R7
 }
 
 export interface CreateSoftBlockRequest {
@@ -117,7 +118,7 @@ export interface ValidationResult {
 }
 
 export interface ValidationError {
-  rule:    'R1' | 'R2' | 'R3' | 'R4' | 'R5' | 'R6'
+  rule:    'R1' | 'R2' | 'R3' | 'R4' | 'R5' | 'R6' | 'R7'
   message: string
 }
 
@@ -145,6 +146,10 @@ export const BLOCK_REASONS = [
   'Practice / Internal Game',
   'Other',
 ] as const
+
+// Referenced by validation.ts (R7) and the soft-blocks admin flow — kept as
+// one named constant so the two never drift out of sync with each other.
+export const KNOCKOUT_HOLD_REASON: string = BLOCK_REASONS[1]
 
 // ── Player performance stats (analytics DB, see src/lib/playerStats.ts) ───
 

@@ -7,6 +7,7 @@ import type {
   SlotTime,
   GameFormat,
 } from '@/types'
+import { KNOCKOUT_HOLD_REASON } from '@/types'
 
 export function getWeekNumber(dateStr: string): number {
   return getISOWeek(parseISO(dateStr))
@@ -53,6 +54,7 @@ function hasT20T30Conflict(
 type BookingWithTournamentCaptain = Booking & {
   tournament?: {
     captain_id: string | null
+    name?: string | null
   } | null
 }
 
@@ -203,6 +205,41 @@ export function validateBooking(
   if (booking.slot_time === '12:30') {
     if (sameDayActive.find(b => b.slot_time === '14:30' && b.format === 'T20')) {
       errors.push({ rule: 'R6', message: `A T20 game at 14:30 conflicts with the 12:30 slot.` })
+    }
+  }
+
+  // ── R7: Knockout day priority ────────────────────────────────
+  // Once any active booking on a date carries the Knockout hold reason, no
+  // *new* booking may take a slot_time at or before it that same day — this
+  // protects the day for a knockout fixture from the moment it's placed.
+  // Applies every day, not just weekends (a knockout can land on a weekday).
+  // slot_time strings ('07:30' etc.) sort correctly with plain string
+  // comparison since they're all zero-padded 24h HH:MM.
+  const sameDayAllActive = active.filter(b => b.game_date === booking.game_date)
+  const isKnockoutCandidate = booking.block_reason === KNOCKOUT_HOLD_REASON
+
+  if (isKnockoutCandidate) {
+    // Placing the knockout hold itself — a warning, not a rejection, since
+    // the organiser's date is a given and there may be no alternative.
+    const earlierSameDay = sameDayAllActive
+      .filter(b => b.slot_time < booking.slot_time)
+      .sort((a, b) => a.slot_time.localeCompare(b.slot_time))[0]
+    if (earlierSameDay) {
+      const label = earlierSameDay.tournament?.name ?? 'Another booking'
+      warnings.push({
+        rule: 'R7',
+        message: `${label} already has the ${earlierSameDay.slot_time} slot on ${booking.game_date}. Knockouts take precedence — consider asking them to reschedule later the same day.`,
+      })
+    }
+  } else {
+    const knockoutSameDay = sameDayAllActive.find(b =>
+      b.block_reason === KNOCKOUT_HOLD_REASON && booking.slot_time <= b.slot_time
+    )
+    if (knockoutSameDay) {
+      errors.push({
+        rule: 'R7',
+        message: `${booking.game_date} has a Knockout hold at ${knockoutSameDay.slot_time}. No slot at or before that time can be booked on this date.`,
+      })
     }
   }
 

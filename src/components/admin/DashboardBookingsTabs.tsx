@@ -65,8 +65,14 @@ function BookingsTable({ bookings, emptyLabel }: { bookings: DashboardBookingRow
                 <td className="px-4 py-3 font-cinzel text-sm text-parchment">{b.slot_time}</td>
                 <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{b.format ?? '—'}</td>
                 <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{b.captain_name ?? '—'}</td>
-                <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400 max-w-[140px] truncate">
-                  {b.status === 'soft_block' ? b.block_reason : b.tournament_name ?? '—'}
+                <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400 max-w-[140px] truncate" title={
+                  b.status === 'soft_block' && b.block_reason && b.tournament_name
+                    ? `${b.block_reason} — ${b.tournament_name}`
+                    : undefined
+                }>
+                  {b.status === 'soft_block'
+                    ? (b.tournament_name ? `${b.block_reason} — ${b.tournament_name}` : b.block_reason)
+                    : b.tournament_name ?? '—'}
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={b.status} />

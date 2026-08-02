@@ -55,6 +55,10 @@ interface Props {
   // Never career-wide stats.
   tournamentStatsMap: Record<string, Record<string, PlayerStatsTotals>>
   bookingCaptainMap: Record<string, SquadCaptain>
+  // Admin-only awareness — an existing Knockout-reason soft-block hold
+  // linked to this tournament, if one exists. Read-only here; creation
+  // happens on /admin/soft-blocks/new, not in this view.
+  knockoutHoldsByTournament: Record<string, { game_date: string; slot_time: string }>
 }
 
 // ── Slot definitions ───────────────────────────────────────────────
@@ -682,7 +686,7 @@ function GameTimelineCard({ sortedGames, gaps, avgGap }: {
 
 // ── Tournament block ───────────────────────────────────────────────
 function TournamentBlock({
-  tournament, games, announcedSet, today, isAdmin, isGC, players, stats, bookingCaptainMap, forceOpenToken,
+  tournament, games, announcedSet, today, isAdmin, isGC, players, stats, bookingCaptainMap, knockoutHold, forceOpenToken,
 }: {
   tournament: NonNullable<Booking['tournament']>
   games: Booking[]
@@ -693,6 +697,7 @@ function TournamentBlock({
   players: TournamentPlayer[]
   stats: Record<string, PlayerStatsTotals>
   bookingCaptainMap: Record<string, SquadCaptain>
+  knockoutHold?: { game_date: string; slot_time: string } | null
   forceOpenToken?: number
 }) {
   const [open, setOpen]               = useState(false)
@@ -724,6 +729,12 @@ function TournamentBlock({
   )
   const totalLeague = totalLeagueGames ?? games.length
   const unbooked    = Math.max(0, totalLeague - games.length)
+
+  // Admin-only knockout-candidate nudge — purely informational, mirrors the
+  // same "won"/"lost" matching ResultBadge uses. Doesn't gate or create
+  // anything; the actual hold is created on /admin/soft-blocks/new.
+  const wins = games.filter(g => g.match_result?.toLowerCase().includes('won')).length
+  const showKnockoutNudge = isAdmin && !knockoutHold && unbooked > 0 && wins > 0 && wins >= Math.ceil(totalLeague / 2)
 
   const allDates    = games.map(g => g.game_date).sort()
   const gap         = avgGapWeeks(allDates)
@@ -845,6 +856,24 @@ function TournamentBlock({
 
       {open && (
         <div className="bg-parchment">
+
+          {/* Admin-only, read-only knockout awareness. Never a creation UI —
+              that lives on /admin/soft-blocks/new. */}
+          {isAdmin && knockoutHold && (
+            <div className="mx-4 mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
+              <p className="text-xs font-semibold text-amber-800">
+                🏆 Knockout hold reserved — {format(parseISO(knockoutHold.game_date), 'EEE d MMM')} · {knockoutHold.slot_time}
+              </p>
+            </div>
+          )}
+          {showKnockoutNudge && (
+            <div className="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5">
+              <p className="text-xs text-amber-800">
+                🏆 {wins} of {totalLeague} league games won — this is starting to look like a knockout candidate.
+                Reserve a hold from <span className="font-semibold">Soft Block Slots</span> once the organiser gives a date.
+              </p>
+            </div>
+          )}
 
           {/* Matches — tabbed (Upcoming / Past Matches / Unbooked), replacing the old 4-card stat grid */}
           <div className="px-4 pt-4">
@@ -1376,6 +1405,7 @@ function SlotBalanceByDay({
 // ── Root client component ──────────────────────────────────────────
 export function TournamentPlannerClient({
   bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, tournamentStatsMap, bookingCaptainMap,
+  knockoutHoldsByTournament,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
   const [showUpcoming,  setShowUpcoming]  = useState(true)
@@ -1548,6 +1578,7 @@ export function TournamentPlannerClient({
                     players={tournamentPlayersMap[tournament.id] ?? []}
                     stats={tournamentStatsMap[tournament.id] ?? {}}
                     bookingCaptainMap={bookingCaptainMap}
+                    knockoutHold={knockoutHoldsByTournament[tournament.id] ?? null}
                     forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
                 ))}
                 {otherTournaments.length > 0 && (
