@@ -48,6 +48,11 @@ jobs:
             echo "MICROSERVICE_URL repo variable not set — skipping warmup. The real call below may 504 on a cold Render dyno."
             exit 0
           fi
+          # Strip any trailing slash — the repo variable was set with one, which
+          # produced a double-slash //health that FastAPI doesn't normalize (404
+          # instead of 200, confirmed 2026-08-02). Still warms the dyno either way
+          # since a 404 means the app booted and responded, but keep this defensive.
+          MICROSERVICE_URL="${MICROSERVICE_URL%/}"
           echo "Pinging $MICROSERVICE_URL/health to wake the Render dyno before the real cron call..."
           curl --silent --show-error --max-time 55 --output /dev/null \
             --write-out "warmup response: %{http_code} (%{time_total}s)\n" \
