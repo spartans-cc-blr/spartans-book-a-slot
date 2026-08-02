@@ -13,6 +13,17 @@ name: Cron — backfill-scorecards
 # overlap with a same-day manual run — the route only ever processes
 # bookings not yet 'synced'/'fees_applied', so re-running is a no-op for
 # anything already done.
+#
+# Warmup step added 2026-08-02: a manually-triggered run hit a cascading
+# cold-start failure — the first booking's fetch ate the whole 45s
+# microservice timeout waking up Render, leaving no time left in the
+# route's 60s Vercel-function ceiling for the remaining bookings, and the
+# whole call 504'd. A second run immediately after (Render now warm)
+# cleared the backlog in seconds. Pinging Render's own /health endpoint as
+# a separate GitHub Actions step first sidesteps this for free — a step on
+# this runner isn't bound by Vercel's 60s ceiling, so it can afford to sit
+# through the ~30s cold start on its own, leaving the real call to hit an
+# already-warm dyno.
 
 on:
   schedule:
@@ -29,6 +40,19 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     steps:
+      - name: Warm up Render microservice
+        env:
+          MICROSERVICE_URL: ${{ vars.MICROSERVICE_URL }}
+        run: |
+          if [ -z "$MICROSERVICE_URL" ]; then
+            echo "MICROSERVICE_URL repo variable not set — skipping warmup. The real call below may 504 on a cold Render dyno."
+            exit 0
+          fi
+          echo "Pinging $MICROSERVICE_URL/health to wake the Render dyno before the real cron call..."
+          curl --silent --show-error --max-time 55 --output /dev/null \
+            --write-out "warmup response: %{http_code} (%{time_total}s)\n" \
+            "$MICROSERVICE_URL/health" \
+            || echo "warmup ping failed/timed out — continuing anyway, real call may still 504"
       - name: Call backfill-scorecards cron endpoint
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}

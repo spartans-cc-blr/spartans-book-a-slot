@@ -341,6 +341,34 @@ successful re-sync, so there's no separate "un-flag" step needed here.
 > `/admin/scorecard-backfill` (client-paced, one booking per request, not
 > subject to the 60s ceiling at all) rather than repeated cron runs.
 
+> **Incident (2026-08-02) — `MAX_PER_RUN = 3` still wasn't enough headroom
+> once a cold Render dyno was back in the mix.** A manual `workflow_dispatch`
+> run (draining 2 backlogged 1 Aug bookings, match_ids `26132477` and
+> `25762143`) hit the exact 504 this section's `MAX_PER_RUN` fix was meant to
+> prevent — except this time the cause wasn't too many bookings, it was one
+> cold-starting Render dyno. The first booking's fetch ate the entire 45s
+> microservice timeout just waking Render up (`scorecard_uploads.error_message:
+> "Microservice did not respond within 45s"`, left at `pending_parse`); the
+> second booking got as far as `parsed` but the whole Vercel function was then
+> killed by the 60s ceiling before `syncMatchStatsForBooking()` could run. A
+> second run immediately after (Render already warm) synced both bookings in
+> under 10 seconds total — confirming the cold start, not the route logic,
+> was the entire cost.
+>
+> **Fixed:** `cron-backfill-scorecards.yml` gained a "Warm up Render
+> microservice" step that pings the microservice's own `GET /health` before
+> the real cron call, on the same runner. This step isn't bound by Vercel's
+> 60s ceiling, so it can afford to sit through Render's ~30s cold start for
+> free — the real call then only ever hits an already-warm dyno. Requires a
+> `MICROSERVICE_URL` GitHub Actions **repository variable** (not secret — see
+> `architecture.md` §10, this value isn't sensitive) set to the same Render
+> app URL as the Vercel env var of the same name; the step no-ops safely (and
+> says so in the log) if that variable isn't set, so this is additive and
+> can't newly break the workflow. This only covers the GitHub Actions
+> trigger — the lone `vercel.json` backup entry (19:00 IST) has no equivalent
+> external step to pre-warm Render from, and can still occasionally 504 on a
+> cold dyno; acceptable since it's a backup, not the primary trigger.
+
 ### Why the daily-cron-plus-guard shape exists at all
 Vercel Hobby does not support day-of-week-restricted cron expressions —
 this was discovered the hard way on the *separate* `lock-availability`
