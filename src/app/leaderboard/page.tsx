@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { createServiceClient } from '@/lib/supabase'
 import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { LeaderboardFilters, type LeaderboardCategory, type Format } from '@/components/leaderboard/LeaderboardFilters'
@@ -8,6 +9,7 @@ import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
 import { LeaderboardGlossary } from '@/components/leaderboard/LeaderboardGlossary'
+import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
 import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
 import type { Metadata } from 'next'
 
@@ -61,9 +63,14 @@ export default async function LeaderboardPage({
   // Tournament/Ground option lists are themselves scoped by the current
   // Format selection, so picking T20-only immediately narrows both
   // dropdowns to tournaments/grounds that actually have a T20 match.
-  const [{ tournaments, grounds }, availableMonths] = await Promise.all([
+  const supabase = createServiceClient()
+  const [{ tournaments, grounds }, availableMonths, myCricheroesUrl] = await Promise.all([
     getFilterOptions(restrictedFormats),
     getAvailableMonths(),
+    user?.playerId
+      ? supabase.from('players').select('cricheroes_url').eq('id', user.playerId).single()
+          .then(({ data }) => data?.cricheroes_url ?? null)
+      : Promise.resolve(null),
   ])
 
   const tournamentParam = searchParams?.tournament && searchParams.tournament !== 'all' ? searchParams.tournament : 'all'
@@ -118,6 +125,26 @@ export default async function LeaderboardPage({
           Performance
         </p>
         <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-parchment tracking-wide">Yours Statistically</h1>
+
+        {user?.playerId && (
+          <div className="flex flex-wrap items-center gap-4 mt-3">
+            <a href={`/players/${user.playerId}/stats`}
+              className="font-rajdhani text-sm font-semibold text-gold hover:text-gold-light transition-colors">
+              My stats on Hub →
+            </a>
+            {myCricheroesUrl ? (
+              <a href={myCricheroesUrl} target="_blank" rel="noopener noreferrer"
+                className="font-rajdhani text-sm font-semibold text-parchment hover:text-gold transition-colors flex items-center gap-1.5">
+                <CricHeroesIcon size={16} /> My stats on CricHeroes
+              </a>
+            ) : (
+              <a href="/profile"
+                className="font-rajdhani text-xs text-amber-400 hover:text-amber-300 bg-amber-950/30 border border-amber-800/50 rounded px-2.5 py-1 flex items-center gap-1.5 transition-colors">
+                <CricHeroesIcon size={14} /> Add your CricHeroes profile to see your stats there
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="px-5 md:px-8 lg:px-10 py-6">
