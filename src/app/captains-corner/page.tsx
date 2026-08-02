@@ -49,9 +49,6 @@ export default async function CaptainsCornerPage() {
   if (!session) redirect('/login')
   if (!user?.isCaptain && !user?.isAdmin) redirect('/fixtures')
 
-  const captainName     = user?.name ?? null
-  const captainWhatsapp = user?.whatsapp ?? null
-
   const supabase = createServiceClient()
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
@@ -225,10 +222,6 @@ export default async function CaptainsCornerPage() {
         <p className="text-muted text-sm max-w-xl leading-relaxed font-rajdhani">
           Showing Y / O / E responses. N and L are hidden. Amber names have outstanding dues.
         </p>
-        <a href="/fixtures"
-          className="mt-3 inline-flex items-center gap-1.5 font-rajdhani text-xs text-zinc-500 hover:text-gold transition-colors">
-          ← Back to Fixtures
-        </a>
       </div>
 
       {/* Legend */}
@@ -263,11 +256,7 @@ export default async function CaptainsCornerPage() {
               <CaptainsCornerGrid
                 key={wk}
                 weekLabel={weekend.label}
-                bookings={(weekend.bookings ?? []).map(b => ({
-                  ...b,
-                  captain_name:     captainName,
-                  captain_whatsapp: captainWhatsapp,
-                })) as any}
+                bookings={(weekend.bookings ?? []) as any}
                 players={playersWithExempt as any}
                 availMap={availMap}
                 initialSquadMap={initialSquadMap}

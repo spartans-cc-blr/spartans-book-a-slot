@@ -15,6 +15,7 @@ interface Booking {
   slot_time: string
   format: string | null
   cricheroes_url: string | null
+  opponent_name: string | null
   // Resolved server-side from match_stats_cache — null until a scorecard is
   // synced for this match, even for a game that's already been played.
   match_result: string | null
@@ -79,6 +80,23 @@ function slotKey(game_date: string, slot_time: string): SlotKey {
   const d = parseISO(game_date)
   const day = d.getDay() === 6 ? 'Sat' : 'Sun'
   return `${day}-${slot_time}` as SlotKey
+}
+
+// Splits totalLeague games evenly across every slot valid for this
+// tournament's format(s) — e.g. 10 games / 3 valid slots → 4/3/3. The
+// remainder (games that don't divide evenly) goes to the earliest slots in
+// display order (Sat 07:30 → Sun 14:30), which is an arbitrary but stable
+// tie-break, not a scheduling preference.
+function distributeSlotTargets(validKeys: SlotKey[], totalLeague: number): Record<SlotKey, number> {
+  const n = validKeys.length
+  const targets = {} as Record<SlotKey, number>
+  if (n === 0) return targets
+  const base      = Math.floor(totalLeague / n)
+  const remainder = totalLeague % n
+  validKeys.forEach((k, i) => {
+    targets[k] = base + (i < remainder ? 1 : 0)
+  })
+  return targets
 }
 
 // Alternates a 0/1 row for consecutive positions closer together than
@@ -766,6 +784,13 @@ function TournamentBlock({
   )
   const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
 
+  // Even split of totalLeague across every slot valid for this tournament's
+  // format(s) — drives the "2/3" per-slot target shown in SlotBalanceByDay.
+  const validSlotKeys = ALL_SLOTS
+    .filter(s => s.validFor.some(f => activeFormats.includes(f)))
+    .map(s => `${s.day}-${s.time}` as SlotKey)
+  const slotTargets = distributeSlotTargets(validSlotKeys, totalLeague)
+
   // Players with no synced stats always sort to the bottom, regardless of
   // direction or column — "No stats synced" isn't a value on any stat's
   // scale, so it shouldn't jump to the top under a descending numeric sort.
@@ -951,6 +976,7 @@ function TournamentBlock({
           {/* Slot balance — grouped by day */}
           <SlotBalanceByDay
             slotCounts={slotCounts}
+            slotTargets={slotTargets}
             maxSlotCount={maxSlotCount}
             activeFormats={activeFormats}
             isSlotImbalanced={isSlotImbalanced}
@@ -1136,7 +1162,10 @@ function MatchTabsSection({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13.5px] font-bold text-ink">{format(d, 'EEE')} · {g.slot_time}</p>
-                      {g.match_result && <div className="mt-0.5"><ResultBadge result={g.match_result} /></div>}
+                      <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+                        {g.match_result && <ResultBadge result={g.match_result} />}
+                        <span className="text-xs text-stone-500">vs <span className="text-ink font-semibold">{g.opponent_name || 'TBD'}</span></span>
+                      </div>
                       <p className="text-xs text-stone-500 mt-0.5">
                         {showFormatOnRow && <>{g.format} · </>}Captain{' '}
                         {captain
@@ -1174,6 +1203,7 @@ function MatchTabsSection({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13.5px] font-bold text-ink">{format(d, 'EEE')} · {g.slot_time}</p>
+                      <p className="text-xs text-stone-500 mt-0.5">vs <span className="text-ink font-semibold">{g.opponent_name || 'TBD'}</span></p>
                       {showFormatOnRow && <p className="text-xs text-stone-500 mt-0.5">{g.format}</p>}
                     </div>
                     <span className={`${c.bg} ${c.text} text-[11.5px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 text-center`}>
@@ -1350,9 +1380,10 @@ function SuggestedSlotsPanel({
 
 // ── Slot balance — grouped by day (warm-light cards) ─────────────────
 function SlotBalanceByDay({
-  slotCounts, maxSlotCount, activeFormats, isSlotImbalanced, dominantSlot, gamesLength,
+  slotCounts, slotTargets, maxSlotCount, activeFormats, isSlotImbalanced, dominantSlot, gamesLength,
 }: {
   slotCounts: Record<SlotKey, number>
+  slotTargets: Record<SlotKey, number>
   maxSlotCount: number
   activeFormats: string[]
   isSlotImbalanced: boolean
@@ -1363,6 +1394,9 @@ function SlotBalanceByDay({
   return (
     <div className="px-4 pt-6 pb-2">
       <p className="text-[15px] font-bold text-ink mb-3">Slot balance across this tournament</p>
+      <p className="text-[11.5px] text-stone-500 -mt-2 mb-3">
+        Target per slot is the league's total games split evenly across every valid slot.
+      </p>
       <div className="flex flex-col gap-3">
         {days.map(day => {
           // Only slots valid for this tournament's actual format(s) — cuts N/A rows to save space
@@ -1373,18 +1407,22 @@ function SlotBalanceByDay({
               {rows.map(s => {
                 const k: SlotKey = `${s.day}-${s.time}`
                 const count      = slotCounts[k]
-                const pct        = count > 0 ? Math.max(12, Math.round((count / maxSlotCount) * 100)) : 0
+                const target     = slotTargets[k] ?? 0
+                const metTarget  = target > 0 && count >= target
+                const pct        = target > 0
+                  ? Math.max(count > 0 ? 12 : 0, Math.round((Math.min(count, target) / target) * 100))
+                  : (count > 0 ? Math.max(12, Math.round((count / maxSlotCount) * 100)) : 0)
                 return (
                   <div key={k} className="flex items-center gap-3 py-1.5 border-t border-parchment-2 first:border-t-0">
                     <span className="w-[52px] flex-shrink-0 text-[12.5px] font-semibold text-stone-700">{s.time}</span>
                     <div className="flex-1 h-2 bg-parchment-2 rounded-full overflow-hidden">
                       {count > 0 && (
-                        <div className={`h-full rounded-full ${count === maxSlotCount ? 'bg-emerald-600' : 'bg-amber-600'}`}
+                        <div className={`h-full rounded-full ${metTarget ? 'bg-emerald-600' : 'bg-amber-600'}`}
                           style={{ width: `${pct}%` }} />
                       )}
                     </div>
-                    <span className="w-[18px] flex-shrink-0 text-sm font-extrabold text-ink text-right">
-                      {count}
+                    <span className="w-[42px] flex-shrink-0 text-sm font-extrabold text-ink text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {target > 0 ? `${count}/${target}` : count}
                     </span>
                   </div>
                 )

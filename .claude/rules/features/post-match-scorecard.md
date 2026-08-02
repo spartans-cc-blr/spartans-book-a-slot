@@ -91,8 +91,8 @@ Captain / VC / Wrangler opens match                 │  no browser needed)
 in /matches/history                                 │
         │                                            │
         ▼                                            ▼
-"Upload Scorecard" → file picker            Daily cron (07:00 IST) or
-        │                                    /admin/scorecard-backfill
+"Upload Scorecard" → file picker            Twice-daily cron (12:00/19:00
+        │                                    IST) or /admin/scorecard-backfill
         ▼                                            │
 POST /api/matches/[id]/scorecard             backfillOneBooking()
   (streamed progress events)                  (src/lib/scorecardBackfill.ts)
@@ -283,9 +283,19 @@ without re-running the fetch (a false-alarm override, distinct from "Reset
 Upload").
 
 ### `/api/cron/backfill-scorecards` — twice daily, self-healing
-Runs at 07:00 and 19:00 IST (`vercel.json`: `"30 1,13 * * *"` — widened
-from once daily on 2026-07-16 to help drain the backlog described below;
-drop back to once-daily once it's clear). Queries **all** past unsynced
+Runs at 12:00 and 19:00 IST (GitHub Actions: `"30 6,13 * * *"`). `vercel.json`
+carries a single-fire backup at `"30 13 * * *"` (19:00 IST only) — **Vercel
+Hobby caps cron jobs at one invocation per day per job**, so it was never
+possible to mirror both slots there; this is also why `vercel.json` only
+ever had one entry for this route in the first place, not a drift from an
+intended twice-daily config. 19:00 was chosen over 12:00 for the single
+Vercel-side backup since it's the slot more likely to already have a
+CricHeroes scorecard to fetch. Moved off the original 07:00 slot on
+2026-08-01: no games are ever played between 19:00 and 07:00 IST, so a
+07:00 run never had any new backlog the prior 19:00 run hadn't already seen
+— it was pure dead time. 12:00 additionally gives CricHeroes room to
+publish the day's morning-slot (07:30/10:30) scorecards before the fetch
+attempt runs. Queries **all** past unsynced
 bookings with a `match_id`, not just "yesterday" — so a run that's cut
 short, or a match that keeps failing, just rolls into the next run instead
 of being permanently skipped. `MAX_PER_RUN = 3` bounds each individual run
@@ -330,6 +340,34 @@ successful re-sync, so there's no separate "un-flag" step needed here.
 > yet `synced`/`fees_applied`. The March–July backlog is being drained via
 > `/admin/scorecard-backfill` (client-paced, one booking per request, not
 > subject to the 60s ceiling at all) rather than repeated cron runs.
+
+> **Incident (2026-08-02) — `MAX_PER_RUN = 3` still wasn't enough headroom
+> once a cold Render dyno was back in the mix.** A manual `workflow_dispatch`
+> run (draining 2 backlogged 1 Aug bookings, match_ids `26132477` and
+> `25762143`) hit the exact 504 this section's `MAX_PER_RUN` fix was meant to
+> prevent — except this time the cause wasn't too many bookings, it was one
+> cold-starting Render dyno. The first booking's fetch ate the entire 45s
+> microservice timeout just waking Render up (`scorecard_uploads.error_message:
+> "Microservice did not respond within 45s"`, left at `pending_parse`); the
+> second booking got as far as `parsed` but the whole Vercel function was then
+> killed by the 60s ceiling before `syncMatchStatsForBooking()` could run. A
+> second run immediately after (Render already warm) synced both bookings in
+> under 10 seconds total — confirming the cold start, not the route logic,
+> was the entire cost.
+>
+> **Fixed:** `cron-backfill-scorecards.yml` gained a "Warm up Render
+> microservice" step that pings the microservice's own `GET /health` before
+> the real cron call, on the same runner. This step isn't bound by Vercel's
+> 60s ceiling, so it can afford to sit through Render's ~30s cold start for
+> free — the real call then only ever hits an already-warm dyno. Requires a
+> `MICROSERVICE_URL` GitHub Actions **repository variable** (not secret — see
+> `architecture.md` §10, this value isn't sensitive) set to the same Render
+> app URL as the Vercel env var of the same name; the step no-ops safely (and
+> says so in the log) if that variable isn't set, so this is additive and
+> can't newly break the workflow. This only covers the GitHub Actions
+> trigger — the lone `vercel.json` backup entry (19:00 IST) has no equivalent
+> external step to pre-warm Render from, and can still occasionally 504 on a
+> cold dyno; acceptable since it's a backup, not the primary trigger.
 
 ### Why the daily-cron-plus-guard shape exists at all
 Vercel Hobby does not support day-of-week-restricted cron expressions —
@@ -377,6 +415,23 @@ the squad that day. A line under the batting table lists everyone from
 `team_list` who isn't in the filtered batting rows, CricHeroes-linked the
 same way every other player name is — mirrors CricHeroes's own scorecard
 convention.
+
+### Fielding table (added 1 Aug 2026)
+A third table, `ScorecardTables.tsx`, rendered underneath Bowling: Player /
+Ct / St / RO / Total. Sourced from `match_stats_cache.fielding` (already
+being synced and returned by `/api/matches/history/[bookingId]/scorecard` —
+it just wasn't rendered anywhere until now). `Ct` sums the analytics DB's
+`catches` and `caught_behind` fields — both display as a plain "catch" on
+a real scorecard, the DB just tracks keeper catches separately from
+fielder catches. `RO` is `run_outs`, already the total credited to that
+player regardless of whether they were the thrower or collector — the
+`assisted_run_out_thrower`/`assisted_run_out_collector` fields are a
+breakdown of that same number, not additional dismissals. `Total` is the
+sum of all four. Rows with zero total are filtered out (same spirit as the
+did-not-bat/did-not-bowl filters), and the whole table is hidden if no
+player has a fielding dismissal — unlike Batting/Bowling, which always
+render with a "No data" fallback row. Top fielder (by total dismissals) is
+gold-highlighted, same convention as top batter/top bowler.
 
 ### Squad collapsible — hidden once redundant
 Only shown when `!match.stats || !match.roles_complete` — i.e. hidden once
@@ -457,7 +512,7 @@ and `year=all` specifically.
 | `src/app/api/matches/history/[bookingId]/tournament/route.ts` | Reassign tournament post-hoc |
 | `src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` | `/matches/history` page — filters, pagination, `MatchHistoryCard` |
 | `src/components/matches/ScorecardUploadButton.tsx` | Upload button + actionable-state UI only (no-upload / stuck pending_parse) |
-| `src/components/matches/ScorecardTables.tsx` | Batting/bowling tables + "Did not bat" line |
+| `src/components/matches/ScorecardTables.tsx` | Batting/bowling/fielding tables + "Did not bat" line |
 | `src/app/admin/bookings/[id]/page.tsx` | Admin booking edit page — Post-Match panel |
 | `supabase/migrations/042_add_wrangler_role.sql` | `players.is_wrangler` |
 | `supabase/migrations/044_match_stats_cache.sql` | `match_stats_cache` table (reconstructed — see Section 5) |
@@ -515,6 +570,7 @@ MICROSERVICE_SECRET  = <same value as Hub's MICROSERVICE_SECRET>
 | Wrong PDF uploaded — admin override | ✅ Done — "Reset Upload" / `DELETE /api/admin/matches/[id]/post-match` |
 | `import_from_dict` on `SupabaseImporter` | ✅ Done, live on Render |
 | CricHeroes match URL backfill for pre-existing bookings | ⏳ See `pending-backlog.md` E-3 — separate, ongoing coordinator task |
+| `match_stats_cache` carrying stale `player_id: null` for names reconciled in the analytics DB *after* that booking last synced — 63 of ~65 bookings affected | ✅ Bulk-patched 2026-08-01 — see Section 15's second incident write-up. No automated re-sync-on-reconcile hook exists yet, so this class of drift can recur for any newly-confirmed alias/override until one is built |
 
 ---
 
@@ -995,6 +1051,8 @@ tie-inclusive `computeTopPerformers()` path.
 | Item | Notes |
 |---|---|
 | Share list surfaced every tied top scorer/bowler instead of one MVP | ✅ Fixed 28 Jul 2026 — see "Share target — narrowed to a single match MVP" above. `computeMatchMVP()` added to `matchTopPerformers.ts`; `top_performers` in `/api/matches/history` now built from it instead of the tie-inclusive `computeTopPerformers()`. `can_verify`/`canActOnScorecard()` deliberately left unchanged. |
+| `computeMatchMVP()` picked the wrong player when the true MVP's scorecard name didn't byte-match their squad name | ✅ Fixed 31 Jul 2026 — see the incident write-up below. Resolution order flipped: max-then-resolve, not resolve-then-max. |
+| Same stale-`match_stats_cache` root cause, fleet-wide | ✅ Audited and bulk-fixed 1 Aug 2026 — see the second incident write-up below. 63 of ~65 synced bookings were affected; all patched in one pass. |
 | No other known gaps | Fresh as of this pass — worth a follow-up note here once a real top performer has actually verified or flagged a scorecard through this path. |
 
 > **Incident (28 Jul 2026) — stale `match_stats_cache` silently hid the
@@ -1026,6 +1084,100 @@ tie-inclusive `computeTopPerformers()` path.
 > `.neq('status', 'fees_applied')`, so a re-sync can never regress the
 > forward-only status machine back to `synced` and make a fees-applied
 > booking look eligible for another fee debit.
+
+> **Incident (31 Jul 2026) — `computeMatchMVP()` surfaced the wrong player
+> as match MVP on a real match, not just an empty share list.** A club
+> coordinator asked why Tejas Lengade (MVP score 2.3) was shown as the top
+> performer for the 12 Apr Blendin practice game (booking `13b951c8`) when
+> Keshav Renganathan (33 runs + 2 wickets, true MVP 6.74) and Aarit
+> Srivatsava (45 runs, MVP 4.5) clearly outscored him. Root cause: the
+> first cut of `computeMatchMVP()` (see the 28 Jul entry above and the
+> function's own header comment) resolved each scorecard name to a Hub
+> `player_id` **before** taking the max, dropping any candidate that
+> couldn't resolve. Keshav's and Aarit's CricHeroes scorecard names
+> ("Keshav", "Aarit S") don't byte-match their full Hub squad names
+> ("Keshav Renganathan", "Aarit Srivatsava") — a case
+> `player-identity-resolution.md`'s alias table already had covered
+> correctly, but this booking's `match_stats_cache` predated that
+> reconciliation and was still carrying `player_id: null` for every row
+> (the exact same stale-cache class as the 28 Jul incident above, just
+> with a worse symptom this time: instead of an empty share list, the
+> function silently substituted a lesser, resolvable candidate — Tejas,
+> whose scorecard name happens to equal his squad name exactly — and
+> reported him as "the MVP" with full confidence). Confirmed via direct
+> query: `batting_stats`/`bowling_stats`/`fielding_stats` in the analytics
+> DB already had correct `player_id`s reconciled for every name in this
+> match; only the Hub-side `match_stats_cache` copy was stale. Fixed two
+> ways: (1) `computeMatchMVP()` now mirrors `computeTopPerformers()`'s
+> order of operations — sum and max across *all* scorecard names first,
+> resolve `player_id` only on the winner(s) afterward, so an unresolvable
+> winner now correctly yields no share target instead of a wrong one; see
+> the updated header comment on `computeMatchMVP()` for the full
+> before/after; (2) this one booking's `match_stats_cache` was manually
+> re-synced from the analytics DB so it now carries the correct
+> `player_id`s — confirmed Keshav now resolves correctly as MVP 6.74.
+> Take-away, same as 28 Jul's: a name being present in
+> `player_name_aliases` doesn't mean every match that name appears in has
+> picked it up yet — only a sync after the alias existed does that.
+
+> **Incident (1 Aug 2026) — the 31 Jul root cause turned out to be
+> fleet-wide, not a one-off on a single booking.** After fixing the 12 Apr
+> and 18 Apr Blendin matches individually, a full audit was run across
+> every row in `match_stats_cache`: for each booking, count how many
+> `batting`/`bowling`/`fielding`/`team_list` entries still carry
+> `player_id: null` despite the analytics DB's own `batting_stats` /
+> `bowling_stats` / `fielding_stats` / `team_list` rows for that same
+> `(match_id, player_name)` already having a resolved `player_id`. **63 of
+> the ~65 synced bookings** had at least one such row — the same class of
+> drift as both incidents above (a scorecard nickname like "Siva", "Uday",
+> "Sagar", "Kathiresh", "Venkat R", "Trinadh Gondu", or "Ganapathy
+> Rajeswaran" gets reconciled in the analytics DB sometime *after* that
+> booking's Hub-side cache was last synced, and nothing re-syncs it
+> automatically). This had been silently suppressing or misdirecting the
+> MVP share target on the large majority of match history, not just the
+> two reported cases.
+>
+> **Fix — a database-side patch, not a re-sync loop.** Re-running
+> `syncMatchStatsForBooking()` 63 times (the "correct", ordinary path) was
+> considered but skipped in favour of a direct, one-shot SQL correction:
+> a lookup of every `(match_id, player_name, player_id)` triple already
+> resolved in the analytics DB (744 rows across the affected matches) was
+> joined against `match_stats_cache` and used to patch *only* the missing
+> `player_id` key inside each existing JSON array element — every other
+> field (runs, balls, `mvp_score`, etc.) was left untouched, and `synced_at`
+> was bumped to record the correction. This was deliberately narrower than
+> a full re-sync: it fixes exactly the known symptom (stale `player_id`)
+> without re-pulling or overwriting anything else from the analytics DB in
+> the same pass.
+>
+> **Verification, not just execution.** A follow-up null-count sweep
+> across all bookings confirmed the fix, and also caught its own gap: one
+> row (`Nirmal Kumar`, match `23938237`, the same 18 Apr booking from the
+> incident above) was still stale after the bulk patch even though the
+> analytics DB had a resolved `player_id` for it in all four tables —
+> the earlier 744-row extraction had missed this one row for reasons not
+> fully root-caused (not a name-formatting issue — the string matched
+> byte-for-byte). Patched individually once found. The remaining 16
+> matches with a leftover null (one player each, two in one case) were
+> cross-checked directly against the analytics DB and confirmed to have
+> **no** resolution there either, in any of the four stat tables — names
+> like "Shivam Malhotra", "KARAN", "Jenish", "Nitish", "Selva" read as
+> opponent-team players who were never Hub members, not a caching bug.
+> These are expected `player_id: null` and need no action (an admin could
+> optionally mark them `ignored_names` via `/admin/player-reconciliation`
+> to keep them off future reconciliation queues, but nothing depends on
+> that).
+>
+> **Take-away for next time this class of bug is suspected:** don't
+> assume a reported stale-cache symptom is isolated to the one booking a
+> user noticed. `player_name_aliases`/`match_name_overrides` reconciliation
+> in the analytics DB and `match_stats_cache` syncs on the Hub side are two
+> independently-timed operations with no trigger linking them — a booking
+> synced even a day before its scorecard names were reconciled will carry
+> this drift indefinitely until something re-syncs or patches it. There is
+> still no automated re-sync-on-reconcile hook; each new alias/override
+> confirmed via `/admin/player-reconciliation` can leave every
+> already-synced match containing that name freshly stale again.
 
 ---
 

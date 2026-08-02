@@ -21,7 +21,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
-import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow } from '@/types'
+import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -127,9 +127,9 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
   return t
 }
 
-// Resolves a {year, tournamentId, groundId, formats} filter to a concrete
-// list of Hub bookings.match_id values. Returns null when nothing is set —
-// the caller should treat null as "no restriction" (all-time, all
+// Resolves a {year|month, tournamentId, groundId, formats} filter to a
+// concrete list of Hub bookings.match_id values. Returns null when nothing
+// is set — the caller should treat null as "no restriction" (all-time, all
 // tournaments, all grounds, all formats). Returns [] when filters are set
 // but match nothing; the caller MUST short-circuit on an empty array rather
 // than passing it to `.in()`, since an empty `.in()` array does not behave
@@ -140,16 +140,33 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
 // since there are only two known formats) — callers pass undefined/empty
 // for "no restriction" rather than the full ['T20','T30'] list, so this
 // never has to special-case "all formats explicitly named".
-async function getScopedMatchIds(filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] }): Promise<string[] | null> {
+//
+// `month` ('YYYY-MM', for the leaderboard's Monthly view) and `year` are
+// never combined by any caller today — Monthly scopes by month alone, every
+// other view scopes by year alone — so `month` simply takes precedence
+// when both happen to be set, rather than trying to intersect the two.
+async function getScopedMatchIds(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] }): Promise<string[] | null> {
   const hasFormatRestriction = !!filters.formats && filters.formats.length > 0
-  if (!filters.year && !filters.tournamentId && !filters.groundId && !hasFormatRestriction) return null
+  if (!filters.year && !filters.month && !filters.tournamentId && !filters.groundId && !hasFormatRestriction) return null
 
   const hub = createServiceClient()
 
   function baseQuery() {
-    let q = hub.from('bookings').select('match_id').not('match_id', 'is', null)
+    // Cancelled bookings are excluded — a rescheduled match's old slot is
+    // cancelled rather than deleted, but keeps the same match_id, so
+    // without this a match can leak into every month/year/tournament its
+    // now-stale cancelled attempts happened to be booked for, on top of
+    // the one it actually got played in. Confirmed, real incident: see
+    // getPerformances()'s comment below.
+    let q = hub.from('bookings').select('match_id').not('match_id', 'is', null).eq('status', 'confirmed')
     if (filters.tournamentId) q = q.eq('tournament_id', filters.tournamentId)
-    if (filters.year) q = q.gte('game_date', `${filters.year}-01-01`).lte('game_date', `${filters.year}-12-31`)
+    if (filters.month) {
+      const [y, m] = filters.month.split('-').map(Number)
+      const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate() // day 0 of next month = last day of this month
+      q = q.gte('game_date', `${filters.month}-01`).lte('game_date', `${filters.month}-${String(lastDay).padStart(2, '0')}`)
+    } else if (filters.year) {
+      q = q.gte('game_date', `${filters.year}-01-01`).lte('game_date', `${filters.year}-12-31`)
+    }
     if (hasFormatRestriction) q = q.in('format', filters.formats!)
     return q
   }
@@ -224,6 +241,7 @@ export async function getFilterOptions(formats?: string[]): Promise<{
     .in('format', formats)
     .not('match_id', 'is', null)
     .not('tournament_id', 'is', null)
+    .eq('status', 'confirmed')
   if (error) throw new Error(error.message)
 
   const tournamentMap = new Map<string, { id: string; name: string }>()
@@ -279,9 +297,11 @@ async function fetchAnalyticsRows(opts: {
 // directly since it needs year, ground, AND format filters combined.
 export async function getPlayerStats(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean } = {}
 ): Promise<PlayerStatsTotals> {
-  const scoped = await getScopedMatchIds(filters)
+  let scoped = await getScopedMatchIds(filters)
+  if (scoped && scoped.length === 0) return emptyTotals()
+  scoped = await applyCaptainFilter(playerId, scoped, filters.asCaptain)
   if (scoped && scoped.length === 0) return emptyTotals()
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
   const matchIds = new Set<string>(team.map((r: any) => r.match_id).filter(Boolean))
@@ -304,9 +324,11 @@ export async function getPlayerSeasonStats(playerId: string, year: number): Prom
 // this file rather than showing a misleading 0.
 export async function getPlayerMatchHistory(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean } = {}
 ): Promise<PlayerMatchHistoryRow[]> {
-  const scoped = await getScopedMatchIds(filters)
+  let scoped = await getScopedMatchIds(filters)
+  if (scoped && scoped.length === 0) return []
+  scoped = await applyCaptainFilter(playerId, scoped, filters.asCaptain)
   if (scoped && scoped.length === 0) return []
 
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
@@ -321,10 +343,15 @@ export async function getPlayerMatchHistory(
   const matchById = new Map((matchRows ?? []).map((m: any) => [m.match_id, m]))
 
   const hub = createServiceClient()
+  // .eq('status', 'confirmed') — a match_id can be shared with an old,
+  // cancelled (rescheduled-away) booking; without this, whichever row
+  // Postgres happens to return last for that match_id wins the Map below,
+  // which can silently swap in the wrong date/tournament.
   const { data: bookingRows, error: bookingErr } = await hub
     .from('bookings')
     .select('id, match_id, game_date, format, tournament:tournaments(name)')
     .in('match_id', matchIds)
+    .eq('status', 'confirmed')
   if (bookingErr) throw new Error(bookingErr.message)
   const bookingByMatchId = new Map((bookingRows ?? []).map((b: any) => [b.match_id, b]))
 
@@ -370,7 +397,7 @@ export async function getPlayerMatchHistory(
   return rows
 }
 
-export async function getLeaderboard(filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}): Promise<LeaderboardRow[]> {
+export async function getLeaderboard(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] } = {}): Promise<LeaderboardRow[]> {
   const scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return []
 
@@ -429,6 +456,143 @@ export async function getLeaderboard(filters: { year?: number; tournamentId?: st
   return rows
 }
 
+// Distinct 'YYYY-MM' months that have at least one confirmed, synced
+// booking — feeds the month stepper on /leaderboard's Monthly view, most
+// recent first. Mirrors the same distinct-month derivation
+// /api/matches/history/filters already does over bookings, scoped here to
+// bookings with a match_id (the leaderboard only ever has data for those).
+//
+// Capped at today — a future booking can already have a match_id set
+// (admins sometimes attach the CricHeroes match link ahead of time), which
+// would otherwise surface a not-yet-played month in the stepper's picker
+// with nothing in it. Also excludes cancelled bookings — see
+// getPerformances()'s comment for why a stale, rescheduled-away
+// booking can't just be left in.
+export async function getAvailableMonths(): Promise<string[]> {
+  const today = new Date().toISOString().split('T')[0]
+  const hub = createServiceClient()
+  const { data, error } = await hub.from('bookings').select('game_date').not('match_id', 'is', null).eq('status', 'confirmed').lte('game_date', today)
+  if (error) throw new Error(error.message)
+  const months = new Set<string>((data ?? []).map((b: any) => (b.game_date as string).slice(0, 7)))
+  return Array.from(months).sort((a, b) => b.localeCompare(a))
+}
+
+type Performances = {
+  centuries:        MonthlyInnings[]
+  halfCenturies:    MonthlyInnings[]
+  fiveWicketHauls:  MonthlyBowlingInnings[]
+  threeWicketHauls: MonthlyBowlingInnings[]
+}
+const EMPTY_PERFORMANCES: Performances = { centuries: [], halfCenturies: [], fiveWicketHauls: [], threeWicketHauls: [] }
+
+function resolveTournamentName(booking: any): string | null {
+  return Array.isArray(booking?.tournament) ? (booking.tournament[0]?.name ?? null) : (booking?.tournament?.name ?? null)
+}
+
+// Every individual 50+ batting innings and 3+ wicket bowling innings within
+// the given scope, split into centuries/half-centuries and 5-for/3-for
+// bands (each pair mutually exclusive by score) — lists each one rather
+// than crowning a single "most" winner. Sorted best performance first,
+// most recent date as the tiebreak. Takes the same filter shape as
+// getLeaderboard()/getScopedMatchIds() — used both for the Monthly view
+// (scoped by `month`) and for the year-scoped Milestones "Centuries" /
+// "5-Wicket Hauls" collapsible lists (scoped by `year` + whatever
+// tournament/ground/format filter is active), since 100s and 5-fors are
+// rare enough that a whole year's worth is still a reasonably short list.
+export async function getPerformances(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] }): Promise<Performances> {
+  const scoped = await getScopedMatchIds(filters)
+  if (!scoped || scoped.length === 0) return EMPTY_PERFORMANCES
+
+  const analytics = createAnalyticsClient()
+  if (!analytics) throw new Error('Analytics database is not configured')
+  const [{ data: battingRows, error: battErr }, { data: bowlingRows, error: bowlErr }] = await Promise.all([
+    analytics.from('batting_stats').select('*').in('match_id', scoped).not('player_id', 'is', null),
+    analytics.from('bowling_stats').select('*').in('match_id', scoped).not('player_id', 'is', null),
+  ])
+  if (battErr) throw new Error(battErr.message)
+  if (bowlErr) throw new Error(bowlErr.message)
+
+  const qualifyingBatting = (battingRows ?? []).filter((r: any) => r.batted && num(r.runs) >= 50)
+  const qualifyingBowling = (bowlingRows ?? []).filter((r: any) => r.did_bowl && num(r.wickets) >= 3)
+  if (qualifyingBatting.length === 0 && qualifyingBowling.length === 0) return EMPTY_PERFORMANCES
+
+  // One shared bookings + players fetch for both bands — cheaper than
+  // fetching separately, and `id` (booking id) rides along for free
+  // alongside the fields already needed for date/format/tournament, so
+  // the match-page link costs nothing extra on top of this query.
+  const matchIds  = Array.from(new Set<string>([...qualifyingBatting, ...qualifyingBowling].map((r: any) => r.match_id)))
+  const playerIds = Array.from(new Set<string>([...qualifyingBatting, ...qualifyingBowling].map((r: any) => r.player_id)))
+
+  const hub = createServiceClient()
+  // .eq('status', 'confirmed') — real incident: a match rescheduled twice
+  // (Apr -> Jun -> Jul) left two cancelled bookings behind, each still
+  // carrying the same match_id as the eventual confirmed Jul booking.
+  // getScopedMatchIds() already excludes those from a given month's scope
+  // (so the match itself no longer wrongly appears under April/June), but
+  // this join needs the same filter too — otherwise a cancelled booking
+  // sharing the match_id can still win the Map below and show the wrong
+  // date/tournament for a performance that *did* correctly qualify.
+  const [{ data: bookings, error: bookErr }, { data: players, error: pErr }] = await Promise.all([
+    hub.from('bookings').select('id, match_id, game_date, format, tournament:tournaments(name)').in('match_id', matchIds).eq('status', 'confirmed'),
+    hub.from('players').select('id, name, cricheroes_url, photo_url').in('id', playerIds),
+  ])
+  if (bookErr) throw new Error(bookErr.message)
+  if (pErr) throw new Error(pErr.message)
+  const bookingByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b]))
+  const playerById     = new Map((players ?? []).map((p: any) => [p.id, p]))
+
+  const battingInnings: MonthlyInnings[] = qualifyingBatting
+    .filter((r: any) => playerById.has(r.player_id)) // reconciled to a player_id no longer in Hub — skip, same guard as getLeaderboard
+    .map((r: any) => {
+      const booking = bookingByMatch.get(r.match_id) as any
+      const player  = playerById.get(r.player_id) as any
+      return {
+        playerId:       r.player_id,
+        playerName:     player.name,
+        cricheroesUrl:  player.cricheroes_url ?? null,
+        photoUrl:       player.photo_url ?? null,
+        runs:           num(r.runs),
+        balls:          num(r.balls),
+        notOut:         r.not_out === 'Y',
+        gameDate:       booking?.game_date ?? null,
+        format:         booking?.format ?? null,
+        tournamentName: resolveTournamentName(booking),
+        bookingId:      booking?.id ?? null,
+      }
+    })
+  battingInnings.sort((a, b) => b.runs - a.runs || (b.gameDate ?? '').localeCompare(a.gameDate ?? ''))
+
+  const bowlingInnings: MonthlyBowlingInnings[] = qualifyingBowling
+    .filter((r: any) => playerById.has(r.player_id))
+    .map((r: any) => {
+      const booking = bookingByMatch.get(r.match_id) as any
+      const player  = playerById.get(r.player_id) as any
+      return {
+        playerId:       r.player_id,
+        playerName:     player.name,
+        cricheroesUrl:  player.cricheroes_url ?? null,
+        photoUrl:       player.photo_url ?? null,
+        wickets:        num(r.wickets),
+        runsConceded:   num(r.runs),
+        overs:          r.overs,
+        gameDate:       booking?.game_date ?? null,
+        format:         booking?.format ?? null,
+        tournamentName: resolveTournamentName(booking),
+        bookingId:      booking?.id ?? null,
+      }
+    })
+  // Most wickets first; fewer runs conceded (better economy) breaks a tie
+  // on wickets, most recent date breaks a tie on both.
+  bowlingInnings.sort((a, b) => b.wickets - a.wickets || a.runsConceded - b.runsConceded || (b.gameDate ?? '').localeCompare(a.gameDate ?? ''))
+
+  return {
+    centuries:        battingInnings.filter(i => i.runs >= 100),
+    halfCenturies:    battingInnings.filter(i => i.runs >= 50 && i.runs < 100),
+    fiveWicketHauls:  bowlingInnings.filter(i => i.wickets >= 5),
+    threeWicketHauls: bowlingInnings.filter(i => i.wickets >= 3 && i.wickets < 5),
+  }
+}
+
 export async function getRecentForm(playerIds: string[], matchCount: number = 5): Promise<Record<string, RecentForm | null>> {
   const result: Record<string, RecentForm | null> = {}
   if (playerIds.length === 0) return result
@@ -453,7 +617,7 @@ export async function getRecentForm(playerIds: string[], matchCount: number = 5)
   let dateByMatch = new Map<string, string>()
   if (matchIds.length > 0) {
     const hub = createServiceClient()
-    const { data: bookings, error } = await hub.from('bookings').select('match_id, game_date').in('match_id', matchIds)
+    const { data: bookings, error } = await hub.from('bookings').select('match_id, game_date').in('match_id', matchIds).eq('status', 'confirmed')
     if (error) throw new Error(error.message)
     dateByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b.game_date]))
   }
@@ -519,7 +683,7 @@ async function matchIdsForFilter(filter: {
   format?:          string
 }): Promise<string[]> {
   const hub = createServiceClient()
-  let query = hub.from('bookings').select('match_id').not('match_id', 'is', null)
+  let query = hub.from('bookings').select('match_id').not('match_id', 'is', null).eq('status', 'confirmed')
   if (filter.tournamentId)   query = query.eq('tournament_id', filter.tournamentId)
   if (filter.tournamentIdIn) query = query.in('tournament_id', filter.tournamentIdIn)
   // Case-insensitive — CricHeroes/admin-entered venue text and the ground's
@@ -530,6 +694,38 @@ async function matchIdsForFilter(filter: {
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return Array.from(new Set<string>((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+}
+
+// match_id values for every confirmed booking where this player was the
+// match-specific captain (squad.is_captain — see features/squad-selection.md;
+// this is NOT players.is_captain, the permanent club-captain flag). Used by
+// the "As Captain" filter on /players/[id]/stats, intersected with whatever
+// year/ground/format scope is already active rather than replacing it.
+async function getCaptainMatchIds(playerId: string): Promise<string[]> {
+  const hub = createServiceClient()
+  const { data: squadRows, error: squadErr } = await hub
+    .from('squad').select('booking_id').eq('player_id', playerId).eq('is_captain', true)
+  if (squadErr) throw new Error(squadErr.message)
+  const bookingIds = Array.from(new Set<string>((squadRows ?? []).map((r: any) => r.booking_id).filter(Boolean)))
+  if (bookingIds.length === 0) return []
+
+  const { data: bookings, error: bookErr } = await hub
+    .from('bookings').select('match_id').in('id', bookingIds).eq('status', 'confirmed').not('match_id', 'is', null)
+  if (bookErr) throw new Error(bookErr.message)
+  return Array.from(new Set<string>((bookings ?? []).map((b: any) => b.match_id).filter(Boolean)))
+}
+
+// Intersects the already-scoped match_id list (or, if unscoped, the full
+// captain list) with this player's captain match_ids. Returns null only when
+// asCaptain isn't set at all — same "no restriction" contract as
+// getScopedMatchIds — otherwise always a concrete (possibly empty) array.
+async function applyCaptainFilter(playerId: string, scoped: string[] | null, asCaptain?: boolean): Promise<string[] | null> {
+  if (!asCaptain) return scoped
+  const captainMatchIds = await getCaptainMatchIds(playerId)
+  if (captainMatchIds.length === 0) return []
+  if (!scoped) return captainMatchIds
+  const captainSet = new Set(captainMatchIds)
+  return scoped.filter(id => captainSet.has(id))
 }
 
 async function scopedPlayerStats(playerId: string, matchIds: string[]): Promise<PlayerStatsTotals | null> {

@@ -62,6 +62,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 |---|---|---|
 | `/profile` | Server + client form | `players` (own row only — IDOR protected) |
 | `/matches/history` | Server → `MatchHistoryClient` (client) | `bookings` (past confirmed), `scorecard_uploads`, `match_stats_cache`, `squad`; upload/sync/verify/flag actions gated per-booking to captain/VC/wrangler/admin, but the verified status itself is visible to every viewer — see `features/post-match-scorecard.md` §14 |
+| `/leaderboard` | Server → `LeaderboardMilestones`/`LeaderboardMonthly`/`LeaderboardTable` (client) | Analytics DB (`batting_stats`/`bowling_stats`/`fielding_stats`/`team_list`) via `src/lib/playerStats.ts`, joined to Hub `players`; year/month/tournament/ground/format filters — see `features/leaderboard.md` |
  
 ### Captain Routes (`isCaptain` or `isAdmin`)
  
@@ -157,7 +158,7 @@ Access here is genuinely mixed per-route rather than one role — see
  
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/bookings` | GET, POST, PATCH, DELETE | Admin | Booking CRUD | PATCH clears availability rows when game_date or slot_time changes
+| `/api/bookings` | GET, POST, PATCH, DELETE | Admin | Booking CRUD | PATCH clears availability rows when game_date or slot_time changes; POST/PATCH both accept an optional `overrides: {rule, reason}[]` for admin-only R1-R6 bypass — see §7.1
 | `/api/bookings/reserve` | POST | Admin | Create soft_block reservation |
 | `/api/validate` | POST | Admin | Live rule validation during booking form entry; accepts optional exclude_id to exclude current booking from R4 self-conflict on edit
 | `/api/captains` | GET, POST, PATCH | Admin | Captain master data |
@@ -177,7 +178,7 @@ Access here is genuinely mixed per-route rather than one role — see
 |---|---|---|---|
 | `/api/cron/expire-reservations` | GET | `CRON_SECRET` bearer | Daily at 18:30 UTC — delete expired `soft_block` rows |
 | `/api/cron/lock-availability` | GET | `CRON_SECRET` bearer | Fires daily (Vercel Hobby can't restrict cron by day-of-week — see `limitations.md`); route itself gates to Thursday IST via an in-code check before blanket-locking all confirmed Sat/Sun bookings for the upcoming weekend |
-| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Twice daily, 07:00 & 19:00 IST — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 3/run; see `features/post-match-scorecard.md` |
+| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Twice daily, 12:00 & 19:00 IST (moved off 07:00 on 2026-08-01 — no games are played 19:00–07:00 IST, so that slot was dead time) — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 3/run; see `features/post-match-scorecard.md` |
 | `/api/cron/sync-player-status` | GET | `CRON_SECRET` bearer | Daily at 02:00 IST — recomputes every non-expelled player's `active`/`inactive` status from 42-day availability signal; see `features/gc-players.md` |
 | `/api/cron/availability-nudge` | GET | `CRON_SECRET` bearer | Sun–Wed at 20:45 IST — personalised push reminders for `nextLockWeekend` gaps; see `features/availability-nudge.md` |
 
@@ -213,7 +214,7 @@ Primary scheduling record.
 | `opponent_name` | text | Opposing team |
 | `match_id` | text | CricHeroes match reference |
 | `cricheroes_url` | text | Direct CricHeroes match link |
-| `match_time` | text | Actual start time (may differ from slot). Admin booking form defaults this to `slot_time + 15 min` once a slot is picked, unless already saved or manually overridden — see §8.1 |
+| `match_time` | text | Actual start time (may differ from slot). Admin booking form defaults this to the chosen `slot_time` once a slot is picked, unless already saved or manually overridden — see §8.1 |
 | `match_stage` | text | Group / Knockout etc. |
 | `reserved_until` | timestamptz | 48 hr expiry for `soft_block` |
 | `organiser_name` | text | External organiser (reservations) |
@@ -290,6 +291,10 @@ Full member directory.
 `id, booking_id FK, action ('flagged'|'resolved'), note, actor_id FK (nullable — null = system, e.g. an auto-resolve on re-sync), created_at`
 Immutable audit trail for the verify/reconciliation flow above, same insert-only pattern as `availability_audit`. **RLS enabled, no anon/authenticated policies.** Migration `051_scorecard_verification_reconciliation.sql`.
  
+#### `booking_rule_overrides`
+`id, booking_id FK, rule ('R1'..'R6'), rule_message, reason, overridden_by FK (nullable), overridden_by_email, created_at`
+Immutable audit trail for admin-only R1–R6 overrides — see §7.1. One row per overridden rule per booking. **RLS enabled, no anon/authenticated policies.** Migration `052_booking_rule_overrides.sql`.
+ 
 #### `match_stats_cache`
 `match_id PK, booking_id FK, match_result, team_total/wickets/overs, opponent_total/wickets/overs, opponent_name, ground, tournament_name, match_date, batting/bowling/fielding/team_list (jsonb arrays), synced_at, synced_by FK`
 Read-through cache of the separate analytics Supabase project — source of truth stays there. **RLS enabled, no anon/authenticated policies** (same fix as above). See `features/post-match-scorecard.md`.
@@ -327,6 +332,62 @@ All rules live in `src/lib/validation.ts`. Called from both the API (on save) an
 |---|---|
 | T30 | 07:30, 12:30 |
 | T20 | 07:30, 10:30, 14:30 |
+
+### 7.1 Admin-only rule overrides (added July 2026)
+
+Since admin is the only role that ever books a game, any of R1/R3/R4/R5/R6
+(the hard-error rules — R2 was already a non-blocking warning) can be
+overridden on a per-rule basis from `/admin/bookings/new` and
+`/admin/bookings/[id]`, each override requiring its own reason that's
+logged permanently. This exists for cases like a certain-to-happen
+knockout/semifinal needing to go live on the Hub (so players can mark
+availability) while a clashing game is still pending cancellation with its
+organiser — not a general-purpose bypass.
+
+- **UI** — `src/components/admin/RuleCheckStrip.tsx`, a shared horizontal
+  R1-R6 chip row placed directly above the Confirm/Save button on both
+  pages (moved off the old vertical sidebar/mid-form panel so pass/fail is
+  visible right where the admin commits). A failing rule's chip gets an
+  "Override" toggle; toggling it opens a required reason textarea (min 3
+  characters). `ruleChecksAllPassed()` in the same file is the shared gate
+  used for the Confirm/Save button's `disabled` state — a rule counts as
+  clear once it's `pass`/`warn`, or `fail` with a reason typed.
+- **`POST /api/bookings`** (create) — accepts `overrides: {rule, reason}[]`
+  (Zod-validated, `bookingRuleOverridesSchema` in `src/lib/schemas.ts`).
+  `validateBooking()` takes a 6th `overriddenRules: Set<string>` param and
+  splits its raw error list into still-`blocking` errors (only these fail
+  `result.valid`) vs `overridden` ones — only rules that *actually* fired
+  get logged, regardless of what the client sent. On successful insert, one
+  `booking_rule_overrides` row is written per overridden rule; if that
+  insert fails, the just-created booking is deleted and the request 500s —
+  a booking created by bypassing a rule must never exist without its
+  reason logged.
+- **`PATCH /api/bookings/[id]`** (edit) — this route has never re-run
+  `validateBooking()` server-side (edits aren't rule-checked the way
+  creates are — a pre-existing gap, not changed here). Its `overrides`
+  field is therefore a best-effort *acknowledgement* log only: the client
+  freezes the rule message it displayed (since the server doesn't
+  recompute one here) and a log-write failure doesn't block the save,
+  since nothing was actually blocked to begin with. The Confirm button
+  (reservation → confirmed) was also changed to gate on `!allPassed`,
+  which it didn't before — previously it ignored rule state entirely.
+- **Reopening an already-overridden booking** — `GET /api/bookings/[id]`
+  also returns `overrides: Record<rule, reason>`, the latest logged reason
+  per rule from `booking_rule_overrides`. The edit page seeds both its live
+  `overrides` state and a `loggedOverrides` snapshot from this, so the
+  reason box is pre-filled instead of the admin having to retype it every
+  time they reopen the booking; the existing rule-check effect still prunes
+  any rule that isn't genuinely failing anymore. `handleSave` diffs
+  `overrides` against `loggedOverrides` and only sends rules that are new or
+  whose reason text actually changed — otherwise every unrelated field edit
+  would re-log an identical override row on each save.
+- **`booking_rule_overrides`** — `supabase/migrations/052_booking_rule_overrides.sql`.
+  One row per overridden rule per booking: `rule`, `rule_message` (frozen
+  at override time), `reason`, `overridden_by` (nullable FK to `players`,
+  since `isAdmin` doesn't require a `players` row — see §9), and
+  `overridden_by_email` (always present, durable identity either way).
+  RLS enabled, no anon/authenticated policies — service role only, same
+  blanket-deny pattern as every other table in this app.
  
 ---
  
@@ -336,27 +397,30 @@ All rules live in `src/lib/validation.ts`. Called from both the API (on save) an
 ```
 Admin → /admin/bookings/new
   → Validate rules (R1–R6) via /api/validate (live)
-  → Match Start Time auto-fills to slot_time + 15 min once a slot is picked
+  → Match Start Time auto-fills to the chosen slot_time once a slot is picked
   → POST /api/bookings → DB write (service role)
   → [soft_block] reserved_until = now() + 48hr
   → [confirmed] WhatsApp notify buttons (organiser + captain)
   → Cron at 18:30 UTC deletes expired soft_blocks
 ```
 
-> **Match Start Time default (added July 2026):** both `/admin/bookings/new`
-> and `/admin/bookings/[id]` auto-fill the Match Start Time field to
-> `slot_time + 15 min` (a local `defaultMatchTime()` helper in each page)
-> the moment a slot is picked — on the edit page this also applies on load,
-> for any existing booking whose `match_time` is still null. A
-> `matchTimeTouched` flag stops the default from ever overwriting a value
-> the admin typed themselves, or one already saved in the DB. This is a
-> client-side UX default only — nothing server-side changed, and
+> **Match Start Time default (added July 2026, changed 31 Jul 2026):** both
+> `/admin/bookings/new` and `/admin/bookings/[id]` auto-fill the Match Start
+> Time field to the chosen `slot_time` itself (a local `defaultMatchTime()`
+> helper in each page — originally `slot_time + 15 min`, changed to return
+> `slot` unmodified after the +15 default was found to be the wrong default
+> in practice) the moment a slot is picked — on the edit page this also
+> applies on load, for any existing booking whose `match_time` is still
+> null. A `matchTimeTouched` flag stops the default from ever overwriting a
+> value the admin typed themselves, or one already saved in the DB. This is
+> a client-side UX default only — nothing server-side changed, and
 > `POST /api/bookings` / `PATCH /api/bookings/[id]` still happily accept
 > `match_time: null`. The value feeds straight into the announcement
 > reporting-time calc (`match_time − 15 min`) — see
-> `features/squad-selection.md` §6. Existing bookings created before this
-> shipped are unaffected until their edit page is opened and saved — no
-> DB backfill was run.
+> `features/squad-selection.md` §6, so reporting time is now 15 minutes
+> earlier relative to `match_time` than it was under the old +15 default.
+> Existing bookings created before this shipped are unaffected until their
+> edit page is opened and saved — no DB backfill was run.
 
 ### 8.2 Player Availability Flow
 ```
@@ -493,6 +557,7 @@ Next.js API Routes (server-side)
 | `scorecard_uploads` | ❌ Locked | ❌ Locked | Service role only *(RLS enabled 2026-07-15 — was previously disabled, see `features/post-match-scorecard.md` §5)* |
 | `scorecard_reconciliation_log` | ❌ Locked | ❌ Locked | Service role only |
 | `match_stats_cache` | ❌ Locked | ❌ Locked | Service role only *(same fix, same date)* |
+| `booking_rule_overrides` | ❌ Locked | ❌ Locked | Service role only — see §7.1 |
 | `family_sessions` *(planned)* | ❌ Locked | ❌ Locked | Service role only |
  
 ### Security Checklist Status (vibe-security audit)
@@ -543,7 +608,8 @@ Next.js API Routes (server-side)
 | `src/lib/auth.ts` | NextAuth config; JWT callback enriches token with player context; email lowercased; Google photo seeded on first sign-in; `session.maxAge` + `jwt.maxAge` aligned to 30 days |
 | `src/lib/rateLimit.ts` | Upstash Redis sliding-window rate limiter; `RATE_LIMITS` presets: `playerWrite` (20/min), `captainWrite` (30/min), `adminWrite` (60/min), `publicRead` (100/min) |
 | `src/lib/supabase.ts` | Three client factories: browser (anon), server (anon), service (bypasses RLS) |
-| `src/lib/validation.ts` | Booking rules engine R1–R6; used by both API and client |
+| `src/lib/validation.ts` | Booking rules engine R1–R6; used by both API and client; `validateBooking()`'s optional `overriddenRules` param splits errors into still-blocking vs admin-overridden — see §7.1 |
+| `src/components/admin/RuleCheckStrip.tsx` | Shared horizontal R1-R6 rule-check row + admin override UI, used by both `/admin/bookings/new` and `/admin/bookings/[id]`; `ruleChecksAllPassed()` is the shared Confirm/Save button gate — see §7.1 |
 | `src/middleware.ts` | Route protection; redirects unauthenticated/unauthorised requests |
 | `src/app/fixtures/page.tsx` | Main fixtures server component; fetches bookings, availability, squad; includes `cricheroes_points_table_url` in tournament select |
 | `src/app/captains-corner/page.tsx` | Captain-only server page; feeds `CaptainsCornerGrid` |
@@ -584,6 +650,14 @@ Next.js API Routes (server-side)
 | `src/app/api/admin/player-reconciliation/route.ts` | GET buckets pending scorecard names, POST confirms/ignores/reconciles |
 | `src/app/admin/player-reconciliation/page.tsx` | Admin reconciliation UI + "Run Reconciliation Pass" client loop |
 | `analytics-db/migrations/001_player_identity_resolution.sql` | Analytics DB (separate project) — `player_id` columns + alias/override/ignore tables |
+| `src/app/leaderboard/page.tsx` | `/leaderboard` ("Yours Statistically") — any signed-in, non-expelled member; year/month/tournament/ground/format filters; see `features/leaderboard.md` |
+| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()`, `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()` — shared analytics-DB query layer, also used by Captains' Corner recent-form |
+| `src/lib/leaderboardMilestones.ts` | Plain (non-`'use client'`) module — `minGamesThreshold()`, `minDismissalsThreshold()`, `bestBy()`/`bestByAll()`, `totalDismissals()`; deliberately kept free of React/JSX so server-only callers like `leaderboardGlossary.ts` can import it safely — see `features/leaderboard.md` |
+| `src/lib/leaderboardGlossary.ts` | Builds the "What do these numbers mean?" entries at the bottom of `/leaderboard`, quoting the real thresholds currently in effect |
+| `src/components/leaderboard/LeaderboardMilestones.tsx` | "Overall" tab — milestone cards (tie-inclusive) + year-scoped collapsible Centuries/5-Wicket Hauls bands; see `features/leaderboard.md` |
+| `src/components/leaderboard/LeaderboardMonthly.tsx` | "Monthly" tab — single-winner cards + always-open Centuries/Half-Centuries/5-for/3-for panels |
+| `src/components/leaderboard/InningsRow.tsx` | Shared clickable-row-to-match-page primitives (`ClickableRow`, `BattingInningsRow`, `BowlingInningsRow`), used by both Milestones and Monthly |
+| `src/components/leaderboard/LeaderboardTable.tsx` | Batting/Bowling/Fielding/MVP detailed-columns tabs |
 | `src/app/wrangler/grounds/page.tsx` + `src/components/wrangler/GroundsClient.tsx` | `/wrangler/grounds` — grounds management, moved off `/admin/*`; `canAdd`/`canEdit` props gate GC-vs-wrangler UI; see `features/wrangler-grounds-menu.md` |
 | `src/app/api/grounds/route.ts` | GET public; POST `isGC \|\| isAdmin`; PATCH `isWrangler \|\| isAdmin` |
  

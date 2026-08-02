@@ -12,6 +12,11 @@
 // (src/components/leaderboard/LeaderboardFilters.tsx): both checked means
 // no restriction, unchecking one scopes to the other, and unchecking both
 // snaps back to both checked rather than showing zero results.
+//
+// "As Captain" sits next to the T20/T30 checkboxes, same styling, and
+// restricts both the summary and match list to matches where this player
+// was the match-specific captain (squad.is_captain — not players.is_captain,
+// the permanent club-captain flag; see features/squad-selection.md).
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
@@ -45,12 +50,13 @@ export function PlayerStatsClient({
   const [year, setYear] = useState<number | 'all'>('all')
   const [groundId, setGroundId] = useState<string>('all')
   const [formats, setFormats] = useState<Set<Format>>(new Set<Format>(['T20', 'T30']))
+  const [asCaptain, setAsCaptain] = useState(false)
   const [scoped, setScoped] = useState<PlayerStatsTotals>(initialCareer)
   const [matches, setMatches] = useState<PlayerMatchHistoryRow[]>(initialMatches)
   const [loading, setLoading] = useState(false)
 
   const fetchScoped = useCallback(async () => {
-    if (year === 'all' && groundId === 'all' && formats.size === 2) {
+    if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain) {
       setScoped(initialCareer)
       setMatches(initialMatches)
       return
@@ -60,6 +66,7 @@ export function PlayerStatsClient({
     if (year !== 'all') params.set('year', String(year))
     if (groundId !== 'all') params.set('ground', groundId)
     if (formats.size === 1) params.set('format', Array.from(formats)[0])
+    if (asCaptain) params.set('captain', '1')
     const res = await fetch(`/api/players/${player.id}/match-history?${params.toString()}`)
     if (res.ok) {
       const d = await res.json()
@@ -67,7 +74,7 @@ export function PlayerStatsClient({
       setMatches(d.matches)
     }
     setLoading(false)
-  }, [year, groundId, formats, player.id, initialCareer, initialMatches])
+  }, [year, groundId, formats, asCaptain, player.id, initialCareer, initialMatches])
 
   useEffect(() => { fetchScoped() }, [fetchScoped])
 
@@ -86,7 +93,7 @@ export function PlayerStatsClient({
     })
   }
 
-  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1
+  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain
 
   return (
     <>
@@ -142,6 +149,11 @@ export function PlayerStatsClient({
               ${formats.has('T30') ? 'text-gold-dim' : 'text-stone-500'}`}>
               <input type="checkbox" checked={formats.has('T30')} onChange={() => toggleFormat('T30')} className="accent-gold" />
               T30
+            </label>
+            <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
+              ${asCaptain ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={asCaptain} onChange={() => setAsCaptain(v => !v)} className="accent-gold" />
+              As Captain
             </label>
           </div>
           <select value={groundId} onChange={e => setGroundId(e.target.value)}

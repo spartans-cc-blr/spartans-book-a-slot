@@ -104,6 +104,14 @@ export interface CreateBookingRequest {
   block_reason?:  string | null  // set when this candidate is itself a soft-block hold (e.g. a Knockout hold) — read by R7
 }
 
+// Admin-only rule override — one entry per rule the admin is knowingly
+// bypassing, each requiring its own reason. See
+// features (architecture.md §7 rules engine) and booking_rule_overrides.
+export interface RuleOverrideInput {
+  rule:   ValidationError['rule']
+  reason: string
+}
+
 export interface CreateSoftBlockRequest {
   game_date:    string
   slot_time:    SlotTime
@@ -112,9 +120,10 @@ export interface CreateSoftBlockRequest {
 }
 
 export interface ValidationResult {
-  valid:    boolean
-  errors:   ValidationError[]
-  warnings: ValidationError[]
+  valid:      boolean
+  errors:     ValidationError[]
+  warnings:   ValidationError[]
+  overridden?: ValidationError[]   // rules that failed but were admin-overridden — see RuleOverrideInput
 }
 
 export interface ValidationError {
@@ -127,7 +136,7 @@ export interface ValidationError {
 export interface RuleCheckItem {
   rule:    string
   label:   string
-  status:  'pass' | 'fail' | 'pending' | 'warn'
+  status:  'pass' | 'fail' | 'pending' | 'warn' | 'override'
   message: string
 }
 
@@ -193,6 +202,43 @@ export interface RecentForm {
   matches: number
   runs:    number
   wickets: number
+}
+
+// One qualifying 50+/100+ innings, or one qualifying 3+/5+ wicket bowling
+// innings, for the /leaderboard "Monthly" view and the "Overall" view's
+// year-scoped Centuries/5-Wicket Hauls bands — see
+// src/lib/playerStats.ts getPerformances(). Unlike LeaderboardRow
+// (aggregated across every match in scope), these are single-match lines,
+// since both views list every century/half-century/5-for/3-for rather than
+// crowning one "most" winner. `bookingId` links the row to its match page
+// (/matches/history/[bookingId]) — null only if the booking behind an
+// already-synced match_id was later deleted.
+export interface MonthlyInnings {
+  playerId:       string
+  playerName:     string
+  cricheroesUrl:  string | null
+  photoUrl:       string | null
+  runs:           number
+  balls:          number
+  notOut:         boolean
+  gameDate:       string | null
+  format:         string | null
+  tournamentName: string | null
+  bookingId:      string | null
+}
+
+export interface MonthlyBowlingInnings {
+  playerId:       string
+  playerName:     string
+  cricheroesUrl:  string | null
+  photoUrl:       string | null
+  wickets:        number
+  runsConceded:   number
+  overs:          string | number
+  gameDate:       string | null
+  format:         string | null
+  tournamentName: string | null
+  bookingId:      string | null
 }
 
 // Per-booking context stats for Captains' Corner's tap-to-expand "Form"

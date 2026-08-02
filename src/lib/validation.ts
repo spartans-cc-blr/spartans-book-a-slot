@@ -63,7 +63,8 @@ export function validateBooking(
   existingBookings: BookingWithTournamentCaptain[],
   captainName: string,
   tournamentName: string,
-  thisTournamentCaptainId: string | null = null
+  thisTournamentCaptainId: string | null = null,
+  overriddenRules: Set<string> = new Set()
 ): ValidationResult {
   const errors: ValidationError[] = []
   const warnings: ValidationError[] = []
@@ -243,10 +244,22 @@ export function validateBooking(
     }
   }
 
+  // Admin-only override: a rule that would otherwise block the booking can
+  // be explicitly overridden (each override is logged with a reason — see
+  // booking_rule_overrides / src/app/api/bookings/route.ts). Overridden
+  // rules move out of `errors` (so `valid` reflects only what's still
+  // actually blocking) into their own `overridden` list, keeping the
+  // original rule + message intact for the audit log write. R7 goes through
+  // this same split — an admin can override a knockout-day conflict too,
+  // same as any other rule, as long as it's logged.
+  const overridden = errors.filter(e => overriddenRules.has(e.rule))
+  const blocking   = errors.filter(e => !overriddenRules.has(e.rule))
+
   return {
-    valid: errors.length === 0,
-    errors,
+    valid: blocking.length === 0,
+    errors: blocking,
     warnings,
+    overridden,
   }
 }
 

@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import type { Booking, GameFormat, SlotTime } from '@/types'
+import type { Booking, GameFormat, SlotTime, RuleCheckItem } from '@/types'
 import { SLOT_TIMES, SLOT_FORMATS } from '@/types'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
+import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 
 type ScorecardUploadStatus = 'pending_parse' | 'parsed' | 'synced' | 'fees_applied'
 
@@ -65,14 +66,11 @@ const RULES = [
   { rule: 'R4', label: 'Slot not already taken' },
   { rule: 'R5', label: 'Format/time clash' },
   { rule: 'R6', label: '12:30 overlap' },
+  { rule: 'R7', label: 'Knockout day priority' },
 ]
 
 function defaultMatchTime(slot: SlotTime): string {
-  const [h, m] = slot.split(':').map(Number)
-  const total = h * 60 + m + 15
-  const nh = Math.floor(total / 60) % 24
-  const nm = total % 60
-  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
+  return slot
 }
 
 export default function BookingDetailPage() {
@@ -84,12 +82,16 @@ export default function BookingDetailPage() {
   const [saving,       setSaving]       = useState(false)
   const [saveError,    setSaveError]    = useState('')
   const [saveSuccess,  setSaveSuccess]  = useState(false)
-  type RuleStatus = 'pending' | 'pass' | 'warn' | 'fail'
-  type RuleCheck  = { rule: string; label: string; status: RuleStatus; message: string }
 
-  const [ruleChecks, setRuleChecks] = useState<RuleCheck[]>(
-    RULES.map(r => ({ ...r, status: 'pending' as RuleStatus, message: 'Waiting for input...' }))
+  const [ruleChecks, setRuleChecks] = useState<RuleCheckItem[]>(
+    RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' }))
   )
+  // Admin-only: rule -> reason. Presence of a key = admin has overridden that rule.
+  const [overrides, setOverrides] = useState<Record<string, string>>({})
+  // Snapshot of the most recent reason already logged per rule (from
+  // booking_rule_overrides, fetched on load). Used only to avoid re-logging
+  // an identical override on every unrelated "Save Changes" click.
+  const [loggedOverrides, setLoggedOverrides] = useState<Record<string, string>>({})
 
   // Editable fields
   const [tournamentId,  setTournamentId]  = useState('')
@@ -121,7 +123,7 @@ export default function BookingDetailPage() {
   const [feeError,         setFeeError]          = useState('')
   const [feeConfirming,    setFeeConfirming]     = useState(false)
   const [scorecardOpen,    setScorecardOpen]     = useState(false)
-  const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[]; team_list?: any[] } | null>(null)
+  const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[]; fielding?: any[]; team_list?: any[] } | null>(null)
   const [scorecardSquad,   setScorecardSquad]    = useState<{ player_id: string; player_name: string; cricheroes_url: string | null }[] | undefined>(undefined)
   const [scorecardLoading, setScorecardLoading]  = useState(false)
   const [scorecardError,   setScorecardError]    = useState('')
@@ -150,6 +152,11 @@ export default function BookingDetailPage() {
         setGameDate(b.game_date ?? '')
         setMatchStage(b.match_stage ?? '')
         setMatchFeeOverride((b as any).match_fee_override != null ? String((b as any).match_fee_override) : '')
+        // Pre-fill any previously-logged override reason (booking_rule_overrides).
+        // The rule-check effect below prunes any entry that isn't actually
+        // failing anymore, so a resolved conflict won't leave a stale reason box.
+        setOverrides(d.overrides ?? {})
+        setLoggedOverrides(d.overrides ?? {})
         setLoading(false)
       })
   }, [id])
@@ -302,18 +309,6 @@ export default function BookingDetailPage() {
     } catch { /* invalid URL — ignore */ }
   }, [cricheroes])
 
-  useEffect(() => {
-    if (!slotTime) return
-    setMatchTime(prev => {
-      if (prev) return prev
-      const [h, m] = slotTime.split(':').map(Number)
-      const total  = h * 60 + m - 15
-      const hh     = String(Math.floor(total / 60)).padStart(2, '0')
-      const mm     = String(total % 60).padStart(2, '0')
-      return `${hh}:${mm}`
-    })
-  }, [slotTime])
-
   const validate = useCallback(async () => {
     if (!gameDate || !format || !slotTime || !tournamentId) {
       setRuleChecks(RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Fill all fields to check.' })))
@@ -333,21 +328,44 @@ export default function BookingDetailPage() {
     const result = await res.json()
     const errorMap   = Object.fromEntries(result.errors?.map((e: any) => [e.rule, e.message]) ?? [])
     const warningMap = Object.fromEntries(result.warnings?.map((e: any) => [e.rule, e.message]) ?? [])
-    setRuleChecks(RULES.map(r => ({
+    const next: RuleCheckItem[] = RULES.map(r => ({
       ...r,
-      status:  errorMap[r.rule] ? 'fail' : warningMap[r.rule] ? 'warn' : 'pass',
+      status:  (errorMap[r.rule] ? 'fail' : warningMap[r.rule] ? 'warn' : 'pass') as RuleCheckItem['status'],
       message: errorMap[r.rule] ?? warningMap[r.rule] ?? '✓ Passed',
-    })))
+    }))
+    setRuleChecks(next)
+    // Drop any override reason for a rule that's no longer actually failing.
+    const stillFailing = new Set(next.filter(r => r.status === 'fail').map(r => r.rule))
+    setOverrides(prev => Object.fromEntries(Object.entries(prev).filter(([rule]) => stillFailing.has(rule))))
   }, [gameDate, format, slotTime, tournamentId, id])
 
   useEffect(() => { validate() }, [validate])
 
-  const allPassed = ruleChecks.every(r => r.status === 'pass' || r.status === 'warn')
+  function handleOverrideToggle(rule: string) {
+    setOverrides(prev => {
+      if (rule in prev) {
+        const { [rule]: _dropped, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [rule]: '' }
+    })
+  }
+
+  function handleOverrideReasonChange(rule: string, reason: string) {
+    setOverrides(prev => ({ ...prev, [rule]: reason }))
+  }
+
+  const allPassed = ruleChecksAllPassed(ruleChecks, overrides)
 
   async function handleSave(extraFields?: Record<string, any>) {
     setSaving(true)
     setSaveError('')
     setSaveSuccess(false)
+    // Only log a rule as overridden if it's new or the reason actually
+    // changed since last logged — otherwise every unrelated "Save Changes"
+    // click would re-log an identical row for a rule the admin already
+    // explained on a previous save.
+    const overridesToLog = Object.entries(overrides).filter(([rule, reason]) => loggedOverrides[rule] !== reason)
     const res = await fetch(`/api/bookings/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -366,10 +384,18 @@ export default function BookingDetailPage() {
         organiser_name:  organiserName || null,
         organiser_phone: organiserPhone || null,
         match_fee_override: matchFeeOverride ? parseInt(matchFeeOverride) : null,
+        overrides: overridesToLog.map(([rule, reason]) => ({
+          rule,
+          reason,
+          message: ruleChecks.find(r => r.rule === rule)?.message,
+        })),
         ...extraFields,
       }),
     })
     if (res.ok) {
+      if (overridesToLog.length > 0) {
+        setLoggedOverrides(prev => ({ ...prev, ...Object.fromEntries(overridesToLog) }))
+      }
       setSaveSuccess(true)
       setTimeout(() => router.push('/admin?saved=1'), 1500)
     } else {
@@ -574,23 +600,6 @@ export default function BookingDetailPage() {
             </div>
           </FormCard>
 
-          <div className="bg-ink-3 border border-ink-5 rounded p-4">
-            <p className="font-cinzel text-xs text-gold mb-3">Rule Checks</p>
-            <div className="space-y-1.5">
-              {ruleChecks.map(r => (
-                <div key={r.rule} className="flex items-start gap-2 font-rajdhani text-xs">
-                  <span className={r.status === 'fail' ? 'text-red-400' : r.status === 'warn' ? 'text-yellow-400' : r.status === 'pass' ? 'text-emerald-400' : 'text-zinc-600'}>
-                    {r.status === 'fail' ? '✗' : r.status === 'warn' ? '⚠' : r.status === 'pass' ? '✓' : '·'}
-                  </span>
-                  <span className="text-zinc-500">{r.label}</span>
-                  {(r.status === 'fail' || r.status === 'warn') && (
-                    <span className={r.status === 'fail' ? 'text-red-400' : 'text-yellow-400'}>— {r.message}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Match Details — only visible when a tournament is selected */}
           {tournamentId && (
             <FormCard title="Match Details">
@@ -725,7 +734,7 @@ export default function BookingDetailPage() {
                         {scorecardLoading && <p className="font-rajdhani text-xs text-zinc-600">Loading…</p>}
                         {scorecardError && <p className="font-rajdhani text-xs text-red-400">{scorecardError}</p>}
                         {scorecard && (
-                          <ScorecardTables batting={scorecard.batting} bowling={scorecard.bowling} teamList={scorecard.team_list} squad={scorecardSquad} />
+                          <ScorecardTables batting={scorecard.batting} bowling={scorecard.bowling} fielding={scorecard.fielding} teamList={scorecard.team_list} squad={scorecardSquad} />
                         )}
                       </div>
                     )}
@@ -771,6 +780,10 @@ export default function BookingDetailPage() {
               ✓ Saved successfully.
             </div>
           )}
+
+          {/* Live Rule Check — horizontal, directly above the save/confirm buttons */}
+          <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
+
           <div className="flex gap-3 justify-between">
             <button onClick={handleCancel}
               className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 px-4 py-2.5 rounded transition-colors">
@@ -782,7 +795,7 @@ export default function BookingDetailPage() {
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
               {isReservation && (
-                <button onClick={handleConfirm} disabled={saving || !tournamentId || !format}
+                <button onClick={handleConfirm} disabled={saving || !tournamentId || !format || !allPassed}
                   className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors">
                   {saving ? 'Confirming...' : '✓ Confirm Booking'}
                 </button>

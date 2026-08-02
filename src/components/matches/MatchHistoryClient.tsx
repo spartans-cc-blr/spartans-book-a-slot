@@ -682,8 +682,9 @@ function MatchHistoryCard({
       <div>
         <div style={{ fontSize: '15px', fontWeight: 700, color: '#F5F5F5', lineHeight: 1.3, marginBottom: '3px' }}>
           {/* Links into "Yours Statistically" (/leaderboard) pre-filtered to
-              this tournament — category defaults to mvp (milestones ignores/
-              resets tournament scoping, see LeaderboardFilters.tsx) and year
+              this tournament — category defaults to mvp (Honor Board's
+              Overall/Monthly sub-tabs ignore/reset tournament scoping, see
+              LeaderboardFilters.tsx) and year
               is forced to 'all' so a tournament spanning outside the current
               calendar year isn't silently hidden by the page's own
               current-year default. Underlined in gold — same hyperlink
@@ -926,6 +927,7 @@ function MatchHistoryCard({
                 <ScorecardTables
                   batting={scorecard.batting}
                   bowling={scorecard.bowling}
+                  fielding={scorecard.fielding}
                   teamList={scorecard.team_list}
                   squad={detail?.squad}
                 />

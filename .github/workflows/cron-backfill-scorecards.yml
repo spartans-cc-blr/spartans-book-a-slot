@@ -13,17 +13,51 @@ name: Cron — backfill-scorecards
 # overlap with a same-day manual run — the route only ever processes
 # bookings not yet 'synced'/'fees_applied', so re-running is a no-op for
 # anything already done.
+#
+# Warmup step added 2026-08-02: a manually-triggered run hit a cascading
+# cold-start failure — the first booking's fetch ate the whole 45s
+# microservice timeout waking up Render, leaving no time left in the
+# route's 60s Vercel-function ceiling for the remaining bookings, and the
+# whole call 504'd. A second run immediately after (Render now warm)
+# cleared the backlog in seconds. Pinging Render's own /health endpoint as
+# a separate GitHub Actions step first sidesteps this for free — a step on
+# this runner isn't bound by Vercel's 60s ceiling, so it can afford to sit
+# through the ~30s cold start on its own, leaving the real call to hit an
+# already-warm dyno.
 
 on:
   schedule:
-    # 01:30 UTC = 07:00 IST, and 13:30 UTC = 19:00 IST
-    - cron: '30 1,13 * * *'
+    # 06:30 UTC = 12:00 IST, and 13:30 UTC = 19:00 IST
+    # Moved off 07:00 IST on 2026-08-01 — no games are ever played between
+    # 19:00 and 07:00 IST, so a 07:00 run only ever re-checked the same
+    # backlog the prior 19:00 run had already seen. 12:00 gives CricHeroes
+    # time to publish scorecards for the day's morning slots (07:30/10:30)
+    # before the fetch attempt runs.
+    - cron: '30 6,13 * * *'
   workflow_dispatch: {}
 
 jobs:
   trigger:
     runs-on: ubuntu-latest
     steps:
+      - name: Warm up Render microservice
+        env:
+          MICROSERVICE_URL: ${{ vars.MICROSERVICE_URL }}
+        run: |
+          if [ -z "$MICROSERVICE_URL" ]; then
+            echo "MICROSERVICE_URL repo variable not set — skipping warmup. The real call below may 504 on a cold Render dyno."
+            exit 0
+          fi
+          # Strip any trailing slash — the repo variable was set with one, which
+          # produced a double-slash //health that FastAPI doesn't normalize (404
+          # instead of 200, confirmed 2026-08-02). Still warms the dyno either way
+          # since a 404 means the app booted and responded, but keep this defensive.
+          MICROSERVICE_URL="${MICROSERVICE_URL%/}"
+          echo "Pinging $MICROSERVICE_URL/health to wake the Render dyno before the real cron call..."
+          curl --silent --show-error --max-time 55 --output /dev/null \
+            --write-out "warmup response: %{http_code} (%{time_total}s)\n" \
+            "$MICROSERVICE_URL/health" \
+            || echo "warmup ping failed/timed out — continuing anyway, real call may still 504"
       - name: Call backfill-scorecards cron endpoint
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
