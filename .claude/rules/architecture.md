@@ -108,6 +108,9 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 |---|---|---|---|
 | `/api/availability` | GET | None | Slot availability grid with booking rules applied |
 | `/api/grounds` | GET | None | Grounds list (`id, name, maps_url, hospital_url`) — displayed on public fixture cards. Writes are not public: POST is `isGC \|\| isAdmin` (create), PATCH is `isWrangler \|\| isAdmin` (edit) — see `features/wrangler-grounds-menu.md` |
+| `/api/tournaments/[id]/organiser-reserve` | POST | None — the app's first unauthenticated write route | Organiser self-service: reserves one exact `{game_date, slot_time, format}` slot-bucket suggestion as a 48h `soft_block`; only when `tournaments.organiser_self_service` is true; rate-limited (`organiserWrite`); re-validates R1–R7 live — see `features/organiser-self-service.md` |
+| `/api/tournaments/[id]/organiser-next-slot` | POST | None | Read-only lookup for the "Not available" step on one slot bucket — `publicRead` rate limit, nothing written |
+| `/api/tournaments/[id]/organiser-attach-url` | POST | None | Attaches a CricHeroes URL to a hold this same flow created; never flips status to `confirmed` — notifies GC for a manual one-click admin confirm |
  
 ### Player APIs
  
@@ -160,9 +163,10 @@ Access here is genuinely mixed per-route rather than one role — see
 |---|---|---|---|
 | `/api/bookings` | GET, POST, PATCH, DELETE | Admin | Booking CRUD | PATCH clears availability rows when game_date or slot_time changes; POST/PATCH both accept an optional `overrides: {rule, reason}[]` for admin-only R1-R6 bypass — see §7.1
 | `/api/bookings/reserve` | POST | Admin | Create soft_block reservation |
+| `/api/soft-blocks` | GET, POST | Admin | Internal-reason holds (Club Event / Knockout / etc.); accepts optional `tournament_id`/`format` — when present, runs the full `validateBooking()` engine (R1–R7) instead of the bare slot-taken check, and returns an R7 `conflict` payload if placing a Knockout hold finds an earlier slot already taken that day — see `features/knockout-day-protection.md` |
 | `/api/validate` | POST | Admin | Live rule validation during booking form entry; accepts optional exclude_id to exclude current booking from R4 self-conflict on edit
 | `/api/captains` | GET, POST, PATCH | Admin | Captain master data |
-| `/api/tournaments` | GET, POST, PATCH | Admin | Tournament master data; PATCH also used by `InlineGameCountEditor` in Tournament Planner to update `total_league_games`; POST/PATCH both handle `cricheroes_points_table_url` |
+| `/api/tournaments` | GET, POST, PATCH | Admin | Tournament master data; PATCH also used by `InlineGameCountEditor` in Tournament Planner to update `total_league_games`; POST/PATCH both handle `cricheroes_points_table_url`; PATCH also toggles `organiser_self_service` (opt-in for `features/organiser-self-service.md`) |
 | `/api/players` | GET, POST, PATCH | Admin | Full player directory management |
 | `/api/wallet/transactions` | POST | Admin | *(Planned Sprint 3)* Isolated wallet balance writes with immutable log |
  
@@ -233,8 +237,8 @@ Primary scheduling record.
 - `inactive_since` — date the captain was marked inactive. NULL while active.
  
 #### `tournaments`
-`id, name, organiser_name, organiser_contact, active, total_league_games, vc_captain_id, cricheroes_points_table_url, created_at`
-> `total_league_games` — used by Tournament Planner for bandwidth and pace signals. `vc_captain_id` — links the vice-captain for this tournament (FK → `captains.id`); used in share card and bandwidth view. `cricheroes_points_table_url` — optional URL to the CricHeroes points table for this tournament; when set, the tournament name renders as a hyperlink on fixture cards (`FixturesCard.tsx`) and the Tournament Planner page (`TournamentPlannerClient.tsx`), helping captains and players track standings.
+`id, name, organiser_name, organiser_contact, active, total_league_games, vc_captain_id, cricheroes_points_table_url, organiser_self_service, created_at`
+> `total_league_games` — used by Tournament Planner for bandwidth and pace signals. `vc_captain_id` — links the vice-captain for this tournament (FK → `captains.id`); used in share card and bandwidth view. `cricheroes_points_table_url` — optional URL to the CricHeroes points table for this tournament; when set, the tournament name renders as a hyperlink on fixture cards (`FixturesCard.tsx`) and the Tournament Planner page (`TournamentPlannerClient.tsx`), helping captains and players track standings. `organiser_self_service` — boolean, default `false` (migration `053_tournament_organiser_self_service.sql`); per-tournament opt-in for the public organiser reserve/decline flow on the share page — see `features/organiser-self-service.md`.
  
 #### `grounds`
 `id, name, maps_url, hospital_url` — joined into fixture cards and squad announcement text. Managed at `/wrangler/grounds` (not `/admin/*`) — create is `isGC || isAdmin`, edit is `isWrangler || isAdmin`; see `features/wrangler-grounds-menu.md`.
@@ -325,6 +329,7 @@ All rules live in `src/lib/validation.ts`. Called from both the API (on save) an
 | R4 | No Duplicate Slot | Error | Same `game_date` + `slot_time` cannot be double-booked |
 | R5 | T30 Format Clash | Error | T30 at 07:30 blocks 10:30; T20 at 10:30 blocks 12:30 |
 | R6 | 12:30 Overlap | Error | Any game at 12:30 blocks 10:30 and 14:30; T20 at 14:30 blocks 12:30 |
+| R7 | Knockout Day Priority | Warning when placing the knockout hold itself; Error otherwise (overridable) | Once a booking on a date carries the Knockout `block_reason`, no other booking may take a slot at or before it that day — see `features/knockout-day-protection.md` |
  
 **Valid slot/format combinations:**
  
@@ -570,6 +575,7 @@ Next.js API Routes (server-side)
 | Cron job protected by bearer token | ✅ `CRON_SECRET` |
 | Security headers on all `/api/*` | ✅ `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` |
 | `cricheroes_points_table_url` — read-only URL, no user input trusted client-side | ✅ Admin-only write; rendered as plain `<a href>` |
+| Organiser self-service — first unauthenticated write path in the app | ✅ Per-tournament opt-in (`organiser_self_service`, default `false`), rate-limited (`organiserWrite`), every candidate re-validated server-side (R1–R7) at submit time, admin still does the final confirm — see `features/organiser-self-service.md` |
  
 ---
  
@@ -608,7 +614,7 @@ Next.js API Routes (server-side)
 | `src/lib/auth.ts` | NextAuth config; JWT callback enriches token with player context; email lowercased; Google photo seeded on first sign-in; `session.maxAge` + `jwt.maxAge` aligned to 30 days |
 | `src/lib/rateLimit.ts` | Upstash Redis sliding-window rate limiter; `RATE_LIMITS` presets: `playerWrite` (20/min), `captainWrite` (30/min), `adminWrite` (60/min), `publicRead` (100/min) |
 | `src/lib/supabase.ts` | Three client factories: browser (anon), server (anon), service (bypasses RLS) |
-| `src/lib/validation.ts` | Booking rules engine R1–R6; used by both API and client; `validateBooking()`'s optional `overriddenRules` param splits errors into still-blocking vs admin-overridden — see §7.1 |
+| `src/lib/validation.ts` | Booking rules engine R1–R7; used by both API and client; `validateBooking()`'s optional `overriddenRules` param splits errors into still-blocking vs admin-overridden — see §7.1; R7 (knockout day priority) — see `features/knockout-day-protection.md` |
 | `src/components/admin/RuleCheckStrip.tsx` | Shared horizontal R1-R6 rule-check row + admin override UI, used by both `/admin/bookings/new` and `/admin/bookings/[id]`; `ruleChecksAllPassed()` is the shared Confirm/Save button gate — see §7.1 |
 | `src/middleware.ts` | Route protection; redirects unauthenticated/unauthorised requests |
 | `src/app/fixtures/page.tsx` | Main fixtures server component; fetches bookings, availability, squad; includes `cricheroes_points_table_url` in tournament select |
@@ -622,10 +628,13 @@ Next.js API Routes (server-side)
 | `src/app/api/captain-availability/route.ts` | Captain proxy availability override — flat route (not nested under `/api/captain/`); audit log |
 | `src/app/api/tournaments/route.ts` | Tournament CRUD; POST explicitly destructures `cricheroes_points_table_url`; PATCH spreads full body |
 | `src/components/admin/GCReviewClient.tsx` | Fairness check table; per-slot approval panels |
-| `src/app/tournament-planner/page.tsx` | Captain/GC/Admin server page — feeds `TournamentPlannerClient`; caps `.in()` at 100 booking IDs (S-4 partial fix) |
-| `src/app/tournament-planner/share/[tournamentId]/page.tsx` | Public server page (`revalidate=300`) — `TournamentShareCard` for WhatsApp sharing with tournament organisers |
-| `src/components/tournament-planner/TournamentPlannerClient.tsx` | Bandwidth meter, per-tournament pace timeline, `InlineGameCountEditor` (admin-only inline edit of `total_league_games`), WhatsApp nudge links; tournament name links to CricHeroes points table if URL set |
-| `src/components/tournament-planner/TournamentShareCard.tsx` | Public-facing single tournament slot-balance card |
+| `src/app/tournament-planner/page.tsx` | Captain/GC/Admin server page — feeds `TournamentPlannerClient`; caps `.in()` at 100 booking IDs (S-4 partial fix); admin-only knockout qualification nudge + existing-hold lookup — see `features/knockout-day-protection.md` |
+| `src/app/tournament-planner/share/[tournamentId]/page.tsx` | Public server page (`revalidate=300`) — `TournamentShareCard` for WhatsApp sharing with tournament organisers; branches between `getSuggestedOpenDates` and `getSuggestedSlotDates` based on `tournament.organiser_self_service` — see `features/organiser-self-service.md` |
+| `src/components/tournament-planner/TournamentPlannerClient.tsx` | Bandwidth meter, per-tournament pace timeline, `InlineGameCountEditor` (admin-only inline edit of `total_league_games`), WhatsApp nudge links; tournament name links to CricHeroes points table if URL set; admin-only knockout awareness block |
+| `src/components/tournament-planner/TournamentShareCard.tsx` | Public-facing single tournament slot-balance card; `count/target` per-slot display; renders `OrganiserSelfService` when the tournament has self-service enabled |
+| `src/components/tournament-planner/OrganiserSelfService.tsx` | Public, unauthenticated per-slot-bucket reserve/decline/attach-URL widget — see `features/organiser-self-service.md` |
+| `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` — used by the share card and the slot-bucket suggestion engine |
+| `src/lib/suggestedSlots.ts` | `getSuggestedOpenDates()` (day-level, non-self-service tournaments); `getSuggestedSlotDates()` / `findNextSlotDate()` (per-slot-bucket, self-service tournaments) |
 | `src/lib/familyAuth.ts` | *(Planned U-24)* `validateFamilySession()` — re-queries `family_sessions` table; never trusts cookie value alone |
 | `src/lib/announcement.ts` | `buildSquadAnnouncement()` — WhatsApp message builder |
 | `supabase/migrations/` | All schema migrations as SQL files — source of truth for DB state |
