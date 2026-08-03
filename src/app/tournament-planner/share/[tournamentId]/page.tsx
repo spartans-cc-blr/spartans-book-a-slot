@@ -43,7 +43,7 @@ export default async function TournamentSharePage({
   // silently and made every booking fetch below return nothing).
   const { data: rawTournament } = await supabase
     .from('tournaments')
-    .select('id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, organiser_self_service, captains!tournaments_captain_id_fkey(id, name)')
+    .select('id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, organiser_self_service, cricheroes_points_table_url, captains!tournaments_captain_id_fkey(id, name)')
     .eq('id', params.tournamentId)
     .single()
 

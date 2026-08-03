@@ -47,6 +47,7 @@ interface Tournament {
   total_league_games: number | null
   vc_captain_id: string | null
   organiser_self_service: boolean
+  cricheroes_points_table_url: string | null
   captain: { id: string; name: string } | null
 }
 
@@ -143,7 +144,14 @@ export function TournamentShareCard({
           <span className="text-amber-500 text-xl">🏆</span>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-cinzel text-base font-bold text-ink">{tournament.name}</h1>
+              <h1 className="font-cinzel text-base font-bold text-ink">
+                {tournament.cricheroes_points_table_url ? (
+                  <a href={tournament.cricheroes_points_table_url} target="_blank" rel="noopener noreferrer"
+                    className="underline decoration-gold-dim underline-offset-2 hover:text-gold-dim transition-colors">
+                    {tournament.name}
+                  </a>
+                ) : tournament.name}
+              </h1>
               {formats.length > 0 && (
                 <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
                   {formats.join(' / ')}

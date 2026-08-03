@@ -473,6 +473,7 @@ tournaments.cricheroes_points_table_url (set by admin on /admin/tournaments)
   → Rendered as <a href={cricheroes_points_table_url}> on tournament name wherever it appears:
       - FixturesCard.tsx — tournament name in match card header
       - TournamentPlannerClient.tsx — tournament name in planner section headers
+      - TournamentShareCard.tsx — tournament name in the public organiser share page header
   → Falls back to plain <span> if URL is null/empty
   → Helps captains and players track standings directly from the fixture card
   → Migration: 021_tournament_cricheroes_points_url.sql
@@ -631,7 +632,7 @@ Next.js API Routes (server-side)
 | `src/app/tournament-planner/page.tsx` | Captain/GC/Admin server page — feeds `TournamentPlannerClient`; caps `.in()` at 100 booking IDs (S-4 partial fix); admin-only knockout qualification nudge + existing-hold lookup — see `features/knockout-day-protection.md` |
 | `src/app/tournament-planner/share/[tournamentId]/page.tsx` | Public server page (`revalidate=300`) — `TournamentShareCard` for WhatsApp sharing with tournament organisers; branches between `getSuggestedOpenDates` and `getSuggestedSlotDates` based on `tournament.organiser_self_service` — see `features/organiser-self-service.md` |
 | `src/components/tournament-planner/TournamentPlannerClient.tsx` | Bandwidth meter, per-tournament pace timeline, `InlineGameCountEditor` (admin-only inline edit of `total_league_games`), WhatsApp nudge links; tournament name links to CricHeroes points table if URL set; admin-only knockout awareness block |
-| `src/components/tournament-planner/TournamentShareCard.tsx` | Public-facing single tournament slot-balance card; `count/target` per-slot display; renders `OrganiserSelfService` when the tournament has self-service enabled |
+| `src/components/tournament-planner/TournamentShareCard.tsx` | Public-facing single tournament slot-balance card; `count/target` per-slot display; tournament name links to CricHeroes points table if `cricheroes_points_table_url` set (§8.5); renders `OrganiserSelfService` when the tournament has self-service enabled |
 | `src/components/tournament-planner/OrganiserSelfService.tsx` | Public, unauthenticated per-slot-bucket reserve/decline/attach-URL widget — see `features/organiser-self-service.md` |
 | `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` — used by the share card and the slot-bucket suggestion engine |
 | `src/lib/suggestedSlots.ts` | `getSuggestedOpenDates()` (day-level, non-self-service tournaments); `getSuggestedSlotDates()` / `findNextSlotDate()` (per-slot-bucket, self-service tournaments) |

@@ -205,6 +205,17 @@ own historical copy of the identical formula untouched (zero risk to
 already-shipped code); the new shared module exists for this share card
 and the suggestion engine, which need to stay honest with each other.
 
+### Tournament name — hyperlink to points table
+
+Same parity motivation: the share card's header now follows the existing
+CricHeroes points-table hyperlink pattern (`architecture.md` §8.5) — the
+tournament name links out to `tournaments.cricheroes_points_table_url`
+when an admin has set one, same as `FixturesCard.tsx` and
+`TournamentPlannerClient.tsx` already do, falling back to plain text when
+unset. The share page's tournament query was widened to select
+`cricheroes_points_table_url` for this — no new write path, no new
+security surface, purely a read of an existing admin-set field.
+
 ---
 
 ## 8. File Map
