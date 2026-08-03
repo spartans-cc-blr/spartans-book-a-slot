@@ -228,11 +228,11 @@ export function TournamentShareCard({
               </div>
             )
           })}
-          {Array.from({ length: unbooked }).map((_, i) => (
-            <div key={`u${i}`} className="flex items-center gap-2 py-1.5 px-2 font-rajdhani text-xs text-stone-400 border border-dashed border-parchment-3 rounded-xl">
-              ○ Game {sorted.length + i + 1} — date &amp; slot not yet booked
-            </div>
-          ))}
+          {/* No per-game "Game N — not yet booked" placeholder rows here —
+              the UNBOOKED stat chip above already says the count, and the
+              Reserve section below (or the plain WhatsApp list) already
+              says which slots specifically, with far more actionable
+              detail than a repeated dashed placeholder line ever did. */}
         </div>
 
         {/* Next available dates. Self-service tournaments get the
@@ -332,7 +332,8 @@ export function TournamentShareCard({
           Slot balance
         </p>
         <p className="font-rajdhani text-[11px] text-stone-500 mb-2.5">
-          Target per slot is the league's total games split evenly across every valid slot.
+          Target per slot is the league's total games split evenly across every valid slot — our proposal
+          is to schedule the remaining games so every slot below its target gets filled first.
         </p>
         <div className="flex flex-col gap-3">
           {(['Sat', 'Sun'] as const).map(day => {
