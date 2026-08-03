@@ -27,7 +27,7 @@ import { PlayerNameLink } from '@/lib/playerLink'
 import { PlayerAvatar } from './PlayerAvatar'
 import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
 import { BallIcon } from '@/components/matches/BallIcon'
-import { MIN_BALLS_FOR_ECONOMY, minGamesThreshold, minDismissalsThreshold, bestByAll, totalDismissals } from '@/lib/leaderboardMilestones'
+import { MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE_OVERALL, minGamesThreshold, minDismissalsThreshold, bestByAll, totalDismissals } from '@/lib/leaderboardMilestones'
 import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
 interface Milestone {
@@ -91,7 +91,7 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
   const mostCenturies     = bestByAll(rows, r => r.centuries, r => r.centuries > 0 && qualifiesOnGames(r))
   const mostHalfCenturies = bestByAll(rows, r => r.halfCenturies, r => r.halfCenturies > 0 && qualifiesOnGames(r))
   const bestAverage = bestByAll(rows, r => r.stats.battingAverage, qualifiesOnGames)
-  const bestSR       = bestByAll(rows, r => r.stats.strikeRate, qualifiesOnGames)
+  const bestSR       = bestByAll(rows, r => r.stats.strikeRate, r => r.stats.balls >= MIN_BALLS_FOR_STRIKE_RATE_OVERALL && qualifiesOnGames(r))
   const bestEconomy = bestByAll(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && qualifiesOnGames(r), true)
 
   // "Most 100s" only earns a card when someone genuinely has more than one

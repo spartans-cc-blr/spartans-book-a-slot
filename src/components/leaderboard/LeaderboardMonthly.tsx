@@ -21,12 +21,13 @@
 // Qualification is deliberately much looser than Milestones' quarterly-
 // ratchet minGamesThreshold(): a club month is realistically 1-4 games per
 // player, so any player who appeared that month qualifies for the counting
-// cards (Top MVP/Runs/Wickets). Best Economy still requires a minimum
-// sample (MIN_BALLS_FOR_ECONOMY) for the same reason it does on Milestones
-// — a two-ball spell shouldn't win "best economy".
+// cards (Top MVP/Runs/Wickets). Best Economy and Highest S/R still require
+// a minimum sample (MIN_BALLS_FOR_ECONOMY / MIN_BALLS_FOR_STRIKE_RATE) for
+// the same reason they do on Milestones — a two-ball spell shouldn't win
+// "best economy", and a one-ball slog shouldn't win "highest strike rate".
 
 import { PlayerNameLink } from '@/lib/playerLink'
-import { bestBy, MIN_BALLS_FOR_ECONOMY } from '@/lib/leaderboardMilestones'
+import { bestBy, MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE } from '@/lib/leaderboardMilestones'
 import { PlayerAvatar } from './PlayerAvatar'
 import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
 import { BallIcon } from '@/components/matches/BallIcon'
@@ -69,7 +70,7 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
   const topRuns     = bestBy(rows, r => r.stats.runs, qualifies)
   const topWickets  = bestBy(rows, r => r.stats.wickets, qualifies)
   const bestAverage = bestBy(rows, r => r.stats.battingAverage, qualifies)
-  const bestSR       = bestBy(rows, r => r.stats.strikeRate, qualifies)
+  const bestSR       = bestBy(rows, r => r.stats.strikeRate, r => r.stats.balls >= MIN_BALLS_FOR_STRIKE_RATE && qualifies(r))
   const bestEconomy = bestBy(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && qualifies(r), true)
 
   const milestones: Milestone[] = [
