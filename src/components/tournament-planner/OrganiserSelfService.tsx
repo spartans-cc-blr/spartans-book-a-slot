@@ -179,7 +179,13 @@ export function OrganiserSelfService({
       </div>
 
       <div className="flex flex-col gap-2.5">
-        {cards.map(card => (
+        {/* Sorted by actual date, not by the fixed day/time bucket order —
+            otherwise a later Saturday bucket can render above an earlier
+            one just because of slot-time ordering, which reads as an
+            unexplained jump to an organiser scanning top to bottom.
+            Re-sorted on every render so a card whose date moves after a
+            decline never leaves the list out of chronological order. */}
+        {[...cards].sort((a, b) => a.game_date.localeCompare(b.game_date)).map(card => (
           <div key={card.key}>
             {card.phase === 'pick' && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-3">
