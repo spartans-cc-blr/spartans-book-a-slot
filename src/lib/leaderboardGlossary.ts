@@ -6,7 +6,7 @@
 // fixed glossary would drift out of sync with what's on screen. Each
 // builder below quotes the real number currently in effect.
 
-import { minGamesThreshold, minDismissalsThreshold, MIN_BALLS_FOR_ECONOMY } from '@/lib/leaderboardMilestones'
+import { minGamesThreshold, minDismissalsThreshold, MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE } from '@/lib/leaderboardMilestones'
 import type { TableCategory } from '@/components/leaderboard/LeaderboardFilters'
 
 export interface GlossaryEntry {
@@ -52,7 +52,7 @@ export function buildMonthlyGlossary(monthLabel: string): GlossaryEntry[] {
   return [
     { term: 'Top MVP / Top Run Scorer / Top Wicket Taker', definition: `Highest MVP points / runs / wickets among players who played at least 1 game in ${monthLabel}.` },
     { term: 'Best Average', definition: `Highest batting average — runs ÷ dismissals, not-out innings excluded — in ${monthLabel}.` },
-    { term: 'Highest S/R', definition: `Highest batting strike rate — runs per 100 balls faced — in ${monthLabel}.` },
+    { term: 'Highest S/R', definition: `Highest batting strike rate — runs per 100 balls faced — among players who faced at least ${MIN_BALLS_FOR_STRIKE_RATE} balls in ${monthLabel}.` },
     { term: 'Best Economy', definition: `Fewest runs conceded per over among bowlers who bowled at least ${MIN_BALLS_FOR_ECONOMY} balls (${MIN_BALLS_FOR_ECONOMY / 6} overs) in ${monthLabel}.` },
     { term: 'Centuries', definition: `Every individual batting innings of 100+ runs in ${monthLabel} — every one, not just the highest.` },
     { term: 'Half-Centuries', definition: `Every individual batting innings of 50-99 runs in ${monthLabel}.` },

@@ -14,6 +14,11 @@ import type { LeaderboardRow } from '@/types'
 
 export const MIN_BALLS_FOR_ECONOMY = 30 // 5 overs
 
+// Same spirit as MIN_BALLS_FOR_ECONOMY, for the Monthly "Highest S/R" card
+// — a couple of balls faced shouldn't be able to win "highest strike rate"
+// off an unrepresentative sample.
+export const MIN_BALLS_FOR_STRIKE_RATE = 10
+
 // YTD qualification bar: 3 games per completed calendar quarter of the
 // selected season. Ratchets up as the season progresses (0 through Mar,
 // 3 from Apr, 6 from Jul, 9 from Oct) so early-season small samples don't
