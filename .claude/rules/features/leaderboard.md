@@ -110,14 +110,15 @@ players who qualify":
 | Highest S/R | `stats.strikeRate`, highest | ⚡ |
 | Best Economy | `stats.economy`, **lowest**, min `MIN_BALLS_FOR_ECONOMY` (30) balls bowled | 🛡️ |
 
-**Highest S/R minimum-balls gate (Monthly only, added August 2026):**
+**Highest S/R minimum-balls gate (added August 2026):**
 `LeaderboardMonthly.tsx`'s `bestSR` requires at least
 `MIN_BALLS_FOR_STRIKE_RATE` (10) balls faced — same motivation as Best
 Economy's `MIN_BALLS_FOR_ECONOMY` gate, a one- or two-ball innings
-shouldn't be able to win "highest strike rate" for the month. Overall's
-`bestSR` (`LeaderboardMilestones.tsx`) is deliberately left ungated — a
-year-long sample is large enough that this hasn't been a problem there,
-and gating it wasn't requested.
+shouldn't be able to win "highest strike rate" for the month.
+`LeaderboardMilestones.tsx`'s `bestSR` (Overall tab) carries its own,
+higher floor — `MIN_BALLS_FOR_STRIKE_RATE_OVERALL` (30), matching Best
+Economy's own club-wide bar — since even a year-long or all-time sample
+can still be dominated by one short, unrepresentative innings without one.
 
 ### Qualification — `minGamesThreshold(year, scoped)`
 

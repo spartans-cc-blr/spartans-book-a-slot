@@ -6,7 +6,7 @@
 // fixed glossary would drift out of sync with what's on screen. Each
 // builder below quotes the real number currently in effect.
 
-import { minGamesThreshold, minDismissalsThreshold, MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE } from '@/lib/leaderboardMilestones'
+import { minGamesThreshold, minDismissalsThreshold, MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE, MIN_BALLS_FOR_STRIKE_RATE_OVERALL } from '@/lib/leaderboardMilestones'
 import type { TableCategory } from '@/components/leaderboard/LeaderboardFilters'
 
 export interface GlossaryEntry {
@@ -36,7 +36,7 @@ export function buildOverallGlossary(year: number | 'all', tournamentName: strin
         : `Only shown when a player has scored more than one century ${scope} — with everyone else tied at just one, that's not a real "most" yet. See every individual century in the Centuries list below instead.` },
     { term: 'Most 50s', definition: `Most half-centuries scored among players with ${qualifier}.` },
     { term: 'Best Average', definition: `Highest batting average — runs ÷ dismissals, not-out innings excluded — among players with ${qualifier}.` },
-    { term: 'Highest S/R', definition: `Highest batting strike rate — runs per 100 balls faced — among players with ${qualifier}.` },
+    { term: 'Highest S/R', definition: `Highest batting strike rate — runs per 100 balls faced — among players with ${qualifier} and at least ${MIN_BALLS_FOR_STRIKE_RATE_OVERALL} balls faced ${scope}.` },
     { term: 'Best Economy', definition: `Fewest runs conceded per over among bowlers who bowled at least ${MIN_BALLS_FOR_ECONOMY} balls (${MIN_BALLS_FOR_ECONOMY / 6} overs) ${scope}.` },
   ]
   if (year !== 'all') {
