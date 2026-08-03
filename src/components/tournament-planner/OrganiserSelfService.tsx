@@ -80,11 +80,17 @@ export function OrganiserSelfService({
 
   async function advanceToNext(card: CardState, extraExclude?: string) {
     const excludeDates = extraExclude ? [...card.declined, extraExclude] : card.declined
+    // Other bucket cards' current dates — the next date found for this
+    // bucket shouldn't land within a weekend of a sibling's date either.
+    const avoidNearDates = cards.filter(c => c.key !== card.key).map(c => c.game_date)
     try {
       const res = await fetch(`/api/tournaments/${tournamentId}/organiser-next-slot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day: card.day, slot_time: card.slot_time, format: card.format, exclude_dates: excludeDates }),
+        body: JSON.stringify({
+          day: card.day, slot_time: card.slot_time, format: card.format,
+          exclude_dates: excludeDates, avoid_near_dates: avoidNearDates,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.game_date) {

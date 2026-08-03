@@ -102,6 +102,19 @@ Returns `{ day, slot_time, format, game_date, current, target }[]` — one
 entry per deficient bucket, or an empty array once every bucket has met
 its target.
 
+**Weekend-gap rule.** R1–R7 only cap club-wide weekend capacity — nothing
+in the shared rules engine stops two suggestions for the *same* tournament
+landing on the same weekend, or on back-to-back weekends, which reads as
+an unpaced cluster to an organiser. `weekendAnchor()` / `blockSurroundingWeeks()`
+(same file) enforce at least one clear weekend gap between any two of a
+tournament's own dates — seeded from its real confirmed games, then grown
+as each bucket suggestion is accepted so later buckets in the same run
+can't land next to an earlier one either. `findNextSlotDate()` (below)
+applies the identical rule for the decline step, and additionally takes
+`avoidNearDates` — the other bucket cards' *currently displayed* dates,
+sent by the client — so declining one card can't produce a date that
+clusters with a sibling card still on screen.
+
 ### `findNextSlotDate(tournamentId, day, slotTime, format, excludeDates)`
 
 The "decline" counterpart — given one specific bucket and whatever dates

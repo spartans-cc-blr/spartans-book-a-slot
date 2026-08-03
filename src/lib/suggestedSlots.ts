@@ -82,6 +82,28 @@ function toISODate(d: Date): string {
   return d.toISOString().split('T')[0]
 }
 
+// ── Weekend-gap helpers (getSuggestedSlotDates / findNextSlotDate) ──────
+// A tournament's own games are meant to be spread across the season, not
+// clustered — R1-R7 only cap club-wide weekend capacity and never stop two
+// slot-bucket suggestions for the SAME tournament landing on the same
+// weekend, or on back-to-back weekends. `weekendAnchor` maps both Saturday
+// and Sunday of a weekend to the same key (the Saturday date); blocking a
+// date's anchor plus the week before and after enforces "at least one clear
+// weekend gap" between any two of this tournament's own dates.
+function weekendAnchor(dateStr: string): string {
+  const d = parseISO(dateStr)
+  const dow = d.getDay()
+  const sat = dow === 0 ? addDays(d, -1) : d // Sunday -> the Saturday before it
+  return toISODate(sat)
+}
+
+function blockSurroundingWeeks(blocked: Set<string>, dateStr: string): void {
+  const anchor = parseISO(weekendAnchor(dateStr))
+  blocked.add(toISODate(anchor))
+  blocked.add(toISODate(addDays(anchor, -7)))
+  blocked.add(toISODate(addDays(anchor, 7)))
+}
+
 export interface SuggestedDate {
   game_date: string
   day: 'Sat' | 'Sun'
@@ -401,6 +423,13 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
   const working = [...existing]
   const buckets: SuggestedSlotBucket[] = []
 
+  // At least one clear weekend gap between any two of this tournament's own
+  // dates — seeded from its real confirmed games, then grown as each bucket
+  // suggestion is accepted, so later buckets in this same run can't land
+  // next to an earlier one either.
+  const blockedWeeks = new Set<string>()
+  for (const g of ownGames ?? []) blockSurroundingWeeks(blockedWeeks, g.game_date)
+
   for (const slotDef of deficientSlots) {
     const format = slotDef.validFor.find(f => activeFormats.includes(f)) ?? slotDef.validFor[0]
     let found: string | null = null
@@ -410,6 +439,7 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
       const dayLabel = dow === 6 ? 'Sat' : dow === 0 ? 'Sun' : null
       if (dayLabel !== slotDef.day) continue
       const dateStr = toISODate(d)
+      if (blockedWeeks.has(weekendAnchor(dateStr))) continue
 
       const candidate: CreateBookingRequest = {
         game_date: dateStr, slot_time: slotDef.time, format, tournament_id: tournamentId,
@@ -428,6 +458,7 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
       day: slotDef.day, slot_time: slotDef.time, format,
       game_date: found, current: slotCounts[k], target: targets[k],
     })
+    blockSurroundingWeeks(blockedWeeks, found)
     working.push({
       id: `candidate-slot-${buckets.length}`,
       game_date: found, slot_time: slotDef.time, format,
@@ -450,12 +481,19 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
 // every deficient one — used by /api/tournaments/[id]/organiser-next-slot,
 // which has nothing else to recompute once the organiser is already mid-flow
 // on one particular bucket.
+//
+// `avoidNearDates` carries the same weekend-gap rule getSuggestedSlotDates
+// applies against this tournament's confirmed games — the caller passes
+// both those and whatever other bucket cards are currently showing, so a
+// decline can't produce a date that clusters with a sibling bucket's
+// still-active suggestion.
 export async function findNextSlotDate(
   tournamentId: string,
   day: 'Sat' | 'Sun',
   slotTime: SlotTime,
   format: GameFormat,
-  excludeDates: string[]
+  excludeDates: string[],
+  avoidNearDates: string[] = []
 ): Promise<{ ok: true; game_date: string | null } | { ok: false; error: string; status: number }> {
   const supabase = createServiceClient()
 
@@ -469,6 +507,18 @@ export async function findNextSlotDate(
 
   const captainName = (tournament.captains as any)?.name ?? 'This captain'
   const excluded = new Set(excludeDates)
+
+  const { data: ownGames, error: ownErr } = await supabase
+    .from('bookings')
+    .select('game_date')
+    .eq('tournament_id', tournamentId)
+    .eq('status', 'confirmed')
+
+  if (ownErr) return { ok: false, error: ownErr.message, status: 500 }
+
+  const blockedWeeks = new Set<string>()
+  for (const g of ownGames ?? []) blockSurroundingWeeks(blockedWeeks, g.game_date)
+  for (const d of avoidNearDates) blockSurroundingWeeks(blockedWeeks, d)
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -496,6 +546,7 @@ export async function findNextSlotDate(
     if (dayLabel !== day) continue
     const dateStr = toISODate(d)
     if (excluded.has(dateStr)) continue
+    if (blockedWeeks.has(weekendAnchor(dateStr))) continue
 
     const candidate: CreateBookingRequest = {
       game_date: dateStr, slot_time: slotTime, format, tournament_id: tournamentId,

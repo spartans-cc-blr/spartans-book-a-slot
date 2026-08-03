@@ -27,6 +27,12 @@ export async function POST(
   const exclude_dates: string[] = Array.isArray(body?.exclude_dates)
     ? body.exclude_dates.filter((d: unknown): d is string => typeof d === 'string').slice(0, 50)
     : []
+  // Other bucket cards' current dates, so this bucket's next date can't
+  // land within a weekend of one of its siblings either — see
+  // findNextSlotDate's weekend-gap handling in suggestedSlots.ts.
+  const avoid_near_dates: string[] = Array.isArray(body?.avoid_near_dates)
+    ? body.avoid_near_dates.filter((d: unknown): d is string => typeof d === 'string').slice(0, 20)
+    : []
 
   if (day !== 'Sat' && day !== 'Sun') {
     return NextResponse.json({ error: 'Invalid day' }, { status: 400 })
@@ -53,7 +59,7 @@ export async function POST(
     return NextResponse.json({ error: 'Self-service reservations are not enabled for this tournament.' }, { status: 403 })
   }
 
-  const result = await findNextSlotDate(tournamentId, day, slot_time, format, exclude_dates)
+  const result = await findNextSlotDate(tournamentId, day, slot_time, format, exclude_dates, avoid_near_dates)
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
 
   return NextResponse.json({ game_date: result.game_date })
