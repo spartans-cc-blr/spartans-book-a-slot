@@ -242,7 +242,13 @@ export function TournamentShareCard({
             mirroring /schedule's pattern. Only shown when there's actually
             something left to book. */}
         {unbooked > 0 && tournament.organiser_self_service && suggestedBuckets.length > 0 && (
-          <OrganiserSelfService tournamentId={tournament.id} buckets={suggestedBuckets} waNumber={waNumber} />
+          <OrganiserSelfService
+            tournamentId={tournament.id}
+            buckets={suggestedBuckets}
+            waNumber={waNumber}
+            defaultName={tournament.organiser_name}
+            defaultPhone={tournament.organiser_contact}
+          />
         )}
         {unbooked > 0 && !tournament.organiser_self_service && suggestedDates.length > 0 && (
           <div className="mt-3 pt-3 border-t border-parchment-3">

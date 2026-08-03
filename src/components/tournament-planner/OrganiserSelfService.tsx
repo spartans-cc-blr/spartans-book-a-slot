@@ -46,19 +46,29 @@ function initialCard(b: SuggestedSlotBucket): CardState {
 }
 
 export function OrganiserSelfService({
-  tournamentId, buckets, waNumber,
+  tournamentId, buckets, waNumber, defaultName, defaultPhone,
 }: {
   tournamentId: string
   buckets: SuggestedSlotBucket[]
   waNumber: string
+  // Already on file from when this tournament was set up (tournaments.
+  // organiser_name / organiser_contact) — used as a fallback only, so a
+  // first-time visitor doesn't have to retype what the club already has.
+  // Whatever the organiser previously typed into this same browser still
+  // wins over these.
+  defaultName?:  string | null
+  defaultPhone?: string | null
 }) {
   const [name, setName]   = useState('')
   const [phone, setPhone] = useState('')
   const [cards, setCards] = useState<CardState[]>(() => buckets.map(initialCard))
 
   useEffect(() => {
-    setName(localStorage.getItem(NAME_KEY) ?? '')
-    setPhone(localStorage.getItem(PHONE_KEY) ?? '')
+    setName(localStorage.getItem(NAME_KEY) || defaultName || '')
+    setPhone(localStorage.getItem(PHONE_KEY) || defaultPhone || '')
+    // Only ever read once, on mount — defaultName/defaultPhone are static
+    // props for the life of this page, not something to re-sync against.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const phoneDigits = phone.replace(/\D/g, '')
