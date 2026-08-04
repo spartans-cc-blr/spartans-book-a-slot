@@ -17,10 +17,17 @@
 // restricts both the summary and match list to matches where this player
 // was the match-specific captain (squad.is_captain — not players.is_captain,
 // the permanent club-captain flag; see features/squad-selection.md).
+//
+// Match History below the summary is split into Batting/Bowling/Fielding
+// tabs (plain text, no icons — the tab itself already says what kind of
+// innings this is). Each tab only lists matches carrying that stat line
+// (e.g. Batting hides matches this player didn't bat in) and cards are
+// sorted most-recent first — `matches` already arrives pre-sorted by
+// date+time from getPlayerMatchHistory(), so no client-side sort is
+// needed here.
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { CricketBallIcon } from '@/components/ui/CricketBallIcon'
 import type { PlayerStatsTotals, PlayerMatchHistoryRow } from '@/types'
 
 interface PlayerInfo {
@@ -38,6 +45,8 @@ const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2]
 
 type Format = 'T20' | 'T30'
+type StatTab = 'batting' | 'bowling' | 'fielding'
+const STAT_TABS: StatTab[] = ['batting', 'bowling', 'fielding']
 
 export function PlayerStatsClient({
   player, grounds, initialCareer, initialMatches,
@@ -54,6 +63,7 @@ export function PlayerStatsClient({
   const [scoped, setScoped] = useState<PlayerStatsTotals>(initialCareer)
   const [matches, setMatches] = useState<PlayerMatchHistoryRow[]>(initialMatches)
   const [loading, setLoading] = useState(false)
+  const [statTab, setStatTab] = useState<StatTab>('batting')
 
   const fetchScoped = useCallback(async () => {
     if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain) {
@@ -94,6 +104,11 @@ export function PlayerStatsClient({
   }
 
   const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain
+
+  const tabMatches = useMemo(
+    () => matches.filter(m => statTab === 'batting' ? m.batting : statTab === 'bowling' ? m.bowling : m.fielding),
+    [matches, statTab],
+  )
 
   return (
     <>
@@ -196,13 +211,22 @@ export function PlayerStatsClient({
         {/* Match by match */}
         <div className="bg-white border border-parchment-3 rounded-2xl p-5">
           <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">Match History</h2>
+          <div className="flex gap-2 mb-4">
+            {STAT_TABS.map(t => (
+              <button key={t} onClick={() => setStatTab(t)}
+                className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors capitalize
+                  ${statTab === t ? 'bg-gold/10 border-gold-dim text-gold-dim' : 'border-parchment-3 text-stone-500 hover:text-stone-700'}`}>
+                {t}
+              </button>
+            ))}
+          </div>
           {loading ? (
             <p className="font-rajdhani text-sm text-stone-500">Loading…</p>
-          ) : matches.length === 0 ? (
-            <p className="font-rajdhani text-sm text-stone-500">No matches for this filter.</p>
+          ) : tabMatches.length === 0 ? (
+            <p className="font-rajdhani text-sm text-stone-500">No {statTab} innings for this filter.</p>
           ) : (
             <div className="space-y-3">
-              {matches.map(m => <MatchRow key={m.matchId} match={m} />)}
+              {tabMatches.map(m => <InningsCard key={m.matchId} match={m} statTab={statTab} />)}
             </div>
           )}
         </div>
@@ -230,15 +254,18 @@ function MvpStat({ label, value, color }: { label: string; value: number; color:
   )
 }
 
-function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
+function InningsCard({ match, statTab }: { match: PlayerMatchHistoryRow; statTab: StatTab }) {
   const dateLabel = match.gameDate
     ? new Date(match.gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—'
 
-  // The filter bar scopes by ground now, not tournament — the tournament
-  // name is never implied by the active filter, so it's always the more
-  // useful headline (a ground can host many different tournaments).
-  const primaryLabel = match.tournamentName ? `at ${match.tournamentName}` : (match.opponentName ? `vs ${match.opponentName}` : 'Match')
+  // Opponent and tournament together underneath the date — unlike the old
+  // combined view, each tab is already scoped to one stat type, so there's
+  // room to show both rather than picking one.
+  const subLabel = [
+    match.opponentName ? `vs ${match.opponentName}` : null,
+    match.tournamentName,
+  ].filter(Boolean).join(' · ')
 
   const body = (
     <div style={{
@@ -253,36 +280,15 @@ function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
       {/* Gold top accent bar — matches FixturesCard.tsx */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
 
-      <div className="flex items-center justify-between gap-3 mb-1.5">
-        <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
-          {primaryLabel}
-        </p>
-        <span className="font-rajdhani text-xs text-zinc-500 whitespace-nowrap">
-          {dateLabel}{match.format ? ` · ${match.format}` : ''}
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 font-rajdhani text-xs text-zinc-400">
-        {match.batting && (
-          <span>
-            🏏 {match.batting.runs}{match.batting.notOut ? '*' : ''} ({match.batting.balls}b
-            {match.batting.strikeRate != null ? `, SR ${match.batting.strikeRate.toFixed(2)}` : ''})
-          </span>
-        )}
-        {match.bowling && (
-          <span className="inline-flex items-center gap-1">
-            <CricketBallIcon size={12} /> {match.bowling.wickets}/{match.bowling.runsConceded} ({match.bowling.overs}ov
-            {match.bowling.economy != null ? `, Eco ${match.bowling.economy.toFixed(2)}` : ''})
-          </span>
-        )}
-        {match.fielding && (match.fielding.catches + match.fielding.runOuts + match.fielding.stumpings > 0) && (
-          <span>
-            🧤 {match.fielding.catches}c {match.fielding.runOuts}ro {match.fielding.stumpings}st
-          </span>
-        )}
-        {!match.batting && !match.bowling && !match.fielding && (
-          <span className="text-zinc-600">No stat line recorded</span>
-        )}
-        {match.matchResult && <span className="text-zinc-600">{match.matchResult}</span>}
+      <p className="font-rajdhani text-sm font-semibold text-parchment">
+        {dateLabel}{match.format ? ` · ${match.format}` : ''}
+      </p>
+      {subLabel && <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">{subLabel}</p>}
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1 font-rajdhani text-xs text-zinc-400 mt-2">
+        {statTab === 'batting' && match.batting && <BattingFields batting={match.batting} />}
+        {statTab === 'bowling' && match.bowling && <BowlingFields bowling={match.bowling} />}
+        {statTab === 'fielding' && match.fielding && <FieldingFields fielding={match.fielding} />}
       </div>
     </div>
   )
@@ -295,4 +301,31 @@ function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
     )
   }
   return body
+}
+
+function BattingFields({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['batting']> }) {
+  return (
+    <>
+      <span>Runs: <span className="text-gold font-semibold">{batting.runs}{batting.notOut ? '*' : ''}</span> ({batting.balls})</span>
+      <span>How out: <span className="text-zinc-300">{batting.notOut ? 'Not out' : (batting.howOut ?? '—')}</span></span>
+    </>
+  )
+}
+
+function BowlingFields({ bowling }: { bowling: NonNullable<PlayerMatchHistoryRow['bowling']> }) {
+  return (
+    <span>O-D-R-W: <span className="text-gold font-semibold">{bowling.overs}-{bowling.dots}-{bowling.runsConceded}-{bowling.wickets}</span></span>
+  )
+}
+
+function FieldingFields({ fielding }: { fielding: NonNullable<PlayerMatchHistoryRow['fielding']> }) {
+  const total = fielding.catches + fielding.runOuts + fielding.stumpings
+  return (
+    <>
+      <span>Catches: <span className="text-zinc-300">{fielding.catches}</span></span>
+      <span>Stumpings: <span className="text-zinc-300">{fielding.stumpings}</span></span>
+      <span>Run Outs: <span className="text-zinc-300">{fielding.runOuts}</span></span>
+      <span>Total: <span className="text-gold font-semibold">{total}</span></span>
+    </>
+  )
 }

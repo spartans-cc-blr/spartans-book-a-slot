@@ -273,10 +273,10 @@ export interface PlayerMatchHistoryRow {
   matchResult:    string | null
   batting: {
     runs: number; balls: number; fours: number; sixes: number
-    notOut: boolean; strikeRate: number | null
+    notOut: boolean; strikeRate: number | null; howOut: string | null
   } | null
   bowling: {
-    overs: string | number; wickets: number; runsConceded: number; economy: number | null
+    overs: string | number; dots: number; wickets: number; runsConceded: number; economy: number | null
   } | null
   fielding: {
     catches: number; runOuts: number; stumpings: number
