@@ -28,6 +28,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { ResultBadge } from '@/components/shared/ResultBadge'
 import type { PlayerStatsTotals, PlayerMatchHistoryRow } from '@/types'
 
 interface PlayerInfo {
@@ -280,9 +281,12 @@ function InningsCard({ match, statTab }: { match: PlayerMatchHistoryRow; statTab
       {/* Gold top accent bar — matches FixturesCard.tsx */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
 
-      <p className="font-rajdhani text-sm font-semibold text-parchment">
-        {dateLabel}{match.format ? ` · ${match.format}` : ''}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-rajdhani text-sm font-semibold text-parchment">
+          {dateLabel}{match.format ? ` · ${match.format}` : ''}
+        </p>
+        {match.matchResult && <ResultBadge result={match.matchResult} />}
+      </div>
       {subLabel && <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">{subLabel}</p>}
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 font-rajdhani text-xs text-zinc-400 mt-2">
