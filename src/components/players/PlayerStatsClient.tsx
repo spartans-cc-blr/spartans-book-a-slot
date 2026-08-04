@@ -258,16 +258,16 @@ function MvpStat({ label, value, color }: { label: string; value: number; color:
 // Row identity (format + date) uses <th scope="row"> — an accessible table,
 // not a list of cards dressed up as rows.
 function MatchHistoryTable({ matches, statTab }: { matches: PlayerMatchHistoryRow[]; statTab: StatTab }) {
-  const columnLabel = statTab === 'batting' ? 'Batting' : statTab === 'bowling' ? 'Bowling' : 'Fielding'
+  const columnLabel = statTab === 'batting' ? 'Runs' : statTab === 'bowling' ? 'Bowling' : 'Fielding'
   return (
     <div className="bg-white border border-parchment-3 rounded-2xl overflow-hidden overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
           <tr className="bg-parchment-2 border-b border-parchment-3">
-            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-4 py-2.5">Date</th>
-            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-4 py-2.5">Match</th>
-            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-4 py-2.5">{columnLabel}</th>
-            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-4 py-2.5">Result</th>
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-1.5 py-2 whitespace-nowrap">Date</th>
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-2 py-2">Match</th>
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-2 py-2">{columnLabel}</th>
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-1.5 py-2 whitespace-nowrap">R</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-parchment-3">
@@ -293,36 +293,33 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
         onKeyDown: (e: React.KeyboardEvent<HTMLTableRowElement>) => { if (e.key === 'Enter' || e.key === ' ') goToMatch() },
       } : {})}
       className={clickable ? 'cursor-pointer hover:bg-parchment-2 transition-colors' : ''}>
-      <th scope="row" className="text-left font-normal align-top px-4 py-3.5">
+      <th scope="row" className="text-left font-normal align-top px-1.5 py-2.5 whitespace-nowrap">
         {d ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <span
-              className="font-rajdhani text-[10px] font-bold tracking-wide text-stone-400 uppercase"
+              className="font-rajdhani text-[10px] font-bold tracking-wide text-stone-400 uppercase whitespace-nowrap"
               style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
             >
-              {d.toLocaleDateString('en-IN', { month: 'short' })}
+              {d.toLocaleDateString('en-IN', { month: 'short' })}-{String(d.getFullYear()).slice(-2)}
             </span>
-            <div className="leading-tight">
-              <span className="block font-cinzel text-sm font-bold text-ink">{d.getDate()}</span>
-              <span className="block font-rajdhani text-[10px] text-stone-400">{d.getFullYear()}</span>
-            </div>
+            <span className="font-cinzel text-sm font-bold text-ink">{d.getDate()}</span>
           </div>
         ) : (
           <span className="font-rajdhani text-xs text-stone-400">—</span>
         )}
       </th>
-      <td className="align-top px-4 py-3.5">
+      <td className="align-top px-2 py-2.5">
         <span className="block font-rajdhani text-sm font-semibold text-ink">
           {match.tournamentName ?? '—'}{match.format ? ` - ${match.format}` : ''}
         </span>
         <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
       </td>
-      <td className="align-top px-4 py-3.5">
+      <td className="align-top px-2 py-2.5">
         {statTab === 'batting' && match.batting && <BattingCell batting={match.batting} />}
         {statTab === 'bowling' && match.bowling && <BowlingCell bowling={match.bowling} />}
         {statTab === 'fielding' && match.fielding && <FieldingCell fielding={match.fielding} />}
       </td>
-      <td className="align-top px-4 py-3.5">
+      <td className="align-top px-1.5 py-2.5">
         {match.matchResult ? <ResultCell result={match.matchResult} /> : <span className="font-rajdhani text-xs text-stone-400">—</span>}
       </td>
     </tr>
