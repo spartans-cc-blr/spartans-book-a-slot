@@ -52,7 +52,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { computeTopPerformers, computeMatchMVP, type SquadRef } from '@/lib/matchTopPerformers'
+import { computeTopPerformers, computeMatchMVP, summarizeTopPerformance, type SquadRef } from '@/lib/matchTopPerformers'
 
 const DEFAULT_LIMIT = 15
 const MAX_LIMIT = 50
@@ -80,23 +80,7 @@ function num(row: any, keys: string[]): number {
 // stays small — the full batting/bowling arrays are only sent by the
 // dedicated scorecard endpoint when a card is expanded.
 function summarizeStats(row: any) {
-  const battingArr = Array.isArray(row.batting) ? row.batting : []
-  const bowlingArr = Array.isArray(row.bowling) ? row.bowling : []
-
-  const topBat = battingArr.reduce((best: any, cur: any) => {
-    const runs = num(cur, ['runs', 'total_runs'])
-    const bestRuns = best ? num(best, ['runs', 'total_runs']) : -1
-    return runs > bestRuns ? cur : best
-  }, null)
-
-  const topBowl = bowlingArr.reduce((best: any, cur: any) => {
-    const wkts = num(cur, ['wickets', 'wickets_taken'])
-    const bestWkts = best ? num(best, ['wickets', 'wickets_taken']) : -1
-    if (wkts !== bestWkts) return wkts > bestWkts ? cur : best
-    const conceded = num(cur, ['runs', 'runs_conceded'])
-    const bestConceded = best ? num(best, ['runs', 'runs_conceded']) : Infinity
-    return conceded < bestConceded ? cur : best
-  }, null)
+  const { top_bat, top_bowl } = summarizeTopPerformance(row.batting ?? [], row.bowling ?? [])
 
   return {
     match_result:     row.match_result ?? null,
@@ -106,17 +90,8 @@ function summarizeStats(row: any) {
     opponent_total:   row.opponent_total ?? null,
     opponent_wickets: row.opponent_wickets ?? null,
     opponent_overs:   row.opponent_overs ?? null,
-    top_bat: topBat ? {
-      name:  pickField(topBat, ['player_name', 'name']),
-      runs:  num(topBat, ['runs', 'total_runs']),
-      balls: num(topBat, ['balls', 'balls_faced']),
-    } : null,
-    top_bowl: topBowl ? {
-      name:    pickField(topBowl, ['player_name', 'name']),
-      wickets: num(topBowl, ['wickets', 'wickets_taken']),
-      runs:    num(topBowl, ['runs', 'runs_conceded']),
-      overs:   num(topBowl, ['overs', 'overs_bowled']),
-    } : null,
+    top_bat,
+    top_bowl,
   }
 }
 

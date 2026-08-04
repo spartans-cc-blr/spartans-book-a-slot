@@ -122,6 +122,53 @@ export function topPerformerPlayerIds(performers: TopPerformer[]): Set<string> {
   return new Set(performers.filter(p => p.player_id).map(p => p.player_id as string))
 }
 
+export interface TopBatSummary { name: string; runs: number; balls: number }
+export interface TopBowlSummary { name: string; wickets: number; runs: number; overs: number }
+
+// Single-winner (not tie-inclusive) top-bat/top-bowl headline — the small
+// "🏏 <name> — runs (balls)" / "<ball> <name> — w/r (ov)" line shown under
+// the result strip on both /matches/history's MatchHistoryCard and the
+// standalone /matches/history/[bookingId] page. Deliberately a different,
+// simpler pick than computeTopPerformers() above (which is tie-inclusive
+// and feeds real verify/flag authorization) — this is a passive headline,
+// not an access grant, so a single arbitrary tied "winner" is fine here.
+export function summarizeTopPerformance(batting: any[], bowling: any[]): {
+  top_bat: TopBatSummary | null
+  top_bowl: TopBowlSummary | null
+} {
+  const battingArr = Array.isArray(batting) ? batting : []
+  const bowlingArr = Array.isArray(bowling) ? bowling : []
+
+  const topBat = battingArr.reduce((best: any, cur: any) => {
+    const runs = num(cur, ['runs', 'total_runs'])
+    const bestRuns = best ? num(best, ['runs', 'total_runs']) : -1
+    return runs > bestRuns ? cur : best
+  }, null)
+
+  const topBowl = bowlingArr.reduce((best: any, cur: any) => {
+    const wkts = num(cur, ['wickets', 'wickets_taken'])
+    const bestWkts = best ? num(best, ['wickets', 'wickets_taken']) : -1
+    if (wkts !== bestWkts) return wkts > bestWkts ? cur : best
+    const conceded = num(cur, ['runs', 'runs_conceded'])
+    const bestConceded = best ? num(best, ['runs', 'runs_conceded']) : Infinity
+    return conceded < bestConceded ? cur : best
+  }, null)
+
+  return {
+    top_bat: topBat ? {
+      name:  pickField(topBat, ['player_name', 'name']),
+      runs:  num(topBat, ['runs', 'total_runs']),
+      balls: num(topBat, ['balls', 'balls_faced']),
+    } : null,
+    top_bowl: topBowl ? {
+      name:    pickField(topBowl, ['player_name', 'name']),
+      wickets: num(topBowl, ['wickets', 'wickets_taken']),
+      runs:    num(topBowl, ['runs', 'runs_conceded']),
+      overs:   num(topBowl, ['overs', 'overs_bowled']),
+    } : null,
+  }
+}
+
 // Server-side resolver for routes that only have a booking_id in hand (the
 // verify-scorecard / flag-reconciliation auth check) — pages that already
 // fetched match_stats_cache + squad for their own rendering (the standalone
