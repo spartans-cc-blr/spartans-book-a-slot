@@ -269,27 +269,16 @@ function InningsCard({ match, statTab }: { match: PlayerMatchHistoryRow; statTab
   ].filter(Boolean).join(' · ')
 
   const body = (
-    <div style={{
-      background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
-      border: '1px solid #2D3748',
-      borderRadius: '12px',
-      padding: '14px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      {/* Gold top accent bar — matches FixturesCard.tsx */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
-
+    <div className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5 hover:border-gold-dim transition-colors">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-rajdhani text-sm font-semibold text-parchment">
+        <p className="font-rajdhani text-sm font-semibold text-ink">
           {dateLabel}{match.format ? ` · ${match.format}` : ''}
         </p>
         {match.matchResult && <ResultBadge result={match.matchResult} />}
       </div>
-      {subLabel && <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">{subLabel}</p>}
+      {subLabel && <p className="font-rajdhani text-xs text-stone-500 mt-0.5">{subLabel}</p>}
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 font-rajdhani text-xs text-zinc-400 mt-2">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 font-rajdhani text-xs text-stone-600 mt-2">
         {statTab === 'batting' && match.batting && <BattingFields batting={match.batting} />}
         {statTab === 'bowling' && match.bowling && <BowlingFields bowling={match.bowling} />}
         {statTab === 'fielding' && match.fielding && <FieldingFields fielding={match.fielding} />}
@@ -299,7 +288,7 @@ function InningsCard({ match, statTab }: { match: PlayerMatchHistoryRow; statTab
 
   if (match.bookingId) {
     return (
-      <Link href={`/matches/history/${match.bookingId}`} className="block transition-transform hover:-translate-y-0.5">
+      <Link href={`/matches/history/${match.bookingId}`} className="block">
         {body}
       </Link>
     )
@@ -310,15 +299,15 @@ function InningsCard({ match, statTab }: { match: PlayerMatchHistoryRow; statTab
 function BattingFields({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['batting']> }) {
   return (
     <>
-      <span>Runs: <span className="text-gold font-semibold">{batting.runs}{batting.notOut ? '*' : ''}</span> ({batting.balls})</span>
-      <span>How out: <span className="text-zinc-300">{batting.notOut ? 'Not out' : (batting.howOut ?? '—')}</span></span>
+      <span>Runs: <span className="text-gold-dim font-semibold">{batting.runs}{batting.notOut ? '*' : ''}</span> ({batting.balls})</span>
+      <span>How out: <span className="text-stone-700">{batting.notOut ? 'Not out' : (batting.howOut ?? '—')}</span></span>
     </>
   )
 }
 
 function BowlingFields({ bowling }: { bowling: NonNullable<PlayerMatchHistoryRow['bowling']> }) {
   return (
-    <span>O-D-R-W: <span className="text-gold font-semibold">{bowling.overs}-{bowling.dots}-{bowling.runsConceded}-{bowling.wickets}</span></span>
+    <span>O-D-R-W: <span className="text-gold-dim font-semibold">{bowling.overs}-{bowling.dots}-{bowling.runsConceded}-{bowling.wickets}</span></span>
   )
 }
 
@@ -326,10 +315,10 @@ function FieldingFields({ fielding }: { fielding: NonNullable<PlayerMatchHistory
   const total = fielding.catches + fielding.runOuts + fielding.stumpings
   return (
     <>
-      <span>Catches: <span className="text-zinc-300">{fielding.catches}</span></span>
-      <span>Stumpings: <span className="text-zinc-300">{fielding.stumpings}</span></span>
-      <span>Run Outs: <span className="text-zinc-300">{fielding.runOuts}</span></span>
-      <span>Total: <span className="text-gold font-semibold">{total}</span></span>
+      <span>Catches: <span className="text-stone-700">{fielding.catches}</span></span>
+      <span>Stumpings: <span className="text-stone-700">{fielding.stumpings}</span></span>
+      <span>Run Outs: <span className="text-stone-700">{fielding.runOuts}</span></span>
+      <span>Total: <span className="text-gold-dim font-semibold">{total}</span></span>
     </>
   )
 }
