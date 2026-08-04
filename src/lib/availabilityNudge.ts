@@ -574,6 +574,33 @@ export async function getWeeklyNudgeHistoryForPlayers(
   return result
 }
 
+// ── Day-agnostic weekend gap check — powers the first-open-of-day greeting
+// dialog on the home page. Unlike getNudgeForPlayer() below, this has no
+// Sun–Wed window and no theme/copy selection — it just answers "does this
+// player still have an unanswered nextLockWeekend booking, right now." Once
+// the Thursday lock cron fires, fetchNextLockWeekendBookings() naturally
+// stops returning that weekend's rows (availability_locked = true), so the
+// dialog stops prompting for a weekend nothing can be done about anymore.
+export async function getWeekendGapForPlayer(
+  supabase: ServiceClient,
+  playerId: string,
+  playerStatus: string | null | undefined
+): Promise<NudgeBooking[]> {
+  if (playerStatus === 'expelled') return []
+
+  const bookingList = await fetchNextLockWeekendBookings(supabase)
+  if (!bookingList.length) return []
+
+  const { data: responded } = await supabase
+    .from('availability')
+    .select('booking_id')
+    .eq('player_id', playerId)
+    .in('booking_id', bookingList.map(b => b.id))
+
+  const respondedIds = new Set((responded ?? []).map(r => r.booking_id))
+  return bookingList.filter(b => !respondedIds.has(b.id))
+}
+
 // ── Single-player pipeline — used for the read-only dashboard section ──────
 export async function getNudgeForPlayer(
   supabase: ServiceClient,

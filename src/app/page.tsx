@@ -9,7 +9,8 @@ import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { getNudgeForPlayer } from '@/lib/availabilityNudge'
+import { getNudgeForPlayer, getWeekendGapForPlayer } from '@/lib/availabilityNudge'
+import { WeekendAvailabilityGreeting } from '@/components/ui/WeekendAvailabilityGreeting'
 
 export const revalidate = 60
 
@@ -63,7 +64,11 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
   // shows this player's own "still open, matches your pattern" nudge, if any.
   const nudge = await getNudgeForPlayer(supabase, playerId, playerStatus)
 
-  return { upcomingCount: upcomingCount ?? 0, nextFixture, nextFixtureResponse, pendingCount, nudge }
+  // Day-agnostic weekend gap — powers the first-open-of-day greeting dialog.
+  // Unlike `nudge` above, this isn't gated to Sun-Wed.
+  const weekendGap = await getWeekendGapForPlayer(supabase, playerId, playerStatus)
+
+  return { upcomingCount: upcomingCount ?? 0, nextFixture, nextFixtureResponse, pendingCount, nudge, weekendGap }
 }
 
 function formatDate(dateStr: string) {
@@ -155,6 +160,11 @@ export default async function HomePage() {
         {/* ── PLAYER DASHBOARD ── */}
         {isPlayer && playerData && (
           <div className="mb-10">
+            <WeekendAvailabilityGreeting
+              playerId={player.playerId}
+              firstName={player?.playerName?.split(' ')[0] ?? 'Spartan'}
+              bookings={playerData.weekendGap}
+            />
             {/* Welcome */}
             <div className="flex items-center gap-3 mb-6">
               <img
