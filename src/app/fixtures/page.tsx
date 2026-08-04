@@ -96,6 +96,19 @@ export default async function FixturesPage() {
     .eq('status', 'announced')
   : { data: [] }
 
+  // Y-response counts per booking — powers the "In: N Y" nudge on the upcoming weekend's cards
+  const { data: yAvailRows } = bookingIds.length ? await supabase
+    .from('availability')
+    .select('booking_id')
+    .in('booking_id', bookingIds)
+    .eq('response', 'Y')
+  : { data: [] }
+
+  const yCountMap: Record<string, number> = {}
+  for (const row of yAvailRows ?? []) {
+    yCountMap[row.booking_id] = (yCountMap[row.booking_id] ?? 0) + 1
+  }
+
   const squadMap: Record<string, any[]> = {}
 
   for (const row of squadRows ?? []) {
@@ -177,6 +190,12 @@ export default async function FixturesPage() {
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
 
+  // The nearest upcoming Sat/Sun weekend group — the "In: N Y" nudge is scoped to it only,
+  // never to a weekday game or a later weekend (bookingsWithStatus is already date-ascending)
+  const upcomingWeekendKey = bookingsWithStatus
+    .map(b => validationGroupKey((b as any).game_date))
+    .find(k => k.startsWith('weekend-')) ?? null
+
     // Running balance for wallet projection — chains across matches chronologically
     // bookingsWithStatus is already sorted by game_date + slot_time ASC from the query
     let runningWalletBalance: number | null = loggedInWalletBalance
@@ -205,6 +224,8 @@ export default async function FixturesPage() {
         isLoggedInPlayerInSquad:  isInSquad,
         isLoggedInPlayerExempt:   isExempt,
         loggedInWalletBalance:    runningWalletBalance,
+        yCount:                   yCountMap[b.id] ?? 0,
+        showYCount:               wk === upcomingWeekendKey,
       },
       hasDues:                 hasDues,
       slotLocked:              (b as any).availability_locked ?? false,
