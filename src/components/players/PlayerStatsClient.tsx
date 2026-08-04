@@ -309,7 +309,7 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
         )}
       </th>
       <td className="align-middle px-2 py-2.5">
-        <span className="block font-rajdhani text-sm font-semibold text-ink">
+        <span className="block font-rajdhani text-sm text-ink">
           {match.tournamentName ?? '—'}{match.format ? ` - ${match.format}` : ''}
         </span>
         <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
@@ -373,13 +373,14 @@ function BowlingCell({ bowling }: { bowling: NonNullable<PlayerMatchHistoryRow['
 }
 
 function FieldingCell({ fielding }: { fielding: NonNullable<PlayerMatchHistoryRow['fielding']> }) {
-  const total = fielding.catches + fielding.runOuts + fielding.stumpings
-  return (
-    <>
-      <span className="block font-rajdhani text-xs text-stone-500">
-        {fielding.catches} ct · {fielding.stumpings} st · {fielding.runOuts} ro
-      </span>
-      <span className="block font-rajdhani text-sm font-semibold text-gold-dim mt-0.5">Total {total}</span>
-    </>
+  const parts = [
+    fielding.catches > 0 ? `${fielding.catches} ct` : null,
+    fielding.stumpings > 0 ? `${fielding.stumpings} st` : null,
+    fielding.runOuts > 0 ? `${fielding.runOuts} ro` : null,
+  ].filter((p): p is string => p !== null)
+  return parts.length > 0 ? (
+    <span className="block font-rajdhani text-sm font-semibold text-gold-dim">{parts.join(' · ')}</span>
+  ) : (
+    <span className="font-rajdhani text-xs text-stone-400">—</span>
   )
 }
