@@ -27,7 +27,7 @@
 // needed here.
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ResultBadge } from '@/components/shared/ResultBadge'
 import type { PlayerStatsTotals, PlayerMatchHistoryRow } from '@/types'
 
@@ -226,9 +226,7 @@ export function PlayerStatsClient({
           ) : tabMatches.length === 0 ? (
             <p className="font-rajdhani text-sm text-stone-500">No {statTab} innings for this filter.</p>
           ) : (
-            <div className="space-y-3">
-              {tabMatches.map(m => <InningsCard key={m.matchId} match={m} statTab={statTab} />)}
-            </div>
+            <MatchHistoryTable matches={tabMatches} statTab={statTab} />
           )}
         </div>
       </div>
@@ -255,70 +253,99 @@ function MvpStat({ label, value, color }: { label: string; value: number; color:
   )
 }
 
-function InningsCard({ match, statTab }: { match: PlayerMatchHistoryRow; statTab: StatTab }) {
+// Match History table — each row is a full <tr>, whole-row clickable to
+// /matches/history/[bookingId] (rows with no bookingId render inert, same
+// as the earlier card view's fallback). Column 3's content flips per tab.
+// Row identity (format + date) uses <th scope="row"> — an accessible table,
+// not a list of cards dressed up as rows.
+function MatchHistoryTable({ matches, statTab }: { matches: PlayerMatchHistoryRow[]; statTab: StatTab }) {
+  const columnLabel = statTab === 'batting' ? 'Batting' : statTab === 'bowling' ? 'Bowling' : 'Fielding'
+  return (
+    <div className="bg-white border border-parchment-3 rounded-2xl overflow-hidden overflow-x-auto">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-parchment-2 border-b border-parchment-3">
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-4 py-2.5">Date</th>
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-4 py-2.5">Match</th>
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-4 py-2.5">{columnLabel}</th>
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-4 py-2.5">Result</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-parchment-3">
+          {matches.map(m => <MatchHistoryRow key={m.matchId} match={m} statTab={statTab} />)}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; statTab: StatTab }) {
+  const router = useRouter()
   const dateLabel = match.gameDate
     ? new Date(match.gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—'
+  const clickable = !!match.bookingId
+  const goToMatch = () => { if (match.bookingId) router.push(`/matches/history/${match.bookingId}`) }
 
-  // Opponent and tournament together underneath the date — unlike the old
-  // combined view, each tab is already scoped to one stat type, so there's
-  // room to show both rather than picking one.
-  const subLabel = [
-    match.opponentName ? `vs ${match.opponentName}` : null,
-    match.tournamentName,
-  ].filter(Boolean).join(' · ')
-
-  const body = (
-    <div className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5 hover:border-gold-dim transition-colors">
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-rajdhani text-sm font-semibold text-ink">
-          {dateLabel}{match.format ? ` · ${match.format}` : ''}
-        </p>
-        {match.matchResult && <ResultBadge result={match.matchResult} />}
-      </div>
-      {subLabel && <p className="font-rajdhani text-xs text-stone-500 mt-0.5">{subLabel}</p>}
-
-      <div className="flex flex-wrap gap-x-4 gap-y-1 font-rajdhani text-xs text-stone-600 mt-2">
-        {statTab === 'batting' && match.batting && <BattingFields batting={match.batting} />}
-        {statTab === 'bowling' && match.bowling && <BowlingFields bowling={match.bowling} />}
-        {statTab === 'fielding' && match.fielding && <FieldingFields fielding={match.fielding} />}
-      </div>
-    </div>
+  return (
+    <tr
+      {...(clickable ? {
+        role: 'link',
+        tabIndex: 0,
+        onClick: goToMatch,
+        onKeyDown: (e: React.KeyboardEvent<HTMLTableRowElement>) => { if (e.key === 'Enter' || e.key === ' ') goToMatch() },
+      } : {})}
+      className={clickable ? 'cursor-pointer hover:bg-parchment-2 transition-colors' : ''}>
+      <th scope="row" className="text-left font-normal align-top px-4 py-3.5">
+        <span className="block font-rajdhani text-xs font-bold text-ink">{match.format ?? '—'}</span>
+        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{dateLabel}</span>
+      </th>
+      <td className="align-top px-4 py-3.5">
+        <span className="block font-rajdhani text-sm font-semibold text-ink">{match.tournamentName ?? '—'}</span>
+        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
+      </td>
+      <td className="align-top px-4 py-3.5">
+        {statTab === 'batting' && match.batting && <BattingCell batting={match.batting} />}
+        {statTab === 'bowling' && match.bowling && <BowlingCell bowling={match.bowling} />}
+        {statTab === 'fielding' && match.fielding && <FieldingCell fielding={match.fielding} />}
+      </td>
+      <td className="align-top px-4 py-3.5">
+        {match.matchResult ? <ResultBadge result={match.matchResult} /> : <span className="font-rajdhani text-xs text-stone-400">—</span>}
+      </td>
+    </tr>
   )
-
-  if (match.bookingId) {
-    return (
-      <Link href={`/matches/history/${match.bookingId}`} className="block">
-        {body}
-      </Link>
-    )
-  }
-  return body
 }
 
-function BattingFields({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['batting']> }) {
+function BattingCell({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['batting']> }) {
   return (
     <>
-      <span>Runs: <span className="text-gold-dim font-semibold">{batting.runs}{batting.notOut ? '*' : ''}</span> ({batting.balls})</span>
-      <span>How out: <span className="text-stone-700">{batting.notOut ? 'Not out' : (batting.howOut ?? '—')}</span></span>
+      <span className="block font-rajdhani text-xs text-stone-500">{batting.notOut ? 'Not out' : (batting.howOut ?? '—')}</span>
+      <span className="block font-rajdhani text-sm font-semibold text-gold-dim mt-0.5">
+        {batting.runs}{batting.notOut ? '*' : ''} ({batting.balls})
+      </span>
     </>
   )
 }
 
-function BowlingFields({ bowling }: { bowling: NonNullable<PlayerMatchHistoryRow['bowling']> }) {
+function BowlingCell({ bowling }: { bowling: NonNullable<PlayerMatchHistoryRow['bowling']> }) {
   return (
-    <span>O-D-R-W: <span className="text-gold-dim font-semibold">{bowling.overs}-{bowling.dots}-{bowling.runsConceded}-{bowling.wickets}</span></span>
+    <>
+      <span className="block font-rajdhani text-[10px] font-bold tracking-wide uppercase text-stone-400">O-D-R-W</span>
+      <span className="block font-rajdhani text-sm font-semibold text-gold-dim mt-0.5">
+        {bowling.overs}-{bowling.dots}-{bowling.runsConceded}-{bowling.wickets}
+      </span>
+    </>
   )
 }
 
-function FieldingFields({ fielding }: { fielding: NonNullable<PlayerMatchHistoryRow['fielding']> }) {
+function FieldingCell({ fielding }: { fielding: NonNullable<PlayerMatchHistoryRow['fielding']> }) {
   const total = fielding.catches + fielding.runOuts + fielding.stumpings
   return (
     <>
-      <span>Catches: <span className="text-stone-700">{fielding.catches}</span></span>
-      <span>Stumpings: <span className="text-stone-700">{fielding.stumpings}</span></span>
-      <span>Run Outs: <span className="text-stone-700">{fielding.runOuts}</span></span>
-      <span>Total: <span className="text-gold-dim font-semibold">{total}</span></span>
+      <span className="block font-rajdhani text-xs text-stone-500">
+        {fielding.catches} ct · {fielding.stumpings} st · {fielding.runOuts} ro
+      </span>
+      <span className="block font-rajdhani text-sm font-semibold text-gold-dim mt-0.5">Total {total}</span>
     </>
   )
 }
