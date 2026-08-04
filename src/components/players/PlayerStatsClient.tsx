@@ -106,7 +106,11 @@ export function PlayerStatsClient({
   const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain
 
   const tabMatches = useMemo(
-    () => matches.filter(m => statTab === 'batting' ? m.batting : statTab === 'bowling' ? m.bowling : m.fielding),
+    () => matches.filter(m => {
+      if (statTab === 'batting') return !!m.batting
+      if (statTab === 'bowling') return !!m.bowling
+      return !!m.fielding && (m.fielding.catches > 0 || m.fielding.stumpings > 0 || m.fielding.runOuts > 0)
+    }),
     [matches, statTab],
   )
 
@@ -305,9 +309,6 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
               </span>
               <span className="font-cinzel text-sm font-bold text-ink">{d.getDate()}</span>
             </div>
-            {match.format && (
-              <span className="font-rajdhani text-[10px] font-bold text-stone-500">{match.format}</span>
-            )}
           </div>
         ) : (
           <span className="font-rajdhani text-xs text-stone-400">—</span>
@@ -354,9 +355,10 @@ function formatDismissal(howOut: string): string {
 }
 
 function BattingCell({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['batting']> }) {
+  const highlight = batting.runs >= 30
   return (
     <>
-      <span className="block font-rajdhani text-sm font-semibold text-gold-dim">
+      <span className={`block font-rajdhani text-sm font-semibold ${highlight ? 'text-blue-700' : 'text-gold-dim'}`}>
         {batting.runs}{batting.notOut ? '*' : ''} ({batting.balls})
       </span>
       {!batting.notOut && (
@@ -367,10 +369,11 @@ function BattingCell({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['
 }
 
 function BowlingCell({ bowling }: { bowling: NonNullable<PlayerMatchHistoryRow['bowling']> }) {
+  const highlight = bowling.wickets >= 3
   return (
     <>
       <span className="block font-rajdhani text-[10px] font-bold tracking-wide uppercase text-stone-400">O-D-R-W</span>
-      <span className="block font-rajdhani text-sm font-semibold text-gold-dim mt-0.5">
+      <span className={`block font-rajdhani text-sm font-semibold mt-0.5 ${highlight ? 'text-blue-700' : 'text-gold-dim'}`}>
         {bowling.overs}-{bowling.dots}-{bowling.runsConceded}-{bowling.wickets}
       </span>
     </>
@@ -383,8 +386,12 @@ function FieldingCell({ fielding }: { fielding: NonNullable<PlayerMatchHistoryRo
     fielding.stumpings > 0 ? `${fielding.stumpings} st` : null,
     fielding.runOuts > 0 ? `${fielding.runOuts} ro` : null,
   ].filter((p): p is string => p !== null)
+  const total = fielding.catches + fielding.stumpings + fielding.runOuts
+  const highlight = total >= 3
   return parts.length > 0 ? (
-    <span className="block font-rajdhani text-sm font-semibold text-gold-dim">{parts.join(' · ')}</span>
+    <span className={`font-rajdhani text-sm font-semibold ${highlight ? 'text-blue-700' : 'text-gold-dim'}`}>
+      {parts.map(p => <span key={p} className="block">{p}</span>)}
+    </span>
   ) : (
     <span className="font-rajdhani text-xs text-stone-400">—</span>
   )
