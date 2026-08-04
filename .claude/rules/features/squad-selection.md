@@ -389,6 +389,19 @@ Nearest hospital URL
 ### `src/components/fixtures/FixturesCard.tsx`
  
 Announced squad display for all logged-in players. Squad section collapsed by default. Expanded view shows players sorted **alphabetically by full name** with C / VC / WK role badges. Player names link to their CricHeroes profile if `cricheroes_url` is set. Jersey number, jersey name, and primary skill are intentionally excluded on the main fixtures page — the squad fetch selects only `id, name, cricheroes_url` from `players`, plus `is_match_captain, is_vc, is_wk` from the squad row.
+
+**"In: N Y" availability nudge (added August 2026):** a small bottom-left line on
+the card — `In: <count> Y` — showing how many players have marked `Y` availability
+for that specific game. Scoped server-side in `src/app/fixtures/page.tsx` to the
+**nearest upcoming Sat/Sun weekend group only** (`upcomingWeekendKey`, the first
+`validationGroupKey()` result prefixed `weekend-` among date-ascending confirmed
+bookings) — never shown on a weekday game or a later weekend's cards. `yCount` is
+a plain per-booking tally of `availability` rows where `response = 'Y'`, fetched
+once for all active booking IDs and passed down via `cardData`. The row hides only
+once the squad has been **announced with a full 12 players** (`squadAnnounced &&
+squad.length >= 12`, `squad` here being the already-announced-only rows from
+`squadMap`) — a draft/pending/approved squad, or an announced squad below 12,
+keeps showing it. Purely a read of existing `availability` data; no new write path.
  
 ---
  
