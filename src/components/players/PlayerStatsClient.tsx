@@ -266,8 +266,8 @@ function MatchHistoryTable({ matches, statTab }: { matches: PlayerMatchHistoryRo
           <tr className="bg-parchment-2 border-b border-parchment-3">
             <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-1.5 py-2 whitespace-nowrap">Date</th>
             <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-2 py-2">Match</th>
-            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-2 py-2">{columnLabel}</th>
-            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-1.5 py-2 whitespace-nowrap">R</th>
+            <th scope="col" className="text-center font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-2 py-2">{columnLabel}</th>
+            <th scope="col" className="text-center font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-1.5 py-2 whitespace-nowrap">R</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-parchment-3">
@@ -314,12 +314,12 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
         </span>
         <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
       </td>
-      <td className="align-middle px-2 py-2.5">
+      <td className="text-center align-middle px-2 py-2.5">
         {statTab === 'batting' && match.batting && <BattingCell batting={match.batting} />}
         {statTab === 'bowling' && match.bowling && <BowlingCell bowling={match.bowling} />}
         {statTab === 'fielding' && match.fielding && <FieldingCell fielding={match.fielding} />}
       </td>
-      <td className="align-middle px-1.5 py-2.5">
+      <td className="text-center align-middle px-1.5 py-2.5">
         {match.matchResult ? <ResultCell result={match.matchResult} /> : <span className="font-rajdhani text-xs text-stone-400">—</span>}
       </td>
     </tr>
