@@ -50,12 +50,30 @@ export function FixturesWeekendGroup({
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({})
   const [errorMap,  setErrorMap]  = useState<Record<string, string | null>>({})
 
+  // Live "In: N Y" count per booking — seeded from the server-rendered value, then
+  // nudged optimistically whenever this player's own response crosses in/out of Y,
+  // so the card doesn't need a full page reload to reflect a just-saved change.
+  const [yCountMap, setYCountMap] = useState<Record<string, number>>(() =>
+    Object.fromEntries(bookings.map(b => [b.id, b.cardData?.yCount ?? 0]))
+  )
+
   // weekendBookings = slim version used for validation context
   const weekendBookings = bookings.map(b => ({
     id:        b.id,
     game_date: b.game_date,
     slot_time: b.slot_time,
   }))
+
+  // Nudges the live Y-count when this player's own response crosses in/out of Y
+  function adjustYCount(bookingId: string, oldResponse: AvailKey | null, newResponse: AvailKey | null) {
+    const wasY = oldResponse === 'Y'
+    const isY  = newResponse === 'Y'
+    if (wasY === isY) return
+    setYCountMap(prev => ({
+      ...prev,
+      [bookingId]: Math.max(0, (prev[bookingId] ?? 0) + (isY ? 1 : -1)),
+    }))
+  }
 
   async function handleSelect(bookingId: string, code: AvailKey | null) {
     if (!isPlayer) return
@@ -77,6 +95,7 @@ export function FixturesWeekendGroup({
           setWeekendResponses(prev => {
             const n = { ...prev }; delete n[bookingId]; return n
           })
+          adjustYCount(bookingId, current, null)
         } else {
           const d = await res.json().catch(() => ({}))
           setErrorMap(prev => ({ ...prev, [bookingId]: d.error ?? `Save failed (${res.status})` }))
@@ -89,6 +108,7 @@ export function FixturesWeekendGroup({
         })
         if (res.ok) {
           setWeekendResponses(prev => ({ ...prev, [bookingId]: newResponse }))
+          adjustYCount(bookingId, current, newResponse)
         } else {
           const d = await res.json().catch(() => ({}))
           setErrorMap(prev => ({ ...prev, [bookingId]: d.error ?? `Save failed (${res.status})` }))
@@ -105,7 +125,7 @@ export function FixturesWeekendGroup({
     <>
       {bookings.map(b => (
         <div key={b.id} className="mb-4">
-          <FixturesCard booking={{ ...b.cardData, squad: b.squad }} />
+          <FixturesCard booking={{ ...b.cardData, squad: b.squad, yCount: yCountMap[b.id] ?? b.cardData?.yCount ?? 0 }} />
                     {b.hasDues ? (
             <div style={{
               marginTop: '-6px', padding: '10px 16px',
