@@ -293,7 +293,7 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
         onKeyDown: (e: React.KeyboardEvent<HTMLTableRowElement>) => { if (e.key === 'Enter' || e.key === ' ') goToMatch() },
       } : {})}
       className={clickable ? 'cursor-pointer hover:bg-parchment-2 transition-colors' : ''}>
-      <th scope="row" className="text-left font-normal align-top px-1.5 py-2.5 whitespace-nowrap">
+      <th scope="row" className="text-left font-normal align-middle px-1.5 py-2.5 whitespace-nowrap">
         {d ? (
           <div className="flex items-center gap-1">
             <span
@@ -308,18 +308,18 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
           <span className="font-rajdhani text-xs text-stone-400">—</span>
         )}
       </th>
-      <td className="align-top px-2 py-2.5">
+      <td className="align-middle px-2 py-2.5">
         <span className="block font-rajdhani text-sm font-semibold text-ink">
           {match.tournamentName ?? '—'}{match.format ? ` - ${match.format}` : ''}
         </span>
         <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
       </td>
-      <td className="align-top px-2 py-2.5">
+      <td className="align-middle px-2 py-2.5">
         {statTab === 'batting' && match.batting && <BattingCell batting={match.batting} />}
         {statTab === 'bowling' && match.bowling && <BowlingCell bowling={match.bowling} />}
         {statTab === 'fielding' && match.fielding && <FieldingCell fielding={match.fielding} />}
       </td>
-      <td className="align-top px-1.5 py-2.5">
+      <td className="align-middle px-1.5 py-2.5">
         {match.matchResult ? <ResultCell result={match.matchResult} /> : <span className="font-rajdhani text-xs text-stone-400">—</span>}
       </td>
     </tr>
@@ -337,6 +337,17 @@ function ResultCell({ result }: { result: string }) {
   return <span className="text-stone-400 text-[10px] font-bold">{result.charAt(0).toUpperCase()}</span>
 }
 
+// Raw dismissal_method values from the analytics DB use snake_case
+// (e.g. "caught_behind", "run_out") — humanize known ones explicitly,
+// fall back to a generic underscore-to-space + title-case for anything else.
+const DISMISSAL_LABELS: Record<string, string> = {
+  caught_behind: 'C&B',
+  run_out: 'Run Out',
+}
+function formatDismissal(howOut: string): string {
+  return DISMISSAL_LABELS[howOut] ?? howOut.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
 function BattingCell({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['batting']> }) {
   return (
     <>
@@ -344,7 +355,7 @@ function BattingCell({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['
         {batting.runs}{batting.notOut ? '*' : ''} ({batting.balls})
       </span>
       {!batting.notOut && (
-        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{batting.howOut ?? '—'}</span>
+        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{batting.howOut ? formatDismissal(batting.howOut) : '—'}</span>
       )}
     </>
   )
