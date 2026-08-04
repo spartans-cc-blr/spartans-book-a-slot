@@ -146,11 +146,16 @@ export async function buildPlayerHistories(
   const map = new Map<string, PlayerHistory>()
   if (!playerIds.length) return map
 
+  // bookings.status filtered to 'confirmed' — otherwise a cancelled
+  // (rescheduled-away) booking's availability response still counts toward
+  // this player's habitual day/slot/format pattern, skewing which theme
+  // pickNudgeCandidate() picks off a game that never actually happened.
   const { data } = await supabase
     .from('availability')
     .select('player_id, response, bookings!inner(slot_time, format, game_date, tournament_id)')
     .in('player_id', playerIds)
     .in('response', ['Y', 'O', 'E'])
+    .eq('bookings.status', 'confirmed')
 
   type Row = {
     player_id: string
