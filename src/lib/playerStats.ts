@@ -347,9 +347,12 @@ export async function getPlayerMatchHistory(
   // cancelled (rescheduled-away) booking; without this, whichever row
   // Postgres happens to return last for that match_id wins the Map below,
   // which can silently swap in the wrong date/tournament.
+  // match_time/slot_time are fetched purely to break ties on the date+time
+  // sort below (a single day can have more than one game) — neither is
+  // part of the returned row shape.
   const { data: bookingRows, error: bookingErr } = await hub
     .from('bookings')
-    .select('id, match_id, game_date, format, tournament:tournaments(name)')
+    .select('id, match_id, game_date, format, slot_time, match_time, tournament:tournaments(name)')
     .in('match_id', matchIds)
     .eq('status', 'confirmed')
   if (bookingErr) throw new Error(bookingErr.message)
@@ -359,7 +362,20 @@ export async function getPlayerMatchHistory(
   const bowlingByMatch  = new Map(bowling.map((r: any) => [r.match_id, r]))
   const fieldingByMatch = new Map(fielding.map((r: any) => [r.match_id, r]))
 
-  const rows: PlayerMatchHistoryRow[] = matchIds.map(matchId => {
+  // Sort match_ids by date+time (most recent first) before building the
+  // final rows — game_date alone can't break a tie between two matches
+  // played the same day.
+  const sortedMatchIds = [...matchIds].sort((a, b) => {
+    const ba = bookingByMatchId.get(a) as any
+    const bb = bookingByMatchId.get(b) as any
+    const dateA = ba?.game_date ?? matchById.get(a)?.match_date ?? ''
+    const dateB = bb?.game_date ?? matchById.get(b)?.match_date ?? ''
+    const timeA = ba?.match_time ?? ba?.slot_time ?? ''
+    const timeB = bb?.match_time ?? bb?.slot_time ?? ''
+    return `${dateB} ${timeB}`.localeCompare(`${dateA} ${timeA}`)
+  })
+
+  const rows: PlayerMatchHistoryRow[] = sortedMatchIds.map(matchId => {
     const m = matchById.get(matchId) as any
     const booking = bookingByMatchId.get(matchId) as any
     const bat = battingByMatch.get(matchId) as any
@@ -381,9 +397,10 @@ export async function getPlayerMatchHistory(
         runs: num(bat.runs), balls: num(bat.balls), fours: num(bat.fours), sixes: num(bat.sixes),
         notOut: bat.not_out === 'Y',
         strikeRate: num(bat.balls) > 0 ? round2((num(bat.runs) / num(bat.balls)) * 100) : null,
+        howOut: bat.dismissal_method ?? null,
       } : null,
       bowling: bowledThisMatch ? {
-        overs: bowl.overs, wickets: num(bowl.wickets), runsConceded: num(bowl.runs),
+        overs: bowl.overs, dots: num(bowl.dots), wickets: num(bowl.wickets), runsConceded: num(bowl.runs),
         economy: oversToBalls(num(bowl.overs)) > 0 ? round2(num(bowl.runs) / (oversToBalls(num(bowl.overs)) / 6)) : null,
       } : null,
       fielding: field ? {
@@ -393,7 +410,6 @@ export async function getPlayerMatchHistory(
     }
   })
 
-  rows.sort((a, b) => (b.gameDate ?? '').localeCompare(a.gameDate ?? ''))
   return rows
 }
 
