@@ -21,10 +21,14 @@ export async function GET(req: NextRequest) {
   const today  = new Date().toISOString().split('T')[0]
 
   // NEW — any meaningful availability signal in last 6 weeks (42 days)
+  // bookings.status filtered to 'confirmed' — a cancelled (rescheduled-away)
+  // booking otherwise still counts its availability responses toward the
+  // activity signal, which can keep a genuinely inactive player marked active.
 const { data: activePlayers, error:activeErr } = await supabase
   .from('availability')
   .select('player_id, bookings!inner(game_date)')
   .in('response', ['Y', 'O', 'E'])
+  .eq('bookings.status', 'confirmed')
   .gte('bookings.game_date', cutoff)
   .lte('bookings.game_date', today)
 
