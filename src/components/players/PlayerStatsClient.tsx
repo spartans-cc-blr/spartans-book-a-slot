@@ -28,7 +28,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ResultBadge } from '@/components/shared/ResultBadge'
 import type { PlayerStatsTotals, PlayerMatchHistoryRow } from '@/types'
 
 interface PlayerInfo {
@@ -281,9 +280,7 @@ function MatchHistoryTable({ matches, statTab }: { matches: PlayerMatchHistoryRo
 
 function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; statTab: StatTab }) {
   const router = useRouter()
-  const dateLabel = match.gameDate
-    ? new Date(match.gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '—'
+  const d = match.gameDate ? new Date(match.gameDate) : null
   const clickable = !!match.bookingId
   const goToMatch = () => { if (match.bookingId) router.push(`/matches/history/${match.bookingId}`) }
 
@@ -297,11 +294,27 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
       } : {})}
       className={clickable ? 'cursor-pointer hover:bg-parchment-2 transition-colors' : ''}>
       <th scope="row" className="text-left font-normal align-top px-4 py-3.5">
-        <span className="block font-rajdhani text-xs font-bold text-ink">{match.format ?? '—'}</span>
-        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{dateLabel}</span>
+        {d ? (
+          <div className="flex items-center gap-1.5">
+            <span
+              className="font-rajdhani text-[10px] font-bold tracking-wide text-stone-400 uppercase"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+            >
+              {d.toLocaleDateString('en-IN', { month: 'short' })}
+            </span>
+            <div className="leading-tight">
+              <span className="block font-cinzel text-sm font-bold text-ink">{d.getDate()}</span>
+              <span className="block font-rajdhani text-[10px] text-stone-400">{d.getFullYear()}</span>
+            </div>
+          </div>
+        ) : (
+          <span className="font-rajdhani text-xs text-stone-400">—</span>
+        )}
       </th>
       <td className="align-top px-4 py-3.5">
-        <span className="block font-rajdhani text-sm font-semibold text-ink">{match.tournamentName ?? '—'}</span>
+        <span className="block font-rajdhani text-sm font-semibold text-ink">
+          {match.tournamentName ?? '—'}{match.format ? ` - ${match.format}` : ''}
+        </span>
         <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
       </td>
       <td className="align-top px-4 py-3.5">
@@ -310,19 +323,32 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
         {statTab === 'fielding' && match.fielding && <FieldingCell fielding={match.fielding} />}
       </td>
       <td className="align-top px-4 py-3.5">
-        {match.matchResult ? <ResultBadge result={match.matchResult} /> : <span className="font-rajdhani text-xs text-stone-400">—</span>}
+        {match.matchResult ? <ResultCell result={match.matchResult} /> : <span className="font-rajdhani text-xs text-stone-400">—</span>}
       </td>
     </tr>
   )
 }
 
+function ResultCell({ result }: { result: string }) {
+  const r = result.toLowerCase()
+  if (r.includes('won'))
+    return <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">W</span>
+  if (r.includes('lost'))
+    return <span className="text-red-700 text-[10px] font-bold">L</span>
+  if (r.includes('tie'))
+    return <span className="text-amber-700 text-[10px] font-bold">T</span>
+  return <span className="text-stone-400 text-[10px] font-bold">{result.charAt(0).toUpperCase()}</span>
+}
+
 function BattingCell({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['batting']> }) {
   return (
     <>
-      <span className="block font-rajdhani text-xs text-stone-500">{batting.notOut ? 'Not out' : (batting.howOut ?? '—')}</span>
-      <span className="block font-rajdhani text-sm font-semibold text-gold-dim mt-0.5">
+      <span className="block font-rajdhani text-sm font-semibold text-gold-dim">
         {batting.runs}{batting.notOut ? '*' : ''} ({batting.balls})
       </span>
+      {!batting.notOut && (
+        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{batting.howOut ?? '—'}</span>
+      )}
     </>
   )
 }
