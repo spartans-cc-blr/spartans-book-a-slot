@@ -293,16 +293,21 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
         onKeyDown: (e: React.KeyboardEvent<HTMLTableRowElement>) => { if (e.key === 'Enter' || e.key === ' ') goToMatch() },
       } : {})}
       className={clickable ? 'cursor-pointer hover:bg-parchment-2 transition-colors' : ''}>
-      <th scope="row" className="text-left font-normal align-middle px-1.5 py-2.5 whitespace-nowrap">
+      <th scope="row" className="text-center font-normal align-middle px-1.5 py-2.5 whitespace-nowrap">
         {d ? (
-          <div className="flex items-center gap-1">
-            <span
-              className="font-rajdhani text-[10px] font-bold tracking-wide text-stone-400 uppercase whitespace-nowrap"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-            >
-              {d.toLocaleDateString('en-IN', { month: 'short' })}-{String(d.getFullYear()).slice(-2)}
-            </span>
-            <span className="font-cinzel text-sm font-bold text-ink">{d.getDate()}</span>
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="flex items-center gap-1">
+              <span
+                className="font-rajdhani text-[10px] font-bold tracking-wide text-stone-400 uppercase whitespace-nowrap"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+              >
+                {d.toLocaleDateString('en-IN', { month: 'short' })}-{String(d.getFullYear()).slice(-2)}
+              </span>
+              <span className="font-cinzel text-sm font-bold text-ink">{d.getDate()}</span>
+            </div>
+            {match.format && (
+              <span className="font-rajdhani text-[10px] font-bold text-stone-500">{match.format}</span>
+            )}
           </div>
         ) : (
           <span className="font-rajdhani text-xs text-stone-400">—</span>
@@ -310,7 +315,7 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
       </th>
       <td className="align-middle px-2 py-2.5">
         <span className="block font-rajdhani text-sm text-ink">
-          {match.tournamentName ?? '—'}{match.format ? ` - ${match.format}` : ''}
+          {match.tournamentName ?? '—'}
         </span>
         <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
       </td>
