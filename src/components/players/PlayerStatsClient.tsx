@@ -45,6 +45,7 @@ const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2]
 
 type Format = 'T20' | 'T30'
+type Innings = 'defending' | 'chasing'
 type StatTab = 'batting' | 'bowling' | 'fielding'
 const STAT_TABS: StatTab[] = ['batting', 'bowling', 'fielding']
 
@@ -63,14 +64,16 @@ export function PlayerStatsClient({
   // Defending = batted first, set a target. Chasing = batted second, chasing
   // the opponent's target. Derived from the analytics DB's toss_won/
   // toss_decision (see getInningsMatchIds() in src/lib/playerStats.ts).
-  const [innings, setInnings] = useState<'all' | 'defending' | 'chasing'>('all')
+  // Same convention as `formats`: both checked means no restriction,
+  // unchecking one scopes to the other, unchecking both snaps back to both.
+  const [innings, setInnings] = useState<Set<Innings>>(new Set<Innings>(['defending', 'chasing']))
   const [scoped, setScoped] = useState<PlayerStatsTotals>(initialCareer)
   const [matches, setMatches] = useState<PlayerMatchHistoryRow[]>(initialMatches)
   const [loading, setLoading] = useState(false)
   const [statTab, setStatTab] = useState<StatTab>('batting')
 
   const fetchScoped = useCallback(async () => {
-    if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain && innings === 'all') {
+    if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain && innings.size === 2) {
       setScoped(initialCareer)
       setMatches(initialMatches)
       return
@@ -81,7 +84,7 @@ export function PlayerStatsClient({
     if (groundId !== 'all') params.set('ground', groundId)
     if (formats.size === 1) params.set('format', Array.from(formats)[0])
     if (asCaptain) params.set('captain', '1')
-    if (innings !== 'all') params.set('innings', innings)
+    if (innings.size === 1) params.set('innings', Array.from(innings)[0])
     const res = await fetch(`/api/players/${player.id}/match-history?${params.toString()}`)
     if (res.ok) {
       const d = await res.json()
@@ -108,7 +111,20 @@ export function PlayerStatsClient({
     })
   }
 
-  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain || innings !== 'all'
+  function toggleInnings(v: Innings) {
+    setInnings(prev => {
+      const next = new Set(prev)
+      if (next.has(v)) {
+        next.delete(v)
+        if (next.size === 0) { next.add('defending'); next.add('chasing') }
+      } else {
+        next.add(v)
+      }
+      return next
+    })
+  }
+
+  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain || innings.size === 1
 
   const tabMatches = useMemo(
     () => matches.filter(m => {
@@ -180,15 +196,13 @@ export function PlayerStatsClient({
               As Captain
             </label>
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
-              ${innings === 'defending' ? 'text-gold-dim' : 'text-stone-500'}`}>
-              <input type="checkbox" checked={innings === 'defending'}
-                onChange={() => setInnings(v => v === 'defending' ? 'all' : 'defending')} className="accent-gold" />
+              ${innings.has('defending') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={innings.has('defending')} onChange={() => toggleInnings('defending')} className="accent-gold" />
               Defending
             </label>
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
-              ${innings === 'chasing' ? 'text-gold-dim' : 'text-stone-500'}`}>
-              <input type="checkbox" checked={innings === 'chasing'}
-                onChange={() => setInnings(v => v === 'chasing' ? 'all' : 'chasing')} className="accent-gold" />
+              ${innings.has('chasing') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={innings.has('chasing')} onChange={() => toggleInnings('chasing')} className="accent-gold" />
               Chasing
             </label>
           </div>

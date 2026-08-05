@@ -39,8 +39,10 @@ export type Format = 'T20' | 'T30'
 // batted second, chasing the target. Only surfaced on Detailed → MVP — see
 // LeaderboardTable.tsx's MVP tab and getLeaderboard()'s innings scoping in
 // src/lib/playerStats.ts (same toss_won/toss_decision derivation as the
-// player stats page's Defending/Chasing filter).
-export type Innings = 'all' | 'defending' | 'chasing'
+// player stats page's Defending/Chasing filter). Same convention as
+// `formats`: both checked means no restriction, unchecking one scopes to
+// the other, and unchecking both snaps back to both checked.
+export type InningsKey = 'defending' | 'chasing'
 
 const DETAILED_LABEL: Record<TableCategory, string> = {
   mvp: 'MVP', batting: 'Bat', bowling: 'Bowl', fielding: 'Field',
@@ -100,7 +102,7 @@ interface Props {
   tournamentId: string | 'all'
   groundId:     string | 'all'
   formats:      Set<Format>
-  innings:      Innings
+  innings:      Set<InningsKey>
   category:     LeaderboardCategory
 }
 
@@ -128,11 +130,12 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
       // Carry the current format restriction forward on unrelated
       // navigations (e.g. changing Tournament shouldn't reset Format).
       ...(formats.size === 1 ? { format: Array.from(formats)[0] } : {}),
-      ...(innings !== 'all' ? { innings } : {}),
+      ...(innings.size === 1 ? { innings: Array.from(innings)[0] } : {}),
       ...next,
     })
-    // toggleFormat() passes format: '' to mean "back to no restriction" —
-    // an empty query param isn't the same as an absent one, so strip it.
+    // toggleFormat()/toggleInnings() pass '' to mean "back to no
+    // restriction" — an empty query param isn't the same as an absent one,
+    // so strip it.
     if (next.format === '') params.delete('format')
     if (next.innings === '') params.delete('innings')
     router.push(`/leaderboard?${params.toString()}`)
@@ -151,14 +154,20 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
     navigate({ format: next.size === 1 ? Array.from(next)[0] : '' })
   }
 
-  // Mutually exclusive checkbox pair, mirroring toggleFormat()'s shape —
-  // clicking the already-checked one clears back to 'all'. Only ever
-  // rendered when category === 'mvp' (see Row 2 below), and resetting on
-  // every other sub-tab selection (selectDetailedSub / selectHonorSub)
-  // keeps a stale value from silently scoping a table it's no longer shown
-  // next to.
-  function toggleInnings(v: Exclude<Innings, 'all'>) {
-    navigate({ innings: innings === v ? '' : v })
+  // Same shape as toggleFormat() — both checked means no restriction.
+  // Only ever rendered when category === 'mvp' (see Row 2 below), and
+  // resetting on every other sub-tab selection (selectDetailedSub /
+  // selectHonorSub) keeps a stale value from silently scoping a table it's
+  // no longer shown next to.
+  function toggleInnings(v: InningsKey) {
+    const next = new Set(innings)
+    if (next.has(v)) {
+      next.delete(v)
+      if (next.size === 0) { next.add('defending'); next.add('chasing') }
+    } else {
+      next.add(v)
+    }
+    navigate({ innings: next.size === 1 ? Array.from(next)[0] : '' })
   }
 
   // Monthly is a strictly month-scoped view — its own stepper is the
@@ -215,13 +224,13 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
   const inningsCheckboxes = category === 'mvp' ? (
     <div className="flex items-center gap-2 flex-shrink-0">
       <label className={`flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-widest uppercase cursor-pointer select-none
-        ${innings === 'defending' ? 'text-gold' : 'text-zinc-500'}`}>
-        <input type="checkbox" checked={innings === 'defending'} onChange={() => toggleInnings('defending')} className="accent-gold" />
+        ${innings.has('defending') ? 'text-gold' : 'text-zinc-500'}`}>
+        <input type="checkbox" checked={innings.has('defending')} onChange={() => toggleInnings('defending')} className="accent-gold" />
         Defending
       </label>
       <label className={`flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-widest uppercase cursor-pointer select-none
-        ${innings === 'chasing' ? 'text-gold' : 'text-zinc-500'}`}>
-        <input type="checkbox" checked={innings === 'chasing'} onChange={() => toggleInnings('chasing')} className="accent-gold" />
+        ${innings.has('chasing') ? 'text-gold' : 'text-zinc-500'}`}>
+        <input type="checkbox" checked={innings.has('chasing')} onChange={() => toggleInnings('chasing')} className="accent-gold" />
         Chasing
       </label>
     </div>

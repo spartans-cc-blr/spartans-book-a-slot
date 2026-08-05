@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { LeaderboardFilters, type LeaderboardCategory, type Format, type Innings } from '@/components/leaderboard/LeaderboardFilters'
+import { LeaderboardFilters, type LeaderboardCategory, type Format, type InningsKey } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
@@ -60,12 +60,15 @@ export default async function LeaderboardPage({
   const restrictedFormats: Format[] | undefined = formatParam === 'T20' || formatParam === 'T30' ? [formatParam] : undefined
   const formats: Set<Format> = new Set(restrictedFormats ?? (['T20', 'T30'] as Format[]))
 
-  // Defending/Chasing — only ever surfaced (and therefore only ever
-  // meaningful) on Detailed → MVP; a hand-edited URL setting it alongside
-  // another category is simply ignored rather than silently scoping a
-  // table the control isn't shown next to.
+  // Defending/Chasing — same both-checked-means-no-restriction convention
+  // as Format. Only ever surfaced (and therefore only ever meaningful) on
+  // Detailed → MVP; a hand-edited URL setting it alongside another
+  // category is simply ignored rather than silently scoping a table the
+  // control isn't shown next to.
   const inningsParam = searchParams?.innings
-  const innings: Innings = inningsParam === 'defending' || inningsParam === 'chasing' ? inningsParam : 'all'
+  const restrictedInnings: InningsKey[] | undefined =
+    inningsParam === 'defending' || inningsParam === 'chasing' ? [inningsParam] : undefined
+  const innings: Set<InningsKey> = new Set(restrictedInnings ?? (['defending', 'chasing'] as InningsKey[]))
 
   // Tournament/Ground option lists are themselves scoped by the current
   // Format selection, so picking T20-only immediately narrows both
@@ -99,7 +102,7 @@ export default async function LeaderboardPage({
     tournamentId: tournamentId === 'all' ? undefined : tournamentId,
     groundId: groundId === 'all' ? undefined : groundId,
     formats: restrictedFormats,
-    innings: category === 'mvp' && innings !== 'all' ? innings : undefined,
+    innings: category === 'mvp' ? restrictedInnings?.[0] : undefined,
   }
 
   const rows = category === 'monthly'
