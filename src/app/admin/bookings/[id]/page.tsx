@@ -34,9 +34,26 @@ interface PostMatchStats {
   opponent_overs:   number | null
 }
 
+interface RecordedWaiver {
+  player_id:  string
+  name:       string
+  reason:     string
+  created_at: string
+}
+
 interface PostMatchData {
-  upload: PostMatchUpload | null
-  stats:  PostMatchStats | null
+  upload:  PostMatchUpload | null
+  stats:   PostMatchStats | null
+  waivers: RecordedWaiver[]
+}
+
+interface FeeSquadRow {
+  player_id: string
+  name:      string
+  exempt:    boolean
+  waived:    boolean
+  batted:    boolean
+  bowled:    boolean
 }
 
 interface FeePreview {
@@ -44,6 +61,7 @@ interface FeePreview {
   non_exempt_count: number
   fee_per_player:   number
   total_squad:      number
+  squad:            FeeSquadRow[]
 }
 
 type TournamentWithCaptain = {
@@ -122,6 +140,8 @@ export default function BookingDetailPage() {
   const [feeLoading,       setFeeLoading]        = useState(false)
   const [feeError,         setFeeError]          = useState('')
   const [feeConfirming,    setFeeConfirming]     = useState(false)
+  const [waivedIds,        setWaivedIds]         = useState<Set<string>>(new Set())
+  const [waiverReason,     setWaiverReason]      = useState('')
   const [scorecardOpen,    setScorecardOpen]     = useState(false)
   const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[]; fielding?: any[]; team_list?: any[] } | null>(null)
   const [scorecardSquad,   setScorecardSquad]    = useState<{ player_id: string; player_name: string; cricheroes_url: string | null }[] | undefined>(undefined)
@@ -184,14 +204,16 @@ export default function BookingDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPostMatchEligible, id])
 
-  useEffect(() => {
-    if (!postMatch?.upload || !['synced', 'fees_applied'].includes(postMatch.upload.status)) return
+  // Shared by the initial load and every waiver checkbox toggle — the
+  // per-head fee split is always recomputed server-side, never guessed
+  // client-side, so the preview stays authoritative even mid-selection.
+  function fetchFeePreview(waived: Set<string>) {
     setFeeLoading(true)
     setFeeError('')
-    fetch('/api/fees/apply', {
+    return fetch('/api/fees/apply', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ booking_id: id, confirm: false }),
+      body:    JSON.stringify({ booking_id: id, confirm: false, waived_player_ids: Array.from(waived) }),
     })
       .then(res => res.json().then(data => ({ ok: res.ok, data })))
       .then(({ ok, data }) => {
@@ -200,8 +222,25 @@ export default function BookingDetailPage() {
       })
       .catch(() => setFeeError('Network error'))
       .finally(() => setFeeLoading(false))
+  }
+
+  useEffect(() => {
+    if (!postMatch?.upload || !['synced', 'fees_applied'].includes(postMatch.upload.status)) return
+    setWaivedIds(new Set())
+    setWaiverReason('')
+    fetchFeePreview(new Set())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postMatch?.upload?.status, id])
+
+  function toggleWaive(playerId: string) {
+    setWaivedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(playerId)) next.delete(playerId)
+      else next.add(playerId)
+      fetchFeePreview(next)
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!scorecardOpen || scorecard || scorecardLoading) return
@@ -241,14 +280,24 @@ export default function BookingDetailPage() {
 
   async function handleApplyFees() {
     if (!feePreview) return
-    if (!confirm(`This will debit ₹${feePreview.fee_per_player} from ${feePreview.non_exempt_count} wallets. Continue?`)) return
+    if (waivedIds.size > 0 && !waiverReason.trim()) {
+      setFeeError('A reason is required when waiving a player from this match\'s fee.')
+      return
+    }
+    const waiverNote = waivedIds.size > 0 ? ` (${waivedIds.size} player${waivedIds.size > 1 ? 's' : ''} waived)` : ''
+    if (!confirm(`This will debit ₹${feePreview.fee_per_player} from ${feePreview.non_exempt_count} wallets${waiverNote}. Continue?`)) return
     setFeeConfirming(true)
     setFeeError('')
     try {
       const res = await fetch('/api/fees/apply', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ booking_id: id, confirm: true }),
+        body:    JSON.stringify({
+          booking_id: id,
+          confirm: true,
+          waived_player_ids: Array.from(waivedIds),
+          waiver_reason: waivedIds.size > 0 ? waiverReason.trim() : undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setFeeError(data.error ?? 'Failed to apply fees'); return }
@@ -751,16 +800,68 @@ export default function BookingDetailPage() {
                         <p className="font-rajdhani text-xs text-zinc-400">
                           ₹{feePreview.fee_per_player} per player · {feePreview.non_exempt_count} of {feePreview.total_squad} players
                         </p>
+
                         {postMatch.upload.status === 'fees_applied' ? (
-                          <p className="font-rajdhani text-xs text-emerald-400">
-                            ✓ Fees already applied
-                            {postMatch.upload.fees_applied_at && ` · ${new Date(postMatch.upload.fees_applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
-                          </p>
+                          <>
+                            <p className="font-rajdhani text-xs text-emerald-400">
+                              ✓ Fees already applied
+                              {postMatch.upload.fees_applied_at && ` · ${new Date(postMatch.upload.fees_applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
+                            </p>
+                            {postMatch.waivers.length > 0 && (
+                              <div className="mt-1 space-y-0.5">
+                                {postMatch.waivers.map(w => (
+                                  <p key={w.player_id} className="font-rajdhani text-xs text-amber-400">
+                                    ⓘ {w.name} waived — {w.reason}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </>
                         ) : (
-                          <button onClick={handleApplyFees} disabled={feeConfirming}
-                            className="font-rajdhani text-sm font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
-                            {feeConfirming ? 'Applying…' : `Apply Match Fees — ₹${feePreview.fee_per_player} · ${feePreview.non_exempt_count} players`}
-                          </button>
+                          <>
+                            {/* Per-match waiver checklist — separate from the standing
+                                fee_exemptions flag on /admin/players. A player already
+                                exempt there is shown but locked, since waiving them again
+                                would be redundant. See features/post-match-scorecard.md §16. */}
+                            <div className="space-y-1 bg-ink-4 border border-ink-5 rounded p-2.5">
+                              <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">
+                                Waive a player from this match's fee
+                              </p>
+                              {feePreview.squad.map(row => (
+                                <label key={row.player_id}
+                                  className={`flex items-center gap-2 py-0.5 ${row.exempt ? 'opacity-40' : 'cursor-pointer'}`}>
+                                  <input type="checkbox"
+                                    checked={row.exempt || row.waived}
+                                    disabled={row.exempt}
+                                    onChange={() => toggleWaive(row.player_id)}
+                                    className="w-3.5 h-3.5 accent-amber-600" />
+                                  <span className="font-rajdhani text-xs text-zinc-300">{row.name}</span>
+                                  {row.exempt && (
+                                    <span className="font-rajdhani text-[9px] font-bold text-zinc-500">standing exemption</span>
+                                  )}
+                                  {!row.exempt && (row.batted || row.bowled) && (
+                                    <span className="font-rajdhani text-[9px] text-emerald-500">
+                                      {row.batted && row.bowled ? 'batted & bowled' : row.batted ? 'batted' : 'bowled'}
+                                    </span>
+                                  )}
+                                  {!row.exempt && !row.batted && !row.bowled && (
+                                    <span className="font-rajdhani text-[9px] text-amber-500">no role recorded</span>
+                                  )}
+                                </label>
+                              ))}
+                              {waivedIds.size > 0 && (
+                                <input type="text" value={waiverReason}
+                                  onChange={e => setWaiverReason(e.target.value)}
+                                  placeholder="Reason — e.g. Did not bat or bowl"
+                                  className="form-input mt-1.5 text-xs" />
+                              )}
+                            </div>
+
+                            <button onClick={handleApplyFees} disabled={feeConfirming || feeLoading}
+                              className="font-rajdhani text-sm font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
+                              {feeConfirming ? 'Applying…' : `Apply Match Fees — ₹${feePreview.fee_per_player} · ${feePreview.non_exempt_count} players${waivedIds.size > 0 ? ` · ${waivedIds.size} waived` : ''}`}
+                            </button>
+                          </>
                         )}
                       </>
                     )}
