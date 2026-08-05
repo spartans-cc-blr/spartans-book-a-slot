@@ -61,6 +61,10 @@ export function PlayerStatsClient({
   const [groundId, setGroundId] = useState<string>('all')
   const [formats, setFormats] = useState<Set<Format>>(new Set<Format>(['T20', 'T30']))
   const [asCaptain, setAsCaptain] = useState(false)
+  // Practice games (the "Practice games" umbrella tournament) are excluded
+  // from stats by default — only real tournament fixtures count. This is
+  // the opt-in to see through that exclusion; off by default.
+  const [includePractice, setIncludePractice] = useState(false)
   // Defending = batted first, set a target. Chasing = batted second, chasing
   // the opponent's target. Derived from the analytics DB's toss_won/
   // toss_decision (see getInningsMatchIds() in src/lib/playerStats.ts).
@@ -73,7 +77,7 @@ export function PlayerStatsClient({
   const [statTab, setStatTab] = useState<StatTab>('batting')
 
   const fetchScoped = useCallback(async () => {
-    if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain && innings.size === 2) {
+    if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain && innings.size === 2 && !includePractice) {
       setScoped(initialCareer)
       setMatches(initialMatches)
       return
@@ -85,6 +89,7 @@ export function PlayerStatsClient({
     if (formats.size === 1) params.set('format', Array.from(formats)[0])
     if (asCaptain) params.set('captain', '1')
     if (innings.size === 1) params.set('innings', Array.from(innings)[0])
+    if (includePractice) params.set('practice', '1')
     const res = await fetch(`/api/players/${player.id}/match-history?${params.toString()}`)
     if (res.ok) {
       const d = await res.json()
@@ -92,7 +97,7 @@ export function PlayerStatsClient({
       setMatches(d.matches)
     }
     setLoading(false)
-  }, [year, groundId, formats, asCaptain, innings, player.id, initialCareer, initialMatches])
+  }, [year, groundId, formats, asCaptain, innings, includePractice, player.id, initialCareer, initialMatches])
 
   useEffect(() => { fetchScoped() }, [fetchScoped])
 
@@ -124,7 +129,7 @@ export function PlayerStatsClient({
     })
   }
 
-  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain || innings.size === 1
+  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain || innings.size === 1 || includePractice
 
   const tabMatches = useMemo(
     () => matches.filter(m => {
@@ -206,6 +211,11 @@ export function PlayerStatsClient({
               ${innings.has('chasing') ? 'text-gold-dim' : 'text-stone-500'}`}>
               <input type="checkbox" checked={innings.has('chasing')} onChange={() => toggleInnings('chasing')} className="accent-gold" />
               Chasing
+            </label>
+            <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
+              ${includePractice ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={includePractice} onChange={() => setIncludePractice(v => !v)} className="accent-gold" />
+              Include Practice Games
             </label>
           </div>
           <select value={groundId} onChange={e => setGroundId(e.target.value)}
