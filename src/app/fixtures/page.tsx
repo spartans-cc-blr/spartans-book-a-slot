@@ -96,7 +96,7 @@ export default async function FixturesPage() {
     .eq('status', 'announced')
   : { data: [] }
 
-  // Y-response counts per booking — powers the "In: N Y" nudge on the upcoming weekend's cards
+  // Y-response counts per booking — powers the "Slot open" nudge on the upcoming weekend's cards
   const { data: yAvailRows } = bookingIds.length ? await supabase
     .from('availability')
     .select('booking_id')
@@ -190,7 +190,7 @@ export default async function FixturesPage() {
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
 
-  // The nearest upcoming Sat/Sun weekend group — the "In: N Y" nudge is scoped to it only,
+  // The nearest upcoming Sat/Sun weekend group — the "Slot open" nudge is scoped to it only,
   // never to a weekday game or a later weekend (bookingsWithStatus is already date-ascending)
   const upcomingWeekendKey = bookingsWithStatus
     .map(b => validationGroupKey((b as any).game_date))
@@ -225,7 +225,7 @@ export default async function FixturesPage() {
         isLoggedInPlayerExempt:   isExempt,
         loggedInWalletBalance:    runningWalletBalance,
         yCount:                   yCountMap[b.id] ?? 0,
-        showYCount:               wk === upcomingWeekendKey,
+        isUpcomingWeekendSlot:    wk === upcomingWeekendKey,
       },
       hasDues:                 hasDues,
       slotLocked:              (b as any).availability_locked ?? false,
