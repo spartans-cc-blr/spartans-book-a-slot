@@ -33,6 +33,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const inningsParam = searchParams.get('innings')
   const innings: 'defending' | 'chasing' | undefined =
     inningsParam === 'defending' || inningsParam === 'chasing' ? inningsParam : undefined
+  // Practice games are excluded from stats by default (see getScopedMatchIds
+  // in src/lib/playerStats.ts) — this is the personal stats page's explicit
+  // opt-in to see through that exclusion.
+  const includePractice = searchParams.get('practice') === '1'
   const year = yearParam ? Number(yearParam) : undefined
   const filters = {
     year: Number.isFinite(year) && year ? year : undefined,
@@ -42,6 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     formats: formatParam ? [formatParam] : undefined,
     asCaptain,
     innings,
+    includePractice,
   }
 
   const supabase = createServiceClient()

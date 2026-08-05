@@ -275,7 +275,10 @@ its existing callers."
 | File | Role |
 |---|---|
 | `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`), glossary building |
-| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form |
+| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10) |
+| `src/components/players/PlayerStatsClient.tsx` | `/players/[id]/stats` filter bar — Year/Ground/Format/As Captain/Defending/Chasing, plus the "Include Practice Games" opt-in (§10) |
+| `src/app/api/players/[id]/match-history/route.ts` | Feeds `PlayerStatsClient.tsx` — parses `practice=1` into `includePractice` (§10) |
+| `supabase/migrations/054_tournament_is_practice.sql` | `tournaments.is_practice` flag (§10) |
 | `src/lib/leaderboardMilestones.ts` | Plain thresholds/tie-handling module (§7) — the fix for §8's incident |
 | `src/lib/leaderboardGlossary.ts` | `buildOverallGlossary()`/`buildMonthlyGlossary()`/`buildDetailedGlossary()` — server-side, quotes real thresholds |
 | `src/components/leaderboard/LeaderboardFilters.tsx` | Nav tree + filter bar (§2) — pushes `searchParams`, page re-fetches server-side |
@@ -291,7 +294,61 @@ its existing callers."
 
 ---
 
-## 10. Explicitly Out of Scope
+## 10. Practice Games Exclusion (added August 2026)
+
+**Only real tournament fixtures count as stats.** The club runs an
+umbrella "Practice games" tournament (`tournaments.name = 'Practice
+games'`, no `ground_id` of its own — see `getScopedMatchIds()`'s existing
+ground-union comment in `src/lib/playerStats.ts`) for informal games that
+were never meant to feed the leaderboard or a player's career record.
+
+**Schema:** `tournaments.is_practice boolean not null default false`
+(migration `054_tournament_is_practice.sql`), set `true` on that one row.
+A flag rather than a hardcoded name match, so a future rename of the
+tournament — or a second practice-style umbrella tournament — doesn't
+silently break the exclusion.
+
+**Where it's enforced — `getScopedMatchIds()` in `src/lib/playerStats.ts`:**
+every caller of this shared resolver (`getLeaderboard()`, `getPerformances()`,
+`getPlayerStats()`, `getPlayerMatchHistory()`) excludes bookings under any
+`is_practice` tournament by default. Two ways to see through the exclusion,
+both already-established patterns in this file rather than new concepts:
+
+1. **An explicit `tournamentId` filter always wins.** Scoping to one
+   specific tournament (whichever one that is) is a deliberate, narrow
+   request, not a default aggregate — so `/admin/stats` and
+   `/tournament-planner` can still show a per-tournament breakdown for the
+   Practice games tournament itself if someone explicitly picks it there.
+2. **`includePractice` — the personal stats page's opt-in.** `/players/[id]/stats`
+   (`PlayerStatsClient.tsx`) has an "Include Practice Games" checkbox next
+   to Defending/Chasing, **off by default** — same both-checked/one-checked
+   convention as every other filter on that page, except this one starts
+   unchecked. Threaded through `GET /api/players/[id]/match-history`'s
+   `practice=1` query param into `getPlayerStats()`/`getPlayerMatchHistory()`.
+   The compact "My Stats" summary on `/profile` (`getPlayerCareerStats()`/
+   `getPlayerSeasonStats()`, no filter UI at all) always excludes practice
+   games — there's no toggle there, only a link to the Full Stats page.
+
+**Leaderboard itself has no toggle** — `/leaderboard` always excludes
+practice games, and `getFilterOptions()` drops the Practice games
+tournament from the Tournament dropdown entirely (both the unrestricted
+and format-restricted branches), so it isn't offered as something to
+scope to from that page.
+
+**Deliberately unaffected:** `getPlayerBookingContextStats()` (the
+Captains' Corner "Form" panel's tournament/ground/format context stats)
+does **not** go through `getScopedMatchIds()` — it has its own
+`matchIdsForFilter()` — and intentionally still counts practice matches
+played at a given ground, per the existing documented ground-union
+rationale (a captain checking a player's form at a specific ground cares
+about every game played there, practice included). `getRecentForm()`
+(Captains' Corner recent-form strip) is also unchanged — "last N matches"
+there is about picking a squad from recent activity, not a stats ranking,
+and wasn't part of this change.
+
+---
+
+## 11. Explicitly Out of Scope
 
 - No write path anywhere in this feature — pure read/display.
 - Monthly tab's cards remain single-winner (`bestBy`) — ties there weren't
