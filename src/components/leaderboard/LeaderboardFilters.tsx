@@ -35,6 +35,12 @@ export type HonorCategory = 'overall' | 'monthly'
 export type LeaderboardCategory = HonorCategory | TableCategory
 
 export type Format = 'T20' | 'T30'
+// Defending = our team batted first and set a target. Chasing = our team
+// batted second, chasing the target. Only surfaced on Detailed → MVP — see
+// LeaderboardTable.tsx's MVP tab and getLeaderboard()'s innings scoping in
+// src/lib/playerStats.ts (same toss_won/toss_decision derivation as the
+// player stats page's Defending/Chasing filter).
+export type Innings = 'all' | 'defending' | 'chasing'
 
 const DETAILED_LABEL: Record<TableCategory, string> = {
   mvp: 'MVP', batting: 'Bat', bowling: 'Bowl', fielding: 'Field',
@@ -94,10 +100,11 @@ interface Props {
   tournamentId: string | 'all'
   groundId:     string | 'all'
   formats:      Set<Format>
+  innings:      Innings
   category:     LeaderboardCategory
 }
 
-export function LeaderboardFilters({ years, months, tournaments, grounds, year, month, tournamentId, groundId, formats, category }: Props) {
+export function LeaderboardFilters({ years, months, tournaments, grounds, year, month, tournamentId, groundId, formats, innings, category }: Props) {
   const router = useRouter()
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
 
@@ -111,7 +118,7 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
   // down to one year on top would usually just produce an empty result.
   const showYear = topGroup === 'detailed' || category === 'overall'
 
-  function navigate(next: Partial<{ year: string; month: string; tournament: string; ground: string; category: string; format: string }>) {
+  function navigate(next: Partial<{ year: string; month: string; tournament: string; ground: string; category: string; format: string; innings: string }>) {
     const params = new URLSearchParams({
       year: String(year),
       month,
@@ -121,11 +128,13 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
       // Carry the current format restriction forward on unrelated
       // navigations (e.g. changing Tournament shouldn't reset Format).
       ...(formats.size === 1 ? { format: Array.from(formats)[0] } : {}),
+      ...(innings !== 'all' ? { innings } : {}),
       ...next,
     })
     // toggleFormat() passes format: '' to mean "back to no restriction" —
     // an empty query param isn't the same as an absent one, so strip it.
     if (next.format === '') params.delete('format')
+    if (next.innings === '') params.delete('innings')
     router.push(`/leaderboard?${params.toString()}`)
   }
 
@@ -142,6 +151,16 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
     navigate({ format: next.size === 1 ? Array.from(next)[0] : '' })
   }
 
+  // Mutually exclusive checkbox pair, mirroring toggleFormat()'s shape —
+  // clicking the already-checked one clears back to 'all'. Only ever
+  // rendered when category === 'mvp' (see Row 2 below), and resetting on
+  // every other sub-tab selection (selectDetailedSub / selectHonorSub)
+  // keeps a stale value from silently scoping a table it's no longer shown
+  // next to.
+  function toggleInnings(v: Exclude<Innings, 'all'>) {
+    navigate({ innings: innings === v ? '' : v })
+  }
+
   // Monthly is a strictly month-scoped view — its own stepper is the
   // timeframe control, so tournament/ground get forced back to "all" (and
   // hidden entirely, see Row 3 below) whenever it's selected. Overall does
@@ -150,10 +169,13 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
   // it deliberately does NOT reset them — whatever was selected on
   // Detailed carries over.
   function selectHonorSub(sub: HonorCategory) {
-    navigate(sub === 'monthly' ? { category: sub, tournament: 'all', ground: 'all' } : { category: sub })
+    navigate(sub === 'monthly' ? { category: sub, tournament: 'all', ground: 'all', innings: '' } : { category: sub, innings: '' })
   }
   function selectDetailedSub(sub: TableCategory) {
-    navigate({ category: sub })
+    // Defending/Chasing only ever shows next to MVP — clear it on every
+    // other sub-tab so it can't keep scoping a table it's no longer
+    // visibly filtering.
+    navigate(sub === 'mvp' ? { category: sub } : { category: sub, innings: '' })
   }
   // Clicking a top-level branch button jumps to that branch's default
   // sub-tab — but only when actually switching branches, so re-clicking
@@ -187,6 +209,23 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
       </label>
     </div>
   )
+
+  // Detailed → MVP only. Sits ahead of the T20/T30 checkboxes on the same
+  // line — see Row 2 below.
+  const inningsCheckboxes = category === 'mvp' ? (
+    <div className="flex items-center gap-2 flex-shrink-0">
+      <label className={`flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-widest uppercase cursor-pointer select-none
+        ${innings === 'defending' ? 'text-gold' : 'text-zinc-500'}`}>
+        <input type="checkbox" checked={innings === 'defending'} onChange={() => toggleInnings('defending')} className="accent-gold" />
+        Defending
+      </label>
+      <label className={`flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-widest uppercase cursor-pointer select-none
+        ${innings === 'chasing' ? 'text-gold' : 'text-zinc-500'}`}>
+        <input type="checkbox" checked={innings === 'chasing'} onChange={() => toggleInnings('chasing')} className="accent-gold" />
+        Chasing
+      </label>
+    </div>
+  ) : null
 
   return (
     <div className="flex flex-col gap-2 mb-5">
@@ -223,7 +262,10 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
               <button key={c} onClick={() => selectDetailedSub(c)} className={pillClass(category === c)}>{DETAILED_LABEL[c]}</button>
             ))}
           </div>
-          {formatCheckboxes}
+          <div className="flex items-center gap-2 flex-wrap">
+            {inningsCheckboxes}
+            {formatCheckboxes}
+          </div>
         </div>
       )}
 
