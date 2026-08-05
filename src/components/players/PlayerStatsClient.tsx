@@ -195,6 +195,8 @@ export function PlayerStatsClient({
               <input type="checkbox" checked={asCaptain} onChange={() => setAsCaptain(v => !v)} className="accent-gold" />
               As Captain
             </label>
+          </div>
+          <div className="flex gap-2 items-center flex-shrink-0">
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
               ${innings.has('defending') ? 'text-gold-dim' : 'text-stone-500'}`}>
               <input type="checkbox" checked={innings.has('defending')} onChange={() => toggleInnings('defending')} className="accent-gold" />
