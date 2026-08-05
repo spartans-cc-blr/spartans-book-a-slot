@@ -15,7 +15,17 @@ import type { Metadata } from 'next'
 // one entry per deficient slot bucket rather than a capped flat list.
 const SHARE_CARD_SUGGESTION_COUNT = 3
 
-export const revalidate = 300 // 5 min cache — public page
+// Always rendered fresh — no ISR cache. This page used to carry
+// `revalidate = 300` (5 min), which caused a real staleness bug: an admin
+// editing the tournament from /tournament-planner and immediately opening
+// the share link would sometimes see the pre-edit render (Next serves the
+// stale cached HTML on the first hit after expiry while regenerating in
+// the background — classic stale-while-revalidate — so only a follow-up
+// refresh picked up the change). Given how few visits this page actually
+// gets (an occasional organiser open, or an admin sanity-checking right
+// after a change), correctness beats the marginal Supabase-read savings.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function generateMetadata(
   { params }: { params: { tournamentId: string } }
@@ -43,15 +53,24 @@ export default async function TournamentSharePage({
   // silently and made every booking fetch below return nothing).
   const { data: rawTournament } = await supabase
     .from('tournaments')
-    .select('id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, organiser_self_service, cricheroes_points_table_url, captains!tournaments_captain_id_fkey(id, name)')
+    .select('id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, organiser_self_service, cricheroes_points_table_url, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))')
     .eq('id', params.tournamentId)
     .single()
 
   if (!rawTournament) redirect('/')
 
+  const rawCaptain = Array.isArray(rawTournament.captains) ? rawTournament.captains[0] ?? null : rawTournament.captains
+  // captains.player_id is nullable (legacy rows) — no linked player means
+  // no CricHeroes URL to show, same as any other player without one.
+  const captainPlayer = rawCaptain
+    ? (Array.isArray(rawCaptain.players) ? rawCaptain.players[0] ?? null : rawCaptain.players)
+    : null
+
   const tournament = {
     ...rawTournament,
-    captain: Array.isArray(rawTournament.captains) ? rawTournament.captains[0] ?? null : rawTournament.captains,
+    captain: rawCaptain
+      ? { id: rawCaptain.id, name: rawCaptain.name, cricheroes_url: captainPlayer?.cricheroes_url ?? null }
+      : null,
   }
 
   // Fetch confirmed bookings for this tournament

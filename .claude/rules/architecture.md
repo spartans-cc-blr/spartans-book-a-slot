@@ -53,7 +53,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/schedule` | Server component | `bookings` (confirmed + soft_block, non-cancelled) |
 | `/fixtures` | Server component + `FixturesWeekendGroup` (client) | `bookings`, `availability`, `squad` (announced only) |
 | `/fixtures/[id]` | Server component | Single booking + squad; auth-gated share URL |
-| `/tournament-planner/share/[tournamentId]` | Public server component (`revalidate=300`) | Single tournament slot-balance card for WhatsApp sharing with organisers; no auth |
+| `/tournament-planner/share/[tournamentId]` | Public server component (`dynamic='force-dynamic'`, no ISR cache — see `features/organiser-self-service.md` §10) | Single tournament slot-balance card for WhatsApp sharing with organisers; no auth |
 | `/login` | NextAuth sign-in page | Google OAuth |
  
 ### Player Routes (auth required)
@@ -463,6 +463,8 @@ players.cricheroes_url (set by player on /profile)
       - SelectablePlayerRow in CaptainsCornerGrid (per-slot view)
       - MatrixView column headers (Captains Corner)
       - FixturesCard announced squad panel
+      - TournamentPlannerClient — captain name, squad player names (via PlayerNameLink, internal/authenticated)
+      - TournamentShareCard — captain name only (public/unauthenticated — plain <a> to the external URL, never PlayerNameLink's playerId branch; see features/organiser-self-service.md)
       - (pending) availability grids, squad announcements
   → e.stopPropagation() prevents link click from triggering checkbox
 ```
@@ -630,7 +632,7 @@ Next.js API Routes (server-side)
 | `src/app/api/tournaments/route.ts` | Tournament CRUD; POST explicitly destructures `cricheroes_points_table_url`; PATCH spreads full body |
 | `src/components/admin/GCReviewClient.tsx` | Fairness check table; per-slot approval panels |
 | `src/app/tournament-planner/page.tsx` | Captain/GC/Admin server page — feeds `TournamentPlannerClient`; caps `.in()` at 100 booking IDs (S-4 partial fix); admin-only knockout qualification nudge + existing-hold lookup — see `features/knockout-day-protection.md` |
-| `src/app/tournament-planner/share/[tournamentId]/page.tsx` | Public server page (`revalidate=300`) — `TournamentShareCard` for WhatsApp sharing with tournament organisers; branches between `getSuggestedOpenDates` and `getSuggestedSlotDates` based on `tournament.organiser_self_service` — see `features/organiser-self-service.md` |
+| `src/app/tournament-planner/share/[tournamentId]/page.tsx` | Public server page (`dynamic='force-dynamic'`, no ISR cache) — `TournamentShareCard` for WhatsApp sharing with tournament organisers; branches between `getSuggestedOpenDates` and `getSuggestedSlotDates` based on `tournament.organiser_self_service` — see `features/organiser-self-service.md` |
 | `src/components/tournament-planner/TournamentPlannerClient.tsx` | Bandwidth meter, per-tournament pace timeline, `InlineGameCountEditor` (admin-only inline edit of `total_league_games`), WhatsApp nudge links; tournament name links to CricHeroes points table if URL set; admin-only knockout awareness block |
 | `src/components/tournament-planner/TournamentShareCard.tsx` | Public-facing single tournament slot-balance card; `count/target` per-slot display; tournament name links to CricHeroes points table if `cricheroes_points_table_url` set (§8.5); renders `OrganiserSelfService` when the tournament has self-service enabled |
 | `src/components/tournament-planner/OrganiserSelfService.tsx` | Public, unauthenticated per-slot-bucket reserve/decline/attach-URL widget — see `features/organiser-self-service.md` |

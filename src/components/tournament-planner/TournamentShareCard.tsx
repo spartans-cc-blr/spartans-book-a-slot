@@ -48,7 +48,7 @@ interface Tournament {
   vc_captain_id: string | null
   organiser_self_service: boolean
   cricheroes_points_table_url: string | null
-  captain: { id: string; name: string } | null
+  captain: { id: string; name: string; cricheroes_url: string | null } | null
 }
 
 export function TournamentShareCard({
@@ -160,7 +160,19 @@ export function TournamentShareCard({
             </div>
             <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
               {tournament.captain && (
-                <>Captain: <span className="text-ink font-semibold">{tournament.captain.name}</span> &nbsp;·&nbsp; </>
+                <>Captain:{' '}
+                  {tournament.captain.cricheroes_url ? (
+                    // Public unauthenticated page — deliberately not
+                    // PlayerNameLink, which would send an anonymous
+                    // organiser to a login-gated /players/[id]/stats page.
+                    // Links straight to the external CricHeroes profile.
+                    <a href={tournament.captain.cricheroes_url} target="_blank" rel="noopener noreferrer"
+                      className="text-ink font-semibold underline decoration-dotted underline-offset-2 hover:text-gold-dim transition-colors">
+                      {tournament.captain.name}
+                    </a>
+                  ) : (
+                    <span className="text-ink font-semibold">{tournament.captain.name}</span>
+                  )} &nbsp;·&nbsp; </>
               )}
               Avg gap: <span className="text-ink font-semibold">
                 {avgGap !== null ? `${avgGap} week${avgGap !== 1 ? 's' : ''}` : 'N/A'}
