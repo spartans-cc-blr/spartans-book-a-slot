@@ -44,3 +44,27 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true })
 }
+
+export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!user?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+
+  const body = await req.json().catch(() => ({}))
+  const { endpoint } = body ?? {}
+  if (!endpoint) return NextResponse.json({ error: 'endpoint is required' }, { status: 400 })
+
+  const supabase = createServiceClient()
+
+  // Scoped to the caller's own player_id — a player can only ever remove
+  // their own subscription rows, never an arbitrary endpoint.
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .delete()
+    .eq('player_id', user.playerId)
+    .eq('endpoint', endpoint)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ ok: true })
+}
