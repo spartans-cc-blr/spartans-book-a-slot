@@ -390,18 +390,29 @@ Nearest hospital URL
  
 Announced squad display for all logged-in players. Squad section collapsed by default. Expanded view shows players sorted **alphabetically by full name** with C / VC / WK role badges. Player names link to their CricHeroes profile if `cricheroes_url` is set. Jersey number, jersey name, and primary skill are intentionally excluded on the main fixtures page — the squad fetch selects only `id, name, cricheroes_url` from `players`, plus `is_match_captain, is_vc, is_wk` from the squad row.
 
-**"In: N Y" availability nudge (added August 2026):** a small bottom-left line on
-the card — `In: <count> Y` — showing how many players have marked `Y` availability
-for that specific game. Scoped server-side in `src/app/fixtures/page.tsx` to the
-**nearest upcoming Sat/Sun weekend group only** (`upcomingWeekendKey`, the first
+**"Slot open" availability nudge (added August 2026):** a small bottom-left line
+on the card — `⚠ Slot open` — shown whenever fewer than 12 players have marked
+`Y` availability for that specific game. Deliberately **Y-count only** — O and E
+responses are real availability signals too, but they're shared across other
+slots that weekend/day (a captain can only place a given O/E responder in one of
+them), so folding them in would require solving a cross-slot assignment/matching
+problem rather than simple per-slot arithmetic. Y-only was chosen as a cheap,
+slightly-over-eager heuristic in place of that: it can flag a slot as "open" that
+would in practice fill fine off O/E responses, but never silently misses a real
+gap. Scoped server-side in `src/app/fixtures/page.tsx` to the **nearest upcoming
+Sat/Sun weekend group only** (`upcomingWeekendKey`, the first
 `validationGroupKey()` result prefixed `weekend-` among date-ascending confirmed
 bookings) — never shown on a weekday game or a later weekend's cards. `yCount` is
 a plain per-booking tally of `availability` rows where `response = 'Y'`, fetched
-once for all active booking IDs and passed down via `cardData`. The row hides only
-once the squad has been **announced with a full 12 players** (`squadAnnounced &&
-squad.length >= 12`, `squad` here being the already-announced-only rows from
-`squadMap`) — a draft/pending/approved squad, or an announced squad below 12,
-keeps showing it. Purely a read of existing `availability` data; no new write path.
+once for all active booking IDs and passed down via `cardData`, then kept live
+client-side in `FixturesWeekendGroup` (nudged up/down as the signed-in player's
+own response crosses in/out of `Y`, so a toggle reflects immediately without a
+page reload). The flag is **squad-status-independent** — it keeps showing straight
+through draft/pending/approved/announced, regardless of announced squad size —
+and is gated purely on `matchStatus !== 'in_progress'` (i.e. it disappears once
+the match itself starts, not when a squad is announced) and `yCount < 12`. At 12
+or more Y responses, nothing is shown at all. Purely a read of existing
+`availability` data; no new write path.
  
 ---
  
