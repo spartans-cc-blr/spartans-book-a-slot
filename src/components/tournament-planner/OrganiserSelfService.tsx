@@ -163,7 +163,7 @@ export function OrganiserSelfService({
   )}`
 
   return (
-    <div className="mt-3 pt-3 border-t border-parchment-3">
+    <div>
       <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-1">
         Reserve your next dates
       </p>

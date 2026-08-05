@@ -188,6 +188,19 @@ the horizon is declined):
 - **Held state** → CricHeroes URL input + submit → `organiser-attach-url`
   → `done`.
 
+### Section order on the card — Reserve ahead of Schedule
+
+`TournamentShareCard.tsx` renders this widget (or, for non-self-service
+tournaments, the plain WhatsApp-enquiry list) directly under the stat bar,
+**above** the Schedule section — moved up from its original position after
+the game list. What an organiser can actually act on today is the reason
+they're looking at the card at all; the completed/already-booked schedule
+below it is reference material, not the thing they came to do. Both
+variants dropped the `mt-3 pt-3 border-t` spacing they used when they were
+appended after the game list — each is now the sole content of its own
+top-level `px-4 py-3 border-b` section, matching every other section on
+the card (Stat bar, Schedule, Game timeline, Slot balance).
+
 ### Slot balance parity — `TournamentShareCard.tsx`
 
 The public share card's own "Slot balance" section previously showed a

@@ -186,6 +186,48 @@ export function TournamentShareCard({
         ))}
       </div>
 
+      {/* Reserve your next dates — surfaced ahead of the Schedule list below
+          so an organiser sees what's actually actionable right now (or, for
+          self-service tournaments, what they can book immediately) before
+          scrolling past the already-played/already-booked schedule to find
+          it. Self-service tournaments get the interactive per-slot-bucket
+          reserve/decline flow (one card per slot below its target — see
+          getSuggestedSlotDates); everyone else keeps the plain fully-open-day
+          WhatsApp enquiry link, mirroring /schedule's pattern. Only shown
+          when there's actually something left to book. */}
+      {unbooked > 0 && tournament.organiser_self_service && suggestedBuckets.length > 0 && (
+        <div className="px-4 py-3 border-b border-parchment-3">
+          <OrganiserSelfService
+            tournamentId={tournament.id}
+            buckets={suggestedBuckets}
+            waNumber={waNumber}
+            defaultName={tournament.organiser_name}
+            defaultPhone={tournament.organiser_contact}
+          />
+        </div>
+      )}
+      {unbooked > 0 && !tournament.organiser_self_service && suggestedDates.length > 0 && (
+        <div className="px-4 py-3 border-b border-parchment-3">
+          <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-2">
+            Next available dates
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {suggestedDates.map(s => (
+              <a key={s.game_date} href={suggestedDateWaLink(s)} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 hover:bg-emerald-100 transition-colors">
+                <span className="font-rajdhani text-xs font-semibold text-emerald-800">
+                  {s.day} {format(parseISO(s.game_date), 'd MMM')}
+                </span>
+                <span className="flex items-center gap-1.5 text-emerald-700">
+                  {WA_ICON}
+                  <span className="font-rajdhani text-[11px] font-bold">Book this date</span>
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Game list */}
       <div className="px-4 py-3 border-b border-parchment-3">
         <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">
@@ -211,7 +253,7 @@ export function TournamentShareCard({
                 </div>
                 <div className="px-2.5 py-2 flex flex-col items-start justify-center gap-0.5 min-w-0">
                   <p className="font-rajdhani text-[10px] text-stone-500">{dayName} · {g.slot_time}</p>
-                  <p className="font-rajdhani text-[13px] font-semibold text-ink truncate">
+                  <p className="font-rajdhani text-[13px] font-semibold text-ink truncate w-full min-w-0">
                     vs {g.opponent_name || 'TBD'}
                     {formats.length > 1 && <span className="text-stone-400 font-normal"> · {g.format}</span>}
                   </p>
@@ -238,47 +280,10 @@ export function TournamentShareCard({
           })}
           {/* No per-game "Game N — not yet booked" placeholder rows here —
               the UNBOOKED stat chip above already says the count, and the
-              Reserve section below (or the plain WhatsApp list) already
-              says which slots specifically, with far more actionable
-              detail than a repeated dashed placeholder line ever did. */}
+              Reserve section above already says which slots specifically,
+              with far more actionable detail than a repeated dashed
+              placeholder line ever did. */}
         </div>
-
-        {/* Next available dates. Self-service tournaments get the
-            interactive per-slot-bucket reserve/decline flow (one card per
-            slot below its target — see getSuggestedSlotDates); everyone
-            else keeps the plain fully-open-day WhatsApp enquiry link,
-            mirroring /schedule's pattern. Only shown when there's actually
-            something left to book. */}
-        {unbooked > 0 && tournament.organiser_self_service && suggestedBuckets.length > 0 && (
-          <OrganiserSelfService
-            tournamentId={tournament.id}
-            buckets={suggestedBuckets}
-            waNumber={waNumber}
-            defaultName={tournament.organiser_name}
-            defaultPhone={tournament.organiser_contact}
-          />
-        )}
-        {unbooked > 0 && !tournament.organiser_self_service && suggestedDates.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-parchment-3">
-            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-2">
-              Next available dates
-            </p>
-            <div className="flex flex-col gap-1.5">
-              {suggestedDates.map(s => (
-                <a key={s.game_date} href={suggestedDateWaLink(s)} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 hover:bg-emerald-100 transition-colors">
-                  <span className="font-rajdhani text-xs font-semibold text-emerald-800">
-                    {s.day} {format(parseISO(s.game_date), 'd MMM')}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-emerald-700">
-                    {WA_ICON}
-                    <span className="font-rajdhani text-[11px] font-bold">Book this date</span>
-                  </span>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Game timeline — pace view. Needs 2+ real games to plot a line
