@@ -65,13 +65,22 @@ export default function ProfilePage() {
   const [error,    setError]    = useState('')
 
   const [pushSubscribed, setPushSubscribed] = useState(false)
+  const [pushServerSubscribed, setPushServerSubscribed] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
   const [pushSuccess, setPushSuccess] = useState(false)
+  const [pushError, setPushError] = useState('')
 
   async function subscribeToPush() {
-  if (!('serviceWorker' in navigator)) return
-  if (!('PushManager' in window)) return
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    setPushError('Push notifications are not supported in this browser.')
+    return
+  }
+  if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+    setPushError('Notifications are blocked for this site — enable them in your browser/device settings, then try again.')
+    return
+  }
   setPushLoading(true)
+  setPushError('')
   try {
     const reg = await navigator.serviceWorker.register('/sw.js')
     await navigator.serviceWorker.ready
@@ -86,11 +95,20 @@ export default function ProfilePage() {
     })
     if (res.ok) {
       setPushSubscribed(true)
+      setPushServerSubscribed(true)
       setPushSuccess(true)
       setTimeout(() => setPushSuccess(false), 3000)
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setPushError(d.error ?? 'Could not save your subscription. Please try again.')
     }
   } catch (err: any) {
     console.error('Push subscription error:', err)
+    setPushError(
+      err?.name === 'NotAllowedError'
+        ? 'Notification permission was not granted — allow notifications for this site and try again.'
+        : 'Could not enable notifications on this device. Please try again.'
+    )
   } finally {
     setPushLoading(false)
   }
@@ -158,13 +176,22 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function checkSubscription() {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-      const reg = await navigator.serviceWorker.ready
-      const existing = await reg.pushManager.getSubscription()
-      if (existing) setPushSubscribed(true)
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const reg = await navigator.serviceWorker.ready
+        const existing = await reg.pushManager.getSubscription()
+        if (existing) setPushSubscribed(true)
+      }
     }
     checkSubscription()
   }, [])
+
+  useEffect(() => {
+    if (!player?.playerId) return
+    fetch('/api/push/subscribe')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.subscribed) setPushServerSubscribed(true) })
+      .catch(() => {})
+  }, [player?.playerId])
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -460,10 +487,25 @@ export default function ProfilePage() {
               disabled={pushSubscribed || pushLoading}
               className="font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded transition-colors"
             >
-              {pushLoading ? 'Enabling...' : pushSubscribed ? '✓ Notifications enabled' : '🔔 Subscribe to notifications'}
+              {pushLoading
+                ? 'Enabling...'
+                : pushSubscribed
+                ? '✓ Notifications enabled'
+                : pushServerSubscribed
+                ? '🔔 Re-enable notifications on this device'
+                : '🔔 Subscribe to notifications'}
             </button>
+            {!pushSubscribed && pushServerSubscribed && !pushLoading && (
+              <p className="font-rajdhani text-[11px] text-amber-400 mt-1.5">
+                We have a notification subscription on file for you, but this device/browser has lost it
+                (common on iPhone if the Hub icon hasn't been opened in a while) — tap above to refresh it.
+              </p>
+            )}
             {pushSuccess && (
               <p className="font-rajdhani text-[11px] text-emerald-400 mt-1.5">You'll be notified when you're selected in a squad.</p>
+            )}
+            {pushError && (
+              <p className="font-rajdhani text-[11px] text-crimson mt-1.5">{pushError}</p>
             )}
           </div>
           <p className="font-rajdhani text-[10px] text-zinc-700 mt-3 italic">
