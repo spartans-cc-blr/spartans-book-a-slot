@@ -195,7 +195,7 @@ export default async function LeaderboardPage({
         )}
 
         <p className="font-rajdhani text-xs text-zinc-500 text-center mt-8 px-4">
-          Stats are synced from CricHeroes, a third-party platform, on a best-effort basis. Small discrepancies may appear from time to time — we're actively working to catch these up.
+          Stats are synced from CricHeroes, a third-party platform, on a best-effort basis. Small discrepancies may appear from time to time — we're actively working to catch these up. Practice games are excluded — only real tournament fixtures count towards these numbers.
         </p>
 
         <LeaderboardGlossary title={glossaryTitle} entries={glossaryEntries} />
