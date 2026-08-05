@@ -76,14 +76,20 @@ export async function POST(req: NextRequest) {
 
     if (error) errors.push(`${row.player_id}: ${error.message}`)
 
-    // Record wallet transaction
-    await supabase.from('wallet_transactions').insert({
+    // Record wallet transaction — wallet_transactions.type only allows
+    // 'debit'/'credit' and the free-text column is `reason`, not `note`;
+    // this insert previously violated both silently (error was never
+    // checked), so every fee-apply left the ledger empty. amount is a
+    // positive magnitude here, matching POST /api/wallet/transactions'
+    // convention — direction comes from `type`, not the sign.
+    const { error: txError } = await supabase.from('wallet_transactions').insert({
       player_id:   row.player_id,
-      amount:      -feePerPlayer,
-      type:        'match_fee',
+      amount:      feePerPlayer,
+      type:        'debit',
       booking_id,
-      note:        `Match fee debit — ₹${feePerPlayer}`,
+      reason:      `Match fee debit — ₹${feePerPlayer}`,
     })
+    if (txError) errors.push(`${row.player_id} (ledger): ${txError.message}`)
   }
 
   if (errors.length) {

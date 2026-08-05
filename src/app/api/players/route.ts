@@ -77,9 +77,15 @@ export async function POST(request: Request) {
 const PLAYER_COLUMNS = new Set([
   'name', 'gmail_id', 'whatsapp', 'dob', 'jersey_name', 'jersey_number',
   'blood_group', 'primary_skill', 'secondary_skill', 'cricheroes_url',
-  'photo_url', 'wallet_balance', 'inducted_on', 'referred_by',
+  'photo_url', 'inducted_on', 'referred_by',
   'is_captain', 'is_gc', 'is_wrangler', 'dues_override',
   // 'status' intentionally excluded — cron-managed; admin uses expel action only
+  // 'wallet_balance' intentionally excluded — see security.md §10 (S-1).
+  // Balance changes now only go through POST /api/wallet/transactions,
+  // which writes an immutable ledger row and pushes the player a
+  // notification. This route would otherwise silently drop a client-sent
+  // wallet_balance anyway (not in this Set), but excluding it explicitly
+  // documents that the omission is deliberate, not an oversight.
 ])
 
 export async function PATCH(request: Request) {
