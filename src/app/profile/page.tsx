@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SiteNav } from '@/components/ui/SiteNav'
 import type { PlayerStatsTotals } from '@/types'
+import { hasLocalPushSubscription, subscribeToPush as subscribeToPushBrowser, unsubscribeFromPush as unsubscribeFromPushBrowser } from '@/lib/pushSubscription'
 
 const SKILLS = [
   'Right Hand Opening Batsman',
@@ -71,48 +72,37 @@ export default function ProfilePage() {
   const [pushError, setPushError] = useState('')
 
   async function subscribeToPush() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    setPushError('Push notifications are not supported in this browser.')
-    return
-  }
-  if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
-    setPushError('Notifications are blocked for this site — enable them in your browser/device settings, then try again.')
-    return
-  }
-  setPushLoading(true)
-  setPushError('')
-  try {
-    const reg = await navigator.serviceWorker.register('/sw.js')
-    await navigator.serviceWorker.ready
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-    })
-    const res = await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sub.toJSON()),
-    })
-    if (res.ok) {
+    setPushLoading(true)
+    setPushError('')
+    const result = await subscribeToPushBrowser()
+    if (result.ok) {
       setPushSubscribed(true)
       setPushServerSubscribed(true)
       setPushSuccess(true)
       setTimeout(() => setPushSuccess(false), 3000)
     } else {
-      const d = await res.json().catch(() => ({}))
-      setPushError(d.error ?? 'Could not save your subscription. Please try again.')
+      setPushError(result.error)
     }
-  } catch (err: any) {
-    console.error('Push subscription error:', err)
-    setPushError(
-      err?.name === 'NotAllowedError'
-        ? 'Notification permission was not granted — allow notifications for this site and try again.'
-        : 'Could not enable notifications on this device. Please try again.'
-    )
-  } finally {
     setPushLoading(false)
   }
-}
+
+  async function unsubscribeFromPush() {
+    setPushLoading(true)
+    setPushError('')
+    const result = await unsubscribeFromPushBrowser()
+    if (result.ok) {
+      setPushSubscribed(false)
+      // Other devices may still hold a subscription for this player —
+      // re-check the server rather than assuming none remain.
+      fetch('/api/push/subscribe')
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => setPushServerSubscribed(!!d?.subscribed))
+        .catch(() => {})
+    } else {
+      setPushError(result.error)
+    }
+    setPushLoading(false)
+  }
 
 
   const [dashboard, setDashboard] = useState<{
@@ -175,14 +165,7 @@ export default function ProfilePage() {
   }, [sessionStatus, player?.playerId])
 
   useEffect(() => {
-    async function checkSubscription() {
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        const reg = await navigator.serviceWorker.ready
-        const existing = await reg.pushManager.getSubscription()
-        if (existing) setPushSubscribed(true)
-      }
-    }
-    checkSubscription()
+    hasLocalPushSubscription().then(existing => { if (existing) setPushSubscribed(true) })
   }, [])
 
   useEffect(() => {
@@ -482,19 +465,30 @@ export default function ProfilePage() {
             )}
           </div>
           <div className="mt-4">
-            <button
-              onClick={subscribeToPush}
-              disabled={pushSubscribed || pushLoading}
-              className="font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded transition-colors"
-            >
-              {pushLoading
-                ? 'Enabling...'
-                : pushSubscribed
-                ? '✓ Notifications enabled'
-                : pushServerSubscribed
-                ? '🔔 Re-enable notifications on this device'
-                : '🔔 Subscribe to notifications'}
-            </button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={subscribeToPush}
+                disabled={pushSubscribed || pushLoading}
+                className="font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded transition-colors"
+              >
+                {pushLoading
+                  ? (pushSubscribed ? 'Disabling...' : 'Enabling...')
+                  : pushSubscribed
+                  ? '✓ Notifications enabled'
+                  : pushServerSubscribed
+                  ? '🔔 Re-enable notifications on this device'
+                  : '🔔 Subscribe to notifications'}
+              </button>
+              {pushSubscribed && (
+                <button
+                  onClick={unsubscribeFromPush}
+                  disabled={pushLoading}
+                  className="font-rajdhani text-xs font-bold text-zinc-500 hover:text-crimson underline disabled:opacity-50"
+                >
+                  Unsubscribe
+                </button>
+              )}
+            </div>
             {!pushSubscribed && pushServerSubscribed && !pushLoading && (
               <p className="font-rajdhani text-[11px] text-amber-400 mt-1.5">
                 We have a notification subscription on file for you, but this device/browser has lost it

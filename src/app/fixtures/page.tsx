@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { FixturesCard } from '@/components/fixtures/FixturesCard'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
+import { PushSubscribePrompt } from '@/components/fixtures/PushSubscribePrompt'
 import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
 
@@ -244,6 +245,7 @@ export default async function FixturesPage() {
   return (
     <div className="min-h-screen bg-ink grain">
       <SiteNav activePage="fixtures" />
+      {isPlayer && <PushSubscribePrompt />}
 
       {/* Hero */}
       <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden">
