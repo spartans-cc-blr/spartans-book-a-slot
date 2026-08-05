@@ -271,6 +271,12 @@ export interface PlayerMatchHistoryRow {
   tournamentName: string | null
   opponentName:   string | null
   matchResult:    string | null
+  // Derived from the analytics DB's match_stats.toss_won/toss_decision —
+  // true if this player's own team batted first, false if they chased,
+  // null when toss data wasn't captured for this match (older parses, or
+  // a scorecard the "Toss" line couldn't be extracted from). See
+  // src/lib/playerStats.ts's getPlayerMatchHistory() for the derivation.
+  battedFirst:    boolean | null
   batting: {
     runs: number; balls: number; fours: number; sixes: number
     notOut: boolean; strikeRate: number | null; howOut: string | null

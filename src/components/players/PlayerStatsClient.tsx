@@ -64,6 +64,7 @@ export function PlayerStatsClient({
   const [matches, setMatches] = useState<PlayerMatchHistoryRow[]>(initialMatches)
   const [loading, setLoading] = useState(false)
   const [statTab, setStatTab] = useState<StatTab>('batting')
+  const [inningsFilter, setInningsFilter] = useState<'all' | 'first' | 'chasing'>('all')
 
   const fetchScoped = useCallback(async () => {
     if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain) {
@@ -110,8 +111,14 @@ export function PlayerStatsClient({
       if (statTab === 'batting') return !!m.batting
       if (statTab === 'bowling') return !!m.bowling
       return !!m.fielding && (m.fielding.catches > 0 || m.fielding.stumpings > 0 || m.fielding.runOuts > 0)
+    }).filter(m => {
+      if (inningsFilter === 'all') return true
+      // Matches with no toss signal (older parses) are excluded from
+      // either scoped filter rather than guessed at.
+      if (m.battedFirst === null) return false
+      return inningsFilter === 'first' ? m.battedFirst : !m.battedFirst
     }),
-    [matches, statTab],
+    [matches, statTab, inningsFilter],
   )
 
   return (
@@ -215,12 +222,21 @@ export function PlayerStatsClient({
         {/* Match by match */}
         <div className="bg-white border border-parchment-3 rounded-2xl p-5">
           <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">Match History</h2>
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-2">
             {STAT_TABS.map(t => (
               <button key={t} onClick={() => setStatTab(t)}
                 className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors capitalize
                   ${statTab === t ? 'bg-gold/10 border-gold-dim text-gold-dim' : 'border-parchment-3 text-stone-500 hover:text-stone-700'}`}>
                 {t}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 mb-4">
+            {([['all', 'All'], ['first', 'Batted First'], ['chasing', 'Chasing']] as const).map(([key, label]) => (
+              <button key={key} onClick={() => setInningsFilter(key)}
+                className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors
+                  ${inningsFilter === key ? 'bg-gold/10 border-gold-dim text-gold-dim' : 'border-parchment-3 text-stone-500 hover:text-stone-700'}`}>
+                {label}
               </button>
             ))}
           </div>

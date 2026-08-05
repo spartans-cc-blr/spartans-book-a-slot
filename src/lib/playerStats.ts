@@ -59,6 +59,22 @@ function ballsToOversString(balls: number): string {
   return `${Math.floor(balls / 6)}.${balls % 6}`
 }
 
+// analytics DB match_stats.toss_won is always relative to *our* team (the
+// Spartans variant that played — spartans-python's extractor resolves
+// "team" that way regardless of which specific house/branch it was), and
+// toss_decision ('bat'|'field') is what the toss winner chose. Combining
+// them tells us whether our team batted first, independent of who won the
+// toss. Returns null when either field is missing/blank — older parses
+// predate this extraction, and a blank toss_decision is valid (CSV writer
+// leaves it '' when the toss text didn't contain "bat"/"field"/"bowl").
+function deriveBattedFirst(m: any): boolean | null {
+  const tossWon = m?.toss_won
+  const tossDecision = m?.toss_decision
+  if (tossWon !== 'Y' && tossWon !== 'N') return null
+  if (tossDecision !== 'bat' && tossDecision !== 'field') return null
+  return (tossWon === 'Y') === (tossDecision === 'bat')
+}
+
 function emptyTotals(): PlayerStatsTotals {
   return {
     matches: 0, battingInnings: 0, bowlingInnings: 0, runs: 0, balls: 0, notOuts: 0,
@@ -393,6 +409,7 @@ export async function getPlayerMatchHistory(
       tournamentName:  Array.isArray(booking?.tournament) ? booking?.tournament[0]?.name : booking?.tournament?.name ?? m?.tournament_name ?? null,
       opponentName:    m?.opponent_name ?? null,
       matchResult:     m?.match_result ?? null,
+      battedFirst:     deriveBattedFirst(m),
       batting: battedThisMatch ? {
         runs: num(bat.runs), balls: num(bat.balls), fours: num(bat.fours), sixes: num(bat.sixes),
         notOut: bat.not_out === 'Y',
