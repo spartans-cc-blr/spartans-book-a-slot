@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { FixturesCard } from '@/components/fixtures/FixturesCard'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
+import { PushSubscribePrompt } from '@/components/fixtures/PushSubscribePrompt'
 import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
 
@@ -96,7 +97,7 @@ export default async function FixturesPage() {
     .eq('status', 'announced')
   : { data: [] }
 
-  // Y-response counts per booking — powers the "Slot open" nudge on the upcoming weekend's cards
+  // Y-response counts per booking — powers the "Slot underfilled" nudge on the upcoming weekend's cards
   const { data: yAvailRows } = bookingIds.length ? await supabase
     .from('availability')
     .select('booking_id')
@@ -190,7 +191,7 @@ export default async function FixturesPage() {
   }
   const weekendMap: Record<string, BookingWithCard[]> = {}
 
-  // The nearest upcoming Sat/Sun weekend group — the "Slot open" nudge is scoped to it only,
+  // The nearest upcoming Sat/Sun weekend group — the "Slot underfilled" nudge is scoped to it only,
   // never to a weekday game or a later weekend (bookingsWithStatus is already date-ascending)
   const upcomingWeekendKey = bookingsWithStatus
     .map(b => validationGroupKey((b as any).game_date))
@@ -244,6 +245,7 @@ export default async function FixturesPage() {
   return (
     <div className="min-h-screen bg-ink grain">
       <SiteNav activePage="fixtures" />
+      {isPlayer && <PushSubscribePrompt />}
 
       {/* Hero */}
       <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden">

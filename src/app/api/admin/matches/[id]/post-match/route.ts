@@ -61,6 +61,21 @@ export async function GET(
     stats = statsRow ?? null
   }
 
+  // Waivers already recorded for this booking — surfaced so re-opening an
+  // already-fees_applied booking still shows who was waived and why,
+  // rather than that context only being visible during the apply flow.
+  const { data: waiverRows } = await supabase
+    .from('match_fee_waivers')
+    .select('player_id, reason, created_at, players(name)')
+    .eq('booking_id', params.id)
+
+  const waivers = (waiverRows ?? []).map(w => ({
+    player_id:  w.player_id,
+    name:       (w.players as any)?.name ?? 'Unknown',
+    reason:     w.reason,
+    created_at: w.created_at,
+  }))
+
   return NextResponse.json({
     upload: upload ? {
       status:           upload.status,
@@ -70,6 +85,7 @@ export async function GET(
       fees_applied_at:  upload.fees_applied_at,
     } : null,
     stats,
+    waivers,
   })
 }
 
