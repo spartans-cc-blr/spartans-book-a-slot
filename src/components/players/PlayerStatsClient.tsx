@@ -350,7 +350,7 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
               >
                 {d.toLocaleDateString('en-IN', { month: 'short' })}-{String(d.getFullYear()).slice(-2)}
               </span>
-              <span className="font-cinzel text-sm font-bold text-ink">{d.getDate()}</span>
+              <span className="font-cinzel text-sm font-bold text-ink">{String(d.getDate()).padStart(2, '0')}</span>
             </div>
           </div>
         ) : (
