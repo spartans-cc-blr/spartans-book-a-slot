@@ -405,9 +405,40 @@ Admin → /admin/bookings/new
   → Match Start Time auto-fills to the chosen slot_time once a slot is picked
   → POST /api/bookings → DB write (service role)
   → [soft_block] reserved_until = now() + 48hr
-  → [confirmed] WhatsApp notify buttons (organiser + captain)
+  → [confirmed] WhatsApp notify buttons (organiser + captain) — on /admin/bookings/[id]
   → Cron at 18:30 UTC deletes expired soft_blocks
 ```
+
+> **WhatsApp notify buttons (added August 2026) — live on the edit/confirm
+> page, not the create page.** `/admin/bookings/[id]`'s "📲 Notify via
+> WhatsApp" panel is where these actually are — `/admin/bookings/new`
+> itself has no notify UI at all, and a booking created there as
+> `confirmed` directly (never having been a reservation) never captures an
+> `organiser_phone`, so the organiser button only ever lights up for the
+> reservation → confirm path. Message wording is built by
+> `src/lib/bookingNotify.ts` (`buildOrganiserWhatsAppUrl()` /
+> `buildCaptainWhatsAppUrl()`), shared so the two messages can't drift:
+> - **Organiser** message now includes a link to this tournament's public
+>   share page (`/tournament-planner/share/[tournamentId]`) — "track your
+>   tournament's schedule and next open slots anytime on the Hub" — built
+>   client-side via `window.location.origin`, so an organiser gets a
+>   standing link to check status themselves instead of only a one-off
+>   confirmation text.
+> - **Captain** message already included the CricHeroes URL when set
+>   (`\nCricHeroes: ${url}`) — unchanged, just moved into the shared
+>   module; falls back to a destination-free `wa.me` link when the captain
+>   has no WhatsApp number on file.
+> - **`handleConfirm()` no longer auto-redirects.** Every other save on
+>   this page still does the original "✓ Saved successfully" +
+>   1.5s-then-`router.push('/admin?saved=1')` — but confirming a
+>   reservation used to do the exact same thing, giving the admin barely
+>   enough time to notice the Notify buttons exist before being sent back
+>   to the dashboard. A `justConfirmed` flag now keeps the admin on the
+>   page instead, with a "🎉 Game booked!" banner on the Notify panel and a
+>   manual "Done — Back to Dashboard" button — `booking.status` itself
+>   isn't refetched after the PATCH, so the header/badge/message wording
+>   all read `isConfirmed || justConfirmed` rather than the (locally
+>   stale) `booking.status` alone.
 
 > **Match Start Time default (added July 2026, changed 31 Jul 2026):** both
 > `/admin/bookings/new` and `/admin/bookings/[id]` auto-fill the Match Start
@@ -640,6 +671,7 @@ Next.js API Routes (server-side)
 | `src/lib/suggestedSlots.ts` | `getSuggestedOpenDates()` (day-level, non-self-service tournaments); `getSuggestedSlotDates()` / `findNextSlotDate()` (per-slot-bucket, self-service tournaments) |
 | `src/lib/familyAuth.ts` | *(Planned U-24)* `validateFamilySession()` — re-queries `family_sessions` table; never trusts cookie value alone |
 | `src/lib/announcement.ts` | `buildSquadAnnouncement()` — WhatsApp message builder |
+| `src/lib/bookingNotify.ts` | `buildOrganiserWhatsAppUrl()` / `buildCaptainWhatsAppUrl()` — shared message builders for `/admin/bookings/[id]`'s Notify panel; organiser message includes the tournament share page link, captain message includes the CricHeroes URL when set — see §8.1 |
 | `supabase/migrations/` | All schema migrations as SQL files — source of truth for DB state |
 | `vercel.json` | Cron job config + security headers |
 | src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup |

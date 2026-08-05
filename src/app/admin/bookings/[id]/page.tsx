@@ -6,6 +6,7 @@ import type { Booking, GameFormat, SlotTime, RuleCheckItem } from '@/types'
 import { SLOT_TIMES, SLOT_FORMATS } from '@/types'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
+import { buildOrganiserWhatsAppUrl, buildCaptainWhatsAppUrl } from '@/lib/bookingNotify'
 
 type ScorecardUploadStatus = 'pending_parse' | 'parsed' | 'synced' | 'fees_applied'
 
@@ -82,6 +83,12 @@ export default function BookingDetailPage() {
   const [saving,       setSaving]       = useState(false)
   const [saveError,    setSaveError]    = useState('')
   const [saveSuccess,  setSaveSuccess]  = useState(false)
+  // Set only by handleConfirm — keeps the admin on this page (instead of
+  // the usual auto-redirect) with the Notify panel front and center, so
+  // there's actually time to tap the WhatsApp buttons right after a game
+  // gets booked, not just a 1.5s window before being sent back to the
+  // dashboard.
+  const [justConfirmed, setJustConfirmed] = useState(false)
 
   const [ruleChecks, setRuleChecks] = useState<RuleCheckItem[]>(
     RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' }))
@@ -357,7 +364,8 @@ export default function BookingDetailPage() {
 
   const allPassed = ruleChecksAllPassed(ruleChecks, overrides)
 
-  async function handleSave(extraFields?: Record<string, any>) {
+  async function handleSave(extraFields?: Record<string, any>, opts?: { redirectAfter?: boolean }): Promise<boolean> {
+    const redirectAfter = opts?.redirectAfter ?? true
     setSaving(true)
     setSaveError('')
     setSaveSuccess(false)
@@ -397,12 +405,14 @@ export default function BookingDetailPage() {
         setLoggedOverrides(prev => ({ ...prev, ...Object.fromEntries(overridesToLog) }))
       }
       setSaveSuccess(true)
-      setTimeout(() => router.push('/admin?saved=1'), 1500)
-    } else {
-      const d = await res.json()
-      setSaveError(d.error ?? 'Something went wrong.')
+      if (redirectAfter) setTimeout(() => router.push('/admin?saved=1'), 1500)
+      setSaving(false)
+      return true
     }
+    const d = await res.json()
+    setSaveError(d.error ?? 'Something went wrong.')
     setSaving(false)
+    return false
   }
 
   async function handleConfirm() {
@@ -410,10 +420,11 @@ export default function BookingDetailPage() {
       setSaveError('Tournament and format are required to confirm a booking.')
       return
     }
-    await handleSave({
-      status:        'confirmed',
-      reserved_until: null,
-    })
+    const ok = await handleSave(
+      { status: 'confirmed', reserved_until: null },
+      { redirectAfter: false }
+    )
+    if (ok) setJustConfirmed(true)
   }
 
   async function handleCancel() {
@@ -424,28 +435,28 @@ export default function BookingDetailPage() {
 
   function buildOrganiserWhatsApp() {
     if (!booking) return ''
-    const phone = organiserPhone?.replace(/\D/g, '')
-    if (!phone) return ''
-    const date = booking.game_date
-    const slot = booking.slot_time
-    const msg = encodeURIComponent(
-      `Hi! Your slot reservation for *${date} at ${slot}* has been confirmed with Spartans CC.\n\nPlease create the match in CricHeroes and share the Match ID with us.\n\nThanks!`
-    )
-    return `https://wa.me/${phone}?text=${msg}`
+    return buildOrganiserWhatsAppUrl({
+      gameDate:       booking.game_date,
+      slotTime:       booking.slot_time,
+      organiserPhone,
+      isConfirmed:    isConfirmed || justConfirmed,
+      tournamentId:   tournamentId || null,
+      origin:         typeof window !== 'undefined' ? window.location.origin : 'https://hub.spartanscricketclub.in',
+    })
   }
 
   function buildCaptainWhatsApp() {
     if (!booking || !selectedTournament?.captains) return ''
     const captain = selectedTournament.captains
-    const phone = captain.players?.whatsapp?.replace(/\D/g, '') ?? ''
-    const date = booking.game_date
-    const slot = booking.slot_time
-    const opponent = opponentName || 'TBD'
-    const venue_str = venue || 'TBD'
-    const msg = encodeURIComponent(
-      `Hi ${captain.name}! You have been assigned as captain for a game on *${date} at ${slot}*.\n\nOpponent: ${opponent}\nVenue: ${venue_str}${cricheroes ? `\nCricHeroes: ${cricheroes}` : ''}\n\nPlease confirm your availability.`
-    )
-    return phone ? `https://wa.me/${phone}?text=${msg}` : `https://wa.me/?text=${msg}`
+    return buildCaptainWhatsAppUrl({
+      captainName:   captain.name,
+      captainPhone:  captain.players?.whatsapp ?? null,
+      gameDate:      booking.game_date,
+      slotTime:      booking.slot_time,
+      opponentName,
+      venue,
+      cricheroesUrl: cricheroes || null,
+    })
   }
 
   if (loading) return (
@@ -460,6 +471,11 @@ export default function BookingDetailPage() {
 
   const isReservation = booking.status === 'soft_block'
   const isConfirmed   = booking.status === 'confirmed'
+  // booking.status itself isn't refetched after a successful Confirm click
+  // (see handleConfirm) — this is what actually drives the header/badge so
+  // they flip immediately instead of still reading "Reservation" until the
+  // admin navigates away and back.
+  const displayConfirmed = isConfirmed || justConfirmed
   const selectedTournament = tournaments.find(t => t.id === tournamentId)
   const organiserWA   = buildOrganiserWhatsApp()
   const captainWA     = buildCaptainWhatsApp()
@@ -470,7 +486,7 @@ export default function BookingDetailPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-cinzel text-xl font-bold text-gold">
-            {isReservation ? '🟡 Reservation' : '✓ Confirmed Booking'}
+            {displayConfirmed ? '✓ Confirmed Booking' : '🟡 Reservation'}
           </h1>
           <p className="font-rajdhani text-zinc-500 text-sm mt-1">
             {booking.game_date} · {booking.slot_time}
@@ -794,7 +810,7 @@ export default function BookingDetailPage() {
                 className="font-rajdhani text-sm font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
-              {isReservation && (
+              {isReservation && !justConfirmed && (
                 <button onClick={handleConfirm} disabled={saving || !tournamentId || !format || !allPassed}
                   className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors">
                   {saving ? 'Confirming...' : '✓ Confirm Booking'}
@@ -812,6 +828,14 @@ export default function BookingDetailPage() {
             <div className="bg-ink-4 px-4 py-3 border-b border-ink-5">
               <p className="font-cinzel text-sm text-gold">📲 Notify via WhatsApp</p>
             </div>
+            {justConfirmed && (
+              <div className="bg-emerald-950/40 border-b border-emerald-800 px-4 py-3">
+                <p className="font-rajdhani text-sm font-bold text-emerald-400">🎉 Game booked!</p>
+                <p className="font-rajdhani text-xs text-emerald-300/80 mt-0.5">
+                  Notify the organiser and captain below before heading back.
+                </p>
+              </div>
+            )}
             <div className="p-4 space-y-3">
               {organiserWA ? (
                 <a href={organiserWA} target="_blank" rel="noopener noreferrer"
@@ -836,6 +860,12 @@ export default function BookingDetailPage() {
               <p className="font-rajdhani text-[10px] text-zinc-600 italic">
                 Messages open pre-filled in WhatsApp for your review before sending.
               </p>
+              {justConfirmed && (
+                <button onClick={() => router.push('/admin?saved=1')}
+                  className="w-full font-rajdhani text-sm font-bold tracking-wide border border-ink-5 text-zinc-400 hover:text-zinc-200 hover:border-gold-dim px-4 py-2.5 rounded transition-colors">
+                  Done — Back to Dashboard
+                </button>
+              )}
             </div>
           </div>
 
@@ -863,8 +893,8 @@ export default function BookingDetailPage() {
 
           {/* Status badge */}
           <div className={`rounded px-4 py-3 border font-rajdhani text-sm font-bold text-center
-            ${isConfirmed ? 'bg-emerald-950 border-emerald-800 text-emerald-400' : 'bg-amber-950 border-amber-800 text-amber-400'}`}>
-            {isConfirmed ? '✓ Confirmed' : '🟡 Reserved — Pending Confirmation'}
+            ${displayConfirmed ? 'bg-emerald-950 border-emerald-800 text-emerald-400' : 'bg-amber-950 border-amber-800 text-amber-400'}`}>
+            {displayConfirmed ? '✓ Confirmed' : '🟡 Reserved — Pending Confirmation'}
           </div>
         </div>
       </div>
