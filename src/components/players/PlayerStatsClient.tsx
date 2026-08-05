@@ -17,10 +17,17 @@
 // restricts both the summary and match list to matches where this player
 // was the match-specific captain (squad.is_captain — not players.is_captain,
 // the permanent club-captain flag; see features/squad-selection.md).
+//
+// Match History below the summary is split into Batting/Bowling/Fielding
+// tabs (plain text, no icons — the tab itself already says what kind of
+// innings this is). Each tab only lists matches carrying that stat line
+// (e.g. Batting hides matches this player didn't bat in) and cards are
+// sorted most-recent first — `matches` already arrives pre-sorted by
+// date+time from getPlayerMatchHistory(), so no client-side sort is
+// needed here.
 
-import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
-import { CricketBallIcon } from '@/components/ui/CricketBallIcon'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import type { PlayerStatsTotals, PlayerMatchHistoryRow } from '@/types'
 
 interface PlayerInfo {
@@ -38,6 +45,9 @@ const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2]
 
 type Format = 'T20' | 'T30'
+type Innings = 'defending' | 'chasing'
+type StatTab = 'batting' | 'bowling' | 'fielding'
+const STAT_TABS: StatTab[] = ['batting', 'bowling', 'fielding']
 
 export function PlayerStatsClient({
   player, grounds, initialCareer, initialMatches,
@@ -51,12 +61,19 @@ export function PlayerStatsClient({
   const [groundId, setGroundId] = useState<string>('all')
   const [formats, setFormats] = useState<Set<Format>>(new Set<Format>(['T20', 'T30']))
   const [asCaptain, setAsCaptain] = useState(false)
+  // Defending = batted first, set a target. Chasing = batted second, chasing
+  // the opponent's target. Derived from the analytics DB's toss_won/
+  // toss_decision (see getInningsMatchIds() in src/lib/playerStats.ts).
+  // Same convention as `formats`: both checked means no restriction,
+  // unchecking one scopes to the other, unchecking both snaps back to both.
+  const [innings, setInnings] = useState<Set<Innings>>(new Set<Innings>(['defending', 'chasing']))
   const [scoped, setScoped] = useState<PlayerStatsTotals>(initialCareer)
   const [matches, setMatches] = useState<PlayerMatchHistoryRow[]>(initialMatches)
   const [loading, setLoading] = useState(false)
+  const [statTab, setStatTab] = useState<StatTab>('batting')
 
   const fetchScoped = useCallback(async () => {
-    if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain) {
+    if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain && innings.size === 2) {
       setScoped(initialCareer)
       setMatches(initialMatches)
       return
@@ -67,6 +84,7 @@ export function PlayerStatsClient({
     if (groundId !== 'all') params.set('ground', groundId)
     if (formats.size === 1) params.set('format', Array.from(formats)[0])
     if (asCaptain) params.set('captain', '1')
+    if (innings.size === 1) params.set('innings', Array.from(innings)[0])
     const res = await fetch(`/api/players/${player.id}/match-history?${params.toString()}`)
     if (res.ok) {
       const d = await res.json()
@@ -74,7 +92,7 @@ export function PlayerStatsClient({
       setMatches(d.matches)
     }
     setLoading(false)
-  }, [year, groundId, formats, asCaptain, player.id, initialCareer, initialMatches])
+  }, [year, groundId, formats, asCaptain, innings, player.id, initialCareer, initialMatches])
 
   useEffect(() => { fetchScoped() }, [fetchScoped])
 
@@ -93,7 +111,29 @@ export function PlayerStatsClient({
     })
   }
 
-  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain
+  function toggleInnings(v: Innings) {
+    setInnings(prev => {
+      const next = new Set(prev)
+      if (next.has(v)) {
+        next.delete(v)
+        if (next.size === 0) { next.add('defending'); next.add('chasing') }
+      } else {
+        next.add(v)
+      }
+      return next
+    })
+  }
+
+  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain || innings.size === 1
+
+  const tabMatches = useMemo(
+    () => matches.filter(m => {
+      if (statTab === 'batting') return !!m.batting
+      if (statTab === 'bowling') return !!m.bowling
+      return !!m.fielding && (m.fielding.catches > 0 || m.fielding.stumpings > 0 || m.fielding.runOuts > 0)
+    }),
+    [matches, statTab],
+  )
 
   return (
     <>
@@ -155,6 +195,16 @@ export function PlayerStatsClient({
               <input type="checkbox" checked={asCaptain} onChange={() => setAsCaptain(v => !v)} className="accent-gold" />
               As Captain
             </label>
+            <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
+              ${innings.has('defending') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={innings.has('defending')} onChange={() => toggleInnings('defending')} className="accent-gold" />
+              Defending
+            </label>
+            <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
+              ${innings.has('chasing') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={innings.has('chasing')} onChange={() => toggleInnings('chasing')} className="accent-gold" />
+              Chasing
+            </label>
           </div>
           <select value={groundId} onChange={e => setGroundId(e.target.value)}
             className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5 w-full">
@@ -196,14 +246,21 @@ export function PlayerStatsClient({
         {/* Match by match */}
         <div className="bg-white border border-parchment-3 rounded-2xl p-5">
           <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">Match History</h2>
+          <div className="flex gap-2 mb-4">
+            {STAT_TABS.map(t => (
+              <button key={t} onClick={() => setStatTab(t)}
+                className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors capitalize
+                  ${statTab === t ? 'bg-gold/10 border-gold-dim text-gold-dim' : 'border-parchment-3 text-stone-500 hover:text-stone-700'}`}>
+                {t}
+              </button>
+            ))}
+          </div>
           {loading ? (
             <p className="font-rajdhani text-sm text-stone-500">Loading…</p>
-          ) : matches.length === 0 ? (
-            <p className="font-rajdhani text-sm text-stone-500">No matches for this filter.</p>
+          ) : tabMatches.length === 0 ? (
+            <p className="font-rajdhani text-sm text-stone-500">No {statTab} innings for this filter.</p>
           ) : (
-            <div className="space-y-3">
-              {matches.map(m => <MatchRow key={m.matchId} match={m} />)}
-            </div>
+            <MatchHistoryTable matches={tabMatches} statTab={statTab} />
           )}
         </div>
       </div>
@@ -230,69 +287,143 @@ function MvpStat({ label, value, color }: { label: string; value: number; color:
   )
 }
 
-function MatchRow({ match }: { match: PlayerMatchHistoryRow }) {
-  const dateLabel = match.gameDate
-    ? new Date(match.gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '—'
-
-  // The filter bar scopes by ground now, not tournament — the tournament
-  // name is never implied by the active filter, so it's always the more
-  // useful headline (a ground can host many different tournaments).
-  const primaryLabel = match.tournamentName ? `at ${match.tournamentName}` : (match.opponentName ? `vs ${match.opponentName}` : 'Match')
-
-  const body = (
-    <div style={{
-      background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
-      border: '1px solid #2D3748',
-      borderRadius: '12px',
-      padding: '14px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      {/* Gold top accent bar — matches FixturesCard.tsx */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
-
-      <div className="flex items-center justify-between gap-3 mb-1.5">
-        <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
-          {primaryLabel}
-        </p>
-        <span className="font-rajdhani text-xs text-zinc-500 whitespace-nowrap">
-          {dateLabel}{match.format ? ` · ${match.format}` : ''}
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 font-rajdhani text-xs text-zinc-400">
-        {match.batting && (
-          <span>
-            🏏 {match.batting.runs}{match.batting.notOut ? '*' : ''} ({match.batting.balls}b
-            {match.batting.strikeRate != null ? `, SR ${match.batting.strikeRate.toFixed(2)}` : ''})
-          </span>
-        )}
-        {match.bowling && (
-          <span className="inline-flex items-center gap-1">
-            <CricketBallIcon size={12} /> {match.bowling.wickets}/{match.bowling.runsConceded} ({match.bowling.overs}ov
-            {match.bowling.economy != null ? `, Eco ${match.bowling.economy.toFixed(2)}` : ''})
-          </span>
-        )}
-        {match.fielding && (match.fielding.catches + match.fielding.runOuts + match.fielding.stumpings > 0) && (
-          <span>
-            🧤 {match.fielding.catches}c {match.fielding.runOuts}ro {match.fielding.stumpings}st
-          </span>
-        )}
-        {!match.batting && !match.bowling && !match.fielding && (
-          <span className="text-zinc-600">No stat line recorded</span>
-        )}
-        {match.matchResult && <span className="text-zinc-600">{match.matchResult}</span>}
-      </div>
+// Match History table — each row is a full <tr>, whole-row clickable to
+// /matches/history/[bookingId] (rows with no bookingId render inert, same
+// as the earlier card view's fallback). Column 3's content flips per tab.
+// Row identity (format + date) uses <th scope="row"> — an accessible table,
+// not a list of cards dressed up as rows.
+function MatchHistoryTable({ matches, statTab }: { matches: PlayerMatchHistoryRow[]; statTab: StatTab }) {
+  const columnLabel = statTab === 'batting' ? 'Runs' : statTab === 'bowling' ? 'Bowling' : 'Fielding'
+  return (
+    <div className="bg-white border border-parchment-3 rounded-2xl overflow-hidden overflow-x-auto">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-parchment-2 border-b border-parchment-3">
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-1.5 py-2 whitespace-nowrap">Date</th>
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-2 py-2">Match</th>
+            <th scope="col" className="text-center font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-2 py-2">{columnLabel}</th>
+            <th scope="col" className="text-center font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-1.5 py-2 whitespace-nowrap">R</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-parchment-3">
+          {matches.map(m => <MatchHistoryRow key={m.matchId} match={m} statTab={statTab} />)}
+        </tbody>
+      </table>
     </div>
   )
+}
 
-  if (match.bookingId) {
-    return (
-      <Link href={`/matches/history/${match.bookingId}`} className="block transition-transform hover:-translate-y-0.5">
-        {body}
-      </Link>
-    )
-  }
-  return body
+function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; statTab: StatTab }) {
+  const router = useRouter()
+  const d = match.gameDate ? new Date(match.gameDate) : null
+  const clickable = !!match.bookingId
+  const goToMatch = () => { if (match.bookingId) router.push(`/matches/history/${match.bookingId}`) }
+
+  return (
+    <tr
+      {...(clickable ? {
+        role: 'link',
+        tabIndex: 0,
+        onClick: goToMatch,
+        onKeyDown: (e: React.KeyboardEvent<HTMLTableRowElement>) => { if (e.key === 'Enter' || e.key === ' ') goToMatch() },
+      } : {})}
+      className={clickable ? 'cursor-pointer hover:bg-parchment-2 transition-colors' : ''}>
+      <th scope="row" className="text-center font-normal align-middle px-1.5 py-2.5 whitespace-nowrap">
+        {d ? (
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="flex items-center gap-1">
+              <span
+                className="font-rajdhani text-[10px] font-bold tracking-wide text-stone-400 uppercase whitespace-nowrap"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+              >
+                {d.toLocaleDateString('en-IN', { month: 'short' })}-{String(d.getFullYear()).slice(-2)}
+              </span>
+              <span className="font-cinzel text-sm font-bold text-ink">{d.getDate()}</span>
+            </div>
+          </div>
+        ) : (
+          <span className="font-rajdhani text-xs text-stone-400">—</span>
+        )}
+      </th>
+      <td className="align-middle px-2 py-2.5">
+        <span className="block font-rajdhani text-sm text-ink">
+          {match.tournamentName ?? '—'}
+        </span>
+        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
+      </td>
+      <td className="text-center align-middle px-2 py-2.5">
+        {statTab === 'batting' && match.batting && <BattingCell batting={match.batting} />}
+        {statTab === 'bowling' && match.bowling && <BowlingCell bowling={match.bowling} />}
+        {statTab === 'fielding' && match.fielding && <FieldingCell fielding={match.fielding} />}
+      </td>
+      <td className="text-center align-middle px-1.5 py-2.5">
+        {match.matchResult ? <ResultCell result={match.matchResult} /> : <span className="font-rajdhani text-xs text-stone-400">—</span>}
+      </td>
+    </tr>
+  )
+}
+
+function ResultCell({ result }: { result: string }) {
+  const r = result.toLowerCase()
+  if (r.includes('won'))
+    return <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">W</span>
+  if (r.includes('lost'))
+    return <span className="text-red-700 text-[10px] font-bold">L</span>
+  if (r.includes('tie'))
+    return <span className="text-amber-700 text-[10px] font-bold">T</span>
+  return <span className="text-stone-400 text-[10px] font-bold">{result.charAt(0).toUpperCase()}</span>
+}
+
+// Raw dismissal_method values from the analytics DB use snake_case
+// (e.g. "caught_behind", "run_out") — humanize known ones explicitly,
+// fall back to a generic underscore-to-space + title-case for anything else.
+const DISMISSAL_LABELS: Record<string, string> = {
+  caught_behind: 'C&B',
+  run_out: 'Run Out',
+}
+function formatDismissal(howOut: string): string {
+  return DISMISSAL_LABELS[howOut] ?? howOut.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+function BattingCell({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['batting']> }) {
+  const highlight = batting.runs >= 30
+  return (
+    <>
+      <span className={`block font-rajdhani text-sm font-semibold ${highlight ? 'text-blue-700' : 'text-gold-dim'}`}>
+        {batting.runs}{batting.notOut ? '*' : ''} ({batting.balls})
+      </span>
+      {!batting.notOut && (
+        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{batting.howOut ? formatDismissal(batting.howOut) : '—'}</span>
+      )}
+    </>
+  )
+}
+
+function BowlingCell({ bowling }: { bowling: NonNullable<PlayerMatchHistoryRow['bowling']> }) {
+  const highlight = bowling.wickets >= 3
+  return (
+    <>
+      <span className="block font-rajdhani text-[10px] font-bold tracking-wide uppercase text-stone-400">O-D-R-W</span>
+      <span className={`block font-rajdhani text-sm font-semibold mt-0.5 ${highlight ? 'text-blue-700' : 'text-gold-dim'}`}>
+        {bowling.overs}-{bowling.dots}-{bowling.runsConceded}-{bowling.wickets}
+      </span>
+    </>
+  )
+}
+
+function FieldingCell({ fielding }: { fielding: NonNullable<PlayerMatchHistoryRow['fielding']> }) {
+  const parts = [
+    fielding.catches > 0 ? `${fielding.catches} ct` : null,
+    fielding.stumpings > 0 ? `${fielding.stumpings} st` : null,
+    fielding.runOuts > 0 ? `${fielding.runOuts} ro` : null,
+  ].filter((p): p is string => p !== null)
+  const total = fielding.catches + fielding.stumpings + fielding.runOuts
+  const highlight = total >= 3
+  return parts.length > 0 ? (
+    <span className={`font-rajdhani text-sm font-semibold ${highlight ? 'text-blue-700' : 'text-gold-dim'}`}>
+      {parts.map(p => <span key={p} className="block">{p}</span>)}
+    </span>
+  ) : (
+    <span className="font-rajdhani text-xs text-stone-400">—</span>
+  )
 }

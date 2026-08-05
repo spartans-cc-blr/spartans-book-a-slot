@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { LeaderboardFilters, type LeaderboardCategory, type Format } from '@/components/leaderboard/LeaderboardFilters'
+import { LeaderboardFilters, type LeaderboardCategory, type Format, type InningsKey } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
@@ -33,7 +33,7 @@ function monthLabel(m: string): string {
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams?: { year?: string; month?: string; tournament?: string; ground?: string; category?: string; format?: string }
+  searchParams?: { year?: string; month?: string; tournament?: string; ground?: string; category?: string; format?: string; innings?: string }
 }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
@@ -59,6 +59,16 @@ export default async function LeaderboardPage({
   const formatParam = searchParams?.format
   const restrictedFormats: Format[] | undefined = formatParam === 'T20' || formatParam === 'T30' ? [formatParam] : undefined
   const formats: Set<Format> = new Set(restrictedFormats ?? (['T20', 'T30'] as Format[]))
+
+  // Defending/Chasing — same both-checked-means-no-restriction convention
+  // as Format. Only ever surfaced (and therefore only ever meaningful) on
+  // Detailed → MVP; a hand-edited URL setting it alongside another
+  // category is simply ignored rather than silently scoping a table the
+  // control isn't shown next to.
+  const inningsParam = searchParams?.innings
+  const restrictedInnings: InningsKey[] | undefined =
+    inningsParam === 'defending' || inningsParam === 'chasing' ? [inningsParam] : undefined
+  const innings: Set<InningsKey> = new Set(restrictedInnings ?? (['defending', 'chasing'] as InningsKey[]))
 
   // Tournament/Ground option lists are themselves scoped by the current
   // Format selection, so picking T20-only immediately narrows both
@@ -92,6 +102,7 @@ export default async function LeaderboardPage({
     tournamentId: tournamentId === 'all' ? undefined : tournamentId,
     groundId: groundId === 'all' ? undefined : groundId,
     formats: restrictedFormats,
+    innings: category === 'mvp' ? restrictedInnings?.[0] : undefined,
   }
 
   const rows = category === 'monthly'
@@ -158,6 +169,7 @@ export default async function LeaderboardPage({
           tournamentId={tournamentId}
           groundId={groundId}
           formats={formats}
+          innings={innings}
           category={category}
         />
 

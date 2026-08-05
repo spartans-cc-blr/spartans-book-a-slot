@@ -59,6 +59,22 @@ function ballsToOversString(balls: number): string {
   return `${Math.floor(balls / 6)}.${balls % 6}`
 }
 
+// analytics DB match_stats.toss_won is always relative to *our* team (the
+// Spartans variant that played — spartans-python's extractor resolves
+// "team" that way regardless of which specific house/branch it was), and
+// toss_decision ('bat'|'field') is what the toss winner chose. Combining
+// them tells us whether our team batted first, independent of who won the
+// toss. Returns null when either field is missing/blank — older parses
+// predate this extraction, and a blank toss_decision is valid (CSV writer
+// leaves it '' when the toss text didn't contain "bat"/"field"/"bowl").
+function deriveBattedFirst(m: any): boolean | null {
+  const tossWon = m?.toss_won
+  const tossDecision = m?.toss_decision
+  if (tossWon !== 'Y' && tossWon !== 'N') return null
+  if (tossDecision !== 'bat' && tossDecision !== 'field') return null
+  return (tossWon === 'Y') === (tossDecision === 'bat')
+}
+
 function emptyTotals(): PlayerStatsTotals {
   return {
     matches: 0, battingInnings: 0, bowlingInnings: 0, runs: 0, balls: 0, notOuts: 0,
@@ -297,11 +313,13 @@ async function fetchAnalyticsRows(opts: {
 // directly since it needs year, ground, AND format filters combined.
 export async function getPlayerStats(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean; innings?: 'defending' | 'chasing' } = {}
 ): Promise<PlayerStatsTotals> {
   let scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return emptyTotals()
   scoped = await applyCaptainFilter(playerId, scoped, filters.asCaptain)
+  if (scoped && scoped.length === 0) return emptyTotals()
+  scoped = await applyInningsFilter(scoped, filters.innings)
   if (scoped && scoped.length === 0) return emptyTotals()
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
   const matchIds = new Set<string>(team.map((r: any) => r.match_id).filter(Boolean))
@@ -324,11 +342,13 @@ export async function getPlayerSeasonStats(playerId: string, year: number): Prom
 // this file rather than showing a misleading 0.
 export async function getPlayerMatchHistory(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean; innings?: 'defending' | 'chasing' } = {}
 ): Promise<PlayerMatchHistoryRow[]> {
   let scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return []
   scoped = await applyCaptainFilter(playerId, scoped, filters.asCaptain)
+  if (scoped && scoped.length === 0) return []
+  scoped = await applyInningsFilter(scoped, filters.innings)
   if (scoped && scoped.length === 0) return []
 
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
@@ -347,9 +367,12 @@ export async function getPlayerMatchHistory(
   // cancelled (rescheduled-away) booking; without this, whichever row
   // Postgres happens to return last for that match_id wins the Map below,
   // which can silently swap in the wrong date/tournament.
+  // match_time/slot_time are fetched purely to break ties on the date+time
+  // sort below (a single day can have more than one game) — neither is
+  // part of the returned row shape.
   const { data: bookingRows, error: bookingErr } = await hub
     .from('bookings')
-    .select('id, match_id, game_date, format, tournament:tournaments(name)')
+    .select('id, match_id, game_date, format, slot_time, match_time, tournament:tournaments(name)')
     .in('match_id', matchIds)
     .eq('status', 'confirmed')
   if (bookingErr) throw new Error(bookingErr.message)
@@ -359,7 +382,20 @@ export async function getPlayerMatchHistory(
   const bowlingByMatch  = new Map(bowling.map((r: any) => [r.match_id, r]))
   const fieldingByMatch = new Map(fielding.map((r: any) => [r.match_id, r]))
 
-  const rows: PlayerMatchHistoryRow[] = matchIds.map(matchId => {
+  // Sort match_ids by date+time (most recent first) before building the
+  // final rows — game_date alone can't break a tie between two matches
+  // played the same day.
+  const sortedMatchIds = [...matchIds].sort((a, b) => {
+    const ba = bookingByMatchId.get(a) as any
+    const bb = bookingByMatchId.get(b) as any
+    const dateA = ba?.game_date ?? matchById.get(a)?.match_date ?? ''
+    const dateB = bb?.game_date ?? matchById.get(b)?.match_date ?? ''
+    const timeA = ba?.match_time ?? ba?.slot_time ?? ''
+    const timeB = bb?.match_time ?? bb?.slot_time ?? ''
+    return `${dateB} ${timeB}`.localeCompare(`${dateA} ${timeA}`)
+  })
+
+  const rows: PlayerMatchHistoryRow[] = sortedMatchIds.map(matchId => {
     const m = matchById.get(matchId) as any
     const booking = bookingByMatchId.get(matchId) as any
     const bat = battingByMatch.get(matchId) as any
@@ -377,13 +413,15 @@ export async function getPlayerMatchHistory(
       tournamentName:  Array.isArray(booking?.tournament) ? booking?.tournament[0]?.name : booking?.tournament?.name ?? m?.tournament_name ?? null,
       opponentName:    m?.opponent_name ?? null,
       matchResult:     m?.match_result ?? null,
+      battedFirst:     deriveBattedFirst(m),
       batting: battedThisMatch ? {
         runs: num(bat.runs), balls: num(bat.balls), fours: num(bat.fours), sixes: num(bat.sixes),
         notOut: bat.not_out === 'Y',
         strikeRate: num(bat.balls) > 0 ? round2((num(bat.runs) / num(bat.balls)) * 100) : null,
+        howOut: bat.dismissal_method ?? null,
       } : null,
       bowling: bowledThisMatch ? {
-        overs: bowl.overs, wickets: num(bowl.wickets), runsConceded: num(bowl.runs),
+        overs: bowl.overs, dots: num(bowl.dots), wickets: num(bowl.wickets), runsConceded: num(bowl.runs),
         economy: oversToBalls(num(bowl.overs)) > 0 ? round2(num(bowl.runs) / (oversToBalls(num(bowl.overs)) / 6)) : null,
       } : null,
       fielding: field ? {
@@ -393,12 +431,13 @@ export async function getPlayerMatchHistory(
     }
   })
 
-  rows.sort((a, b) => (b.gameDate ?? '').localeCompare(a.gameDate ?? ''))
   return rows
 }
 
-export async function getLeaderboard(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] } = {}): Promise<LeaderboardRow[]> {
-  const scoped = await getScopedMatchIds(filters)
+export async function getLeaderboard(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; innings?: 'defending' | 'chasing' } = {}): Promise<LeaderboardRow[]> {
+  let scoped = await getScopedMatchIds(filters)
+  if (scoped && scoped.length === 0) return []
+  scoped = await applyInningsFilter(scoped, filters.innings)
   if (scoped && scoped.length === 0) return []
 
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ matchIds: scoped })
@@ -726,6 +765,38 @@ async function applyCaptainFilter(playerId: string, scoped: string[] | null, asC
   if (!scoped) return captainMatchIds
   const captainSet = new Set(captainMatchIds)
   return scoped.filter(id => captainSet.has(id))
+}
+
+// match_id values from the analytics DB's match_stats table where our team
+// batted first ('defending' — won the toss and chose to bat, or lost the
+// toss and the opponent chose to field) or batted second ('chasing' — the
+// inverse). Same toss_won/toss_decision combination as deriveBattedFirst()
+// above, expressed as a query instead of a per-row boolean so it can be
+// intersected with the rest of the match_id scope server-side, the same way
+// getCaptainMatchIds()/applyCaptainFilter() work for the "As Captain" filter.
+async function getInningsMatchIds(innings: 'defending' | 'chasing'): Promise<string[]> {
+  const analytics = createAnalyticsClient()
+  if (!analytics) throw new Error('Analytics database is not configured')
+  const orExpr = innings === 'defending'
+    ? 'and(toss_won.eq.Y,toss_decision.eq.bat),and(toss_won.eq.N,toss_decision.eq.field)'
+    : 'and(toss_won.eq.Y,toss_decision.eq.field),and(toss_won.eq.N,toss_decision.eq.bat)'
+  const { data, error } = await analytics.from('match_stats').select('match_id').or(orExpr)
+  if (error) throw new Error(error.message)
+  return Array.from(new Set<string>((data ?? []).map((r: any) => r.match_id).filter(Boolean)))
+}
+
+// Intersects the already-scoped match_id list with matches where our team
+// was defending (batted first) or chasing (batted second) — same "no
+// restriction" contract as applyCaptainFilter: returns `scoped` unchanged
+// when `innings` isn't set, otherwise always a concrete (possibly empty)
+// array.
+async function applyInningsFilter(scoped: string[] | null, innings?: 'defending' | 'chasing'): Promise<string[] | null> {
+  if (!innings) return scoped
+  const inningsMatchIds = await getInningsMatchIds(innings)
+  if (inningsMatchIds.length === 0) return []
+  if (!scoped) return inningsMatchIds
+  const inningsSet = new Set(inningsMatchIds)
+  return scoped.filter(id => inningsSet.has(id))
 }
 
 async function scopedPlayerStats(playerId: string, matchIds: string[]): Promise<PlayerStatsTotals | null> {

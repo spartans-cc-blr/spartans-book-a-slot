@@ -5,9 +5,10 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
-import { computeTopPerformers } from '@/lib/matchTopPerformers'
+import { computeTopPerformers, summarizeTopPerformance } from '@/lib/matchTopPerformers'
 import { MatchVerifyBlock } from '@/components/matches/MatchVerifyBlock'
 import { NotifyIcon, VerifiedStatusLine } from '@/components/matches/ScorecardVerifyPanel'
+import { BallIcon } from '@/components/matches/BallIcon'
 
 export const revalidate = 0
 
@@ -67,6 +68,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
   const tournament = Array.isArray(booking.tournament) ? booking.tournament[0] ?? null : booking.tournament
   const ground = tournament?.ground ? (Array.isArray(tournament.ground) ? tournament.ground[0] ?? null : tournament.ground) : null
+  const ballType = (tournament?.ball_type as any) ?? 'red'
 
   const [{ data: squadRows }, statsRes, uploadRes] = await Promise.all([
     supabase
@@ -113,6 +115,13 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   const performers = stats
     ? computeTopPerformers(stats.batting ?? [], stats.bowling ?? [], squad)
     : []
+
+  // Headline "🏏 top scorer / 🏐 top wicket-taker" line shown under the
+  // result strip — mirrors MatchHistoryCard's use of the same shared
+  // summarizeTopPerformance() helper (src/lib/matchTopPerformers.ts).
+  const topPerformance = stats
+    ? summarizeTopPerformance(stats.batting ?? [], stats.bowling ?? [])
+    : null
 
   const viewerSquadRow = (squadRows ?? []).find((r: any) => r.player_id === user?.playerId)
   // vibe-security: mirrors canActOnScorecard() exactly — wrangler/admin
@@ -189,13 +198,28 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
           {stats && (() => {
             const badge = resultBadgeStyle(stats.match_result)
             return (
-              <div className="flex items-center gap-2 mb-1">
-                <span style={badge.pill
-                  ? { background: badge.bg, color: badge.color, fontSize: 13, fontWeight: 800, padding: '4px 12px', borderRadius: 6, letterSpacing: '0.06em' }
-                  : { color: badge.color, fontSize: 13, fontWeight: 800, letterSpacing: '0.06em' }}>
-                  {badge.label}
-                </span>
-                <span className="text-xs text-zinc-400">{scoreLine(stats)}</span>
+              <div className="flex flex-col gap-1 mb-1">
+                <div className="flex items-center gap-2">
+                  <span style={badge.pill
+                    ? { background: badge.bg, color: badge.color, fontSize: 13, fontWeight: 800, padding: '4px 12px', borderRadius: 6, letterSpacing: '0.06em' }
+                    : { color: badge.color, fontSize: 13, fontWeight: 800, letterSpacing: '0.06em' }}>
+                    {badge.label}
+                  </span>
+                  <span className="text-xs text-zinc-400">{scoreLine(stats)}</span>
+                </div>
+                {topPerformance && (topPerformance.top_bat || topPerformance.top_bowl) && (
+                  <div className="flex flex-wrap gap-2.5 text-[10px] text-zinc-500">
+                    {topPerformance.top_bat && (
+                      <span>🏏 <span className="text-gold">{topPerformance.top_bat.name}</span> — {topPerformance.top_bat.runs} ({topPerformance.top_bat.balls})</span>
+                    )}
+                    {topPerformance.top_bowl && (
+                      <span className="inline-flex items-center gap-1">
+                        <BallIcon type={ballType} size={12} />
+                        <span className="text-gold">{topPerformance.top_bowl.name}</span> — {topPerformance.top_bowl.wickets}/{topPerformance.top_bowl.runs} ({topPerformance.top_bowl.overs} ov)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })()}
@@ -236,7 +260,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
         <div className="mt-5">
           {stats ? (
-            <ScorecardTables batting={stats.batting ?? []} bowling={stats.bowling ?? []} teamList={stats.team_list ?? []} squad={squad} />
+            <ScorecardTables batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} squad={squad} />
           ) : (
             <p className="font-rajdhani text-sm text-zinc-500">
               Scorecard not yet synced to Hub for this match.

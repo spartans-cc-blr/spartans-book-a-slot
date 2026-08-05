@@ -231,6 +231,8 @@ type BookingProp = {
   isLoggedInPlayerInSquad?:  boolean
   isLoggedInPlayerExempt?:   boolean
   loggedInWalletBalance?:    number | null
+  yCount?:                   number
+  showYCount?:               boolean
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
@@ -240,6 +242,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
   const {
     game_date, slot_time, format, opponent_name, cricheroes_url, tournament, matchStatus, match_stage,
     feePerPlayer, isLoggedInPlayerInSquad, isLoggedInPlayerExempt, loggedInWalletBalance,
+    yCount, showYCount,
   } = booking;
   const ground = tournament?.ground;
   const ballType  = tournament?.ball_type || "red";
@@ -247,6 +250,9 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
   const jLabel    = jerseyLabel(ballType);
   const hasGround = ground?.maps_url;
   const hasHosp   = ground?.hospital_url;
+  // Hidden only once a squad has been announced with a full 12 — an announced squad
+  // below 12, or no squad yet at all, keeps showing the nudge
+  const showYCountRow = !!showYCount && !(squadAnnounced && squad.length >= 12);
 
   return (
     <div style={{
@@ -515,7 +521,18 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             </div>
           )}
         </div>
-      )}  
+      )}
+
+      {/* Y-count nudge — upcoming weekend only, hidden once a full 12-player squad is announced */}
+      {showYCountRow && (
+        <div style={{
+          fontSize: "11px", color: "#9CA3AF",
+          fontFamily: "'Rajdhani', sans-serif",
+          textAlign: "left",
+        }}>
+          In: <span style={{ color: "#4ade80", fontWeight: 700 }}>{yCount ?? 0}</span> Y
+        </div>
+      )}
     </div>
   );
 }
