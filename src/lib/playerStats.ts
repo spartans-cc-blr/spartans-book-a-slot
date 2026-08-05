@@ -434,8 +434,10 @@ export async function getPlayerMatchHistory(
   return rows
 }
 
-export async function getLeaderboard(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] } = {}): Promise<LeaderboardRow[]> {
-  const scoped = await getScopedMatchIds(filters)
+export async function getLeaderboard(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; innings?: 'defending' | 'chasing' } = {}): Promise<LeaderboardRow[]> {
+  let scoped = await getScopedMatchIds(filters)
+  if (scoped && scoped.length === 0) return []
+  scoped = await applyInningsFilter(scoped, filters.innings)
   if (scoped && scoped.length === 0) return []
 
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ matchIds: scoped })
