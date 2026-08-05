@@ -30,6 +30,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const groundId = searchParams.get('ground') || undefined
   const formatParam = searchParams.get('format') || undefined
   const asCaptain = searchParams.get('captain') === '1'
+  const inningsParam = searchParams.get('innings')
+  const innings: 'defending' | 'chasing' | undefined =
+    inningsParam === 'defending' || inningsParam === 'chasing' ? inningsParam : undefined
   const year = yearParam ? Number(yearParam) : undefined
   const filters = {
     year: Number.isFinite(year) && year ? year : undefined,
@@ -38,6 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // convention — absent/both-checked means "no restriction").
     formats: formatParam ? [formatParam] : undefined,
     asCaptain,
+    innings,
   }
 
   const supabase = createServiceClient()

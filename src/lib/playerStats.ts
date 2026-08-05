@@ -313,11 +313,13 @@ async function fetchAnalyticsRows(opts: {
 // directly since it needs year, ground, AND format filters combined.
 export async function getPlayerStats(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean; innings?: 'defending' | 'chasing' } = {}
 ): Promise<PlayerStatsTotals> {
   let scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return emptyTotals()
   scoped = await applyCaptainFilter(playerId, scoped, filters.asCaptain)
+  if (scoped && scoped.length === 0) return emptyTotals()
+  scoped = await applyInningsFilter(scoped, filters.innings)
   if (scoped && scoped.length === 0) return emptyTotals()
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
   const matchIds = new Set<string>(team.map((r: any) => r.match_id).filter(Boolean))
@@ -340,11 +342,13 @@ export async function getPlayerSeasonStats(playerId: string, year: number): Prom
 // this file rather than showing a misleading 0.
 export async function getPlayerMatchHistory(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean; innings?: 'defending' | 'chasing' } = {}
 ): Promise<PlayerMatchHistoryRow[]> {
   let scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return []
   scoped = await applyCaptainFilter(playerId, scoped, filters.asCaptain)
+  if (scoped && scoped.length === 0) return []
+  scoped = await applyInningsFilter(scoped, filters.innings)
   if (scoped && scoped.length === 0) return []
 
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ playerId, matchIds: scoped })
@@ -759,6 +763,38 @@ async function applyCaptainFilter(playerId: string, scoped: string[] | null, asC
   if (!scoped) return captainMatchIds
   const captainSet = new Set(captainMatchIds)
   return scoped.filter(id => captainSet.has(id))
+}
+
+// match_id values from the analytics DB's match_stats table where our team
+// batted first ('defending' — won the toss and chose to bat, or lost the
+// toss and the opponent chose to field) or batted second ('chasing' — the
+// inverse). Same toss_won/toss_decision combination as deriveBattedFirst()
+// above, expressed as a query instead of a per-row boolean so it can be
+// intersected with the rest of the match_id scope server-side, the same way
+// getCaptainMatchIds()/applyCaptainFilter() work for the "As Captain" filter.
+async function getInningsMatchIds(innings: 'defending' | 'chasing'): Promise<string[]> {
+  const analytics = createAnalyticsClient()
+  if (!analytics) throw new Error('Analytics database is not configured')
+  const orExpr = innings === 'defending'
+    ? 'and(toss_won.eq.Y,toss_decision.eq.bat),and(toss_won.eq.N,toss_decision.eq.field)'
+    : 'and(toss_won.eq.Y,toss_decision.eq.field),and(toss_won.eq.N,toss_decision.eq.bat)'
+  const { data, error } = await analytics.from('match_stats').select('match_id').or(orExpr)
+  if (error) throw new Error(error.message)
+  return Array.from(new Set<string>((data ?? []).map((r: any) => r.match_id).filter(Boolean)))
+}
+
+// Intersects the already-scoped match_id list with matches where our team
+// was defending (batted first) or chasing (batted second) — same "no
+// restriction" contract as applyCaptainFilter: returns `scoped` unchanged
+// when `innings` isn't set, otherwise always a concrete (possibly empty)
+// array.
+async function applyInningsFilter(scoped: string[] | null, innings?: 'defending' | 'chasing'): Promise<string[] | null> {
+  if (!innings) return scoped
+  const inningsMatchIds = await getInningsMatchIds(innings)
+  if (inningsMatchIds.length === 0) return []
+  if (!scoped) return inningsMatchIds
+  const inningsSet = new Set(inningsMatchIds)
+  return scoped.filter(id => inningsSet.has(id))
 }
 
 async function scopedPlayerStats(playerId: string, matchIds: string[]): Promise<PlayerStatsTotals | null> {

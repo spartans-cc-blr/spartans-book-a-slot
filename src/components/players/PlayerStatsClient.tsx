@@ -60,14 +60,17 @@ export function PlayerStatsClient({
   const [groundId, setGroundId] = useState<string>('all')
   const [formats, setFormats] = useState<Set<Format>>(new Set<Format>(['T20', 'T30']))
   const [asCaptain, setAsCaptain] = useState(false)
+  // Defending = batted first, set a target. Chasing = batted second, chasing
+  // the opponent's target. Derived from the analytics DB's toss_won/
+  // toss_decision (see getInningsMatchIds() in src/lib/playerStats.ts).
+  const [innings, setInnings] = useState<'all' | 'defending' | 'chasing'>('all')
   const [scoped, setScoped] = useState<PlayerStatsTotals>(initialCareer)
   const [matches, setMatches] = useState<PlayerMatchHistoryRow[]>(initialMatches)
   const [loading, setLoading] = useState(false)
   const [statTab, setStatTab] = useState<StatTab>('batting')
-  const [inningsFilter, setInningsFilter] = useState<'all' | 'first' | 'chasing'>('all')
 
   const fetchScoped = useCallback(async () => {
-    if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain) {
+    if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain && innings === 'all') {
       setScoped(initialCareer)
       setMatches(initialMatches)
       return
@@ -78,6 +81,7 @@ export function PlayerStatsClient({
     if (groundId !== 'all') params.set('ground', groundId)
     if (formats.size === 1) params.set('format', Array.from(formats)[0])
     if (asCaptain) params.set('captain', '1')
+    if (innings !== 'all') params.set('innings', innings)
     const res = await fetch(`/api/players/${player.id}/match-history?${params.toString()}`)
     if (res.ok) {
       const d = await res.json()
@@ -85,7 +89,7 @@ export function PlayerStatsClient({
       setMatches(d.matches)
     }
     setLoading(false)
-  }, [year, groundId, formats, asCaptain, player.id, initialCareer, initialMatches])
+  }, [year, groundId, formats, asCaptain, innings, player.id, initialCareer, initialMatches])
 
   useEffect(() => { fetchScoped() }, [fetchScoped])
 
@@ -104,21 +108,15 @@ export function PlayerStatsClient({
     })
   }
 
-  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain
+  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain || innings !== 'all'
 
   const tabMatches = useMemo(
     () => matches.filter(m => {
       if (statTab === 'batting') return !!m.batting
       if (statTab === 'bowling') return !!m.bowling
       return !!m.fielding && (m.fielding.catches > 0 || m.fielding.stumpings > 0 || m.fielding.runOuts > 0)
-    }).filter(m => {
-      if (inningsFilter === 'all') return true
-      // Matches with no toss signal (older parses) are excluded from
-      // either scoped filter rather than guessed at.
-      if (m.battedFirst === null) return false
-      return inningsFilter === 'first' ? m.battedFirst : !m.battedFirst
     }),
-    [matches, statTab, inningsFilter],
+    [matches, statTab],
   )
 
   return (
@@ -181,6 +179,18 @@ export function PlayerStatsClient({
               <input type="checkbox" checked={asCaptain} onChange={() => setAsCaptain(v => !v)} className="accent-gold" />
               As Captain
             </label>
+            <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
+              ${innings === 'defending' ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={innings === 'defending'}
+                onChange={() => setInnings(v => v === 'defending' ? 'all' : 'defending')} className="accent-gold" />
+              Defending
+            </label>
+            <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
+              ${innings === 'chasing' ? 'text-gold-dim' : 'text-stone-500'}`}>
+              <input type="checkbox" checked={innings === 'chasing'}
+                onChange={() => setInnings(v => v === 'chasing' ? 'all' : 'chasing')} className="accent-gold" />
+              Chasing
+            </label>
           </div>
           <select value={groundId} onChange={e => setGroundId(e.target.value)}
             className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5 w-full">
@@ -222,21 +232,12 @@ export function PlayerStatsClient({
         {/* Match by match */}
         <div className="bg-white border border-parchment-3 rounded-2xl p-5">
           <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">Match History</h2>
-          <div className="flex gap-2 mb-2">
+          <div className="flex gap-2 mb-4">
             {STAT_TABS.map(t => (
               <button key={t} onClick={() => setStatTab(t)}
                 className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors capitalize
                   ${statTab === t ? 'bg-gold/10 border-gold-dim text-gold-dim' : 'border-parchment-3 text-stone-500 hover:text-stone-700'}`}>
                 {t}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2 mb-4">
-            {([['all', 'All'], ['first', 'Batted First'], ['chasing', 'Chasing']] as const).map(([key, label]) => (
-              <button key={key} onClick={() => setInningsFilter(key)}
-                className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors
-                  ${inningsFilter === key ? 'bg-gold/10 border-gold-dim text-gold-dim' : 'border-parchment-3 text-stone-500 hover:text-stone-700'}`}>
-                {label}
               </button>
             ))}
           </div>
