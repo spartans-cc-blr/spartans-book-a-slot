@@ -232,7 +232,7 @@ type BookingProp = {
   isLoggedInPlayerExempt?:   boolean
   loggedInWalletBalance?:    number | null
   yCount?:                   number
-  showYCount?:               boolean
+  isUpcomingWeekendSlot?:    boolean
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
@@ -242,7 +242,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
   const {
     game_date, slot_time, format, opponent_name, cricheroes_url, tournament, matchStatus, match_stage,
     feePerPlayer, isLoggedInPlayerInSquad, isLoggedInPlayerExempt, loggedInWalletBalance,
-    yCount, showYCount,
+    yCount, isUpcomingWeekendSlot,
   } = booking;
   const ground = tournament?.ground;
   const ballType  = tournament?.ball_type || "red";
@@ -250,9 +250,10 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
   const jLabel    = jerseyLabel(ballType);
   const hasGround = ground?.maps_url;
   const hasHosp   = ground?.hospital_url;
-  // Hidden only once a squad has been announced with a full 12 — an announced squad
-  // below 12, or no squad yet at all, keeps showing the nudge
-  const showYCountRow = !!showYCount && !(squadAnnounced && squad.length >= 12);
+  // "Slot open" — Y-count only, no squad/O/E involved. Shows for the upcoming weekend's
+  // slots while Y is under 12, all the way through squad announcement, until the match
+  // itself goes in_progress. At 12+ Y, nothing is shown at all.
+  const showSlotOpen = !!isUpcomingWeekendSlot && matchStatus !== 'in_progress' && (yCount ?? 0) < 12;
 
   return (
     <div style={{
@@ -523,14 +524,14 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
         </div>
       )}
 
-      {/* Y-count nudge — upcoming weekend only, hidden once a full 12-player squad is announced */}
-      {showYCountRow && (
+      {/* Slot open — upcoming weekend only, Y-count under 12, shown until the match goes in_progress */}
+      {showSlotOpen && (
         <div style={{
-          fontSize: "11px", color: "#9CA3AF",
+          fontSize: "11px", color: "#fbbf24", fontWeight: 700,
           fontFamily: "'Rajdhani', sans-serif",
           textAlign: "left",
         }}>
-          In: <span style={{ color: "#4ade80", fontWeight: 700 }}>{yCount ?? 0}</span> Y
+          ⚠ Slot open
         </div>
       )}
     </div>

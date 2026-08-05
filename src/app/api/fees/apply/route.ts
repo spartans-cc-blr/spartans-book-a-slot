@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { sendPushToPlayer } from '@/lib/webpush'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -64,6 +65,11 @@ export async function POST(req: NextRequest) {
 
   // Apply: debit each non-exempt player's wallet
   const errors: string[] = []
+  // Collected rather than awaited inline — sent together after the loop so
+  // one slow push doesn't serialize the whole debit run. Still awaited
+  // before the response is returned (Vercel kills fire-and-forget work the
+  // instant a serverless function returns — see webpush.ts / push-notifications.md).
+  const pushes: Promise<unknown>[] = []
   for (const row of nonExemptSquad) {
     const player = row.players as any
     const currentBalance: number = player?.wallet_balance ?? 0
@@ -76,15 +82,31 @@ export async function POST(req: NextRequest) {
 
     if (error) errors.push(`${row.player_id}: ${error.message}`)
 
-    // Record wallet transaction
-    await supabase.from('wallet_transactions').insert({
+    // Record wallet transaction — wallet_transactions.type only allows
+    // 'debit'/'credit' and the free-text column is `reason`, not `note`;
+    // this insert previously violated both silently (error was never
+    // checked), so every fee-apply left the ledger empty. amount is a
+    // positive magnitude here, matching POST /api/wallet/transactions'
+    // convention — direction comes from `type`, not the sign.
+    const { error: txError } = await supabase.from('wallet_transactions').insert({
       player_id:   row.player_id,
-      amount:      -feePerPlayer,
-      type:        'match_fee',
+      amount:      feePerPlayer,
+      type:        'debit',
       booking_id,
-      note:        `Match fee debit — ₹${feePerPlayer}`,
+      reason:      `Match fee debit — ₹${feePerPlayer}`,
     })
+    if (txError) errors.push(`${row.player_id} (ledger): ${txError.message}`)
+
+    if (!error && !txError) {
+      pushes.push(sendPushToPlayer(row.player_id, {
+        title: '💰 Wallet Debited',
+        body: `-₹${feePerPlayer} — Match fee. New balance: ₹${newBalance}`,
+        url: '/profile',
+      }))
+    }
   }
+
+  await Promise.allSettled(pushes)
 
   if (errors.length) {
     return NextResponse.json({ error: 'Partial failure', details: errors }, { status: 500 })

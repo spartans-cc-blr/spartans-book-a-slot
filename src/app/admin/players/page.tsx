@@ -11,6 +11,16 @@ type FeeExemption = {
   notes: string | null
 }
 
+type WalletTransaction = {
+  id: string
+  type: 'credit' | 'debit'
+  amount: number
+  reason: string
+  notes: string | null
+  created_by: string | null
+  created_at: string
+}
+
 type Player = {
   id: string
   name: string
@@ -53,6 +63,11 @@ export default function AdminPlayersPage() {
   const [showAdd,     setShowAdd]     = useState(false)
   const [showExempt,  setShowExempt]  = useState<string | null>(null)
   const [exemptForm,  setExemptForm]  = useState({ reason: 'student', start_date: new Date().toISOString().split('T')[0], end_date: '', notes: '' })
+  const [showWallet,  setShowWallet]  = useState<string | null>(null)
+  const [walletForm,  setWalletForm]  = useState({ type: 'credit' as 'credit' | 'debit', amount: '', reason: '' })
+  const [walletHistory, setWalletHistory] = useState<Record<string, WalletTransaction[]>>({})
+  const [walletSaving, setWalletSaving] = useState(false)
+  const [walletError,  setWalletError]  = useState('')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
   const [search,      setSearch]      = useState('')
@@ -169,6 +184,52 @@ export default function AdminPlayersPage() {
     if (res.ok) {
       setPlayers(prev => prev.map(p => p.id === id ? { ...p, status: 'expelled' } : p))
     }
+  }
+
+  async function loadWalletHistory(playerId: string) {
+    const res = await fetch(`/api/wallet/transactions?player_id=${playerId}`)
+    if (res.ok) {
+      const d = await res.json()
+      setWalletHistory(prev => ({ ...prev, [playerId]: d.transactions ?? [] }))
+    }
+  }
+
+  async function toggleWallet(playerId: string) {
+    const next = showWallet === playerId ? null : playerId
+    setShowWallet(next)
+    setWalletError('')
+    setWalletForm({ type: 'credit', amount: '', reason: '' })
+    if (next && !walletHistory[playerId]) await loadWalletHistory(playerId)
+  }
+
+  async function submitWalletTransaction(playerId: string) {
+    const amount = parseFloat(walletForm.amount)
+    if (!amount || amount <= 0 || !walletForm.reason.trim()) {
+      setWalletError('Amount and reason are required.')
+      return
+    }
+    setWalletSaving(true)
+    setWalletError('')
+    const res = await fetch('/api/wallet/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        player_id: playerId,
+        type: walletForm.type,
+        amount,
+        reason: walletForm.reason.trim(),
+      }),
+    })
+    if (res.ok) {
+      const d = await res.json()
+      setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, wallet_balance: d.player.wallet_balance } : p))
+      setWalletHistory(prev => ({ ...prev, [playerId]: [d.transaction, ...(prev[playerId] ?? [])] }))
+      setWalletForm({ type: 'credit', amount: '', reason: '' })
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setWalletError(d.error ?? 'Failed to record wallet transaction.')
+    }
+    setWalletSaving(false)
   }
 
   async function endExemption(playerId: string, exemptionId: string) {
@@ -306,7 +367,6 @@ export default function AdminPlayersPage() {
                             { label: 'WhatsApp', key: 'whatsapp', type: 'tel' },
                             { label: 'Jersey Name', key: 'jersey_name', type: 'text' },
                             { label: 'Jersey No', key: 'jersey_number', type: 'number' },
-                            { label: 'Wallet Balance', key: 'wallet_balance', type: 'number' },
                             { label: 'CricHeroes URL', key: 'cricheroes_url', type: 'text' },
                             { label: 'Referred By', key: 'referred_by', type: 'text' },
                           ].map(({ label, key, type }) => (
@@ -362,6 +422,73 @@ export default function AdminPlayersPage() {
                               className="font-rajdhani text-xs text-zinc-600 hover:text-red-400 border border-ink-5 hover:border-red-800 px-2 py-1.5 rounded transition-colors ml-auto">
                               Expel player
                             </button>
+                          )}
+                        </div>
+
+                        {/* Wallet */}
+                        <div className="mt-4 border-t border-ink-5 pt-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-cinzel text-xs text-gold">
+                              Wallet · <span className={p.wallet_balance < 0 ? 'text-amber-400' : 'text-zinc-300'}>₹{p.wallet_balance}</span>
+                            </p>
+                            <button onClick={() => toggleWallet(p.id)}
+                              className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors">
+                              {showWallet === p.id ? '✕ Close' : '＋ Update Wallet'}
+                            </button>
+                          </div>
+
+                          {showWallet === p.id && (
+                            <div className="bg-ink-4 p-3 rounded border border-ink-5">
+                              <div className="grid sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="form-label">Type</label>
+                                  <select value={walletForm.type}
+                                    onChange={e => setWalletForm(f => ({ ...f, type: e.target.value as 'credit' | 'debit' }))}
+                                    className="form-input">
+                                    <option value="credit">Credit (add)</option>
+                                    <option value="debit">Debit (deduct)</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="form-label">Amount (₹)</label>
+                                  <input type="number" min="0" step="1" value={walletForm.amount}
+                                    onChange={e => setWalletForm(f => ({ ...f, amount: e.target.value }))}
+                                    className="form-input" />
+                                </div>
+                                <div className="sm:col-span-1">
+                                  <label className="form-label">Reason</label>
+                                  <input type="text" value={walletForm.reason}
+                                    placeholder="e.g. Top-up via UPI"
+                                    onChange={e => setWalletForm(f => ({ ...f, reason: e.target.value }))}
+                                    className="form-input" />
+                                </div>
+                              </div>
+                              {walletError && <p className="font-rajdhani text-xs text-red-400 mt-2">{walletError}</p>}
+                              <button onClick={() => submitWalletTransaction(p.id)} disabled={walletSaving}
+                                className="mt-3 font-rajdhani text-xs font-bold bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
+                                {walletSaving ? 'Saving...' : '✓ Apply & Notify Player'}
+                              </button>
+                              <p className="font-rajdhani text-[10px] text-zinc-600 mt-1.5">
+                                Pushes a notification to the player if they've subscribed on their profile.
+                              </p>
+
+                              {/* Recent transactions */}
+                              {(walletHistory[p.id] ?? []).length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-ink-5 space-y-1">
+                                  {walletHistory[p.id].map(t => (
+                                    <div key={t.id} className="flex items-center justify-between text-xs font-rajdhani text-zinc-500">
+                                      <span>
+                                        <span className={t.type === 'credit' ? 'text-emerald-400' : 'text-amber-400'}>
+                                          {t.type === 'credit' ? '+' : '-'}₹{t.amount}
+                                        </span>
+                                        {' '}· {t.reason}
+                                      </span>
+                                      <span className="text-zinc-600">{new Date(t.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
 

@@ -23,6 +23,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { validateBooking } from '@/lib/validation'
 import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 import { GAME_DATE_REGEX } from '@/lib/schemas'
+import { notifyGCs } from '@/lib/webpush'
 import { SLOT_TIMES, ORGANISER_SELF_SERVICE_REASON } from '@/types'
 import type { CreateBookingRequest, GameFormat, SlotTime } from '@/types'
 
@@ -123,6 +124,18 @@ export async function POST(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Notify GC the moment the hold is made, not just once a CricHeroes link
+  // is attached (organiser-attach-url's own notifyGCs call) — an organiser
+  // who reserves and never comes back to paste a match link is still an
+  // actionable pending hold an admin needs to know exists. Awaited before
+  // returning, same reason as every other push in this app: Vercel kills
+  // fire-and-forget work the moment the response is sent.
+  await notifyGCs(
+    '\u{1F514} Self-service slot reserved',
+    `${tournament.name} · ${game_date} · ${slot_time} — held by ${organiser_name}, match link pending`,
+    `/admin/bookings/${data.id}`
+  )
 
   return NextResponse.json({ booking: data }, { status: 201 })
 }

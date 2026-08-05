@@ -229,3 +229,22 @@ export const bookingRuleOverrideSchema = z.object({
 })
 
 export const bookingRuleOverridesSchema = z.array(bookingRuleOverrideSchema).max(6).optional()
+
+// ── WALLET TRANSACTIONS (admin-only) ────────────────────────────────────────
+// POST/GET /api/wallet/transactions — see wallet_transactions table
+// (live in Supabase, not yet in supabase/migrations/ — same drift pattern
+// documented elsewhere in this repo) and .claude/rules/security.md §10.
+
+export const walletTransactionSchema = z.object({
+  player_id: z.string().uuid('player_id must be a valid UUID'),
+  type: z.enum(['credit', 'debit'], { message: 'type must be credit or debit' }),
+  // Magnitude only — direction comes from `type`. Capped well above any
+  // real club fee/top-up to catch a fat-fingered extra zero.
+  amount: z.number().positive('amount must be greater than 0').max(100000, 'amount is too large'),
+  reason: z
+    .string()
+    .min(3, 'Reason must be at least 3 characters')
+    .max(200, 'Reason max 200 characters')
+    .trim(),
+  notes: z.string().max(500, 'Notes max 500 characters').trim().optional(),
+})

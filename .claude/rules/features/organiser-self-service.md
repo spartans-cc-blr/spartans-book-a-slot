@@ -130,9 +130,30 @@ already mid-flow on one particular card.
 
 | Route | Method | Purpose |
 |---|---|---|
-| `/api/tournaments/[id]/organiser-reserve` | POST | Re-validates the exact `{game_date, slot_time, format}` the organiser is committing to (not a day-level check) via `validateBooking()`; creates a `soft_block` (48h) tagged to the tournament with the organiser's own name/phone. Returns `{taken: true}` (409) if the slot was taken between page-load and click, or if validation now fails for any reason (including landing on an existing R7-protected knockout day) — the client treats this identically to a decline. |
+| `/api/tournaments/[id]/organiser-reserve` | POST | Re-validates the exact `{game_date, slot_time, format}` the organiser is committing to (not a day-level check) via `validateBooking()`; creates a `soft_block` (48h) tagged to the tournament with the organiser's own name/phone. Returns `{taken: true}` (409) if the slot was taken between page-load and click, or if validation now fails for any reason (including landing on an existing R7-protected knockout day) — the client treats this identically to a decline. Notifies GC via `notifyGCs()` on success (added August 2026 — see below). |
 | `/api/tournaments/[id]/organiser-next-slot` | POST | Read-only lookup (`findNextSlotDate`) for the "Not available" step on one bucket. Rate-limited under `publicRead`, not `organiserWrite`, since nothing is written. |
 | `/api/tournaments/[id]/organiser-attach-url` | POST | Attaches a CricHeroes URL (validated via `isCricheroesUrl()`) to a hold this same flow created — refuses anything not `status = 'soft_block'` with the exact `ORGANISER_SELF_SERVICE_REASON`, so it can't be pointed at an arbitrary `booking_id`. Notifies GC via the existing `notifyGCs()` helper; never flips status itself. |
+
+### GC notification fires on reserve, not just on attach-url (fixed August 2026)
+
+The first cut of this feature only called `notifyGCs()` from `organiser-attach-url`
+— the "match link attached, ready to confirm" step. That meant an organiser
+who reserved a slot and never came back to paste a CricHeroes link produced
+**zero notification at all**: the hold sat in `bookings` as an unconfirmed
+`soft_block`, invisible to every admin/GC unless someone happened to open
+the share page or query the DB directly (exactly how a real stale hold —
+reserved by an organiser named Ravi, never followed up — was found and
+diagnosed). The reservation itself is the actionable event, not just the
+follow-up step, since an admin may want to reach out or confirm even
+before a match link exists. `organiser-reserve/route.ts` now also calls
+`notifyGCs()` on a successful insert, awaited before the response is sent
+(same reason as every other push in this app — Vercel kills fire-and-forget
+work the instant the response returns), with its own distinct copy
+("🔔 Self-service slot reserved … match link pending") so it doesn't read
+like a duplicate of the attach-url notification. A tournament's full flow
+now sends up to two GC notifications per booking — one at reserve, one at
+attach-url — which is intentional, not a duplicate: they signal two
+different states (held vs. ready to confirm).
 
 All three re-derive tournament-scoped authorization server-side
 (`organiser_self_service` must be `true` for that tournament) — never
