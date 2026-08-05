@@ -143,6 +143,20 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
   return t
 }
 
+// Tournaments flagged tournaments.is_practice (currently just the single
+// "Practice games" umbrella tournament — see migration
+// 054_tournament_is_practice.sql). Practice games are not real tournament
+// fixtures, so they're excluded from every stats aggregate by default; only
+// callers that explicitly scope to one tournament (that tournament's own
+// stats, whichever it is) or that pass `includePractice` (the personal
+// stats page's opt-in toggle) see through the exclusion.
+async function getPracticeTournamentIds(): Promise<Set<string>> {
+  const hub = createServiceClient()
+  const { data, error } = await hub.from('tournaments').select('id').eq('is_practice', true)
+  if (error) throw new Error(error.message)
+  return new Set<string>((data ?? []).map((t: any) => t.id))
+}
+
 // Resolves a {year|month, tournamentId, groundId, formats} filter to a
 // concrete list of Hub bookings.match_id values. Returns null when nothing
 // is set — the caller should treat null as "no restriction" (all-time, all
@@ -161,11 +175,23 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
 // never combined by any caller today — Monthly scopes by month alone, every
 // other view scopes by year alone — so `month` simply takes precedence
 // when both happen to be set, rather than trying to intersect the two.
-async function getScopedMatchIds(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] }): Promise<string[] | null> {
+async function getScopedMatchIds(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; includePractice?: boolean }): Promise<string[] | null> {
   const hasFormatRestriction = !!filters.formats && filters.formats.length > 0
-  if (!filters.year && !filters.month && !filters.tournamentId && !filters.groundId && !hasFormatRestriction) return null
+
+  // Excluding practice games is itself a restriction, so the "nothing is
+  // set, return null (fully unrestricted)" shortcut below can't apply
+  // whenever the exclusion is in effect — an explicit tournamentId always
+  // wins (that's a deliberate, narrow request, not a default aggregate).
+  const excludePractice = !filters.tournamentId && !filters.includePractice
+  const hasAnyFilter = !!filters.year || !!filters.month || !!filters.tournamentId || !!filters.groundId || hasFormatRestriction
+  if (!hasAnyFilter && !excludePractice) return null
 
   const hub = createServiceClient()
+  const practiceIds = excludePractice ? await getPracticeTournamentIds() : new Set<string>()
+
+  function withoutPractice(rows: any[]): any[] {
+    return excludePractice ? rows.filter(b => !practiceIds.has(b.tournament_id)) : rows
+  }
 
   function baseQuery() {
     // Cancelled bookings are excluded — a rescheduled match's old slot is
@@ -174,7 +200,7 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
     // now-stale cancelled attempts happened to be booked for, on top of
     // the one it actually got played in. Confirmed, real incident: see
     // getPerformances()'s comment below.
-    let q = hub.from('bookings').select('match_id').not('match_id', 'is', null).eq('status', 'confirmed')
+    let q = hub.from('bookings').select('match_id, tournament_id').not('match_id', 'is', null).eq('status', 'confirmed')
     if (filters.tournamentId) q = q.eq('tournament_id', filters.tournamentId)
     if (filters.month) {
       const [y, m] = filters.month.split('-').map(Number)
@@ -190,7 +216,7 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
   if (!filters.groundId) {
     const { data, error } = await baseQuery()
     if (error) throw new Error(error.message)
-    return Array.from(new Set<string>((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+    return Array.from(new Set<string>(withoutPractice(data ?? []).map((b: any) => b.match_id).filter(Boolean)))
   }
 
   // Ground isn't a direct column on a booking — resolve it as the UNION of
@@ -222,8 +248,8 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
   if (byVenue.error) throw new Error(byVenue.error.message)
 
   const matchIds = new Set<string>()
-  for (const b of byTournament.data ?? []) if (b.match_id) matchIds.add(b.match_id)
-  for (const b of byVenue.data ?? []) if (b.match_id) matchIds.add(b.match_id)
+  for (const b of withoutPractice(byTournament.data ?? [])) if (b.match_id) matchIds.add(b.match_id)
+  for (const b of withoutPractice(byVenue.data ?? [])) if (b.match_id) matchIds.add(b.match_id)
   return Array.from(matchIds)
 }
 
@@ -235,6 +261,11 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
 // match (match_id set) in that format are returned, so the Tournament/
 // Ground dropdowns never offer a combination the leaderboard would then
 // show as empty.
+//
+// The "Practice games" umbrella tournament (tournaments.is_practice) is
+// excluded from this list entirely — practice games aren't counted towards
+// leaderboard stats at all (see getScopedMatchIds()), so offering it as a
+// selectable Tournament filter here would be misleading.
 export async function getFilterOptions(formats?: string[]): Promise<{
   tournaments: { id: string; name: string }[]
   grounds:     { id: string; name: string }[]
@@ -243,7 +274,7 @@ export async function getFilterOptions(formats?: string[]): Promise<{
 
   if (!formats || formats.length === 0) {
     const [{ data: tournaments, error: tErr }, { data: grounds, error: gErr }] = await Promise.all([
-      hub.from('tournaments').select('id, name').order('name', { ascending: true }),
+      hub.from('tournaments').select('id, name').eq('is_practice', false).order('name', { ascending: true }),
       hub.from('grounds').select('id, name').order('name', { ascending: true }),
     ])
     if (tErr) throw new Error(tErr.message)
@@ -253,7 +284,7 @@ export async function getFilterOptions(formats?: string[]): Promise<{
 
   const { data: bookings, error } = await hub
     .from('bookings')
-    .select('tournament:tournaments(id, name, ground:grounds(id, name))')
+    .select('tournament:tournaments(id, name, is_practice, ground:grounds(id, name))')
     .in('format', formats)
     .not('match_id', 'is', null)
     .not('tournament_id', 'is', null)
@@ -264,7 +295,7 @@ export async function getFilterOptions(formats?: string[]): Promise<{
   const groundMap = new Map<string, { id: string; name: string }>()
   for (const row of bookings ?? []) {
     const t = (row as any).tournament
-    if (!t) continue
+    if (!t || t.is_practice) continue
     tournamentMap.set(t.id, { id: t.id, name: t.name })
     if (t.ground) groundMap.set(t.ground.id, { id: t.ground.id, name: t.ground.name })
   }
@@ -313,7 +344,7 @@ async function fetchAnalyticsRows(opts: {
 // directly since it needs year, ground, AND format filters combined.
 export async function getPlayerStats(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean; innings?: 'defending' | 'chasing' } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean; innings?: 'defending' | 'chasing'; includePractice?: boolean } = {}
 ): Promise<PlayerStatsTotals> {
   let scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return emptyTotals()
@@ -342,7 +373,7 @@ export async function getPlayerSeasonStats(playerId: string, year: number): Prom
 // this file rather than showing a misleading 0.
 export async function getPlayerMatchHistory(
   playerId: string,
-  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean; innings?: 'defending' | 'chasing' } = {}
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[]; asCaptain?: boolean; innings?: 'defending' | 'chasing'; includePractice?: boolean } = {}
 ): Promise<PlayerMatchHistoryRow[]> {
   let scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return []
