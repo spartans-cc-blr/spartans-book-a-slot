@@ -225,6 +225,7 @@ export default function AdminPlayersPage() {
       setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, wallet_balance: d.player.wallet_balance } : p))
       setWalletHistory(prev => ({ ...prev, [playerId]: [d.transaction, ...(prev[playerId] ?? [])] }))
       setWalletForm({ type: 'credit', amount: '', reason: '' })
+      setShowWallet(null)
     } else {
       const d = await res.json().catch(() => ({}))
       setWalletError(d.error ?? 'Failed to record wallet transaction.')
