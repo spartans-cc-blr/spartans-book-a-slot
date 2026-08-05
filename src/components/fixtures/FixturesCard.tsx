@@ -250,10 +250,13 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
   const jLabel    = jerseyLabel(ballType);
   const hasGround = ground?.maps_url;
   const hasHosp   = ground?.hospital_url;
-  // "Slot open" — Y-count only, no squad/O/E involved. Shows for the upcoming weekend's
-  // slots while Y is under 12, all the way through squad announcement, until the match
-  // itself goes in_progress. At 12+ Y, nothing is shown at all.
-  const showSlotOpen = !!isUpcomingWeekendSlot && matchStatus !== 'in_progress' && (yCount ?? 0) < 12;
+  // "Slot underfilled" — Y-count only, no squad/O/E involved. Shows for the upcoming
+  // weekend's slots while Y is under 12, all the way through squad announcement, until
+  // the match itself goes in_progress. At 12+ Y, nothing is shown at all.
+  // Named "underfilled" rather than "open" so it never reads as contradicting the
+  // separate "🔒 Availability locked" message once the Thursday cron or squad
+  // submission locks the slot — this badge is a headcount fact, not an invitation.
+  const showSlotUnderfilled = !!isUpcomingWeekendSlot && matchStatus !== 'in_progress' && (yCount ?? 0) < 12;
 
   return (
     <div style={{
@@ -524,14 +527,14 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
         </div>
       )}
 
-      {/* Slot open — upcoming weekend only, Y-count under 12, shown until the match goes in_progress */}
-      {showSlotOpen && (
+      {/* Slot underfilled — upcoming weekend only, Y-count under 12, shown until the match goes in_progress */}
+      {showSlotUnderfilled && (
         <div style={{
           fontSize: "11px", color: "#fbbf24", fontWeight: 700,
           fontFamily: "'Rajdhani', sans-serif",
           textAlign: "left",
         }}>
-          ⚠ Slot open
+          ⚠ Slot underfilled
         </div>
       )}
     </div>

@@ -50,7 +50,7 @@ export function FixturesWeekendGroup({
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({})
   const [errorMap,  setErrorMap]  = useState<Record<string, string | null>>({})
 
-  // Live Y-count per booking — drives the "Slot open" flag (shown while under 12).
+  // Live Y-count per booking — drives the "Slot underfilled" flag (shown while under 12).
   // Seeded from the server-rendered value, then nudged optimistically whenever this
   // player's own response crosses in/out of Y, so the card doesn't need a full page
   // reload to reflect a just-saved change.
