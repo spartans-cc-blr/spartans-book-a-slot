@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { AdminSidebar } from '@/components/admin/AdminSidebar'
+import { AdminPersonaSwitcher } from '@/components/admin/AdminPersonaSwitcher'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -25,10 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <span className="font-rajdhani text-zinc-700 text-xs tracking-widest">/ ADMIN</span>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <a href="/"
-            className="font-rajdhani text-xs text-zinc-500 hover:text-gold border border-ink-5 px-3 py-1 rounded transition-colors">
-            ← Hub
-          </a>
+          <AdminPersonaSwitcher />
           {session.user?.image && (
             <img src={session.user.image} alt="" className="w-6 h-6 rounded-full opacity-80" />
           )}
