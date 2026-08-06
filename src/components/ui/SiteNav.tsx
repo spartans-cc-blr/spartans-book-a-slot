@@ -6,10 +6,9 @@ import { JerseyIcon } from '@/components/ui/JerseyIcon'
 
 interface SiteNavProps {
   activePage?: string
-  isAdmin?:    boolean
 }
 
-export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
+export function SiteNav({ activePage }: SiteNavProps) {
   const [open,         setOpen]         = useState(false)
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [gcOpen,       setGcOpen]       = useState(false)
@@ -20,9 +19,10 @@ export function SiteNav({ activePage, isAdmin }: SiteNavProps) {
   const player     = session?.user as any
   const isLoggedIn = status === 'authenticated'
   const isExpelled = player?.playerStatus === 'expelled'
-  const isGC       = !!player?.isGC || !!player?.isAdmin
+  const isAdmin    = !!player?.isAdmin
+  const isGC       = !!player?.isGC || isAdmin
   const isCaptain  = !!player?.isCaptain
-  const isWrangler = !!player?.isWrangler || !!player?.isAdmin
+  const isWrangler = !!player?.isWrangler || isAdmin
 
   const links = [
     { href: 'https://spartanscricketclub.vercel.app', label: 'Club Site' },

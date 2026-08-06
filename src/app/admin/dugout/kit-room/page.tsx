@@ -70,7 +70,7 @@ export default async function AdminKitRoomPage() {
 
   return (
     <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
-      <SiteNav activePage="dugout" isAdmin={user.isAdmin} />
+      <SiteNav activePage="dugout" />
       <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
         <div className="max-w-5xl mx-auto">
           <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Kit Room — Admin</h1>
