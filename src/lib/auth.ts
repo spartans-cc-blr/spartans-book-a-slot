@@ -30,7 +30,7 @@ export const authOptions: NextAuthOptions = {
         const supabase = createServiceClient()
         const { data: player, error: playerErr } = await supabase
           .from('players')
-          .select('id, name, is_captain, is_gc, is_wrangler, status, photo_url, default_persona')
+          .select('id, name, is_captain, is_gc, is_wrangler, status, photo_url')
           .eq('gmail_id', email.toLowerCase())
           .single()
 
@@ -47,7 +47,6 @@ export const authOptions: NextAuthOptions = {
         token.playerStatus = player?.status ?? null
         token.isAdmin      = ADMIN_EMAILS.includes(email.toLowerCase())
         token.photoUrl     = player?.photo_url ?? null
-        token.defaultPersona = player?.default_persona ?? null
       }
       return token
     },
@@ -62,7 +61,6 @@ export const authOptions: NextAuthOptions = {
         ;(session.user as any).playerStatus = token.playerStatus
         ;(session.user as any).isAdmin      = token.isAdmin
         ;(session.user as any).photoUrl     = token.photoUrl
-        ;(session.user as any).defaultPersona = token.defaultPersona
       }
       return session
     },

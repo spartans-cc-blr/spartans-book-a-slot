@@ -3,8 +3,6 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { JerseyIcon } from '@/components/ui/JerseyIcon'
-import { usePersonaState } from '@/lib/usePersona'
-import { PersonaSwitcher, PersonaChipRow } from '@/components/ui/PersonaSwitcher'
 
 interface SiteNavProps {
   activePage?: string
@@ -17,26 +15,19 @@ export function SiteNav({ activePage }: SiteNavProps) {
   const [matchesOpen,  setMatchesOpen]  = useState(false)
   const [wranglerOpen, setWranglerOpen] = useState(false)
   const { data: session, status }     = useSession()
-  const { persona, selectPersona, available } = usePersonaState()
 
   const player     = session?.user as any
   const isLoggedIn = status === 'authenticated'
   const isExpelled = player?.playerStatus === 'expelled'
-
-  // Nav visibility is keyed off the *chosen persona*, not the raw session
-  // flags — an admin viewing as "Player" sees exactly what a player sees.
-  // Admin has no inline view here at all: picking it in the switcher
-  // navigates straight into /admin, which has its own dedicated sidebar.
-  const isCaptainView  = persona === 'captain'
-  const isGCView       = persona === 'gc'
-  const isWranglerView = persona === 'wrangler'
+  const isAdmin    = !!player?.isAdmin
+  const isGC       = !!player?.isGC || isAdmin
+  const isCaptain  = !!player?.isCaptain
+  const isWrangler = !!player?.isWrangler || isAdmin
 
   const links = [
     { href: 'https://spartanscricketclub.vercel.app', label: 'Club Site' },
-    // Schedule is the public/organiser slot grid — signed-in members use
-    // Fixtures instead. Admin's own "Organiser View" link into /schedule
-    // lives inside /admin's sidebar now, not duplicated here.
-    ...(!isLoggedIn
+    // Schedule only for public (signed-out) or admin — players use Fixtures
+    ...(!isLoggedIn || isAdmin
       ? [{ href: '/schedule', label: 'Schedule', key: 'schedule' }]
       : []),
     ...(isLoggedIn && !isExpelled
@@ -45,10 +36,12 @@ export function SiteNav({ activePage }: SiteNavProps) {
     ...(isLoggedIn && !isExpelled
       ? [{ href: '/leaderboard', label: 'Stats', key: 'leaderboard' }]
       : []),
-    ...(isCaptainView
+    // Captains' Corner — direct top-level link for captains & admin
+    ...(isCaptain || isAdmin
       ? [{ href: '/captains-corner', label: "Captains' Corner", key: 'captains' }]
       : []),
-    ...(isCaptainView || isGCView
+    // Tournament Planner — captains, GC, admin
+    ...(isCaptain || isGC || isAdmin
       ? [{ href: '/tournament-planner', label: 'Tournaments', key: 'planner' }]
       : []),
     ...(isLoggedIn && !isExpelled
@@ -108,8 +101,8 @@ export function SiteNav({ activePage }: SiteNavProps) {
             </Link>
           ))}
 
-          {/* GC submenu — desktop, only while viewing as Governing Council */}
-          {isGCView && (
+          {/* GC submenu — desktop */}
+          {isGC && (
             <div className="relative ml-1"
               onMouseEnter={() => setGcOpen(true)}
               onMouseLeave={() => setGcOpen(false)}>
@@ -154,8 +147,8 @@ export function SiteNav({ activePage }: SiteNavProps) {
             </div>
           )}
 
-          {/* Wrangler submenu — desktop, only while viewing as Data Wrangler */}
-          {isWranglerView && (
+          {/* Wrangler submenu — desktop */}
+          {isWrangler && (
             <div className="relative ml-1"
               onMouseEnter={() => setWranglerOpen(true)}
               onMouseLeave={() => setWranglerOpen(false)}>
@@ -183,10 +176,11 @@ export function SiteNav({ activePage }: SiteNavProps) {
             </div>
           )}
 
-          {/* Persona switcher — hidden entirely for accounts that only ever
-              qualify for one persona; picking Admin here routes to /admin */}
-          {isLoggedIn && !isExpelled && (
-            <PersonaSwitcher persona={persona} selectPersona={selectPersona} available={available} />
+          {isAdmin && (
+            <Link href="/admin"
+              className="ml-3 font-rajdhani text-xs font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark text-white px-4 py-2 rounded transition-colors">
+              Admin ⚙
+            </Link>
           )}
 
           {/* Auth button — desktop */}
@@ -257,6 +251,12 @@ export function SiteNav({ activePage }: SiteNavProps) {
 
         {/* Mobile: hamburger + auth */}
         <div className="md:hidden ml-auto flex items-center gap-3">
+          {isAdmin && (
+            <Link href="/admin" className="font-rajdhani text-xs font-bold text-crimson">Admin</Link>
+          )}
+          {isGC && !isAdmin && (
+            <Link href="/gc-review" className="font-rajdhani text-xs font-bold text-gold">GC</Link>
+          )}
           {isLoggedIn ? (
             <button onClick={() => setProfileOpen(v => !v)}>
               <img
@@ -307,13 +307,6 @@ export function SiteNav({ activePage }: SiteNavProps) {
       {open && (
         <div className="md:hidden bg-ink-2 border-t border-ink-5 px-5 py-3 flex flex-col gap-1">
           {isLoggedIn && !isExpelled && (
-            <PersonaChipRow
-              persona={persona}
-              selectPersona={p => { selectPersona(p); setOpen(false) }}
-              available={available}
-            />
-          )}
-          {isLoggedIn && !isExpelled && (
             <>
               <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 pt-1">
                 Matches
@@ -337,7 +330,13 @@ export function SiteNav({ activePage }: SiteNavProps) {
               {item.label}
             </Link>
           ))}
-          {isGCView && (
+          {isAdmin && (
+            <Link href="/admin" onClick={() => setOpen(false)}
+              className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 text-crimson">
+              Admin ⚙
+            </Link>
+          )}
+          {isGC && (
             <>
               <Link href="/gc-review" onClick={() => setOpen(false)}
                 className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 text-gold border-b border-ink-4">
@@ -366,7 +365,7 @@ export function SiteNav({ activePage }: SiteNavProps) {
               <GenerateInviteItem mobile onClose={() => setOpen(false)} />
             </>
           )}
-          {isWranglerView && (
+          {isWrangler && (
             <>
               <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 pt-3">
                 Wrangler
