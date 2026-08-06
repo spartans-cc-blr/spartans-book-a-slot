@@ -250,13 +250,19 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
   const jLabel    = jerseyLabel(ballType);
   const hasGround = ground?.maps_url;
   const hasHosp   = ground?.hospital_url;
-  // "Slot underfilled" — Y-count only, no squad/O/E involved. Shows for the upcoming
-  // weekend's slots while Y is under 12, all the way through squad announcement, until
-  // the match itself goes in_progress. At 12+ Y, nothing is shown at all.
+  // "Slot underfilled" — Y-count only, no O/E involved. Shows for the upcoming weekend's
+  // slots while Y is under 12, all the way through draft/pending/approved squad states,
+  // until the match itself goes in_progress. At 12+ Y, nothing is shown at all.
   // Named "underfilled" rather than "open" so it never reads as contradicting the
   // separate "🔒 Availability locked" message once the Thursday cron or squad
   // submission locks the slot — this badge is a headcount fact, not an invitation.
-  const showSlotUnderfilled = !!isUpcomingWeekendSlot && matchStatus !== 'in_progress' && (yCount ?? 0) < 12;
+  // Suppressed once a squad has actually been announced with a full 12 — at that point
+  // the slot is genuinely filled (Y count alone doesn't reflect O/E squad picks), so
+  // flagging it as underfilled would be wrong, not just over-eager.
+  const showSlotUnderfilled = !!isUpcomingWeekendSlot
+    && matchStatus !== 'in_progress'
+    && (yCount ?? 0) < 12
+    && !(squadAnnounced && squad.length >= 12);
 
   return (
     <div style={{
