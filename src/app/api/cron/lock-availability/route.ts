@@ -57,18 +57,32 @@ export async function GET(req: NextRequest) {
   }
 
   if (!result || result.length === 0) {
-    await notifyGCs(
-      '⚠️ Availability Lock — Nothing Locked',
-      `No confirmed slots found for ${dates.join(' & ')} — check bookings`,
-      '/admin',
-      true
-    )
+    // Nothing left to lock — but that's the expected, harmless outcome
+    // whenever another trigger (Vercel's own cron, or a captain's squad
+    // draft save) already locked these bookings first. Only alert when
+    // there are genuinely no confirmed slots for the weekend at all
+    // (e.g. a club-level event weekend with no games) — that's the one
+    // case that actually needs a human to check bookings.
+    const { count: existingCount } = await supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .in('game_date', dates)
+      .eq('status', 'confirmed')
+
+    if (!existingCount) {
+      await notifyGCs(
+        '⚠️ Availability Lock — Nothing Locked',
+        `No confirmed slots found for ${dates.join(' & ')} — check bookings`,
+        '/admin',
+        true
+      )
+    }
     return NextResponse.json({ locked: 0, dates })
   }
 
   await notifyGCs(
     '🔒 Availability Locked',
-    `${result.length} slot${result.length > 1 ? 's' : ''} locked for ${dates.join(' & ')}`,
+    `${result.length} slot${result.length > 1 ? 's' : ''} locked for ${dates.join(' & ')} — captains can start drafting`,
     '/admin',
     true
   )
