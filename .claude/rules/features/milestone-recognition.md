@@ -173,7 +173,52 @@ has no user present at detection time to show anything to.
 
 ---
 
-## 8. Explicitly Out of Scope
+## 8. Baseline Backfill (applied 2026-08-07)
+
+Migration `059_milestone_achievements.sql` was applied to the live project
+via Supabase MCP the same day this feature shipped. Since detection only
+ever runs when a scorecard is (re-)synced, and most of 2026's matches were
+already synced before this feature existed, going live with an empty table
+would have meant the *next* sync of any already-past-threshold player's
+match — even a routine reconciliation re-sync — surfacing their season
+total as a brand-new "just crossed" event to the whole club, months late.
+
+To avoid that, a one-time baseline pass queried the analytics DB directly
+(mirroring `getPlayerSeasonStats()`'s own aggregation: `batted`/`did_bowl`
+row filters, confirmed non-practice-tournament bookings only, year 2026)
+and inserted a row for every threshold already crossed as of 2026-08-07,
+**with `achieved_at` set to the Unix epoch instead of `now()`** — since
+every player's `milestones_seen_at` cursor defaults to `now()` (always
+later than epoch, including for any player who joins after this point,
+because that's the column's own `DEFAULT`), none of these baseline rows
+can ever appear as "unseen." Only a milestone crossed by a sync that
+happens *after* this point will ever trigger the modal.
+
+17 rows were seeded this way:
+
+| Player | Runs | Wickets |
+|---|---|---|
+| Siva Kumar | 500, 750, 1000 | |
+| Harsha Konka | 500, 750, 1000 | |
+| Saurav Kalsoor | 500, 750 | |
+| Shabarinath Iyer | 500, 750 | |
+| Rahul Priyadarshi | 500 | |
+| DS Sakketha | 500 | 50 |
+| Gunasagar | 500 | |
+| Anurag Tiwari | 500 | |
+| Udaya Shankar | 500 | |
+| Ramesh Shanmugamoorthy | | 50 |
+
+No player had crossed 50 fielding dismissals for 2026 as of this date, so
+no dismissal rows were seeded. This was a one-off data fix run directly
+against the live DB, not a checked-in migration — schema-only changes stay
+in `supabase/migrations/`, consistent with this app's existing convention
+of one-off backfills (e.g. `features/post-match-scorecard.md` §15) being
+documented here rather than encoded as a script.
+
+---
+
+## 9. Explicitly Out of Scope
 
 - No push notification — the club's explicit choice was a modal shown on
   next page load, not an async push (unlike squad announcements — see
