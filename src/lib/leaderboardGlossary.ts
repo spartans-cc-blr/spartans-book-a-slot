@@ -26,6 +26,7 @@ export function buildOverallGlossary(year: number | 'all', tournamentName: strin
   const minDismissals = minDismissalsThreshold(year, scoped)
   const scope = scopeDescriptor(year, tournamentName, groundName)
   const qualifier = `at least ${minGames} game${minGames === 1 ? '' : 's'} ${scope}`
+  const inningsQualifier = `at least ${minGames} batting innings ${scope}`
   const entries: GlossaryEntry[] = [
     { term: 'Leading MVP', definition: `Highest total MVP points (batting, bowling, and fielding contributions combined) among players with ${qualifier}.` },
     { term: 'Leading Run Scorer', definition: `Most runs scored among players with ${qualifier}.` },
@@ -35,7 +36,7 @@ export function buildOverallGlossary(year: number | 'all', tournamentName: strin
         ? `Most centuries scored among players with ${qualifier}.`
         : `Only shown when a player has scored more than one century ${scope} — with everyone else tied at just one, that's not a real "most" yet. See every individual century in the Centuries list below instead.` },
     { term: 'Most 50s', definition: `Most half-centuries scored among players with ${qualifier}.` },
-    { term: 'Best Average', definition: `Highest batting average — runs ÷ dismissals, not-out innings excluded — among players with ${qualifier}.` },
+    { term: 'Best Average', definition: `Highest batting average — runs ÷ dismissals, not-out innings excluded — among players with ${inningsQualifier}.` },
     { term: 'Highest S/R', definition: `Highest batting strike rate — runs per 100 balls faced — among players with ${qualifier} and at least ${MIN_BALLS_FOR_STRIKE_RATE_OVERALL} balls faced ${scope}.` },
     { term: 'Best Economy', definition: `Fewest runs conceded per over among bowlers who bowled at least ${MIN_BALLS_FOR_ECONOMY} balls (${MIN_BALLS_FOR_ECONOMY / 6} overs) ${scope}.` },
   ]
@@ -51,7 +52,7 @@ export function buildOverallGlossary(year: number | 'all', tournamentName: strin
 export function buildMonthlyGlossary(monthLabel: string): GlossaryEntry[] {
   return [
     { term: 'Top MVP / Top Run Scorer / Top Wicket Taker', definition: `Highest MVP points / runs / wickets among players who played at least 1 game in ${monthLabel}.` },
-    { term: 'Best Average', definition: `Highest batting average — runs ÷ dismissals, not-out innings excluded — in ${monthLabel}.` },
+    { term: 'Best Average', definition: `Highest batting average — runs ÷ dismissals, not-out innings excluded — among players with at least 1 batting innings in ${monthLabel}.` },
     { term: 'Highest S/R', definition: `Highest batting strike rate — runs per 100 balls faced — among players who faced at least ${MIN_BALLS_FOR_STRIKE_RATE} balls in ${monthLabel}.` },
     { term: 'Best Economy', definition: `Fewest runs conceded per over among bowlers who bowled at least ${MIN_BALLS_FOR_ECONOMY} balls (${MIN_BALLS_FOR_ECONOMY / 6} overs) in ${monthLabel}.` },
     { term: 'Centuries', definition: `Every individual batting innings of 100+ runs in ${monthLabel} — every one, not just the highest.` },
