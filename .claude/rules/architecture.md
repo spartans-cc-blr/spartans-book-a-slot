@@ -118,6 +118,8 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 |---|---|---|---|
 | `/api/player-availability` | GET, POST, DELETE | Player session | Upsert own Y/O/E/L availability (**N removed** — blank = not available); guards: wallet dues block, `checkFreeze()` (blanket Thu lock + squad `pending_approval`/`approved`/`announced`); captains/GC/admin bypass freeze; auto-reactivation; audit log |
 | `/api/players/[id]` | PATCH | Own session (allowlisted fields) | Self-edit profile fields; `wallet_balance`, `is_captain`, `status` silently dropped |
+| `/api/milestones/unseen` | GET | Any signed-in, non-expelled member | Broadcast feed for the milestone recognition modal — every `milestone_achievements` row since this player's own `milestones_seen_at` cursor; see `features/milestone-recognition.md` |
+| `/api/milestones/mark-seen` | POST | Own session | Advances the signed-in player's own `milestones_seen_at` cursor to now; player_id and timestamp always server-derived |
  
 ### Captain APIs
  
@@ -305,7 +307,19 @@ Read-through cache of the separate analytics Supabase project — source of trut
  
 #### `fee_exemptions`
 Full lockdown RLS. Joined to `players` in admin view.
- 
+
+#### `milestone_achievements`
+`id, player_id FK, booking_id FK (nullable, ON DELETE SET NULL), milestone_type ('runs'|'wickets'|'dismissals'), milestone_value, year, achieved_at`
+Idempotent log of club-wide milestone recognitions (500/750/1000 runs,
+50/75/100 wickets, 50/75/100 dismissals per calendar year), detected inside
+`syncMatchStatsForBooking()` on every scorecard sync (manual or the
+automated cron). **`UNIQUE(player_id, milestone_type, milestone_value,
+year)`** guarantees a re-sync never double-logs. RLS enabled, no
+anon/authenticated policies — service role only. Migration
+`059_milestone_achievements.sql`. Also adds `players.milestones_seen_at`
+(the per-player "seen" cursor for the broadcast modal). See
+`features/milestone-recognition.md`.
+
 ### Planned Tables (Future Sprints)
  
 | Table | Sprint | Purpose |
@@ -683,7 +697,10 @@ Next.js API Routes (server-side)
 | `src/app/api/matches/[id]/flag-reconciliation/route.ts` | POST reports a stats discrepancy (Zod-validated note), re-queuing into the backfill pipeline; DELETE is an admin-only clear-without-reprocessing override |
 | `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking verify/flag auth, includes the top-performer grant; see `features/post-match-scorecard.md` §15 |
 | `src/lib/matchTopPerformers.ts` | Resolves a match's top scorer/wicket-taker to a Hub `player_id`; see `features/post-match-scorecard.md` §15 |
-| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path |
+| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; last step calls `detectAndLogMilestones()` |
+| `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` — club-wide milestone recognition detection; see `features/milestone-recognition.md` |
+| `src/app/api/milestones/unseen/route.ts` + `src/app/api/milestones/mark-seen/route.ts` | Broadcast feed + seen-cursor advance for the milestone recognition modal |
+| `src/components/milestones/MilestoneCelebrationModal.tsx` | Club-wide milestone recognition modal, mounted once inside `SiteNav` |
 | `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — CricHeroes direct-fetch pipeline; chains parse → sync; never touches fees; also auto-clears a reconciliation flag on a successful re-sync |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron — see `features/post-match-scorecard.md` |
 | `src/app/admin/scorecard-backfill/page.tsx` | One-time admin catch-up UI, client-driven sequential loop |

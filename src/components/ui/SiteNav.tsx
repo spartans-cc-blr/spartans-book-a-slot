@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { JerseyIcon } from '@/components/ui/JerseyIcon'
+import { MilestoneCelebrationModal } from '@/components/milestones/MilestoneCelebrationModal'
 
 interface SiteNavProps {
   activePage?: string
@@ -51,6 +52,7 @@ export function SiteNav({ activePage }: SiteNavProps) {
 
   return (
     <nav className="bg-ink-2 border-b border-gold-dim sticky top-0 z-50">
+      {isLoggedIn && !isExpelled && <MilestoneCelebrationModal />}
       <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
