@@ -2,21 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { notifyGCs } from '@/lib/webpush'
 import { backfillOneBooking } from '@/lib/scorecardBackfill'
+import { hasMatchEnded } from '@/lib/matchStatus'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const maxDuration = 60
 
-// Runs daily at 01:30 UTC = 07:00 IST. All Spartans matches are Sat/Sun
-// (see architecture.md — bookings.game_date is weekend-only), so a daily
-// run reliably catches "yesterday" the morning after every match day.
-// vercel.json entry: { "path": "/api/cron/backfill-scorecards", "schedule": "30 1 * * *" }
+// Twice daily, 13:00 & 19:00 IST — the GitHub Actions workflow
+// (.github/workflows/cron-backfill-scorecards.yml) is the primary trigger;
+// vercel.json only ever carries a single-fire backup at 19:00 IST
+// ("30 13 * * *" UTC) since Vercel Hobby caps a cron job at one
+// invocation/day. See architecture.md §5 and limitations.md.
 //
-// Deliberately queries ALL past unsynced bookings, not just "yesterday" —
-// if a run gets cut short (Vercel's hard ceiling) or a fetch keeps failing,
-// the leftover bookings just get picked up by tomorrow's run instead of
-// being permanently skipped. MAX_PER_RUN bounds each individual run's
-// duration; a backlog beyond that drains a few more each day until clear.
+// Deliberately queries ALL past-or-ended unsynced bookings, not just
+// "yesterday" — if a run gets cut short (Vercel's hard ceiling) or a fetch
+// keeps failing, the leftover bookings just get picked up by tomorrow's run
+// instead of being permanently skipped. MAX_PER_RUN bounds each individual
+// run's duration; a backlog beyond that drains a few more each day until
+// clear.
 //
 // Lowered from 5 to 3 on 2026-07-16 — a live manual run timed out
 // (504 FUNCTION_INVOCATION_TIMEOUT) after completing exactly 3 bookings and
@@ -42,9 +45,9 @@ export async function GET(req: NextRequest) {
 
   const { data: bookings, error } = await supabase
     .from('bookings')
-    .select('id, opponent_name, game_date, match_id, scorecard_uploads(status, needs_reconciliation)')
+    .select('id, opponent_name, game_date, slot_time, format, match_id, scorecard_uploads(status, needs_reconciliation)')
     .eq('status', 'confirmed')
-    .lt('game_date', today)
+    .lte('game_date', today)
     .not('match_id', 'is', null)
     .order('game_date', { ascending: false })
     .limit(50) // upper bound on the query itself; MAX_PER_RUN caps what we actually process
@@ -59,11 +62,20 @@ export async function GET(req: NextRequest) {
   // features/post-match-scorecard.md and flag-reconciliation/route.ts. A
   // flagged booking jumps the queue (sorted first) since a human already
   // singled it out as wrong, ahead of routine never-synced backlog.
+  //
+  // game_date alone can't tell "starts later today" apart from "already
+  // finished" — same gap src/lib/matchStatus.ts was written to close for
+  // /fixtures and /api/matches/history. Without the hasMatchEnded() check
+  // here, a match played earlier today (e.g. the 07:30 slot, already over
+  // by a 19:00 IST run) was silently excluded until the calendar date rolled
+  // over — sometimes a full day-plus of unnecessary delay before its
+  // scorecard was ever fetched.
   const withFlag = (bookings ?? [])
     .map((b: any) => ({
       ...b,
       su: Array.isArray(b.scorecard_uploads) ? b.scorecard_uploads[0] : b.scorecard_uploads,
     }))
+    .filter(b => b.game_date < today || hasMatchEnded(b.game_date, b.slot_time, b.format))
     .filter(b => !b.su || !['synced', 'fees_applied'].includes(b.su.status) || b.su.needs_reconciliation)
 
   const eligible = [
