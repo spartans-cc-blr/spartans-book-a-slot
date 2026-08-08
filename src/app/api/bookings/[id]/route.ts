@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
+import { ORGANISER_SELF_SERVICE_REASON } from '@/types'
 
 export async function GET(
   req: NextRequest,
@@ -82,13 +83,36 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
 
   const { data: existing } = await supabase
   .from('bookings')
-  .select('game_date, slot_time')
+  .select('game_date, slot_time, status, block_reason, cricheroes_url')
   .eq('id', params.id)
   .single()
 
   const dateOrSlotChanged =
     (safeUpdates.game_date && safeUpdates.game_date !== existing?.game_date) ||
     (safeUpdates.slot_time && safeUpdates.slot_time !== existing?.slot_time)
+
+  // An organiser self-service hold must not go permanent until the
+  // organiser is actually ready — i.e. a CricHeroes match link exists,
+  // whether the organiser attached it themselves (organiser-attach-url) or
+  // the admin pasted it in here. Client-side this is mirrored by the
+  // Confirm Booking button's disabled state on /admin/bookings/[id], but
+  // that's a UX nicety, not the real gate — this is, so the rule holds
+  // regardless of which path a PATCH comes from.
+  if (
+    safeUpdates.status === 'confirmed' &&
+    existing?.status === 'soft_block' &&
+    existing.block_reason === ORGANISER_SELF_SERVICE_REASON
+  ) {
+    const resultingCricheroesUrl = 'cricheroes_url' in safeUpdates
+      ? safeUpdates.cricheroes_url
+      : existing.cricheroes_url
+    if (!resultingCricheroesUrl) {
+      return NextResponse.json(
+        { error: 'Cannot confirm yet — waiting for the organiser\'s CricHeroes match link. Add it below or wait for them to attach it via the share page.' },
+        { status: 400 }
+      )
+    }
+  }
 
   const { data, error } = await supabase
     .from('bookings')

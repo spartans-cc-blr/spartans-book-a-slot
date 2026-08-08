@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import type { Booking, GameFormat, SlotTime, RuleCheckItem } from '@/types'
-import { SLOT_TIMES, SLOT_FORMATS } from '@/types'
+import { SLOT_TIMES, SLOT_FORMATS, ORGANISER_SELF_SERVICE_REASON } from '@/types'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 import { buildOrganiserWhatsAppUrl, buildCaptainWhatsAppUrl } from '@/lib/bookingNotify'
@@ -469,6 +469,16 @@ export default function BookingDetailPage() {
       setSaveError('Tournament and format are required to confirm a booking.')
       return
     }
+    // An organiser self-service hold shouldn't go permanent until the
+    // organiser is actually ready — i.e. a CricHeroes match link exists.
+    // Mirrored server-side in PATCH /api/bookings/[id] (the real gate);
+    // this just avoids a round trip for the common case of an admin
+    // reacting to the "slot reserved" push before the "ready to confirm"
+    // one has fired.
+    if (booking?.block_reason === ORGANISER_SELF_SERVICE_REASON && !cricheroes.trim()) {
+      setSaveError('Waiting for the organiser\'s CricHeroes match link before this can be confirmed — add it below, or wait for them to attach it via the share page.')
+      return
+    }
     const ok = await handleSave(
       { status: 'confirmed', reserved_until: null },
       { redirectAfter: false }
@@ -525,6 +535,11 @@ export default function BookingDetailPage() {
   // they flip immediately instead of still reading "Reservation" until the
   // admin navigates away and back.
   const displayConfirmed = isConfirmed || justConfirmed
+  // A self-service hold must not go permanent until the organiser has a
+  // CricHeroes match link on record — see handleConfirm() and the same
+  // gate enforced server-side in PATCH /api/bookings/[id].
+  const isSelfServiceHold = booking.block_reason === ORGANISER_SELF_SERVICE_REASON
+  const missingCricheroesForSelfService = isSelfServiceHold && !cricheroes.trim()
   const selectedTournament = tournaments.find(t => t.id === tournamentId)
   const organiserWA   = buildOrganiserWhatsApp()
   const captainWA     = buildCaptainWhatsApp()
@@ -901,6 +916,14 @@ export default function BookingDetailPage() {
           {/* Live Rule Check — horizontal, directly above the save/confirm buttons */}
           <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
 
+          {isReservation && !justConfirmed && missingCricheroesForSelfService && (
+            <div className="bg-amber-950/40 border border-amber-800 rounded px-4 py-3 font-rajdhani text-sm text-amber-300">
+              🔗 This is an organiser self-service hold — it can't be confirmed until a CricHeroes
+              match link exists. Add it in Match Details below, or wait for the organiser to attach
+              one via the share page (you'll get a second notification when they do).
+            </div>
+          )}
+
           <div className="flex gap-3 justify-between">
             <button onClick={handleCancel}
               className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 px-4 py-2.5 rounded transition-colors">
@@ -912,7 +935,9 @@ export default function BookingDetailPage() {
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
               {isReservation && !justConfirmed && (
-                <button onClick={handleConfirm} disabled={saving || !tournamentId || !format || !allPassed}
+                <button onClick={handleConfirm}
+                  disabled={saving || !tournamentId || !format || !allPassed || missingCricheroesForSelfService}
+                  title={missingCricheroesForSelfService ? 'Waiting for the organiser\'s CricHeroes match link' : undefined}
                   className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors">
                   {saving ? 'Confirming...' : '✓ Confirm Booking'}
                 </button>

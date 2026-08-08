@@ -32,6 +32,18 @@ existing `/admin/bookings/[id]` page. Every other confirmed booking in
 this app is admin-created; an anonymous organiser (name + phone, never
 verified) shouldn't be the one exception.
 
+**That confirm step is itself gated on a CricHeroes link existing (added
+August 2026).** The reserve notification and the attach-URL notification
+are two different signals — "held" vs. "ready to confirm" — but an admin
+reacting to the first one could still click Confirm Booking immediately,
+converting the hold to a permanent booking before the organiser had
+actually provided a match link. `PATCH /api/bookings/[id]` now rejects a
+`status: 'confirmed'` transition for a booking whose `block_reason` is
+`ORGANISER_SELF_SERVICE_REASON` if the resulting `cricheroes_url` (either
+already on the row, or in the same request) would be empty; the edit page
+mirrors this by disabling the Confirm Booking button and showing an inline
+explainer, but the API check is the real gate — see §10.
+
 ---
 
 ## 2. Why Per-Slot-Bucket, Not Per-Day
@@ -290,6 +302,9 @@ CricHeroes URL to show, same as any other unset-URL player.
 | `src/app/admin/tournaments/page.tsx` | The opt-in checkbox |
 | `src/lib/cricheroesId.ts` | `isCricheroesUrl()` — reused, not reimplemented |
 | `src/lib/webpush.ts` | `notifyGCs()` — reused, not reimplemented |
+| `src/app/api/bookings/[id]/route.ts` | Admin confirm — `PATCH` blocks `status: 'confirmed'` on a self-service hold with no CricHeroes URL; see §11 |
+| `src/app/admin/bookings/[id]/page.tsx` | Confirm Booking button disabled + inline explainer when a self-service hold has no CricHeroes URL yet; see §11 |
+| `src/lib/bookingNotify.ts` | Organiser/captain WhatsApp message builders for this page — see `architecture.md` §8.1 |
 
 ---
 
@@ -338,6 +353,46 @@ cost. Same fix shape as the `lock-availability` cron's own
 different layer, but the same underlying lesson: don't assume a value read
 fresh in one request is still fresh in the next one, on a route that isn't
 forced dynamic.
+
+---
+
+## 11. Fixed — Confirm Booking Could Go Permanent Before a CricHeroes Link Existed (August 2026)
+
+**Reported symptom:** confirming a self-service reservation from
+`/admin/bookings/[id]` immediately flipped it to `confirmed`, even when
+the organiser hadn't attached a CricHeroes match link yet — the intended
+gate ("book it only once the organiser is ready with the CH URL") wasn't
+actually enforced anywhere.
+
+**Root cause:** the two GC notifications (§5) genuinely are two different
+signals — "slot reserved" vs. "match link attached, ready to confirm" —
+but nothing stopped an admin from acting on the *first* one. The Confirm
+Booking button's only guard was `!tournamentId || !format || !allPassed`;
+`PATCH /api/bookings/[id]` had no awareness of `block_reason` at all and
+happily applied any `status: 'confirmed'` update sent to it.
+
+**Fix — server-side is the real gate, client mirrors it:**
+- `PATCH /api/bookings/[id]` now fetches `status`, `block_reason`, and
+  `cricheroes_url` before applying an update. If the request would set
+  `status: 'confirmed'` on a booking that is currently `soft_block` with
+  `block_reason === ORGANISER_SELF_SERVICE_REASON`, and the *resulting*
+  `cricheroes_url` (from the request body if present, else the existing
+  row) is empty, the request 400s with an explanatory error instead of
+  writing. This covers every path to that PATCH, not just the button.
+- `/admin/bookings/[id]`'s Confirm Booking button disables the same way
+  (`missingCricheroesForSelfService`) with an inline amber explainer and a
+  tooltip, and `handleConfirm()` short-circuits with the same message
+  before ever calling the API — a UX nicety that avoids a round trip for
+  the common case, not the actual enforcement.
+- The CricHeroes URL field on this page already existed (Match Details,
+  visible whenever a tournament is set — which it always is for a
+  self-service hold) — an admin who already has the link via WhatsApp can
+  just paste it there themselves and confirm immediately, without waiting
+  on the organiser to use the public attach-URL flow.
+- Non-self-service reservations (an admin's own "Reserve Slot" holds from
+  `/admin/bookings/new`) are unaffected — the gate only applies to
+  `block_reason === ORGANISER_SELF_SERVICE_REASON` specifically, since
+  those never had a CricHeroes-URL expectation baked into the workflow.
 
 ---
 
