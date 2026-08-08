@@ -53,11 +53,31 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { computeTopPerformers, computeMatchMVP, summarizeTopPerformance, type SquadRef } from '@/lib/matchTopPerformers'
+import { hasMatchEnded } from '@/lib/matchStatus'
 
 const DEFAULT_LIMIT = 15
 const MAX_LIMIT = 50
 const CURSOR_RE = /^(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2})_([0-9a-fA-F-]{36})$/
 const MONTH_RE  = /^(\d{4})-(\d{2})$/
+// Max slot_times per day (07:30/10:30/12:30/14:30) — the buffer fetched
+// beyond `limit` so that filtering out today's not-yet-ended games (below)
+// can never leave a page short of `limit` rows unless the table itself is
+// exhausted. See the isPastMatch() comment for why game_date alone can't
+// drive this filter.
+const TODAY_SLOT_BUFFER = 4
+
+// A match only belongs in "past" once it has actually ended — game_date
+// alone can't distinguish "starts later today" from "already finished".
+// Yesterday-or-earlier is unambiguous; today needs the real end time
+// (slot_time + format duration, same calc /fixtures uses to drop ended
+// games from Upcoming) — without this a match played today falls into a
+// gap: gone from Upcoming the instant it ends, but not eligible for Past
+// until game_date < today rolls over the next calendar day.
+function isPastMatch(gameDate: string, slotTime: string, format: string, today: string): boolean {
+  if (gameDate < today) return true
+  if (gameDate > today) return false
+  return hasMatchEnded(gameDate, slotTime, format)
+}
 
 function nextMonthStr(month: string): string {
   const [y, m] = month.split('-').map(Number)
@@ -164,10 +184,10 @@ export async function GET(req: NextRequest) {
 
     const [byTournament, byVenue] = await Promise.all([
       groundTournamentIds.length
-        ? supabase.from('bookings').select('id').eq('status', 'confirmed').lt('game_date', today).in('tournament_id', groundTournamentIds)
+        ? supabase.from('bookings').select('id').eq('status', 'confirmed').lte('game_date', today).in('tournament_id', groundTournamentIds)
         : Promise.resolve({ data: [] as { id: string }[], error: null }),
       groundName
-        ? supabase.from('bookings').select('id').eq('status', 'confirmed').lt('game_date', today).ilike('venue', groundName)
+        ? supabase.from('bookings').select('id').eq('status', 'confirmed').lte('game_date', today).ilike('venue', groundName)
         : Promise.resolve({ data: [] as { id: string }[], error: null }),
     ])
     if (byTournament.error) return NextResponse.json({ error: byTournament.error.message }, { status: 500 })
@@ -190,7 +210,7 @@ export async function GET(req: NextRequest) {
   // deliberately excludes `cursor`, since the count must reflect the whole
   // current filter set, not just what's left after the page already loaded.
   function applySharedFilters(q: any) {
-    q = q.eq('status', 'confirmed').lt('game_date', today)
+    q = q.eq('status', 'confirmed').lte('game_date', today)
     if (tournamentId)         q = q.eq('tournament_id', tournamentId)
     if (venue)                q = q.eq('venue', venue)
     if (format)               q = q.eq('format', format)
@@ -201,10 +221,17 @@ export async function GET(req: NextRequest) {
     return q
   }
 
-  const { count: totalCount, error: countErr } = await applySharedFilters(
-    supabase.from('bookings').select('id', { count: 'exact', head: true })
+  // `.lte('game_date', today)` above can include today's not-yet-ended
+  // games, which don't count as "past" yet — a head-only count can't apply
+  // that check (no slot_time/format to test), so this fetches the real
+  // columns and filters in JS instead. Table size here is small (a club's
+  // full match history), so this costs nothing meaningful over the old
+  // head-count.
+  const { data: countRows, error: countErr } = await applySharedFilters(
+    supabase.from('bookings').select('id, game_date, slot_time, format')
   )
   if (countErr) return NextResponse.json({ error: countErr.message }, { status: 500 })
+  const totalCount = (countRows ?? []).filter((b: any) => isPastMatch(b.game_date, b.slot_time, b.format, today)).length
 
   let query = applySharedFilters(
     supabase
@@ -214,7 +241,7 @@ export async function GET(req: NextRequest) {
     .order('game_date', { ascending: false })
     .order('slot_time', { ascending: false })
     .order('id', { ascending: false })
-    .limit(limit)
+    .limit(limit + TODAY_SLOT_BUFFER)
 
   // Never trust the client's cursor blindly — it's about to be interpolated
   // into a raw filter string, so it must match this exact shape first.
@@ -228,8 +255,17 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  const { data, error } = await query
+  const { data: rawData, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Drop today's not-yet-ended games (see isPastMatch above), then trim
+  // back down to the requested page size. TODAY_SLOT_BUFFER guarantees this
+  // can only fall short of `limit` when the underlying table is genuinely
+  // exhausted — today can contribute at most 4 excluded rows, and they can
+  // only ever appear at the very top of this game_date-desc ordering.
+  const data = (rawData ?? [])
+    .filter((b: any) => isPastMatch(b.game_date, b.slot_time, b.format, today))
+    .slice(0, limit)
 
   const bookingIds = (data ?? []).map((b: any) => b.id)
 
