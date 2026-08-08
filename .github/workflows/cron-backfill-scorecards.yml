@@ -27,13 +27,15 @@ name: Cron — backfill-scorecards
 
 on:
   schedule:
-    # 06:30 UTC = 12:00 IST, and 13:30 UTC = 19:00 IST
+    # 07:30 UTC = 13:00 IST, and 13:30 UTC = 19:00 IST
     # Moved off 07:00 IST on 2026-08-01 — no games are ever played between
     # 19:00 and 07:00 IST, so a 07:00 run only ever re-checked the same
-    # backlog the prior 19:00 run had already seen. 12:00 gives CricHeroes
-    # time to publish scorecards for the day's morning slots (07:30/10:30)
-    # before the fetch attempt runs.
-    - cron: '30 6,13 * * *'
+    # backlog the prior 19:00 run had already seen. Moved off 12:00 IST to
+    # 13:00 IST on 2026-08-08. The original 12:00 IST timing still gives
+    # CricHeroes time to publish scorecards for the day's morning slots
+    # (07:30/10:30) before the fetch attempt runs — 13:00 IST gives it even
+    # more room.
+    - cron: '30 7,13 * * *'
   workflow_dispatch: {}
 
 jobs:

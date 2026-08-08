@@ -86,7 +86,7 @@ than once a day, full stop — there's no way to express `"30 6,13 * * *"`
 `vercel.json`'s entry for `/api/cron/backfill-scorecards` has only ever
 carried one time of day; it was never an oversight or drift from an
 intended twice-daily config there. Any cron on this project that genuinely
-needs multiple fires per day (`backfill-scorecards` at 12:00 & 19:00 IST)
+needs multiple fires per day (`backfill-scorecards` at 13:00 & 19:00 IST)
 must rely on its GitHub Actions workflow for the additional fire(s) —
 `vercel.json` can only ever cover one of them as a backup.
 
