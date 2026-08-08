@@ -1,11 +1,13 @@
 'use client'
 
 // Club-wide milestone recognition modal — celebrates a player crossing a
-// runs/wickets/dismissals threshold for the year, shown to every signed-in,
-// non-expelled player the next time they open the Hub after a scorecard
-// sync logs it (see src/lib/milestones.ts). Deliberately a broadcast, not
-// targeted at just the achiever or whoever triggered the sync — "recognition
-// from club to all players." See features/milestone-recognition.md.
+// season runs/wickets/dismissals threshold, or a standout single-match
+// performance (century, half-century, five- or three-wicket haul, five-plus
+// dismissals) — shown to every signed-in, non-expelled player the next time
+// they open the Hub after a scorecard sync logs it (see
+// src/lib/milestones.ts). Deliberately a broadcast, not targeted at just
+// the achiever or whoever triggered the sync — "recognition from club to
+// all players." See features/milestone-recognition.md.
 //
 // Mounted once inside SiteNav (rendered on every authenticated page) rather
 // than a specific page, so it fires regardless of which page a player lands
@@ -16,19 +18,60 @@ import { useSession } from 'next-auth/react'
 import { Dialog } from '@/components/ui/Dialog'
 import { PlayerNameLink } from '@/lib/playerLink'
 
-type MilestoneType = 'runs' | 'wickets' | 'dismissals'
+type SeasonMilestoneType = 'runs' | 'wickets' | 'dismissals'
+type MatchPerformanceType = 'century' | 'half_century' | 'five_wicket_haul' | 'three_wicket_haul' | 'five_dismissals'
 
-interface Achievement {
+interface PlayerRef {
   id: string
-  milestone_type: MilestoneType
-  milestone_value: number
-  year: number
-  player: { id: string; name: string; photo_url: string | null; cricheroes_url: string | null } | null
-  booking: { game_date: string | null; opponent_name: string | null } | null
+  name: string
+  photo_url: string | null
+  cricheroes_url: string | null
+}
+interface BookingRef {
+  game_date: string | null
+  opponent_name: string | null
 }
 
-const LABELS: Record<MilestoneType, string> = { runs: 'runs', wickets: 'wickets', dismissals: 'dismissals' }
-const ICONS:  Record<MilestoneType, string> = { runs: '🏏', wickets: '🎯', dismissals: '🧤' }
+interface SeasonAchievement {
+  kind: 'season'
+  id: string
+  milestone_type: SeasonMilestoneType
+  milestone_value: number
+  year: number
+  player: PlayerRef | null
+  booking: BookingRef | null
+}
+interface MatchAchievement {
+  kind: 'match'
+  id: string
+  performance_type: MatchPerformanceType
+  value: number
+  player: PlayerRef | null
+  booking: BookingRef | null
+}
+type Achievement = SeasonAchievement | MatchAchievement
+
+const SEASON_LABELS: Record<SeasonMilestoneType, string> = { runs: 'runs', wickets: 'wickets', dismissals: 'dismissals' }
+const SEASON_ICONS:  Record<SeasonMilestoneType, string> = { runs: '🏏', wickets: '🎯', dismissals: '🧤' }
+
+const MATCH_ICONS: Record<MatchPerformanceType, string> = {
+  century:           '💯',
+  half_century:      '5️⃣0️⃣',
+  five_wicket_haul:  '🔥',
+  three_wicket_haul: '🎳',
+  five_dismissals:   '🧤',
+}
+const MATCH_TEXT: Record<MatchPerformanceType, (value: number) => React.ReactNode> = {
+  century:           value => <>scored a century — <span className="font-bold">{value} runs</span></>,
+  half_century:      value => <>scored a half-century — <span className="font-bold">{value} runs</span></>,
+  five_wicket_haul:  value => <>took a five-wicket haul — <span className="font-bold">{value} wickets</span></>,
+  three_wicket_haul: value => <>took a three-wicket haul — <span className="font-bold">{value} wickets</span></>,
+  five_dismissals:   value => <>recorded <span className="font-bold">{value} dismissals</span> in the field</>,
+}
+
+function formatMatchDate(gameDate: string | null): string {
+  return gameDate ? new Date(gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''
+}
 
 export function MilestoneCelebrationModal() {
   const { status } = useSession()
@@ -72,7 +115,7 @@ export function MilestoneCelebrationModal() {
     >
       <div className="flex flex-col gap-4">
         {achievements.map(a => (
-          <div key={a.id} className="flex items-start gap-3">
+          <div key={`${a.kind}-${a.id}`} className="flex items-start gap-3">
             <img
               src={a.player?.photo_url ?? '/default-avatar.png'}
               alt=""
@@ -80,7 +123,9 @@ export function MilestoneCelebrationModal() {
             />
             <div>
               <p className="font-rajdhani text-sm text-parchment leading-snug">
-                <span className="text-lg mr-1">{ICONS[a.milestone_type]}</span>
+                <span className="text-lg mr-1">
+                  {a.kind === 'season' ? SEASON_ICONS[a.milestone_type] : MATCH_ICONS[a.performance_type]}
+                </span>
                 {a.player ? (
                   <PlayerNameLink
                     name={a.player.name}
@@ -91,12 +136,18 @@ export function MilestoneCelebrationModal() {
                 ) : (
                   <span className="font-bold text-gold">A player</span>
                 )}{' '}
-                crossed <span className="font-bold">{a.milestone_value} {LABELS[a.milestone_type]}</span> in {a.year}!
+                {a.kind === 'season' ? (
+                  <>
+                    crossed <span className="font-bold">{a.milestone_value} {SEASON_LABELS[a.milestone_type]}</span> in {a.year}!
+                  </>
+                ) : (
+                  <>{MATCH_TEXT[a.performance_type](a.value)}!</>
+                )}
               </p>
               {a.booking?.opponent_name && (
                 <p className="font-rajdhani text-[11px] text-zinc-500 mt-0.5">
                   vs {a.booking.opponent_name}
-                  {a.booking.game_date ? ` · ${new Date(a.booking.game_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+                  {a.booking.game_date ? ` · ${formatMatchDate(a.booking.game_date)}` : ''}
                 </p>
               )}
             </div>

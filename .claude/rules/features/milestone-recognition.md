@@ -6,16 +6,23 @@
 
 ## 1. Overview
 
-A club-wide recognition modal that celebrates a player crossing a fixed
-runs / wickets / fielding-dismissals threshold for the current calendar
-year, detected the moment a match scorecard syncs into the Hub. This is a
-broadcast, not a targeted notification: every signed-in, non-expelled
-player sees the modal on their next page load, regardless of whether they
-achieved the milestone, uploaded the scorecard, or had nothing to do with
-either — "recognition from the club to all players," per the product
-decision this was built against.
+A club-wide recognition modal that celebrates two different kinds of
+achievement, detected the moment a match scorecard syncs into the Hub:
 
-**Thresholds:**
+- **Season milestones** — a player's runs / wickets / fielding-dismissals
+  *total for the calendar year* crossing a fixed threshold.
+- **Single-match performance highlights** (added August 2026) — a standout
+  performance *in the one match that just synced*: a century or
+  half-century, a five- or three-wicket haul, or five-plus fielding
+  dismissals.
+
+Both are a broadcast, not a targeted notification: every signed-in,
+non-expelled player sees the modal on their next page load, regardless of
+whether they achieved anything, uploaded the scorecard, or had nothing to
+do with either — "recognition from the club to all players," per the
+product decision this was built against.
+
+**Season milestone thresholds:**
 
 | Metric | Values |
 |---|---|
@@ -26,6 +33,22 @@ decision this was built against.
 All three reset every calendar year — a player's total is their season
 total (see `features/leaderboard.md` for the same year-scoping convention
 used by the leaderboard's milestone cards), not a career total.
+
+**Single-match performance thresholds:**
+
+| Performance | Band |
+|---|---|
+| Runs in an innings | 50–99 → half-century, 100+ → century |
+| Wickets in a spell | 3–4 → three-wicket haul, 5+ → five-wicket haul |
+| Fielding dismissals in a match (catches + run outs + stumpings) | 5+ |
+
+Runs and wickets bands are mutually exclusive per innings — the higher band
+wins (a 120-run innings is credited a century, not also a half-century),
+mirroring `getPerformances()`'s centuries/halfCenturies split in
+`src/lib/playerStats.ts`. Unlike season milestones, these are **not
+deduped per year** — a player can be recognised for the same
+performance_type (e.g. two separate centuries) across different matches in
+one season; each match's performance is its own achievement.
 
 ---
 
@@ -84,9 +107,33 @@ are already logged.
 `year` is the calendar year of the match's own `game_date`, not "today" —
 correct even when an old match is synced or re-synced long after the fact.
 
+### Single-match performances — `detectAndLogMatchPerformances(bookingId, batting, bowling, fielding)`
+
+Reads directly off the batting/bowling/fielding rows already fetched for
+**this one match** inside `syncMatchStatsForBooking()` — no extra round
+trip, no season aggregation, since "did this match qualify" is fully
+answered by that match's own rows:
+
+- Batting: rows with `batted = true`; `runs >= 100` → `century`, else
+  `runs >= 50` → `half_century`.
+- Bowling: rows with `did_bowl = true`; `wickets >= 5` → `five_wicket_haul`,
+  else `wickets >= 3` → `three_wicket_haul`.
+- Fielding: `catches + caught_behind + run_outs + stumpings >= 5` →
+  `five_dismissals`.
+
+Upserts into `match_performance_achievements` with
+`ON CONFLICT (player_id, booking_id, performance_type) DO NOTHING` — a
+re-sync of the same match can't double-log the same performance.
+
+**Skipped entirely for practice-tournament bookings** (`tournaments.is_practice`
+— see `features/leaderboard.md` §10), same "real stats only" posture as
+every other performance/stats surface in this app. Season milestones don't
+need this same explicit check — they already inherit the exclusion via
+`getPlayerSeasonStats()`'s own default scoping.
+
 ---
 
-## 4. Database — `supabase/migrations/059_milestone_achievements.sql`
+## 4. Database — `supabase/migrations/059_milestone_achievements.sql` and `060_match_performance_achievements.sql`
 
 ### `milestone_achievements`
 
@@ -110,23 +157,40 @@ New nullable-in-spirit-but-`NOT NULL DEFAULT now()` timestamp column — the
 per-player "seen" cursor for the broadcast modal (see §5). Defaults to
 `now()` at migration time so this can never retroactively flood every
 existing player with a backlog if it ever runs after achievements already
-exist.
+exist. Shared by both achievement types below — one cursor, one modal.
+
+### `match_performance_achievements`
+
+| Column | Notes |
+|---|---|
+| `player_id` | FK → players |
+| `booking_id` | FK → bookings, `ON DELETE SET NULL` |
+| `performance_type` | `century` \| `half_century` \| `five_wicket_haul` \| `three_wicket_haul` \| `five_dismissals` |
+| `value` | the exact runs/wickets/dismissals achieved, for display ("127 runs", not just "a century") |
+| `achieved_at` | when detection first logged it |
+
+**`UNIQUE(player_id, booking_id, performance_type)`** — deduped per match,
+not per year (contrast with `milestone_achievements` above). RLS enabled,
+no anon/authenticated policies — service role only.
 
 ---
 
 ## 5. Broadcast — API routes and the modal
 
 **`GET /api/milestones/unseen`** — any signed-in, non-expelled member.
-Returns every `milestone_achievements` row with `achieved_at` after this
-player's own `milestones_seen_at` cursor, joined to the achiever's name/
-photo/CricHeroes URL and the triggering booking's opponent/date, capped at
-20 rows. Rate-limited (`RATE_LIMITS.publicRead`, keyed by `player_id`).
+Merges two sources — `milestone_achievements` (season) and
+`match_performance_achievements` (single-match) — returning every row from
+either with `achieved_at` after this player's own `milestones_seen_at`
+cursor, joined to the achiever's name/photo/CricHeroes URL and the
+triggering booking's opponent/date, sorted together and capped at 20 rows
+total. Rate-limited (`RATE_LIMITS.publicRead`, keyed by `player_id`).
 
 **`POST /api/milestones/mark-seen`** — advances the signed-in player's own
-`milestones_seen_at` to now. `player_id` and the timestamp are both always
-server-derived, never taken from the request body — same "never trust the
-client" posture as every other player-scoped write in this app (push
-subscribe, player-availability). Rate-limited
+`milestones_seen_at` to now, regardless of which achievement type(s) the
+modal was showing (one shared cursor for both sources). `player_id` and
+the timestamp are both always server-derived, never taken from the request
+body — same "never trust the client" posture as every other player-scoped
+write in this app (push subscribe, player-availability). Rate-limited
 (`RATE_LIMITS.playerWrite`).
 
 **`MilestoneCelebrationModal`** (`src/components/milestones/MilestoneCelebrationModal.tsx`)
@@ -134,11 +198,13 @@ subscribe, player-availability). Rate-limited
 authenticated page) rather than a specific page, so it fires regardless of
 which page a player lands on first after signing in. On mount, if the
 session is authenticated, fetches `/api/milestones/unseen`; if any rows
-come back, opens a `Dialog` listing each achievement (icon + player name,
-CricHeroes-linked via `PlayerNameLink` when resolvable + match context).
-Dismissing (the "Got it" button, the ✕, Escape, or an overlay click — all
-routed through `Dialog`'s existing `onClose`) calls
-`POST /api/milestones/mark-seen` and closes.
+come back, opens a `Dialog` listing each achievement — season and
+single-match rows rendered with their own icon/copy (a discriminated
+`kind: 'season' | 'match'` union), player name CricHeroes-linked via
+`PlayerNameLink` when resolvable, plus match context. Dismissing (the "Got
+it" button, the ✕, Escape, or an overlay click — all routed through
+`Dialog`'s existing `onClose`) calls `POST /api/milestones/mark-seen` and
+closes.
 
 Each player sees each achievement exactly once, no matter when they next
 open the Hub — including one detected by the unattended cron path, which
@@ -151,7 +217,7 @@ has no user present at detection time to show anything to.
 | Check | Status |
 |---|---|
 | Detection runs entirely server-side, inside the existing sync pipeline — never client-triggered | ✅ |
-| `milestone_achievements` RLS enabled, no anon/authenticated policies — service role only | ✅ |
+| `milestone_achievements` / `match_performance_achievements` RLS enabled, no anon/authenticated policies — service role only | ✅ |
 | `GET /unseen` requires a signed-in, non-expelled session; broadcasts achievement data (not sensitive) but never wallet/personal fields | ✅ |
 | `POST /mark-seen` — `player_id` and timestamp always server-derived from session, never the request body | ✅ |
 | Both new routes rate-limited | ✅ |
@@ -164,9 +230,10 @@ has no user present at detection time to show anything to.
 | File | Role |
 |---|---|
 | `supabase/migrations/059_milestone_achievements.sql` | `milestone_achievements` table + `players.milestones_seen_at` |
-| `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` |
-| `src/lib/matchStatsSync.ts` | Calls `detectAndLogMilestones()` as the last step of `syncMatchStatsForBooking()` |
-| `src/app/api/milestones/unseen/route.ts` | GET — broadcast feed for the modal |
+| `supabase/migrations/060_match_performance_achievements.sql` | `match_performance_achievements` table |
+| `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` (season) + `detectAndLogMatchPerformances()` (single-match) |
+| `src/lib/matchStatsSync.ts` | Calls both detection functions (in parallel) as the last step of `syncMatchStatsForBooking()`; skips match-performance detection for practice-tournament bookings |
+| `src/app/api/milestones/unseen/route.ts` | GET — broadcast feed, merges both achievement tables |
 | `src/app/api/milestones/mark-seen/route.ts` | POST — advances the player's own seen-cursor |
 | `src/components/milestones/MilestoneCelebrationModal.tsx` | The modal itself |
 | `src/components/ui/SiteNav.tsx` | Mounts the modal once, gated on `isLoggedIn && !isExpelled` |
@@ -215,6 +282,36 @@ against the live DB, not a checked-in migration — schema-only changes stay
 in `supabase/migrations/`, consistent with this app's existing convention
 of one-off backfills (e.g. `features/post-match-scorecard.md` §15) being
 documented here rather than encoded as a script.
+
+---
+
+## 8.1 Baseline Backfill — Match Performances (applied 2026-08-08)
+
+Same reasoning as §8, applied to `match_performance_achievements` when
+single-match highlights shipped a day later: without a backfill, the next
+reconciliation re-sync of any already-synced historical match containing a
+century/fifty/wicket-haul would surface it as a brand-new celebration,
+months late. Unlike §8 (year-scoped, so only 2026 bookings needed
+checking), this backfill isn't year-scoped — a century is a century
+regardless of which season it was scored in — so **every** confirmed,
+non-practice, already-`match_id`-tagged booking across the Hub's full
+history was checked (113 match_ids), not just this year's.
+
+Queried the analytics DB directly for every `(match_id, player_id)` pair
+crossing a band (mirroring `detectAndLogMatchPerformances()`'s own
+`batted`/`did_bowl` filters and mutually-exclusive banding), resolved each
+`match_id` to its confirmed Hub `booking_id` (careful to exclude a
+cancelled/rescheduled-away booking sharing the same `match_id` — the same
+`status = 'confirmed'` guard `getScopedMatchIds()` and `getPerformances()`
+already document needing, and a real instance of it was hit here: match
+`22868730` had both a `cancelled` and a `confirmed` booking row sharing one
+`match_id`), and inserted **135 rows** with `achieved_at` pinned to the
+Unix epoch — same technique as §8, confirmed against every player's
+`milestones_seen_at` cursor (all still `> epoch`) before and after.
+
+Breakdown: 71 half-centuries, 53 three-wicket hauls, 6 five-wicket hauls, 5
+centuries. Zero five-dismissal matches — no fielder has ever recorded 5+
+dismissals in a single match in the Hub's synced history to date.
 
 ---
 

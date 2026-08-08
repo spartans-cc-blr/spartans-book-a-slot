@@ -1,8 +1,11 @@
-// Detects and permanently logs "club recognition" milestones — a player's
-// runs / wickets / fielding-dismissals total for the calendar year a match
-// was played in crossing a fixed threshold. Called from
-// src/lib/matchStatsSync.ts as the last step of every scorecard sync
-// (manual upload/"Sync Stats" click, or the unattended twice-daily
+// Detects and permanently logs "club recognition" achievements, in two
+// flavours: season milestones (detectAndLogMilestones — a player's runs /
+// wickets / fielding-dismissals total for the calendar year crossing a
+// fixed threshold) and single-match performance highlights
+// (detectAndLogMatchPerformances — a century/half-century, a five- or
+// three-wicket haul, five-plus dismissals, all in one match). Both are
+// called from src/lib/matchStatsSync.ts as the last step of every scorecard
+// sync (manual upload/"Sync Stats" click, or the unattended twice-daily
 // backfill/cron path — see features/post-match-scorecard.md), so detection
 // covers both sync paths without either one needing its own copy.
 //
@@ -66,5 +69,66 @@ export async function detectAndLogMilestones(bookingId: string, year: number, pl
     if (error) console.error('[milestones] insert failed:', error.message)
   } catch (err) {
     console.error('[milestones] detection failed:', err)
+  }
+}
+
+// Single-match performance highlights — a century/half-century in one
+// innings, a five- or three-wicket haul in one spell, five-or-more fielding
+// dismissals in one match. Unlike the season milestones above, these are
+// read directly off the batting/bowling/fielding rows already fetched for
+// THIS match inside syncMatchStatsForBooking() — no extra round trip, no
+// season aggregation needed, since "did this one match qualify" is fully
+// answered by that match's own rows.
+//
+// Runs/wickets bands are mutually exclusive per innings (the higher band
+// wins) — a player who scores 120 is credited a century, not also a
+// half-century, mirroring getPerformances()'s centuries/halfCenturies split
+// in src/lib/playerStats.ts. `value` carries the exact runs/wickets/
+// dismissals achieved, for display ("127 runs", not just "a century").
+//
+// Idempotency: UNIQUE(player_id, booking_id, performance_type) — a re-sync
+// of the same match can't double-log the same performance, and a player
+// can rack up the same performance_type across many different matches in a
+// season (unlike the once-per-year season milestones above).
+export type MatchPerformanceType = 'century' | 'half_century' | 'five_wicket_haul' | 'three_wicket_haul' | 'five_dismissals'
+
+export async function detectAndLogMatchPerformances(
+  bookingId: string,
+  batting: any[],
+  bowling: any[],
+  fielding: any[]
+): Promise<void> {
+  try {
+    const rows: { player_id: string; booking_id: string; performance_type: MatchPerformanceType; value: number }[] = []
+
+    for (const r of batting) {
+      if (!r.batted || !r.player_id) continue
+      const runs = Number(r.runs) || 0
+      if (runs >= 100) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'century', value: runs })
+      else if (runs >= 50) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'half_century', value: runs })
+    }
+
+    for (const r of bowling) {
+      if (!r.did_bowl || !r.player_id) continue
+      const wickets = Number(r.wickets) || 0
+      if (wickets >= 5) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'five_wicket_haul', value: wickets })
+      else if (wickets >= 3) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'three_wicket_haul', value: wickets })
+    }
+
+    for (const r of fielding) {
+      if (!r.player_id) continue
+      const dismissals = (Number(r.catches) || 0) + (Number(r.caught_behind) || 0) + (Number(r.run_outs) || 0) + (Number(r.stumpings) || 0)
+      if (dismissals >= 5) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'five_dismissals', value: dismissals })
+    }
+
+    if (rows.length === 0) return
+
+    const supabase = createServiceClient()
+    const { error } = await supabase
+      .from('match_performance_achievements')
+      .upsert(rows, { onConflict: 'player_id,booking_id,performance_type', ignoreDuplicates: true })
+    if (error) console.error('[milestones] match performance insert failed:', error.message)
+  } catch (err) {
+    console.error('[milestones] match performance detection failed:', err)
   }
 }

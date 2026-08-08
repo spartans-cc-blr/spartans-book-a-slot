@@ -320,6 +320,20 @@ anon/authenticated policies — service role only. Migration
 (the per-player "seen" cursor for the broadcast modal). See
 `features/milestone-recognition.md`.
 
+#### `match_performance_achievements`
+`id, player_id FK, booking_id FK (nullable, ON DELETE SET NULL), performance_type ('century'|'half_century'|'five_wicket_haul'|'three_wicket_haul'|'five_dismissals'), value, achieved_at`
+Single-match performance highlights, alongside the season milestones above
+— a century/half-century in one innings, a five- or three-wicket haul, five-
+plus fielding dismissals in one match. Detected inside
+`syncMatchStatsForBooking()` from the same match's own batting/bowling/
+fielding rows already fetched for the sync — no extra round trip. **`UNIQUE
+(player_id, booking_id, performance_type)`** — deduped per match, not per
+year, since a player can repeat the same performance_type across different
+matches in a season. RLS enabled, no anon/authenticated policies — service
+role only. Migration `060_match_performance_achievements.sql`. Shares the
+same broadcast modal and `players.milestones_seen_at` cursor as
+`milestone_achievements`. See `features/milestone-recognition.md`.
+
 ### Planned Tables (Future Sprints)
  
 | Table | Sprint | Purpose |
@@ -698,7 +712,7 @@ Next.js API Routes (server-side)
 | `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking verify/flag auth, includes the top-performer grant; see `features/post-match-scorecard.md` §15 |
 | `src/lib/matchTopPerformers.ts` | Resolves a match's top scorer/wicket-taker to a Hub `player_id`; see `features/post-match-scorecard.md` §15 |
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; last step calls `detectAndLogMilestones()` |
-| `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` — club-wide milestone recognition detection; see `features/milestone-recognition.md` |
+| `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` (season) + `detectAndLogMatchPerformances()` (single-match highlights) — club-wide milestone recognition detection; see `features/milestone-recognition.md` |
 | `src/app/api/milestones/unseen/route.ts` + `src/app/api/milestones/mark-seen/route.ts` | Broadcast feed + seen-cursor advance for the milestone recognition modal |
 | `src/components/milestones/MilestoneCelebrationModal.tsx` | Club-wide milestone recognition modal, mounted once inside `SiteNav` |
 | `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — CricHeroes direct-fetch pipeline; chains parse → sync; never touches fees; also auto-clears a reconciliation flag on a successful re-sync |
