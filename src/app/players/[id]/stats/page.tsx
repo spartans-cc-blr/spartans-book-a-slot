@@ -39,7 +39,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
 
   return (
     <div className="min-h-screen bg-parchment">
-      <SiteNav isAdmin={!!user?.isAdmin} />
+      <SiteNav />
       <PlayerStatsClient
         player={player}
         grounds={grounds ?? []}

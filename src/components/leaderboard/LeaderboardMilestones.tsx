@@ -90,7 +90,14 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
   const mostDismissals    = bestByAll(rows, totalDismissals, r => totalDismissals(r) > 0 && qualifiesOnGames(r))
   const mostCenturies     = bestByAll(rows, r => r.centuries, r => r.centuries > 0 && qualifiesOnGames(r))
   const mostHalfCenturies = bestByAll(rows, r => r.halfCenturies, r => r.halfCenturies > 0 && qualifiesOnGames(r))
-  const bestAverage = bestByAll(rows, r => r.stats.battingAverage, qualifiesOnGames)
+  // Batting average is an innings-level stat — gating it on games played
+  // (qualifiesOnGames) lets a player who only batted a handful of times
+  // (e.g. 6 games played, 4 innings batted) qualify off a small, possibly
+  // lucky sample just because their games-played count cleared the bar.
+  // Reusing the same minGames number against battingInnings instead keeps
+  // the qualification bar's size logic (the quarterly ratchet, the scoped
+  // floor) but applies it to the stat the card is actually about.
+  const bestAverage = bestByAll(rows, r => r.stats.battingAverage, r => r.stats.battingInnings >= minGames)
   const bestSR       = bestByAll(rows, r => r.stats.strikeRate, r => r.stats.balls >= MIN_BALLS_FOR_STRIKE_RATE_OVERALL && qualifiesOnGames(r))
   const bestEconomy = bestByAll(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && qualifiesOnGames(r), true)
 

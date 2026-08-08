@@ -138,7 +138,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
   return (
     <>
-      <SiteNav activePage="matches" isAdmin={!!user?.isAdmin} />
+      <SiteNav activePage="matches" />
       <main className="min-h-screen bg-ink-1 px-4 md:px-8 py-8 max-w-2xl mx-auto">
         <Link href="/matches/history" className="font-rajdhani text-xs font-bold text-gold hover:text-gold-light transition-colors">
           ← Past Matches

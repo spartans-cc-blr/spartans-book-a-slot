@@ -69,7 +69,10 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
   const topMVP     = bestBy(rows, r => r.stats.mvpPoints, qualifies)
   const topRuns     = bestBy(rows, r => r.stats.runs, qualifies)
   const topWickets  = bestBy(rows, r => r.stats.wickets, qualifies)
-  const bestAverage = bestBy(rows, r => r.stats.battingAverage, qualifies)
+  // Innings-based, not games-based — see the equivalent comment in
+  // LeaderboardMilestones.tsx. A player who played the month's games but
+  // barely batted shouldn't win "Best Average" off a tiny innings sample.
+  const bestAverage = bestBy(rows, r => r.stats.battingAverage, r => r.stats.battingInnings >= 1)
   const bestSR       = bestBy(rows, r => r.stats.strikeRate, r => r.stats.balls >= MIN_BALLS_FOR_STRIKE_RATE && qualifies(r))
   const bestEconomy = bestBy(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && qualifies(r), true)
 

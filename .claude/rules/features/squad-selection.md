@@ -407,19 +407,24 @@ confirmed bookings) — never shown on a weekday game or a later weekend's cards
 `response = 'Y'`, fetched once for all active booking IDs and passed down via
 `cardData`, then kept live client-side in `FixturesWeekendGroup` (nudged up/down
 as the signed-in player's own response crosses in/out of `Y`, so a toggle
-reflects immediately without a page reload). The flag is
-**squad-status-independent** — it keeps showing straight through
-draft/pending/approved/announced, regardless of announced squad size — and is
-gated purely on `matchStatus !== 'in_progress'` (i.e. it disappears once the
-match itself starts, not when a squad is announced) and `yCount < 12`. At 12 or
-more Y responses, nothing is shown at all. Purely a read of existing
-`availability` data; no new write path.
+reflects immediately without a page reload). The flag keeps showing straight
+through draft/pending/approved squad states — it does **not** wait for a squad
+to be announced — but is suppressed once a squad has actually been
+**announced with a full 12 players** (`squadAnnounced && squad.length >= 12`,
+`squad` here being the already-announced-only rows from `squadMap`): at that
+point the slot is genuinely filled regardless of what the raw Y-count says
+(some of those 12 may have been O/E responders), so continuing to flag it as
+underfilled would be actively wrong, not just over-eager. Otherwise gated
+purely on `matchStatus !== 'in_progress'` (i.e. it disappears once the match
+itself starts) and `yCount < 12`. At 12 or more Y responses, nothing is shown
+at all. Purely a read of existing `availability` data; no new write path.
 
 Named "underfilled" rather than "open" deliberately: `FixturesAvailability.tsx`
 already renders a separate `🔒 Availability locked — Squad selection in
 progress` message on the same card once the Thursday cron or a squad
 submission locks the slot (see `features/player-availability.md` §10). Since
-this nudge is squad-status-independent, it can render on the same card at the
+this nudge can still show while a squad is in draft/pending/approved (i.e.
+already locked but not yet announced), it can render on the same card at the
 same time as that lock message — "open" would read as directly contradicting
 "locked," even though they describe two different things (whether responses
 can still be changed vs. whether Y-count has hit 12). "Underfilled" is a

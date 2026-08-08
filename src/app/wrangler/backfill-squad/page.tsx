@@ -18,7 +18,7 @@ export default async function BackfillSquadPage() {
 
   return (
     <>
-      <SiteNav activePage="wrangler" isAdmin={!!user?.isAdmin} />
+      <SiteNav activePage="wrangler" />
       <main className="min-h-screen bg-ink-1 px-4 md:px-8 py-8 max-w-3xl mx-auto">
         <div className="mb-6">
           <h1 className="font-cinzel text-xl font-bold text-gold">Squad Backfill</h1>
