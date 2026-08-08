@@ -8,6 +8,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { detectAndLogMilestones, detectAndLogMatchPerformances } from '@/lib/milestones'
 
 export interface SyncMatchStatsResult {
   ok:    boolean
@@ -22,7 +23,7 @@ export async function syncMatchStatsForBooking(
 
   const { data: booking, error: bookingErr } = await supabase
     .from('bookings')
-    .select('match_id')
+    .select('match_id, game_date, tournament:tournaments(is_practice)')
     .eq('id', bookingId)
     .single()
 
@@ -94,6 +95,27 @@ export async function syncMatchStatsForBooking(
     .neq('status', 'fees_applied')
 
   if (statusErr) return { ok: false, error: statusErr.message }
+
+  // Club recognition — best-effort, covers this sync regardless of whether
+  // it was a manual click or the unattended cron path (both funnel through
+  // this one function). Never allowed to fail the sync itself — see
+  // src/lib/milestones.ts. Practice games (see features/leaderboard.md
+  // §10) are excluded from match-performance highlights, same as every
+  // other "real stats" surface in this app — season milestones already
+  // exclude them via getPlayerSeasonStats()'s own default scoping.
+  const year = parseInt(String(booking.game_date).slice(0, 4), 10)
+  const playerIds = Array.from(new Set<string>(
+    [...(batting.data ?? []), ...(bowling.data ?? []), ...(fielding.data ?? []), ...(team.data ?? [])]
+      .map((r: any) => r.player_id)
+      .filter(Boolean)
+  ))
+  const tournamentRow = Array.isArray(booking.tournament) ? booking.tournament[0] : booking.tournament
+  const isPractice = !!(tournamentRow as any)?.is_practice
+
+  await Promise.all([
+    detectAndLogMilestones(bookingId, year, playerIds),
+    isPractice ? Promise.resolve() : detectAndLogMatchPerformances(bookingId, batting.data ?? [], bowling.data ?? [], fielding.data ?? []),
+  ])
 
   return { ok: true }
 }
