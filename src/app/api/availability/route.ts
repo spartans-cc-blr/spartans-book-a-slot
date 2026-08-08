@@ -47,9 +47,16 @@ export async function GET(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-  const now = new Date().toISOString()
+  // Deliberately no reserved_until filtering here — a soft_block is still an
+  // active hold (still shown as reserved on /admin, still blocks R4 in
+  // validateBooking()/getSuggestedOpenDates()) until expire-reservations
+  // actually deletes the row. Filtering out "expired-but-not-yet-deleted"
+  // holds here would let the public schedule show a slot as open hours
+  // before the once-daily cron catches up, out of step with the rest of the
+  // app. Matches this route's own documented contract in architecture.md
+  // (`bookings` — confirmed + soft_block, non-cancelled).
   const response = await fetch(
-    `${supabaseUrl}/rest/v1/bookings?status=neq.cancelled&or=(reserved_until.is.null,reserved_until.gt.${now})&order=game_date,slot_time&limit=1000&select=*,tournament:tournaments(name)`,
+    `${supabaseUrl}/rest/v1/bookings?status=neq.cancelled&order=game_date,slot_time&limit=1000&select=*,tournament:tournaments(name)`,
     {
       headers: {
         'apikey': supabaseKey,
