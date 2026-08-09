@@ -714,7 +714,8 @@ Next.js API Routes (server-side)
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; last step calls `detectAndLogMilestones()` |
 | `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` (season) + `detectAndLogMatchPerformances()` (single-match highlights) — club-wide milestone recognition detection; see `features/milestone-recognition.md` |
 | `src/app/api/milestones/unseen/route.ts` + `src/app/api/milestones/mark-seen/route.ts` | Broadcast feed + seen-cursor advance for the milestone recognition modal |
-| `src/components/milestones/MilestoneCelebrationModal.tsx` | Club-wide milestone recognition modal, mounted once inside `SiteNav` |
+| `src/components/milestones/MilestoneCelebrationModal.tsx` | Club-wide milestone recognition modal |
+| `src/components/ui/GlobalMilestoneModal.tsx` | Mounts the modal once per session from the root layout — not from `SiteNav`, which isn't part of a shared layout and remounts per navigation; see `features/milestone-recognition.md` §7.1 |
 | `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — CricHeroes direct-fetch pipeline; chains parse → sync; never touches fees; also auto-clears a reconciliation flag on a successful re-sync |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron — see `features/post-match-scorecard.md` |
 | `src/app/admin/scorecard-backfill/page.tsx` | One-time admin catch-up UI, client-driven sequential loop |

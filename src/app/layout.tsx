@@ -3,6 +3,7 @@ import { Cinzel, Rajdhani } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 import { ChunkErrorBoundary } from '@/components/ui/ChunkErrorBoundary'
+import { GlobalMilestoneModal } from '@/components/ui/GlobalMilestoneModal'
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -37,7 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${cinzel.variable} ${rajdhani.variable}`}>
       <body className="bg-ink text-parchment font-rajdhani antialiased">
-        <Providers><ChunkErrorBoundary>{children}</ChunkErrorBoundary></Providers>
+        <Providers>
+          <GlobalMilestoneModal />
+          <ChunkErrorBoundary>{children}</ChunkErrorBoundary>
+        </Providers>
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {

@@ -9,9 +9,9 @@
 // the achiever or whoever triggered the sync — "recognition from club to
 // all players." See features/milestone-recognition.md.
 //
-// Mounted once inside SiteNav (rendered on every authenticated page) rather
-// than a specific page, so it fires regardless of which page a player lands
-// on first.
+// Mounted once via GlobalMilestoneModal in the root layout (src/app/layout.tsx)
+// rather than a specific page, so it fires regardless of which page a player
+// lands on first — and exactly once per session, not once per navigation.
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
