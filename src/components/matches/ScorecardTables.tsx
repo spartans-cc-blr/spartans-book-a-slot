@@ -73,10 +73,20 @@ export function ScorecardTables({
   // filtered out here since they're just clutter in the readout. Balls
   // faced (not runs) is the right batting signal: a player can legitimately
   // score 0 off a ball they actually faced.
-  const battingRows = batting.filter(row =>
-    pickField(row, ['dismissal_method']) !== 'did_not_bat' && num(row, ['balls', 'balls_faced']) > 0
-  )
-  const bowlingRows = bowling.filter(row => num(row, ['overs', 'overs_bowled']) > 0)
+  // Sorted by the real batting/bowling order captured off the CricHeroes
+  // scorecard (batting_order/bowling_order) — without this, rows render in
+  // whatever order Postgres happens to return them in, which is not the
+  // same thing and looked shuffled match to match. Rows synced before
+  // bowling_order existed carry it as null/0 for every player; num()
+  // reads that as 0 and Array.prototype.sort is stable, so those matches
+  // just fall back to their pre-existing (unsorted) order rather than
+  // breaking — they'll sort correctly once re-synced.
+  const battingRows = batting
+    .filter(row => pickField(row, ['dismissal_method']) !== 'did_not_bat' && num(row, ['balls', 'balls_faced']) > 0)
+    .sort((a, b) => num(a, ['batting_order']) - num(b, ['batting_order']))
+  const bowlingRows = bowling
+    .filter(row => num(row, ['overs', 'overs_bowled']) > 0)
+    .sort((a, b) => num(a, ['bowling_order']) - num(b, ['bowling_order']))
 
   // Most players in a squad had zero fielding involvement in a given match —
   // only show rows with at least one dismissal, same spirit as filtering
