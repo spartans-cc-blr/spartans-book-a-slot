@@ -170,11 +170,44 @@ Overall instead:
   tied-cards treatment from §4 stays as the only treatment; no collapsible
   list, no `>1` gate.
 
-`page.tsx` only fetches `getPerformances(overallFilters)` when
-`category === 'overall' && year !== 'all'` — `yearlyPerformances`, passed
-down as `centuries`/`fiveWicketHauls` props (`null` when not applicable,
-which the component treats as "don't show the bands", not "zero this
-year").
+All of the above only applies when **no** Tournament/Ground filter is
+active — see §5.1 for what a scoped filter does instead.
+
+`page.tsx` fetches `getPerformances(overallFilters)` when
+`category === 'overall' && (year !== 'all' || scoped)` — `yearlyPerformances`,
+passed down as `centuries`/`halfCenturies`/`fiveWicketHauls`/`threeWicketHauls`
+props (`null` when not applicable, which the component treats as "don't
+show any band/list", not "zero this year").
+
+---
+
+## 5.1 Tournament/Ground-Scoped Lists (added August 2026)
+
+A Tournament/Ground filter shrinks the sample further than a plain year
+filter does — a single tournament might only run a handful of games all
+season, so even the year-scoped `>1` gate on "Most 100s" (§5) doesn't
+reliably rescue a "most" card from being a tie-break artifact once scoped.
+When `scoped` (a Tournament or Ground is selected, independent of which
+year is picked — including "All Time"), Overall drops the card/band
+treatment for **all four** rare-performance categories and instead mirrors
+the Monthly tab exactly: always-open lists (`ScopedInningsPanel` in
+`LeaderboardMilestones.tsx`, visually identical to `CollapsibleInningsPanel`
+minus the toggle — same shell `LeaderboardMonthly.tsx`'s own `InningsPanel`
+uses) for **Centuries, Half-Centuries, 5-Wicket Hauls, and 3-Wicket Hauls**,
+every qualifying performance listed with no threshold gate. Neither
+"Most 100s" nor "Most 50s" renders as a card at all while scoped — there is
+no in-between "most, but only if >1" treatment here, unlike the year-only
+case.
+
+Scoped always wins over the year-band treatment (§5) — a scoped-and-yeared
+selection (e.g. Tournament X + 2025) shows the scoped lists, not the year
+bands, and the `>1` gate on Most 100s never applies while scoped.
+
+Every other card (Leading MVP/Runs/Wickets, Most Dismissals, Best
+Average/S/R/Economy) is unaffected — `minGamesThreshold()`/
+`minDismissalsThreshold()` already had a `scoped` floor of 1 game/dismissal
+for exactly this filter, and that's unchanged; only the four rare-performance
+categories change presentation.
 
 ---
 
@@ -282,13 +315,13 @@ its existing callers."
 | `src/lib/leaderboardMilestones.ts` | Plain thresholds/tie-handling module (§7) — the fix for §8's incident |
 | `src/lib/leaderboardGlossary.ts` | `buildOverallGlossary()`/`buildMonthlyGlossary()`/`buildDetailedGlossary()` — server-side, quotes real thresholds |
 | `src/components/leaderboard/LeaderboardFilters.tsx` | Nav tree + filter bar (§2) — pushes `searchParams`, page re-fetches server-side |
-| `src/components/leaderboard/LeaderboardMilestones.tsx` | Overall tab — tie-inclusive cards (§4) + year-scoped collapsible bands (§5) + Most Dismissals (§6) |
+| `src/components/leaderboard/LeaderboardMilestones.tsx` | Overall tab — tie-inclusive cards (§4) + year-scoped collapsible bands (§5) + Tournament/Ground-scoped always-open lists (§5.1) + Most Dismissals (§6) |
 | `src/components/leaderboard/LeaderboardMonthly.tsx` | Monthly tab — single-winner cards + always-open Centuries/Half-Centuries/5-for/3-for panels |
 | `src/components/leaderboard/InningsRow.tsx` | Shared `ClickableRow`/`BattingInningsRow`/`BowlingInningsRow` — whole-row click to `/matches/history/[bookingId]`, used by both Milestones and Monthly |
 | `src/components/leaderboard/LeaderboardTable.tsx` | Detailed branch — sortable MVP/Bat/Bowl/Field tables |
 | `src/components/leaderboard/LeaderboardGlossary.tsx` | Renders the glossary entries built server-side |
 | `src/components/leaderboard/PlayerAvatar.tsx` | Shared avatar (photo or initials) used across every card/row on this page |
-| `src/components/leaderboard/WicketIcon.tsx` | 3-wicket-haul icon, Monthly tab only |
+| `src/components/leaderboard/WicketIcon.tsx` | 3-wicket-haul icon — Monthly tab, and Overall's Tournament/Ground-scoped 3-Wicket Hauls list (§5.1) |
 | `src/components/matches/BallIcon.tsx` | Gold-ball icon reused here for the 5-Wicket Hauls band header |
 | `src/types/index.ts` | `LeaderboardRow`, `MonthlyInnings`, `MonthlyBowlingInnings` |
 
@@ -354,13 +387,16 @@ and wasn't part of this change.
 - Monthly tab's cards remain single-winner (`bestBy`) — ties there weren't
   part of the August 2026 fix, on the reasoning that a single month's
   sample makes exact ties much rarer than a full year's.
-- "All Time" view keeps the pre-tie-fix "Most 100s" behaviour for
-  `>1`-gating and has no collapsible Centuries/5-Wicket Hauls bands — both
-  are deliberately scoped to "a specific year selected," not extended to
-  "All Time" in this pass.
-- No "Most 3-Wicket Hauls" or "Most Half-Centuries-only-list" card/band —
-  only centuries and 5-wicket hauls were called out as rare enough to
-  warrant the §5 treatment.
+- "All Time" view with **no** Tournament/Ground filter keeps the
+  pre-tie-fix "Most 100s" behaviour for `>1`-gating and has no collapsible
+  Centuries/5-Wicket Hauls bands — that combination (`year === 'all'` and
+  not scoped) is the one case §5/§5.1 don't cover, since a scoped filter
+  (§5.1) or a specific year (§5) each independently supply a list-based
+  fallback, but neither is present here.
+- No "Most 3-Wicket Hauls" or "Most Half-Centuries-only-list" card/band for
+  the **year-only** case (§5) — only centuries and 5-wicket hauls were
+  called out as rare enough to warrant that treatment. The Tournament/
+  Ground-scoped case (§5.1) does cover all four, matching Monthly.
 
 ---
 
