@@ -39,8 +39,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${cinzel.variable} ${rajdhani.variable}`}>
       <body className="bg-ink text-parchment font-rajdhani antialiased">
         <Providers>
-          <GlobalMilestoneModal />
-          <ChunkErrorBoundary>{children}</ChunkErrorBoundary>
+          <ChunkErrorBoundary>
+            <GlobalMilestoneModal />
+            {children}
+          </ChunkErrorBoundary>
         </Providers>
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
