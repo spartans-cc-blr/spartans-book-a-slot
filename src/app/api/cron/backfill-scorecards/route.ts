@@ -49,8 +49,28 @@ export async function GET(req: NextRequest) {
     .eq('status', 'confirmed')
     .lte('game_date', today)
     .not('match_id', 'is', null)
-    .order('game_date', { ascending: false })
-    .limit(50) // upper bound on the query itself; MAX_PER_RUN caps what we actually process
+    // Oldest-first — MAX_PER_RUN only lets a couple of bookings through per
+    // run, so ordering is what actually decides which ones get skipped this
+    // time. Newest-first (the previous order) meant a match that just ended
+    // today always sorted ahead of older, already-waiting backlog — and
+    // since a just-ended match usually isn't marked complete on CricHeroes
+    // yet (see the "Match not yet completed" failure path below), it would
+    // often occupy one of the scarce slots and fail, while an older match
+    // that was genuinely ready to sync got bumped to the next run. Oldest
+    // first guarantees real FIFO draining, matching the "leftover bookings
+    // just get picked up by tomorrow's run" intent described above. slot_time
+    // is a secondary tiebreaker so two same-day matches process in the order
+    // they were actually played.
+    .order('game_date', { ascending: true })
+    .order('slot_time', { ascending: true })
+    // NOTE: this limit applies BEFORE the in-memory sync-status filter below,
+    // and now that the order is oldest-first, a too-small limit here would
+    // silently starve the query — the oldest N rows are almost always
+    // already synced, so the real (recent) backlog would never even be
+    // fetched. 500 is well above the club's total match history (~100
+    // confirmed bookings as of Aug 2026) with years of headroom; MAX_PER_RUN
+    // is what actually bounds how many get processed per run.
+    .limit(500)
 
   if (error) {
     await notifyGCs('⚠️ Scorecard Backfill — Query Failed', `Cron error: ${error.message}`, '/admin/scorecard-backfill', false)
