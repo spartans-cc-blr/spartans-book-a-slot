@@ -111,11 +111,13 @@ export default async function LeaderboardPage({
 
   const monthlyPerformances = category === 'monthly' ? await getPerformances({ month }) : null
 
-  // Individual centuries/5-wicket-hauls list for the Overall tab's
-  // collapsible bands — only fetched for a specific year (not "All Time"),
-  // matching the same scope as `rows` above. Not fetched for "All" — that
-  // view keeps the plain tied-cards Most 100s treatment instead.
-  const yearlyPerformances = category === 'overall' && year !== 'all' ? await getPerformances(overallFilters) : null
+  // Individual centuries/half-centuries/5-wicket/3-wicket-haul lists for the
+  // Overall tab's bands — fetched for a specific year (not "All Time") or
+  // whenever a Tournament/Ground filter is active (scoped), matching the
+  // same scope as `rows` above. Neither condition met ("All Time", no
+  // scope) keeps the plain tied-cards Most 100s/50s treatment instead.
+  const scoped = !!(tournamentName || groundName)
+  const yearlyPerformances = category === 'overall' && (year !== 'all' || scoped) ? await getPerformances(overallFilters) : null
 
   const glossaryTitle = category === 'overall' ? 'Overall'
     : category === 'monthly' ? 'Monthly'
@@ -177,9 +179,11 @@ export default async function LeaderboardPage({
           <LeaderboardMilestones
             rows={rows}
             year={year}
-            scoped={!!(tournamentName || groundName)}
+            scoped={scoped}
             centuries={yearlyPerformances?.centuries ?? null}
+            halfCenturies={yearlyPerformances?.halfCenturies ?? null}
             fiveWicketHauls={yearlyPerformances?.fiveWicketHauls ?? null}
+            threeWicketHauls={yearlyPerformances?.threeWicketHauls ?? null}
           />
         ) : category === 'monthly' ? (
           <LeaderboardMonthly

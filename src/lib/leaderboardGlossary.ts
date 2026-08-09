@@ -32,15 +32,32 @@ export function buildOverallGlossary(year: number | 'all', tournamentName: strin
     { term: 'Leading Run Scorer', definition: `Most runs scored among players with ${qualifier}.` },
     { term: 'Leading Wicket Taker', definition: `Most wickets taken among players with ${qualifier}.` },
     { term: 'Most Dismissals', definition: `Most fielding dismissals (catches + run outs + stumpings combined) among players with ${qualifier} — only shown once the leader has reached ${minDismissals} dismissal${minDismissals === 1 ? '' : 's'} ${scope}. A full season of 50 is considered a genuinely good year in the field; that bar is prorated by quarter for a season still in progress.` },
-    { term: 'Most 100s', definition: year === 'all'
-        ? `Most centuries scored among players with ${qualifier}.`
-        : `Only shown when a player has scored more than one century ${scope} — with everyone else tied at just one, that's not a real "most" yet. See every individual century in the Centuries list below instead.` },
-    { term: 'Most 50s', definition: `Most half-centuries scored among players with ${qualifier}.` },
+  ]
+  // A Tournament/Ground filter drops "Most 100s"/"Most 50s" entirely in
+  // favour of the individual-list treatment below — the sample is small
+  // enough that a "most" card is usually just a tie-break artifact, same
+  // reasoning as the year-scoped ">1" gate on Most 100s, just stricter.
+  if (!scoped) {
+    entries.push(
+      { term: 'Most 100s', definition: year === 'all'
+          ? `Most centuries scored among players with ${qualifier}.`
+          : `Only shown when a player has scored more than one century ${scope} — with everyone else tied at just one, that's not a real "most" yet. See every individual century in the Centuries list below instead.` },
+      { term: 'Most 50s', definition: `Most half-centuries scored among players with ${qualifier}.` },
+    )
+  }
+  entries.push(
     { term: 'Best Average', definition: `Highest batting average — runs ÷ dismissals, not-out innings excluded — among players with ${inningsQualifier}.` },
     { term: 'Highest S/R', definition: `Highest batting strike rate — runs per 100 balls faced — among players with ${qualifier} and at least ${MIN_BALLS_FOR_STRIKE_RATE_OVERALL} balls faced ${scope}.` },
     { term: 'Best Economy', definition: `Fewest runs conceded per over among bowlers who bowled at least ${MIN_BALLS_FOR_ECONOMY} balls (${MIN_BALLS_FOR_ECONOMY / 6} overs) ${scope}.` },
-  ]
-  if (year !== 'all') {
+  )
+  if (scoped) {
+    entries.push(
+      { term: 'Centuries', definition: `Every individual batting innings of 100+ runs ${scope} — every one, not just the highest. Tap a row to open that match.` },
+      { term: 'Half-Centuries', definition: `Every individual batting innings of 50-99 runs ${scope}. Tap a row to open that match.` },
+      { term: '5-Wicket Hauls', definition: `Every bowling innings of 5 or more wickets ${scope}. Tap a row to open that match.` },
+      { term: '3-Wicket Hauls', definition: `Every bowling innings of 3-4 wickets ${scope}. Tap a row to open that match.` },
+    )
+  } else if (year !== 'all') {
     entries.push(
       { term: 'Centuries', definition: `Every individual batting innings of 100+ runs ${scope} — every one, not just the highest. Tap a row to open that match.` },
       { term: '5-Wicket Hauls', definition: `Every bowling innings of 5 or more wickets ${scope}. Tap a row to open that match.` },
