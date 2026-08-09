@@ -17,6 +17,7 @@
 
 import { SupabaseClient, createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase'
+import { syncMatchStatsForBooking } from '@/lib/matchStatsSync'
 
 export function createAnalyticsClient(): SupabaseClient | null {
   const url = process.env.ANALYTICS_SUPABASE_URL
@@ -132,16 +133,21 @@ export async function resolvePlayerName(opts: {
 // both right after an admin confirms a new alias/override, and by the
 // "Run reconciliation pass" backfill loop for rows added since the last
 // pass (see Part F).
+//
+// Returns the distinct match_ids actually touched so the caller can decide
+// which already-synced Hub bookings need a re-sync — see
+// resyncBookingsForMatchIds() below.
 export async function backfillPlayerIdForName(opts: {
   analytics: SupabaseClient
   matchId?: string // when set, scopes the backfill to one match (override); otherwise all matches (alias)
   scorecardName: string
   playerId: string
-}): Promise<{ updated: number; error?: string }> {
+}): Promise<{ updated: number; matchIds: string[]; error?: string }> {
   const { analytics, matchId, scorecardName, playerId } = opts
   const tables = ['batting_stats', 'bowling_stats', 'fielding_stats', 'team_list'] as const
 
   let updated = 0
+  const matchIds = new Set<string>()
   for (const table of tables) {
     let query = analytics
       .from(table)
@@ -151,8 +157,61 @@ export async function backfillPlayerIdForName(opts: {
     if (matchId) query = query.eq('match_id', matchId)
 
     const { data, error } = await query.select('match_id')
-    if (error) return { updated, error: `${table}: ${error.message}` }
+    if (error) return { updated, matchIds: Array.from(matchIds), error: `${table}: ${error.message}` }
     updated += data?.length ?? 0
+    for (const row of data ?? []) {
+      const mid = (row as any).match_id
+      if (mid) matchIds.add(mid)
+    }
   }
-  return { updated }
+  return { updated, matchIds: Array.from(matchIds) }
+}
+
+// Closes the "no automated re-sync-on-reconcile hook" gap documented in
+// features/player-identity-resolution.md: resolving a scorecard name only
+// ever wrote player_id into the analytics DB. Any Hub booking that was
+// already synced *before* this resolution existed kept a stale
+// match_stats_cache row (player_id still null there) until an admin
+// separately found the match on /matches/history and clicked "Re-sync
+// stats". This re-syncs those bookings automatically, right inside the
+// same reconciliation request.
+//
+// A booking that hasn't been synced to the Hub yet needs nothing here —
+// its first real sync reads the analytics DB fresh (select('*') in
+// syncMatchStatsForBooking) and picks up the now-resolved player_id for
+// free. Only bookings already at 'synced' or 'fees_applied' are stale and
+// worth the round trip. Best-effort per booking — one failure doesn't stop
+// the others, and this never throws: the caller's alias/override write
+// already succeeded and is the important part of the request regardless
+// of whether the resync keeps up.
+export async function resyncBookingsForMatchIds(
+  matchIds: string[],
+  syncedBy: string | null
+): Promise<{ resynced: number; failed: number }> {
+  if (matchIds.length === 0) return { resynced: 0, failed: 0 }
+
+  const hub = createServiceClient()
+
+  const { data: bookingRows } = await hub
+    .from('bookings')
+    .select('id, match_id')
+    .in('match_id', matchIds)
+    .eq('status', 'confirmed')
+  if (!bookingRows?.length) return { resynced: 0, failed: 0 }
+
+  const bookingIds = bookingRows.map((b: any) => b.id)
+  const { data: uploadRows } = await hub
+    .from('scorecard_uploads')
+    .select('booking_id')
+    .in('booking_id', bookingIds)
+    .in('status', ['synced', 'fees_applied'])
+
+  let resynced = 0
+  let failed = 0
+  for (const row of uploadRows ?? []) {
+    const result = await syncMatchStatsForBooking((row as any).booking_id, syncedBy)
+    if (result.ok) resynced++
+    else failed++
+  }
+  return { resynced, failed }
 }

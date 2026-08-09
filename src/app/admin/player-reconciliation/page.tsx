@@ -116,7 +116,8 @@ export default function PlayerReconciliationPage() {
   const [busyName, setBusyName] = useState<string | null>(null)
   const [pickerFor, setPickerFor] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
-  const [passResults, setPassResults] = useState<Record<string, { updated: number; error?: string }>>({})
+  const [passResults, setPassResults] = useState<Record<string, { updated: number; resynced?: number; error?: string }>>({})
+  const [confirmNote, setConfirmNote] = useState('')
 
   function load() {
     setLoading(true)
@@ -161,8 +162,13 @@ export default function PlayerReconciliationPage() {
     }
 
     setBusyName(name)
+    setConfirmNote('')
     try {
-      await post({ mode: 'confirm', scorecard_name: name, player_id: player.id, scope: 'global' })
+      const d = await post({ mode: 'confirm', scorecard_name: name, player_id: player.id, scope: 'global' })
+      setConfirmNote(
+        `✓ ${player.name} confirmed for "${name}"` +
+        (d.resynced ? ` — ${d.resynced} already-synced match(es) re-synced` : '')
+      )
       load()
     } catch (e: any) {
       setError(e.message)
@@ -188,12 +194,13 @@ export default function PlayerReconciliationPage() {
     if (!data) return
     setRunning(true)
     setPassResults({})
+    setConfirmNote('')
     const allNames = [...data.auto_resolved, ...data.suggested, ...data.no_match].map(e => e.scorecard_name)
     for (let i = 0; i < allNames.length; i++) {
       const name = allNames[i]
       try {
         const d = await post({ mode: 'reconcile', scorecard_name: name })
-        setPassResults(prev => ({ ...prev, [name]: { updated: d.updated ?? 0 } }))
+        setPassResults(prev => ({ ...prev, [name]: { updated: d.updated ?? 0, resynced: d.resynced ?? 0 } }))
       } catch (e: any) {
         setPassResults(prev => ({ ...prev, [name]: { updated: 0, error: e.message } }))
       }
@@ -218,6 +225,7 @@ export default function PlayerReconciliationPage() {
 
       {loading && <p className="font-rajdhani text-sm text-zinc-600">Loading…</p>}
       {error && <p className="font-rajdhani text-sm text-red-400 mb-3">{error}</p>}
+      {confirmNote && <p className="font-rajdhani text-sm text-emerald-400 mb-3">{confirmNote}</p>}
 
       {!loading && data && (
         <>
@@ -245,7 +253,9 @@ export default function PlayerReconciliationPage() {
               <div className="space-y-0.5">
                 {Object.entries(passResults).map(([name, r]) => (
                   <p key={name} className="font-rajdhani text-xs text-zinc-400">
-                    {name}: {r.error ? <span className="text-red-400">{r.error}</span> : `${r.updated} row(s) updated`}
+                    {name}: {r.error
+                      ? <span className="text-red-400">{r.error}</span>
+                      : `${r.updated} row(s) updated${r.resynced ? `, ${r.resynced} match(es) re-synced` : ''}`}
                   </p>
                 ))}
               </div>
