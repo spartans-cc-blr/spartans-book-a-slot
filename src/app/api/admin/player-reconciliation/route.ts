@@ -37,6 +37,7 @@ import {
   createAnalyticsClient,
   resolvePlayerName,
   backfillPlayerIdForName,
+  resyncBookingsForMatchIds,
 } from '@/lib/playerIdentityResolution'
 
 async function requireAdmin() {
@@ -202,7 +203,10 @@ export async function POST(req: NextRequest) {
 
       const result = await backfillPlayerIdForName({ analytics, scorecardName: scorecard_name, playerId: player_id })
       if (result.error) return NextResponse.json({ error: result.error }, { status: 500 })
-      return NextResponse.json({ ok: true, updated: result.updated, cricheroes_player_id })
+      const { resynced, failed } = await resyncBookingsForMatchIds(result.matchIds, user.playerId ?? null)
+      return NextResponse.json({
+        ok: true, updated: result.updated, cricheroes_player_id, resynced, resync_failed: failed,
+      })
     }
 
     // Match-scoped override
@@ -218,7 +222,12 @@ export async function POST(req: NextRequest) {
       analytics, scorecardName: scorecard_name, playerId: player_id, matchId: scope.match_id,
     })
     if (result.error) return NextResponse.json({ error: result.error }, { status: 500 })
-    return NextResponse.json({ ok: true, updated: result.updated })
+    // Always attempt a resync for this one known match, even if `updated`
+    // came back 0 — the analytics rows may already have carried this
+    // player_id from an earlier pass while the Hub-side cache never
+    // caught up.
+    const { resynced, failed } = await resyncBookingsForMatchIds([scope.match_id], user.playerId ?? null)
+    return NextResponse.json({ ok: true, updated: result.updated, resynced, resync_failed: failed })
   }
 
   // mode === 'reconcile' — process every match this name still has an
@@ -239,6 +248,7 @@ export async function POST(req: NextRequest) {
 
   let updated = 0
   const stillUnresolved: string[] = []
+  const touchedMatchIds = new Set<string>()
   for (const matchId of Array.from(remainingMatchIds)) {
     const resolved = await resolvePlayerName({ analytics, hub, matchId, scorecardName: scorecard_name })
     if (resolved.player_id) {
@@ -247,10 +257,18 @@ export async function POST(req: NextRequest) {
       })
       if (result.error) return NextResponse.json({ error: result.error }, { status: 500 })
       updated += result.updated
+      if (result.updated > 0) touchedMatchIds.add(matchId)
     } else {
       stillUnresolved.push(matchId)
     }
   }
 
-  return NextResponse.json({ ok: true, updated, still_unresolved_matches: stillUnresolved })
+  // One batched pass over every match this run actually wrote a new
+  // player_id for, rather than a resync per matchId inside the loop above
+  // — see resyncBookingsForMatchIds() for why this is needed at all.
+  const { resynced, failed } = await resyncBookingsForMatchIds(Array.from(touchedMatchIds), user.playerId ?? null)
+
+  return NextResponse.json({
+    ok: true, updated, still_unresolved_matches: stillUnresolved, resynced, resync_failed: failed,
+  })
 }
