@@ -219,6 +219,16 @@ single-match performance, and a neutral `🎉 Club Recognition` when a batch
 happens to mix both (e.g. a sync that both crosses a season total and
 produces a fifty in the same match).
 
+**Wicket-haul icons reuse the app's own cricket icon set, not emoji** —
+`matchIcon()` renders `WicketIcon` (`src/components/leaderboard/WicketIcon.tsx`,
+three stumps with bails dislodged) for a three-wicket haul and
+`BallIcon type="gold"` (`src/components/matches/BallIcon.tsx`) for a
+five-wicket haul, the exact same two icons `/leaderboard`'s own 3-/5-Wicket
+Hauls bands already use. Both of those components were built specifically
+to replace a 🎳 (ten-pin bowling) emoji that isn't a cricket icon at all —
+this modal had briefly regressed to that same emoji before being fixed to
+match.
+
 Each player sees each achievement exactly once, no matter when they next
 open the Hub — including one detected by the unattended cron path, which
 has no user present at detection time to show anything to.
