@@ -17,6 +17,8 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Dialog } from '@/components/ui/Dialog'
 import { PlayerNameLink } from '@/lib/playerLink'
+import { WicketIcon } from '@/components/leaderboard/WicketIcon'
+import { BallIcon } from '@/components/matches/BallIcon'
 
 type SeasonMilestoneType = 'runs' | 'wickets' | 'dismissals'
 type MatchPerformanceType = 'century' | 'half_century' | 'five_wicket_haul' | 'three_wicket_haul' | 'five_dismissals'
@@ -54,12 +56,19 @@ type Achievement = SeasonAchievement | MatchAchievement
 const SEASON_LABELS: Record<SeasonMilestoneType, string> = { runs: 'runs', wickets: 'wickets', dismissals: 'dismissals' }
 const SEASON_ICONS:  Record<SeasonMilestoneType, string> = { runs: '🏏', wickets: '🎯', dismissals: '🧤' }
 
-const MATCH_ICONS: Record<MatchPerformanceType, string> = {
-  century:           '💯',
-  half_century:      '5️⃣0️⃣',
-  five_wicket_haul:  '🔥',
-  three_wicket_haul: '🎳',
-  five_dismissals:   '🧤',
+// Wicket-haul icons match the ones already shipped on /leaderboard's
+// 5-Wicket Hauls / 3-Wicket Hauls bands (src/components/leaderboard/WicketIcon.tsx,
+// src/components/matches/BallIcon.tsx) rather than an emoji — 🎳 (ten-pin
+// bowling) isn't a cricket icon at all, and both of these were built
+// specifically to replace it.
+function matchIcon(type: MatchPerformanceType): React.ReactNode {
+  switch (type) {
+    case 'century':           return '💯'
+    case 'half_century':      return '5️⃣0️⃣'
+    case 'five_wicket_haul':  return <BallIcon type="gold" size={18} />
+    case 'three_wicket_haul': return <WicketIcon size={18} />
+    case 'five_dismissals':   return '🧤'
+  }
 }
 const MATCH_TEXT: Record<MatchPerformanceType, (value: number) => React.ReactNode> = {
   century:           value => <>scored a century — <span className="font-bold">{value} runs</span></>,
@@ -136,8 +145,8 @@ export function MilestoneCelebrationModal() {
                 </span>
               )}
               <p className="font-rajdhani text-sm text-parchment leading-snug">
-                <span className="text-lg mr-1">
-                  {a.kind === 'season' ? SEASON_ICONS[a.milestone_type] : MATCH_ICONS[a.performance_type]}
+                <span className="inline-flex items-center align-[-3px] text-lg mr-1">
+                  {a.kind === 'season' ? SEASON_ICONS[a.milestone_type] : matchIcon(a.performance_type)}
                 </span>
                 {a.player ? (
                   <PlayerNameLink
