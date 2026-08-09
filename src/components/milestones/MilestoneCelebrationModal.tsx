@@ -73,6 +73,14 @@ function formatMatchDate(gameDate: string | null): string {
   return gameDate ? new Date(gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''
 }
 
+function dialogTitle(achievements: Achievement[]): string {
+  const hasSeason = achievements.some(a => a.kind === 'season')
+  const hasMatch = achievements.some(a => a.kind === 'match')
+  if (hasSeason && !hasMatch) return '🎉 Milestone Recognition'
+  if (hasMatch && !hasSeason) return '🏅 Performer of the Match'
+  return '🎉 Club Recognition'
+}
+
 export function MilestoneCelebrationModal() {
   const { status } = useSession()
   const [achievements, setAchievements] = useState<Achievement[]>([])
@@ -103,7 +111,7 @@ export function MilestoneCelebrationModal() {
     <Dialog
       open={open}
       onClose={dismiss}
-      title="🎉 Milestone Recognition"
+      title={dialogTitle(achievements)}
       actions={
         <button
           onClick={dismiss}
@@ -122,6 +130,11 @@ export function MilestoneCelebrationModal() {
               className="w-10 h-10 rounded-full object-cover border border-gold-dim flex-shrink-0"
             />
             <div>
+              {a.kind === 'match' && (
+                <span className="inline-block font-rajdhani text-[10px] font-bold uppercase tracking-wide text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded px-1.5 py-0.5 mb-1">
+                  🏅 Performer of the Match
+                </span>
+              )}
               <p className="font-rajdhani text-sm text-parchment leading-snug">
                 <span className="text-lg mr-1">
                   {a.kind === 'season' ? SEASON_ICONS[a.milestone_type] : MATCH_ICONS[a.performance_type]}
@@ -148,6 +161,11 @@ export function MilestoneCelebrationModal() {
                 <p className="font-rajdhani text-[11px] text-zinc-500 mt-0.5">
                   vs {a.booking.opponent_name}
                   {a.booking.game_date ? ` · ${formatMatchDate(a.booking.game_date)}` : ''}
+                </p>
+              )}
+              {a.kind === 'match' && (
+                <p className="font-rajdhani text-xs text-emerald-400 mt-1">
+                  👏 Let's celebrate this performance!
                 </p>
               )}
             </div>

@@ -206,6 +206,19 @@ it" button, the ✕, Escape, or an overlay click — all routed through
 `Dialog`'s existing `onClose`) calls `POST /api/milestones/mark-seen` and
 closes.
 
+**Match-kind rows are deliberately not framed as "milestones"** — a
+100/50/5-wicket/3-wicket/5-dismissal performance is a standout on that one
+day, not a threshold crossed over a season, so calling it a "milestone" the
+same way as a 500-run season total misrepresents it. Each `kind: 'match'`
+row instead carries its own **"🏅 Performer of the Match"** tag above the
+description, plus a closing congratulatory line ("👏 Let's celebrate this
+performance!"). `dialogTitle()` picks the dialog's own header to match what
+it's actually showing: `🎉 Milestone Recognition` when every row is a
+season milestone, `🏅 Performer of the Match` when every row is a
+single-match performance, and a neutral `🎉 Club Recognition` when a batch
+happens to mix both (e.g. a sync that both crosses a season total and
+produces a fifty in the same match).
+
 Each player sees each achievement exactly once, no matter when they next
 open the Hub — including one detected by the unattended cron path, which
 has no user present at detection time to show anything to.
