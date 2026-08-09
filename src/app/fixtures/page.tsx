@@ -55,55 +55,63 @@ export default async function FixturesPage() {
     // Fetch from yesterday so we can catch in-progress games that started today
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  const { data: bookings } = await supabase
-    .from('bookings')
-    .select(`
-      id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
-      match_fee_override,
-      tournament:tournaments(name, ball_type, match_fee, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url))
-    `)
-    .eq('status', 'confirmed')
-    .gte('game_date', yesterday)
-    .order('game_date', { ascending: true })
-    .order('slot_time', { ascending: true })
+  // `bookings`, `avail` (player's own responses), and `playerRow` (wallet/dues)
+  // are all independent of each other — only the two below depend on the
+  // signed-in player, and neither depends on `bookings` — so all three are
+  // issued together instead of one-after-another.
+  const [
+    { data: bookings },
+    { data: avail },
+    { data: playerRow },
+  ] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select(`
+        id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
+        match_fee_override,
+        tournament:tournaments(name, ball_type, match_fee, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url))
+      `)
+      .eq('status', 'confirmed')
+      .gte('game_date', yesterday)
+      .order('game_date', { ascending: true })
+      .order('slot_time', { ascending: true }),
 
-  let existingResponses: Record<string, string> = {}
-  if (player?.playerId) {
-    const { data: avail } = await supabase
-      .from('availability')
-      .select('booking_id, response')
-      .eq('player_id', player.playerId)
-    existingResponses = Object.fromEntries((avail ?? []).map(r => [r.booking_id, r.response]))
-  }
+    player?.playerId
+      ? supabase.from('availability').select('booking_id, response').eq('player_id', player.playerId)
+      : Promise.resolve({ data: null as { booking_id: string; response: string }[] | null }),
 
-  let hasDues = false
-  let loggedInWalletBalance: number | null = null
-  if (player?.playerId) {
-    const { data: playerRow } = await supabase
-      .from('players')
-      .select('wallet_balance, dues_override')
-      .eq('id', player.playerId)
-      .single()
-    hasDues = (playerRow?.wallet_balance ?? 0) < 0 && !playerRow?.dues_override
-    loggedInWalletBalance = playerRow?.wallet_balance ?? null
-  }
+    player?.playerId
+      ? supabase.from('players').select('wallet_balance, dues_override').eq('id', player.playerId).single()
+      : Promise.resolve({ data: null as { wallet_balance: number; dues_override: boolean } | null }),
+  ])
+
+  const existingResponses: Record<string, string> = player?.playerId
+    ? Object.fromEntries((avail ?? []).map(r => [r.booking_id, r.response]))
+    : {}
+
+  const hasDues = player?.playerId ? (playerRow?.wallet_balance ?? 0) < 0 && !playerRow?.dues_override : false
+  const loggedInWalletBalance: number | null = player?.playerId ? (playerRow?.wallet_balance ?? null) : null
 
 // Fetch announced squads for all active bookings
   const bookingIds = (bookings ?? []).map(b => b.id)
-  const { data: squadRows } = bookingIds.length ? await supabase
-    .from('squad')
-    .select('booking_id, status, is_captain, is_vc, is_wk, player:players(id, name, cricheroes_url, fee_exemptions(start_date, end_date))')
-    .in('booking_id', bookingIds)
-    .eq('status', 'announced')
-  : { data: [] }
 
-  // Y-response counts per booking — powers the "Slot underfilled" nudge on the upcoming weekend's cards
-  const { data: yAvailRows } = bookingIds.length ? await supabase
-    .from('availability')
-    .select('booking_id')
-    .in('booking_id', bookingIds)
-    .eq('response', 'Y')
-  : { data: [] }
+  // Both of these depend on `bookingIds` (so they wait on the query above),
+  // but not on each other — issued together rather than sequentially.
+  const [{ data: squadRows }, { data: yAvailRows }] = bookingIds.length
+    ? await Promise.all([
+        supabase
+          .from('squad')
+          .select('booking_id, status, is_captain, is_vc, is_wk, player:players(id, name, cricheroes_url, fee_exemptions(start_date, end_date))')
+          .in('booking_id', bookingIds)
+          .eq('status', 'announced'),
+        // Y-response counts per booking — powers the "Slot underfilled" nudge on the upcoming weekend's cards
+        supabase
+          .from('availability')
+          .select('booking_id')
+          .in('booking_id', bookingIds)
+          .eq('response', 'Y'),
+      ])
+    : [{ data: [] as any[] }, { data: [] as any[] }]
 
   const yCountMap: Record<string, number> = {}
   for (const row of yAvailRows ?? []) {

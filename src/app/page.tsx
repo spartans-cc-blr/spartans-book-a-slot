@@ -16,34 +16,61 @@ export const revalidate = 60
 
 async function getPlayerData(playerId: string, playerStatus: string | null | undefined) {
   const supabase = createServiceClient()
-
-  // Upcoming fixtures count
   const today = new Date().toISOString().split('T')[0]
-  const { count: upcomingCount } = await supabase
-    .from('bookings')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'confirmed')
-    .gte('game_date', today)
 
-  // Player's availability responses for upcoming matches
-  const { data: avail } = await supabase
-    .from('availability')
-    .select('booking_id, response')
-    .eq('player_id', playerId)
+  // All six queries below are independent of each other — none consumes
+  // another's result — so they're issued together instead of one-after-
+  // another. Same queries, same shapes, just no longer serialized.
+  const [
+    { count: upcomingCount },
+    { data: avail },
+    { data: nextFixture },
+    { data: upcomingBookings },
+    nudge,
+    weekendGap,
+  ] = await Promise.all([
+    // Upcoming fixtures count
+    supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'confirmed')
+      .gte('game_date', today),
 
-  // Next confirmed fixture
-  const { data: nextFixture } = await supabase
-    .from('bookings')
-    .select(`
-      id, game_date, slot_time, format, opponent_name,
-      tournament:tournaments(name, ball_type)
-    `)
-    .eq('status', 'confirmed')
-    .gte('game_date', today)
-    .order('game_date', { ascending: true })
-    .order('slot_time', { ascending: true })
-    .limit(1)
-    .single()
+    // Player's availability responses for upcoming matches
+    supabase
+      .from('availability')
+      .select('booking_id, response')
+      .eq('player_id', playerId),
+
+    // Next confirmed fixture
+    supabase
+      .from('bookings')
+      .select(`
+        id, game_date, slot_time, format, opponent_name,
+        tournament:tournaments(name, ball_type)
+      `)
+      .eq('status', 'confirmed')
+      .gte('game_date', today)
+      .order('game_date', { ascending: true })
+      .order('slot_time', { ascending: true })
+      .limit(1)
+      .single(),
+
+    // All upcoming booking IDs (for pending count computation)
+    supabase
+      .from('bookings')
+      .select('id')
+      .eq('status', 'confirmed')
+      .gte('game_date', today),
+
+    // Read-only rendering of the same Sun-Wed nudge logic the cron uses —
+    // shows this player's own "still open, matches your pattern" nudge, if any.
+    getNudgeForPlayer(supabase, playerId, playerStatus),
+
+    // Day-agnostic weekend gap — powers the first-open-of-day greeting dialog.
+    // Unlike `nudge` above, this isn't gated to Sun-Wed.
+    getWeekendGapForPlayer(supabase, playerId, playerStatus),
+  ])
 
   // Player's availability for next fixture
   const nextFixtureResponse = nextFixture
@@ -51,22 +78,8 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     : null
 
   // Count of upcoming fixtures player has NOT responded to
-  const { data: upcomingBookings } = await supabase
-    .from('bookings')
-    .select('id')
-    .eq('status', 'confirmed')
-    .gte('game_date', today)
-
   const respondedIds = new Set((avail ?? []).map(a => a.booking_id))
   const pendingCount = (upcomingBookings ?? []).filter(b => !respondedIds.has(b.id)).length
-
-  // Read-only rendering of the same Sun-Wed nudge logic the cron uses —
-  // shows this player's own "still open, matches your pattern" nudge, if any.
-  const nudge = await getNudgeForPlayer(supabase, playerId, playerStatus)
-
-  // Day-agnostic weekend gap — powers the first-open-of-day greeting dialog.
-  // Unlike `nudge` above, this isn't gated to Sun-Wed.
-  const weekendGap = await getWeekendGapForPlayer(supabase, playerId, playerStatus)
 
   return { upcomingCount: upcomingCount ?? 0, nextFixture, nextFixtureResponse, pendingCount, nudge, weekendGap }
 }

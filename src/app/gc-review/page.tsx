@@ -43,51 +43,54 @@ export default async function GCReviewPage() {
 
   const bookingIds = (bookings ?? []).map(b => b.id)
 
-  // ADD — after const bookingIds = ...
-  const { data: captains } = bookingIds.length > 0
-    ? await supabase
-        .from('bookings')
-        .select('id, captain:players!bookings_captain_id_fkey(name, whatsapp)')
-        .in('id', bookingIds)
-    : { data: [] }
-  
+  // The four queries below all depend only on `bookingIds` (already
+  // resolved above), never on each other — issued together instead of
+  // one-after-another.
+  const [
+    { data: captains },
+    { data: avail },
+    { data: squads },
+    { data: draftSquads },
+  ] = bookingIds.length > 0
+    ? await Promise.all([
+        supabase
+          .from('bookings')
+          .select('id, captain:players!bookings_captain_id_fkey(name, whatsapp)')
+          .in('id', bookingIds),
+
+        // Y/O/E availability (all three, not just O/E) — Y included so the
+        // matrix can show all available players and flag anyone who
+        // responded Y but was not selected in any squad.
+        supabase
+          .from('availability')
+          .select('player_id, booking_id, response, players!availability_player_id_fkey(id, name, cricheroes_url)')
+          .in('response', ['Y', 'O', 'E'])
+          .in('booking_id', bookingIds),
+
+        // All squads for these bookings — match_role included for role
+        // composition display in the matrix and approval panels.
+        supabase
+          .from('squad')
+          .select('player_id, booking_id, status, is_captain, is_vc, is_wk, match_role, players(id, name, primary_skill, is_captain, fee_exemptions(start_date, end_date))')
+          .in('booking_id', bookingIds)
+          .in('status', ['pending_approval', 'approved', 'announced']),
+
+        // Draft squad player IDs (read-only, for matrix context) — GC
+        // cannot approve/return draft squads; this only shows whether an
+        // available player is already in the captain's draft selection.
+        supabase
+          .from('squad')
+          .select('player_id, booking_id')
+          .in('booking_id', bookingIds)
+          .eq('status', 'draft'),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
+
   // Build captainMap: bookingId → { name, whatsapp }
   const captainMap: Record<string, { name: string; whatsapp: string | null }> = {}
   for (const row of captains ?? []) {
     if (row.captain) captainMap[row.id] = row.captain as any
   }
-  
-  // ── Fetch Y/O/E availability (all three, not just O/E) ────
-  // Y included so the matrix can show all available players and
-  // flag anyone who responded Y but was not selected in any squad.
-  const { data: avail } = bookingIds.length > 0
-    ? await supabase
-        .from('availability')
-        .select('player_id, booking_id, response, players!availability_player_id_fkey(id, name, cricheroes_url)')
-        .in('response', ['Y', 'O', 'E'])
-        .in('booking_id', bookingIds)
-    : { data: [] }
-
-  // ── Fetch all squads for these bookings ────────────────────
-  // match_role included for role composition display in the matrix and approval panels.
-  const { data: squads } = bookingIds.length > 0
-    ? await supabase
-        .from('squad')
-        .select('player_id, booking_id, status, is_captain, is_vc, is_wk, match_role, players(id, name, primary_skill, is_captain, fee_exemptions(start_date, end_date))')
-        .in('booking_id', bookingIds)
-        .in('status', ['pending_approval', 'approved', 'announced'])
-    : { data: [] }
-
-  // ── Fetch draft squad player IDs (read-only, for matrix context) ──
-  // GC cannot approve/return draft squads — this data is used only to show
-  // whether an available player is already in the captain's draft selection.
-  const { data: draftSquads } = bookingIds.length > 0
-    ? await supabase
-        .from('squad')
-        .select('player_id, booking_id')
-        .in('booking_id', bookingIds)
-        .eq('status', 'draft')
-    : { data: [] }
  
   // Build draftSquadMap: bookingId → player_id[]
   const draftSquadMap: Record<string, string[]> = {}

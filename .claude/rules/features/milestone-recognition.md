@@ -194,11 +194,12 @@ write in this app (push subscribe, player-availability). Rate-limited
 (`RATE_LIMITS.playerWrite`).
 
 **`MilestoneCelebrationModal`** (`src/components/milestones/MilestoneCelebrationModal.tsx`)
-— client component, mounted once inside `SiteNav` (rendered on every
-authenticated page) rather than a specific page, so it fires regardless of
-which page a player lands on first after signing in. On mount, if the
-session is authenticated, fetches `/api/milestones/unseen`; if any rows
-come back, opens a `Dialog` listing each achievement — season and
+— client component, mounted once in the root layout via
+`GlobalMilestoneModal` (`src/components/ui/GlobalMilestoneModal.tsx`, added
+August 2026 — see "Performance" below) rather than a specific page, so it
+fires regardless of which page a player lands on first after signing in.
+On mount, if the session is authenticated, fetches `/api/milestones/unseen`;
+if any rows come back, opens a `Dialog` listing each achievement — season and
 single-match rows rendered with their own icon/copy (a discriminated
 `kind: 'season' | 'match'` union), player name CricHeroes-linked via
 `PlayerNameLink` when resolvable, plus match context. Dismissing (the "Got
@@ -259,7 +260,36 @@ has no user present at detection time to show anything to.
 | `src/app/api/milestones/unseen/route.ts` | GET — broadcast feed, merges both achievement tables |
 | `src/app/api/milestones/mark-seen/route.ts` | POST — advances the player's own seen-cursor |
 | `src/components/milestones/MilestoneCelebrationModal.tsx` | The modal itself |
-| `src/components/ui/SiteNav.tsx` | Mounts the modal once, gated on `isLoggedIn && !isExpelled` |
+| `src/components/ui/GlobalMilestoneModal.tsx` | Mounts the modal once per session in the root layout, gated on `isLoggedIn && !isExpelled` — added August 2026, see "Performance" below |
+| `src/app/layout.tsx` | Renders `GlobalMilestoneModal` once, inside `Providers` |
+
+---
+
+## 7.1 Performance — mount moved out of `SiteNav` (August 2026)
+
+Originally mounted directly inside `SiteNav.tsx`, gated on
+`isLoggedIn && !isExpelled` right there. `SiteNav` itself is rendered from
+inside 21 separate `page.tsx` files (see `architecture.md`'s file map) —
+it is **not** part of a shared Next.js layout — so every client-side
+navigation between pages unmounted and remounted `SiteNav`, which remounted
+`MilestoneCelebrationModal` with it, which re-ran its
+`fetch('/api/milestones/unseen')` on every single page view instead of once
+per session.
+
+Fixed by extracting the mount into `GlobalMilestoneModal.tsx` (same
+`isLoggedIn && !isExpelled` gate, since the modal component itself doesn't
+check `playerStatus`) and rendering it once in `src/app/layout.tsx`, inside
+`Providers` — the layout, unlike `SiteNav`, genuinely persists across
+navigation. `SiteNav.tsx` no longer imports or renders the modal at all.
+
+This was scoped narrowly rather than moving `SiteNav` itself into the root
+layout: most `/admin/**` pages deliberately render no `SiteNav` at all
+(they use `AdminLayout`'s own separate top bar instead — see
+`architecture.md` §4), so hoisting `SiteNav` wholesale would have added a
+second nav bar to every admin page. `SessionProvider` already lives in the
+root layout, so `useSession()` inside a remounted `SiteNav` was never
+re-fetching anything — the milestone-modal fetch was the only real
+recurring cost, and is the only piece that moved.
 
 ---
 

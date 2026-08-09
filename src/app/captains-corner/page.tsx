@@ -52,62 +52,38 @@ export default async function CaptainsCornerPage() {
   const supabase = createServiceClient()
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  // ── Fetch upcoming confirmed bookings ──────────────────────
-  const { data: bookings } = await supabase
-    .from('bookings')
-    .select(`
-      id, game_date, slot_time, format, opponent_name,
-      match_time, cricheroes_url, gc_return_note,
-      tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
-    `)
-    .eq('status', 'confirmed')
-    .gte('game_date', yesterday)
-    .order('game_date', { ascending: true })
-    .order('slot_time', { ascending: true })
-    .limit(20) // cap to reasonable window
+  // ── Fetch upcoming confirmed bookings + all non-expelled players ──
+  // Neither query depends on the other, so both are issued together.
+  const [{ data: bookings }, { data: players }] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select(`
+        id, game_date, slot_time, format, opponent_name,
+        match_time, cricheroes_url, gc_return_note,
+        tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))
+      `)
+      .eq('status', 'confirmed')
+      .gte('game_date', yesterday)
+      .order('game_date', { ascending: true })
+      .order('slot_time', { ascending: true })
+      .limit(20), // cap to reasonable window
+
+    supabase
+      .from('players')
+      .select('id, name, jersey_name, jersey_number, wallet_balance, dues_override, primary_skill, is_captain, priority_pick, cricheroes_url, status, fee_exemptions(start_date, end_date)')
+      .neq('status', 'expelled')
+      .order('name', { ascending: true }),
+  ])
+
   const activeBookings = (bookings ?? []).filter(b =>
     !isMatchExpired(b.game_date, b.slot_time, b.format ?? 'T20')
-  )    
-
-  // ── Fetch all non expelled players ───────────────────────────────
-  const { data: players } = await supabase
-    .from('players')
-    .select('id, name, jersey_name, jersey_number, wallet_balance, dues_override, primary_skill, is_captain, priority_pick, cricheroes_url, status, fee_exemptions(start_date, end_date)')
-    .neq('status', 'expelled')
-    .order('name', { ascending: true })
-
-  // ── Fetch availability for all upcoming bookings ───────────
-  const bookingIds = (activeBookings ?? []).map(b => b.id)
-  let availability: { player_id: string; booking_id: string; response: string }[] = []
-  if (bookingIds.length > 0) {
-    const { data: avail } = await supabase
-      .from('availability')
-      .select('player_id, booking_id, response')
-      .in('booking_id', bookingIds)
-    availability = avail ?? []
-  }
+  )
 
   const today = new Date().toISOString().split('T')[0]
 
-  // Batched — one round trip for the whole candidate pool, not per player.
-  // Only used to decide whether a player gets a "Form" toggle at all — a
-  // player with `null` here has no reconciled matches anywhere, so showing
-  // a toggle that always opens to "no data" would just be clutter. The
-  // actual tournament/ground/format breakdown behind the toggle is fetched
-  // lazily per player on tap (GET /api/captains-corner/context-stats), not
-  // computed here — see src/lib/playerStats.ts getPlayerBookingContextStats().
-  const recentFormByPlayer = await getRecentForm((players ?? []).map(p => p.id))
-
-  const playersWithExempt = (players ?? []).map(p => ({
-   ...p,
-   is_fee_exempt: (p.fee_exemptions ?? []).some(
-     (e: { start_date: string; end_date: string | null }) =>
-       e.start_date <= today && (e.end_date === null || e.end_date >= today)
-   ),
-   recent_form: recentFormByPlayer[p.id] ?? null,
- }))
-
-  // ── Fetch existing squad rows ──────────────────────────────
+  // ── Fetch availability, existing squad rows, and recent-form data ──
+  // All three depend on `bookings`/`players` above (already resolved) but
+  // not on each other, so they're issued together rather than in sequence.
   type ExistingSquadRow = {
     booking_id: string
     player_id:  string
@@ -118,15 +94,43 @@ export default async function CaptainsCornerPage() {
     match_role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null  // ADD
 
   }
-  let existingSquads: ExistingSquadRow[] = []
-  if (bookingIds.length > 0) {
-    const { data: squads } = await supabase
-      .from('squad')
-      .select('booking_id, player_id, status, is_captain, is_vc, is_wk, match_role')
-      .in('booking_id', bookingIds)
-      .in('status', ['draft', 'pending_approval', 'approved', 'announced'])
-    existingSquads = (squads ?? []) as ExistingSquadRow[]
-  }
+
+  const bookingIds = (activeBookings ?? []).map(b => b.id)
+
+  const [{ data: avail }, { data: squads }, recentFormByPlayer] = await Promise.all([
+    bookingIds.length > 0
+      ? supabase.from('availability').select('player_id, booking_id, response').in('booking_id', bookingIds)
+      : Promise.resolve({ data: [] as { player_id: string; booking_id: string; response: string }[] }),
+
+    bookingIds.length > 0
+      ? supabase
+          .from('squad')
+          .select('booking_id, player_id, status, is_captain, is_vc, is_wk, match_role')
+          .in('booking_id', bookingIds)
+          .in('status', ['draft', 'pending_approval', 'approved', 'announced'])
+      : Promise.resolve({ data: [] as ExistingSquadRow[] }),
+
+    // Batched — one round trip for the whole candidate pool, not per player.
+    // Only used to decide whether a player gets a "Form" toggle at all — a
+    // player with `null` here has no reconciled matches anywhere, so showing
+    // a toggle that always opens to "no data" would just be clutter. The
+    // actual tournament/ground/format breakdown behind the toggle is fetched
+    // lazily per player on tap (GET /api/captains-corner/context-stats), not
+    // computed here — see src/lib/playerStats.ts getPlayerBookingContextStats().
+    getRecentForm((players ?? []).map(p => p.id)),
+  ])
+
+  const availability: { player_id: string; booking_id: string; response: string }[] = avail ?? []
+  const existingSquads: ExistingSquadRow[] = (squads ?? []) as ExistingSquadRow[]
+
+  const playersWithExempt = (players ?? []).map(p => ({
+   ...p,
+   is_fee_exempt: (p.fee_exemptions ?? []).some(
+     (e: { start_date: string; end_date: string | null }) =>
+       e.start_date <= today && (e.end_date === null || e.end_date >= today)
+   ),
+   recent_form: recentFormByPlayer[p.id] ?? null,
+ }))
 
   // Build initialSquadMap: bookingId → hydration data for SlotCard.
   // One entry per active booking (not just ones with existing squad rows) —
