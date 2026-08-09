@@ -366,7 +366,12 @@ both already-established patterns in this file rather than new concepts:
 practice games, and `getFilterOptions()` drops the Practice games
 tournament from the Tournament dropdown entirely (both the unrestricted
 and format-restricted branches), so it isn't offered as something to
-scope to from that page.
+scope to from that page. The footer disclaimer under the tables/cards
+(`src/app/leaderboard/page.tsx`, same line as the "stats synced from
+CricHeroes on a best-effort basis" note) says so explicitly — "Practice
+games are excluded — only real tournament fixtures count towards these
+numbers" — since the exclusion is otherwise silent (there's no filter
+control whose absence would hint at it).
 
 **Deliberately unaffected:** `getPlayerBookingContextStats()` (the
 Captains' Corner "Form" panel's tournament/ground/format context stats)
