@@ -64,7 +64,14 @@ function num(row: any, keys: string[]): number {
 // null and are simply not grantable access. Returns the whole matched
 // squad row (not just the id) so callers can also pull whatsapp off it
 // without a second lookup.
-function resolveSquadMatch(row: any, name: string, squad: SquadRef[]): SquadRef | null {
+//
+// Exported so src/lib/milestones.ts can reuse the exact same resolution —
+// without it, milestone/performance-highlight detection only ever worked
+// off the analytics row's own (often still-null, pre-reconciliation)
+// player_id, silently skipping every player in a freshly-synced match even
+// when their name matches this booking's squad exactly. See the 9 Aug 2026
+// PSG Champions Trophy incident in features/post-match-scorecard.md.
+export function resolveSquadMatch(row: any, name: string, squad: SquadRef[]): SquadRef | null {
   const rowPlayerId = pickField(row, ['player_id'])
   if (rowPlayerId) {
     const byId = squad.find(p => p.player_id === rowPlayerId)

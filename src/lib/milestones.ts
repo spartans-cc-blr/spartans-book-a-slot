@@ -28,6 +28,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { getPlayerSeasonStats } from '@/lib/playerStats'
+import { resolveSquadMatch, type SquadRef } from '@/lib/matchTopPerformers'
 
 export type MilestoneType = 'runs' | 'wickets' | 'dismissals'
 
@@ -92,33 +93,48 @@ export async function detectAndLogMilestones(bookingId: string, year: number, pl
 // season (unlike the once-per-year season milestones above).
 export type MatchPerformanceType = 'century' | 'half_century' | 'five_wicket_haul' | 'three_wicket_haul' | 'five_dismissals'
 
+// `squad` lets a row resolve via resolveSquadMatch()'s case-insensitive
+// name fallback when the analytics row's own player_id is still null
+// (i.e. this match's scorecard names haven't been through
+// /admin/player-reconciliation yet — see playerIdentityResolution.ts).
+// Before this, a freshly-synced match with zero reconciled names silently
+// logged nothing at all, even for a player whose name matched the squad
+// byte-for-byte — the same class of bug post-match-scorecard.md §15
+// already fixed for computeTopPerformers()/computeMatchMVP(), just never
+// applied here.
 export async function detectAndLogMatchPerformances(
   bookingId: string,
   batting: any[],
   bowling: any[],
-  fielding: any[]
+  fielding: any[],
+  squad: SquadRef[]
 ): Promise<void> {
   try {
     const rows: { player_id: string; booking_id: string; performance_type: MatchPerformanceType; value: number }[] = []
 
     for (const r of batting) {
-      if (!r.batted || !r.player_id) continue
+      if (!r.batted) continue
+      const playerId = resolveSquadMatch(r, r.player_name, squad)?.player_id
+      if (!playerId) continue
       const runs = Number(r.runs) || 0
-      if (runs >= 100) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'century', value: runs })
-      else if (runs >= 50) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'half_century', value: runs })
+      if (runs >= 100) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'century', value: runs })
+      else if (runs >= 50) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'half_century', value: runs })
     }
 
     for (const r of bowling) {
-      if (!r.did_bowl || !r.player_id) continue
+      if (!r.did_bowl) continue
+      const playerId = resolveSquadMatch(r, r.player_name, squad)?.player_id
+      if (!playerId) continue
       const wickets = Number(r.wickets) || 0
-      if (wickets >= 5) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'five_wicket_haul', value: wickets })
-      else if (wickets >= 3) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'three_wicket_haul', value: wickets })
+      if (wickets >= 5) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'five_wicket_haul', value: wickets })
+      else if (wickets >= 3) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'three_wicket_haul', value: wickets })
     }
 
     for (const r of fielding) {
-      if (!r.player_id) continue
+      const playerId = resolveSquadMatch(r, r.player_name, squad)?.player_id
+      if (!playerId) continue
       const dismissals = (Number(r.catches) || 0) + (Number(r.caught_behind) || 0) + (Number(r.run_outs) || 0) + (Number(r.stumpings) || 0)
-      if (dismissals >= 5) rows.push({ player_id: r.player_id, booking_id: bookingId, performance_type: 'five_dismissals', value: dismissals })
+      if (dismissals >= 5) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'five_dismissals', value: dismissals })
     }
 
     if (rows.length === 0) return

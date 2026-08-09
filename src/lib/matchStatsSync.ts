@@ -9,6 +9,7 @@
 import { createServiceClient } from '@/lib/supabase'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { detectAndLogMilestones, detectAndLogMatchPerformances } from '@/lib/milestones'
+import { resolveSquadMatch, type SquadRef } from '@/lib/matchTopPerformers'
 
 export interface SyncMatchStatsResult {
   ok:    boolean
@@ -103,18 +104,37 @@ export async function syncMatchStatsForBooking(
   // §10) are excluded from match-performance highlights, same as every
   // other "real stats" surface in this app — season milestones already
   // exclude them via getPlayerSeasonStats()'s own default scoping.
+  //
+  // playerIds is resolved via this booking's own squad (resolveSquadMatch,
+  // same helper computeTopPerformers()/computeMatchMVP() already use),
+  // not just the analytics row's own player_id — a fresh sync almost
+  // always predates /admin/player-reconciliation for that match's scorecard
+  // names (see player-identity-resolution.md), so relying on raw
+  // row.player_id alone left milestone/performance detection silently
+  // no-op for every player in a newly-synced match, even ones whose name
+  // matches the squad byte-for-byte. See the 9 Aug 2026 PSG Champions
+  // Trophy incident in features/post-match-scorecard.md.
+  const { data: squadRows } = await supabase
+    .from('squad')
+    .select('player_id, players(name)')
+    .eq('booking_id', bookingId)
+  const squad: SquadRef[] = (squadRows ?? []).map((r: any) => ({
+    player_id:   r.player_id,
+    player_name: r.players?.name ?? '',
+  }))
+
   const year = parseInt(String(booking.game_date).slice(0, 4), 10)
   const playerIds = Array.from(new Set<string>(
     [...(batting.data ?? []), ...(bowling.data ?? []), ...(fielding.data ?? []), ...(team.data ?? [])]
-      .map((r: any) => r.player_id)
-      .filter(Boolean)
+      .map((r: any) => resolveSquadMatch(r, r.player_name, squad)?.player_id)
+      .filter((id): id is string => Boolean(id))
   ))
   const tournamentRow = Array.isArray(booking.tournament) ? booking.tournament[0] : booking.tournament
   const isPractice = !!(tournamentRow as any)?.is_practice
 
   await Promise.all([
     detectAndLogMilestones(bookingId, year, playerIds),
-    isPractice ? Promise.resolve() : detectAndLogMatchPerformances(bookingId, batting.data ?? [], bowling.data ?? [], fielding.data ?? []),
+    isPractice ? Promise.resolve() : detectAndLogMatchPerformances(bookingId, batting.data ?? [], bowling.data ?? [], fielding.data ?? [], squad),
   ])
 
   return { ok: true }
