@@ -285,51 +285,72 @@ export default function ProfilePage() {
       <SiteNav activePage="profile" />
       {/* ── Dashboard Stats ── */}
               {dashboard && (
-                <div className="bg-ink-1 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-5">
+                <section aria-labelledby="dashboard-heading" className="bg-ink-1 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-5">
+                  <h2 id="dashboard-heading" className="sr-only">Your dashboard</h2>
                   <div className="max-w-2xl space-y-3">
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {/* Wallet */}
                       <div className={`rounded-lg border px-4 py-3 ${
                         (profile?.wallet_balance ?? 0) < 0 ? 'bg-amber-950/30 border-amber-800/60' : 'bg-ink-2 border-ink-5'
                       }`}>
-                        <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Wallet</p>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-base leading-none" aria-hidden="true">💰</span>
+                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500">Wallet</p>
+                        </div>
                         <p className={`font-cinzel text-lg font-bold ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
                           ₹{profile?.wallet_balance ?? 0}
                         </p>
-                        {(profile?.wallet_balance ?? 0) < 0 && (
-                          <p className="font-rajdhani text-[9px] text-amber-500 mt-0.5">Dues outstanding</p>
-                        )}
+                        <p className={`font-rajdhani text-xs mt-0.5 ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-500' : 'text-zinc-500'}`}>
+                          {(profile?.wallet_balance ?? 0) < 0 ? 'Dues outstanding' : 'Balance'}
+                        </p>
                       </div>
 
                       {/* Pending availability */}
-                      <div className={`rounded-lg border px-4 py-3 ${
-                        dashboard.pendingCount > 0 ? 'bg-amber-950/30 border-amber-800/60' : 'bg-ink-2 border-ink-5'
-                      }`}>
-                        <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Pending</p>
+                      <Link href="/fixtures"
+                        aria-label={dashboard.pendingCount > 0
+                          ? `${dashboard.pendingCount} matches need your availability response — go to Fixtures`
+                          : 'All matches marked — go to Fixtures'}
+                        className={`rounded-lg border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
+                          dashboard.pendingCount > 0
+                            ? 'bg-amber-950/30 border-amber-800/60 hover:border-amber-600'
+                            : 'bg-ink-2 border-ink-5 hover:border-gold-dim'
+                        }`}>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-base leading-none" aria-hidden="true">{dashboard.pendingCount > 0 ? '⚠️' : '✅'}</span>
+                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500">Pending</p>
+                        </div>
                         <p className={`font-cinzel text-lg font-bold ${dashboard.pendingCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
                           {dashboard.pendingCount}
                         </p>
-                        <p className="font-rajdhani text-[9px] text-zinc-500 mt-0.5">
+                        <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
                           {dashboard.pendingCount > 0 ? 'Need response' : 'All marked ✓'}
                         </p>
-                      </div>
+                      </Link>
 
                       {/* Upcoming fixtures */}
-                      <div className="rounded-lg border bg-ink-2 border-ink-5 px-4 py-3">
-                        <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Fixtures</p>
+                      <Link href="/fixtures"
+                        aria-label={`${dashboard.upcomingCount} upcoming confirmed matches — go to Fixtures`}
+                        className="rounded-lg border bg-ink-2 border-ink-5 px-4 py-3 transition-colors hover:border-gold-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-base leading-none" aria-hidden="true">🏏</span>
+                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500">Fixtures</p>
+                        </div>
                         <p className="font-cinzel text-lg font-bold text-parchment">{dashboard.upcomingCount}</p>
-                        <p className="font-rajdhani text-[9px] text-zinc-500 mt-0.5">Upcoming</p>
-                      </div>
+                        <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">Upcoming</p>
+                      </Link>
                     </div>
 
                     {/* Next match */}
                     {dashboard.nextMatch && (
-                      <a href={`/fixtures/${dashboard.nextMatch.id}`}
-                        className="block rounded-lg border border-ink-5 bg-ink-2 px-4 py-3 hover:border-gold/40 transition-colors">
+                      <Link href={`/fixtures/${dashboard.nextMatch.id}`}
+                        aria-label={`Next match: ${dashboard.nextMatch.opponent_name ? `versus ${dashboard.nextMatch.opponent_name}` : dashboard.nextMatch.tournament?.name ?? 'TBD'} on ${new Date(dashboard.nextMatch.game_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} at ${dashboard.nextMatch.slot_time}. ${dashboard.nextMatchResponse ? `Your response: ${dashboard.nextMatchResponse}` : 'Response not yet marked'}`}
+                        className="block rounded-lg border border-ink-5 bg-ink-2 px-4 py-3 hover:border-gold/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="font-rajdhani text-[10px] tracking-widest uppercase text-zinc-500 mb-0.5">Next Match</p>
+                            <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500 mb-0.5 flex items-center gap-1.5">
+                              <span aria-hidden="true">📅</span> Next Match
+                            </p>
                             <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
                               {dashboard.nextMatch.opponent_name
                                 ? `vs ${dashboard.nextMatch.opponent_name}`
@@ -352,17 +373,17 @@ export default function ProfilePage() {
                                 {dashboard.nextMatchResponse}
                               </span>
                             ) : (
-                              <span className="font-rajdhani text-[10px] font-bold px-2.5 py-1 rounded border bg-amber-950/40 border-amber-700 text-amber-400">
+                              <span className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded border bg-amber-950/40 border-amber-700 text-amber-400">
                                 Mark →
                               </span>
                             )}
                           </div>
                         </div>
-                      </a>
+                      </Link>
                     )}
 
                   </div>
-                </div>
+                </section>
               )}
       {/* Hero */}
       <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">

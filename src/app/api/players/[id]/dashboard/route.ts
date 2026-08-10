@@ -15,7 +15,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const supabase = createServiceClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: upcomingBookings }, { data: myResponses }] = await Promise.all([
+  const [{ data: upcomingIdRows }, { data: nextMatchRows }, { data: myResponses }] = await Promise.all([
+    // Full id list (uncapped) — needed to compute an accurate count and pendingCount
+    supabase
+      .from('bookings')
+      .select('id')
+      .eq('status', 'confirmed')
+      .gte('game_date', today),
+    // Only the single nearest fixture needs the full column set
     supabase
       .from('bookings')
       .select('id, game_date, slot_time, format, opponent_name, tournament:tournaments(name, ball_type)')
@@ -23,7 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .gte('game_date', today)
       .order('game_date', { ascending: true })
       .order('slot_time', { ascending: true })
-      .limit(20),
+      .limit(1),
     supabase
       .from('availability')
       .select('booking_id, response')
@@ -31,9 +38,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   ])
 
   const respondedIds = new Set((myResponses ?? []).map(r => r.booking_id))
-  const allUpcomingIds = (upcomingBookings ?? []).map(b => b.id)
+  const allUpcomingIds = (upcomingIdRows ?? []).map(b => b.id)
   const pendingCount = allUpcomingIds.filter(id => !respondedIds.has(id)).length
-  const nextMatch = (upcomingBookings ?? [])[0] ?? null
+  const nextMatch = (nextMatchRows ?? [])[0] ?? null
   const nextMatchResponse = nextMatch
     ? (myResponses ?? []).find(r => r.booking_id === nextMatch.id)?.response ?? null
     : null
