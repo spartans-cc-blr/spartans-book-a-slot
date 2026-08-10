@@ -14,13 +14,11 @@ const NAV = [
   { href: '/admin/players',          label: 'Players',          icon: '🏏' },
   { href: '/schedule',               label: 'Free Schedules',            icon: '🌐', section: 'Hub Views' },
   { href: '/fixtures',               label: 'Fixtures - Players View',   icon: '🏏' },
-  { href: '/matches/history',        label: 'Past Matches',     icon: '📜' },
   { href: '/tournament-planner',     label: 'Tournament Planner',   icon: '📊' },
   { href: '/admin/scorecard-backfill', label: 'Scorecard Backfill', icon: '📥', section: 'Utilities' },
   { href: '/admin/booking-backfill', label: 'Booking Backfill', icon: '🗓️' },
   { href: '/admin/player-reconciliation', label: 'Player Reconciliation', icon: '🪪' },
   { href: '/admin/cricheroes-id-backfill', label: 'CricHeroes ID Backfill', icon: '🔗' },
-  { href: '/gc-review',              label: 'GC Review',        icon: '⚖️' },
   { href: '/admin/dugout/kit-room',  label: 'Store Orders',  icon: '🥎', section: 'The Dugout' },
 ]
 
