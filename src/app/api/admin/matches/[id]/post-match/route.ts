@@ -61,17 +61,19 @@ export async function GET(
     stats = statsRow ?? null
   }
 
-  // Waivers already recorded for this booking — surfaced so re-opening an
-  // already-fees_applied booking still shows who was waived and why,
-  // rather than that context only being visible during the apply flow.
+  // Fee share adjustments already recorded for this booking — surfaced so
+  // re-opening an already-fees_applied booking still shows who diverged
+  // from the default share and why, rather than that context only being
+  // visible during the apply flow.
   const { data: waiverRows } = await supabase
     .from('match_fee_waivers')
-    .select('player_id, reason, created_at, players(name)')
+    .select('player_id, units, reason, created_at, players(name)')
     .eq('booking_id', params.id)
 
   const waivers = (waiverRows ?? []).map(w => ({
     player_id:  w.player_id,
     name:       (w.players as any)?.name ?? 'Unknown',
+    units:      w.units,
     reason:     w.reason,
     created_at: w.created_at,
   }))

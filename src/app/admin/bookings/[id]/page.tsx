@@ -38,6 +38,7 @@ interface PostMatchStats {
 interface RecordedWaiver {
   player_id:  string
   name:       string
+  units:      number
   reason:     string
   created_at: string
 }
@@ -49,20 +50,24 @@ interface PostMatchData {
 }
 
 interface FeeSquadRow {
-  player_id: string
-  name:      string
-  exempt:    boolean
-  waived:    boolean
-  batted:    boolean
-  bowled:    boolean
+  player_id:     string
+  name:          string
+  exempt:        boolean
+  batted:        boolean
+  bowled:        boolean
+  units:         number
+  default_units: number
+  fee:           number
 }
 
 interface FeePreview {
-  base_fee:         number
-  non_exempt_count: number
-  fee_per_player:   number
-  total_squad:      number
-  squad:            FeeSquadRow[]
+  base_fee:          number
+  total_units:       number
+  unit_price:        number
+  included_count:    number
+  total_collectable: number
+  total_squad:       number
+  squad:             FeeSquadRow[]
 }
 
 type TournamentWithCaptain = {
@@ -147,8 +152,12 @@ export default function BookingDetailPage() {
   const [feeLoading,       setFeeLoading]        = useState(false)
   const [feeError,         setFeeError]          = useState('')
   const [feeConfirming,    setFeeConfirming]     = useState(false)
-  const [waivedIds,        setWaivedIds]         = useState<Set<string>>(new Set())
-  const [waiverReason,     setWaiverReason]      = useState('')
+  // Sparse — only players the admin has explicitly toggled/stepped away
+  // from the server-computed default. Missing entries fall back to the
+  // default (0 for exempt/no-role, 1 for a recognized batting/bowling
+  // role) server-side.
+  const [unitsMap,         setUnitsMap]          = useState<Record<string, number>>({})
+  const [adjustmentReason, setAdjustmentReason]  = useState('')
   const [scorecardOpen,    setScorecardOpen]     = useState(false)
   const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[]; fielding?: any[]; team_list?: any[] } | null>(null)
   const [scorecardSquad,   setScorecardSquad]    = useState<{ player_id: string; player_name: string; cricheroes_url: string | null }[] | undefined>(undefined)
@@ -211,16 +220,16 @@ export default function BookingDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPostMatchEligible, id])
 
-  // Shared by the initial load and every waiver checkbox toggle — the
-  // per-head fee split is always recomputed server-side, never guessed
+  // Shared by the initial load and every checkbox/stepper change — the
+  // per-share fee split is always recomputed server-side, never guessed
   // client-side, so the preview stays authoritative even mid-selection.
-  function fetchFeePreview(waived: Set<string>) {
+  function fetchFeePreview(units: Record<string, number>) {
     setFeeLoading(true)
     setFeeError('')
     return fetch('/api/fees/apply', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ booking_id: id, confirm: false, waived_player_ids: Array.from(waived) }),
+      body:    JSON.stringify({ booking_id: id, confirm: false, player_units: units }),
     })
       .then(res => res.json().then(data => ({ ok: res.ok, data })))
       .then(({ ok, data }) => {
@@ -233,20 +242,23 @@ export default function BookingDetailPage() {
 
   useEffect(() => {
     if (!postMatch?.upload || !['synced', 'fees_applied'].includes(postMatch.upload.status)) return
-    setWaivedIds(new Set())
-    setWaiverReason('')
-    fetchFeePreview(new Set())
+    setUnitsMap({})
+    setAdjustmentReason('')
+    fetchFeePreview({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postMatch?.upload?.status, id])
 
-  function toggleWaive(playerId: string) {
-    setWaivedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(playerId)) next.delete(playerId)
-      else next.add(playerId)
+  function updateUnits(playerId: string, units: number) {
+    const clamped = Math.max(0, Math.min(12, units))
+    setUnitsMap(prev => {
+      const next = { ...prev, [playerId]: clamped }
       fetchFeePreview(next)
       return next
     })
+  }
+
+  function toggleInclude(row: FeeSquadRow) {
+    updateUnits(row.player_id, row.units > 0 ? 0 : 1)
   }
 
   useEffect(() => {
@@ -287,12 +299,13 @@ export default function BookingDetailPage() {
 
   async function handleApplyFees() {
     if (!feePreview) return
-    if (waivedIds.size > 0 && !waiverReason.trim()) {
-      setFeeError('A reason is required when waiving a player from this match\'s fee.')
+    const adjustedRows = feePreview.squad.filter(r => r.units !== r.default_units)
+    if (adjustedRows.length > 0 && !adjustmentReason.trim()) {
+      setFeeError('A reason is required when adjusting a player\'s fee share from the default.')
       return
     }
-    const waiverNote = waivedIds.size > 0 ? ` (${waivedIds.size} player${waivedIds.size > 1 ? 's' : ''} waived)` : ''
-    if (!confirm(`This will debit ₹${feePreview.fee_per_player} from ${feePreview.non_exempt_count} wallets${waiverNote}. Continue?`)) return
+    const adjustNote = adjustedRows.length > 0 ? ` (${adjustedRows.length} player${adjustedRows.length > 1 ? 's' : ''} adjusted)` : ''
+    if (!confirm(`This will debit a total of ₹${feePreview.total_collectable} across ${feePreview.included_count} wallets${adjustNote}. Continue?`)) return
     setFeeConfirming(true)
     setFeeError('')
     try {
@@ -302,8 +315,8 @@ export default function BookingDetailPage() {
         body:    JSON.stringify({
           booking_id: id,
           confirm: true,
-          waived_player_ids: Array.from(waivedIds),
-          waiver_reason: waivedIds.size > 0 ? waiverReason.trim() : undefined,
+          player_units: unitsMap,
+          adjustment_reason: adjustedRows.length > 0 ? adjustmentReason.trim() : undefined,
         }),
       })
       const data = await res.json()
@@ -487,6 +500,7 @@ export default function BookingDetailPage() {
   }
 
   async function handleCancel() {
+    if (isPostMatchEligible) return
     if (!confirm('Are you sure you want to cancel this booking?')) return
     const res = await fetch(`/api/bookings/${id}`, { method: 'DELETE' })
     if (res.ok) router.push('/admin')
@@ -829,7 +843,7 @@ export default function BookingDetailPage() {
                     {feePreview && (
                       <>
                         <p className="font-rajdhani text-xs text-zinc-400">
-                          ₹{feePreview.fee_per_player} per player · {feePreview.non_exempt_count} of {feePreview.total_squad} players
+                          ₹{feePreview.unit_price} per share · {feePreview.included_count} of {feePreview.total_squad} players included
                         </p>
 
                         {postMatch.upload.status === 'fees_applied' ? (
@@ -842,7 +856,7 @@ export default function BookingDetailPage() {
                               <div className="mt-1 space-y-0.5">
                                 {postMatch.waivers.map(w => (
                                   <p key={w.player_id} className="font-rajdhani text-xs text-amber-400">
-                                    ⓘ {w.name} waived — {w.reason}
+                                    ⓘ {w.name} — {w.units} share{w.units === 1 ? '' : 's'} · {w.reason}
                                   </p>
                                 ))}
                               </div>
@@ -850,47 +864,71 @@ export default function BookingDetailPage() {
                           </>
                         ) : (
                           <>
-                            {/* Per-match waiver checklist — separate from the standing
+                            {/* Per-match fee share checklist — separate from the standing
                                 fee_exemptions flag on /admin/players. A player already
-                                exempt there is shown but locked, since waiving them again
-                                would be redundant. See features/post-match-scorecard.md §16. */}
+                                exempt there is always shown locked at 0 shares, since
+                                including them again would be redundant. Checked =
+                                included in this match's fee; the stepper sets how many
+                                shares (1 = the player's own share, >1 = also covering a
+                                guest riding on their account). See
+                                features/post-match-scorecard.md §16. */}
                             <div className="space-y-1 bg-ink-4 border border-ink-5 rounded p-2.5">
                               <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">
-                                Waive a player from this match's fee
+                                Include player in this match's fee
                               </p>
                               {feePreview.squad.map(row => (
-                                <label key={row.player_id}
-                                  className={`flex items-center gap-2 py-0.5 ${row.exempt ? 'opacity-40' : 'cursor-pointer'}`}>
-                                  <input type="checkbox"
-                                    checked={row.exempt || row.waived}
-                                    disabled={row.exempt}
-                                    onChange={() => toggleWaive(row.player_id)}
-                                    className="w-3.5 h-3.5 accent-amber-600" />
-                                  <span className="font-rajdhani text-xs text-zinc-300">{row.name}</span>
-                                  {row.exempt && (
-                                    <span className="font-rajdhani text-[9px] font-bold text-zinc-500">standing exemption</span>
-                                  )}
-                                  {!row.exempt && (row.batted || row.bowled) && (
-                                    <span className="font-rajdhani text-[9px] text-emerald-500">
-                                      {row.batted && row.bowled ? 'batted & bowled' : row.batted ? 'batted' : 'bowled'}
-                                    </span>
-                                  )}
-                                  {!row.exempt && !row.batted && !row.bowled && (
-                                    <span className="font-rajdhani text-[9px] text-amber-500">no role recorded</span>
-                                  )}
-                                </label>
+                                <div key={row.player_id}
+                                  className={`flex items-center gap-2 py-0.5 ${row.exempt ? 'opacity-40' : ''}`}>
+                                  <label className={`flex items-center gap-2 flex-1 min-w-0 ${row.exempt ? '' : 'cursor-pointer'}`}>
+                                    <input type="checkbox"
+                                      checked={row.units > 0}
+                                      disabled={row.exempt}
+                                      onChange={() => toggleInclude(row)}
+                                      className="w-3.5 h-3.5 accent-emerald-600 shrink-0" />
+                                    <span className="font-rajdhani text-xs text-zinc-300 truncate">{row.name}</span>
+                                    {row.exempt && (
+                                      <span className="font-rajdhani text-[9px] font-bold text-zinc-500 shrink-0">standing exemption</span>
+                                    )}
+                                    {!row.exempt && (row.batted || row.bowled) && (
+                                      <span className="font-rajdhani text-[9px] text-emerald-500 shrink-0">
+                                        {row.batted && row.bowled ? 'batted & bowled' : row.batted ? 'batted' : 'bowled'}
+                                      </span>
+                                    )}
+                                    {!row.exempt && !row.batted && !row.bowled && (
+                                      <span className="font-rajdhani text-[9px] text-amber-500 shrink-0">no role recorded</span>
+                                    )}
+                                  </label>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button type="button" disabled={row.exempt || row.units <= 0}
+                                      onClick={() => updateUnits(row.player_id, row.units - 1)}
+                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                      −
+                                    </button>
+                                    <span className="font-rajdhani text-xs w-4 text-center text-parchment">{row.units}</span>
+                                    <button type="button" disabled={row.exempt || row.units >= 12}
+                                      onClick={() => updateUnits(row.player_id, row.units + 1)}
+                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                      +
+                                    </button>
+                                  </div>
+                                  <span className="font-rajdhani text-[10px] text-zinc-500 w-10 text-right shrink-0">
+                                    {row.units > 0 ? `₹${row.fee}` : ''}
+                                  </span>
+                                </div>
                               ))}
-                              {waivedIds.size > 0 && (
-                                <input type="text" value={waiverReason}
-                                  onChange={e => setWaiverReason(e.target.value)}
-                                  placeholder="Reason — e.g. Did not bat or bowl"
+                              {feePreview.squad.some(r => r.units !== r.default_units) && (
+                                <input type="text" value={adjustmentReason}
+                                  onChange={e => setAdjustmentReason(e.target.value)}
+                                  placeholder="Reason — e.g. Did not bat or bowl, or covering a guest player"
                                   className="form-input mt-1.5 text-xs" />
                               )}
                             </div>
 
                             <button onClick={handleApplyFees} disabled={feeConfirming || feeLoading}
                               className="font-rajdhani text-sm font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
-                              {feeConfirming ? 'Applying…' : `Apply Match Fees — ₹${feePreview.fee_per_player} · ${feePreview.non_exempt_count} players${waivedIds.size > 0 ? ` · ${waivedIds.size} waived` : ''}`}
+                              {feeConfirming
+                                ? 'Applying…'
+                                : `Apply Match Fees — ₹${feePreview.total_collectable} · ${feePreview.included_count} players`}
                             </button>
                           </>
                         )}
@@ -925,8 +963,9 @@ export default function BookingDetailPage() {
           )}
 
           <div className="flex gap-3 justify-between">
-            <button onClick={handleCancel}
-              className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 px-4 py-2.5 rounded transition-colors">
+            <button onClick={handleCancel} disabled={isPostMatchEligible}
+              title={isPostMatchEligible ? 'This match has already been played — cancel via Supabase directly if this booking truly needs to be removed.' : undefined}
+              className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed px-4 py-2.5 rounded transition-colors">
               Cancel Booking
             </button>
             <div className="flex gap-3">

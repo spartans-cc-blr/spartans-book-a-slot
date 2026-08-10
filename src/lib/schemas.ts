@@ -235,29 +235,28 @@ export const bookingRuleOverridesSchema = z.array(bookingRuleOverrideSchema).max
 // (live in Supabase, not yet in supabase/migrations/ — same drift pattern
 // documented elsewhere in this repo) and .claude/rules/security.md §10.
 
-// ── MATCH FEE APPLICATION + PER-BOOKING WAIVERS (admin-only) ───────────────
+// ── MATCH FEE APPLICATION + PER-PLAYER SHARE ADJUSTMENTS (admin-only) ──────
 // POST /api/fees/apply — see match_fee_waivers table and
 // .claude/rules/features/post-match-scorecard.md §16.
 //
-// waiver_reason is only required when confirm=true and at least one player
-// is being waived — a dry-run preview (confirm=false) can freely toggle
-// waived_player_ids without a reason typed yet, so the fee-per-player
-// recompute stays live while the admin is still deciding.
+// player_units maps player_id -> number of fee "shares" (0-12). A player
+// not present in the map falls back to the server-computed default
+// (0 for a standing exemption or no recorded batting/bowling role, 1 for a
+// recognized role) — the client only ever needs to send entries that
+// diverge from what it was shown. Whether a reason is required depends on
+// comparing the final units against those server-computed defaults, which
+// this schema has no way to know — that check happens in the route handler
+// itself, not here.
 
-export const feesApplySchema = z
-  .object({
-    booking_id: z.string().uuid('booking_id must be a valid UUID'),
-    confirm: z.boolean(),
-    waived_player_ids: z.array(z.string().uuid()).max(12).optional().default([]),
-    waiver_reason: z.string().min(3).max(300).trim().optional(),
-  })
-  .refine(
-    data => !data.confirm || data.waived_player_ids.length === 0 || !!data.waiver_reason,
-    {
-      message: "A reason is required when waiving a player from this match's fee",
-      path: ['waiver_reason'],
-    }
-  )
+export const feesApplySchema = z.object({
+  booking_id: z.string().uuid('booking_id must be a valid UUID'),
+  confirm: z.boolean(),
+  player_units: z.record(z.string().uuid(), z.number().int().min(0).max(12))
+    .refine(units => Object.keys(units).length <= 20, 'Too many players')
+    .optional()
+    .default({}),
+  adjustment_reason: z.string().min(3).max(300).trim().optional(),
+})
 
 export const walletTransactionSchema = z.object({
   player_id: z.string().uuid('player_id must be a valid UUID'),

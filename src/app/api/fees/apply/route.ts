@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     )
   }
-  const { booking_id, confirm, waived_player_ids, waiver_reason } = parsed.data
+  const { booking_id, confirm, player_units, adjustment_reason } = parsed.data
 
   const supabase = createServiceClient()
 
@@ -80,16 +80,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No announced squad for this booking' }, { status: 400 })
   }
 
-  // Waived players must actually be in this booking's own squad — never
-  // trust a client-supplied ID list beyond that.
+  // Unit overrides must actually be for players in this booking's own
+  // squad — never trust a client-supplied player_id beyond that.
   const squadIds = new Set(squad.map(row => row.player_id))
-  if (waived_player_ids.some(id => !squadIds.has(id))) {
+  const unitOverrideIds = Object.keys(player_units)
+  if (unitOverrideIds.some(id => !squadIds.has(id))) {
     return NextResponse.json(
-      { error: "One or more waived players are not in this booking's announced squad" },
+      { error: "One or more players are not in this booking's announced squad" },
       { status: 400 }
     )
   }
-  const waivedSet = new Set(waived_player_ids)
 
   const today = new Date().toISOString().split('T')[0]
   const isExempt = (row: any) =>
@@ -125,42 +125,84 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Default share count for a player who wasn't given an explicit override:
+  // 0 for a standing exemption (never overridable — see below) or a squad
+  // member with no recorded batting/bowling role, 1 for a recognized role.
+  // "No role recorded" defaults to excluded rather than included — a player
+  // who never appears on the scorecard at all is assumed not to have
+  // actually played, not silently charged unless an admin notices and
+  // unchecks them.
+  const defaultUnits = (row: any): number => {
+    if (isExempt(row)) return 0
+    return battedIds.has(row.player_id) || bowledIds.has(row.player_id) ? 1 : 0
+  }
+
+  // Final units per player: the client's override if one was sent for that
+  // player, clamped 0-12 (already enforced by the schema), else the
+  // server-computed default. A standing exemption always wins regardless of
+  // what the client sent — same as the old "waived: true, disabled" row,
+  // never client-overridable.
+  const finalUnits = (row: any): number =>
+    isExempt(row) ? 0 : (player_units[row.player_id] ?? defaultUnits(row))
+
   const squadDetail = squad.map(row => ({
-    player_id: row.player_id,
-    name:      (row.players as any)?.name ?? 'Unknown',
-    exempt:    isExempt(row),
-    waived:    waivedSet.has(row.player_id),
-    batted:    battedIds.has(row.player_id),
-    bowled:    bowledIds.has(row.player_id),
+    player_id:     row.player_id,
+    name:          (row.players as any)?.name ?? 'Unknown',
+    exempt:        isExempt(row),
+    batted:        battedIds.has(row.player_id),
+    bowled:        bowledIds.has(row.player_id),
+    units:         finalUnits(row),
+    default_units: defaultUnits(row),
   }))
 
-  const nonExemptSquad = squad.filter(row => !isExempt(row) && !waivedSet.has(row.player_id))
+  const totalUnits = squadDetail.reduce((sum, row) => sum + row.units, 0)
+  const unitPrice = totalUnits > 0 ? Math.ceil(baseFee / totalUnits) : 0
+  const squadWithFee = squadDetail.map(row => ({ ...row, fee: unitPrice * row.units }))
+  const includedCount = squadWithFee.filter(row => row.units > 0).length
+  const totalCollectable = squadWithFee.reduce((sum, row) => sum + row.fee, 0)
 
-  const nonExemptCount = nonExemptSquad.length
-  const feePerPlayer = nonExemptCount > 0 ? Math.ceil(baseFee / nonExemptCount) : 0
+  // Rows whose final share diverges from the server-computed default —
+  // these are the only ones that need (and get) a logged reason, and the
+  // only ones written to match_fee_waivers on confirm.
+  const adjustedRows = squadWithFee.filter(row => row.units !== row.default_units)
 
   if (!confirm) {
     // Dry-run: return the computed fee without applying
     return NextResponse.json({
-      base_fee:         baseFee,
-      non_exempt_count: nonExemptCount,
-      fee_per_player:   feePerPlayer,
-      total_squad:      squad.length,
-      squad:            squadDetail,
+      base_fee:          baseFee,
+      total_units:       totalUnits,
+      unit_price:        unitPrice,
+      included_count:    includedCount,
+      total_collectable: totalCollectable,
+      total_squad:       squad.length,
+      squad:             squadWithFee,
     })
   }
 
-  // Apply: debit each non-exempt, non-waived player's wallet
+  if (adjustedRows.length > 0 && !adjustment_reason) {
+    return NextResponse.json(
+      { error: "A reason is required when adjusting a player's fee share from the default" },
+      { status: 400 }
+    )
+  }
+
+  // Apply: debit each included player's wallet by their own share
+  // (units × unit_price — a player with 2 units, e.g. covering a guest,
+  // pays double a single-share player, not the same flat amount).
   const errors: string[] = []
   // Pushes collected rather than awaited inline — sent together after the
   // loop so one slow push doesn't serialize the whole debit run. Still
   // awaited before the response is returned (Vercel kills fire-and-forget
   // work the instant a serverless function returns — see webpush.ts).
   const pushes: Promise<unknown>[] = []
-  for (const row of nonExemptSquad) {
+  for (const row of squad) {
+    const units = finalUnits(row)
+    if (units <= 0) continue
+    const fee = unitPrice * units
+
     const player = row.players as any
     const currentBalance: number = player?.wallet_balance ?? 0
-    const newBalance = currentBalance - feePerPlayer
+    const newBalance = currentBalance - fee
 
     const { error } = await supabase
       .from('players')
@@ -177,36 +219,40 @@ export async function POST(req: NextRequest) {
     // convention — direction comes from `type`, not the sign.
     const { error: txError } = await supabase.from('wallet_transactions').insert({
       player_id:   row.player_id,
-      amount:      feePerPlayer,
+      amount:      fee,
       type:        'debit',
       booking_id,
-      reason:      `Match fee debit — ₹${feePerPlayer}`,
+      reason:      `Match fee debit — ₹${fee}${units > 1 ? ` (${units} shares)` : ''}`,
     })
     if (txError) errors.push(`${row.player_id} (ledger): ${txError.message}`)
 
     if (!error && !txError) {
       pushes.push(sendPushToPlayer(row.player_id, {
         title: '💰 Wallet Debited',
-        body: `-₹${feePerPlayer} — Match fee. New balance: ₹${newBalance}`,
+        body: `-₹${fee} — Match fee. New balance: ₹${newBalance}`,
         url: '/profile',
       }))
     }
   }
 
-  // Record per-booking, per-player waivers — separate from the standing
-  // fee_exemptions table by design: a judgment call for this match only,
-  // never leaks into any other booking's fee application.
-  if (waived_player_ids.length) {
+  // Record per-booking, per-player share adjustments — separate from the
+  // standing fee_exemptions table by design: a judgment call for this
+  // match only, never leaks into any other booking's fee application. Only
+  // rows that actually diverged from the server-computed default are
+  // logged, each carrying the one shared reason the admin gave for this
+  // apply action.
+  if (adjustedRows.length) {
     const { error: waiverErr } = await supabase.from('match_fee_waivers').insert(
-      waived_player_ids.map(player_id => ({
+      adjustedRows.map(row => ({
         booking_id,
-        player_id,
-        reason:          waiver_reason!,
+        player_id:       row.player_id,
+        units:           row.units,
+        reason:          adjustment_reason!,
         waived_by:       user.playerId ?? null,
         waived_by_email: user.email ?? '',
       }))
     )
-    if (waiverErr) errors.push(`waivers: ${waiverErr.message}`)
+    if (waiverErr) errors.push(`adjustments: ${waiverErr.message}`)
   }
 
   await Promise.allSettled(pushes)
@@ -221,9 +267,10 @@ export async function POST(req: NextRequest) {
     .eq('booking_id', booking_id)
 
   return NextResponse.json({
-    ok:               true,
-    fee_per_player:   feePerPlayer,
-    players_debited:  nonExemptCount,
-    players_waived:   waived_player_ids.length,
+    ok:                true,
+    unit_price:        unitPrice,
+    total_collectable: totalCollectable,
+    players_debited:   includedCount,
+    players_adjusted:  adjustedRows.length,
   })
 }
