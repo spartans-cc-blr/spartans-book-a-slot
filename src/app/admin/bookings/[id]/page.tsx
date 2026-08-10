@@ -43,10 +43,17 @@ interface RecordedWaiver {
   created_at: string
 }
 
+interface FeeBreakdownRow {
+  player_id: string
+  name:      string
+  amount:    number
+}
+
 interface PostMatchData {
-  upload:  PostMatchUpload | null
-  stats:   PostMatchStats | null
-  waivers: RecordedWaiver[]
+  upload:       PostMatchUpload | null
+  stats:        PostMatchStats | null
+  waivers:      RecordedWaiver[]
+  feeBreakdown: FeeBreakdownRow[]
 }
 
 interface FeeSquadRow {
@@ -238,8 +245,15 @@ export default function BookingDetailPage() {
       .finally(() => setFeeLoading(false))
   }
 
+  // Only fetch a dry-run preview while fees are still to be applied. Once
+  // fees_applied, a fresh preview would only reflect server-computed
+  // *defaults* — not the actual per-player unit overrides an admin applied
+  // at the time — and showing that instead of the real ledger previously
+  // produced a per-share figure that didn't match what was actually
+  // debited. The real breakdown for that state comes from
+  // postMatch.feeBreakdown (sourced from wallet_transactions) instead.
   useEffect(() => {
-    if (!postMatch?.upload || !['synced', 'fees_applied'].includes(postMatch.upload.status)) return
+    if (postMatch?.upload?.status !== 'synced') return
     setUnitsMap({})
     setAdjustmentReason('')
     fetchFeePreview({})
@@ -830,7 +844,48 @@ export default function BookingDetailPage() {
                   </div>
                 )}
 
-                {postMatch?.upload && ['synced', 'fees_applied'].includes(postMatch.upload.status) && (
+                {postMatch?.upload?.status === 'fees_applied' && (
+                  <div className="border-t border-ink-5 pt-3 space-y-2">
+                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Match Fees</p>
+                    <p className="font-rajdhani text-xs text-emerald-400">
+                      ✓ Fees already applied
+                      {postMatch.upload.fees_applied_at && ` · ${new Date(postMatch.upload.fees_applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
+                    </p>
+
+                    {/* The real per-player breakdown, sourced from the
+                        immutable wallet_transactions ledger — never a
+                        recomputed preview, which would only reflect
+                        server-computed defaults rather than the actual
+                        overrides applied at the time. */}
+                    {postMatch.feeBreakdown.length > 0 && (
+                      <div className="space-y-0.5">
+                        <p className="font-rajdhani text-xs text-zinc-400">
+                          ₹{postMatch.feeBreakdown.reduce((sum, r) => sum + r.amount, 0)} collected · {postMatch.feeBreakdown.length} players charged
+                        </p>
+                        <div className="bg-ink-4 border border-ink-5 rounded p-2.5 space-y-0.5">
+                          {postMatch.feeBreakdown.map(r => (
+                            <div key={r.player_id} className="flex items-center justify-between gap-2 py-0.5">
+                              <span className="font-rajdhani text-xs text-zinc-300 truncate">{r.name}</span>
+                              <span className="font-rajdhani text-xs text-parchment shrink-0">₹{r.amount}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {postMatch.waivers.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {postMatch.waivers.map(w => (
+                          <p key={w.player_id} className="font-rajdhani text-xs text-amber-400">
+                            ⓘ {w.name} — {w.units} share{w.units === 1 ? '' : 's'} · {w.reason}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {postMatch?.upload?.status === 'synced' && (
                   <div className="border-t border-ink-5 pt-3 space-y-2">
                     <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Match Fees</p>
                     {feeLoading && <p className="font-rajdhani text-xs text-zinc-600">Calculating…</p>}
@@ -841,92 +896,72 @@ export default function BookingDetailPage() {
                           ₹{feePreview.unit_price} per share · {feePreview.included_count} of {feePreview.total_squad} players included
                         </p>
 
-                        {postMatch.upload.status === 'fees_applied' ? (
-                          <>
-                            <p className="font-rajdhani text-xs text-emerald-400">
-                              ✓ Fees already applied
-                              {postMatch.upload.fees_applied_at && ` · ${new Date(postMatch.upload.fees_applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
-                            </p>
-                            {postMatch.waivers.length > 0 && (
-                              <div className="mt-1 space-y-0.5">
-                                {postMatch.waivers.map(w => (
-                                  <p key={w.player_id} className="font-rajdhani text-xs text-amber-400">
-                                    ⓘ {w.name} — {w.units} share{w.units === 1 ? '' : 's'} · {w.reason}
-                                  </p>
-                                ))}
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {/* Per-match fee share checklist — separate from the standing
-                                fee_exemptions flag on /admin/players. A player already
-                                exempt there is always shown locked at 0 shares, since
-                                including them again would be redundant. Checked =
-                                included in this match's fee; the stepper sets how many
-                                shares (1 = the player's own share, >1 = also covering a
-                                guest riding on their account). See
-                                features/post-match-scorecard.md §16. */}
-                            <div className="space-y-1 bg-ink-4 border border-ink-5 rounded p-2.5">
-                              <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">
-                                Include player in this match's fee
-                              </p>
-                              {feePreview.squad.map(row => (
-                                <div key={row.player_id}
-                                  className={`flex items-center gap-2 py-0.5 ${row.exempt ? 'opacity-40' : ''}`}>
-                                  <label className={`flex items-center gap-2 flex-1 min-w-0 ${row.exempt ? '' : 'cursor-pointer'}`}>
-                                    <input type="checkbox"
-                                      checked={row.units > 0}
-                                      disabled={row.exempt}
-                                      onChange={() => toggleInclude(row)}
-                                      className="w-3.5 h-3.5 accent-emerald-600 shrink-0" />
-                                    <span className="font-rajdhani text-xs text-zinc-300 truncate">{row.name}</span>
-                                    {row.exempt && (
-                                      <span className="font-rajdhani text-[9px] font-bold text-zinc-500 shrink-0">standing exemption</span>
-                                    )}
-                                    {!row.exempt && (row.batted || row.bowled) && (
-                                      <span className="font-rajdhani text-[9px] text-emerald-500 shrink-0">
-                                        {row.batted && row.bowled ? 'batted & bowled' : row.batted ? 'batted' : 'bowled'}
-                                      </span>
-                                    )}
-                                    {!row.exempt && !row.batted && !row.bowled && (
-                                      <span className="font-rajdhani text-[9px] text-amber-500 shrink-0">no role recorded</span>
-                                    )}
-                                  </label>
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <button type="button" disabled={row.exempt || row.units <= 0}
-                                      onClick={() => updateUnits(row.player_id, row.units - 1)}
-                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
-                                      −
-                                    </button>
-                                    <span className="font-rajdhani text-xs w-4 text-center text-parchment">{row.units}</span>
-                                    <button type="button" disabled={row.exempt || row.units >= 12}
-                                      onClick={() => updateUnits(row.player_id, row.units + 1)}
-                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
-                                      +
-                                    </button>
-                                  </div>
-                                  <span className="font-rajdhani text-[10px] text-zinc-500 w-10 text-right shrink-0">
-                                    {row.units > 0 ? `₹${row.fee}` : ''}
+                        {/* Per-match fee share checklist — separate from the standing
+                            fee_exemptions flag on /admin/players. A player already
+                            exempt there is always shown locked at 0 shares, since
+                            including them again would be redundant. Checked =
+                            included in this match's fee; the stepper sets how many
+                            shares (1 = the player's own share, >1 = also covering a
+                            guest riding on their account). See
+                            features/post-match-scorecard.md §16. */}
+                        <div className="space-y-1 bg-ink-4 border border-ink-5 rounded p-2.5">
+                          <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">
+                            Include player in this match's fee
+                          </p>
+                          {feePreview.squad.map(row => (
+                            <div key={row.player_id}
+                              className={`flex items-center gap-2 py-0.5 ${row.exempt ? 'opacity-40' : ''}`}>
+                              <label className={`flex items-center gap-2 flex-1 min-w-0 ${row.exempt ? '' : 'cursor-pointer'}`}>
+                                <input type="checkbox"
+                                  checked={row.units > 0}
+                                  disabled={row.exempt}
+                                  onChange={() => toggleInclude(row)}
+                                  className="w-3.5 h-3.5 accent-emerald-600 shrink-0" />
+                                <span className="font-rajdhani text-xs text-zinc-300 truncate">{row.name}</span>
+                                {row.exempt && (
+                                  <span className="font-rajdhani text-[9px] font-bold text-zinc-500 shrink-0">standing exemption</span>
+                                )}
+                                {!row.exempt && (row.batted || row.bowled) && (
+                                  <span className="font-rajdhani text-[9px] text-emerald-500 shrink-0">
+                                    {row.batted && row.bowled ? 'batted & bowled' : row.batted ? 'batted' : 'bowled'}
                                   </span>
-                                </div>
-                              ))}
-                              {feePreview.squad.some(r => r.units !== r.default_units) && (
-                                <input type="text" value={adjustmentReason}
-                                  onChange={e => setAdjustmentReason(e.target.value)}
-                                  placeholder="Reason — e.g. Did not bat or bowl, or covering a guest player"
-                                  className="form-input mt-1.5 text-xs" />
-                              )}
+                                )}
+                                {!row.exempt && !row.batted && !row.bowled && (
+                                  <span className="font-rajdhani text-[9px] text-amber-500 shrink-0">no role recorded</span>
+                                )}
+                              </label>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button type="button" disabled={row.exempt || row.units <= 0}
+                                  onClick={() => updateUnits(row.player_id, row.units - 1)}
+                                  className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                  −
+                                </button>
+                                <span className="font-rajdhani text-xs w-4 text-center text-parchment">{row.units}</span>
+                                <button type="button" disabled={row.exempt || row.units >= 12}
+                                  onClick={() => updateUnits(row.player_id, row.units + 1)}
+                                  className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                  +
+                                </button>
+                              </div>
+                              <span className="font-rajdhani text-[10px] text-zinc-500 w-10 text-right shrink-0">
+                                {row.units > 0 ? `₹${row.fee}` : ''}
+                              </span>
                             </div>
+                          ))}
+                          {feePreview.squad.some(r => r.units !== r.default_units) && (
+                            <input type="text" value={adjustmentReason}
+                              onChange={e => setAdjustmentReason(e.target.value)}
+                              placeholder="Reason — e.g. Did not bat or bowl, or covering a guest player"
+                              className="form-input mt-1.5 text-xs" />
+                          )}
+                        </div>
 
-                            <button onClick={handleApplyFees} disabled={feeConfirming || feeLoading}
-                              className="font-rajdhani text-sm font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
-                              {feeConfirming
-                                ? 'Applying…'
-                                : `Apply Match Fees — ₹${feePreview.total_collectable} · ${feePreview.included_count} players`}
-                            </button>
-                          </>
-                        )}
+                        <button onClick={handleApplyFees} disabled={feeConfirming || feeLoading}
+                          className="font-rajdhani text-sm font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
+                          {feeConfirming
+                            ? 'Applying…'
+                            : `Apply Match Fees — ₹${feePreview.total_collectable} · ${feePreview.included_count} players`}
+                        </button>
                       </>
                     )}
                   </div>
