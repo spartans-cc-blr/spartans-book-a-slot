@@ -13,9 +13,10 @@ export interface DashboardBookingRow {
   block_reason:     string | null
   captain_name:     string | null
   tournament_name:  string | null
-  // Scorecard upload/apply status — only populated for past bookings.
-  // Drives the "Apply Match Fee" shortcut below.
-  scorecard_status?: string | null
+  // Only meaningful for past bookings — scorecard synced, fees not yet
+  // applied, and not already reconciled outside the Hub via the legacy
+  // spreadsheet. Drives the "Apply Match Fee" shortcut below.
+  apply_fee_eligible?: boolean
 }
 
 // A single malformed game_date (e.g. a mistyped year) must never crash the
@@ -90,7 +91,7 @@ function BookingsTable({ bookings, emptyLabel }: { bookings: DashboardBookingRow
                         been applied yet — a shortcut straight to the fee-only
                         view of the same page, so applying a fee doesn't
                         require going through the full booking-edit flow. */}
-                    {b.scorecard_status === 'synced' && (
+                    {b.apply_fee_eligible && (
                       <Link href={`/admin/bookings/${b.id}?action=fees`}
                         className="font-rajdhani text-xs text-gold hover:text-gold-light border border-gold-dim hover:bg-gold/10 px-2 py-1 rounded transition-colors">
                         Apply Match Fee

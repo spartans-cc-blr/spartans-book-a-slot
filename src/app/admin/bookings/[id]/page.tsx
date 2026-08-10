@@ -18,11 +18,12 @@ const UPLOAD_STATUS_CONFIG: Record<ScorecardUploadStatus, { label: string; class
 }
 
 interface PostMatchUpload {
-  status:           ScorecardUploadStatus
-  uploaded_at:      string | null
-  uploaded_by_name: string | null
-  error_message:    string | null
-  fees_applied_at:  string | null
+  status:                      ScorecardUploadStatus
+  uploaded_at:                 string | null
+  uploaded_by_name:            string | null
+  error_message:               string | null
+  fees_applied_at:             string | null
+  fees_reconciled_externally:  boolean
 }
 
 interface PostMatchStats {
@@ -272,8 +273,11 @@ function BookingDetailPageInner() {
   // produced a per-share figure that didn't match what was actually
   // debited. The real breakdown for that state comes from
   // postMatch.feeBreakdown (sourced from wallet_transactions) instead.
+  // Also skipped entirely when this match's fees were already reconciled
+  // outside the Hub (legacy spreadsheet) — POST /api/fees/apply rejects it
+  // anyway (see migration 062), so there's nothing useful to preview.
   useEffect(() => {
-    if (postMatch?.upload?.status !== 'synced') return
+    if (postMatch?.upload?.status !== 'synced' || postMatch.upload.fees_reconciled_externally) return
     setUnitsMap({})
     setAdjustmentReason('')
     fetchFeePreview({})
@@ -916,7 +920,16 @@ function BookingDetailPageInner() {
                   </div>
                 )}
 
-                {postMatch?.upload?.status === 'synced' && (
+                {postMatch?.upload?.status === 'synced' && postMatch.upload.fees_reconciled_externally && (
+                  <div className="border-t border-ink-5 pt-3 space-y-2">
+                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Match Fees</p>
+                    <p className="font-rajdhani text-xs text-zinc-500">
+                      ⓘ This match's fees were already reconciled outside the Hub (legacy spreadsheet) — not applicable here.
+                    </p>
+                  </div>
+                )}
+
+                {postMatch?.upload?.status === 'synced' && !postMatch.upload.fees_reconciled_externally && (
                   <div className="border-t border-ink-5 pt-3 space-y-2">
                     <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Match Fees</p>
                     {feeLoading && <p className="font-rajdhani text-xs text-zinc-600">Calculating…</p>}

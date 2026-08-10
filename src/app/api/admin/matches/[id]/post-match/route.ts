@@ -26,7 +26,7 @@ export async function GET(
 
   const { data: upload, error: uploadErr } = await supabase
     .from('scorecard_uploads')
-    .select('status, uploaded_at, uploaded_by, error_message, fees_applied_at')
+    .select('status, uploaded_at, uploaded_by, error_message, fees_applied_at, fees_reconciled_externally')
     .eq('booking_id', params.id)
     .maybeSingle()
 
@@ -104,11 +104,12 @@ export async function GET(
 
   return NextResponse.json({
     upload: upload ? {
-      status:           upload.status,
-      uploaded_at:      upload.uploaded_at,
-      uploaded_by_name: uploadedByName,
-      error_message:    upload.error_message,
-      fees_applied_at:  upload.fees_applied_at,
+      status:                     upload.status,
+      uploaded_at:                upload.uploaded_at,
+      uploaded_by_name:           uploadedByName,
+      error_message:              upload.error_message,
+      fees_applied_at:            upload.fees_applied_at,
+      fees_reconciled_externally: upload.fees_reconciled_externally,
     } : null,
     stats,
     waivers,
