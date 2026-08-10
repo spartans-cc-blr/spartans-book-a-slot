@@ -116,7 +116,7 @@ export default function PlayerReconciliationPage() {
   const [busyName, setBusyName] = useState<string | null>(null)
   const [pickerFor, setPickerFor] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
-  const [passResults, setPassResults] = useState<Record<string, { updated: number; resynced?: number; error?: string }>>({})
+  const [passResults, setPassResults] = useState<Record<string, { updated: number; resynced?: number; resyncSkipped?: number; error?: string }>>({})
   const [confirmNote, setConfirmNote] = useState('')
 
   function load() {
@@ -200,7 +200,10 @@ export default function PlayerReconciliationPage() {
       const name = allNames[i]
       try {
         const d = await post({ mode: 'reconcile', scorecard_name: name })
-        setPassResults(prev => ({ ...prev, [name]: { updated: d.updated ?? 0, resynced: d.resynced ?? 0 } }))
+        setPassResults(prev => ({
+          ...prev,
+          [name]: { updated: d.updated ?? 0, resynced: d.resynced ?? 0, resyncSkipped: d.resync_skipped ?? 0 },
+        }))
       } catch (e: any) {
         setPassResults(prev => ({ ...prev, [name]: { updated: 0, error: e.message } }))
       }
@@ -255,7 +258,9 @@ export default function PlayerReconciliationPage() {
                   <p key={name} className="font-rajdhani text-xs text-zinc-400">
                     {name}: {r.error
                       ? <span className="text-red-400">{r.error}</span>
-                      : `${r.updated} row(s) updated${r.resynced ? `, ${r.resynced} match(es) re-synced` : ''}`}
+                      : `${r.updated} row(s) updated`
+                        + (r.resynced ? `, ${r.resynced} match(es) re-synced` : '')
+                        + (r.resyncSkipped ? ` (${r.resyncSkipped} already re-synced this pass)` : '')}
                   </p>
                 ))}
               </div>
