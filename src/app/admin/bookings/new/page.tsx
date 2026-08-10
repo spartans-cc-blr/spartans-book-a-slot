@@ -41,7 +41,6 @@ export default function NewBookingPage() {
 
   // Confirmed-only fields
   const [tournamentId,  setTournamentId]  = useState('')
-  const [venue,         setVenue]         = useState('')
   const [opponentName,  setOpponentName]  = useState('')
   const [matchId,       setMatchId]       = useState('')
   const [cricHeroesUrl, setCricHeroesUrl] = useState('')
@@ -82,7 +81,7 @@ export default function NewBookingPage() {
 
   useEffect(() => {
     setGameDate(''); setSlotTime(''); setFormat(''); setNotes('')
-    setTournamentId(''); setVenue('')
+    setTournamentId('')
     setOpponentName(''); setMatchId(''); setCricHeroesUrl(''); setMatchTime(''); setMatchTimeTouched(false)
     setOrganiserName(''); setOrganiserPhone('')
     setShowAddTournament(false); setNewTournamentName(''); setNewTournamentOrg('')
@@ -242,7 +241,6 @@ export default function NewBookingPage() {
           format,
           slot_time:      slotTime,
           tournament_id:  tournamentId,
-          venue:          venue || null,
           notes:          notes || null,
           opponent_name:  opponentName || null,
           match_id:       matchId || null,
@@ -476,23 +474,8 @@ export default function NewBookingPage() {
                 )}
               </FormCard>
 
-              <FormCard step={4} title="Venue & Notes (optional)">
-                <div className="space-y-3">
-                  <div>
-                    <label className="form-label">Venue</label>
-                    <input type="text" value={venue} onChange={e => setVenue(e.target.value)}
-                      placeholder="e.g. Stellar Cricket Ground, HSR Layout" className="form-input" />
-                  </div>
-                  <div>
-                    <label className="form-label">Internal Notes <span className="text-zinc-700">(never shown publicly)</span></label>
-                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-                      placeholder="Any notes for your reference..." className="form-input resize-none" />
-                  </div>
-                </div>
-              </FormCard>
-
               {tournamentId && (
-                <FormCard step={5} title="Match Details (optional)">
+                <FormCard step={4} title="Match Details (optional)">
                   <div className="space-y-3">
                     <div>
                       <label className="form-label">Opponent Name</label>
@@ -525,6 +508,20 @@ export default function NewBookingPage() {
                       Defaults to 15 min after slot time — edit if the organiser confirms a different start time.
                     </p>
                   </div>
+                  <div>
+                    <label className="form-label">Internal Notes <span className="text-zinc-700">(never shown publicly)</span></label>
+                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                      placeholder="Any notes for your reference..." className="form-input resize-none" />
+                  </div>
+                </FormCard>
+              )}
+
+              {/* No tournament selected yet — Internal Notes still needs a
+                  home outside Match Details in that case. */}
+              {!tournamentId && (
+                <FormCard step={4} title="Internal Notes (optional)">
+                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                    placeholder="Any notes for your reference..." className="form-input resize-none" />
                 </FormCard>
               )}
             </>
@@ -586,7 +583,6 @@ export default function NewBookingPage() {
                 {matchTime && <p>⏰ Match starts: {matchTime}</p>}
                 {mode === 'confirmed' && selectedTournament?.captains?.name && <p>👤 {selectedTournament.captains.name}</p>}
                 {mode === 'confirmed' && tournamentId && <p>🏆 {selectedTournament?.name}</p>}
-                {mode === 'confirmed' && venue        && <p>📍 {venue}</p>}
                 {mode === 'confirmed' && opponentName && <p>⚔️ vs {opponentName}</p>}
                 {mode === 'confirmed' && cricHeroesUrl && (
                   <a href={cricHeroesUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline flex items-center gap-1">

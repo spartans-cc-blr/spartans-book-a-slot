@@ -127,7 +127,6 @@ export default function BookingDetailPage() {
   const [tournamentId,  setTournamentId]  = useState('')
   const [format,        setFormat]        = useState<GameFormat | ''>('')
   const [slotTime,      setSlotTime]      = useState<SlotTime | ''>('')
-  const [venue,         setVenue]         = useState('')
   const [matchId,       setMatchId]       = useState('')
   const [matchTime,     setMatchTime]     = useState('')
   const [matchTimeTouched, setMatchTimeTouched] = useState(false)
@@ -176,7 +175,6 @@ export default function BookingDetailPage() {
         setTournamentId(b.tournament_id ?? '')
         setFormat((b.format as GameFormat) ?? '')
         setSlotTime(b.slot_time)
-        setVenue(b.venue ?? '')
         setMatchId(b.match_id ?? '')
         setMatchTime(b.match_time ?? defaultMatchTime(b.slot_time))
         setMatchTimeTouched(b.match_time != null)
@@ -444,7 +442,6 @@ export default function BookingDetailPage() {
         tournament_id:   tournamentId || null,
         format:          format || null,
         slot_time:       slotTime,
-        venue:           venue || null,
         match_id:        tournamentId ? (matchId || null) : null,
         match_stage:     matchStage || null,
         match_time:      matchTime || null,
@@ -527,7 +524,7 @@ export default function BookingDetailPage() {
       gameDate:      booking.game_date,
       slotTime:      booking.slot_time,
       opponentName,
-      venue,
+      venue:         booking.venue,
       cricheroesUrl: cricheroes || null,
     })
   }
@@ -678,22 +675,6 @@ export default function BookingDetailPage() {
             })()}
           </FormCard>
 
-          {/* Venue & Notes */}
-          <FormCard title="Venue & Notes">
-            <div className="space-y-3">
-              <div>
-                <label className="form-label">Venue</label>
-                <input type="text" value={venue} onChange={e => setVenue(e.target.value)}
-                  placeholder="e.g. Stellar Cricket Ground, HSR Layout" className="form-input" />
-              </div>
-              <div>
-                <label className="form-label">Internal Notes <span className="text-zinc-700">(never shown publicly)</span></label>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-                  placeholder="Any notes for your reference..." className="form-input resize-none" />
-              </div>
-            </div>
-          </FormCard>
-
           {/* Match Details — only visible when a tournament is selected */}
           {tournamentId && (
             <FormCard title="Match Details">
@@ -745,7 +726,21 @@ export default function BookingDetailPage() {
                         : 'No fee configured on tournament'}
                   </p>
                 </div>
+                <div>
+                  <label className="form-label">Internal Notes <span className="text-zinc-700">(never shown publicly)</span></label>
+                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                    placeholder="Any notes for your reference..." className="form-input resize-none" />
+                </div>
               </div>
+            </FormCard>
+          )}
+
+          {/* No tournament selected yet (e.g. a plain reservation) — Internal
+              Notes still needs a home outside Match Details in that case. */}
+          {!tournamentId && (
+            <FormCard title="Internal Notes">
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                placeholder="Any notes for your reference..." className="form-input resize-none" />
             </FormCard>
           )}
 
@@ -1042,7 +1037,6 @@ export default function BookingDetailPage() {
               <p>🕐 {slotTime}{format ? ` — ${format}` : ''}</p>
               {captainName        && <p>👤 {captainName}</p>}
               {selectedTournament && <p>🏆 {selectedTournament.name}</p>}
-              {venue              && <p>📍 {venue}</p>}
               {opponentName       && <p>⚔️ vs {opponentName}</p>}
               {matchId            && <p>🏏 Match ID: {matchId}</p>}
               {cricheroes && (
