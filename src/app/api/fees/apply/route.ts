@@ -53,6 +53,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Matches before the 8 Aug 2026 weekend already had fees collected
+  // through the legacy Hub Google Sheets process, never through the Hub's
+  // own wallet — applying here too would double-charge every player.
+  // Checked server-side (not just the UI hiding the button/checklist) so a
+  // direct URL or API hit can't bypass it — see migration 062.
+  const { data: uploadRow } = await supabase
+    .from('scorecard_uploads')
+    .select('fees_reconciled_externally')
+    .eq('booking_id', booking_id)
+    .maybeSingle()
+  if (uploadRow?.fees_reconciled_externally) {
+    return NextResponse.json(
+      { error: "This match's fees were already reconciled outside the Hub (legacy spreadsheet) — applying here would double-charge players." },
+      { status: 400 }
+    )
+  }
+
   // Derive fee server-side — never trust client input
   const { data: bookingRow } = await supabase
     .from('bookings')
