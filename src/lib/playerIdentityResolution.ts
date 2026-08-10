@@ -184,11 +184,24 @@ export async function backfillPlayerIdForName(opts: {
 // the others, and this never throws: the caller's alias/override write
 // already succeeded and is the important part of the request regardless
 // of whether the resync keeps up.
+//
+// Debounced per booking (see RESYNC_DEBOUNCE_MS): "Run Reconciliation
+// Pass" on the admin page calls this once per scorecard_name, sequentially
+// — a single match whose scorecard exported several players under a
+// nickname (a whole team's worth, in the case that surfaced this) means
+// every one of those names' reconcile calls resolves to the *same*
+// booking. Without the debounce, one pass over N such names would call
+// syncMatchStatsForBooking() N times back-to-back for that one booking —
+// harmless (idempotent), but pure waste. Skipping a booking whose
+// match_stats_cache was written inside the debounce window collapses that
+// burst down to one real resync.
+const RESYNC_DEBOUNCE_MS = 30_000
+
 export async function resyncBookingsForMatchIds(
   matchIds: string[],
   syncedBy: string | null
-): Promise<{ resynced: number; failed: number }> {
-  if (matchIds.length === 0) return { resynced: 0, failed: 0 }
+): Promise<{ resynced: number; failed: number; skipped: number }> {
+  if (matchIds.length === 0) return { resynced: 0, failed: 0, skipped: 0 }
 
   const hub = createServiceClient()
 
@@ -197,7 +210,7 @@ export async function resyncBookingsForMatchIds(
     .select('id, match_id')
     .in('match_id', matchIds)
     .eq('status', 'confirmed')
-  if (!bookingRows?.length) return { resynced: 0, failed: 0 }
+  if (!bookingRows?.length) return { resynced: 0, failed: 0, skipped: 0 }
 
   const bookingIds = bookingRows.map((b: any) => b.id)
   const { data: uploadRows } = await hub
@@ -205,13 +218,28 @@ export async function resyncBookingsForMatchIds(
     .select('booking_id')
     .in('booking_id', bookingIds)
     .in('status', ['synced', 'fees_applied'])
+  if (!uploadRows?.length) return { resynced: 0, failed: 0, skipped: 0 }
+
+  const targetBookingIds = Array.from(new Set(uploadRows.map((r: any) => r.booking_id as string)))
+  const { data: cacheRows } = await hub
+    .from('match_stats_cache')
+    .select('booking_id, synced_at')
+    .in('booking_id', targetBookingIds)
+  const cutoff = Date.now() - RESYNC_DEBOUNCE_MS
+  const recentlySynced = new Set(
+    (cacheRows ?? [])
+      .filter((r: any) => new Date(r.synced_at).getTime() > cutoff)
+      .map((r: any) => r.booking_id as string)
+  )
 
   let resynced = 0
   let failed = 0
-  for (const row of uploadRows ?? []) {
-    const result = await syncMatchStatsForBooking((row as any).booking_id, syncedBy)
+  let skipped = 0
+  for (const bookingId of targetBookingIds) {
+    if (recentlySynced.has(bookingId)) { skipped++; continue }
+    const result = await syncMatchStatsForBooking(bookingId, syncedBy)
     if (result.ok) resynced++
     else failed++
   }
-  return { resynced, failed }
+  return { resynced, failed, skipped }
 }
