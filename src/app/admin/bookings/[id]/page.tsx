@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import type { Booking, GameFormat, SlotTime, RuleCheckItem } from '@/types'
 import { SLOT_TIMES, SLOT_FORMATS, ORGANISER_SELF_SERVICE_REASON } from '@/types'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
@@ -105,8 +105,28 @@ function defaultMatchTime(slot: SlotTime): string {
 }
 
 export default function BookingDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-3 animate-pulse">
+        {[0,1,2].map(i => <div key={i} className="h-16 bg-ink-3 rounded border border-ink-5" />)}
+      </div>
+    }>
+      <BookingDetailPageInner />
+    </Suspense>
+  )
+}
+
+function BookingDetailPageInner() {
   const router = useRouter()
   const { id } = useParams<{ id: string }>()
+  // Reached via the "Apply Match Fee" shortcut on the dashboard's Past tab —
+  // same page, same data, but everything except the Post-Match panel
+  // renders read-only, since applying a fee is a distinct action from
+  // editing the booking (a past match has practically nothing left to edit,
+  // and Cancel Booking is already disabled for one — see the Post-Match /
+  // sidebar-nav overhaul this followed).
+  const searchParams = useSearchParams()
+  const feesMode = searchParams.get('action') === 'fees'
 
   const [booking,      setBooking]      = useState<Booking | null>(null)
   const [loading,      setLoading]      = useState(true)
@@ -420,7 +440,10 @@ export default function BookingDetailPage() {
     setOverrides(prev => Object.fromEntries(Object.entries(prev).filter(([rule]) => stillFailing.has(rule))))
   }, [gameDate, format, slotTime, tournamentId, id])
 
-  useEffect(() => { validate() }, [validate])
+  useEffect(() => {
+    if (feesMode) return
+    validate()
+  }, [validate, feesMode])
 
   function handleOverrideToggle(rule: string) {
     setOverrides(prev => {
@@ -574,8 +597,13 @@ export default function BookingDetailPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-cinzel text-xl font-bold text-gold">
+          <h1 className="font-cinzel text-xl font-bold text-gold flex items-center gap-2">
             {displayConfirmed ? '✓ Confirmed Booking' : '🟡 Reservation'}
+            {feesMode && (
+              <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold px-2 py-0.5 rounded-sm">
+                Apply Match Fee
+              </span>
+            )}
           </h1>
           <p className="font-rajdhani text-zinc-500 text-sm mt-1">
             {booking.game_date} · {booking.slot_time}
@@ -622,14 +650,15 @@ export default function BookingDetailPage() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Game Date</label>
-                <input type="date" value={gameDate} onChange={e => setGameDate(e.target.value)} className="form-input" />
+                <input type="date" value={gameDate} onChange={e => setGameDate(e.target.value)} disabled={feesMode}
+                  className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
               </div>
               <div>
                 <label className="form-label">Format</label>
                 <div className="flex border border-ink-5 rounded overflow-hidden">
                   {(['T20', 'T30'] as GameFormat[]).map(f => (
-                    <button key={f} onClick={() => setFormat(f)}
-                      className={`flex-1 py-2.5 font-cinzel text-sm font-semibold transition-colors
+                    <button key={f} onClick={() => setFormat(f)} disabled={feesMode}
+                      className={`flex-1 py-2.5 font-cinzel text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed
                         ${format === f ? 'bg-gold-dim text-gold-light' : 'bg-ink-4 text-zinc-500 hover:text-zinc-300'}`}>
                       {f}
                     </button>
@@ -643,8 +672,8 @@ export default function BookingDetailPage() {
           <FormCard title="Time Slot">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {SLOT_TIMES.map(t => (
-                <button key={t} onClick={() => setSlotTime(t)}
-                  className={`py-3 rounded border text-center transition-all
+                <button key={t} onClick={() => setSlotTime(t)} disabled={feesMode}
+                  className={`py-3 rounded border text-center transition-all disabled:opacity-50 disabled:cursor-not-allowed
                     ${slotTime === t ? 'border-gold bg-gold/10 text-gold' : 'bg-ink-4 border-ink-5 text-parchment hover:border-gold-dim'}`}>
                   <p className="font-cinzel text-sm font-semibold">{t}</p>
                   <p className="font-rajdhani text-[10px] text-zinc-600 mt-0.5">{SLOT_FORMATS[t].join('/')}</p>
@@ -655,7 +684,8 @@ export default function BookingDetailPage() {
 
           {/* Tournament (captain read-only from tournament) */}
           <FormCard title={isReservation ? 'Tournament (required to confirm)' : 'Tournament'}>
-            <select value={tournamentId} onChange={e => setTournamentId(e.target.value)} className="form-input">
+            <select value={tournamentId} onChange={e => setTournamentId(e.target.value)} disabled={feesMode}
+              className="form-input disabled:opacity-50 disabled:cursor-not-allowed">
               <option value="">Select tournament...</option>
               {tournaments.filter(t => t.active).map(t => (
                 <option key={t.id} value={t.id}>{t.name}{t.organiser_name ? ` — ${t.organiser_name}` : ''}</option>
@@ -695,30 +725,30 @@ export default function BookingDetailPage() {
               <div className="space-y-3">
                 <div>
                   <label className="form-label">Opponent Name</label>
-                  <input type="text" value={opponentName} onChange={e => setOpponentName(e.target.value)}
-                    placeholder="e.g. Challengers CC" className="form-input" />
+                  <input type="text" value={opponentName} onChange={e => setOpponentName(e.target.value)} disabled={feesMode}
+                    placeholder="e.g. Challengers CC" className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="form-label">CricHeroes Match ID</label>
-                  <input type="text" value={matchId} onChange={e => setMatchId(e.target.value)}
-                    placeholder="e.g. 12345678" className="form-input" />
+                  <input type="text" value={matchId} onChange={e => setMatchId(e.target.value)} disabled={feesMode}
+                    placeholder="e.g. 12345678" className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
                   <p className="font-rajdhani text-xs text-zinc-600 mt-1">Enter after organiser creates match in CricHeroes</p>
                 </div>
                 <div>
                   <label className="form-label">Match Stage <span className="text-zinc-600">(optional)</span></label>
-                  <input type="text" value={matchStage} onChange={e => setMatchStage(e.target.value)}
-                    placeholder="e.g. Quarter Final, Semi Final, Final, Knockout" className="form-input" />
+                  <input type="text" value={matchStage} onChange={e => setMatchStage(e.target.value)} disabled={feesMode}
+                    placeholder="e.g. Quarter Final, Semi Final, Final, Knockout" className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="form-label">CricHeroes URL</label>
-                  <input type="text" value={cricheroes} onChange={e => setCricheroes(e.target.value)}
-                    placeholder="e.g. https://cricheroes.in/match/12345678" className="form-input" />
+                  <input type="text" value={cricheroes} onChange={e => setCricheroes(e.target.value)} disabled={feesMode}
+                    placeholder="e.g. https://cricheroes.in/match/12345678" className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="form-label">Match Start Time</label>
-                  <input type="time" value={matchTime}
+                  <input type="time" value={matchTime} disabled={feesMode}
                     onChange={e => { setMatchTime(e.target.value); setMatchTimeTouched(true) }}
-                    className="form-input" />
+                    className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
                   <p className="font-rajdhani text-xs text-zinc-600 mt-1">
                     Defaults to 15 min after slot time — edit if the organiser confirms a different start time.
                   </p>
@@ -729,8 +759,9 @@ export default function BookingDetailPage() {
                     type="number" min="0"
                     value={matchFeeOverride}
                     onChange={e => setMatchFeeOverride(e.target.value)}
+                    disabled={feesMode}
                     placeholder="Leave blank to use tournament default"
-                    className="form-input w-32"
+                    className="form-input w-32 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <p className="font-rajdhani text-xs text-zinc-600 mt-1">
                     {matchFeeOverride
@@ -742,8 +773,8 @@ export default function BookingDetailPage() {
                 </div>
                 <div>
                   <label className="form-label">Internal Notes <span className="text-zinc-700">(never shown publicly)</span></label>
-                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-                    placeholder="Any notes for your reference..." className="form-input resize-none" />
+                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} disabled={feesMode}
+                    placeholder="Any notes for your reference..." className="form-input resize-none disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
               </div>
             </FormCard>
@@ -981,44 +1012,52 @@ export default function BookingDetailPage() {
             </div>
           )}
 
-          {/* Live Rule Check — horizontal, directly above the save/confirm buttons */}
-          <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
+          {/* Live Rule Check + Save/Cancel/Confirm — none of this applies in
+              fees-only mode, since nothing on the page above is editable
+              there and there's nothing to save. */}
+          {!feesMode && (
+            <>
+              <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
 
-          {isReservation && !justConfirmed && missingCricheroesForSelfService && (
-            <div className="bg-amber-950/40 border border-amber-800 rounded px-4 py-3 font-rajdhani text-sm text-amber-300">
-              🔗 This is an organiser self-service hold — it can't be confirmed until a CricHeroes
-              match link exists. Add it in Match Details below, or wait for the organiser to attach
-              one via the share page (you'll get a second notification when they do).
-            </div>
-          )}
-
-          <div className="flex gap-3 justify-between">
-            <button onClick={handleCancel} disabled={isPostMatchEligible}
-              title={isPostMatchEligible ? 'This match has already been played — cancel via Supabase directly if this booking truly needs to be removed.' : undefined}
-              className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed px-4 py-2.5 rounded transition-colors">
-              Cancel Booking
-            </button>
-            <div className="flex gap-3">
-              <button onClick={() => handleSave()} disabled={saving || !allPassed}
-                className="font-rajdhani text-sm font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-              {isReservation && !justConfirmed && (
-                <button onClick={handleConfirm}
-                  disabled={saving || !tournamentId || !format || !allPassed || missingCricheroesForSelfService}
-                  title={missingCricheroesForSelfService ? 'Waiting for the organiser\'s CricHeroes match link' : undefined}
-                  className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors">
-                  {saving ? 'Confirming...' : '✓ Confirm Booking'}
-                </button>
+              {isReservation && !justConfirmed && missingCricheroesForSelfService && (
+                <div className="bg-amber-950/40 border border-amber-800 rounded px-4 py-3 font-rajdhani text-sm text-amber-300">
+                  🔗 This is an organiser self-service hold — it can't be confirmed until a CricHeroes
+                  match link exists. Add it in Match Details below, or wait for the organiser to attach
+                  one via the share page (you'll get a second notification when they do).
+                </div>
               )}
-            </div>
-          </div>
+
+              <div className="flex gap-3 justify-between">
+                <button onClick={handleCancel} disabled={isPostMatchEligible}
+                  title={isPostMatchEligible ? 'This match has already been played — cancel via Supabase directly if this booking truly needs to be removed.' : undefined}
+                  className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed px-4 py-2.5 rounded transition-colors">
+                  Cancel Booking
+                </button>
+                <div className="flex gap-3">
+                  <button onClick={() => handleSave()} disabled={saving || !allPassed}
+                    className="font-rajdhani text-sm font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                  {isReservation && !justConfirmed && (
+                    <button onClick={handleConfirm}
+                      disabled={saving || !tournamentId || !format || !allPassed || missingCricheroesForSelfService}
+                      title={missingCricheroesForSelfService ? 'Waiting for the organiser\'s CricHeroes match link' : undefined}
+                      className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors">
+                      {saving ? 'Confirming...' : '✓ Confirm Booking'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── RIGHT PANEL ── */}
         <div className="space-y-4">
 
-          {/* WhatsApp Notify buttons */}
+          {/* WhatsApp Notify buttons — edit-adjacent, not relevant while
+              only applying a fee. */}
+          {!feesMode && (
           <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
             <div className="bg-ink-4 px-4 py-3 border-b border-ink-5">
               <p className="font-cinzel text-sm text-gold">📲 Notify via WhatsApp</p>
@@ -1063,6 +1102,7 @@ export default function BookingDetailPage() {
               )}
             </div>
           </div>
+          )}
 
           {/* Booking summary */}
           <div className="bg-ink-3 border border-ink-5 rounded p-4">

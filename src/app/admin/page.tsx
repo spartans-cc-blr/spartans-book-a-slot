@@ -9,16 +9,17 @@ import { DashboardBookingsTabs, type DashboardBookingRow } from '@/components/ad
 
 export const revalidate = 0  // Always fresh for admin
 
-function toDashboardRow(b: any): DashboardBookingRow {
+function toDashboardRow(b: any, scorecardStatus?: string | null): DashboardBookingRow {
   return {
-    id:              b.id,
-    game_date:       b.game_date,
-    slot_time:       b.slot_time,
-    format:          b.format ?? null,
-    status:          b.status,
-    block_reason:    b.block_reason ?? null,
-    captain_name:    b.tournament?.captains?.name ?? null,
-    tournament_name: b.tournament?.name ?? null,
+    id:               b.id,
+    game_date:        b.game_date,
+    slot_time:        b.slot_time,
+    format:           b.format ?? null,
+    status:           b.status,
+    block_reason:     b.block_reason ?? null,
+    captain_name:     b.tournament?.captains?.name ?? null,
+    tournament_name:  b.tournament?.name ?? null,
+    scorecard_status: scorecardStatus ?? null,
   }
 }
 
@@ -61,6 +62,14 @@ export default async function AdminDashboard({
     .order('game_date', { ascending: false })
     .order('slot_time', { ascending: false })
     .limit(100) as { data: Booking[] | null }
+
+  // Scorecard status per past booking — drives the "Apply Match Fee"
+  // shortcut on the Past tab (shown only once synced, not yet applied).
+  const pastBookingIds = (pastBookings ?? []).map(b => b.id)
+  const { data: scorecardRows } = pastBookingIds.length
+    ? await supabase.from('scorecard_uploads').select('booking_id, status').in('booking_id', pastBookingIds)
+    : { data: [] as { booking_id: string; status: string }[] }
+  const scorecardStatusByBooking = new Map((scorecardRows ?? []).map(r => [r.booking_id, r.status]))
 
   const { data: captains }     = await supabase.from('captains').select('id, name').eq('active', true).order('name')
   const { data: grounds }      = await supabase.from('grounds').select('id, name').order('name')
@@ -147,8 +156,8 @@ export default async function AdminDashboard({
       </div>
 
       <DashboardBookingsTabs
-        upcoming={(bookings ?? []).map(toDashboardRow)}
-        past={(pastBookings ?? []).map(toDashboardRow)}
+        upcoming={(bookings ?? []).map(b => toDashboardRow(b))}
+        past={(pastBookings ?? []).map(b => toDashboardRow(b, scorecardStatusByBooking.get(b.id)))}
       />
     </div>
   )

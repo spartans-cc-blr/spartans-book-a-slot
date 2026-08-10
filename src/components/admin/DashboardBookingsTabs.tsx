@@ -5,14 +5,17 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 
 export interface DashboardBookingRow {
-  id:              string
-  game_date:       string
-  slot_time:       string
-  format:          string | null
-  status:          string
-  block_reason:    string | null
-  captain_name:    string | null
-  tournament_name: string | null
+  id:               string
+  game_date:        string
+  slot_time:        string
+  format:           string | null
+  status:           string
+  block_reason:     string | null
+  captain_name:     string | null
+  tournament_name:  string | null
+  // Scorecard upload/apply status — only populated for past bookings.
+  // Drives the "Apply Match Fee" shortcut below.
+  scorecard_status?: string | null
 }
 
 // A single malformed game_date (e.g. a mistyped year) must never crash the
@@ -83,6 +86,16 @@ function BookingsTable({ bookings, emptyLabel }: { bookings: DashboardBookingRow
                       className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
                       Edit
                     </Link>
+                    {/* Shown only once the scorecard is synced but fees haven't
+                        been applied yet — a shortcut straight to the fee-only
+                        view of the same page, so applying a fee doesn't
+                        require going through the full booking-edit flow. */}
+                    {b.scorecard_status === 'synced' && (
+                      <Link href={`/admin/bookings/${b.id}?action=fees`}
+                        className="font-rajdhani text-xs text-gold hover:text-gold-light border border-gold-dim hover:bg-gold/10 px-2 py-1 rounded transition-colors">
+                        Apply Match Fee
+                      </Link>
+                    )}
                   </div>
                 </td>
               </tr>
