@@ -9,7 +9,7 @@ export default function AdminSchedulePage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-cinzel text-xl font-bold text-gold">Full Schedule</h1>
+          <h1 className="font-cinzel text-xl font-bold text-gold">Fixtures - Calendar View</h1>
           <p className="font-rajdhani text-zinc-500 text-sm mt-1">
             All slots — open, booked, reserved and blocked. Admin view only.
           </p>

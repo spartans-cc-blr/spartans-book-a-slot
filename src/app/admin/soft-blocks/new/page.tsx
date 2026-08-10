@@ -159,7 +159,7 @@ export default function NewSoftBlockPage() {
           <div className="flex justify-end pt-1">
             <button onClick={() => router.push('/admin?blocked=1')}
               className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark text-white px-5 py-2.5 rounded transition-colors">
-              Continue to Dashboard
+              Continue to Matches
             </button>
           </div>
         </div>

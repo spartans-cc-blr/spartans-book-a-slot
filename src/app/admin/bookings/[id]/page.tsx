@@ -1058,7 +1058,7 @@ export default function BookingDetailPage() {
               {justConfirmed && (
                 <button onClick={() => router.push('/admin?saved=1')}
                   className="w-full font-rajdhani text-sm font-bold tracking-wide border border-ink-5 text-zinc-400 hover:text-zinc-200 hover:border-gold-dim px-4 py-2.5 rounded transition-colors">
-                  Done — Back to Dashboard
+                  Done — Back to Matches
                 </button>
               )}
             </div>
