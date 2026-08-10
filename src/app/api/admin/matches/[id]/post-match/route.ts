@@ -78,6 +78,30 @@ export async function GET(
     created_at: w.created_at,
   }))
 
+  // The actual per-player amounts charged, once fees have been applied —
+  // sourced from the immutable wallet_transactions ledger, never
+  // recomputed. A fresh dry-run preview (POST /api/fees/apply,
+  // confirm:false) only knows the server-computed *defaults*, not the
+  // per-player unit overrides an admin actually applied — showing that
+  // instead of the real ledger here previously produced a misleading
+  // "per share" figure that didn't match what was actually debited.
+  let feeBreakdown: { player_id: string; name: string; amount: number }[] = []
+  if (upload?.status === 'fees_applied') {
+    const { data: txRows } = await supabase
+      .from('wallet_transactions')
+      .select('player_id, amount, players(name)')
+      .eq('booking_id', params.id)
+      .eq('type', 'debit')
+
+    feeBreakdown = (txRows ?? [])
+      .map(t => ({
+        player_id: t.player_id,
+        name:      (t.players as any)?.name ?? 'Unknown',
+        amount:    Number(t.amount),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
   return NextResponse.json({
     upload: upload ? {
       status:           upload.status,
@@ -88,6 +112,7 @@ export async function GET(
     } : null,
     stats,
     waivers,
+    feeBreakdown,
   })
 }
 

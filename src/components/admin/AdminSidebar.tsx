@@ -4,22 +4,22 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
 const NAV = [
-  { href: '/admin',                  label: 'Dashboard',        icon: '📋', exact: true },
-  // After the Dashboard entry:
-  { href: '/admin/schedule',         label: 'Full Schedule',    icon: '📅' },
+  { href: '/admin',                  label: 'Matches - List View',      icon: '📋', exact: true },
+  // After the Matches entry:
+  { href: '/admin/schedule',         label: 'Fixtures - Calendar View', icon: '📅' },
   { href: '/admin/bookings/new',     label: 'New Booking',      icon: '➕' },
   { href: '/admin/soft-blocks/new',  label: 'Soft Blocks',      icon: '🔒' },
   { href: '/admin/captains',         label: 'Captains',         icon: '👥', section: 'Master Data' },
   { href: '/admin/tournaments',      label: 'Tournaments',      icon: '🏆' },
-  { href: '/schedule',               label: 'Organiser View',   icon: '🌐', section: 'Views' },
-  { href: '/fixtures',               label: 'Upcoming Matches', icon: '🏏' },
+  { href: '/admin/players',          label: 'Players',          icon: '🏏' },
+  { href: '/schedule',               label: 'Free Schedules',            icon: '🌐', section: 'Hub Views' },
+  { href: '/fixtures',               label: 'Fixtures - Players View',   icon: '🏏' },
   { href: '/matches/history',        label: 'Past Matches',     icon: '📜' },
-  { href: '/admin/scorecard-backfill', label: 'Scorecard Backfill', icon: '📥' },
+  { href: '/tournament-planner',     label: 'Tournament Planner',   icon: '📊' },
+  { href: '/admin/scorecard-backfill', label: 'Scorecard Backfill', icon: '📥', section: 'Utilities' },
   { href: '/admin/booking-backfill', label: 'Booking Backfill', icon: '🗓️' },
   { href: '/admin/player-reconciliation', label: 'Player Reconciliation', icon: '🪪' },
   { href: '/admin/cricheroes-id-backfill', label: 'CricHeroes ID Backfill', icon: '🔗' },
-  { href: '/tournament-planner',     label: 'Tournament Planner',   icon: '📊' },
-  { href: '/admin/players',          label: 'Players',          icon: '🏏' },
   { href: '/gc-review',              label: 'GC Review',        icon: '⚖️' },
   { href: '/admin/dugout/kit-room',  label: 'Store Orders',  icon: '🥎', section: 'The Dugout' },
 ]
