@@ -78,7 +78,7 @@ export default async function AdminDashboard({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-gold">Dashboard</h1>
+        <h1 className="font-cinzel text-xl font-bold text-gold">Matches - List View</h1>
         <p className="font-rajdhani text-zinc-500 text-sm mt-1">
           Welcome back, {session?.user?.name?.split(' ')[0]}. Here's your weekend at a glance.
         </p>
