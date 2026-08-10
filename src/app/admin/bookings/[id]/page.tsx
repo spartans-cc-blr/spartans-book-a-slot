@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import type { Booking, GameFormat, SlotTime, RuleCheckItem } from '@/types'
-import { SLOT_TIMES, SLOT_FORMATS, ORGANISER_SELF_SERVICE_REASON } from '@/types'
+import { SLOT_TIMES, SLOT_FORMATS, ORGANISER_SELF_SERVICE_REASON, isInformalFormat } from '@/types'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 import { buildOrganiserWhatsAppUrl, buildCaptainWhatsAppUrl } from '@/lib/bookingNotify'
@@ -415,6 +415,10 @@ function BookingDetailPageInner() {
   }, [cricheroes])
 
   const validate = useCallback(async () => {
+    if (isInformalFormat(format)) {
+      setRuleChecks(RULES.map(r => ({ ...r, status: 'pass' as const, message: 'N/A — informal format, not rule-checked' })))
+      return
+    }
     if (!gameDate || !format || !slotTime || !tournamentId) {
       setRuleChecks(RULES.map(r => ({ ...r, status: 'pending' as const, message: 'Fill all fields to check.' })))
       return
@@ -660,7 +664,7 @@ function BookingDetailPageInner() {
               <div>
                 <label className="form-label">Format</label>
                 <div className="flex border border-ink-5 rounded overflow-hidden">
-                  {(['T20', 'T30'] as GameFormat[]).map(f => (
+                  {(['T20', 'T30', 'T10', 'T25'] as GameFormat[]).map(f => (
                     <button key={f} onClick={() => setFormat(f)} disabled={feesMode}
                       className={`flex-1 py-2.5 font-cinzel text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed
                         ${format === f ? 'bg-gold-dim text-gold-light' : 'bg-ink-4 text-zinc-500 hover:text-zinc-300'}`}>
@@ -668,6 +672,11 @@ function BookingDetailPageInner() {
                     </button>
                   ))}
                 </div>
+                {isInformalFormat(format) && (
+                  <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
+                    Informal quick game — rules aren&apos;t checked, and it won&apos;t show on the public schedule or Tournament Planner.
+                  </p>
+                )}
               </div>
             </div>
           </FormCard>
@@ -1030,7 +1039,11 @@ function BookingDetailPageInner() {
               there and there's nothing to save. */}
           {!feesMode && (
             <>
-              <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
+              {isInformalFormat(format) ? (
+                <p className="font-rajdhani text-xs text-zinc-600">Rule checks don&apos;t apply to informal formats (T10/T25).</p>
+              ) : (
+                <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
+              )}
 
               {isReservation && !justConfirmed && missingCricheroesForSelfService && (
                 <div className="bg-amber-950/40 border border-amber-800 rounded px-4 py-3 font-rajdhani text-sm text-amber-300">

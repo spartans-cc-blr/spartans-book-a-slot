@@ -7,7 +7,7 @@ import { TournamentPlannerClient } from '@/components/tournament-planner/Tournam
 import { getLeaderboard } from '@/lib/playerStats'
 import type { Metadata } from 'next'
 import type { PlayerStatsTotals } from '@/types'
-import { KNOCKOUT_HOLD_REASON } from '@/types'
+import { KNOCKOUT_HOLD_REASON, isInformalFormat } from '@/types'
 
 export const metadata: Metadata = { title: 'Tournament Planner — Spartans CC' }
 export const revalidate = 0
@@ -48,12 +48,18 @@ export default async function TournamentPlannerPage() {
     : { data: [] }
   const resultByMatchId = new Map((statsRows ?? []).map(r => [r.match_id, r.match_result]))
 
-  // Supabase returns FK joins as arrays — cast to single objects to match Booking type
-  const bookings = (rawBookings ?? []).map(b => ({
-    ...b,
-    match_result: b.match_id ? resultByMatchId.get(b.match_id) ?? null : null,
-    tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
-  })) as unknown as Array<{
+  // Supabase returns FK joins as arrays — cast to single objects to match Booking type.
+  // T10/T25 are rare, informal, admin-only quick games that don't participate
+  // in the slot-target/bandwidth model this page is built around (ALL_SLOTS
+  // has no entry for them) — excluded here so they don't skew captain
+  // bandwidth counts or silently render an empty slot-balance section.
+  const bookings = (rawBookings ?? [])
+    .filter(b => !isInformalFormat(b.format))
+    .map(b => ({
+      ...b,
+      match_result: b.match_id ? resultByMatchId.get(b.match_id) ?? null : null,
+      tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
+    })) as unknown as Array<{
     id: string
     game_date: string
     slot_time: string
