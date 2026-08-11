@@ -9,7 +9,9 @@
 
 export function getMatchEndTime(gameDate: string, slotTime: string, format: string): Date {
   const end = new Date(`${gameDate}T${slotTime}:00+05:30`)
-  const durationHours = format === 'T30' ? 5.5 : 3.5
+  // T10/T25 are informal quick games — shorter (T10) or in-between (T25)
+  // durations than the T20/T30 grid these estimates were originally tuned for.
+  const durationHours = format === 'T30' ? 5.5 : format === 'T25' ? 4.5 : format === 'T10' ? 2 : 3.5
   end.setTime(end.getTime() + durationHours * 60 * 60 * 1000)
   return end
 }

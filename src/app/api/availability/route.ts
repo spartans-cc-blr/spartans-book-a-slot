@@ -3,6 +3,7 @@ import { computeSlotStatus } from '@/lib/validation'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { addDays, format, parseISO, formatDistanceToNow } from 'date-fns'
 import type { SlotTime, WeekAvailability, DayAvailability, SlotInfo } from '@/types'
+import { isInformalFormat } from '@/types'
 
 const SLOT_TIMES: SlotTime[] = ['07:30', '10:30', '12:30', '14:30']
 
@@ -68,12 +69,18 @@ export async function GET(req: NextRequest) {
       cache: 'no-store',
     }
   )
-  const bookings = await response.json()
-  const error = response.ok ? null : bookings
+  const rawBookings = await response.json()
+  const error = response.ok ? null : rawBookings
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // T10/T25 are rare, informal, admin-only quick games — they're deliberately
+  // never reflected on the public schedule (they aren't booked in advance the
+  // way this grid assumes), so their slot reads as open here even though it's
+  // actually occupied in the DB. See .claude/rules/architecture.md.
+  const bookings = (rawBookings ?? []).filter((b: any) => !isInformalFormat(b.format))
 
   // Auto-compute weeks if not explicitly passed — extend to end of last booked month
   if (!searchParams.get('weeks')) {

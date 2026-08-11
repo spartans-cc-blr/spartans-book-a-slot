@@ -1,9 +1,21 @@
 // ── Core domain types ────────────────────────────────────────────
 
 export type BookingStatus = 'confirmed' | 'cancelled' | 'soft_block'
-export type GameFormat    = 'T20' | 'T30'
+export type GameFormat    = 'T20' | 'T30' | 'T10' | 'T25'
 export type SlotTime      = '07:30' | '10:30' | '12:30' | '14:30'
 export type SlotStatus = 'open' | 'booked' | 'soft_block' | 'clash' | 't20only' | 'na'
+
+// T10/T25 are rare, informal, admin-only "quick game" formats — they never
+// go through the R1-R7 booking rules engine, never appear as a format filter
+// anywhere T20/T30 filters are shown, are excluded from the public /schedule
+// grid and from /tournament-planner, but do count toward player stats (no
+// dedicated bucket — they just fold into the aggregate totals) and render
+// normally wherever a match's own format is shown (fixtures, match history,
+// admin dashboard). See .claude/rules/architecture.md.
+export const INFORMAL_FORMATS: GameFormat[] = ['T10', 'T25']
+export function isInformalFormat(format: string | null | undefined): boolean {
+  return format === 'T10' || format === 'T25'
+}
 
 export interface Captain {
   id:         string
@@ -142,11 +154,14 @@ export interface RuleCheckItem {
 
 export const SLOT_TIMES: SlotTime[] = ['07:30', '10:30', '12:30', '14:30']
 
+// T10/T25 aren't rule-checked, so they're valid at every slot bucket — the
+// admin just picks whichever of the 4 is closest to when the game is
+// actually happening. This is a scheduling label only, not a rule input.
 export const SLOT_FORMATS: Record<SlotTime, GameFormat[]> = {
-  '07:30': ['T20', 'T30'],
-  '10:30': ['T20'],
-  '12:30': ['T20', 'T30'],
-  '14:30': ['T20'],
+  '07:30': ['T20', 'T30', 'T10', 'T25'],
+  '10:30': ['T20', 'T10', 'T25'],
+  '12:30': ['T20', 'T30', 'T10', 'T25'],
+  '14:30': ['T20', 'T10', 'T25'],
 }
 
 export const BLOCK_REASONS = [

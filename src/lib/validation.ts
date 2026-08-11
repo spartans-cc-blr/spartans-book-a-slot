@@ -7,7 +7,7 @@ import type {
   SlotTime,
   GameFormat,
 } from '@/types'
-import { KNOCKOUT_HOLD_REASON } from '@/types'
+import { KNOCKOUT_HOLD_REASON, isInformalFormat } from '@/types'
 
 export function getWeekNumber(dateStr: string): number {
   return getISOWeek(parseISO(dateStr))
@@ -66,6 +66,14 @@ export function validateBooking(
   thisTournamentCaptainId: string | null = null,
   overriddenRules: Set<string> = new Set()
 ): ValidationResult {
+  // T10/T25 are rare, informal, admin-only quick games — they never go
+  // through R1-R7 at all (no weekend cap, no clash checks, no knockout-day
+  // priority). This is a deliberate exemption, not a gap: see
+  // .claude/rules/architecture.md.
+  if (isInformalFormat(booking.format)) {
+    return { valid: true, errors: [], warnings: [], overridden: [] }
+  }
+
   const errors: ValidationError[] = []
   const warnings: ValidationError[] = []
   const active = existingBookings.filter(b => b.status !== 'cancelled')
