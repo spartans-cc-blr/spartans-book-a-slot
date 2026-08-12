@@ -204,8 +204,11 @@ function BookingDetailPageInner() {
         setFormat((b.format as GameFormat) ?? '')
         setSlotTime(b.slot_time)
         setMatchId(b.match_id ?? '')
-        setMatchTime(b.match_time ?? defaultMatchTime(b.slot_time))
-        setMatchTimeTouched(b.match_time != null)
+        // match_time is DB-guaranteed non-null now (backfilled from
+        // slot_time — see supabase/migrations/064_backfill_match_time_default.sql),
+        // so a loaded booking always has a real, already-set value.
+        setMatchTime(b.match_time!)
+        setMatchTimeTouched(true)
         setOpponentName(b.opponent_name ?? '')
         setCricheroes(b.cricheroes_url ?? '')
         setNotes(b.notes ?? '')

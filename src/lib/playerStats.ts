@@ -398,12 +398,12 @@ export async function getPlayerMatchHistory(
   // cancelled (rescheduled-away) booking; without this, whichever row
   // Postgres happens to return last for that match_id wins the Map below,
   // which can silently swap in the wrong date/tournament.
-  // match_time/slot_time are fetched purely to break ties on the date+time
-  // sort below (a single day can have more than one game) — neither is
-  // part of the returned row shape.
+  // match_time is fetched purely to break ties on the date+time sort below
+  // (a single day can have more than one game) — it isn't part of the
+  // returned row shape. DB-guaranteed non-null — see matchStatus.ts.
   const { data: bookingRows, error: bookingErr } = await hub
     .from('bookings')
-    .select('id, match_id, game_date, format, slot_time, match_time, tournament:tournaments(name)')
+    .select('id, match_id, game_date, format, match_time, tournament:tournaments(name)')
     .in('match_id', matchIds)
     .eq('status', 'confirmed')
   if (bookingErr) throw new Error(bookingErr.message)
@@ -421,8 +421,8 @@ export async function getPlayerMatchHistory(
     const bb = bookingByMatchId.get(b) as any
     const dateA = ba?.game_date ?? matchById.get(a)?.match_date ?? ''
     const dateB = bb?.game_date ?? matchById.get(b)?.match_date ?? ''
-    const timeA = ba?.match_time ?? ba?.slot_time ?? ''
-    const timeB = bb?.match_time ?? bb?.slot_time ?? ''
+    const timeA = ba?.match_time ?? ''
+    const timeB = bb?.match_time ?? ''
     return `${dateB} ${timeB}`.localeCompare(`${dateA} ${timeA}`)
   })
 
