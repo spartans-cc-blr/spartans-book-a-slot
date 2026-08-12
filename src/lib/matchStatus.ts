@@ -19,3 +19,27 @@ export function getMatchEndTime(gameDate: string, slotTime: string, format: stri
 export function hasMatchEnded(gameDate: string, slotTime: string, format: string): boolean {
   return new Date() >= getMatchEndTime(gameDate, slotTime, format)
 }
+
+// Formats a 24h "HH:MM" string as 12h — "07:30" -> "7:30", optionally with
+// an AM/PM suffix. Drops a :00 minute the same way the reporting-time
+// calc elsewhere in the app already does, for a consistent look.
+export function formatTime12h(time: string, withPeriod = false): string {
+  const [h, m] = time.split(':').map(Number)
+  const period = h >= 12 ? 'PM' : 'AM'
+  const hour12 = h % 12 || 12
+  const minute = m > 0 ? `:${String(m).padStart(2, '0')}` : ''
+  return withPeriod ? `${hour12}${minute} ${period}` : `${hour12}${minute}`
+}
+
+// The time to actually show a captain/GC reviewer: match_time (the real
+// kickoff, which an admin can set independently of the nominal 4-slot
+// bucket) when set, falling back to slot_time for older bookings created
+// before match_time existed. Captains'/GC Review previously showed
+// slot_time-derived times only — see .claude/rules/architecture.md §8.1.
+export function matchDisplayTime(
+  matchTime: string | null | undefined,
+  slotTime: string,
+  withPeriod = false
+): string {
+  return formatTime12h(matchTime || slotTime, withPeriod)
+}

@@ -34,7 +34,7 @@ export default async function GCReviewPage() {
   // ── Fetch this weekend's confirmed bookings ────────────────
   const { data: bookings } = await supabase
     .from('bookings')
-		.select('id, game_date, slot_time, format, opponent_name, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))')
+		.select('id, game_date, slot_time, match_time, format, opponent_name, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))')
 		.eq('status', 'confirmed')
     .gte('game_date', weekStart)
     .lt('game_date', weekEnd)
