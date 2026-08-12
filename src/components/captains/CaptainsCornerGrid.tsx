@@ -15,6 +15,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { BookingContextStats, PlayerStatsTotals } from '@/types'
+import { matchDisplayTime } from '@/lib/matchStatus'
 
 interface Booking {
   id: string
@@ -85,20 +86,6 @@ const RESP: Record<string, { bg: string; text: string; border: string; label: st
   E: { bg: '#1e3a5f', text: '#93c5fd', border: '#3b82f6', label: 'Either game today — one only' },
   O: { bg: '#431407', text: '#fdba74', border: '#f97316', label: 'One game this weekend only' },
   L: { bg: '#2e1a47', text: '#d8b4fe', border: '#a855f7', label: 'On leave' },
-}
-
-const SLOT_DISPLAY: Record<string, string> = {
-  '07:30': '7:15 AM',
-  '10:30': '10:15 AM',
-  '12:30': '12:15 PM',
-  '14:30': '2:15 PM',
-}
-
-const SLOT_SHORT: Record<string, string> = {
-  '07:30': '7:15',
-  '10:30': '10:15',
-  '12:30': '12:15',
-  '14:30': '2:15',
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -1140,12 +1127,12 @@ function SlotCard({
       // O: one game per weekend — block if the other slot is in the same ISO weekend
       if (response === 'O') {
         if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
-        return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
+        return `${matchDisplayTime(other.match_time, other.slot_time)} ${other.format}`
       }
       // E: one game per day — block only if the other slot is on the same calendar day
       if (response === 'E') {
         if (other.game_date !== booking.game_date) continue
-        return `${SLOT_SHORT[other.slot_time] ?? other.slot_time} ${other.format}`
+        return `${matchDisplayTime(other.match_time, other.slot_time)} ${other.format}`
       }
       // No response or unknown — never block.
       continue
@@ -1337,7 +1324,7 @@ function SlotCard({
       const date    = new Date(booking.game_date + 'T00:00:00').toLocaleDateString('en-IN', {
         weekday: 'short', day: 'numeric', month: 'short',
       })
-      const slot    = `${SLOT_SHORT[booking.slot_time] ?? booking.slot_time} ${booking.format}`
+      const slot    = `${matchDisplayTime(booking.match_time, booking.slot_time)} ${booking.format}`
       const tourney = booking.tournament?.name ? ` · ${booking.tournament.name}` : ''
       const msg     = `🏏 *Squad submitted for GC review*\n${date} · ${slot}${tourney}\n\nPlease review and approve on the Hub:\nhttps://hub.spartanscricketclub.in/gc-review`
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
@@ -1421,7 +1408,7 @@ function SlotCard({
               {formatSlotDate(booking.game_date)}
             </p>
             <p className="font-cinzel text-base font-bold text-gold leading-none">
-              {SLOT_SHORT[booking.slot_time] ?? booking.slot_time}
+              {matchDisplayTime(booking.match_time, booking.slot_time)}
             </p>
             <p className="font-rajdhani text-[9px] text-zinc-600 mt-0.5">{booking.format}</p>
           </div>
@@ -1786,7 +1773,7 @@ function MatrixView({
                     {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}
                   </span>
                   <span className="font-rajdhani text-[10px] font-bold text-zinc-400">
-                    {SLOT_DISPLAY[b.slot_time]} · {b.format}
+                    {matchDisplayTime(b.match_time, b.slot_time, true)} · {b.format}
                   </span>
                   <span className="font-rajdhani text-[10px] text-zinc-600">
                     {shortTourney(b.tournament?.name)}
