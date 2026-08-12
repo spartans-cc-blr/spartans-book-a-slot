@@ -49,7 +49,7 @@ export interface NudgeBooking {
   id: string
   game_date: string          // YYYY-MM-DD
   slot_time: string
-  match_time: string | null
+  match_time: string  // DB-guaranteed non-null — see src/lib/matchStatus.ts
   format: string
   tournament_id: string | null
   tournament_name: string | null
@@ -89,16 +89,7 @@ export interface PriorNudge {
 
 // ── Date / label helpers ────────────────────────────────────────────────────
 
-const SLOT_LABELS: Record<string, string> = {
-  '07:30': '7:15 AM', '10:30': '10:15 AM', '12:30': '12:15 PM', '14:30': '2:15 PM',
-}
-
-function slotLabel(slot: string): string {
-  return SLOT_LABELS[slot] ?? slot
-}
-
-function formatReportingTime(matchTime: string | null): string {
-  if (!matchTime) return ''
+function formatReportingTime(matchTime: string): string {
   const [h, m] = matchTime.split(':').map(Number)
   const totalMinutes = h * 60 + m - 15   // reporting time is 15 min before kickoff
   const rh = Math.floor(totalMinutes / 60)
@@ -114,7 +105,7 @@ function formatNudgeDateOnly(booking: NudgeBooking): string {
 }
 
 export function formatNudgeDateTime(booking: NudgeBooking): string {
-  const timeLabel = formatReportingTime(booking.match_time) || slotLabel(booking.slot_time)
+  const timeLabel = formatReportingTime(booking.match_time)
   return `${formatNudgeDateOnly(booking)}, ${timeLabel}`
 }
 

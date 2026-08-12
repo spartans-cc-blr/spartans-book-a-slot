@@ -23,7 +23,7 @@ interface Booking {
   slot_time: string
   format: string
   opponent_name: string | null
-  match_time: string | null
+  match_time: string  // DB-guaranteed non-null — see matchStatus.ts
   cricheroes_url: string | null
   tournament: {
      name: string
@@ -179,10 +179,10 @@ function formatSlotDate(dateStr: string): string {
 }
 
 // Build WhatsApp-ready announcement text from current selection + roles
-function formatReportingTime(matchTime: string | null, slotTime: string): string {
-  // Use match_time if set, fall back to slot_time. Reporting = 15 min before.
-  const base = matchTime ?? slotTime
-  const [h, m] = base.split(':').map(Number)
+function formatReportingTime(matchTime: string): string {
+  // match_time is DB-guaranteed non-null — see matchStatus.ts's matchDisplayTime.
+  // Reporting = 15 min before kickoff.
+  const [h, m] = matchTime.split(':').map(Number)
   const totalMinutes = h * 60 + m - 15
   const rh = Math.floor(totalMinutes / 60)
   const rm = totalMinutes % 60
@@ -231,7 +231,7 @@ function buildAnnouncementText(
   const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
   const jersey       = ballType === 'white' ? 'Colours' : 'Whites'
   const ground       = booking.tournament?.ground
-  const reportTime   = formatReportingTime(booking.match_time, booking.slot_time)
+  const reportTime   = formatReportingTime(booking.match_time)
 
   const lines: (string | null)[] = [
     `*${dateStr}*`,
@@ -1127,12 +1127,12 @@ function SlotCard({
       // O: one game per weekend — block if the other slot is in the same ISO weekend
       if (response === 'O') {
         if (isoWeekKey(other.game_date) !== isoWeekKey(booking.game_date)) continue
-        return `${matchDisplayTime(other.match_time, other.slot_time)} ${other.format}`
+        return `${matchDisplayTime(other.match_time)} ${other.format}`
       }
       // E: one game per day — block only if the other slot is on the same calendar day
       if (response === 'E') {
         if (other.game_date !== booking.game_date) continue
-        return `${matchDisplayTime(other.match_time, other.slot_time)} ${other.format}`
+        return `${matchDisplayTime(other.match_time)} ${other.format}`
       }
       // No response or unknown — never block.
       continue
@@ -1324,7 +1324,7 @@ function SlotCard({
       const date    = new Date(booking.game_date + 'T00:00:00').toLocaleDateString('en-IN', {
         weekday: 'short', day: 'numeric', month: 'short',
       })
-      const slot    = `${matchDisplayTime(booking.match_time, booking.slot_time)} ${booking.format}`
+      const slot    = `${matchDisplayTime(booking.match_time)} ${booking.format}`
       const tourney = booking.tournament?.name ? ` · ${booking.tournament.name}` : ''
       const msg     = `🏏 *Squad submitted for GC review*\n${date} · ${slot}${tourney}\n\nPlease review and approve on the Hub:\nhttps://hub.spartanscricketclub.in/gc-review`
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
@@ -1408,7 +1408,7 @@ function SlotCard({
               {formatSlotDate(booking.game_date)}
             </p>
             <p className="font-cinzel text-base font-bold text-gold leading-none">
-              {matchDisplayTime(booking.match_time, booking.slot_time)}
+              {matchDisplayTime(booking.match_time)}
             </p>
             <p className="font-rajdhani text-[9px] text-zinc-600 mt-0.5">{booking.format}</p>
           </div>
@@ -1773,7 +1773,7 @@ function MatrixView({
                     {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}
                   </span>
                   <span className="font-rajdhani text-[10px] font-bold text-zinc-400">
-                    {matchDisplayTime(b.match_time, b.slot_time, true)} · {b.format}
+                    {matchDisplayTime(b.match_time, true)} · {b.format}
                   </span>
                   <span className="font-rajdhani text-[10px] text-zinc-600">
                     {shortTourney(b.tournament?.name)}

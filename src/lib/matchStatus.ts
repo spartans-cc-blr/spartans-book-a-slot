@@ -31,15 +31,12 @@ export function formatTime12h(time: string, withPeriod = false): string {
   return withPeriod ? `${hour12}${minute} ${period}` : `${hour12}${minute}`
 }
 
-// The time to actually show a captain/GC reviewer: match_time (the real
-// kickoff, which an admin can set independently of the nominal 4-slot
-// bucket) when set, falling back to slot_time for older bookings created
-// before match_time existed. Captains'/GC Review previously showed
-// slot_time-derived times only — see .claude/rules/architecture.md §8.1.
-export function matchDisplayTime(
-  matchTime: string | null | undefined,
-  slotTime: string,
-  withPeriod = false
-): string {
-  return formatTime12h(matchTime || slotTime, withPeriod)
+// The time to actually show a captain/GC reviewer: the real kickoff time,
+// which an admin can set independently of the nominal 4-slot bucket.
+// bookings.match_time is DB-guaranteed non-null (backfilled from slot_time
+// and enforced by a trigger + NOT NULL constraint — see
+// supabase/migrations/064_backfill_match_time_default.sql), so there is no
+// slot_time fallback here anymore — see .claude/rules/architecture.md §8.1.
+export function matchDisplayTime(matchTime: string, withPeriod = false): string {
+  return formatTime12h(matchTime, withPeriod)
 }
