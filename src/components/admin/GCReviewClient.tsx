@@ -7,11 +7,13 @@
 // U-4: WhatsApp nudge to captain after approve/return (destination-free — GC picks recipient)
 
 import { useState, useMemo, useCallback } from 'react'
+import { matchDisplayTime } from '@/lib/matchStatus'
 
 interface Booking {
   id:            string
   game_date:     string
   slot_time:     string
+  match_time:    string | null
   format:        string
   opponent_name: string | null
   tournament:    { name: string } | null
@@ -51,10 +53,6 @@ interface Props {
 }
 
 // ── Constants ─────────────────────────────────────────────────────
-const SLOT_SHORT: Record<string, string> = {
-  '07:30': '7:15', '10:30': '10:15', '12:30': '12:15', '14:30': '2:15',
-}
-
 const MATCH_ROLE_LABEL: Record<string, string> = {
   bat: 'BAT', bowl: 'BOWL', bat_ar: 'BAT-AR', bowl_ar: 'BOWL-AR',
 }
@@ -67,7 +65,7 @@ const RESP_STYLE: Record<string, { bg: string; text: string; border: string }> =
 
 // ── Helpers ───────────────────────────────────────────────────────
 function slotLabel(b: Booking) {
-  return `${SLOT_SHORT[b.slot_time] ?? b.slot_time} · ${b.format}${b.tournament?.name ? ` · ${b.tournament.name}` : ''}`
+  return `${matchDisplayTime(b.match_time, b.slot_time)} · ${b.format}${b.tournament?.name ? ` · ${b.tournament.name}` : ''}`
 }
 
 function formatDate(dateStr: string) {
@@ -292,7 +290,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
           {slotCounts.map(({ b, count }) => (
             <div key={b.id} className="flex items-center gap-2">
               <span className="font-rajdhani text-[10px] text-zinc-500">
-                {formatDate(b.game_date)} · {SLOT_SHORT[b.slot_time]} {b.format}
+                {formatDate(b.game_date)} · {matchDisplayTime(b.match_time, b.slot_time)} {b.format}
               </span>
               <span className={`font-rajdhani text-xs font-bold tabular-nums px-2 py-0.5 rounded-sm border ${
                 count === 12 ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400'
@@ -328,7 +326,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                       : <span className="font-rajdhani text-xs text-amber-300">{r.name}</span>
                     }
                     <span className="font-rajdhani text-[10px] text-zinc-600">
-                      {bookings.filter(b => squadMap[b.id]?.includes(r.pid)).map(b => `${SLOT_SHORT[b.slot_time]} ${b.format}`).join(' + ')}
+                      {bookings.filter(b => squadMap[b.id]?.includes(r.pid)).map(b => `${matchDisplayTime(b.match_time, b.slot_time)} ${b.format}`).join(' + ')}
                     </span>
                     <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm bg-amber-950/40 border border-amber-700 text-amber-400">{r.games}×</span>
                   </div>
@@ -371,7 +369,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                       <span className="font-rajdhani text-[10px] text-zinc-600">
                         {bookings
                           .filter(b => r.responses[b.id] === 'Y' && submittedBookingIds.has(b.id))
-                          .map(b => `${SLOT_SHORT[b.slot_time]} ${b.format}`)
+                          .map(b => `${matchDisplayTime(b.match_time, b.slot_time)} ${b.format}`)
                           .join(', ')}
                       </span>
                     </div>
@@ -402,13 +400,13 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                           {/* Show which slots they're in vs left out of */}
                           {bookings
                             .filter(b => submittedBookingIds.has(b.id) && squadMap[b.id]?.includes(r.pid))
-                            .map(b => `✓ ${SLOT_SHORT[b.slot_time]} ${b.format}`)
+                            .map(b => `✓ ${matchDisplayTime(b.match_time, b.slot_time)} ${b.format}`)
                             .join(' · ')}
                         </span>
                         <span className="font-rajdhani text-[10px] text-zinc-700">
                           {bookings
                             .filter(b => submittedBookingIds.has(b.id) && r.responses[b.id] === 'Y' && !squadMap[b.id]?.includes(r.pid))
-                            .map(b => `— ${SLOT_SHORT[b.slot_time]} ${b.format}`)
+                            .map(b => `— ${matchDisplayTime(b.match_time, b.slot_time)} ${b.format}`)
                             .join(' · ')}
                         </span>
                       </div>
@@ -449,7 +447,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                             {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                           </span>
                           <span className="font-rajdhani text-[10px] font-bold text-zinc-400">
-                            {SLOT_SHORT[b.slot_time]} {b.format}
+                            {matchDisplayTime(b.match_time, b.slot_time)} {b.format}
                           </span>
                           {!submittedBookingIds.has(b.id) && (
                             <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm bg-zinc-800 border border-zinc-700 text-zinc-500">draft</span>
