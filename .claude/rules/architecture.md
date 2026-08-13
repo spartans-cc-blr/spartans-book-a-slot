@@ -116,7 +116,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
  
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/player-availability` | GET, POST, DELETE | Player session | Upsert own Y/O/E/L availability (**N removed** — blank = not available); guards: wallet dues block, `checkFreeze()` (blanket Thu lock + squad `pending_approval`/`approved`/`announced`); captains/GC/admin bypass freeze; auto-reactivation; audit log |
+| `/api/player-availability` | GET, POST, DELETE | Player session | Upsert own Y/O/E/L availability (**N removed** — blank = not available); guards: wallet dues block, `checkFreeze()` (blanket Thu lock + squad `pending_approval`/`approved`/`announced`); captains/GC/admin bypass freeze; DELETE also bypasses freeze for a player clearing their own existing `L` specifically (self-withdrawal exception, POST stays fully blocked regardless of response — see `features/player-availability.md` §10); auto-reactivation; audit log |
 | `/api/players/[id]` | PATCH | Own session (allowlisted fields) | Self-edit profile fields; `wallet_balance`, `is_captain`, `status` silently dropped |
 | `/api/milestones/unseen` | GET | Any signed-in, non-expelled member | Broadcast feed for the milestone recognition modal — every `milestone_achievements` row since this player's own `milestones_seen_at` cursor; see `features/milestone-recognition.md` |
 | `/api/milestones/mark-seen` | POST | Own session | Advances the signed-in player's own `milestones_seen_at` cursor to now; player_id and timestamp always server-derived |
