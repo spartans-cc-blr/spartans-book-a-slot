@@ -289,14 +289,40 @@ Any trigger is sufficient to freeze the slot. A slot locked by more than one tri
 
 ### Player behaviour matrix
 
-| Slot state | Player updates availability | Player withdraws |
-|---|---|---|
-| Before Thu 8 AM, squad in `draft` / no squad | ✅ Allowed | ✅ Allowed |
-| `availability_locked = true` (Thu cron fired) | ❌ Hard block | ❌ Hard block |
-| Squad `pending_approval` or `approved` | ❌ Hard block | ❌ Hard block |
-| Squad `announced` | ❌ Hard block | ❌ Hard block |
+| Slot state | Player updates availability | Player withdraws Y/O/E | Player withdraws L |
+|---|---|---|---|
+| Before Thu 8 AM, squad in `draft` / no squad | ✅ Allowed | ✅ Allowed | ✅ Allowed |
+| `availability_locked = true` (Thu cron fired) | ❌ Hard block | ❌ Hard block | ✅ Allowed |
+| Squad `pending_approval` or `approved` | ❌ Hard block | ❌ Hard block | ✅ Allowed |
+| Squad `announced` | ❌ Hard block | ❌ Hard block | ✅ Allowed |
 
 **Error message shown to player in all blocked states:** `"Availability locked — Squad selection in progress"`
+
+**Exception — a player may always withdraw their own `L` (added August 2026).**
+The blanket freeze in §10 is about *claiming or holding a slot* once squad
+selection is underway — a player pulling themselves out of the pool via `L`
+isn't doing that, so it was carved out as a standing self-service exception
+rather than routed through the captain proxy. This was a deliberate rejection
+of the alternative fix (widening `AddPlayerPanel` in Captains Corner to let a
+captain re-set an already-`L` player's response) — the product decision was
+that this stays player-initiated only, captains don't get a UI to touch it.
+
+`DELETE /api/player-availability` checks the player's *existing* response
+before applying `checkFreeze()`: if it's `L`, the freeze check is skipped
+entirely and the row is deleted unconditionally (self only — captain/GC/admin
+already bypassed the freeze regardless of response). If it's `Y`/`O`/`E`, the
+freeze still applies exactly as before — this exception does not loosen
+withdrawal of a real availability commitment, only a leave declaration.
+
+**Deliberately asymmetric with POST.** `POST /api/player-availability` is
+untouched and still fully blocked while locked, for every response value
+including `L` — a player can clear their `L` down to blank once frozen, but
+cannot then re-mark `L` (or `Y`/`O`/`E`) themselves; only a captain/GC/admin
+can set a response for them at that point, via `POST /api/captain-availability`.
+Once cleared, the player is indistinguishable from any other true
+no-response player — including to `AddPlayerPanel`'s `unrespondedPlayers`
+filter in Captains Corner, so a captain can add them from that point on
+using the existing proxy flow, same as anyone else who never responded.
 
 ### Captain override
 

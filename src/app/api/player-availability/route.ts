@@ -156,9 +156,21 @@ export async function DELETE(req: NextRequest) {
 
   // ── GUARD: availability_locked ──────────────────────────────────────────────
   // Captains, GC, and admins bypass — they can always override via captain-availability route.
+  // Exception: a player may always withdraw their own 'L' (on leave) even while frozen —
+  // they're removing themselves from the pool, not claiming a slot. POST stays fully
+  // blocked while locked regardless, so this can't be used to re-mark Y/O/E/L afterward.
   if (!player.isCaptain && !player.isGC && !player.isAdmin) {
-    const freezeMsg = await checkFreeze(supabase, booking_id)
-    if (freezeMsg) return NextResponse.json({ error: freezeMsg }, { status: 403 })
+    const { data: existing } = await supabase
+      .from('availability')
+      .select('response')
+      .eq('player_id', player.playerId)
+      .eq('booking_id', booking_id)
+      .maybeSingle()
+
+    if (existing?.response !== 'L') {
+      const freezeMsg = await checkFreeze(supabase, booking_id)
+      if (freezeMsg) return NextResponse.json({ error: freezeMsg }, { status: 403 })
+    }
   }
 
   const { error } = await supabase
