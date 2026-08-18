@@ -12,6 +12,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSession, signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SiteNav } from '@/components/ui/SiteNav'
+import { DobInput } from '@/components/ui/DobInput'
 
 const SKILLS = [
   'Right Hand Opening Batsman',
@@ -268,12 +269,10 @@ const SKILLS = [
             {/* DOB */}
             <div>
               <label className="form-label">Date of Birth</label>
-              <input
-                type="date"
-                value={form.dob}
-                onChange={e => set('dob', e.target.value)}
-                className="form-input"
-              />
+              <DobInput value={form.dob} onChange={v => set('dob', v)} />
+              <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
+                Year is optional — day and month are enough for birthday wishes 🎂
+              </p>
             </div>
 
             {/* Error */}

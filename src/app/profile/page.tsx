@@ -9,6 +9,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SiteNav } from '@/components/ui/SiteNav'
+import { DobInput } from '@/components/ui/DobInput'
 import type { PlayerStatsTotals } from '@/types'
 import { hasLocalPushSubscription, subscribeToPush as subscribeToPushBrowser, unsubscribeFromPush as unsubscribeFromPushBrowser } from '@/lib/pushSubscription'
 
@@ -566,12 +567,10 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="form-label">Date of Birth</label>
-              <input
-                type="date"
-                value={dob}
-                onChange={e => setDob(e.target.value)}
-                className="form-input"
-              />
+              <DobInput value={dob} onChange={setDob} />
+              <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
+                Year is optional — day and month are enough for birthday wishes 🎂
+              </p>
             </div>
             <div>
               <label className="form-label">Blood Group</label>
