@@ -86,6 +86,27 @@ themselves, from their own contacts) when WhatsApp opens.
 
 ---
 
+## 4.1 Birth year is optional (added August 2026)
+
+`players.dob` is still a plain `date` column (no schema change) — but the
+`/profile` and `/join` forms no longer use a raw `<input type="date">`,
+which forces a full day+month+year. `DobInput`
+(`src/components/ui/DobInput.tsx`) renders day/month `select`s plus an
+**optional** year `number` input; when the player leaves year blank, the
+component writes a sentinel year (`1900`) into the same `YYYY-MM-DD`
+string rather than storing a real one. Nothing server-side changed —
+`playerSelfEditSchema`/`playerRegisterSchema` still just validate the
+`YYYY-MM-DD` shape, and `getTodaysBirthdays()` already only ever compares
+month/day, so the sentinel is invisible to detection. `dob` is never
+displayed anywhere in the app today (excluded from the GC select, never
+rendered on any admin page), so there's nothing downstream that would ever
+show "1900" to anyone. Re-opening the form for an already-set sentinel dob
+shows the year field blank again (`DobInput` treats `1900` as "not
+provided"); a genuine pre-existing full `dob` (set before this shipped)
+still round-trips its real year unchanged.
+
+---
+
 ## 5. Scope
 
 - Excludes `status = 'expelled'` players; includes both `active` and
@@ -124,6 +145,7 @@ themselves, from their own contacts) when WhatsApp opens.
 | `src/components/birthdays/BirthdayWishesModal.tsx` | The modal itself — party-popper banner, `PlayerAvatar`, destination-free WhatsApp wish link |
 | `src/components/ui/GlobalBirthdayModal.tsx` | Mounts the modal once per session in the root layout |
 | `src/app/layout.tsx` | Renders `GlobalBirthdayModal` once, inside `Providers`/`ChunkErrorBoundary`, alongside `GlobalMilestoneModal` |
+| `src/components/ui/DobInput.tsx` | Day/month `select` + optional year `number` — replaces the raw date input on `/profile` and `/join`; see §4.1 |
 
 ---
 

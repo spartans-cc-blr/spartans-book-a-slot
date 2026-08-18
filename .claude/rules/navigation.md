@@ -233,7 +233,7 @@ This means photos are populated passively — existing players who have already 
 | Field | Input Type | Notes |
 |---|---|---|
 | WhatsApp number | `tel` | Include country code e.g. `919876543210` |
-| Date of birth | `date` | |
+| Date of birth | day + month `select`, year `number` (optional) | `DobInput` (`src/components/ui/DobInput.tsx`) — year left blank stores a sentinel `1900` in `players.dob` so the birthday-wishes feature (day/month only) still works without the player disclosing their birth year; see `features/birthday-wishes.md` |
 | Blood group | `select` | A+/A−/B+/B−/AB+/AB−/O+/O− |
 | Jersey name | `text` | Uppercased — name printed on back |
 | Jersey number | `number` | 0–999 |
