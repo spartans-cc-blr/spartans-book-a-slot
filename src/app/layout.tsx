@@ -4,6 +4,7 @@ import './globals.css'
 import { Providers } from './providers'
 import { ChunkErrorBoundary } from '@/components/ui/ChunkErrorBoundary'
 import { GlobalMilestoneModal } from '@/components/ui/GlobalMilestoneModal'
+import { GlobalBirthdayModal } from '@/components/ui/GlobalBirthdayModal'
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-ink text-parchment font-rajdhani antialiased">
         <Providers>
           <ChunkErrorBoundary>
+            <GlobalBirthdayModal />
             <GlobalMilestoneModal />
             {children}
           </ChunkErrorBoundary>

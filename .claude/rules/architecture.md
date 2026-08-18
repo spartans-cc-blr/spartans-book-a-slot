@@ -120,6 +120,8 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/api/players/[id]` | PATCH | Own session (allowlisted fields) | Self-edit profile fields; `wallet_balance`, `is_captain`, `status` silently dropped |
 | `/api/milestones/unseen` | GET | Any signed-in, non-expelled member | Broadcast feed for the milestone recognition modal — every `milestone_achievements` row since this player's own `milestones_seen_at` cursor; see `features/milestone-recognition.md` |
 | `/api/milestones/mark-seen` | POST | Own session | Advances the signed-in player's own `milestones_seen_at` cursor to now; player_id and timestamp always server-derived |
+| `/api/birthdays/today` | GET | Any signed-in, non-expelled member | Broadcast feed for the birthday wishes modal — players whose `dob` falls on today's IST date, gated on the viewer's own `birthday_wishes_seen_date` cursor; see `features/birthday-wishes.md` |
+| `/api/birthdays/mark-seen` | POST | Own session | Advances the signed-in player's own `birthday_wishes_seen_date` cursor to today; player_id and date always server-derived |
  
 ### Captain APIs
  
@@ -333,6 +335,14 @@ matches in a season. RLS enabled, no anon/authenticated policies — service
 role only. Migration `060_match_performance_achievements.sql`. Shares the
 same broadcast modal and `players.milestones_seen_at` cursor as
 `milestone_achievements`. See `features/milestone-recognition.md`.
+
+#### `players.birthday_wishes_seen_date`
+`date`, nullable — added by migration `065_birthday_wishes_seen_date.sql`.
+Per-player "seen today" cursor for the birthday wishes broadcast modal.
+Unlike `milestones_seen_at` this is a plain date, not a timestamp, and has
+no companion achievement table — "today's birthdays" is re-derived fresh
+from `players.dob` on every request rather than detected-and-logged once.
+See `features/birthday-wishes.md`.
 
 ### Planned Tables (Future Sprints)
  
@@ -716,6 +726,10 @@ Next.js API Routes (server-side)
 | `src/app/api/milestones/unseen/route.ts` + `src/app/api/milestones/mark-seen/route.ts` | Broadcast feed + seen-cursor advance for the milestone recognition modal |
 | `src/components/milestones/MilestoneCelebrationModal.tsx` | Club-wide milestone recognition modal |
 | `src/components/ui/GlobalMilestoneModal.tsx` | Mounts the modal once per session from the root layout — not from `SiteNav`, which isn't part of a shared layout and remounts per navigation; see `features/milestone-recognition.md` §7.1 |
+| `src/lib/birthdays.ts` | `getTodaysBirthdays()` / `todayIST()` / `istDateString()` — birthday-wishes detection off `players.dob`; see `features/birthday-wishes.md` |
+| `src/app/api/birthdays/today/route.ts` + `src/app/api/birthdays/mark-seen/route.ts` | Broadcast feed + seen-cursor advance for the birthday wishes modal |
+| `src/components/birthdays/BirthdayWishesModal.tsx` | Club-wide birthday wishes modal — reuses `PlayerAvatar`; name links to a destination-free WhatsApp wish message |
+| `src/components/ui/GlobalBirthdayModal.tsx` | Mounts the birthday modal once per session from the root layout, alongside `GlobalMilestoneModal` |
 | `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — CricHeroes direct-fetch pipeline; chains parse → sync; never touches fees; also auto-clears a reconciliation flag on a successful re-sync |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron — see `features/post-match-scorecard.md` |
 | `src/app/admin/scorecard-backfill/page.tsx` | One-time admin catch-up UI, client-driven sequential loop |
