@@ -31,7 +31,7 @@ export default async function TournamentPlannerPage() {
       tournament:tournaments!bookings_tournament_id_fkey(
         id, name, organiser_name, organiser_contact,
         total_league_games, cricheroes_points_table_url,
-        captain_id,
+        captain_id, is_practice,
         captains!tournaments_captain_id_fkey(id, name, player_id)
       )
     `)
@@ -54,13 +54,18 @@ export default async function TournamentPlannerPage() {
   // in the slot-target/bandwidth model this page is built around (ALL_SLOTS
   // has no entry for them) — excluded here so they don't skew captain
   // bandwidth counts or silently render an empty slot-balance section.
+  // Practice games (tournaments.is_practice) are excluded too — the planner
+  // is a real-tournament pace/bandwidth tool, and the "Practice games"
+  // umbrella tournament has no league games, no captain workload, and no
+  // slot-target model that makes sense here — same "real stats only"
+  // posture as the leaderboard (see features/leaderboard.md §10).
   const bookings = (rawBookings ?? [])
-    .filter(b => !isInformalFormat(b.format))
     .map(b => ({
       ...b,
       match_result: b.match_id ? resultByMatchId.get(b.match_id) ?? null : null,
       tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
-    })) as unknown as Array<{
+    }))
+    .filter(b => !isInformalFormat(b.format) && !b.tournament?.is_practice) as unknown as Array<{
     id: string
     game_date: string
     slot_time: string
@@ -77,6 +82,7 @@ export default async function TournamentPlannerPage() {
       total_league_games: number | null
       cricheroes_points_table_url: string | null
       captain_id: string | null
+      is_practice: boolean
       captains: { id: string; name: string; player_id: string | null } | null
     } | null
   }>
