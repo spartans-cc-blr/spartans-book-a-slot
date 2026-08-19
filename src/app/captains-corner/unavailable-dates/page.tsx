@@ -108,9 +108,12 @@ export default async function UnavailableDatesPage() {
         }
         // 'clash' — blocked by another slot on the same day; resolve to the
         // booking actually causing it, not just a dead "blocked" label.
+        // causeSlot is also handed to the UI so it can point the same
+        // directional arrow the admin schedule grid uses (see
+        // src/components/schedule/ClashArrow.tsx).
         const causeSlot = getClashSource(t, SLOT_TIMES.map(s => ({ time: s, status: statuses[s], format: findBooking(d.game_date, s)?.format ?? null })))
         const causeBooking = causeSlot ? findBooking(d.game_date, causeSlot) : undefined
-        return { time: t, kind: 'blocked', bookingId: causeBooking?.id }
+        return { time: t, kind: 'blocked', bookingId: causeBooking?.id, causeSlot }
       })
 
       if (!slots.some(s => s.kind === 'unscheduled')) return null

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { WeekAvailability, SlotTime } from '@/types'
 import { buildGenericWhatsAppLink } from '@/lib/whatsapp'
 import { getClashSource } from '@/lib/validation'
+import { getArrowDirection, ArrowIcon } from '@/components/schedule/ClashArrow'
 
 const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
   { time: '07:30', label: 'T20/T30' },
@@ -12,13 +13,6 @@ const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
   { time: '14:30', label: 'T20 only' },
 ]
 
-const SLOT_INDEX: Record<SlotTime, number> = {
-  '07:30': 0,
-  '10:30': 1,
-  '12:30': 2,
-  '14:30': 3,
-}
-
 const STATUS_CONFIG = {
   open:       { label: 'Open',         gridLabel: 'Open',         icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
   t20only:    { label: 'T20 only',     gridLabel: 'T20 only',     icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer' },
@@ -26,36 +20,6 @@ const STATUS_CONFIG = {
   soft_block: { label: 'Reserved',     gridLabel: 'Reserved',     icon: '🟡', pill: 'slot-softblock', gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
   clash:      { label: 'Unavailable',  gridLabel: 'Unavailable',  icon: '⛔', pill: 'slot-clash',     gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
   na:         { label: '',             gridLabel: '',             icon: '—',  pill: '',               gridCls: 'bg-transparent border-transparent cursor-default' },
-}
-
-// Returns arrow direction: 'left' | 'right' | 'up' | 'down' | null
-function getArrowDirection(
-  slotTime: SlotTime,
-  clashSource: SlotTime | null,
-  mobile: boolean
-): 'left' | 'right' | 'up' | 'down' | null {
-  if (!clashSource) return null
-  const clashIdx = SLOT_INDEX[clashSource]
-  const thisIdx  = SLOT_INDEX[slotTime]
-  if (mobile) {
-    return clashIdx < thisIdx ? 'up' : 'down'
-  }
-  return clashIdx < thisIdx ? 'left' : 'right'
-}
-
-function ArrowIcon({ direction }: { direction: 'left' | 'right' | 'up' | 'down' }) {
-  const paths: Record<string, string> = {
-    left:  'M15 18l-6-6 6-6',
-    right: 'M9 18l6-6-6-6',
-    up:    'M18 15l-6-6-6 6',
-    down:  'M6 9l6 6 6-6',
-  }
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points={paths[direction].replace(/[A-Z]/g, '').trim()} />
-      <path d={paths[direction]} />
-    </svg>
-  )
 }
 
 function formatExpiryLabel(reserved_until: string): string {
