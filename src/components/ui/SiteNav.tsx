@@ -13,6 +13,7 @@ export function SiteNav({ activePage }: SiteNavProps) {
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [gcOpen,       setGcOpen]       = useState(false)
   const [matchesOpen,  setMatchesOpen]  = useState(false)
+  const [captainsOpen, setCaptainsOpen] = useState(false)
   const [wranglerOpen, setWranglerOpen] = useState(false)
   const { data: session, status }     = useSession()
 
@@ -36,10 +37,8 @@ export function SiteNav({ activePage }: SiteNavProps) {
     ...(isLoggedIn && !isExpelled
       ? [{ href: '/leaderboard', label: 'Stats', key: 'leaderboard' }]
       : []),
-    // Captains' Corner — direct top-level link for captains & admin
-    ...(isCaptain || isAdmin
-      ? [{ href: '/captains-corner', label: "Captains' Corner", key: 'captains' }]
-      : []),
+    // Captains' Corner — its own dropdown now (Squad Selection + Unavailable
+    // Dates), rendered separately below, not a flat link here.
     // Tournament Planner — captains, GC, admin
     ...(isCaptain || isGC || isAdmin
       ? [{ href: '/tournament-planner', label: 'Tournaments', key: 'planner' }]
@@ -69,13 +68,13 @@ export function SiteNav({ activePage }: SiteNavProps) {
               onMouseLeave={() => setMatchesOpen(false)}>
               <button
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
-                  ${activePage === 'fixtures' || activePage === 'matches' || activePage === 'unscheduled'
+                  ${activePage === 'fixtures' || activePage === 'matches'
                     ? 'text-gold border-crimson'
                     : 'text-zinc-500 border-transparent hover:text-gold'}`}>
                 Matches <span className="text-[8px] mt-0.5">▾</span>
               </button>
               {matchesOpen && (
-                <div className="absolute top-14 left-0 w-52 bg-ink-2 border border-ink-5 rounded-b shadow-xl z-50">
+                <div className="absolute top-14 left-0 w-44 bg-ink-2 border border-ink-5 rounded-b shadow-xl z-50">
                   <Link href="/fixtures"
                     onClick={() => setMatchesOpen(false)}
                     className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-ink-5
@@ -84,15 +83,40 @@ export function SiteNav({ activePage }: SiteNavProps) {
                   </Link>
                   <Link href="/matches/history"
                     onClick={() => setMatchesOpen(false)}
-                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-ink-5
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
                       ${activePage === 'matches' ? 'text-gold bg-ink-3' : 'text-zinc-400 hover:text-gold hover:bg-ink-3'}`}>
                     📜 Past Matches
                   </Link>
-                  <Link href="/unscheduled-availability"
-                    onClick={() => setMatchesOpen(false)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Captains' Corner submenu — desktop */}
+          {(isCaptain || isAdmin) && (
+            <div className="relative ml-1"
+              onMouseEnter={() => setCaptainsOpen(true)}
+              onMouseLeave={() => setCaptainsOpen(false)}>
+              <button
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                  ${activePage === 'captains' || activePage === 'captains-unavailable'
+                    ? 'text-gold border-crimson'
+                    : 'text-zinc-500 border-transparent hover:text-gold'}`}>
+                Captains' Corner <span className="text-[8px] mt-0.5">▾</span>
+              </button>
+              {captainsOpen && (
+                <div className="absolute top-14 left-0 w-52 bg-ink-2 border border-ink-5 rounded-b shadow-xl z-50">
+                  <Link href="/captains-corner"
+                    onClick={() => setCaptainsOpen(false)}
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-ink-5
+                      ${activePage === 'captains' ? 'text-gold bg-ink-3' : 'text-zinc-400 hover:text-gold hover:bg-ink-3'}`}>
+                    🏏 Squad Selection
+                  </Link>
+                  <Link href="/captains-corner/unavailable-dates"
+                    onClick={() => setCaptainsOpen(false)}
                     className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
-                      ${activePage === 'unscheduled' ? 'text-gold bg-ink-3' : 'text-zinc-400 hover:text-gold hover:bg-ink-3'}`}>
-                    🗓️ Unscheduled Slots
+                      ${activePage === 'captains-unavailable' ? 'text-gold bg-ink-3' : 'text-zinc-400 hover:text-gold hover:bg-ink-3'}`}>
+                    🚫 Unavailable Dates
                   </Link>
                 </div>
               )}
@@ -327,10 +351,22 @@ export function SiteNav({ activePage }: SiteNavProps) {
                   ${activePage === 'matches' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
                 📜 Past Matches
               </Link>
-              <Link href="/unscheduled-availability" onClick={() => setOpen(false)}
+            </>
+          )}
+          {(isCaptain || isAdmin) && (
+            <>
+              <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 pt-3">
+                Captains' Corner
+              </p>
+              <Link href="/captains-corner" onClick={() => setOpen(false)}
                 className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
-                  ${activePage === 'unscheduled' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
-                🗓️ Unscheduled Slots
+                  ${activePage === 'captains' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
+                🏏 Squad Selection
+              </Link>
+              <Link href="/captains-corner/unavailable-dates" onClick={() => setOpen(false)}
+                className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
+                  ${activePage === 'captains-unavailable' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
+                🚫 Unavailable Dates
               </Link>
             </>
           )}

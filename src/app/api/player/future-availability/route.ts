@@ -1,10 +1,19 @@
 // src/app/api/player/future-availability/route.ts
 //
-// Slot-level availability for dates that don't have a booking yet — lets a
-// player pre-fill attendance ahead of scheduling. Distinct from
-// /api/player-availability, which requires a real booking_id. No wallet-dues
-// guard and no availability_locked/freeze check here — those only make
-// sense once a real booking exists (see player-availability/route.ts).
+// Captain-only: marks a date/slot as "I already know I can't lead a game"
+// (response is always 'L' — see schemas.ts) for dates that don't have a
+// real booking yet. Feeds the tournament share page's suggestion engines
+// only — getSuggestedOpenDates()'s day-level exclusion and R8's exact-slot
+// warning in src/lib/validation.ts. Distinct from /api/player-availability,
+// which requires a real booking_id. No wallet-dues guard and no
+// availability_locked/freeze check here — those only make sense once a
+// real booking exists (see player-availability/route.ts).
+//
+// Narrowed to isCaptain||isAdmin (August 2026) — was open to any active
+// player marking Y/O/E/L, but nothing ever consumed anything but a
+// captain's own 'L', so the wider surface had no purpose. Route path/table
+// name still say "player" — left as-is rather than renamed, since this is
+// an internal API path with no external consumers to break.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -19,7 +28,9 @@ const ALL_SLOT_TIMES = futureAvailabilitySlotTimeSchema.options
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const player  = session?.user as any
-  if (!player?.playerId) return NextResponse.json({ availability: [] })
+  if (!player?.playerId || (!player?.isCaptain && !player?.isAdmin)) {
+    return NextResponse.json({ availability: [] })
+  }
 
   const supabase = createServiceClient()
   const { data } = await supabase
@@ -62,14 +73,17 @@ async function upsertOne(
   return { error: error?.message ?? null }
 }
 
-// ── POST — self-update (single slot, or whole_day fan-out) ─────────────────
+// ── POST — mark unavailable (single slot, or whole_day fan-out) ───────────
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const player  = session?.user as any
   if (!player?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   if (player?.playerStatus === 'expelled') return NextResponse.json({ error: 'Account suspended' }, { status: 403 })
+  if (!player?.isCaptain && !player?.isAdmin) {
+    return NextResponse.json({ error: 'Unauthorised — captains only' }, { status: 403 })
+  }
 
-  const limited = await rateLimit(req, RATE_LIMITS.playerWrite, player.playerId)
+  const limited = await rateLimit(req, RATE_LIMITS.captainWrite, player.playerId)
   if (limited) return limited
 
   const body = await req.json().catch(() => null)
@@ -101,14 +115,17 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true })
 }
 
-// ── DELETE — clear a single slot's response ─────────────────────────────────
+// ── DELETE — clear a single slot's mark ─────────────────────────────────────
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const player  = session?.user as any
   if (!player?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   if (player?.playerStatus === 'expelled') return NextResponse.json({ error: 'Account suspended' }, { status: 403 })
+  if (!player?.isCaptain && !player?.isAdmin) {
+    return NextResponse.json({ error: 'Unauthorised — captains only' }, { status: 403 })
+  }
 
-  const limited = await rateLimit(req, RATE_LIMITS.playerWrite, player.playerId)
+  const limited = await rateLimit(req, RATE_LIMITS.captainWrite, player.playerId)
   if (limited) return limited
 
   const body = await req.json().catch(() => null)

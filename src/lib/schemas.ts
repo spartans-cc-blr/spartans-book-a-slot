@@ -234,15 +234,26 @@ export const bookingRuleOverrideSchema = z.object({
 
 export const bookingRuleOverridesSchema = z.array(bookingRuleOverrideSchema).max(6).optional()
 
-// ── PLAYER FUTURE AVAILABILITY (POST /api/player/future-availability) ──────
-// Slot-level availability for dates that don't have a booking yet — see
-// player_future_availability (migration 067) and
-// .claude/rules/features/... future-availability handoff.
-// Two shapes: a single (game_date, slot_time) row, or `whole_day: true`
-// which the route fans out server-side to all 4 slot_time rows.
+// ── CAPTAIN UNAVAILABLE DATES (POST /api/player/future-availability) ───────
+// Slot-level "I already know I can't lead a game" marker for dates that
+// don't have a booking yet — feeds the tournament share page's suggestion
+// engines (getSuggestedOpenDates()'s day-level exclusion, R8's exact-slot
+// warning), never anything else. See player_future_availability (migration
+// 067) and .claude/rules/features/player-future-availability.md.
+//
+// 'L' only — captain-only, Captains' Corner "Unavailable Dates" page. Y/O/E
+// were dropped (August 2026): nothing has ever consumed them (only 'L' is
+// checked anywhere), and the route was narrowed from every active player to
+// isCaptain||isAdmin at the same time (see route.ts) since a "when am I
+// generally free" signal from non-captains had no consumer either — the
+// table/column names and shape are unchanged, only what's accepted here.
+//
+// Two request shapes: a single (game_date, slot_time) row, or
+// `whole_day: true` which the route fans out server-side to all 4
+// slot_time rows.
 
 export const futureAvailabilitySlotTimeSchema = z.enum(['07:30', '10:30', '12:30', '14:30'])
-export const futureAvailabilityResponseSchema = z.enum(['Y', 'O', 'E', 'L'])
+export const futureAvailabilityResponseSchema = z.literal('L')
 
 export const futureAvailabilityRequestSchema = z.object({
   game_date: z.string().regex(GAME_DATE_REGEX, 'game_date must be YYYY-MM-DD'),
