@@ -16,6 +16,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { UnscheduledAvailabilityPanel } from '@/components/availability/UnscheduledAvailabilityPanel'
 import { upcomingWeekendDates } from '@/lib/suggestedSlots'
+import { computeSlotStatus } from '@/lib/validation'
 import { SLOT_TIMES } from '@/types'
 import type { Metadata } from 'next'
 
@@ -35,27 +36,34 @@ export default async function UnscheduledAvailabilityPage() {
   const lastDate  = dates[dates.length - 1]?.game_date
 
   const supabase = createServiceClient()
+  // format + status (not just game_date/slot_time) are both needed by
+  // computeSlotStatus() below — it reasons about *other* slots on the same
+  // day (a T20 at 10:30 blocks the whole day, a T30 at 07:30 blocks
+  // 10:30/12:30, etc.), not just a direct match on this exact slot_time.
   const { data: existingBookings } = firstDate && lastDate
     ? await supabase
         .from('bookings')
-        .select('game_date, slot_time')
+        .select('game_date, slot_time, format, status')
         .neq('status', 'cancelled')
         .gte('game_date', firstDate)
         .lte('game_date', lastDate)
-    : { data: [] as { game_date: string; slot_time: string }[] }
+    : { data: [] as { game_date: string; slot_time: string; format: string | null; status: string }[] }
 
-  const bookedByDate: Record<string, Set<string>> = {}
-  for (const b of existingBookings ?? []) {
-    if (!bookedByDate[b.game_date]) bookedByDate[b.game_date] = new Set()
-    bookedByDate[b.game_date].add(b.slot_time)
-  }
-
-  // Drop a date entirely once every one of its slots already has a booking —
-  // only dates with at least one genuinely open slot are ever shown.
+  // Same slot-status engine the admin schedule grid uses (/api/availability)
+  // — reused rather than re-implemented so "open" here means exactly what it
+  // means there. A slot counts as open for future-availability purposes if
+  // it's genuinely 'open', or 't20only' (still bookable, just format-
+  // constrained — future availability doesn't care about format, only
+  // whether the player could conceivably play). 'booked'/'soft_block'/
+  // 'clash' — including a slot blocked by an adjacent game running over,
+  // not just a direct booking on that exact slot_time — are all excluded.
   const openDates = dates
     .map(d => ({
       game_date: d.game_date,
-      openSlots: SLOT_TIMES.filter(s => !bookedByDate[d.game_date]?.has(s)),
+      openSlots: SLOT_TIMES.filter(s => {
+        const status = computeSlotStatus(d.game_date, s, (existingBookings ?? []) as any)
+        return status === 'open' || status === 't20only'
+      }),
     }))
     .filter(d => d.openSlots.length > 0)
 

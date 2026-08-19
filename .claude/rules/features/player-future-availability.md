@@ -210,15 +210,28 @@ signed-out/not-registered/expelled banners `/fixtures` shows.
 **Only genuinely open dates/slots are ever shown (added same session as
 the page move).** The page fetches every non-cancelled booking across the
 16-week horizon and filters `upcomingWeekendDates()` down to
-`{game_date, openSlots}[]` — `openSlots` is `SLOT_TIMES` minus whatever
-that date already has booked (any status other than `cancelled`, so an
-unconfirmed `soft_block` hold still counts as "not open" here, consistent
-with how the rest of the app treats a slot's occupancy). A date where
-every slot already has a booking is dropped entirely; a partially-booked
-date only ever shows its remaining slot(s), both in the whole-day quick
-actions and the per-slot expand — the client component (`openSlots` prop)
-has no notion of a slot it isn't allowed to write to, since the server
-never sends it one.
+`{game_date, openSlots}[]`.
+
+**"Open" is computed via `computeSlotStatus()` (`src/lib/validation.ts`)
+— the same slot-status engine `/api/availability` uses for the admin
+schedule grid — not a bare "is there a booking at this exact slot_time"
+check (fixed same session, initial cut of the filtering had this gap).**
+A slot only counts as open when `computeSlotStatus()` returns `'open'` or
+`'t20only'` (still bookable, just format-constrained — future availability
+doesn't ask for a format, only whether the player could conceivably play,
+so `t20only` is close enough to "open" for this purpose). This correctly
+excludes a slot with no *direct* booking that's still unavailable because
+an adjacent slot's game runs over into it — e.g. a T20 confirmed at 10:30
+blocks the entire day (`'clash'` on every other slot_time), a T30 at 07:30
+blocks 10:30 and 12:30, any game at 12:30 blocks 10:30 and 14:30, etc. —
+exactly the same overlap rules the admin fixtures/schedule calendar view
+already enforces, reused rather than re-derived. `soft_block` holds still
+count as occupying a slot (`'soft_block'`, excluded), consistent with how
+the rest of the app treats a slot's occupancy. A date where every slot is
+excluded this way is dropped entirely; a partially-open date only ever
+shows its remaining slot(s), both in the whole-day quick actions and the
+per-slot expand — the client component (`openSlots` prop) has no notion of
+a slot it isn't allowed to write to, since the server never sends it one.
 
 `src/components/availability/UnscheduledAvailabilityPanel.tsx` (renamed
 from `FutureAvailabilityPanel.tsx`, moved out of `src/components/fixtures/`
@@ -300,7 +313,7 @@ the historical note.
 | `src/types/index.ts` | `ValidationError['rule']` widened to include `'R8'` |
 | `src/app/api/validate/route.ts` + `src/app/api/bookings/route.ts` | Fetch and pass `captainFutureAvailability` into `validateBooking()`; the latter also does the carryover (§6) |
 | `src/app/admin/bookings/new/page.tsx` + `src/app/admin/bookings/[id]/page.tsx` | `RULES` lists include `R8` |
-| `src/app/unscheduled-availability/page.tsx` | Dedicated page (§7) — fetches the 16-week horizon + existing bookings, filters to open dates/slots, gated on `isPlayer` |
+| `src/app/unscheduled-availability/page.tsx` | Dedicated page (§7) — fetches the 16-week horizon + existing bookings, filters to open dates/slots via `computeSlotStatus()`, gated on `isPlayer` |
 | `src/components/availability/UnscheduledAvailabilityPanel.tsx` | The player-facing UI (§7) — renamed/moved from `src/components/fixtures/FutureAvailabilityPanel.tsx` |
 | `src/components/ui/SiteNav.tsx` | "Matches ▾" sub-menu gained a third entry, "🗓️ Unscheduled Slots" → `/unscheduled-availability` (desktop dropdown + mobile) |
 | `src/app/api/captain-availability/route.ts` | Unrelated fix bundled in the same work: was missing `RATE_LIMITS.captainWrite`, which its sibling `player-availability/route.ts` already had |
