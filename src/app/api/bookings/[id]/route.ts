@@ -22,7 +22,9 @@ export async function GET(
         *,
         tournament:tournaments!bookings_tournament_id_fkey(
           *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
-        )
+        ),
+        ground:grounds(id, name, maps_url, hospital_url),
+        captain:captains!bookings_captain_id_fkey(id, name, players(cricheroes_url, whatsapp))
       `)
       .eq('id', params.id)
       .single(),
@@ -59,9 +61,8 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
 
   const body = await req.json()
 
-  // vibe-security: strip captain_id — captain is always derived from tournament
   // vibe-security: overrides is not a bookings column — parsed separately below, never spread into the update
-  const { captain_id: _dropped, overrides: rawOverrides, ...safeUpdates } = body
+  const { overrides: rawOverrides, ...safeUpdates } = body
 
   // match_fee_override is admin-only — strip it from non-admin requests
   //const user = session.user as any
@@ -83,13 +84,30 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
 
   const { data: existing } = await supabase
   .from('bookings')
-  .select('game_date, slot_time, status, block_reason, cricheroes_url')
+  .select('game_date, slot_time, status, block_reason, cricheroes_url, captain_id')
   .eq('id', params.id)
   .single()
 
   const dateOrSlotChanged =
     (safeUpdates.game_date && safeUpdates.game_date !== existing?.game_date) ||
     (safeUpdates.slot_time && safeUpdates.slot_time !== existing?.slot_time)
+
+  // vibe-security: never trust a client-supplied FK without checking it's
+  // real — but only when it's actually changing. The edit page always
+  // re-sends the booking's already-stored captain_id on every save (even
+  // one that only touches an unrelated field), so re-validating it
+  // unconditionally would make a booking permanently uneditable the moment
+  // its assigned captain is later deactivated. Only a genuine reassignment
+  // needs to point at someone currently active.
+  if (safeUpdates.captain_id && safeUpdates.captain_id !== existing?.captain_id) {
+    const { data: cap } = await supabase.from('captains').select('id, active').eq('id', safeUpdates.captain_id).single()
+    if (!cap) return NextResponse.json({ error: 'Captain not found' }, { status: 400 })
+    if (!cap.active) return NextResponse.json({ error: 'Captain is not active' }, { status: 400 })
+  }
+  if (safeUpdates.ground_id) {
+    const { data: gr } = await supabase.from('grounds').select('id').eq('id', safeUpdates.ground_id).single()
+    if (!gr) return NextResponse.json({ error: 'Ground not found' }, { status: 400 })
+  }
 
   // An organiser self-service hold must not go permanent until the
   // organiser is actually ready — i.e. a CricHeroes match link exists,
@@ -122,7 +140,9 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
       *,
       tournament:tournaments!bookings_tournament_id_fkey(
         *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
-      )
+      ),
+      ground:grounds(id, name, maps_url, hospital_url),
+      captain:captains!bookings_captain_id_fkey(id, name, players(cricheroes_url, whatsapp))
     `)
     .single()
 

@@ -84,11 +84,23 @@ type TournamentWithCaptain = {
   organiser_name: string | null
   active: boolean
   captain_id: string | null
+  ground_id: string | null
+  // Practice games are played at a different ground every time — see
+  // features/leaderboard.md §10.
+  is_practice: boolean
   captains: {
     id: string
     name: string
     players: { cricheroes_url: string | null; whatsapp: string | null } | null
   } | null
+}
+
+type Ground = { id: string; name: string; maps_url: string; hospital_url: string }
+type CaptainOption = {
+  id: string
+  name: string
+  active: boolean
+  players: { cricheroes_url: string | null; whatsapp: string | null } | null
 }
 
 const RULES = [
@@ -163,8 +175,15 @@ function BookingDetailPageInner() {
   const [notes,         setNotes]         = useState('')
   const [organiserName, setOrganiserName] = useState('')
   const [organiserPhone,setOrganiserPhone]= useState('')
+  // Both default to the booking's own stored ground_id/captain_id (already
+  // snapshotted from the tournament at creation time — see migration 066)
+  // but are always editable.
+  const [groundId,      setGroundId]      = useState('')
+  const [captainId,     setCaptainId]     = useState('')
 
   const [tournaments,  setTournaments]  = useState<TournamentWithCaptain[]>([])
+  const [grounds,      setGrounds]      = useState<Ground[]>([])
+  const [captainOptions, setCaptainOptions] = useState<CaptainOption[]>([])
 
   const [matchStage,        setMatchStage]        = useState('')
   const [gameDate,          setGameDate]           = useState('')
@@ -193,8 +212,17 @@ function BookingDetailPageInner() {
   const [resetLoading,     setResetLoading]      = useState(false)
   const [resetError,       setResetError]        = useState('')
 
+  function refreshGrounds() {
+    fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? []))
+  }
+
   useEffect(() => {
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
+    // all=true — an inactive captain already assigned to this booking (e.g.
+    // via the tournament default) must still resolve to a real option,
+    // never silently fall through to a blank <select>.
+    fetch('/api/captains?all=true').then(r => r.json()).then(d => setCaptainOptions(d.captains ?? []))
+    refreshGrounds()
     fetch(`/api/bookings/${id}`)
       .then(r => r.json())
       .then(d => {
@@ -214,6 +242,8 @@ function BookingDetailPageInner() {
         setNotes(b.notes ?? '')
         setOrganiserName(b.organiser_name ?? '')
         setOrganiserPhone(b.organiser_phone ?? '')
+        setGroundId(b.ground_id ?? '')
+        setCaptainId(b.captain_id ?? '')
         setGameDate(b.game_date ?? '')
         setMatchStage(b.match_stage ?? '')
         setMatchFeeOverride((b as any).match_fee_override != null ? String((b as any).match_fee_override) : '')
@@ -499,6 +529,8 @@ function BookingDetailPageInner() {
         organiser_name:  organiserName || null,
         organiser_phone: organiserPhone || null,
         match_fee_override: matchFeeOverride ? parseInt(matchFeeOverride) : null,
+        ground_id:       tournamentId ? (groundId || null) : null,
+        captain_id:      tournamentId ? (captainId || null) : null,
         overrides: overridesToLog.map(([rule, reason]) => ({
           rule,
           reason,
@@ -564,15 +596,15 @@ function BookingDetailPageInner() {
   }
 
   function buildCaptainWhatsApp() {
-    if (!booking || !selectedTournament?.captains) return ''
-    const captain = selectedTournament.captains
+    const captain = captainOptions.find(c => c.id === captainId)
+    if (!booking || !captain) return ''
     return buildCaptainWhatsAppUrl({
       captainName:   captain.name,
       captainPhone:  captain.players?.whatsapp ?? null,
       gameDate:      booking.game_date,
       slotTime:      booking.slot_time,
       opponentName,
-      venue:         booking.venue,
+      venue:         grounds.find(g => g.id === groundId)?.name ?? booking.venue,
       cricheroesUrl: cricheroes || null,
     })
   }
@@ -602,7 +634,7 @@ function BookingDetailPageInner() {
   const selectedTournament = tournaments.find(t => t.id === tournamentId)
   const organiserWA   = buildOrganiserWhatsApp()
   const captainWA     = buildCaptainWhatsApp()
-  const captainName   = selectedTournament?.captains?.name
+  const captainName   = captainOptions.find(c => c.id === captainId)?.name
 
   return (
     <div>
@@ -698,9 +730,25 @@ function BookingDetailPageInner() {
             </div>
           </FormCard>
 
-          {/* Tournament (captain read-only from tournament) */}
+          {/* Tournament, ground, captain */}
           <FormCard title={isReservation ? 'Tournament (required to confirm)' : 'Tournament'}>
-            <select value={tournamentId} onChange={e => setTournamentId(e.target.value)} disabled={feesMode}
+            <select
+              value={tournamentId}
+              onChange={e => {
+                const newId = e.target.value
+                setTournamentId(newId)
+                // Default ground/captain from the newly picked tournament —
+                // but never clobber a value already set on this booking
+                // (e.g. fixing a mis-tagged tournament shouldn't silently
+                // wipe a deliberately-chosen ground/captain), and never
+                // default to a captain who's since gone inactive — the
+                // server rejects that anyway on an actual reassignment.
+                const t = tournaments.find(x => x.id === newId)
+                const tCaptainActive = t?.captain_id && captainOptions.find(c => c.id === t.captain_id)?.active
+                setGroundId(prev => prev || (t?.ground_id ?? ''))
+                setCaptainId(prev => prev || (tCaptainActive ? t!.captain_id! : ''))
+              }}
+              disabled={feesMode}
               className="form-input disabled:opacity-50 disabled:cursor-not-allowed">
               <option value="">Select tournament...</option>
               {tournaments.filter(t => t.active).map(t => (
@@ -708,31 +756,63 @@ function BookingDetailPageInner() {
               ))}
             </select>
 
-            {/* Captain — read-only, derived from tournament */}
-            {tournamentId && (() => {
-              const captainUrl = selectedTournament?.captains?.players?.cricheroes_url
-              return (
-                <div className="mt-3 p-3 rounded bg-ink-4 border border-ink-5">
-                  <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-1">
-                    Captain
-                  </p>
-                  {captainName ? (
-                    captainUrl ? (
-                      <a href={captainUrl} target="_blank" rel="noopener noreferrer"
-                         className="font-rajdhani font-semibold text-sm text-parchment hover:text-gold underline underline-offset-2 transition-colors">
-                        {captainName}
-                      </a>
-                    ) : (
-                      <span className="font-rajdhani font-semibold text-sm text-parchment">{captainName}</span>
-                    )
-                  ) : (
-                    <span className="font-rajdhani text-xs text-amber-400">
-                      No captain set on this tournament — go to Tournaments to add one.
-                    </span>
+            {/* Ground — defaults from the tournament's own ground_id, but
+                always editable. Practice games have no single tournament
+                ground, so this simply starts blank for those. */}
+            {tournamentId && (
+              <div className="mt-3">
+                <label className="form-label">Ground</label>
+                <div className="flex gap-2">
+                  <select
+                    value={groundId}
+                    onChange={e => setGroundId(e.target.value)}
+                    disabled={feesMode}
+                    className="form-input disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select ground...</option>
+                    {grounds.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                  {!feesMode && (
+                    <a href="/wrangler/grounds" target="_blank" rel="noopener noreferrer"
+                      onClick={() => setTimeout(refreshGrounds, 3000)}
+                      className="flex-shrink-0 font-rajdhani text-xs font-bold text-gold-dim hover:text-gold border border-ink-5 hover:border-gold-dim rounded px-3 py-2 transition-colors whitespace-nowrap">
+                      ＋ Add ground ↗
+                    </a>
                   )}
                 </div>
-              )
-            })()}
+                {selectedTournament?.is_practice && !groundId && (
+                  <p className="font-rajdhani text-xs text-amber-400 mt-1">
+                    Practice games move between grounds — pick this game&apos;s ground.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Captain — defaults from the tournament's own captain_id,
+                always editable (e.g. a VC leading this specific game). */}
+            {tournamentId && (
+              <div className="mt-3">
+                <label className="form-label">Captain</label>
+                <select
+                  value={captainId}
+                  onChange={e => setCaptainId(e.target.value)}
+                  disabled={feesMode}
+                  className="form-input disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">No captain</option>
+                  {captainOptions.filter(c => c.active || c.id === captainId).map(c => (
+                    <option key={c.id} value={c.id}>{c.name}{!c.active ? ' (inactive)' : ''}</option>
+                  ))}
+                </select>
+                {!captainId && (
+                  <p className="font-rajdhani text-xs text-amber-400 mt-1">
+                    No captain selected — WhatsApp captain notification won&apos;t be available.
+                  </p>
+                )}
+              </div>
+            )}
           </FormCard>
 
           {/* Match Details — only visible when a tournament is selected */}
@@ -1117,7 +1197,7 @@ function BookingDetailPageInner() {
                 </a>
               ) : (
                 <div className="font-rajdhani text-xs text-zinc-600 bg-ink-4 border border-ink-5 rounded px-3 py-2.5">
-                  {tournamentId ? 'No captain set on this tournament' : 'Select a tournament to enable captain notification'}
+                  {tournamentId ? 'No captain selected for this booking' : 'Select a tournament to enable captain notification'}
                 </div>
               )}
               <p className="font-rajdhani text-[10px] text-zinc-600 italic">
@@ -1141,6 +1221,7 @@ function BookingDetailPageInner() {
               <p>🕐 {slotTime}{format ? ` — ${format}` : ''}</p>
               {captainName        && <p>👤 {captainName}</p>}
               {selectedTournament && <p>🏆 {selectedTournament.name}</p>}
+              {groundId           && <p>📍 {grounds.find(g => g.id === groundId)?.name}</p>}
               {opponentName       && <p>⚔️ vs {opponentName}</p>}
               {matchId            && <p>🏏 Match ID: {matchId}</p>}
               {cricheroes && (

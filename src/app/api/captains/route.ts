@@ -12,17 +12,31 @@ async function requireAdmin() {
 
 export async function GET(req: NextRequest) {
   // Public — needed by booking form dropdowns and admin pages
+  const session = await getServerSession(authOptions)
+  const isAdmin = !!(session?.user as any)?.isAdmin
+
   const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
   const showAll = searchParams.get('all') === 'true'
   let query = supabase
     .from('captains')
-    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, is_captain)')
+    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, whatsapp, is_captain)')
     .order('name')
   if (!showAll) query = query.eq('active', true)
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ captains: data })
+
+  // vibe-security: whatsapp is only needed by the admin-only booking-form
+  // captain-notify flow — this route itself has no session gate (public,
+  // per the comment above), so redact rather than trust every caller not
+  // to read it. Same posture as top_performers[].whatsapp elsewhere in
+  // this app: never returned to a non-privileged viewer.
+  const captains = isAdmin ? data : (data ?? []).map((c: any) => ({
+    ...c,
+    players: c.players ? { ...c.players, whatsapp: null } : c.players,
+  }))
+
+  return NextResponse.json({ captains })
 }
 
 export async function POST(req: NextRequest) {
@@ -53,7 +67,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('captains')
     .insert({ name: body.name.trim(), player_id: body.player_id ?? null, active: true })
-    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, is_captain)')
+    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, whatsapp, is_captain)')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ captain: data }, { status: 201 })
@@ -87,7 +101,7 @@ export async function PATCH(req: NextRequest) {
     .from('captains')
     .update(updates)
     .eq('id', id)
-    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, is_captain)')
+    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, whatsapp, is_captain)')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ captain: data })

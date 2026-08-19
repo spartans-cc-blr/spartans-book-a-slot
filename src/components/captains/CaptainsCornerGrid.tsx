@@ -30,6 +30,9 @@ interface Booking {
      ball_type: string
      ground: { name: string; maps_url: string; hospital_url: string } | null
    } | null
+  // This booking's own ground (migration 066) — takes priority over the
+  // tournament's ground, which is now only a fallback for older rows.
+  ground?: { name: string; maps_url: string; hospital_url: string } | null
 }
 
 interface Player {
@@ -230,7 +233,7 @@ function buildAnnouncementText(
 
   const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
   const jersey       = ballType === 'white' ? 'Colours' : 'Whites'
-  const ground       = booking.tournament?.ground
+  const ground       = booking.ground ?? booking.tournament?.ground
   const reportTime   = formatReportingTime(booking.match_time)
 
   const lines: (string | null)[] = [

@@ -7,18 +7,18 @@
 // tournament that's since been marked inactive, or a one-off away venue,
 // still needs to show up here as long as a historical match references it.
 //
-// Grounds resolution (fixed — was raw bookings.venue text before):
-// a booking's ground is the UNION of (a) its tournament's linked ground
-// (tournaments.ground_id) and (b) its own free-text venue matching a
-// ground's name via case-insensitive equality — same two-signal approach
-// as getScopedMatchIds()/getPlayerBookingContextStats() in
-// src/lib/playerStats.ts. Plain "distinct bookings.venue string" grouping
-// was the bug: two bookings for the same real ground had venue values
-// "Blendin Cricket Ground" and "Blendin Cricket Ground, Bengaluru
-// (Bangalore)" — different strings — so a dropdown built from raw venue
-// text split one physical ground into two options, each an undercount.
-// Any venue text that doesn't resolve to a known ground row still surfaces
-// via `venues` (fallback, e.g. a genuine one-off away venue).
+// Grounds resolution: each booking's own ground_id (migration 066) is the
+// primary signal — a direct column now, snapshotted from its tournament at
+// creation time but independently overridable (e.g. practice games). Rows
+// from before that migration which never got backfilled a ground_id fall
+// back to a case-insensitive match on the legacy free-text venue column.
+// Plain "distinct bookings.venue string" grouping was the original bug:
+// two bookings for the same real ground had venue values "Blendin Cricket
+// Ground" and "Blendin Cricket Ground, Bengaluru (Bangalore)" — different
+// strings — so a dropdown built from raw venue text split one physical
+// ground into two options, each an undercount. Any venue text that still
+// doesn't resolve to a known ground row surfaces via `venues` (fallback,
+// e.g. a genuine one-off away venue).
 
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -37,7 +37,7 @@ export async function GET() {
   const [{ data, error }, { data: grounds, error: groundsErr }] = await Promise.all([
     supabase
       .from('bookings')
-      .select('game_date, tournament_id, venue, tournament:tournaments(id, name, ground_id), match_stats_cache(match_result)')
+      .select('game_date, tournament_id, ground_id, venue, tournament:tournaments(id, name), match_stats_cache(match_result)')
       .eq('status', 'confirmed')
       .lt('game_date', today),
     supabase.from('grounds').select('id, name'),
@@ -60,12 +60,10 @@ export async function GET() {
     const tournamentName = tournament?.name
     if (b.tournament_id && tournamentName) tournamentMap.set(b.tournament_id, tournamentName)
 
-    // Resolve this booking's ground via the same two signals used
-    // elsewhere: its tournament's linked ground, or its own venue text
-    // matching a ground's name exactly (case-insensitive).
-    const groundIdFromTournament = tournament?.ground_id as string | null | undefined
+    // This booking's own ground_id first; a legacy venue-text match only
+    // for the rare row that predates migration 066 and never got backfilled.
     const groundIdFromVenue = b.venue ? groundIdByNameLower.get(b.venue.toLowerCase()) : undefined
-    const resolvedGroundId = groundIdFromTournament || groundIdFromVenue
+    const resolvedGroundId = (b as any).ground_id || groundIdFromVenue
 
     if (resolvedGroundId) {
       groundIdsSeen.add(resolvedGroundId)

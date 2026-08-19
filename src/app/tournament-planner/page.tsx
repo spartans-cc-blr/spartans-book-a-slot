@@ -27,6 +27,7 @@ export default async function TournamentPlannerPage() {
     .from('bookings')
     .select(`
       id, game_date, slot_time, format, cricheroes_url, match_id, opponent_name,
+      captain_id,
       tournament:tournaments!bookings_tournament_id_fkey(
         id, name, organiser_name, organiser_contact,
         total_league_games, cricheroes_points_table_url,
@@ -170,10 +171,11 @@ export default async function TournamentPlannerPage() {
   if (user?.isCaptain && user?.playerId) {
     const myRecord = (captains ?? []).find(c => c.player_id === user.playerId)
     if (myRecord) {
-      // Only show personal bandwidth view if they have at least one upcoming booking
-      // (via tournament.captain_id, not booking.captain_id)
+      // Only show personal bandwidth view if they have at least one upcoming
+      // booking — either as the tournament's own default captain, or as a
+      // per-booking override (see migration 066).
       const hasActiveBooking = bookings.some(
-        b => b.tournament?.captain_id === myRecord.id && b.game_date >= today
+        b => (b.tournament?.captain_id === myRecord.id || (b as any).captain_id === myRecord.id) && b.game_date >= today
       )
       if (hasActiveBooking) {
         viewerCaptainId = myRecord.id
