@@ -1,8 +1,13 @@
-// getSuggestedOpenDates — shared core behind /api/tournaments/[id]/suggested-slots
-// (GC/Admin panel) and the public tournament share page's "Next available
-// dates" section. Both callers need the exact same algorithm so a date
-// offered to an organiser publicly never contradicts what GC/Admin would
-// see, or what the admin booking form would actually accept.
+// getSuggestedOpenDates — used exclusively by the public tournament share
+// page's "Next available dates" section for non-self-service tournaments
+// (tournament-planner/share/[tournamentId]/page.tsx). The internal Hub
+// Tournament Planner previously had its own GC/Admin "Suggested Slots"
+// panel backed by this same function via /api/tournaments/[id]/suggested-slots
+// — removed so suggested dates live in exactly one place, the organiser
+// share page, rather than two surfaces that could show conflicting dates.
+// Still shares the same R1-R6 booking rules engine (src/lib/validation.ts)
+// used by the admin booking form, so a suggestion can never contradict what
+// the form would actually accept.
 //
 // Finds upcoming (Sat/Sun) DAYS for a tournament — up to `maxSuggestions`
 // (defaults to total_league_games minus confirmed games, capped at
@@ -411,13 +416,14 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
-    .select('id, name, captain_id, total_league_games, captains!tournaments_captain_id_fkey(id, name)')
+    .select('id, name, captain_id, total_league_games, captains!tournaments_captain_id_fkey(id, name, player_id)')
     .eq('id', tournamentId)
     .single()
 
   if (tErr || !tournament) return { ok: false, error: 'Tournament not found', status: 404 }
 
   const thisTournamentCaptainId = tournament.captain_id ?? null
+  const thisTournamentCaptainPlayerId = (tournament.captains as any)?.player_id ?? null
   const captainName = (tournament.captains as any)?.name ?? 'This captain'
   const tournamentName = tournament.name
 
@@ -476,6 +482,23 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
     tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
   }))
 
+  // R8 input — every future-availability row this tournament's own leading
+  // captain has set within the horizon, exact-slot matched by validateBooking
+  // itself (game_date + slot_time). This is what closes the gap the day-level
+  // exclusion in getSuggestedOpenDates() can't: that one can only drop a
+  // whole day (all 4 slots 'L'); here every candidate already names an exact
+  // slot_time, so the same R8 check used at real booking time disqualifies a
+  // candidate the moment the captain is 'L' for that one slot specifically.
+  const { data: captainFutureRows } = thisTournamentCaptainPlayerId
+    ? await supabase
+        .from('player_future_availability')
+        .select('game_date, slot_time, response')
+        .eq('player_id', thisTournamentCaptainPlayerId)
+        .gte('game_date', toISODate(firstSat))
+        .lte('game_date', toISODate(horizonEnd))
+    : { data: [] as { game_date: string; slot_time: string; response: string }[] }
+  const captainFutureAvailability = captainFutureRows ?? []
+
   const working = [...existing]
   const buckets: SuggestedSlotBucket[] = []
 
@@ -500,7 +523,10 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
       const candidate: CreateBookingRequest = {
         game_date: dateStr, slot_time: slotDef.time, format, tournament_id: tournamentId,
       }
-      const result = validateBooking(candidate, working, captainName, tournamentName, thisTournamentCaptainId)
+      const result = validateBooking(
+        candidate, working, captainName, tournamentName, thisTournamentCaptainId,
+        new Set(), captainFutureAvailability
+      )
       if (result.valid && result.warnings.length === 0) {
         found = dateStr
         break
@@ -555,12 +581,13 @@ export async function findNextSlotDate(
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
-    .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name)')
+    .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name, player_id)')
     .eq('id', tournamentId)
     .single()
 
   if (tErr || !tournament) return { ok: false, error: 'Tournament not found', status: 404 }
 
+  const thisTournamentCaptainPlayerId = (tournament.captains as any)?.player_id ?? null
   const captainName = (tournament.captains as any)?.name ?? 'This captain'
   const excluded = new Set(excludeDates)
 
@@ -596,6 +623,17 @@ export async function findNextSlotDate(
     tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
   }))
 
+  // R8 input — see the identical comment in getSuggestedSlotDates() above.
+  const { data: captainFutureRows } = thisTournamentCaptainPlayerId
+    ? await supabase
+        .from('player_future_availability')
+        .select('game_date, slot_time, response')
+        .eq('player_id', thisTournamentCaptainPlayerId)
+        .gte('game_date', toISODate(firstSat))
+        .lte('game_date', toISODate(horizonEnd))
+    : { data: [] as { game_date: string; slot_time: string; response: string }[] }
+  const captainFutureAvailability = captainFutureRows ?? []
+
   for (let d = new Date(firstSat); d <= horizonEnd; d = addDays(d, 1)) {
     const dow = d.getDay()
     const dayLabel = dow === 6 ? 'Sat' : dow === 0 ? 'Sun' : null
@@ -607,7 +645,10 @@ export async function findNextSlotDate(
     const candidate: CreateBookingRequest = {
       game_date: dateStr, slot_time: slotTime, format, tournament_id: tournamentId,
     }
-    const result = validateBooking(candidate, existing, captainName, tournament.name, tournament.captain_id ?? null)
+    const result = validateBooking(
+      candidate, existing, captainName, tournament.name, tournament.captain_id ?? null,
+      new Set(), captainFutureAvailability
+    )
     if (result.valid && result.warnings.length === 0) {
       return { ok: true, game_date: dateStr }
     }

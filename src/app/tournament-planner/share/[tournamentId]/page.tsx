@@ -9,8 +9,7 @@ import type { Metadata } from 'next'
 
 // Fixed regardless of the tournament's own unbooked count — this is a
 // "here's what's open soon" nudge for the organiser, not an exhaustive
-// booking plan (the GC/Admin suggested-slots panel is the exhaustive one).
-// Only used for non-self-service tournaments' plain WhatsApp-enquiry list —
+// booking plan. Only used for non-self-service tournaments' plain WhatsApp-enquiry list —
 // self-service tournaments use getSuggestedSlotDates instead, which returns
 // one entry per deficient slot bucket rather than a capped flat list.
 const SHARE_CARD_SUGGESTION_COUNT = 3
