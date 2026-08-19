@@ -104,8 +104,17 @@ list):
 For each slot bucket (`Sat|Sun` × valid slot_time, per this tournament's
 own active formats) currently below its `distributeSlotTargets()` target,
 walks forward through the horizon to find the next date where that exact
-slot passes `validateBooking()` (R1–R7) cleanly — no errors, no warnings.
-Accepted picks are folded into a working set before checking the next
+slot passes `validateBooking()` (R1–R8, added August 2026 — see
+`features/player-future-availability.md` §4) cleanly — no errors, no
+warnings. R8 is what makes this exact-slot: it fires when the
+tournament's own leading captain has marked themselves `L` in
+`player_future_availability` for that specific `(game_date, slot_time)`,
+so a slot the captain has ruled themselves out of is silently skipped the
+same way any other warning already disqualifies a candidate here — no
+special-casing needed, `captainFutureAvailability` is just another input
+this function fetches once (for the whole horizon) and passes into every
+`validateBooking()` call. Accepted picks are folded into a working set
+before checking the next
 bucket, same incremental-selection principle `getSuggestedOpenDates`
 already used, so two bucket suggestions can never jointly violate R1's
 weekend cap even though each looks fine in isolation.
@@ -134,7 +143,9 @@ have already been declined for it this session, finds the next compliant
 date beyond those exclusions. Powers
 `/api/tournaments/[id]/organiser-next-slot` (§5); has no notion of targets
 or other buckets, since by the time this is called the organiser is
-already mid-flow on one particular card.
+already mid-flow on one particular card. Same R8 exact-slot input as
+`getSuggestedSlotDates()` above — fetched independently since this is a
+separate call, not a shared code path.
 
 ---
 
