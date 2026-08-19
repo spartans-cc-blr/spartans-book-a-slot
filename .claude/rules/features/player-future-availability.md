@@ -192,22 +192,53 @@ const { data: futureRows } = await supabase
 
 ---
 
-## 7. UI — `FutureAvailabilityPanel.tsx`
+## 7. UI — `/unscheduled-availability`
 
-Mounted on `/fixtures` (`src/app/fixtures/page.tsx`), gated on `isPlayer`
-(any active, non-expelled player with a `playerId` — same gate as the
-existing legend/`PushSubscribePrompt`). Collapsed by default.
+**Moved to its own dedicated page (August 2026 — was originally a
+collapsed panel at the very bottom of `/fixtures`, past the footer, where
+no player was realistically finding it).** Now reachable via the
+**Matches ▾** nav sub-menu (`SiteNav.tsx`, both desktop dropdown and
+mobile), alongside "🏏 Upcoming" and "📜 Past Matches", as
+"🗓️ Unscheduled Slots" — `activePage="unscheduled"` keeps the Matches
+button highlighted the same way the other two entries do.
 
-- One row per upcoming Sat/Sun date, next 16 weeks
-  (`upcomingWeekendDates()`, `src/lib/suggestedSlots.ts` — reuses the same
-  "next Saturday strictly after today" anchor the suggestion engines
-  already use, computed server-side and passed down as props).
-- Whole-day **Available**/**Unavailable** quick actions (`whole_day: true`),
-  plus a per-slot expand with Y/O/E/L buttons.
+`src/app/unscheduled-availability/page.tsx` is a server component gated on
+`isPlayer` (any active, non-expelled player with a `playerId` — same gate
+`/fixtures` uses for its own player-only sections), with the same
+signed-out/not-registered/expelled banners `/fixtures` shows.
+
+**Only genuinely open dates/slots are ever shown (added same session as
+the page move).** The page fetches every non-cancelled booking across the
+16-week horizon and filters `upcomingWeekendDates()` down to
+`{game_date, openSlots}[]` — `openSlots` is `SLOT_TIMES` minus whatever
+that date already has booked (any status other than `cancelled`, so an
+unconfirmed `soft_block` hold still counts as "not open" here, consistent
+with how the rest of the app treats a slot's occupancy). A date where
+every slot already has a booking is dropped entirely; a partially-booked
+date only ever shows its remaining slot(s), both in the whole-day quick
+actions and the per-slot expand — the client component (`openSlots` prop)
+has no notion of a slot it isn't allowed to write to, since the server
+never sends it one.
+
+`src/components/availability/UnscheduledAvailabilityPanel.tsx` (renamed
+from `FutureAvailabilityPanel.tsx`, moved out of `src/components/fixtures/`
+since it's no longer part of that page):
+
+- One row per open date. **Whole-day Available/Unavailable now fans out
+  client-side to only that date's own `openSlots`** (individual POSTs via
+  `Promise.all`) — previously this sent the server-side `whole_day: true`
+  fan-out, which always wrote all 4 slot_times regardless of whether a
+  real booking already existed for one of them.
+- Per-slot expand only renders when a date has more than one open slot;
+  a date with exactly one open slot shows a one-line explainer instead
+  ("Only 07:30 is unbooked this day — the rest already have a game.").
 - Tap-active-to-clear convention, same as `FixturesAvailability.tsx`
   (tapping the already-active response clears it via `DELETE`).
 - Same RESP colour legend as `CaptainsCornerGrid.tsx`'s Matrix view (own
   copy, not imported — that file doesn't export its `RESP` const).
+- No outer collapse toggle anymore — the whole point of moving this off
+  `/fixtures` was visibility, so the panel content renders immediately;
+  the page itself is the "opened" state.
 
 ---
 
@@ -269,8 +300,9 @@ the historical note.
 | `src/types/index.ts` | `ValidationError['rule']` widened to include `'R8'` |
 | `src/app/api/validate/route.ts` + `src/app/api/bookings/route.ts` | Fetch and pass `captainFutureAvailability` into `validateBooking()`; the latter also does the carryover (§6) |
 | `src/app/admin/bookings/new/page.tsx` + `src/app/admin/bookings/[id]/page.tsx` | `RULES` lists include `R8` |
-| `src/components/fixtures/FutureAvailabilityPanel.tsx` | The player-facing UI |
-| `src/app/fixtures/page.tsx` | Mounts the panel, gated on `isPlayer` |
+| `src/app/unscheduled-availability/page.tsx` | Dedicated page (§7) — fetches the 16-week horizon + existing bookings, filters to open dates/slots, gated on `isPlayer` |
+| `src/components/availability/UnscheduledAvailabilityPanel.tsx` | The player-facing UI (§7) — renamed/moved from `src/components/fixtures/FutureAvailabilityPanel.tsx` |
+| `src/components/ui/SiteNav.tsx` | "Matches ▾" sub-menu gained a third entry, "🗓️ Unscheduled Slots" → `/unscheduled-availability` (desktop dropdown + mobile) |
 | `src/app/api/captain-availability/route.ts` | Unrelated fix bundled in the same work: was missing `RATE_LIMITS.captainWrite`, which its sibling `player-availability/route.ts` already had |
 
 ---

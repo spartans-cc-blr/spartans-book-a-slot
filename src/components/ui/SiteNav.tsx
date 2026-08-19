@@ -69,13 +69,13 @@ export function SiteNav({ activePage }: SiteNavProps) {
               onMouseLeave={() => setMatchesOpen(false)}>
               <button
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
-                  ${activePage === 'fixtures' || activePage === 'matches'
+                  ${activePage === 'fixtures' || activePage === 'matches' || activePage === 'unscheduled'
                     ? 'text-gold border-crimson'
                     : 'text-zinc-500 border-transparent hover:text-gold'}`}>
                 Matches <span className="text-[8px] mt-0.5">▾</span>
               </button>
               {matchesOpen && (
-                <div className="absolute top-14 left-0 w-44 bg-ink-2 border border-ink-5 rounded-b shadow-xl z-50">
+                <div className="absolute top-14 left-0 w-52 bg-ink-2 border border-ink-5 rounded-b shadow-xl z-50">
                   <Link href="/fixtures"
                     onClick={() => setMatchesOpen(false)}
                     className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-ink-5
@@ -84,9 +84,15 @@ export function SiteNav({ activePage }: SiteNavProps) {
                   </Link>
                   <Link href="/matches/history"
                     onClick={() => setMatchesOpen(false)}
-                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-ink-5
                       ${activePage === 'matches' ? 'text-gold bg-ink-3' : 'text-zinc-400 hover:text-gold hover:bg-ink-3'}`}>
                     📜 Past Matches
+                  </Link>
+                  <Link href="/unscheduled-availability"
+                    onClick={() => setMatchesOpen(false)}
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
+                      ${activePage === 'unscheduled' ? 'text-gold bg-ink-3' : 'text-zinc-400 hover:text-gold hover:bg-ink-3'}`}>
+                    🗓️ Unscheduled Slots
                   </Link>
                 </div>
               )}
@@ -320,6 +326,11 @@ export function SiteNav({ activePage }: SiteNavProps) {
                 className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
                   ${activePage === 'matches' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
                 📜 Past Matches
+              </Link>
+              <Link href="/unscheduled-availability" onClick={() => setOpen(false)}
+                className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
+                  ${activePage === 'unscheduled' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
+                🗓️ Unscheduled Slots
               </Link>
             </>
           )}
