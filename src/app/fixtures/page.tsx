@@ -7,6 +7,8 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import { FixturesCard } from '@/components/fixtures/FixturesCard'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
 import { PushSubscribePrompt } from '@/components/fixtures/PushSubscribePrompt'
+import { FutureAvailabilityPanel } from '@/components/fixtures/FutureAvailabilityPanel'
+import { upcomingWeekendDates } from '@/lib/suggestedSlots'
 import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
 
@@ -329,6 +331,8 @@ export default async function FixturesPage() {
           ))
         )}
       </div>
+
+      {isPlayer && <FutureAvailabilityPanel dates={upcomingWeekendDates()} />}
 
       <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
         © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014

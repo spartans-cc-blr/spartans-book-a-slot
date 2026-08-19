@@ -58,7 +58,7 @@ const SLOT_DEFS: { time: SlotTime; validFor: GameFormat[] }[] = [
   { time: '14:30', validFor: ['T20'] },
 ]
 
-const HORIZON_WEEKS = 16
+export const HORIZON_WEEKS = 16
 // Fallback when a tournament has no total_league_games set and no explicit
 // maxSuggestions override was passed.
 const DEFAULT_SUGGESTIONS = 3
@@ -80,6 +80,34 @@ function addDays(d: Date, n: number): Date {
 }
 function toISODate(d: Date): string {
   return d.toISOString().split('T')[0]
+}
+
+export interface UpcomingWeekendDate {
+  game_date: string
+  day: 'Sat' | 'Sun'
+}
+
+// Plain list of the next `weeks` Sat/Sun dates, starting strictly after
+// today — same "next Saturday after today" anchor used by
+// getSuggestedOpenDates()/getSuggestedSlotDates() above, extracted here so
+// the future-availability UI (fixtures page) renders the same date range
+// without duplicating the anchor math. No DB access, no rule checks — this
+// is just a calendar list, independent of whether any of these dates ever
+// get a real booking.
+export function upcomingWeekendDates(weeks: number = HORIZON_WEEKS): UpcomingWeekendDate[] {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  let firstSat = addDays(today, (6 - today.getDay() + 7) % 7)
+  if (toISODate(firstSat) === toISODate(today)) firstSat = addDays(firstSat, 7)
+
+  const dates: UpcomingWeekendDate[] = []
+  for (let week = 0; week < weeks; week++) {
+    const sat = addDays(firstSat, week * 7)
+    const sun = addDays(sat, 1)
+    dates.push({ game_date: toISODate(sat), day: 'Sat' })
+    dates.push({ game_date: toISODate(sun), day: 'Sun' })
+  }
+  return dates
 }
 
 // ── Weekend-gap helpers (getSuggestedSlotDates / findNextSlotDate) ──────
