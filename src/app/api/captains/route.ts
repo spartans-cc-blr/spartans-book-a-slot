@@ -12,6 +12,9 @@ async function requireAdmin() {
 
 export async function GET(req: NextRequest) {
   // Public — needed by booking form dropdowns and admin pages
+  const session = await getServerSession(authOptions)
+  const isAdmin = !!(session?.user as any)?.isAdmin
+
   const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
   const showAll = searchParams.get('all') === 'true'
@@ -22,7 +25,18 @@ export async function GET(req: NextRequest) {
   if (!showAll) query = query.eq('active', true)
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ captains: data })
+
+  // vibe-security: whatsapp is only needed by the admin-only booking-form
+  // captain-notify flow — this route itself has no session gate (public,
+  // per the comment above), so redact rather than trust every caller not
+  // to read it. Same posture as top_performers[].whatsapp elsewhere in
+  // this app: never returned to a non-privileged viewer.
+  const captains = isAdmin ? data : (data ?? []).map((c: any) => ({
+    ...c,
+    players: c.players ? { ...c.players, whatsapp: null } : c.players,
+  }))
+
+  return NextResponse.json({ captains })
 }
 
 export async function POST(req: NextRequest) {

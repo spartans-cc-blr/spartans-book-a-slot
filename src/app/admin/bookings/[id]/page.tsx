@@ -740,10 +740,13 @@ function BookingDetailPageInner() {
                 // Default ground/captain from the newly picked tournament —
                 // but never clobber a value already set on this booking
                 // (e.g. fixing a mis-tagged tournament shouldn't silently
-                // wipe a deliberately-chosen ground/captain).
+                // wipe a deliberately-chosen ground/captain), and never
+                // default to a captain who's since gone inactive — the
+                // server rejects that anyway on an actual reassignment.
                 const t = tournaments.find(x => x.id === newId)
+                const tCaptainActive = t?.captain_id && captainOptions.find(c => c.id === t.captain_id)?.active
                 setGroundId(prev => prev || (t?.ground_id ?? ''))
-                setCaptainId(prev => prev || (t?.captain_id ?? ''))
+                setCaptainId(prev => prev || (tCaptainActive ? t!.captain_id! : ''))
               }}
               disabled={feesMode}
               className="form-input disabled:opacity-50 disabled:cursor-not-allowed">

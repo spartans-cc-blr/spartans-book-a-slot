@@ -408,10 +408,14 @@ export default function NewBookingPage() {
                     const id = e.target.value
                     setTournamentId(id)
                     // Default ground/captain from the newly picked tournament —
-                    // but never clobber a value already chosen this session.
+                    // but never clobber a value already chosen this session,
+                    // and never default to a captain who's since gone
+                    // inactive — the server rejects that anyway, so pre-
+                    // filling it would just be a dead end for the admin.
                     const t = tournaments.find(x => x.id === id)
+                    const tCaptainActive = t?.captain_id && captains.find(c => c.id === t.captain_id)?.active
                     setGroundId(prev => prev || (t?.ground_id ?? ''))
-                    setCaptainId(prev => prev || (t?.captain_id ?? ''))
+                    setCaptainId(prev => prev || (tCaptainActive ? t!.captain_id! : ''))
                     setShowAddTournament(false)
                   }}
                   className="form-input"
