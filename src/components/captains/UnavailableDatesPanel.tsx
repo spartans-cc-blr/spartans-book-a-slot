@@ -18,15 +18,19 @@
 // includes a day at all if it has at least one slot the captain can
 // actually mark — but once a day qualifies, its booked/reserved/blocked
 // slots are shown too, read-only, so the captain sees the whole day at a
-// glance rather than a set of gaps with no context. Booked and blocked
-// slots link straight through to the real /fixtures/[id] match card
-// (blocked resolves to whichever booking is actually causing the clash,
-// via getClashSource() — never a dead end).
+// glance rather than a set of gaps with no context.
+//
+// Slot cells are deliberately terse — a booked slot is just a "view match"
+// link (what it's for is explained once, in the legend, not repeated
+// inline on every card) and a blocked slot reuses the admin schedule
+// grid's own directional-arrow convention (src/components/schedule/
+// ClashArrow.tsx) rather than inventing a second "here's why it's blocked"
+// treatment. Both keep columns narrow enough to stay compact on a phone.
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { parseISO, format as formatDate } from 'date-fns'
 import type { SlotTime } from '@/types'
+import { getArrowDirection, ArrowIcon } from '@/components/schedule/ClashArrow'
 
 export interface DaySlotInfo {
   time: SlotTime
@@ -34,6 +38,10 @@ export interface DaySlotInfo {
   bookingId?: string
   tournamentName?: string | null
   opponentName?: string | null
+  // Only set for kind: 'blocked' — which other slot on the same day is
+  // actually causing the clash, so the cell can point an arrow at it the
+  // same way the admin schedule grid does.
+  causeSlot?: SlotTime | null
 }
 
 export interface DayInfo {
@@ -151,16 +159,16 @@ export function UnavailableDatesPanel({ days }: Props) {
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', padding: '14px 20px', borderBottom: '1px solid #D4C9B0', background: '#F8F4EE' }}>
-        <LegendItem swatchBg="transparent" swatchBorder="#D4C9B0" label="Unmarked — tap to mark unavailable" />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', padding: '12px 16px', borderBottom: '1px solid #D4C9B0', background: '#F8F4EE' }}>
+        <LegendItem swatchBg="transparent" swatchBorder="#D4C9B0" label="Tap to mark unavailable" />
         <LegendItem swatchBg="#F3E8FF" swatchBorder="#C084FC" label="Marked — tap to clear" />
         <LegendItem swatchBg="#FEE2E2" swatchBorder="#FCA5A5" label="Booked — tap to view match" />
         <LegendItem swatchBg="#FEF3C7" swatchBorder="#FCD34D" label="Reserved" />
-        <LegendItem swatchBg="#E2DACE" swatchBorder="#D4C9B0" label="Blocked — tap to view the match causing it" />
+        <LegendItem swatchBg="#E2DACE" swatchBorder="#D4C9B0" label="Blocked by another slot that day" />
       </div>
 
       {error && (
-        <p style={{ fontFamily: FONT_UI, fontSize: '12.5px', color: '#DC2626', padding: '10px 20px 0' }}>{error}</p>
+        <p style={{ fontFamily: FONT_UI, fontSize: '12.5px', color: '#DC2626', padding: '10px 16px 0' }}>{error}</p>
       )}
 
       {!loaded ? (
@@ -168,16 +176,16 @@ export function UnavailableDatesPanel({ days }: Props) {
           Loading…
         </p>
       ) : (
-        <div style={{ maxHeight: 'calc(100vh - 340px)', minHeight: '360px', overflow: 'auto' }}>
-          <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: '620px' }}>
+        <div style={{ maxHeight: 'calc(100vh - 320px)', minHeight: '360px', overflow: 'auto' }}>
+          <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: '330px' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 5 }}>
               <tr>
-                <th style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '10px 14px', textAlign: 'left', minWidth: '112px' }}>
-                  <span style={{ fontFamily: FONT_UI, fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#A8A29E' }}>Date</span>
+                <th style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px 6px', textAlign: 'left', minWidth: '72px' }}>
+                  <span style={{ fontFamily: FONT_UI, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#A8A29E' }}>Date</span>
                 </th>
                 {SLOT_TIMES.map(slot => (
-                  <th key={slot} style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '10px 6px', textAlign: 'center', minWidth: '128px' }}>
-                    <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '12.5px', fontWeight: 700, color: '#B45309' }}>{slot}</span>
+                  <th key={slot} style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px 2px', textAlign: 'center', minWidth: '62px' }}>
+                    <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '11px', fontWeight: 700, color: '#B45309', whiteSpace: 'nowrap' }}>{slot}</span>
                   </th>
                 ))}
               </tr>
@@ -197,24 +205,24 @@ export function UnavailableDatesPanel({ days }: Props) {
                   <FragmentRow key={day.date}>
                     {showMonth && (
                       <tr>
-                        <td colSpan={5} style={{ background: '#E2DACE', borderBottom: '1px solid #D4C9B0', borderTop: idx === 0 ? 'none' : '2px solid #D4C9B0', padding: '6px 14px', fontFamily: FONT_UI, fontSize: '11px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#D97706' }}>
+                        <td colSpan={5} style={{ background: '#E2DACE', borderBottom: '1px solid #D4C9B0', borderTop: idx === 0 ? 'none' : '2px solid #D4C9B0', padding: '5px 8px', fontFamily: FONT_UI, fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#D97706' }}>
                           {day.month}
                         </td>
                       </tr>
                     )}
                     <tr style={{ background: rowBg }}>
-                      <td style={{ borderBottom: '1px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '10px 14px', verticalAlign: 'middle' }}>
+                      <td style={{ borderBottom: '1px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px', verticalAlign: 'middle' }}>
                         <span style={{
                           display: 'inline-block', fontFamily: FONT_UI,
-                          fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.06em',
-                          padding: '1px 6px', borderRadius: '3px', marginBottom: '4px',
+                          fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.05em',
+                          padding: '1px 5px', borderRadius: '3px', marginBottom: '3px',
                           ...(isSat
                             ? { background: '#DBEAFE', color: '#1D4ED8', border: '1px solid #BFDBFE' }
                             : { background: '#FCE7F3', color: '#BE185D', border: '1px solid #FBCFE8' }),
                         }}>
                           {day.dow.toUpperCase()}
                         </span>
-                        <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '13px', fontWeight: 700, color: '#1C1917' }}>
+                        <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '12px', fontWeight: 700, color: '#1C1917', whiteSpace: 'nowrap' }}>
                           {day.label.replace(/^\w+\s/, '')}
                         </span>
                         {unscheduledSlots.length > 1 && (
@@ -223,8 +231,8 @@ export function UnavailableDatesPanel({ days }: Props) {
                             disabled={savingKey === wholeKey}
                             onClick={() => toggleWholeDay(day.date, unscheduledSlots)}
                             style={{
-                              marginTop: '6px', fontFamily: FONT_UI, fontSize: '10px', fontWeight: 700, letterSpacing: '0.02em',
-                              padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap',
+                              marginTop: '4px', fontFamily: FONT_UI, fontSize: '9px', fontWeight: 700, letterSpacing: '0.01em',
+                              padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap',
                               background: allMarkedToday ? '#F3E8FF' : 'transparent',
                               borderWidth: '1px', borderStyle: 'solid',
                               borderColor: allMarkedToday ? '#C084FC' : '#D4C9B0',
@@ -232,7 +240,7 @@ export function UnavailableDatesPanel({ days }: Props) {
                               opacity: savingKey === wholeKey ? 0.5 : 1,
                             }}
                           >
-                            {allMarkedToday ? '🚫 Unavailable all day' : 'Mark whole day'}
+                            {allMarkedToday ? '🚫 All day' : 'Mark day'}
                           </button>
                         )}
                       </td>
@@ -266,11 +274,15 @@ function FragmentRow({ children }: { children: React.ReactNode }) {
 
 function LegendItem({ swatchBg, swatchBorder, label }: { swatchBg: string; swatchBorder: string; label: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontFamily: FONT_UI, fontSize: '12px', color: '#78716C' }}>
-      <span style={{ width: '11px', height: '11px', borderRadius: '3px', border: `1px solid ${swatchBorder}`, background: swatchBg, flexShrink: 0 }} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: FONT_UI, fontSize: '11px', color: '#78716C', whiteSpace: 'nowrap' }}>
+      <span style={{ width: '10px', height: '10px', borderRadius: '3px', border: `1px solid ${swatchBorder}`, background: swatchBg, flexShrink: 0 }} />
       {label}
     </div>
   )
+}
+
+const cellStyle: React.CSSProperties = {
+  borderBottom: '1px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '3px', verticalAlign: 'middle',
 }
 
 function SlotCell({
@@ -281,31 +293,35 @@ function SlotCell({
   saving: boolean
   onToggle: () => void
 }) {
-  const cellStyle: React.CSSProperties = {
-    borderBottom: '1px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '4px', verticalAlign: 'middle',
-  }
-  const boxBase: React.CSSProperties = {
-    minHeight: '48px', borderRadius: '5px', borderWidth: '1px', borderStyle: 'solid',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px',
-    textAlign: 'center', padding: '6px 4px', fontFamily: FONT_UI, textDecoration: 'none',
-  }
-
   if (slot.kind === 'unscheduled') {
+    // A tappable "button", not an informational tile — embossed so it
+    // reads as pressable at a glance, and deliberately single-line/no-wrap
+    // since it's ever only one character.
     return (
-      <td style={cellStyle}>
+      <td style={{ ...cellStyle, textAlign: 'center' }}>
         <button
           type="button"
           disabled={saving}
           onClick={onToggle}
           title={isMarked ? 'Tap to clear' : 'Tap to mark unavailable'}
           style={{
-            ...boxBase, width: '100%', cursor: 'pointer', opacity: saving ? 0.5 : 1,
-            background: isMarked ? '#F3E8FF' : 'transparent',
-            borderColor: isMarked ? '#C084FC' : '#D4C9B0',
-            color: isMarked ? '#7E22CE' : '#A8A29E',
+            width: '36px', height: '32px', borderRadius: '7px', borderWidth: '1px', borderStyle: 'solid',
+            fontFamily: FONT_DISP, fontSize: '14px', fontWeight: 700, lineHeight: 1, whiteSpace: 'nowrap',
+            cursor: 'pointer', opacity: saving ? 0.5 : 1,
+            ...(isMarked
+              ? {
+                  background: 'linear-gradient(180deg, #F3E8FF 0%, #E9D5FF 100%)',
+                  borderColor: '#C084FC', color: '#7E22CE',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 2px rgba(126,34,206,0.25)',
+                }
+              : {
+                  background: 'linear-gradient(180deg, #FFFFFF 0%, #F1EAD9 100%)',
+                  borderColor: '#D4C9B0', color: '#A8A29E',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(28,25,23,0.1)',
+                }),
           }}
         >
-          <span style={{ fontFamily: FONT_DISP, fontSize: '15px', fontWeight: 700 }}>L</span>
+          L
         </button>
       </td>
     )
@@ -313,43 +329,54 @@ function SlotCell({
 
   if (slot.kind === 'reserved') {
     return (
-      <td style={cellStyle}>
-        <div style={{ ...boxBase, background: '#FEF3C7', borderColor: '#FCD34D', color: '#92400E', cursor: 'default' }}>
-          <span style={{ fontSize: '11.5px', fontWeight: 700 }}>Reserved</span>
-          {slot.tournamentName && (
-            <span style={{ fontSize: '9.5px', opacity: 0.85, lineHeight: 1.2 }}>{slot.tournamentName}</span>
-          )}
+      <td style={{ ...cellStyle, textAlign: 'center' }}>
+        <div style={{
+          height: '32px', borderRadius: '5px', border: '1px solid #FCD34D', background: '#FEF3C7',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: FONT_UI, fontSize: '10px', fontWeight: 700, color: '#92400E', whiteSpace: 'nowrap',
+        }}>
+          Reserved
         </div>
       </td>
     )
   }
 
   if (slot.kind === 'booked') {
+    // Deliberately terse — what "booked" means is explained once in the
+    // legend, not repeated on every card. Just a link through to the match.
     const box = (
-      <div style={{ ...boxBase, width: '100%', background: '#FEE2E2', borderColor: '#FCA5A5', color: '#B91C1C', cursor: slot.bookingId ? 'pointer' : 'default' }}>
-        <span style={{ fontSize: '11.5px', fontWeight: 700 }}>{slot.tournamentName ?? 'Booked'}</span>
-        {slot.opponentName && (
-          <span style={{ fontSize: '9.5px', opacity: 0.85 }}>vs {slot.opponentName}</span>
-        )}
-        {slot.bookingId && <span style={{ fontSize: '9px', opacity: 0.6, marginTop: '1px' }}>↗ view match</span>}
+      <div style={{
+        height: '32px', borderRadius: '5px', border: '1px solid #FCA5A5', background: '#FEE2E2',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
+        fontFamily: FONT_UI, fontSize: '9.5px', fontWeight: 700, color: '#B91C1C', whiteSpace: 'nowrap',
+        cursor: slot.bookingId ? 'pointer' : 'default', textDecoration: 'none',
+      }}>
+        <span aria-hidden>↗</span> View match
       </div>
     )
     return (
-      <td style={cellStyle}>
+      <td style={{ ...cellStyle, textAlign: 'center' }}>
         {slot.bookingId ? <Link href={`/fixtures/${slot.bookingId}`}>{box}</Link> : box}
       </td>
     )
   }
 
-  // 'blocked' — resolved to the booking actually causing the clash, when known.
+  // 'blocked' — same directional-arrow convention as the admin schedule
+  // grid's clash cell, pointing at whichever slot is actually causing it.
+  const arrowDir = getArrowDirection(slot.time, slot.causeSlot ?? null, false)
   const box = (
-    <div style={{ ...boxBase, width: '100%', background: '#E2DACE', borderColor: '#D4C9B0', color: '#78716C', cursor: slot.bookingId ? 'pointer' : 'default' }}>
-      <span style={{ fontSize: '11.5px', fontWeight: 700 }}>Play in progress</span>
-      {slot.bookingId && <span style={{ fontSize: '9px', opacity: 0.6, marginTop: '1px' }}>↗ view match</span>}
+    <div style={{
+      height: '32px', borderRadius: '5px', border: '1px solid #D4C9B0', background: '#E2DACE',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
+      fontFamily: FONT_UI, fontSize: '9px', fontWeight: 700, color: '#78716C', lineHeight: 1.1,
+      cursor: slot.bookingId ? 'pointer' : 'default', textDecoration: 'none', padding: '0 3px',
+    }}>
+      {arrowDir && <ArrowIcon direction={arrowDir} />}
+      <span>Play in progress</span>
     </div>
   )
   return (
-    <td style={cellStyle}>
+    <td style={{ ...cellStyle, textAlign: 'center' }}>
       {slot.bookingId ? <Link href={`/fixtures/${slot.bookingId}`}>{box}</Link> : box}
     </td>
   )
