@@ -84,12 +84,17 @@ type TournamentWithCaptain = {
   organiser_name: string | null
   active: boolean
   captain_id: string | null
+  // Practice games are played at a different ground every time — see
+  // features/leaderboard.md §10. Drives the per-booking ground picker below.
+  is_practice: boolean
   captains: {
     id: string
     name: string
     players: { cricheroes_url: string | null; whatsapp: string | null } | null
   } | null
 }
+
+type Ground = { id: string; name: string; maps_url: string; hospital_url: string }
 
 const RULES = [
   { rule: 'R1', label: 'Weekend capacity (max 3)' },
@@ -163,8 +168,11 @@ function BookingDetailPageInner() {
   const [notes,         setNotes]         = useState('')
   const [organiserName, setOrganiserName] = useState('')
   const [organiserPhone,setOrganiserPhone]= useState('')
+  // Practice games only — see the ground picker in the Tournament FormCard.
+  const [venue,         setVenue]         = useState('')
 
   const [tournaments,  setTournaments]  = useState<TournamentWithCaptain[]>([])
+  const [grounds,      setGrounds]      = useState<Ground[]>([])
 
   const [matchStage,        setMatchStage]        = useState('')
   const [gameDate,          setGameDate]           = useState('')
@@ -195,6 +203,7 @@ function BookingDetailPageInner() {
 
   useEffect(() => {
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
+    fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? []))
     fetch(`/api/bookings/${id}`)
       .then(r => r.json())
       .then(d => {
@@ -214,6 +223,7 @@ function BookingDetailPageInner() {
         setNotes(b.notes ?? '')
         setOrganiserName(b.organiser_name ?? '')
         setOrganiserPhone(b.organiser_phone ?? '')
+        setVenue(b.venue ?? '')
         setGameDate(b.game_date ?? '')
         setMatchStage(b.match_stage ?? '')
         setMatchFeeOverride((b as any).match_fee_override != null ? String((b as any).match_fee_override) : '')
@@ -499,6 +509,11 @@ function BookingDetailPageInner() {
         organiser_name:  organiserName || null,
         organiser_phone: organiserPhone || null,
         match_fee_override: matchFeeOverride ? parseInt(matchFeeOverride) : null,
+        // Only sent for practice-tournament bookings — omitting the key
+        // entirely for every other tournament means a legacy venue string
+        // saved before the field was removed from this form is never
+        // clobbered by an unrelated "Save Changes" click.
+        ...(selectedTournament?.is_practice ? { venue: venue.trim() || null } : {}),
         overrides: overridesToLog.map(([rule, reason]) => ({
           rule,
           reason,
@@ -707,6 +722,29 @@ function BookingDetailPageInner() {
                 <option key={t.id} value={t.id}>{t.name}{t.organiser_name ? ` — ${t.organiser_name}` : ''}</option>
               ))}
             </select>
+
+            {/* Ground — practice games only. Every other tournament plays
+                every game at the one ground set on the tournament itself,
+                so the ground picker is redundant there and stays hidden. */}
+            {tournamentId && selectedTournament?.is_practice && (
+              <div className="mt-3">
+                <label className="form-label">Ground</label>
+                <select
+                  value={grounds.find(g => g.name.toLowerCase() === venue.trim().toLowerCase())?.id ?? ''}
+                  onChange={e => setVenue(grounds.find(g => g.id === e.target.value)?.name ?? '')}
+                  disabled={feesMode}
+                  className="form-input disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select ground...</option>
+                  {grounds.map(g => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+                <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                  Practice games move between grounds — pick this game&apos;s ground.
+                </p>
+              </div>
+            )}
 
             {/* Captain — read-only, derived from tournament */}
             {tournamentId && (() => {
@@ -1141,6 +1179,7 @@ function BookingDetailPageInner() {
               <p>🕐 {slotTime}{format ? ` — ${format}` : ''}</p>
               {captainName        && <p>👤 {captainName}</p>}
               {selectedTournament && <p>🏆 {selectedTournament.name}</p>}
+              {selectedTournament?.is_practice && venue && <p>📍 {venue}</p>}
               {opponentName       && <p>⚔️ vs {opponentName}</p>}
               {matchId            && <p>🏏 Match ID: {matchId}</p>}
               {cricheroes && (

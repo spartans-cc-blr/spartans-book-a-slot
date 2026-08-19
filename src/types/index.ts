@@ -36,6 +36,12 @@ export interface Tournament {
   captain_id:                  string | null
   total_league_games:          number | null
   cricheroes_points_table_url: string | null
+  ground_id:                   string | null
+  // Practice games are played at a different ground every time, unlike a
+  // normal tournament (one ground for its whole run) — see
+  // features/leaderboard.md §10. Drives the per-booking ground picker on
+  // /admin/bookings/new and /admin/bookings/[id].
+  is_practice:                 boolean
   captains: {
     id:      string
     name:    string

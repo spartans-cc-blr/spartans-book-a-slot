@@ -46,6 +46,10 @@ export default function NewBookingPage() {
   const [cricHeroesUrl, setCricHeroesUrl] = useState('')
   const [matchTime,     setMatchTime]     = useState('')
   const [matchTimeTouched, setMatchTimeTouched] = useState(false)
+  // Practice games only — every other tournament plays every game at the
+  // one ground set on the tournament itself, so this stays empty and unsent
+  // for those. See features/leaderboard.md §10 for is_practice.
+  const [venue,         setVenue]         = useState('')
 
   // Reservation-only fields
   const [organiserName,  setOrganiserName]  = useState('')
@@ -81,7 +85,7 @@ export default function NewBookingPage() {
 
   useEffect(() => {
     setGameDate(''); setSlotTime(''); setFormat(''); setNotes('')
-    setTournamentId('')
+    setTournamentId(''); setVenue('')
     setOpponentName(''); setMatchId(''); setCricHeroesUrl(''); setMatchTime(''); setMatchTimeTouched(false)
     setOrganiserName(''); setOrganiserPhone('')
     setShowAddTournament(false); setNewTournamentName(''); setNewTournamentOrg('')
@@ -245,6 +249,7 @@ export default function NewBookingPage() {
           format,
           slot_time:      slotTime,
           tournament_id:  tournamentId,
+          venue:          selectedTournament?.is_practice ? (venue.trim() || null) : null,
           notes:          notes || null,
           opponent_name:  opponentName || null,
           match_id:       matchId || null,
@@ -390,6 +395,7 @@ export default function NewBookingPage() {
                   value={tournamentId}
                   onChange={e => {
                     setTournamentId(e.target.value)
+                    setVenue('')
                     setShowAddTournament(false)
                   }}
                   className="form-input"
@@ -401,6 +407,28 @@ export default function NewBookingPage() {
                     </option>
                   ))}
                 </select>
+
+                {/* Ground — practice games only. Every other tournament plays
+                    every game at the one ground set on the tournament itself,
+                    so the ground picker is redundant there and stays hidden. */}
+                {tournamentId && selectedTournament?.is_practice && (
+                  <div className="mt-3">
+                    <label className="form-label">Ground</label>
+                    <select
+                      value={grounds.find(g => g.name.toLowerCase() === venue.trim().toLowerCase())?.id ?? ''}
+                      onChange={e => setVenue(grounds.find(g => g.id === e.target.value)?.name ?? '')}
+                      className="form-input"
+                    >
+                      <option value="">Select ground...</option>
+                      {grounds.map(g => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                    <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                      Practice games move between grounds — pick this game&apos;s ground.
+                    </p>
+                  </div>
+                )}
 
                 {/* Captain — read-only, derived from tournament */}
                 {tournamentId && (() => {
@@ -594,6 +622,7 @@ export default function NewBookingPage() {
                 {matchTime && <p>⏰ Match starts: {matchTime}</p>}
                 {mode === 'confirmed' && selectedTournament?.captains?.name && <p>👤 {selectedTournament.captains.name}</p>}
                 {mode === 'confirmed' && tournamentId && <p>🏆 {selectedTournament?.name}</p>}
+                {mode === 'confirmed' && selectedTournament?.is_practice && venue && <p>📍 {venue}</p>}
                 {mode === 'confirmed' && opponentName && <p>⚔️ vs {opponentName}</p>}
                 {mode === 'confirmed' && cricHeroesUrl && (
                   <a href={cricHeroesUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline flex items-center gap-1">
