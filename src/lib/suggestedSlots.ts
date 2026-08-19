@@ -121,7 +121,7 @@ export async function getSuggestedOpenDates(
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
-    .select('id, name, captain_id, total_league_games, captains!tournaments_captain_id_fkey(id, name)')
+    .select('id, name, captain_id, total_league_games, captains!tournaments_captain_id_fkey(id, name, player_id)')
     .eq('id', tournamentId)
     .single()
 
@@ -130,6 +130,7 @@ export async function getSuggestedOpenDates(
   }
 
   const thisTournamentCaptainId = tournament.captain_id ?? null
+  const thisTournamentCaptainPlayerId = (tournament.captains as any)?.player_id ?? null
   const captainName = (tournament.captains as any)?.name ?? 'This captain'
   const tournamentName = tournament.name
 
@@ -139,6 +140,32 @@ export async function getSuggestedOpenDates(
   let firstSat = addDays(today, (6 - today.getDay() + 7) % 7)
   if (toISODate(firstSat) === toISODate(today)) firstSat = addDays(firstSat, 7)
   const horizonEnd = addDays(firstSat, HORIZON_WEEKS * 7)
+
+  // Days the leading captain has pre-marked themselves fully unavailable
+  // (player_future_availability) — dropped from candidates entirely below.
+  // Deliberately requires ALL 4 slot_times to be 'L' for that date, not just
+  // some — a captain who's L for some slots but not others still gets the
+  // day offered; the exact-slot check happens at actual booking time
+  // instead (see validateBooking's R8, src/lib/validation.ts).
+  const fullyUnavailableDates = new Set<string>()
+  if (thisTournamentCaptainPlayerId) {
+    const { data: captainFutureRows } = await supabase
+      .from('player_future_availability')
+      .select('game_date, slot_time, response')
+      .eq('player_id', thisTournamentCaptainPlayerId)
+      .gte('game_date', toISODate(firstSat))
+      .lte('game_date', toISODate(horizonEnd))
+
+    const leaveSlotsByDate: Record<string, Set<string>> = {}
+    for (const row of captainFutureRows ?? []) {
+      if (row.response !== 'L') continue
+      if (!leaveSlotsByDate[row.game_date]) leaveSlotsByDate[row.game_date] = new Set()
+      leaveSlotsByDate[row.game_date].add(row.slot_time)
+    }
+    for (const [date, slots] of Object.entries(leaveSlotsByDate)) {
+      if (SLOT_DEFS.every(s => slots.has(s.time))) fullyUnavailableDates.add(date)
+    }
+  }
 
   // This tournament's own confirmed games — used to rank candidate slots by
   // how under-used they are for THIS tournament specifically, and to find
@@ -214,6 +241,7 @@ export async function getSuggestedOpenDates(
       const dateStr = toISODate(date)
       if (bookedDates.has(dateStr)) continue
       if (latestOwnBookingDate && dateStr <= latestOwnBookingDate) continue
+      if (fullyUnavailableDates.has(dateStr)) continue
       for (const slotDef of SLOT_DEFS) {
         const candidateFormats = activeFormats.length
           ? slotDef.validFor.filter(f => activeFormats.includes(f))
