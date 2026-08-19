@@ -230,6 +230,25 @@ export const bookingRuleOverrideSchema = z.object({
 
 export const bookingRuleOverridesSchema = z.array(bookingRuleOverrideSchema).max(6).optional()
 
+// ── PLAYER FUTURE AVAILABILITY (POST /api/player/future-availability) ──────
+// Slot-level availability for dates that don't have a booking yet — see
+// player_future_availability (migration 067) and
+// .claude/rules/features/... future-availability handoff.
+// Two shapes: a single (game_date, slot_time) row, or `whole_day: true`
+// which the route fans out server-side to all 4 slot_time rows.
+
+export const futureAvailabilitySlotTimeSchema = z.enum(['07:30', '10:30', '12:30', '14:30'])
+export const futureAvailabilityResponseSchema = z.enum(['Y', 'O', 'E', 'L'])
+
+export const futureAvailabilityRequestSchema = z.object({
+  game_date: z.string().regex(GAME_DATE_REGEX, 'game_date must be YYYY-MM-DD'),
+  response:  futureAvailabilityResponseSchema,
+  slot_time: futureAvailabilitySlotTimeSchema.optional(),
+  whole_day: z.literal(true).optional(),
+}).refine(data => data.whole_day === true || !!data.slot_time, {
+  message: 'slot_time is required unless whole_day is true',
+})
+
 // ── WALLET TRANSACTIONS (admin-only) ────────────────────────────────────────
 // POST/GET /api/wallet/transactions — see wallet_transactions table
 // (live in Supabase, not yet in supabase/migrations/ — same drift pattern

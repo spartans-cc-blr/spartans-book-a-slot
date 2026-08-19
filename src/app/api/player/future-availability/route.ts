@@ -1,0 +1,131 @@
+// src/app/api/player/future-availability/route.ts
+//
+// Slot-level availability for dates that don't have a booking yet — lets a
+// player pre-fill attendance ahead of scheduling. Distinct from
+// /api/player-availability, which requires a real booking_id. No wallet-dues
+// guard and no availability_locked/freeze check here — those only make
+// sense once a real booking exists (see player-availability/route.ts).
+
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { createServiceClient } from '@/lib/supabase'
+import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
+import { futureAvailabilityRequestSchema, futureAvailabilitySlotTimeSchema } from '@/lib/schemas'
+
+const ALL_SLOT_TIMES = futureAvailabilitySlotTimeSchema.options
+
+// ── GET — own rows ────────────────────────────────────────────────────────
+export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const player  = session?.user as any
+  if (!player?.playerId) return NextResponse.json({ availability: [] })
+
+  const supabase = createServiceClient()
+  const { data } = await supabase
+    .from('player_future_availability')
+    .select('game_date, slot_time, response')
+    .eq('player_id', player.playerId)
+
+  return NextResponse.json({ availability: data ?? [] })
+}
+
+// ── Upsert a single (player, game_date, slot_time) row — explicit
+// SELECT → INSERT or UPDATE, no .upsert(), matching the rest of this repo's
+// availability-write convention (see player-availability/route.ts).
+async function upsertOne(
+  supabase: ReturnType<typeof createServiceClient>,
+  playerId: string,
+  game_date: string,
+  slot_time: string,
+  response: string
+): Promise<{ error: string | null }> {
+  const { data: existing } = await supabase
+    .from('player_future_availability')
+    .select('id')
+    .eq('player_id', playerId)
+    .eq('game_date', game_date)
+    .eq('slot_time', slot_time)
+    .maybeSingle()
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('player_future_availability')
+      .update({ response })
+      .eq('id', existing.id)
+    return { error: error?.message ?? null }
+  }
+
+  const { error } = await supabase
+    .from('player_future_availability')
+    .insert({ player_id: playerId, game_date, slot_time, response })
+  return { error: error?.message ?? null }
+}
+
+// ── POST — self-update (single slot, or whole_day fan-out) ─────────────────
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const player  = session?.user as any
+  if (!player?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (player?.playerStatus === 'expelled') return NextResponse.json({ error: 'Account suspended' }, { status: 403 })
+
+  const limited = await rateLimit(req, RATE_LIMITS.playerWrite, player.playerId)
+  if (limited) return limited
+
+  const body = await req.json().catch(() => null)
+  const parsed = futureAvailabilityRequestSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' }, { status: 400 })
+  }
+  const { game_date, response, slot_time, whole_day } = parsed.data
+
+  const supabase = createServiceClient()
+
+  if (whole_day) {
+    // Fan out to independent rows, one per slot_time — a later single-slot
+    // edit only ever touches its own row, so this is a convenience for
+    // creating 4 rows at once, not a persistent "day mode" flag.
+    const results = await Promise.all(
+      ALL_SLOT_TIMES.map(slot => upsertOne(supabase, player.playerId, game_date, slot, response))
+    )
+    const errors = results.map(r => r.error).filter((e): e is string => !!e)
+    if (errors.length > 0) {
+      return NextResponse.json({ error: errors[0] }, { status: 500 })
+    }
+    return NextResponse.json({ success: true })
+  }
+
+  const { error } = await upsertOne(supabase, player.playerId, game_date, slot_time!, response)
+  if (error) return NextResponse.json({ error }, { status: 500 })
+
+  return NextResponse.json({ success: true })
+}
+
+// ── DELETE — clear a single slot's response ─────────────────────────────────
+export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const player  = session?.user as any
+  if (!player?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (player?.playerStatus === 'expelled') return NextResponse.json({ error: 'Account suspended' }, { status: 403 })
+
+  const limited = await rateLimit(req, RATE_LIMITS.playerWrite, player.playerId)
+  if (limited) return limited
+
+  const body = await req.json().catch(() => null)
+  const game_date = body?.game_date
+  const slot_time = body?.slot_time
+  if (!game_date || !ALL_SLOT_TIMES.includes(slot_time)) {
+    return NextResponse.json({ error: 'game_date and a valid slot_time are required' }, { status: 400 })
+  }
+
+  const supabase = createServiceClient()
+  const { error } = await supabase
+    .from('player_future_availability')
+    .delete()
+    .eq('player_id', player.playerId)
+    .eq('game_date', game_date)
+    .eq('slot_time', slot_time)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}
