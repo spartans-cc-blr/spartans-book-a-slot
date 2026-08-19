@@ -357,3 +357,51 @@ export function computeSlotStatus(
 
   return 'open'
 }
+
+// Given a slot whose computeSlotStatus() came back 'clash', identifies
+// which *other* slot_time on the same day is actually the cause — e.g. a
+// clash at 12:30 caused by a T20 booked at 10:30. Mirrors
+// computeSlotStatus()'s own overlap rules exactly (same slot pairs, same
+// format conditions) so the two can never disagree about why a slot is
+// blocked. Extracted out of ScheduleGrid.tsx (originally a local, unshared
+// copy) so any other consumer needing "which booking is this" — not just
+// "is this blocked" — can reuse the identical logic rather than
+// re-deriving it.
+export function getClashSource(
+  slotTime: SlotTime,
+  daySlots: { time: SlotTime; status: string; format?: string | null }[]
+): SlotTime | null {
+  const slotMap   = Object.fromEntries(daySlots.map(s => [s.time, s.status]))
+  const formatMap = Object.fromEntries(daySlots.map(s => [s.time, s.format]))
+
+  // T20 at 10:30 → clashes 12:30 and 14:30 (not 07:30)
+  if ((slotTime === '12:30' || slotTime === '14:30') &&
+      slotMap['10:30'] === 'booked' && formatMap['10:30'] === 'T20') {
+    return '10:30'
+  }
+
+  if (slotTime === '10:30') {
+    // T20 at 07:30 blocks 10:30
+    if (slotMap['07:30'] === 'booked' && formatMap['07:30'] === 'T20') return '07:30'
+    // T30 at 07:30 blocks 10:30
+    if (slotMap['07:30'] === 'booked') return '07:30'
+    // Any game at 12:30 blocks 10:30
+    if (slotMap['12:30'] === 'booked') return '12:30'
+  }
+
+  if (slotTime === '12:30') {
+    // T30 at 07:30 blocks 12:30
+    if (slotMap['07:30'] === 'booked' && formatMap['07:30'] === 'T30') return '07:30'
+    // T20 at 10:30 (already handled above)
+    if (slotMap['10:30'] === 'booked') return '10:30'
+    // T20 at 14:30 blocks 12:30
+    if (slotMap['14:30'] === 'booked') return '14:30'
+  }
+
+  if (slotTime === '14:30') {
+    // Any game at 12:30 blocks 14:30
+    if (slotMap['12:30'] === 'booked') return '12:30'
+  }
+
+  return null
+}

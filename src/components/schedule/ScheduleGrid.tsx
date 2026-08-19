@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { WeekAvailability, SlotTime } from '@/types'
 import { buildGenericWhatsAppLink } from '@/lib/whatsapp'
+import { getClashSource } from '@/lib/validation'
 
 const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
   { time: '07:30', label: 'T20/T30' },
@@ -25,45 +26,6 @@ const STATUS_CONFIG = {
   soft_block: { label: 'Reserved',     gridLabel: 'Reserved',     icon: '🟡', pill: 'slot-softblock', gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
   clash:      { label: 'Unavailable',  gridLabel: 'Unavailable',  icon: '⛔', pill: 'slot-clash',     gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
   na:         { label: '',             gridLabel: '',             icon: '—',  pill: '',               gridCls: 'bg-transparent border-transparent cursor-default' },
-}
-
-function getClashSource(
-  slotTime: SlotTime,
-  daySlots: { time: SlotTime; status: string; format?: string | null }[]
-): SlotTime | null {
-  const slotMap   = Object.fromEntries(daySlots.map(s => [s.time, s.status]))
-  const formatMap = Object.fromEntries(daySlots.map(s => [s.time, s.format]))
- 
-  // T20 at 10:30 → clashes 12:30 and 14:30 (not 07:30)
-  if ((slotTime === '12:30' || slotTime === '14:30') &&
-      slotMap['10:30'] === 'booked' && formatMap['10:30'] === 'T20') {
-    return '10:30'
-  }
- 
-  if (slotTime === '10:30') {
-    // T20 at 07:30 blocks 10:30
-    if (slotMap['07:30'] === 'booked' && formatMap['07:30'] === 'T20') return '07:30'
-    // T30 at 07:30 blocks 10:30
-    if (slotMap['07:30'] === 'booked') return '07:30'
-    // Any game at 12:30 blocks 10:30
-    if (slotMap['12:30'] === 'booked') return '12:30'
-  }
- 
-  if (slotTime === '12:30') {
-    // T30 at 07:30 blocks 12:30
-    if (slotMap['07:30'] === 'booked' && formatMap['07:30'] === 'T30') return '07:30'
-    // T20 at 10:30 (already handled above)
-    if (slotMap['10:30'] === 'booked') return '10:30'
-    // T20 at 14:30 blocks 12:30
-    if (slotMap['14:30'] === 'booked') return '14:30'
-  }
- 
-  if (slotTime === '14:30') {
-    // Any game at 12:30 blocks 14:30
-    if (slotMap['12:30'] === 'booked') return '12:30'
-  }
- 
-  return null
 }
 
 // Returns arrow direction: 'left' | 'right' | 'up' | 'down' | null
