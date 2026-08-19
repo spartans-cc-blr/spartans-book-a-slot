@@ -54,6 +54,8 @@ export interface Booking {
   game_date:     string        // ISO date: 'YYYY-MM-DD'
   slot_time:     SlotTime
   format:        GameFormat | null
+  // Deprecated — free-text ground name from before ground_id existed (see
+  // migration 066). No longer written to; inert historical data only.
   venue:         string | null
   tournament_id: string | null
   status:        BookingStatus
@@ -61,11 +63,19 @@ export interface Booking {
   notes:         string | null
   created_at:    string
   updated_at:    string
+  // This game's own ground and captain — default to the tournament's own
+  // ground_id/captain_id at booking time, but independently overridable
+  // (e.g. practice games, which have no single tournament-level ground).
+  // See migration 066.
+  ground_id?:    string | null
+  captain_id?:   string | null
   // Joined fields (from API responses)
   tournament?:   Tournament & {
     captain_id: string | null
     captains: { id: string; name: string; players: { cricheroes_url: string | null } | null } | null
   }
+  ground?: { id: string; name: string; maps_url: string; hospital_url: string } | null
+  captain?: { id: string; name: string; players: { cricheroes_url: string | null; whatsapp: string | null } | null } | null
   reserved_until?: string | null
   organiser_name?: string | null
   organiser_phone?: string | null
@@ -110,8 +120,12 @@ export interface CreateBookingRequest {
   game_date:      string
   slot_time:      SlotTime
   format:         GameFormat
-  tournament_id:  string        // captain derived server-side from this
-  venue?:         string | null
+  tournament_id:  string
+  // Both default server-side to the tournament's own ground_id/captain_id
+  // when omitted from the request; send explicitly (including null) to
+  // override. See migration 066.
+  ground_id?:     string | null
+  captain_id?:    string | null
   notes?:         string | null
   opponent_name?: string | null
   match_id?:      string | null

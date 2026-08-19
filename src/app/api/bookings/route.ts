@@ -27,7 +27,9 @@ export async function GET(req: NextRequest) {
       *,
       tournament:tournaments!bookings_tournament_id_fkey(
         *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
-      )
+      ),
+      ground:grounds(id, name, maps_url, hospital_url),
+      captain:captains!bookings_captain_id_fkey(id, name, players(cricheroes_url, whatsapp))
     `)
     .order('game_date', { ascending: true })
     .order('slot_time', { ascending: true })
@@ -50,13 +52,15 @@ export async function POST(req: NextRequest) {
   if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const body = await req.json()
-  // vibe-security: strip captain_id if client sends it — captain is always derived from tournament
   // vibe-security: overrides is parsed separately below (Zod-validated) — never spread into the insert
-  const { captain_id: _dropped, overrides: rawOverrides, ...safeBody } = body
+  const { overrides: rawOverrides, ...safeBody } = body
   const {
     game_date, slot_time, format, tournament_id,
-    venue, notes, opponent_name, match_id, cricheroes_url,
+    notes, opponent_name, match_id, cricheroes_url,
     match_time, match_stage, match_fee_override,
+    // Both validated below and defaulted from the tournament when the key
+    // is omitted entirely — see the resolution after the tournament fetch.
+    captain_id, ground_id,
   } = safeBody
 
   if (!game_date || !slot_time || !format || !tournament_id) {
@@ -83,13 +87,34 @@ export async function POST(req: NextRequest) {
       .neq('status', 'cancelled'),
     supabase
       .from('tournaments')
-      .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name)')
+      .select('id, name, captain_id, ground_id, captains!tournaments_captain_id_fkey(id, name)')
       .eq('id', tournament_id)
       .single(),
   ])
 
   if (!tournament) {
     return NextResponse.json({ error: 'Tournament not found' }, { status: 400 })
+  }
+
+  // Omitted key → default to the tournament's own ground/captain (this is
+  // what the admin form's pickers already pre-fill client-side, but the
+  // server defends the same way for any other caller, e.g. the NLP quick-
+  // command bar). An explicit null is a deliberate "no captain/ground"
+  // override and is respected as such, not coerced back to the default.
+  const resolvedCaptainId: string | null =
+    'captain_id' in safeBody ? (captain_id ?? null) : (tournament.captain_id ?? null)
+  const resolvedGroundId: string | null =
+    'ground_id' in safeBody ? (ground_id ?? null) : (tournament.ground_id ?? null)
+
+  // vibe-security: never trust a client-supplied FK without checking it's real
+  if (resolvedCaptainId) {
+    const { data: cap } = await supabase.from('captains').select('id, active').eq('id', resolvedCaptainId).single()
+    if (!cap) return NextResponse.json({ error: 'Captain not found' }, { status: 400 })
+    if (!cap.active) return NextResponse.json({ error: 'Captain is not active' }, { status: 400 })
+  }
+  if (resolvedGroundId) {
+    const { data: gr } = await supabase.from('grounds').select('id').eq('id', resolvedGroundId).single()
+    if (!gr) return NextResponse.json({ error: 'Ground not found' }, { status: 400 })
   }
 
   const existing = (existingRaw ?? []).map((b: any) => ({
@@ -115,7 +140,8 @@ export async function POST(req: NextRequest) {
     .insert({
       game_date, slot_time, format,
       tournament_id,
-      venue:              venue ?? null,
+      captain_id:         resolvedCaptainId,
+      ground_id:          resolvedGroundId,
       notes:              notes ?? null,
       status:             'confirmed',
       opponent_name:      opponent_name ?? null,
@@ -129,7 +155,9 @@ export async function POST(req: NextRequest) {
       *,
       tournament:tournaments!bookings_tournament_id_fkey(
         *, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))
-      )
+      ),
+      ground:grounds(id, name, maps_url, hospital_url),
+      captain:captains!bookings_captain_id_fkey(id, name, players(cricheroes_url, whatsapp))
     `)
     .single()
 

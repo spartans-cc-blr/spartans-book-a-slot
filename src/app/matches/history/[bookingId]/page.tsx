@@ -57,7 +57,8 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
     .from('bookings')
     .select(`
       id, game_date, slot_time, match_time, format, opponent_name, match_id, cricheroes_url,
-      tournament:tournaments(name, ball_type, ground:grounds(name, maps_url))
+      tournament:tournaments(name, ball_type, ground:grounds(name, maps_url)),
+      ground:grounds(name, maps_url)
     `)
     .eq('id', params.bookingId)
     .eq('status', 'confirmed')
@@ -67,7 +68,10 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   if (bookingErr || !booking) notFound()
 
   const tournament = Array.isArray(booking.tournament) ? booking.tournament[0] ?? null : booking.tournament
-  const ground = tournament?.ground ? (Array.isArray(tournament.ground) ? tournament.ground[0] ?? null : tournament.ground) : null
+  const ownGround = (booking as any).ground
+    ? (Array.isArray((booking as any).ground) ? (booking as any).ground[0] ?? null : (booking as any).ground)
+    : null
+  const ground = ownGround ?? (tournament?.ground ? (Array.isArray(tournament.ground) ? tournament.ground[0] ?? null : tournament.ground) : null)
   const ballType = (tournament?.ball_type as any) ?? 'red'
 
   const [{ data: squadRows }, statsRes, uploadRes] = await Promise.all([

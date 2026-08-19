@@ -20,16 +20,14 @@
 //   cursor        — opaque pagination cursor from a previous response
 //   limit         — page size, default 15, max 50
 //   tournament_id — exact match
-//   ground_id     — resolves to bookings via the UNION of (a) its
-//                   tournament's linked ground (tournaments.ground_id) and
-//                   (b) its own free-text venue matching that ground's name
-//                   (case-insensitive) — same two-signal pattern as
-//                   getScopedMatchIds()/getPlayerBookingContextStats() in
-//                   src/lib/playerStats.ts. Fixes a real undercount: a
-//                   ground filter built from raw bookings.venue text alone
-//                   split "Blendin Cricket Ground" and "Blendin Cricket
-//                   Ground, Bengaluru (Bangalore)" into two buckets even
-//                   though both are the same physical ground.
+//   ground_id     — matches bookings.ground_id directly (migration 066 —
+//                   every booking snapshots its own ground at creation
+//                   time, defaulted from its tournament but independently
+//                   overridable, e.g. practice games). Falls back to a
+//                   case-insensitive match on the legacy free-text
+//                   bookings.venue column only for rows with no ground_id
+//                   at all (pre-migration bookings never backfilled — see
+//                   migration 066's own comment for why some couldn't be).
 //   venue         — exact match on bookings.venue — fallback for genuine
 //                   one-off venues with no grounds-table row; the client
 //                   only sends this for options in filters' `venues` list,
@@ -168,34 +166,26 @@ export async function GET(req: NextRequest) {
     if (restrictToBookingIds.length === 0) return NextResponse.json({ matches: [], nextCursor: null, totalCount: 0 })
   }
 
-  // Ground filter — resolved to booking IDs via the same union-of-signals
-  // pattern as getScopedMatchIds() (src/lib/playerStats.ts), not a raw
-  // `.eq('venue', ...)` on the main query — see the header comment above.
+  // Ground filter — direct match on bookings.ground_id, with a legacy
+  // free-text fallback only for rows that never got one — see the header
+  // comment above.
   if (groundId) {
-    const [{ data: ground, error: groundErr }, { data: groundTournaments, error: tErr }] = await Promise.all([
-      supabase.from('grounds').select('name').eq('id', groundId).maybeSingle(),
-      supabase.from('tournaments').select('id').eq('ground_id', groundId),
-    ])
+    const { data: ground, error: groundErr } = await supabase.from('grounds').select('name').eq('id', groundId).maybeSingle()
     if (groundErr) return NextResponse.json({ error: groundErr.message }, { status: 500 })
-    if (tErr) return NextResponse.json({ error: tErr.message }, { status: 500 })
-
-    const groundTournamentIds = (groundTournaments ?? []).map((t: any) => t.id)
     const groundName = ground?.name ?? null
 
-    const [byTournament, byVenue] = await Promise.all([
-      groundTournamentIds.length
-        ? supabase.from('bookings').select('id').eq('status', 'confirmed').lte('game_date', today).in('tournament_id', groundTournamentIds)
-        : Promise.resolve({ data: [] as { id: string }[], error: null }),
+    const [byGroundId, byLegacyVenue] = await Promise.all([
+      supabase.from('bookings').select('id').eq('status', 'confirmed').lte('game_date', today).eq('ground_id', groundId),
       groundName
-        ? supabase.from('bookings').select('id').eq('status', 'confirmed').lte('game_date', today).ilike('venue', groundName)
+        ? supabase.from('bookings').select('id').eq('status', 'confirmed').lte('game_date', today).is('ground_id', null).ilike('venue', groundName)
         : Promise.resolve({ data: [] as { id: string }[], error: null }),
     ])
-    if (byTournament.error) return NextResponse.json({ error: byTournament.error.message }, { status: 500 })
-    if (byVenue.error) return NextResponse.json({ error: byVenue.error.message }, { status: 500 })
+    if (byGroundId.error) return NextResponse.json({ error: byGroundId.error.message }, { status: 500 })
+    if (byLegacyVenue.error) return NextResponse.json({ error: byLegacyVenue.error.message }, { status: 500 })
 
     const groundBookingIds = new Set<string>()
-    for (const b of byTournament.data ?? []) groundBookingIds.add(b.id)
-    for (const b of byVenue.data ?? []) groundBookingIds.add(b.id)
+    for (const b of byGroundId.data ?? []) groundBookingIds.add(b.id)
+    for (const b of byLegacyVenue.data ?? []) groundBookingIds.add(b.id)
 
     restrictToBookingIds = restrictToBookingIds
       ? restrictToBookingIds.filter(id => groundBookingIds.has(id))
@@ -236,7 +226,7 @@ export async function GET(req: NextRequest) {
   let query = applySharedFilters(
     supabase
       .from('bookings')
-      .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, venue, cricheroes_url, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))')
+      .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, venue, cricheroes_url, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url)), ground:grounds(name, maps_url, hospital_url)')
   )
     .order('game_date', { ascending: false })
     .order('slot_time', { ascending: false })
@@ -368,7 +358,7 @@ export async function GET(req: NextRequest) {
       tournament_name: (b.tournament as any)?.name ?? null,
       ball_type:       (b.tournament as any)?.ball_type ?? null,
       venue:           b.venue,
-      ground:          (b.tournament as any)?.ground ?? null,
+      ground:          (b as any).ground ?? (b.tournament as any)?.ground ?? null,
       cricheroes_url:  b.cricheroes_url,
       scorecard_status:      upload?.status ?? null,
       scorecard_uploaded_at: upload?.uploaded_at ?? null,

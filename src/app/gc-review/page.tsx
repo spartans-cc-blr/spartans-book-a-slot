@@ -53,9 +53,14 @@ export default async function GCReviewPage() {
     { data: draftSquads },
   ] = bookingIds.length > 0
     ? await Promise.all([
+        // This booking's own captain (migration 066) — was previously
+        // attempted with a nonexistent bookings_captain_id_fkey pointed at
+        // players (see the incident note in tournament-planner/share/[id]),
+        // which failed silently. The FK now genuinely exists and resolves
+        // to captains, same as tournaments.captain_id everywhere else.
         supabase
           .from('bookings')
-          .select('id, captain:players!bookings_captain_id_fkey(name, whatsapp)')
+          .select('id, captain:captains!bookings_captain_id_fkey(name, players(whatsapp))')
           .in('id', bookingIds),
 
         // Y/O/E availability (all three, not just O/E) — Y included so the
@@ -89,7 +94,11 @@ export default async function GCReviewPage() {
   // Build captainMap: bookingId → { name, whatsapp }
   const captainMap: Record<string, { name: string; whatsapp: string | null }> = {}
   for (const row of captains ?? []) {
-    if (row.captain) captainMap[row.id] = row.captain as any
+    const raw = row.captain as any
+    const c = Array.isArray(raw) ? raw[0] ?? null : raw
+    if (!c) continue
+    const playerRow = Array.isArray(c.players) ? c.players[0] ?? null : c.players
+    captainMap[row.id] = { name: c.name, whatsapp: playerRow?.whatsapp ?? null }
   }
  
   // Build draftSquadMap: bookingId → player_id[]

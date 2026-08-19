@@ -27,7 +27,8 @@ interface ParsedCommand {
   captain_name: string | null
   tournament_id: string | null
   tournament_name: string | null
-  venue: string | null
+  ground_id: string | null
+  ground_name: string | null
   organiser_name: string | null
   organiser_phone: string | null
   notes: string | null
@@ -217,7 +218,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
     if (p.format)         params.set('format', p.format)
     if (p.captain_id)     params.set('captain', p.captain_id)
     if (p.tournament_id)  params.set('tournament', p.tournament_id)
-    if (p.venue)          params.set('venue', p.venue)
+    if (p.ground_id)      params.set('ground', p.ground_id)
     if (p.notes)          params.set('notes', p.notes)
     if (p.opponent_name)  params.set('opponent', p.opponent_name)
     return `/admin/bookings/new?${params}`
@@ -249,7 +250,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
         if (parsed.format)       body.format       = parsed.format
         if (parsed.captain_id)   body.captain_id   = parsed.captain_id
         if (parsed.tournament_id)body.tournament_id = parsed.tournament_id
-        if (parsed.venue)        body.venue        = parsed.venue
+        if (parsed.ground_id)    body.ground_id    = parsed.ground_id
         if (parsed.notes)        body.notes        = parsed.notes
         if (parsed.opponent_name)body.opponent_name = parsed.opponent_name
         const res = await fetch(`/api/bookings/${parsed.booking_id}`, {
@@ -303,7 +304,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
             format:         parsed.format,
             captain_id:     parsed.captain_id ?? null,
             tournament_id:  parsed.tournament_id ?? null,
-            venue:          parsed.venue ?? null,
+            ground_id:      parsed.ground_id ?? null,
             notes:          parsed.notes ?? null,
             opponent_name:  parsed.opponent_name ?? null,
           }),
@@ -375,8 +376,8 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
           {parsed.tournament_name && (
             <Field label="Tournament" value={parsed.tournament_name} />
           )}
-          {parsed.venue && (
-            <Field label="Venue" value={parsed.venue} />
+          {parsed.ground_name && (
+            <Field label="Ground" value={parsed.ground_name} />
           )}
           {parsed.organiser_name && (
             <Field label="Organiser" value={parsed.organiser_name} />

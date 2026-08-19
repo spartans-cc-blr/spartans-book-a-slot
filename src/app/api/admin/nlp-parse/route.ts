@@ -14,9 +14,14 @@ async function requireAdmin() {
 // Security: prompt injection mitigated by passing user text only as the user
 // message, never interpolated into the system prompt itself.
 function buildSystemPrompt(today: string, context: NLPContext): string {
-  const captainNames = context.captains.map(c => c.name).join(', ')
-  const groundNames = context.grounds.map(g => g.name).join(', ')
-  const tournamentNames = context.tournaments.map(t => t.name).join(', ')
+  // id::name pairs — the model must be given the real id to return it; a
+  // names-only list (the previous shape here) can never produce a genuine
+  // uuid, only a hallucinated one. This is what actually lets captain_id/
+  // tournament_id/ground_id resolve to something real instead of always
+  // coming back null (or, worse, an invented id).
+  const captainList    = context.captains.map(c => `${c.id}::${c.name}`).join(' | ')
+  const groundList     = context.grounds.map(g => `${g.id}::${g.name}`).join(' | ')
+  const tournamentList = context.tournaments.map(t => `${t.id}::${t.name}`).join(' | ')
   const bookingSummary = context.upcomingBookings
     .map(b => `ID:${b.id.slice(0, 8)} ${b.game_date} ${b.slot_time} ${b.format ?? 'soft_block'} ${b.captain_name ?? ''} ${b.tournament_name ?? ''}`)
     .join(' | ')
@@ -30,9 +35,9 @@ VALID FORMATS: T20, T30
 FORMAT-SLOT RULES: T30 only valid at 07:30 or 12:30. T20 valid at 07:30, 10:30, 14:30.
 GAME DATES: Must be Saturday or Sunday only.
 
-KNOWN CAPTAINS (match by name, partial ok): ${captainNames || 'none'}
-KNOWN GROUNDS/VENUES: ${groundNames || 'none'}
-KNOWN TOURNAMENTS: ${tournamentNames || 'none'}
+KNOWN CAPTAINS (id::name, match by name fuzzily/partial ok): ${captainList || 'none'}
+KNOWN GROUNDS (id::name, match by name fuzzily/partial ok): ${groundList || 'none'}
+KNOWN TOURNAMENTS (id::name, match by name fuzzily/partial ok): ${tournamentList || 'none'}
 
 UPCOMING BOOKINGS (for modify/cancel — match by date+slot or short ID):
 ${bookingSummary || 'none'}
@@ -55,7 +60,9 @@ SLOT PARSING RULES:
 - "12:30", "12:30pm", "noon" → 12:30
 - "2:30", "14:30", "2:30pm", "afternoon" → 14:30
 
-CAPTAIN MATCHING: Match captain names fuzzily. "Muthu" → find best match in known captains list. Return captain_id from known captains.
+CAPTAIN MATCHING: Match captain names fuzzily against KNOWN CAPTAINS. "Muthu" → find best match, return its real id as captain_id and its name as captain_name. No confident match → both null. Never invent an id.
+
+GROUND MATCHING: Match ground/venue mentions fuzzily against KNOWN GROUNDS. Return the matching real id as ground_id and its name as ground_name. No confident match (e.g. a ground not in the list at all) → both null. Never invent an id or return raw unmatched text as ground_id.
 
 For MODIFY actions, identify the target booking from the upcoming bookings list using date+slot or partial ID. Set booking_id.
 For CANCEL actions, same — identify booking_id from the list.
@@ -71,7 +78,8 @@ Respond ONLY with valid JSON, no markdown fences, no preamble:
   "captain_name": "matched name or null",
   "tournament_id": "uuid or null",
   "tournament_name": "matched name or null",
-  "venue": "matched ground name or raw text or null",
+  "ground_id": "uuid from KNOWN GROUNDS or null — never invented",
+  "ground_name": "matched name or null",
   "organiser_name": "string or null (for reserves)",
   "organiser_phone": "string or null",
   "notes": "string or null",

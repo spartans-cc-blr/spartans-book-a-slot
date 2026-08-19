@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const showAll = searchParams.get('all') === 'true'
   let query = supabase
     .from('captains')
-    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, is_captain)')
+    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, whatsapp, is_captain)')
     .order('name')
   if (!showAll) query = query.eq('active', true)
   const { data, error } = await query
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('captains')
     .insert({ name: body.name.trim(), player_id: body.player_id ?? null, active: true })
-    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, is_captain)')
+    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, whatsapp, is_captain)')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ captain: data }, { status: 201 })
@@ -87,7 +87,7 @@ export async function PATCH(req: NextRequest) {
     .from('captains')
     .update(updates)
     .eq('id', id)
-    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, is_captain)')
+    .select('id, name, active, player_id, created_at, players(id, name, cricheroes_url, whatsapp, is_captain)')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ captain: data })

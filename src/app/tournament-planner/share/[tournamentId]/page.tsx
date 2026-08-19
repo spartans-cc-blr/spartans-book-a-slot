@@ -47,10 +47,12 @@ export default async function TournamentSharePage({
 }: { params: { tournamentId: string } }) {
   const supabase = createServiceClient()
 
-  // Fetch tournament — captain lives on tournaments, not bookings (bookings
-  // has no captain_id column/FK at all; a prior version of this query joined
-  // captains via a nonexistent bookings_captain_id_fkey, which failed
-  // silently and made every booking fetch below return nothing).
+  // Fetch tournament — this card shows the tournament's own default captain,
+  // deliberately not any per-booking override (bookings.captain_id, added by
+  // migration 066 — see /admin/bookings for that). A prior version of *this*
+  // query joined captains via a nonexistent bookings_captain_id_fkey (the
+  // column didn't exist yet at the time), which failed silently and made
+  // every booking fetch below return nothing.
   const { data: rawTournament } = await supabase
     .from('tournaments')
     .select('id, name, organiser_name, organiser_contact, total_league_games, vc_captain_id, organiser_self_service, cricheroes_points_table_url, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url))')

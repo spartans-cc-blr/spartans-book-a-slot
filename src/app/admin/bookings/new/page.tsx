@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import type { Tournament, SlotTime, GameFormat, ValidationResult, RuleCheckItem } from '@/types'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 
-type Ground = { id: string; name: string; maps_url: string; hospital_url: string }
+type Ground   = { id: string; name: string; maps_url: string; hospital_url: string }
+type Captain  = { id: string; name: string; active: boolean }
 type TournamentWithCaptain = Tournament & {
   captain_id: string | null
   captains: { id: string; name: string; players: { cricheroes_url: string | null } | null } | null
@@ -46,10 +47,11 @@ export default function NewBookingPage() {
   const [cricHeroesUrl, setCricHeroesUrl] = useState('')
   const [matchTime,     setMatchTime]     = useState('')
   const [matchTimeTouched, setMatchTimeTouched] = useState(false)
-  // Practice games only — every other tournament plays every game at the
-  // one ground set on the tournament itself, so this stays empty and unsent
-  // for those. See features/leaderboard.md §10 for is_practice.
-  const [venue,         setVenue]         = useState('')
+  // Both default to the selected tournament's own ground_id/captain_id (see
+  // the tournament <select>'s onChange below) but are always editable —
+  // practice games in particular have no single tournament-level ground.
+  const [groundId,      setGroundId]      = useState('')
+  const [captainId,     setCaptainId]     = useState('')
 
   // Reservation-only fields
   const [organiserName,  setOrganiserName]  = useState('')
@@ -66,6 +68,7 @@ export default function NewBookingPage() {
   // Data
   const [tournaments,  setTournaments]  = useState<TournamentWithCaptain[]>([])
   const [grounds,      setGrounds]      = useState<Ground[]>([])
+  const [captains,     setCaptains]     = useState<Captain[]>([])
 
   // Validation
   const [ruleChecks,  setRuleChecks]  = useState<RuleCheckItem[]>(
@@ -78,14 +81,21 @@ export default function NewBookingPage() {
 
   const [matchStage, setMatchStage] = useState('')
 
+  function refreshGrounds() {
+    fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? []))
+  }
+
   useEffect(() => {
     fetch('/api/tournaments').then(r => r.json()).then(d => setTournaments(d.tournaments ?? []))
-    fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? []))
+    // all=true — an inactive captain that ends up defaulted from a
+    // tournament must still resolve to a real option, never a blank <select>.
+    fetch('/api/captains?all=true').then(r => r.json()).then(d => setCaptains(d.captains ?? []))
+    refreshGrounds()
   }, [])
 
   useEffect(() => {
     setGameDate(''); setSlotTime(''); setFormat(''); setNotes('')
-    setTournamentId(''); setVenue('')
+    setTournamentId(''); setGroundId(''); setCaptainId('')
     setOpponentName(''); setMatchId(''); setCricHeroesUrl(''); setMatchTime(''); setMatchTimeTouched(false)
     setOrganiserName(''); setOrganiserPhone('')
     setShowAddTournament(false); setNewTournamentName(''); setNewTournamentOrg('')
@@ -249,7 +259,8 @@ export default function NewBookingPage() {
           format,
           slot_time:      slotTime,
           tournament_id:  tournamentId,
-          venue:          selectedTournament?.is_practice ? (venue.trim() || null) : null,
+          ground_id:      groundId || null,
+          captain_id:     captainId || null,
           notes:          notes || null,
           opponent_name:  opponentName || null,
           match_id:       matchId || null,
@@ -389,13 +400,18 @@ export default function NewBookingPage() {
           {/* Confirmed-only fields */}
           {mode === 'confirmed' && (
             <>
-              {/* Step 3: Tournament (captain read-only from tournament) */}
+              {/* Step 3: Tournament, ground, captain */}
               <FormCard step={3} title="Tournament">
                 <select
                   value={tournamentId}
                   onChange={e => {
-                    setTournamentId(e.target.value)
-                    setVenue('')
+                    const id = e.target.value
+                    setTournamentId(id)
+                    // Default ground/captain from the newly picked tournament —
+                    // but never clobber a value already chosen this session.
+                    const t = tournaments.find(x => x.id === id)
+                    setGroundId(prev => prev || (t?.ground_id ?? ''))
+                    setCaptainId(prev => prev || (t?.captain_id ?? ''))
                     setShowAddTournament(false)
                   }}
                   className="form-input"
@@ -408,55 +424,59 @@ export default function NewBookingPage() {
                   ))}
                 </select>
 
-                {/* Ground — practice games only. Every other tournament plays
-                    every game at the one ground set on the tournament itself,
-                    so the ground picker is redundant there and stays hidden. */}
-                {tournamentId && selectedTournament?.is_practice && (
+                {/* Ground — defaults from the tournament's own ground_id, but
+                    always editable. Practice games have no single tournament
+                    ground, so this simply starts blank for those. */}
+                {tournamentId && (
                   <div className="mt-3">
                     <label className="form-label">Ground</label>
-                    <select
-                      value={grounds.find(g => g.name.toLowerCase() === venue.trim().toLowerCase())?.id ?? ''}
-                      onChange={e => setVenue(grounds.find(g => g.id === e.target.value)?.name ?? '')}
-                      className="form-input"
-                    >
-                      <option value="">Select ground...</option>
-                      {grounds.map(g => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
-                      ))}
-                    </select>
-                    <p className="font-rajdhani text-xs text-zinc-600 mt-1">
-                      Practice games move between grounds — pick this game&apos;s ground.
-                    </p>
+                    <div className="flex gap-2">
+                      <select
+                        value={groundId}
+                        onChange={e => setGroundId(e.target.value)}
+                        className="form-input"
+                      >
+                        <option value="">Select ground...</option>
+                        {grounds.map(g => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
+                      <a href="/wrangler/grounds" target="_blank" rel="noopener noreferrer"
+                        onClick={() => setTimeout(refreshGrounds, 3000)}
+                        className="flex-shrink-0 font-rajdhani text-xs font-bold text-gold-dim hover:text-gold border border-ink-5 hover:border-gold-dim rounded px-3 py-2 transition-colors whitespace-nowrap">
+                        ＋ Add ground ↗
+                      </a>
+                    </div>
+                    {selectedTournament?.is_practice && !groundId && (
+                      <p className="font-rajdhani text-xs text-amber-400 mt-1">
+                        Practice games move between grounds — pick this game&apos;s ground.
+                      </p>
+                    )}
                   </div>
                 )}
 
-                {/* Captain — read-only, derived from tournament */}
-                {tournamentId && (() => {
-                  const t = selectedTournament
-                  const captainName = t?.captains?.name
-                  const captainUrl  = t?.captains?.players?.cricheroes_url
-                  return (
-                    <div className="mt-3 p-3 rounded bg-ink-4 border border-ink-5">
-                      <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-1">
-                        Captain
+                {/* Captain — defaults from the tournament's own captain_id,
+                    always editable (e.g. a VC leading this specific game). */}
+                {tournamentId && (
+                  <div className="mt-3">
+                    <label className="form-label">Captain</label>
+                    <select
+                      value={captainId}
+                      onChange={e => setCaptainId(e.target.value)}
+                      className="form-input"
+                    >
+                      <option value="">No captain</option>
+                      {captains.filter(c => c.active || c.id === captainId).map(c => (
+                        <option key={c.id} value={c.id}>{c.name}{!c.active ? ' (inactive)' : ''}</option>
+                      ))}
+                    </select>
+                    {!captainId && (
+                      <p className="font-rajdhani text-xs text-amber-400 mt-1">
+                        No captain selected — WhatsApp captain notification won&apos;t be available.
                       </p>
-                      {captainName ? (
-                        captainUrl ? (
-                          <a href={captainUrl} target="_blank" rel="noopener noreferrer"
-                             className="font-rajdhani font-semibold text-sm text-parchment hover:text-gold underline underline-offset-2 transition-colors">
-                            {captainName}
-                          </a>
-                        ) : (
-                          <span className="font-rajdhani font-semibold text-sm text-parchment">{captainName}</span>
-                        )
-                      ) : (
-                        <span className="font-rajdhani text-xs text-amber-400">
-                          No captain set on this tournament — go to Tournaments to add one.
-                        </span>
-                      )}
-                    </div>
-                  )
-                })()}
+                    )}
+                  </div>
+                )}
 
                 <button onClick={() => setShowAddTournament(v => !v)}
                   className="mt-2 font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors flex items-center gap-1">
@@ -620,9 +640,9 @@ export default function NewBookingPage() {
                 {gameDate      && <p>📅 {gameDate}</p>}
                 {slotTime  && <p>🕐 Slot: {slotTime}{format ? ` — ${format}` : ''}</p>}
                 {matchTime && <p>⏰ Match starts: {matchTime}</p>}
-                {mode === 'confirmed' && selectedTournament?.captains?.name && <p>👤 {selectedTournament.captains.name}</p>}
+                {mode === 'confirmed' && captainId && <p>👤 {captains.find(c => c.id === captainId)?.name}</p>}
                 {mode === 'confirmed' && tournamentId && <p>🏆 {selectedTournament?.name}</p>}
-                {mode === 'confirmed' && selectedTournament?.is_practice && venue && <p>📍 {venue}</p>}
+                {mode === 'confirmed' && groundId && <p>📍 {grounds.find(g => g.id === groundId)?.name}</p>}
                 {mode === 'confirmed' && opponentName && <p>⚔️ vs {opponentName}</p>}
                 {mode === 'confirmed' && cricHeroesUrl && (
                   <a href={cricHeroesUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline flex items-center gap-1">

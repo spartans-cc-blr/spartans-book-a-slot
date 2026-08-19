@@ -226,6 +226,10 @@ type BookingProp = {
     cricheroes_points_table_url?: string | null
     ground?: { name: string; maps_url: string; hospital_url: string } | null
   } | null
+  // This booking's own ground (see migration 066) — takes priority over the
+  // tournament's ground below, which is now only a fallback for rows from
+  // before this column existed.
+  ground?: { name: string; maps_url: string; hospital_url: string } | null
   squad?: SquadPlayer[]
   feePerPlayer?:             number | null
   isLoggedInPlayerInSquad?:  boolean
@@ -244,7 +248,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
     feePerPlayer, isLoggedInPlayerInSquad, isLoggedInPlayerExempt, loggedInWalletBalance,
     yCount, isUpcomingWeekendSlot,
   } = booking;
-  const ground = tournament?.ground;
+  const ground = booking.ground ?? tournament?.ground;
   const ballType  = tournament?.ball_type || "red";
   const jColour   = jerseyColour(ballType);
   const jLabel    = jerseyLabel(ballType);
