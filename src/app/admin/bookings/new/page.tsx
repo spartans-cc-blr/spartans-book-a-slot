@@ -27,6 +27,7 @@ const RULES: { rule: string; label: string }[] = [
   { rule: 'R5', label: 'No T20/T30 format clash' },
   { rule: 'R6', label: '12:30 game runs till evening' },
   { rule: 'R7', label: 'Knockout day priority' },
+  { rule: 'R8', label: 'Captain unavailable for this slot' },
 ]
 
 export default function NewBookingPage() {

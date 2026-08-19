@@ -58,13 +58,22 @@ type BookingWithTournamentCaptain = Booking & {
   } | null
 }
 
+// One row from player_future_availability, pre-scoped by the caller to this
+// tournament's own leading captain (see suggestedSlots.ts / bookings routes).
+export interface CaptainFutureAvailabilityRow {
+  game_date: string
+  slot_time: string
+  response:  string
+}
+
 export function validateBooking(
   booking: CreateBookingRequest,
   existingBookings: BookingWithTournamentCaptain[],
   captainName: string,
   tournamentName: string,
   thisTournamentCaptainId: string | null = null,
-  overriddenRules: Set<string> = new Set()
+  overriddenRules: Set<string> = new Set(),
+  captainFutureAvailability: CaptainFutureAvailabilityRow[] = []
 ): ValidationResult {
   // T10/T25 are rare, informal, admin-only quick games — they never go
   // through R1-R7 at all (no weekend cap, no clash checks, no knockout-day
@@ -248,6 +257,27 @@ export function validateBooking(
       errors.push({
         rule: 'R7',
         message: `${booking.game_date} has a Knockout hold at ${knockoutSameDay.slot_time}. No slot at or before that time can be booked on this date.`,
+      })
+    }
+  }
+
+  // ── R8: Captain unavailable for this exact slot (WARNING) ──────
+  // Slot-precise sibling of the day-level exclusion in
+  // getSuggestedOpenDates() (src/lib/suggestedSlots.ts) — that check drops
+  // an entire candidate day only when the captain is 'L' across all 4
+  // slot_times; this one fires at actual booking time for the one exact
+  // slot_time being booked. Non-blocking, same severity as R2 — the admin
+  // sees the warning and can still confirm if the captain has agreed anyway.
+  if (thisTournamentCaptainId) {
+    const captainUnavailable = captainFutureAvailability.find(r =>
+      r.game_date === booking.game_date &&
+      r.slot_time === booking.slot_time &&
+      r.response === 'L'
+    )
+    if (captainUnavailable) {
+      warnings.push({
+        rule: 'R8',
+        message: `${captainName} marked themselves unavailable for ${booking.slot_time} on ${booking.game_date}. Confirm only if they've agreed to play anyway.`,
       })
     }
   }

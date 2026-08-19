@@ -111,6 +111,7 @@ const RULES = [
   { rule: 'R5', label: 'Format/time clash' },
   { rule: 'R6', label: '12:30 overlap' },
   { rule: 'R7', label: 'Knockout day priority' },
+  { rule: 'R8', label: 'Captain unavailable for this slot' },
 ]
 
 function defaultMatchTime(slot: SlotTime): string {

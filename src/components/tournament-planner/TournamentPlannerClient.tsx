@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseISO, differenceInDays, format } from 'date-fns'
 import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
-import { TournamentShareButton, WA_ICON } from './TournamentShareButton'
+import { TournamentShareButton } from './TournamentShareButton'
 import { ResultBadge } from '@/components/shared/ResultBadge'
 import type { PlayerStatsTotals } from '@/types'
 
@@ -918,11 +918,6 @@ function TournamentBlock({
               unbooked={unbooked}
               sortedGames={sortedGames}
               bookingCaptainMap={bookingCaptainMap}
-              tournamentId={tournament.id}
-              tournamentName={tournament.name}
-              organiserName={tournament.organiser_name}
-              organiserContact={tournament.organiser_contact}
-              canSuggestSlots={isAdmin || isGC}
               showFormatOnRow={tournamentFormats.length > 1}
             />
 
@@ -1079,7 +1074,6 @@ function TournamentBlock({
 // since that's what captains care about most day-to-day.
 function MatchTabsSection({
   upcoming, pastMatches, unbooked, sortedGames, bookingCaptainMap,
-  tournamentId, tournamentName, organiserName, organiserContact, canSuggestSlots,
   showFormatOnRow,
 }: {
   upcoming: Booking[]
@@ -1087,11 +1081,6 @@ function MatchTabsSection({
   unbooked: number
   sortedGames: Booking[]
   bookingCaptainMap: Record<string, SquadCaptain>
-  tournamentId: string
-  tournamentName: string
-  organiserName: string | null
-  organiserContact: string | null
-  canSuggestSlots: boolean
   // Format is shown once at the tournament header now (see TournamentBlock).
   // Only repeat it per-row when this tournament actually mixes formats —
   // otherwise it's the same value on every row and just adds noise.
@@ -1227,153 +1216,15 @@ function MatchTabsSection({
           unbooked === 0
             ? <p className="text-xs text-stone-500 py-3">No unbooked games — fully booked.</p>
             : (
-              <>
-                <div className="bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3">
-                  <p className="text-xs font-semibold text-stone-600">
-                    ○ {unbooked} unbooked game{unbooked !== 1 ? 's' : ''} — date &amp; slot not yet booked
-                  </p>
-                </div>
-                {canSuggestSlots && (
-                  <SuggestedSlotsPanel
-                    tournamentId={tournamentId}
-                    tournamentName={tournamentName}
-                    organiserName={organiserName}
-                    organiserContact={organiserContact}
-                  />
-                )}
-              </>
+              <div className="bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3">
+                <p className="text-xs font-semibold text-stone-600">
+                  ○ {unbooked} unbooked game{unbooked !== 1 ? 's' : ''} — date &amp; slot not yet booked.
+                  See the organiser share page for suggested open dates.
+                </p>
+              </div>
             )
         )}
       </div>
-    </div>
-  )
-}
-
-// ── Suggested slots for unbooked games — GC/Admin only ────────────────
-// Fetches candidates from the server (which reuses the R1-R6 validation
-// engine) on demand rather than on mount, since this hits Supabase with a
-// wider club-wide query than the rest of the page needs.
-// No slot_time — every suggested date is a fully open day, so any
-// slot_time on it would work; showing one specific time would wrongly
-// read as a constraint. See the API route's header comment.
-interface SuggestedSlot { game_date: string; day: 'Sat' | 'Sun' }
-
-function SuggestedSlotsPanel({
-  tournamentId, tournamentName, organiserName, organiserContact,
-}: {
-  tournamentId: string
-  tournamentName: string
-  organiserName: string | null
-  organiserContact: string | null
-}) {
-  const [suggestions, setSuggestions] = useState<SuggestedSlot[] | null>(null)
-  const [monthlyCap, setMonthlyCap] = useState(2)
-  const [overCapMonths, setOverCapMonths] = useState<string[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function loadSuggestions() {
-    setLoading(true); setError('')
-    try {
-      const res = await fetch(`/api/tournaments/${tournamentId}/suggested-slots`)
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Could not load suggestions'); return }
-      setSuggestions(data.suggestions ?? [])
-      setMonthlyCap(data.monthlyCap ?? 2)
-      setOverCapMonths(data.overCapMonths ?? [])
-    } catch {
-      setError('Network error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Months where the club's own per-tournament monthly cap means not every
-  // suggested date in that month can actually be booked — the extra options
-  // are backups in case an earlier one in the same month falls through, not
-  // a guarantee all of them are simultaneously bookable. Named explicitly by
-  // date rather than "the options below" — that phrasing read as applying to
-  // every suggestion shown (including unaffected months), when the cap is
-  // really scoped to just the listed dates that share an over-cap month.
-  const capNote = overCapMonths.length > 0 && suggestions
-    ? overCapMonths
-        .map(m => {
-          const datesInMonth = suggestions
-            .filter(s => s.game_date.startsWith(m))
-            .map(s => `${s.day} ${format(parseISO(s.game_date), 'd MMM')}`)
-          return `Of ${datesInMonth.join(', ')}, only ${monthlyCap} can actually be booked (${tournamentName} is capped at ${monthlyCap} confirmed games per month).`
-        })
-        .join(' ')
-    : ''
-
-  // This panel only mounts once the viewer is actually on the Unbooked tab
-  // (see canSuggestSlots gating in MatchTabsSection), so fetching immediately
-  // here already is the lazy behaviour — no extra click needed to see it.
-  useEffect(() => {
-    loadSuggestions()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tournamentId])
-
-  const waMessage = suggestions && suggestions.length > 0
-    ? [
-        `Hi${organiserName ? ' ' + organiserName : ''}! For ${tournamentName}, here are our next earliest fully open days on our end:`,
-        ...suggestions.map(s => `• ${s.day} ${format(parseISO(s.game_date), 'd MMM')}`),
-        ...(capNote ? [``, capNote] : []),
-        `Let us know which of these works and we'll get it locked in. Thanks!`,
-      ].join('\n')
-    : ''
-
-  const waLink = organiserContact && waMessage
-    ? `https://wa.me/${organiserContact.replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`
-    : null
-
-  return (
-    <div className="mt-2.5 bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-bold text-stone-700">Suggest slots to organiser</p>
-        {loading && <span className="text-[11px] text-stone-400 flex-shrink-0">Finding slots…</span>}
-        {error && (
-          <button type="button" onClick={loadSuggestions}
-            className="text-[11px] font-bold text-gold-dim hover:text-gold flex-shrink-0">
-            Retry
-          </button>
-        )}
-      </div>
-      {!loading && !error && (
-        <p className="text-[11px] text-stone-500 mt-0.5">
-          Only days with nothing booked at all — a day with any existing game on it, even at a different time, isn't suggested.
-        </p>
-      )}
-      {error && <p className="text-[11px] text-red-700 mt-1.5">{error}</p>}
-      {suggestions && (
-        suggestions.length === 0 ? (
-          <p className="text-xs text-stone-500 mt-2">No open slots found that satisfy the booking rules in the next few months.</p>
-        ) : (
-          <>
-            <div className="flex flex-col gap-1.5 mt-2">
-              {suggestions.map(s => (
-                <p key={s.game_date} className="text-xs text-stone-700">
-                  <span className="font-semibold text-ink">{s.day} {format(parseISO(s.game_date), 'd MMM')}</span>
-                </p>
-              ))}
-            </div>
-            {capNote && (
-              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2">
-                {capNote}
-              </p>
-            )}
-            {waLink && (
-              <a href={waLink} target="_blank" rel="noopener noreferrer"
-                className="mt-2.5 w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-700 rounded-xl py-2 text-xs font-bold hover:bg-emerald-200 transition-colors">
-                {WA_ICON} Suggest these slots via WhatsApp
-              </a>
-            )}
-            {!organiserContact && (
-              <p className="text-[10px] text-stone-400 mt-1.5">Add organiser WhatsApp in /admin/tournaments to enable sending.</p>
-            )}
-          </>
-        )
-      )}
     </div>
   )
 }

@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       .neq('status', 'cancelled'),
     supabase
       .from('tournaments')
-      .select('id, name, captain_id, ground_id, captains!tournaments_captain_id_fkey(id, name)')
+      .select('id, name, captain_id, ground_id, captains!tournaments_captain_id_fkey(id, name, player_id)')
       .eq('id', tournament_id)
       .single(),
   ])
@@ -95,6 +95,8 @@ export async function POST(req: NextRequest) {
   if (!tournament) {
     return NextResponse.json({ error: 'Tournament not found' }, { status: 400 })
   }
+
+  const thisTournamentCaptainPlayerId = (tournament.captains as any)?.player_id ?? null
 
   // Omitted key → default to the tournament's own ground/captain (this is
   // what the admin form's pickers already pre-fill client-side, but the
@@ -122,13 +124,25 @@ export async function POST(req: NextRequest) {
     tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
   }))
 
+  // R8 input — this exact game_date's future-availability rows for the
+  // tournament's own leading captain only (see validateBooking in
+  // src/lib/validation.ts).
+  const { data: captainFutureAvailability } = thisTournamentCaptainPlayerId
+    ? await supabase
+        .from('player_future_availability')
+        .select('game_date, slot_time, response')
+        .eq('player_id', thisTournamentCaptainPlayerId)
+        .eq('game_date', game_date)
+    : { data: [] as { game_date: string; slot_time: string; response: string }[] }
+
   const result = validateBooking(
     safeBody as CreateBookingRequest,
     existing,
     (tournament.captains as any)?.name ?? 'This captain',
     tournament.name,
     tournament.captain_id ?? null,
-    overriddenRules
+    overriddenRules,
+    captainFutureAvailability ?? []
   )
 
   if (!result.valid) {
@@ -162,6 +176,52 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // ── Carry pre-filled future availability into the real availability
+  // table for this exact date + slot, for every player who filled it in —
+  // not just the captain. Failure here must not roll back the booking (the
+  // booking is real regardless of whether a pre-fill happened to exist);
+  // log and continue, same posture as the audit-insert error handling in
+  // captain-availability/route.ts. Only this route (confirmed bookings) —
+  // not /api/bookings/reserve or the organiser self-service reserve route,
+  // both of which create soft_block holds that might expire, not real games.
+  const { data: futureRows } = await supabase
+    .from('player_future_availability')
+    .select('player_id, response')
+    .eq('game_date', game_date)
+    .eq('slot_time', slot_time)
+
+  if (futureRows && futureRows.length > 0) {
+    const availabilityRows = futureRows.map(r => ({
+      player_id:     r.player_id,
+      booking_id:    data.id,
+      response:      r.response,
+      updated_by:    null,
+      update_source: 'future_carryover',
+    }))
+    const { error: carryError } = await supabase
+      .from('availability')
+      .insert(availabilityRows)
+
+    if (carryError) {
+      console.error('Future-availability carryover failed:', carryError.message)
+    } else {
+      const auditRows = futureRows.map(r => ({
+        player_id:     r.player_id,
+        booking_id:    data.id,
+        old_response:  null,
+        new_response:  r.response,
+        // availability_audit.updated_by is NOT NULL — credit the player
+        // themselves, same convention player-availability/route.ts uses
+        // for a genuine self-update audit row.
+        updated_by:    r.player_id,
+        update_source: 'future_carryover',
+        note:          'Auto-filled from future availability',
+      }))
+      const { error: auditError } = await supabase.from('availability_audit').insert(auditRows)
+      if (auditError) console.error('Carryover audit insert failed:', auditError.message)
+    }
+  }
 
   // Log every rule the admin actually overrode (only ones that genuinely
   // fired — see validateBooking's `overridden` list, not just whatever the

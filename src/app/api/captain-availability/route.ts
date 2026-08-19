@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -14,6 +15,9 @@ export async function POST(req: NextRequest) {
   if (!user?.isCaptain && !user?.isAdmin) {
     return NextResponse.json({ error: 'Unauthorised — captains only' }, { status: 403 })
   }
+
+  const limited = await rateLimit(req, RATE_LIMITS.captainWrite, user.playerId)
+  if (limited) return limited
 
   const body = await req.json()
   const { player_id, booking_id, response, note } = body

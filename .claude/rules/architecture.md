@@ -122,6 +122,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/api/milestones/mark-seen` | POST | Own session | Advances the signed-in player's own `milestones_seen_at` cursor to now; player_id and timestamp always server-derived |
 | `/api/birthdays/today` | GET | Any signed-in, non-expelled member | Broadcast feed for the birthday wishes modal — players whose `dob` falls on today's IST date, gated on the viewer's own `birthday_wishes_seen_date` cursor; see `features/birthday-wishes.md` |
 | `/api/birthdays/mark-seen` | POST | Own session | Advances the signed-in player's own `birthday_wishes_seen_date` cursor to today; player_id and date always server-derived |
+| `/api/player/future-availability` | GET, POST, DELETE | Player session, non-expelled | Slot-level availability for dates without a real booking yet — no wallet-dues/freeze guards (neither applies before a booking exists); POST accepts a single slot or `whole_day: true` (fans out to all 4 slot_times); see `features/player-future-availability.md` |
  
 ### Captain APIs
  
@@ -310,6 +311,18 @@ Read-through cache of the separate analytics Supabase project — source of trut
 #### `fee_exemptions`
 Full lockdown RLS. Joined to `players` in admin view.
 
+#### `player_future_availability`
+`id, player_id FK, game_date, slot_time, response ('Y'|'O'|'E'|'L'), updated_at`
+`UNIQUE(player_id, game_date, slot_time)`. Slot-level availability for
+dates without a real booking yet — distinct from `availability`, which
+requires a real `booking_id`. **RLS enabled, no anon/authenticated
+policies** — same blanket-deny pattern as `availability`/`fee_exemptions`.
+Migration `067_player_future_availability.sql`. Feeds the suggestion
+engines' captain-availability exclusion and R8's exact-slot warning
+(§7), and is carried into a real `availability` row (`update_source:
+'future_carryover'`) once a booking is confirmed for that exact
+date+slot. See `features/player-future-availability.md`.
+
 #### `milestone_achievements`
 `id, player_id FK, booking_id FK (nullable, ON DELETE SET NULL), milestone_type ('runs'|'wickets'|'dismissals'), milestone_value, year, achieved_at`
 Idempotent log of club-wide milestone recognitions (500/750/1000 runs,
@@ -368,6 +381,7 @@ All rules live in `src/lib/validation.ts`. Called from both the API (on save) an
 | R5 | T30 Format Clash | Error | T30 at 07:30 blocks 10:30; T20 at 10:30 blocks 12:30 |
 | R6 | 12:30 Overlap | Error | Any game at 12:30 blocks 10:30 and 14:30; T20 at 14:30 blocks 12:30 |
 | R7 | Knockout Day Priority | Warning when placing the knockout hold itself; Error otherwise (overridable) | Once a booking on a date carries the Knockout `block_reason`, no other booking may take a slot at or before it that day — see `features/knockout-day-protection.md` |
+| R8 | Captain Unavailable For This Slot | Warning (never blocking) | Tournament's leading captain has marked `player_future_availability` response `L` for this exact `game_date`+`slot_time` — see `features/player-future-availability.md` |
  
 **Valid slot/format combinations:**
  
@@ -439,7 +453,7 @@ organiser — not a general-purpose bypass.
 ### 8.1 Booking & Reservation Flow
 ```
 Admin → /admin/bookings/new
-  → Validate rules (R1–R6) via /api/validate (live)
+  → Validate rules (R1–R8) via /api/validate (live)
   → Match Start Time auto-fills to the chosen slot_time once a slot is picked
   → POST /api/bookings → DB write (service role)
   → [soft_block] reserved_until = now() + 48hr
@@ -686,7 +700,7 @@ Next.js API Routes (server-side)
 | `src/lib/auth.ts` | NextAuth config; JWT callback enriches token with player context; email lowercased; Google photo seeded on first sign-in; `session.maxAge` + `jwt.maxAge` aligned to 30 days |
 | `src/lib/rateLimit.ts` | Upstash Redis sliding-window rate limiter; `RATE_LIMITS` presets: `playerWrite` (20/min), `captainWrite` (30/min), `adminWrite` (60/min), `publicRead` (100/min) |
 | `src/lib/supabase.ts` | Three client factories: browser (anon), server (anon), service (bypasses RLS) |
-| `src/lib/validation.ts` | Booking rules engine R1–R7; used by both API and client; `validateBooking()`'s optional `overriddenRules` param splits errors into still-blocking vs admin-overridden — see §7.1; R7 (knockout day priority) — see `features/knockout-day-protection.md` |
+| `src/lib/validation.ts` | Booking rules engine R1–R8; used by both API and client; `validateBooking()`'s optional `overriddenRules` param splits errors into still-blocking vs admin-overridden — see §7.1; R7 (knockout day priority) — see `features/knockout-day-protection.md`; R8 (captain unavailable for this slot, non-blocking) — see `features/player-future-availability.md` |
 | `src/components/admin/RuleCheckStrip.tsx` | Shared horizontal R1-R6 rule-check row + admin override UI, used by both `/admin/bookings/new` and `/admin/bookings/[id]`; `ruleChecksAllPassed()` is the shared Confirm/Save button gate — see §7.1 |
 | `src/middleware.ts` | Route protection; redirects unauthenticated/unauthorised requests |
 | `src/app/fixtures/page.tsx` | Main fixtures server component; fetches bookings, availability, squad; includes `cricheroes_points_table_url` in tournament select |
@@ -706,7 +720,9 @@ Next.js API Routes (server-side)
 | `src/components/tournament-planner/TournamentShareCard.tsx` | Public-facing single tournament slot-balance card; `count/target` per-slot display; tournament name links to CricHeroes points table if `cricheroes_points_table_url` set (§8.5); renders `OrganiserSelfService` when the tournament has self-service enabled |
 | `src/components/tournament-planner/OrganiserSelfService.tsx` | Public, unauthenticated per-slot-bucket reserve/decline/attach-URL widget — see `features/organiser-self-service.md` |
 | `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` — used by the share card and the slot-bucket suggestion engine |
-| `src/lib/suggestedSlots.ts` | `getSuggestedOpenDates()` (day-level, non-self-service tournaments); `getSuggestedSlotDates()` / `findNextSlotDate()` (per-slot-bucket, self-service tournaments) |
+| `src/lib/suggestedSlots.ts` | `getSuggestedOpenDates()` (day-level, non-self-service tournaments — public share page only, the internal GC/Admin panel that also used this was removed, see `features/player-future-availability.md` §8); `getSuggestedSlotDates()` / `findNextSlotDate()` (per-slot-bucket, self-service tournaments); both factor in the tournament captain's `player_future_availability` (day-level whole-day exclusion for the former, exact-slot R8 warning for the latter two); `upcomingWeekendDates()` (plain Sat/Sun date list, feeds `FutureAvailabilityPanel`) |
+| `src/app/api/player/future-availability/route.ts` | GET/POST/DELETE — slot-level availability for dates without a real booking yet; see `features/player-future-availability.md` |
+| `src/components/fixtures/FutureAvailabilityPanel.tsx` | Player-facing UI on `/fixtures`, collapsed by default; whole-day quick actions + per-slot Y/O/E/L expand |
 | `src/lib/familyAuth.ts` | *(Planned U-24)* `validateFamilySession()` — re-queries `family_sessions` table; never trusts cookie value alone |
 | `src/lib/announcement.ts` | `buildSquadAnnouncement()` — WhatsApp message builder |
 | `src/lib/bookingNotify.ts` | `buildOrganiserWhatsAppUrl()` / `buildCaptainWhatsAppUrl()` — shared message builders for `/admin/bookings/[id]`'s Notify panel; organiser message includes the tournament share page link, captain message includes the CricHeroes URL when set — see §8.1 |

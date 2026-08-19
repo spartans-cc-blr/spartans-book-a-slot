@@ -145,9 +145,13 @@ lives here, that stays exclusively on `/admin/soft-blocks/new`:
   non-cancelled status).
 
 Both are gated strictly to `isAdmin` — deliberately stricter than the
-existing, closely related Suggested-Slots panel (`isAdmin || isGC`), since
-knockout negotiation with rival organisers is treated as the coordinator's
-job specifically, not GC's.
+Tournament Planner's internal Suggested-Slots panel (`isAdmin || isGC`) as
+it existed at the time, since knockout negotiation with rival organisers is
+treated as the coordinator's job specifically, not GC's. That internal
+panel was later removed entirely (see `features/player-future-availability.md`
+§8) — suggested dates now live exclusively on the public organiser share
+page, `/tournament-planner/share/[tournamentId]` — so this comparison is
+historical context for the `isAdmin`-only choice, not a live cross-reference.
 
 ---
 
@@ -168,7 +172,7 @@ tournament is attached.
 |---|---|
 | Knockout hold creation stays `isAdmin`-only | ✅ Unchanged — `/admin/soft-blocks/new` and `/api/soft-blocks` already required it |
 | R7 applies to every booking path, not just the one that introduced it | ✅ Lives in the shared `validateBooking()` engine — the confirmed-booking form, the reservation form, and self-service (see `organiser-self-service.md`) all inherit it automatically |
-| Tournament Planner's new read-only pieces are `isAdmin`-only | ✅ Stricter than the pre-existing `isAdmin \|\| isGC` Suggested-Slots panel, a deliberate choice |
+| Tournament Planner's new read-only pieces are `isAdmin`-only | ✅ Stricter than the `isAdmin \|\| isGC` Suggested-Slots panel that existed at the time (since removed — see §5) |
 | Reason logged for any R7 override | ✅ Same `booking_rule_overrides` audit trail as every other rule |
 
 ---

@@ -114,8 +114,9 @@ export function TournamentShareCard({
   const slotTargets = distributeSlotTargets(validSlotKeys, totalLeague)
 
   // Enquiry link to the club for one of the fully-open suggested dates —
-  // no slot_time is named (mirrors the private planner's suggested-slots
-  // panel) since the whole day is open, not one specific time.
+  // no slot_time is named, since the whole day is open, not one specific
+  // time (see getSuggestedOpenDates()'s own header comment in
+  // src/lib/suggestedSlots.ts for why this engine never returns a time).
   function suggestedDateWaLink(s: SuggestedDate): string {
     const dayLabel = format(parseISO(s.game_date), 'EEEE d MMM')
     const message = `Hi Spartans! For ${tournament.name}, is ${dayLabel} available to book? We'd like to schedule our next league game.`

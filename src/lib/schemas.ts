@@ -215,7 +215,11 @@ export const resolveReconciliationSchema = z.object({
 // and .claude/rules/architecture.md §7 (R1-R7 rules engine)
 
 export const bookingRuleOverrideSchema = z.object({
-  rule: z.enum(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']),
+  // R8 (captain unavailable for this exact slot) is a pure warning — never
+  // blocking, so it never actually reaches the override flow — but kept in
+  // this enum so ValidationError['rule'] and this schema stay in sync,
+  // matching how R7 was added here alongside its own addition.
+  rule: z.enum(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']),
   reason: z
     .string()
     .min(3, 'Override reason must be at least 3 characters')
@@ -229,6 +233,25 @@ export const bookingRuleOverrideSchema = z.object({
 })
 
 export const bookingRuleOverridesSchema = z.array(bookingRuleOverrideSchema).max(6).optional()
+
+// ── PLAYER FUTURE AVAILABILITY (POST /api/player/future-availability) ──────
+// Slot-level availability for dates that don't have a booking yet — see
+// player_future_availability (migration 067) and
+// .claude/rules/features/... future-availability handoff.
+// Two shapes: a single (game_date, slot_time) row, or `whole_day: true`
+// which the route fans out server-side to all 4 slot_time rows.
+
+export const futureAvailabilitySlotTimeSchema = z.enum(['07:30', '10:30', '12:30', '14:30'])
+export const futureAvailabilityResponseSchema = z.enum(['Y', 'O', 'E', 'L'])
+
+export const futureAvailabilityRequestSchema = z.object({
+  game_date: z.string().regex(GAME_DATE_REGEX, 'game_date must be YYYY-MM-DD'),
+  response:  futureAvailabilityResponseSchema,
+  slot_time: futureAvailabilitySlotTimeSchema.optional(),
+  whole_day: z.literal(true).optional(),
+}).refine(data => data.whole_day === true || !!data.slot_time, {
+  message: 'slot_time is required unless whole_day is true',
+})
 
 // ── WALLET TRANSACTIONS (admin-only) ────────────────────────────────────────
 // POST/GET /api/wallet/transactions — see wallet_transactions table
