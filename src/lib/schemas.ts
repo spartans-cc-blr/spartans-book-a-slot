@@ -215,7 +215,11 @@ export const resolveReconciliationSchema = z.object({
 // and .claude/rules/architecture.md §7 (R1-R7 rules engine)
 
 export const bookingRuleOverrideSchema = z.object({
-  rule: z.enum(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']),
+  // R8 (captain unavailable for this exact slot) is a pure warning — never
+  // blocking, so it never actually reaches the override flow — but kept in
+  // this enum so ValidationError['rule'] and this schema stay in sync,
+  // matching how R7 was added here alongside its own addition.
+  rule: z.enum(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']),
   reason: z
     .string()
     .min(3, 'Override reason must be at least 3 characters')

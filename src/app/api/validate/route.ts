@@ -37,7 +37,7 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
           .neq('status', 'cancelled'),
     supabase
       .from('tournaments')
-      .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name)')
+      .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name, player_id)')
       .eq('id', tournament_id)
       .single(),
   ])
@@ -47,6 +47,7 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
   }
 
   const thisTournamentCaptainId = tournament.captain_id ?? null
+  const thisTournamentCaptainPlayerId = (tournament.captains as any)?.player_id ?? null
   const captainName = (tournament.captains as any)?.name ?? 'This captain'
   const tournamentName = tournament.name
 
@@ -56,12 +57,25 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
     tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
   }))
 
+  // R8 input — this exact game_date's future-availability rows for the
+  // tournament's own leading captain only (see validateBooking in
+  // src/lib/validation.ts).
+  const { data: captainFutureAvailability } = thisTournamentCaptainPlayerId && game_date
+    ? await supabase
+        .from('player_future_availability')
+        .select('game_date, slot_time, response')
+        .eq('player_id', thisTournamentCaptainPlayerId)
+        .eq('game_date', game_date)
+    : { data: [] as { game_date: string; slot_time: string; response: string }[] }
+
   const result = validateBooking(
     body as CreateBookingRequest,
     existing,
     captainName,
     tournamentName,
-    thisTournamentCaptainId
+    thisTournamentCaptainId,
+    new Set(),
+    captainFutureAvailability ?? []
   )
 
   return NextResponse.json(result)

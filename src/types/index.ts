@@ -159,7 +159,7 @@ export interface ValidationResult {
 }
 
 export interface ValidationError {
-  rule:    'R1' | 'R2' | 'R3' | 'R4' | 'R5' | 'R6' | 'R7'
+  rule:    'R1' | 'R2' | 'R3' | 'R4' | 'R5' | 'R6' | 'R7' | 'R8'
   message: string
 }
 
