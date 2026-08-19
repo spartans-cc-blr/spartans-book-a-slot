@@ -131,7 +131,13 @@ export async function POST(req: NextRequest) {
         block_reason,
         notes: notes ?? null,
         status: 'soft_block',
-        reserved_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+        // Internal-reason holds (Club Event / Knockout / Practice / Other)
+        // are admin-placed and admin-released — never auto-expired by the
+        // cron. Unlike an organiser-pending-match reservation, there's no
+        // natural "did the other party follow through" deadline here; a
+        // Knockout hold in particular is often placed weeks ahead of the
+        // actual date it protects.
+        reserved_until: null,
         organiser_name: 'Internal — Coordinator',
       })
       .select()
@@ -167,7 +173,9 @@ export async function POST(req: NextRequest) {
       status: 'soft_block',
       format: null,
       tournament_id: null,
-      reserved_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      // See the tournament-linked branch above — internal-reason holds are
+      // admin-released, not cron-expired.
+      reserved_until: null,
       organiser_name: 'Internal — Coordinator',
     })
     .select()
