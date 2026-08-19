@@ -1,30 +1,39 @@
-# Player Future Availability — Feature Summary
+# Captain Unavailable Dates (formerly Player Future Availability)
 
-**Spartans Hub · Added: August 2026**
+**Spartans Hub · Added: August 2026 · Narrowed to captain-only, L-only: August 2026**
 
 ---
 
 ## 1. Overview
 
-Slot-level availability for dates that don't have a real booking yet —
-distinct from `availability` (`/api/player-availability`), which requires
-a real `booking_id`. Lets a player pre-fill their general attendance ahead
-of scheduling, feeding two consumers:
+Lets a captain mark a date/slot as "I already know I can't lead a game" —
+for dates that don't have a real booking yet, distinct from `availability`
+(`/api/player-availability`), which requires a real `booking_id`. Feeds
+two consumers, both of which only ever look at `L`:
 
 - **Suggestion engines** (`src/lib/suggestedSlots.ts`) skip a candidate
-  date/slot the tournament's own leading captain has marked themselves
-  unavailable (`L`) for — see §3.
+  date/slot the tournament's own leading captain has marked `L` for —
+  see §3.
 - **Booking-time validation** (`validateBooking()`, `src/lib/validation.ts`)
   surfaces a non-blocking warning (**R8**) when an admin tries to book the
   tournament's captain into a slot they've marked `L` for — see §4.
-- **Carryover**: once a real booking is confirmed for a date/slot, every
-  player's (not just the captain's) pre-filled future-availability response
-  for that exact date/slot is copied into the real `availability` table —
-  see §5.
 
-Reachable by every active, non-expelled player from `/fixtures` — not
-gated behind Captains' Corner, since the underlying data and its two
-consumers above key off *any* player's response, not just a captain's.
+**Narrowed from "every active player, any of Y/O/E/L" to "captains only,
+L only" (August 2026).** The feature originally shipped player-facing
+(`/unscheduled-availability`, reachable by any active player, full Y/O/E/L
+picker) on the theory that a fuller adoption picture might be useful
+someday. In practice nothing ever consumed anything but a captain's own
+`L` — Y/O/E had no reader anywhere in the codebase — so the wider surface
+was pure unused complexity with no benefit, and non-captain players had no
+real reason to be here (the actual real-booking `availability` flow on
+`/fixtures` already covers "am I free," this feature exists purely to keep
+the tournament share page from suggesting a slot to an organiser that the
+captain already knows they can't do). Reachable only from the
+**Captains' Corner ▾** nav dropdown now, alongside "🏏 Squad Selection" —
+see §6 and `architecture.md` §3's role table.
+
+**Carryover was removed in the same pass, not just narrowed** — see §5 for
+why it no longer makes sense once only captains write here.
 
 ---
 
@@ -46,17 +55,31 @@ RLS enabled, no anon/authenticated policy — blanket-deny, same pattern as
 `availability`/`fee_exemptions`. All access via `createServiceClient()`
 through the API route only.
 
+**Schema unchanged by the August 2026 narrowing** — the CHECK constraint
+still technically allows `Y`/`O`/`E`, and `player_id` isn't FK-scoped to
+captains only. Only the application layer (Zod schema + route auth, §3)
+enforces "captains, `L` only" now; the table itself stays general-purpose
+in case a genuine future need for the wider shape ever comes up. No
+migration was written to narrow the CHECK constraint — narrowing a column
+that already has zero non-`L` writes going forward isn't worth a migration
+for its own sake.
+
+Any pre-existing rows from the brief window this was player-facing (any
+`Y`/`O`/`E`/non-captain rows) are inert — nothing reads them — and were
+left in place rather than cleaned up; there's no user-visible surface that
+would ever show them.
+
 ### `supabase/migrations/068_availability_update_source_carryover.sql`
 
 `availability.update_source` and `availability_audit.update_source` both
 carry a live CHECK constraint (`player`/`captain` only) that predates this
 feature and isn't itself checked into `supabase/migrations/` (same
 repo/DB drift pattern documented in `gc-players.md` §13 and
-`post-match-scorecard.md` §5 — found only by querying the live schema, not
-by reading the migrations folder). Widened to also allow
-`'future_carryover'` (§5) — a carried-over row is neither a genuine
-self-service write nor a captain-proxy write, so attributing it to
-`'player'` would blur the audit trail.
+`post-match-scorecard.md` §5). Widened to also allow `'future_carryover'`
+— this was for the carryover feature described in the original version of
+this doc, which has since been removed (§5). The widened constraint is
+harmless to leave in place (an unused enum value costs nothing) and
+reverting it would need its own migration for no benefit.
 
 ---
 
@@ -64,16 +87,26 @@ self-service write nor a captain-proxy write, so attributing it to
 
 | Method | Auth | Purpose |
 |---|---|---|
-| GET | Any signed-in player | Own rows only — `{ availability: {game_date, slot_time, response}[] }` |
-| POST | Own session, non-expelled | `{game_date, slot_time, response}` (single slot) or `{game_date, response, whole_day: true}` (fans out server-side to all 4 slot_times as independent rows — a later single-slot edit only ever touches its own row) |
-| DELETE | Own session, non-expelled | `{game_date, slot_time}` — clears one slot |
+| GET | `isCaptain \|\| isAdmin` | Own rows only — `{ availability: {game_date, slot_time, response}[] }` |
+| POST | `isCaptain \|\| isAdmin`, non-expelled | `{game_date, slot_time, response: 'L'}` (single slot) or `{game_date, response: 'L', whole_day: true}` (fans out server-side to all 4 slot_times as independent rows) |
+| DELETE | `isCaptain \|\| isAdmin`, non-expelled | `{game_date, slot_time}` — clears one slot |
+
+**Route path/table name still say "player"** — left as-is rather than
+renamed when the captain-only gate was added, since this is an internal
+API path with no external consumers to break and renaming would have been
+pure churn for no functional benefit.
+
+`response` is `z.literal('L')` in `futureAvailabilityResponseSchema`
+(`src/lib/schemas.ts`) — Y/O/E were dropped from the accepted values
+entirely, not just the UI, since nothing has ever consumed them (§1).
 
 Mirrors `player-availability/route.ts`'s guard order (session →
-`playerStatus !== 'expelled'` → rate limit → explicit
+`playerStatus !== 'expelled'` → captain check → rate limit → explicit
 select-then-insert/update, never `.upsert()`) but has **no wallet-dues
 guard and no `availability_locked`/freeze check** — neither applies before
-a real booking exists. Zod-validated (`futureAvailabilityRequestSchema`,
-`src/lib/schemas.ts`), rate-limited with `RATE_LIMITS.playerWrite`.
+a real booking exists. Rate-limited with `RATE_LIMITS.captainWrite`
+(30/min) — switched from `playerWrite` when the route was narrowed to
+captains only, matching the tier `/api/captain-availability` already uses.
 
 ---
 
@@ -84,10 +117,10 @@ Two different suggestion engines exist, chosen per-tournament by
 
 | Engine | Granularity | Used by |
 |---|---|---|
-| `getSuggestedOpenDates()` | Whole **day** only — never returns a slot_time | Public share page, non-self-service tournaments only (see §6 — the internal Hub GC/Admin panel that also used this was removed) |
+| `getSuggestedOpenDates()` | Whole **day** only — never returns a slot_time | Public share page, non-self-service tournaments only (see §7 — the internal Hub GC/Admin panel that also used this was removed) |
 | `getSuggestedSlotDates()` / `findNextSlotDate()` | Exact **slot bucket** (day + slot_time) | Public share page, self-service tournaments only (`organiser-reserve`/`organiser-next-slot`) |
 
-Both now factor in the tournament's leading captain's
+Both factor in the tournament's leading captain's
 `player_future_availability`, at the granularity each engine actually
 operates at:
 
@@ -117,21 +150,14 @@ already treat *any* warning as disqualifying (`result.warnings.length ===
 0`), so no separate exclusion logic was needed here — wiring the data
 through was sufficient.
 
-This closes a gap from the first cut of this feature: the whole-day
-exclusion above was the only check that shipped initially, so a
-self-service tournament's share page could still suggest an exact slot the
-captain had marked `L` for (as long as it wasn't `L` for all 4 slots that
-day). Fixed by threading `player_future_availability` into these two
-functions' existing `validateBooking()` calls.
-
 ---
 
 ## 5. Rule R8 — `src/lib/validation.ts`
 
 **Not "R7"** — R7 is already `knockout-day-protection.md`'s Knockout Day
-Priority rule, live before this feature shipped. R8 is a new,
-non-blocking **warning**, same severity tier as R2 (never enters
-`errors`, never needs an admin override):
+Priority rule, live before this feature shipped. R8 is a non-blocking
+**warning**, same severity tier as R2 (never enters `errors`, never needs
+an admin override):
 
 ```ts
 if (thisTournamentCaptainId) {
@@ -146,9 +172,9 @@ if (thisTournamentCaptainId) {
 }
 ```
 
-`validateBooking()` gained a 7th parameter,
+`validateBooking()` has a 7th parameter,
 `captainFutureAvailability: CaptainFutureAvailabilityRow[] = []`, defaulting
-to empty — existing callers that don't pass it are unaffected. Wired in at:
+to empty — callers that don't pass it are unaffected. Wired in at:
 
 - `POST /api/validate` and `POST /api/bookings` (admin booking form —
   fetches the captain's rows for the exact `game_date` being validated)
@@ -156,106 +182,100 @@ to empty — existing callers that don't pass it are unaffected. Wired in at:
 
 `RULES` lists in `/admin/bookings/new` and `/admin/bookings/[id]` both
 include an `R8` entry so it surfaces in the `RuleCheckStrip`.
-`bookingRuleOverrideSchema`'s rule enum was widened to include `'R8'` for
-type consistency with `ValidationError['rule']`, even though a
-non-blocking warning never actually reaches the override flow.
+`bookingRuleOverrideSchema`'s rule enum includes `'R8'` for type
+consistency with `ValidationError['rule']`, even though a non-blocking
+warning never actually reaches the override flow.
+
+### Carryover — removed (August 2026)
+
+`POST /api/bookings` previously copied every player's
+`player_future_availability` row for a newly-confirmed booking's exact
+date/slot into the real `availability` table. This made sense when any
+player could pre-fill Y/O/E/L; once the feature narrowed to captains
+marking only `L`, the only thing carryover could still ever do was
+auto-set the *tournament's own captain* to `L` (on leave) the moment their
+own tournament's game got booked into a slot they'd already flagged as
+`L` — a fairly narrow edge case (an admin overriding past the R8 warning),
+and arguably surprising rather than helpful (silently marking the captain
+"on leave" for their own tournament's match with no explicit action on
+their part). Removed rather than kept as a rare-but-technically-correct
+side effect. `POST /api/bookings` no longer reads `player_future_availability`
+for anything beyond the R8 warning input (§4/§5).
 
 ---
 
-## 6. Carryover — `POST /api/bookings`
+## 6. UI — `/captains-corner/unavailable-dates`
 
-Once a confirmed booking is created, every player's
-`player_future_availability` row for that exact `game_date` + `slot_time`
-is copied into the real `availability` table — not just the captain's:
+**Captains' Corner nav restructured into a dropdown (August 2026)** — was
+a single flat link (`href="/captains-corner"`). `SiteNav.tsx` now renders
+a **"Captains' Corner ▾"** dropdown (desktop hover-menu + mobile section),
+gated the same as the old flat link (`isCaptain || isAdmin`), with two
+entries:
 
-```ts
-const { data: futureRows } = await supabase
-  .from('player_future_availability')
-  .select('player_id, response')
-  .eq('game_date', game_date)
-  .eq('slot_time', slot_time)
-```
+- **🏏 Squad Selection** → `/captains-corner` (the pre-existing page,
+  content and behaviour completely unchanged — only the nav entry point
+  moved) — `activePage="captains"`.
+- **🚫 Unavailable Dates** → `/captains-corner/unavailable-dates` (this
+  feature) — `activePage="captains-unavailable"`.
 
-- `availability.updated_by` set to `null` (matches the main table's
-  "self-update" convention).
-- `availability_audit.updated_by` set to the player's own `player_id` —
-  that column is `NOT NULL` (unlike the nullable column of the same name
-  on `availability` itself), so it can't be `null`; crediting the player
-  themselves matches the self-update convention `player-availability/route.ts`
-  already uses for its own audit rows.
-- Both write `update_source: 'future_carryover'` (§2).
-- Carryover failure is logged and never rolls back the booking — same
-  posture as the audit-insert error handling in `captain-availability/route.ts`.
-- Only this route (real confirmed games) — **not** `/api/bookings/reserve`
-  or the organiser self-service reserve route, both of which create
-  `soft_block` holds that might expire, not real games.
+Both keep the dropdown button itself highlighted
+(`activePage === 'captains' || activePage === 'captains-unavailable'`),
+same pattern as the "Matches ▾" dropdown highlighting on any of its own
+sub-pages.
 
----
+**This replaces the player-facing `/unscheduled-availability` page** (see
+§1) — that route, its "🗓️ Unscheduled Slots" entry in the "Matches ▾"
+dropdown, and `src/components/availability/UnscheduledAvailabilityPanel.tsx`
+were all deleted, not just re-gated. The Matches dropdown is back to just
+"🏏 Upcoming" / "📜 Past Matches" (its width reverted `w-52` → `w-44` to
+match).
 
-## 7. UI — `/unscheduled-availability`
+`src/app/captains-corner/unavailable-dates/page.tsx` is a server component
+gated with a **hard redirect** (`redirect('/login')` if no session,
+`redirect('/fixtures')` if not `isCaptain || isAdmin`) — matching
+`/captains-corner/page.tsx`'s own gate exactly, rather than the soft
+signed-out/not-registered/expelled banners the old player-facing page
+showed (unnecessary now that every visitor either is or isn't a captain,
+with no in-between "registered but not yet a captain" state worth a
+banner for).
 
-**Moved to its own dedicated page (August 2026 — was originally a
-collapsed panel at the very bottom of `/fixtures`, past the footer, where
-no player was realistically finding it).** Now reachable via the
-**Matches ▾** nav sub-menu (`SiteNav.tsx`, both desktop dropdown and
-mobile), alongside "🏏 Upcoming" and "📜 Past Matches", as
-"🗓️ Unscheduled Slots" — `activePage="unscheduled"` keeps the Matches
-button highlighted the same way the other two entries do.
+**Only genuinely open dates/slots are ever shown**, computed via
+`computeSlotStatus()` (`src/lib/validation.ts`) — the same slot-status
+engine `/api/availability` uses for the admin schedule grid, not a bare
+"is there a booking at this exact slot_time" check. A slot counts as open
+when `computeSlotStatus()` returns `'open'` or `'t20only'` (still
+bookable, just format-constrained — this feature doesn't ask for a
+format). This correctly excludes a slot with no *direct* booking that's
+still unavailable because an adjacent slot's game runs over into it — a
+T20 confirmed at 10:30 blocks the entire day, a T30 at 07:30 blocks 10:30
+and 12:30, any game at 12:30 blocks 10:30 and 14:30, etc. A date where
+every slot is excluded this way is dropped entirely; a partially-open date
+only shows its remaining slot(s).
 
-`src/app/unscheduled-availability/page.tsx` is a server component gated on
-`isPlayer` (any active, non-expelled player with a `playerId` — same gate
-`/fixtures` uses for its own player-only sections), with the same
-signed-out/not-registered/expelled banners `/fixtures` shows.
+`src/components/captains/UnavailableDatesPanel.tsx` (new component,
+replacing `UnscheduledAvailabilityPanel.tsx`; lives alongside
+`CaptainsCornerGrid.tsx` rather than in a standalone `availability/`
+directory now that this is captain-specific UI, not general-purpose):
 
-**Only genuinely open dates/slots are ever shown (added same session as
-the page move).** The page fetches every non-cancelled booking across the
-16-week horizon and filters `upcomingWeekendDates()` down to
-`{game_date, openSlots}[]`.
-
-**"Open" is computed via `computeSlotStatus()` (`src/lib/validation.ts`)
-— the same slot-status engine `/api/availability` uses for the admin
-schedule grid — not a bare "is there a booking at this exact slot_time"
-check (fixed same session, initial cut of the filtering had this gap).**
-A slot only counts as open when `computeSlotStatus()` returns `'open'` or
-`'t20only'` (still bookable, just format-constrained — future availability
-doesn't ask for a format, only whether the player could conceivably play,
-so `t20only` is close enough to "open" for this purpose). This correctly
-excludes a slot with no *direct* booking that's still unavailable because
-an adjacent slot's game runs over into it — e.g. a T20 confirmed at 10:30
-blocks the entire day (`'clash'` on every other slot_time), a T30 at 07:30
-blocks 10:30 and 12:30, any game at 12:30 blocks 10:30 and 14:30, etc. —
-exactly the same overlap rules the admin fixtures/schedule calendar view
-already enforces, reused rather than re-derived. `soft_block` holds still
-count as occupying a slot (`'soft_block'`, excluded), consistent with how
-the rest of the app treats a slot's occupancy. A date where every slot is
-excluded this way is dropped entirely; a partially-open date only ever
-shows its remaining slot(s), both in the whole-day quick actions and the
-per-slot expand — the client component (`openSlots` prop) has no notion of
-a slot it isn't allowed to write to, since the server never sends it one.
-
-`src/components/availability/UnscheduledAvailabilityPanel.tsx` (renamed
-from `FutureAvailabilityPanel.tsx`, moved out of `src/components/fixtures/`
-since it's no longer part of that page):
-
-- One row per open date. **Whole-day Available/Unavailable now fans out
-  client-side to only that date's own `openSlots`** (individual POSTs via
-  `Promise.all`) — previously this sent the server-side `whole_day: true`
-  fan-out, which always wrote all 4 slot_times regardless of whether a
-  real booking already existed for one of them.
-- Per-slot expand only renders when a date has more than one open slot;
-  a date with exactly one open slot shows a one-line explainer instead
-  ("Only 07:30 is unbooked this day — the rest already have a game.").
-- Tap-active-to-clear convention, same as `FixturesAvailability.tsx`
-  (tapping the already-active response clears it via `DELETE`).
-- Same RESP colour legend as `CaptainsCornerGrid.tsx`'s Matrix view (own
-  copy, not imported — that file doesn't export its `RESP` const).
-- No outer collapse toggle anymore — the whole point of moving this off
-  `/fixtures` was visibility, so the panel content renders immediately;
-  the page itself is the "opened" state.
+- **No response picker anymore** — Y/O/E/L is gone; each open slot renders
+  as a single toggle pill (tap to mark `L`, tap again to clear via
+  `DELETE` — same tap-active-to-clear convention as `FixturesAvailability.tsx`).
+  Marked slots render filled purple (`#2e1a47`/`#d8b4fe`/`#a855f7` —
+  the same `L` colour from `CaptainsCornerGrid.tsx`'s RESP legend), unmarked
+  slots render as an outlined neutral pill.
+- **Whole-day quick action** — "Mark whole day unavailable" toggles `L` on
+  every one of that date's open slots at once (individual POSTs via
+  `Promise.all`, scoped to that date's own `openSlots`, never a slot
+  that's already booked). Only rendered when a date has more than one open
+  slot.
+- No outer collapse toggle and no per-slot expand — with only one action
+  per slot, all of a date's open slots render inline as a single row of
+  pills; there's no longer enough visual complexity to warrant hiding
+  anything behind an expand.
 
 ---
 
-## 8. Removed — Internal Tournament Planner "Suggested Slots" panel
+## 7. Removed — Internal Tournament Planner "Suggested Slots" panel
 
 The internal Hub `/tournament-planner` page previously had its own
 GC/Admin-only "Suggested Slots" panel (`SuggestedSlotsPanel` in
@@ -264,8 +284,7 @@ GC/Admin-only "Suggested Slots" panel (`SuggestedSlotsPanel` in
 organiser share page's own suggestions. Both surfaces called the same
 `getSuggestedOpenDates()`, so they could never actually disagree — but
 having suggested dates live in two places was judged unnecessary
-duplication. **Removed** (August 2026, same session as the R8 exact-slot
-fix above):
+duplication. **Removed** (August 2026):
 
 - `src/app/api/tournaments/[id]/suggested-slots/route.ts` deleted.
 - `SuggestedSlotsPanel` function, its `canSuggestSlots` prop threading
@@ -286,37 +305,39 @@ the historical note.
 
 ---
 
-## 9. Security (vibe-security)
+## 8. Security (vibe-security)
 
 | Check | Status |
 |---|---|
 | `player_future_availability` RLS enabled, no anon/authenticated policy | ✅ |
-| Route validates session server-side, checks `status !== 'expelled'`, rate-limited | ✅ |
-| `game_date`/`slot_time`/`response` validated server-side against fixed enums on every write path (POST via Zod, DELETE via `GAME_DATE_REGEX` + enum check) | ✅ |
-| Carryover insert failure never rolls back the parent booking | ✅ |
+| Route gated `isCaptain \|\| isAdmin` server-side on GET/POST/DELETE — never trusts the nav hiding the entry from non-captains | ✅ |
+| `status !== 'expelled'` checked, rate-limited (`RATE_LIMITS.captainWrite`) | ✅ |
+| `response` restricted server-side to the literal `'L'` (Zod), not just hidden from the UI | ✅ |
+| `game_date`/`slot_time` validated server-side against fixed formats on every write path (POST via Zod, DELETE via `GAME_DATE_REGEX` + enum check) | ✅ |
 | No new `NEXT_PUBLIC_` env vars | ✅ |
 | R8 is a non-blocking warning, same severity as R2 — never stricter than the pattern it mirrors | ✅ |
 | `player_future_availability` writes never touch `bookings` | ✅ |
+| `/captains-corner/unavailable-dates` hard-redirects non-captains server-side, mirroring `/captains-corner/page.tsx` | ✅ |
 
 ---
 
-## 10. File Map
+## 9. File Map
 
 | File | Role |
 |---|---|
 | `supabase/migrations/067_player_future_availability.sql` | The table |
-| `supabase/migrations/068_availability_update_source_carryover.sql` | Widens `update_source` CHECK constraints for `'future_carryover'` |
-| `src/app/api/player/future-availability/route.ts` | GET/POST/DELETE |
-| `src/lib/schemas.ts` | `futureAvailabilityRequestSchema`, `futureAvailabilitySlotTimeSchema`, `futureAvailabilityResponseSchema` |
-| `src/lib/suggestedSlots.ts` | `upcomingWeekendDates()` (new); day-level exclusion in `getSuggestedOpenDates()`; exact-slot R8 wiring in `getSuggestedSlotDates()`/`findNextSlotDate()`; `HORIZON_WEEKS` now exported |
-| `src/lib/validation.ts` | Rule R8, `CaptainFutureAvailabilityRow` type, `validateBooking()`'s new 7th param |
-| `src/types/index.ts` | `ValidationError['rule']` widened to include `'R8'` |
-| `src/app/api/validate/route.ts` + `src/app/api/bookings/route.ts` | Fetch and pass `captainFutureAvailability` into `validateBooking()`; the latter also does the carryover (§6) |
+| `supabase/migrations/068_availability_update_source_carryover.sql` | Widens `update_source` CHECK constraints for `'future_carryover'` — now unused (§5) but harmless to leave |
+| `src/app/api/player/future-availability/route.ts` | GET/POST/DELETE, `isCaptain \|\| isAdmin` gated, `'L'`-only |
+| `src/lib/schemas.ts` | `futureAvailabilityRequestSchema`, `futureAvailabilitySlotTimeSchema`, `futureAvailabilityResponseSchema` (now `z.literal('L')`) |
+| `src/lib/suggestedSlots.ts` | `upcomingWeekendDates()`; day-level exclusion in `getSuggestedOpenDates()`; exact-slot R8 wiring in `getSuggestedSlotDates()`/`findNextSlotDate()`; `HORIZON_WEEKS` exported |
+| `src/lib/validation.ts` | Rule R8, `CaptainFutureAvailabilityRow` type, `validateBooking()`'s 7th param |
+| `src/types/index.ts` | `ValidationError['rule']` includes `'R8'` |
+| `src/app/api/validate/route.ts` + `src/app/api/bookings/route.ts` | Fetch and pass `captainFutureAvailability` into `validateBooking()` |
 | `src/app/admin/bookings/new/page.tsx` + `src/app/admin/bookings/[id]/page.tsx` | `RULES` lists include `R8` |
-| `src/app/unscheduled-availability/page.tsx` | Dedicated page (§7) — fetches the 16-week horizon + existing bookings, filters to open dates/slots via `computeSlotStatus()`, gated on `isPlayer` |
-| `src/components/availability/UnscheduledAvailabilityPanel.tsx` | The player-facing UI (§7) — renamed/moved from `src/components/fixtures/FutureAvailabilityPanel.tsx` |
-| `src/components/ui/SiteNav.tsx` | "Matches ▾" sub-menu gained a third entry, "🗓️ Unscheduled Slots" → `/unscheduled-availability` (desktop dropdown + mobile) |
-| `src/app/api/captain-availability/route.ts` | Unrelated fix bundled in the same work: was missing `RATE_LIMITS.captainWrite`, which its sibling `player-availability/route.ts` already had |
+| `src/app/captains-corner/unavailable-dates/page.tsx` | The page (§6) — hard-redirect gate, `computeSlotStatus()`-filtered open dates/slots |
+| `src/components/captains/UnavailableDatesPanel.tsx` | The captain-facing UI (§6) — toggle-only, no response picker |
+| `src/components/ui/SiteNav.tsx` | "Captains' Corner ▾" dropdown (Squad Selection + Unavailable Dates), desktop + mobile |
+| `src/app/api/captain-availability/route.ts` | Unrelated fix bundled in earlier work: was missing `RATE_LIMITS.captainWrite`, which its sibling `player-availability/route.ts` already had |
 
 ---
 

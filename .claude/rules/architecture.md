@@ -63,13 +63,13 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/profile` | Server + client form | `players` (own row only — IDOR protected) |
 | `/matches/history` | Server → `MatchHistoryClient` (client) | `bookings` (past confirmed), `scorecard_uploads`, `match_stats_cache`, `squad`; upload/sync/verify/flag actions gated per-booking to captain/VC/wrangler/admin, but the verified status itself is visible to every viewer — see `features/post-match-scorecard.md` §14 |
 | `/leaderboard` | Server → `LeaderboardMilestones`/`LeaderboardMonthly`/`LeaderboardTable` (client) | Analytics DB (`batting_stats`/`bowling_stats`/`fielding_stats`/`team_list`) via `src/lib/playerStats.ts`, joined to Hub `players`; year/month/tournament/ground/format filters — see `features/leaderboard.md` |
-| `/unscheduled-availability` | Server → `UnscheduledAvailabilityPanel` (client) | `bookings` (16-week horizon, any non-`cancelled` status), run through `computeSlotStatus()` (`src/lib/validation.ts`) to compute genuinely open dates/slots — same engine `/api/availability` uses, so slot-overlap rules (a T20 at 10:30 blocking the whole day, etc.) are honoured, not just a direct-booking check; `player_future_availability` (own rows) via `/api/player/future-availability`; reachable from the "Matches ▾" nav sub-menu — see `features/player-future-availability.md` §7 |
  
 ### Captain Routes (`isCaptain` or `isAdmin`)
  
 | Route | Component | Data source |
 |---|---|---|
 | `/captains-corner` | Server → `CaptainsCornerGrid` (client) | `bookings`, `players`, `availability`, `squad` |
+| `/captains-corner/unavailable-dates` | Server → `UnavailableDatesPanel` (client) | `bookings` (16-week horizon, any non-`cancelled` status), run through `computeSlotStatus()` (`src/lib/validation.ts`) to compute genuinely open dates/slots — same engine `/api/availability` uses, so slot-overlap rules (a T20 at 10:30 blocking the whole day, etc.) are honoured; `player_future_availability` (own rows, `L` only) via `/api/player/future-availability`; reachable from the "Captains' Corner ▾" nav dropdown — see `features/player-future-availability.md` §6 |
 | `/tournament-planner` | Server → `TournamentPlannerClient` (client) | `bookings`, `captains`, `tournaments` (with `total_league_games`, `cricheroes_points_table_url`) |
  
 ### GC Routes (`isGC` or `isAdmin`)
@@ -123,7 +123,6 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/api/milestones/mark-seen` | POST | Own session | Advances the signed-in player's own `milestones_seen_at` cursor to now; player_id and timestamp always server-derived |
 | `/api/birthdays/today` | GET | Any signed-in, non-expelled member | Broadcast feed for the birthday wishes modal — players whose `dob` falls on today's IST date, gated on the viewer's own `birthday_wishes_seen_date` cursor; see `features/birthday-wishes.md` |
 | `/api/birthdays/mark-seen` | POST | Own session | Advances the signed-in player's own `birthday_wishes_seen_date` cursor to today; player_id and date always server-derived |
-| `/api/player/future-availability` | GET, POST, DELETE | Player session, non-expelled | Slot-level availability for dates without a real booking yet — no wallet-dues/freeze guards (neither applies before a booking exists); POST accepts a single slot or `whole_day: true` (fans out to all 4 slot_times); see `features/player-future-availability.md` |
  
 ### Captain APIs
  
@@ -133,6 +132,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/api/squad/submit` | POST | Captain or Admin | Flip draft → `pending_approval` |
 | `/api/squad/announce` | POST | Captain or Admin | Flip approved → `announced` (requires prior GC approval) |
 | `/api/captain-availability` | GET, POST | Captain or Admin | Override player availability — flat route, **not** nested under `/api/captain/`; `AddPlayerPanel` proxy flow; audit log |
+| `/api/player/future-availability` | GET, POST, DELETE | Captain or Admin, non-expelled | Mark/clear `'L'` (only) on a date/slot without a real booking yet — no wallet-dues/freeze guards (neither applies before a booking exists); POST accepts a single slot or `whole_day: true` (fans out to all 4 slot_times); feeds the tournament share page's suggestion engines only; see `features/player-future-availability.md` |
 | `/api/availability/weekend` | GET | Captain or Admin | Powers Captains Corner grid |
 | `/api/squad/[booking_id]` | GET | Captain / GC / Admin / Family session | Returns squad with `phone` field conditionally included server-side by tier |
  
@@ -314,15 +314,16 @@ Full lockdown RLS. Joined to `players` in admin view.
 
 #### `player_future_availability`
 `id, player_id FK, game_date, slot_time, response ('Y'|'O'|'E'|'L'), updated_at`
-`UNIQUE(player_id, game_date, slot_time)`. Slot-level availability for
-dates without a real booking yet — distinct from `availability`, which
-requires a real `booking_id`. **RLS enabled, no anon/authenticated
-policies** — same blanket-deny pattern as `availability`/`fee_exemptions`.
-Migration `067_player_future_availability.sql`. Feeds the suggestion
-engines' captain-availability exclusion and R8's exact-slot warning
-(§7), and is carried into a real `availability` row (`update_source:
-'future_carryover'`) once a booking is confirmed for that exact
-date+slot. See `features/player-future-availability.md`.
+`UNIQUE(player_id, game_date, slot_time)`. Slot-level "I already know I
+can't lead a game" marker for dates without a real booking yet — captain-
+only, `L` only at the application layer (the CHECK constraint itself still
+allows the wider set; only the API route and Zod schema enforce `L`-only —
+see `features/player-future-availability.md` §2). **RLS enabled, no
+anon/authenticated policies** — same blanket-deny pattern as
+`availability`/`fee_exemptions`. Migration `067_player_future_availability.sql`.
+Feeds the suggestion engines' captain-availability exclusion and R8's
+exact-slot warning (§7). No carryover into `availability` — removed when
+the feature narrowed to captains-only (see the feature doc §5).
 
 #### `milestone_achievements`
 `id, player_id FK, booking_id FK (nullable, ON DELETE SET NULL), milestone_type ('runs'|'wickets'|'dismissals'), milestone_value, year, achieved_at`
@@ -721,10 +722,10 @@ Next.js API Routes (server-side)
 | `src/components/tournament-planner/TournamentShareCard.tsx` | Public-facing single tournament slot-balance card; `count/target` per-slot display; tournament name links to CricHeroes points table if `cricheroes_points_table_url` set (§8.5); renders `OrganiserSelfService` when the tournament has self-service enabled |
 | `src/components/tournament-planner/OrganiserSelfService.tsx` | Public, unauthenticated per-slot-bucket reserve/decline/attach-URL widget — see `features/organiser-self-service.md` |
 | `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` — used by the share card and the slot-bucket suggestion engine |
-| `src/lib/suggestedSlots.ts` | `getSuggestedOpenDates()` (day-level, non-self-service tournaments — public share page only, the internal GC/Admin panel that also used this was removed, see `features/player-future-availability.md` §8); `getSuggestedSlotDates()` / `findNextSlotDate()` (per-slot-bucket, self-service tournaments); both factor in the tournament captain's `player_future_availability` (day-level whole-day exclusion for the former, exact-slot R8 warning for the latter two); `upcomingWeekendDates()` (plain Sat/Sun date list, feeds `/unscheduled-availability`) |
-| `src/app/api/player/future-availability/route.ts` | GET/POST/DELETE — slot-level availability for dates without a real booking yet; see `features/player-future-availability.md` |
-| `src/app/unscheduled-availability/page.tsx` | Dedicated page — filters the 16-week horizon down to open dates/slots via `computeSlotStatus()` (same slot-status engine as `/api/availability`, so a slot blocked by an adjacent game running over is excluded too, not just a direct booking); reachable via the "Matches ▾" nav sub-menu, not buried on `/fixtures` |
-| `src/components/availability/UnscheduledAvailabilityPanel.tsx` | Player-facing UI — whole-day quick actions + per-slot Y/O/E/L expand, scoped to only the open slots the server sends it |
+| `src/lib/suggestedSlots.ts` | `getSuggestedOpenDates()` (day-level, non-self-service tournaments — public share page only, the internal GC/Admin panel that also used this was removed, see `features/player-future-availability.md` §7); `getSuggestedSlotDates()` / `findNextSlotDate()` (per-slot-bucket, self-service tournaments); both factor in the tournament captain's `player_future_availability` (day-level whole-day exclusion for the former, exact-slot R8 warning for the latter two); `upcomingWeekendDates()` (plain Sat/Sun date list, feeds `/captains-corner/unavailable-dates`) |
+| `src/app/api/player/future-availability/route.ts` | GET/POST/DELETE — captain-only, `L`-only mark/clear on a date/slot without a real booking yet; see `features/player-future-availability.md` |
+| `src/app/captains-corner/unavailable-dates/page.tsx` | Captain-only page — hard-redirect gate, filters the 16-week horizon down to open dates/slots via `computeSlotStatus()` (same slot-status engine as `/api/availability`, so a slot blocked by an adjacent game running over is excluded too, not just a direct booking); reachable via the "Captains' Corner ▾" nav dropdown |
+| `src/components/captains/UnavailableDatesPanel.tsx` | Captain-facing UI — toggle-only (mark/clear `L`), whole-day quick action, scoped to only the open slots the server sends it |
 | `src/lib/familyAuth.ts` | *(Planned U-24)* `validateFamilySession()` — re-queries `family_sessions` table; never trusts cookie value alone |
 | `src/lib/announcement.ts` | `buildSquadAnnouncement()` — WhatsApp message builder |
 | `src/lib/bookingNotify.ts` | `buildOrganiserWhatsAppUrl()` / `buildCaptainWhatsAppUrl()` — shared message builders for `/admin/bookings/[id]`'s Notify panel; organiser message includes the tournament share page link, captain message includes the CricHeroes URL when set — see §8.1 |
