@@ -11,7 +11,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
-import { futureAvailabilityRequestSchema, futureAvailabilitySlotTimeSchema } from '@/lib/schemas'
+import { futureAvailabilityRequestSchema, futureAvailabilitySlotTimeSchema, GAME_DATE_REGEX } from '@/lib/schemas'
 
 const ALL_SLOT_TIMES = futureAvailabilitySlotTimeSchema.options
 
@@ -114,8 +114,8 @@ export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const game_date = body?.game_date
   const slot_time = body?.slot_time
-  if (!game_date || !ALL_SLOT_TIMES.includes(slot_time)) {
-    return NextResponse.json({ error: 'game_date and a valid slot_time are required' }, { status: 400 })
+  if (!game_date || !GAME_DATE_REGEX.test(game_date) || !ALL_SLOT_TIMES.includes(slot_time)) {
+    return NextResponse.json({ error: 'game_date (YYYY-MM-DD) and a valid slot_time are required' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
