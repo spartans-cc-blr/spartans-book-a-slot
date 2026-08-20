@@ -162,9 +162,9 @@ export function UnavailableDatesPanel({ days }: Props) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', padding: '12px 16px', borderBottom: '1px solid #D4C9B0', background: '#F8F4EE' }}>
         <LegendItem swatchBg="transparent" swatchBorder="#D4C9B0" label="Tap to mark unavailable" />
         <LegendItem swatchBg="#F3E8FF" swatchBorder="#C084FC" label="Marked — tap to clear" />
-        <LegendItem swatchBg="#FEE2E2" swatchBorder="#FCA5A5" label="Booked — tap to view match" />
+        <LegendLink color="#B91C1C" underline="#FCA5A5" sample="View match" label="Booked" />
         <LegendItem swatchBg="#FEF3C7" swatchBorder="#FCD34D" label="Reserved" />
-        <LegendItem swatchBg="#E2DACE" swatchBorder="#D4C9B0" label="Blocked by another slot that day" />
+        <LegendLink color="#78716C" underline="#D4C9B0" sample="Play in progress" label="Blocked by another slot that day" />
       </div>
 
       {error && (
@@ -281,6 +281,20 @@ function LegendItem({ swatchBg, swatchBorder, label }: { swatchBg: string; swatc
   )
 }
 
+// For legend rows describing a cell that's plain underlined text now, not a
+// coloured pill — shows the actual text sample instead of a colour swatch
+// so the legend matches what the table cells really look like.
+function LegendLink({ color, underline, sample, label }: { color: string; underline: string; sample: string; label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: FONT_UI, fontSize: '11px', color: '#78716C', whiteSpace: 'nowrap' }}>
+      <span style={{ fontWeight: 700, color, textDecoration: 'underline', textDecorationColor: underline, textUnderlineOffset: '2px', fontSize: '10px' }}>
+        {sample}
+      </span>
+      {label}
+    </div>
+  )
+}
+
 const cellStyle: React.CSSProperties = {
   borderBottom: '1px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '3px', verticalAlign: 'middle',
 }
@@ -343,41 +357,42 @@ function SlotCell({
 
   if (slot.kind === 'booked') {
     // Deliberately terse — what "booked" means is explained once in the
-    // legend, not repeated on every card. Just a link through to the match.
-    const box = (
-      <div style={{
-        height: '32px', borderRadius: '5px', border: '1px solid #FCA5A5', background: '#FEE2E2',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
-        fontFamily: FONT_UI, fontSize: '9.5px', fontWeight: 700, color: '#B91C1C', whiteSpace: 'nowrap',
-        cursor: slot.bookingId ? 'pointer' : 'default', textDecoration: 'none',
+    // legend, not repeated on every card. Plain link text, no pill —
+    // matches the /schedule page's own preference for text-with-link over
+    // a bordered/filled tile.
+    const text = (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', height: '32px',
+        fontFamily: FONT_UI, fontSize: '10.5px', fontWeight: 700, color: '#B91C1C', whiteSpace: 'nowrap',
+        textDecoration: 'underline', textDecorationColor: '#FCA5A5', textUnderlineOffset: '2px',
       }}>
-        <span aria-hidden>↗</span> View match
-      </div>
+        View match
+      </span>
     )
     return (
       <td style={{ ...cellStyle, textAlign: 'center' }}>
-        {slot.bookingId ? <Link href={`/fixtures/${slot.bookingId}`}>{box}</Link> : box}
+        {slot.bookingId ? <Link href={`/fixtures/${slot.bookingId}`}>{text}</Link> : text}
       </td>
     )
   }
 
   // 'blocked' — same directional-arrow convention as the admin schedule
   // grid's clash cell, pointing at whichever slot is actually causing it.
+  // Plain link text, no pill, same as the booked cell above.
   const arrowDir = getArrowDirection(slot.time, slot.causeSlot ?? null, false)
-  const box = (
-    <div style={{
-      height: '32px', borderRadius: '5px', border: '1px solid #D4C9B0', background: '#E2DACE',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
-      fontFamily: FONT_UI, fontSize: '9px', fontWeight: 700, color: '#78716C', lineHeight: 1.1,
-      cursor: slot.bookingId ? 'pointer' : 'default', textDecoration: 'none', padding: '0 3px',
+  const text = (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '3px', height: '32px',
+      fontFamily: FONT_UI, fontSize: '9.5px', fontWeight: 700, color: '#78716C', whiteSpace: 'nowrap',
+      textDecoration: slot.bookingId ? 'underline' : 'none', textDecorationColor: '#D4C9B0', textUnderlineOffset: '2px',
     }}>
       {arrowDir && <ArrowIcon direction={arrowDir} />}
-      <span>Play in progress</span>
-    </div>
+      Play in progress
+    </span>
   )
   return (
     <td style={{ ...cellStyle, textAlign: 'center' }}>
-      {slot.bookingId ? <Link href={`/fixtures/${slot.bookingId}`}>{box}</Link> : box}
+      {slot.bookingId ? <Link href={`/fixtures/${slot.bookingId}`}>{text}</Link> : text}
     </td>
   )
 }
