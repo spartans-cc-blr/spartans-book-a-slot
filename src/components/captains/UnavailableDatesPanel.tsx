@@ -177,14 +177,18 @@ export function UnavailableDatesPanel({ days }: Props) {
         </p>
       ) : (
         <div style={{ maxHeight: 'calc(100vh - 320px)', minHeight: '360px', overflow: 'auto' }}>
-          <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: '330px' }}>
+          {/* table-layout: fixed + explicit widths keeps all four slot
+              columns equal regardless of how much a given cell's text
+              wants — content wraps within its column instead of forcing
+              that column (and only that column) wider than its siblings. */}
+          <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: '300px', tableLayout: 'fixed' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 5 }}>
               <tr>
-                <th style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px 6px', textAlign: 'left', minWidth: '72px' }}>
+                <th style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px 6px', textAlign: 'left', width: '24%' }}>
                   <span style={{ fontFamily: FONT_UI, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#A8A29E' }}>Date</span>
                 </th>
                 {SLOT_TIMES.map(slot => (
-                  <th key={slot} style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px 2px', textAlign: 'center', minWidth: '62px' }}>
+                  <th key={slot} style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px 2px', textAlign: 'center', width: '19%' }}>
                     <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '11px', fontWeight: 700, color: '#B45309', whiteSpace: 'nowrap' }}>{slot}</span>
                   </th>
                 ))}
@@ -362,8 +366,8 @@ function SlotCell({
     // a bordered/filled tile.
     const text = (
       <span style={{
-        display: 'inline-flex', alignItems: 'center', height: '32px',
-        fontFamily: FONT_UI, fontSize: '10.5px', fontWeight: 700, color: '#B91C1C', whiteSpace: 'nowrap',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '32px', padding: '2px 1px',
+        fontFamily: FONT_UI, fontSize: '10px', fontWeight: 700, color: '#B91C1C', whiteSpace: 'normal', lineHeight: 1.15, textAlign: 'center',
         textDecoration: 'underline', textDecorationColor: '#FCA5A5', textUnderlineOffset: '2px',
       }}>
         View match
@@ -382,12 +386,12 @@ function SlotCell({
   const arrowDir = getArrowDirection(slot.time, slot.causeSlot ?? null, false)
   const text = (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '3px', height: '32px',
-      fontFamily: FONT_UI, fontSize: '9.5px', fontWeight: 700, color: '#78716C', whiteSpace: 'nowrap',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', minHeight: '32px', padding: '2px 1px',
+      fontFamily: FONT_UI, fontSize: '9px', fontWeight: 700, color: '#78716C', whiteSpace: 'normal', lineHeight: 1.15, textAlign: 'center',
       textDecoration: slot.bookingId ? 'underline' : 'none', textDecorationColor: '#D4C9B0', textUnderlineOffset: '2px',
     }}>
       {arrowDir && <ArrowIcon direction={arrowDir} />}
-      Play in progress
+      <span>Play in progress</span>
     </span>
   )
   return (
