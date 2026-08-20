@@ -31,13 +31,43 @@ export default async function GCPlayersPage() {
     .select(`
       id, name, photo_url, jersey_name, jersey_number,
       primary_skill, secondary_skill, cricheroes_url,
-      wallet_balance, inducted_on, is_captain, status
+      wallet_balance, is_captain, status
     `)
     .order('name', { ascending: true })
 
   if (error) {
     console.error('[gc-players] Supabase error:', error.message)
   }
+
+  // Last played = most recent confirmed, already-played booking each player
+  // was squadded for. Hub-side only (squad + bookings) — no analytics DB
+  // dependency, same "who was actually in the team" signal used elsewhere
+  // (see features/gc-players.md).
+  const today = new Date().toISOString().split('T')[0]
+  const { data: playedRows, error: playedError } = await supabase
+    .from('squad')
+    .select('player_id, bookings!inner(game_date, status)')
+    .eq('bookings.status', 'confirmed')
+    .lte('bookings.game_date', today)
+
+  if (playedError) {
+    console.error('[gc-players] last-played query error:', playedError.message)
+  }
+
+  const lastPlayedMap: Record<string, string> = {}
+  for (const row of playedRows ?? []) {
+    const gameDate = (row as any).bookings?.game_date as string | undefined
+    if (!gameDate) continue
+    const playerId = row.player_id as string
+    if (!lastPlayedMap[playerId] || gameDate > lastPlayedMap[playerId]) {
+      lastPlayedMap[playerId] = gameDate
+    }
+  }
+
+  const playersWithLastPlayed = (players ?? []).map(p => ({
+    ...p,
+    last_played_on: lastPlayedMap[p.id] ?? null,
+  }))
 
   const total = players?.length ?? 0
 
@@ -58,7 +88,7 @@ export default async function GCPlayersPage() {
             </p>
           </div>
 
-          <GCPlayersGrid players={(players ?? []) as any} />
+          <GCPlayersGrid players={playersWithLastPlayed as any} />
 
         </main>
       </div>

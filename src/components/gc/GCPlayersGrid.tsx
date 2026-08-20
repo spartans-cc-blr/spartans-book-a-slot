@@ -17,7 +17,7 @@ type Player = {
   secondary_skill: string | null
   cricheroes_url: string | null
   wallet_balance: number
-  inducted_on: string | null
+  last_played_on: string | null
   is_captain: boolean
   status: string
 }
@@ -44,8 +44,9 @@ function skillShort(s: string | null) {
   return s.split(' ').slice(-2).join(' ')
 }
 
-function inductedYear(d: string | null) {
-  return d ? String(new Date(d).getFullYear()) : null
+function formatLastPlayed(d: string | null) {
+  if (!d) return null
+  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function initials(name: string) {
@@ -219,7 +220,7 @@ export function GCPlayersGrid({ players }: { players: Player[] }) {
             const hasDues    = p.wallet_balance < 0
             const expelled   = isExpelledPlayer(p)
             const inactive   = isInactivePlayer(p)
-            const year       = inductedYear(p.inducted_on)
+            const lastPlayed = formatLastPlayed(p.last_played_on)
 
             return (
               <div
@@ -295,13 +296,15 @@ export function GCPlayersGrid({ players }: { players: Player[] }) {
                   )}
                 </div>
 
-                {/* Wallet + inducted */}
+                {/* Wallet + last played */}
                 <div className="flex items-center justify-between mt-auto pt-2.5 border-t border-[#E2EAF0]">
                   <span className={`font-rajdhani text-sm font-semibold ${hasDues ? 'text-amber-600' : 'text-emerald-600'}`}>
                     ₹{p.wallet_balance.toLocaleString('en-IN')}
                     {hasDues && <span className="ml-1 text-xs font-normal text-amber-500">⚠ dues</span>}
                   </span>
-                  {year && <span className="font-rajdhani text-xs text-slate-400">Since {year}</span>}
+                  <span className="font-rajdhani text-xs text-slate-400">
+                    {lastPlayed ? `Last played ${lastPlayed}` : 'Never played'}
+                  </span>
                 </div>
               </div>
             )

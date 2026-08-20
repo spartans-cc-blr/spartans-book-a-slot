@@ -203,8 +203,9 @@ p.status === 'expelled' ? 'Expelled' : p.status === 'active' ? 'Active' : 'Inact
 - Requires `isGC || isAdmin` — server-side redirect to `/` on failure
 - Passes `activePage="gc-players"` to `<SiteNav>` (not `"gc"`)
 - Fetches **all players** — no status filter; client-side radio handles filtering
-- Supabase select: `id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, cricheroes_url, wallet_balance, inducted_on, is_captain, status, active`
-- Fields intentionally excluded: `gmail_id`, `dob`, `blood_group`, `whatsapp`, `referred_by`
+- Supabase select: `id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, cricheroes_url, wallet_balance, is_captain, status`
+- Fields intentionally excluded: `gmail_id`, `dob`, `blood_group`, `whatsapp`, `referred_by`, `inducted_on`, `active` (`active` is deprecated — see §2)
+- **Last played (added August 2026):** a second query joins `squad` to `bookings!inner(game_date, status)`, filtered to `status = 'confirmed'` and `game_date <= today`, reduced client-side (in the server component) to the max `game_date` per `player_id`. Merged onto each player as `last_played_on` before passing to `GCPlayersGrid` — replaces the old "Since \<inducted year\>" footer with "Last played \<date\>" (or "Never played" if the player has no past confirmed, squadded booking). Hub-side only (`squad` + `bookings`) — deliberately not sourced from the analytics DB, to avoid the `player_id` reconciliation gaps documented in `features/player-identity-resolution.md`.
 - `revalidate = 120`
 - Page bg: `bg-[#F0F4F5]`, heading: `font-cinzel text-xl font-bold text-[#0F3D42]`
 
@@ -274,7 +275,7 @@ const availableLetters = useMemo(() => {
 - Secondary skill pill: `bg-slate-100 border-slate-300 text-slate-600`
 - Captain badge: `bg-red-50 border-red-300 text-red-700`
 - Wallet: `text-emerald-600` if ≥ 0, `text-amber-600` with `⚠ dues` if < 0
-- Inducted year: `text-slate-400 text-xs` right-aligned in footer
+- Last played: `text-slate-400 text-xs` right-aligned in footer — `Last played <d MMM YYYY>`, or `Never played` if `last_played_on` is null (replaced the old "Since \<inducted year\>" display — see §7)
 
 ### TypeScript gotchas
 
@@ -313,7 +314,7 @@ Approved by club coordinator over the default warm-light theme for this page.
 | Teal border | `#5DCAA5` | Skill pill border, avatar border |
 | Border | `#CBD5DC` | Cards, section dividers |
 | Muted | slate-500 | Jersey, metadata |
-| Faint | slate-400 | Inducted year, result count |
+| Faint | slate-400 | Last played date, result count |
 
 Nav bar stays dark (`bg-ink-2`). Only page content uses slate-teal.
 
