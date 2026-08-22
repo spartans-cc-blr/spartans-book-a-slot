@@ -10,6 +10,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { detectAndLogMilestones, detectAndLogMatchPerformances } from '@/lib/milestones'
 import { resolveSquadMatch, type SquadRef } from '@/lib/matchTopPerformers'
+import { autoResolveMatch } from '@/lib/playerIdentityResolution'
 
 export interface SyncMatchStatsResult {
   ok:    boolean
@@ -40,6 +41,15 @@ export async function syncMatchStatsForBooking(
     return { ok: false, error: 'Analytics database is not configured' }
   }
   const analyticsSupabase = createSupabaseClient(analyticsUrl, analyticsKey, { auth: { persistSession: false } })
+
+  // Auto-apply any already-known alias/override/squad-disambiguation before
+  // reading below — see autoResolveMatch()'s own header comment and
+  // player-identity-resolution.md §5. This is what makes an already-known
+  // player resolve on this very sync instead of needing an admin to run
+  // "Run Reconciliation Pass" again for every new match. Best-effort —
+  // autoResolveMatch() never throws, so a resolution hiccup here can't
+  // block the sync itself.
+  await autoResolveMatch(analyticsSupabase, supabase, mid)
 
   // select('*') deliberately, not an explicit column list — this is what
   // makes player_id (see src/lib/playerIdentityResolution.ts) show up in

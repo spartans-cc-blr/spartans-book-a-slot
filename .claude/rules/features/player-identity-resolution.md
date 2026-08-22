@@ -204,9 +204,9 @@ go ask the player to link their profile first.
   synced bookings carrying at least one stale `player_id: null` for a name
   that *was* already resolved on the analytics side — see
   `features/post-match-scorecard.md` §15's 1 Aug 2026 incident write-up for
-  the fleet-wide bulk-patch and its take-away (there is still no
-  automated re-sync-on-reconcile hook, so this can recur for any newly
-  confirmed alias/override).
+  the fleet-wide bulk-patch. **Fixed 22 Aug 2026 — see §5.1**: the gap that
+  caused this (no automated re-sync-on-reconcile hook) is closed for the
+  common case going forward.
 - `src/components/matches/ScorecardTables.tsx` — `findCricHeroesUrl()`
   prefers a `player_id` match against the booking's squad, falling back to
   the old case-insensitive name match only when `player_id` is absent
@@ -215,13 +215,74 @@ go ask the player to link their profile first.
 
 ---
 
+## 5.1 Auto-resolve on sync (added 22 Aug 2026)
+
+**The problem:** an admin correctly assumed that once a scorecard name was
+aliased (or overridden, or auto-resolved via squad disambiguation), every
+future match containing that name would "just work." It didn't — nothing
+in the automated paths ever *applied* an existing alias/override to a new
+match's freshly-parsed rows. The Python parser always writes new
+`batting_stats`/`bowling_stats`/`fielding_stats`/`team_list` rows with
+`player_id: NULL` (it has no notion of the Hub's alias table), and
+`syncMatchStatsForBooking()` just read those rows as-is. The *only* place
+that ever ran `resolvePlayerName()`/`backfillPlayerIdForName()` was
+`/admin/player-reconciliation` — either an admin confirming a name, or
+clicking "Run Reconciliation Pass." So even a player aliased months ago
+needed the admin to revisit that page after every single new match before
+their name resolved — exactly the "why do I have to keep doing this
+manually" friction that surfaced this gap.
+
+**The fix:** `autoResolveMatch(analytics, hub, matchId)`
+(`src/lib/playerIdentityResolution.ts`) applies steps 1-3 of the precedence
+order (§2) — override, alias, squad disambiguation, none of which need an
+admin decision — to one match's currently-unresolved scorecard names.
+`syncMatchStatsForBooking()` calls it right before reading the analytics
+rows for caching, so both the manual "Sync Stats" button and the automated
+CricHeroes-fetch cron now self-heal on every sync. An admin only ever needs
+`/admin/player-reconciliation` for a genuinely new name (step 4) now —
+the "auto_resolved" bucket on that page should stay empty going forward
+except in the gap between a name being confirmed and its next sync.
+
+**Why it's batched, not a `resolvePlayerName()` call per name:** that
+function does 2+ sequential round trips per name and is fine for the
+admin-triggered reconcile flow (client-paced, one name per request), but
+`syncMatchStatsForBooking()` runs inside `backfill-scorecards`'s twice-daily
+cron under a tight Vercel Hobby timeout budget that has 504'd in production
+before (see `features/post-match-scorecard.md` §8's `MAX_PER_RUN` history).
+`autoResolveMatch()` instead does one bulk override lookup and one bulk
+alias lookup regardless of how many names are unresolved, and only falls
+through to squad disambiguation (which needs the roster + squad, fetched
+once) and the final per-name backfill writes for whatever's left —
+typically a handful of names at most, since most players in any given match
+were already resolved via an earlier one.
+
+**Best-effort, same posture as milestone detection**: `autoResolveMatch()`
+never throws — any DB hiccup inside it is swallowed and the sync proceeds
+exactly as it would have before this fix (i.e. no worse than the
+pre-existing behaviour), never blocking the scorecard sync it's attached
+to.
+
+**What this doesn't change:** the "Run Reconciliation Pass" self-heal sweep
+on `/admin/player-reconciliation` is still needed for one case
+`autoResolveMatch()` can't reach — a match that was already synced *before*
+a name was resolved. `autoResolveMatch()` only ever looks at *that* sync's
+still-unresolved rows; it doesn't retroactively fix a `match_stats_cache`
+that's already cached and stale (that's what `resyncBookingsForMatchIds()`
+and the admin `confirm`/`reconcile` flows are for). It also doesn't newly
+resolve anything for a name CricHeroes has never shown before — that
+genuinely needs an admin's one-time confirm, exactly as before.
+
+---
+
 ## 6. Explicitly Out of Scope
 
 - Fees, the squad selection/GC approval state machine, and the
   `scorecard_uploads` status lifecycle — untouched.
-- No cron for this — reconciliation is an admin-driven pass, not scheduled.
-  A name only needs handling once; new matches for an already-aliased name
-  resolve for free via step 2.
+- No cron for this — reconciliation of a genuinely *new* name is still an
+  admin-driven pass, not scheduled. As of §5.1, a name that's already been
+  resolved once (alias, override, or squad disambiguation) does resolve for
+  free on every subsequent sync — that part of the original claim here is
+  now actually true, rather than only true in theory.
 
 ---
 

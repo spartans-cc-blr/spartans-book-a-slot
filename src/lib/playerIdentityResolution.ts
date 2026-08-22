@@ -7,10 +7,20 @@
 //   3. squad disambiguation  — auto-resolve only when scorecard_name maps to
 //      more than one Hub player AND exactly one of those candidates is in
 //      that match's squad. Writes the result into match_name_overrides so
-//      it is never recomputed. The only fully-automatic path — everything
-//      else requires an admin to confirm via
-//      POST /api/admin/player-reconciliation.
-//   4. unresolved             — surfaced in the admin reconciliation queue.
+//      it is never recomputed.
+//   4. unresolved             — surfaced in the admin reconciliation queue;
+//      needs an admin to confirm via POST /api/admin/player-reconciliation.
+//
+// Steps 1-3 are fully automatic and require no admin decision — only step 4
+// does. autoResolveMatch() (below) applies steps 1-3 to one match's
+// remaining unresolved names and is called from syncMatchStatsForBooking()
+// on every sync (manual or automated), so an already-known player resolves
+// on the very next match without an admin re-running "Run Reconciliation
+// Pass". The admin reconciliation page's resolvePlayerName()/
+// backfillPlayerIdForName() calls remain for two things autoResolveMatch()
+// doesn't cover: confirming a genuinely new name (step 4 -> 1/2), and
+// self-healing rows that predate a resolution already existing (the
+// "Run Reconciliation Pass" club-wide sweep, and per-name "reconcile" mode).
 //
 // Does not touch the match-linkage pipeline (bookings.match_id ->
 // match_stats_cache) — that is unrelated and already correct.
@@ -165,6 +175,117 @@ export async function backfillPlayerIdForName(opts: {
     }
   }
   return { updated, matchIds: Array.from(matchIds) }
+}
+
+// Auto-applies any already-known alias/override/squad-disambiguation to one
+// match's currently-unresolved scorecard names, with zero admin decision
+// required (steps 1-3 of resolvePlayerName only — a genuinely new name
+// still lands in the /admin/player-reconciliation queue as before).
+//
+// Called from syncMatchStatsForBooking() right before the analytics rows
+// are read for caching. Previously, resolvePlayerName()/
+// backfillPlayerIdForName() only ever ran from the admin reconciliation
+// page — an already-aliased player still landed in every *new* match's
+// scorecard with player_id NULL until an admin manually re-ran "Run
+// Reconciliation Pass". This closes that gap so a known player resolves on
+// the very next sync (manual or automated), with no admin action.
+//
+// Batched rather than a resolvePlayerName() call per name (that path does
+// 2+ sequential round trips per name and is fine for the admin-triggered
+// reconcile flow, but this runs inside syncMatchStatsForBooking(), which
+// the twice-daily backfill-scorecards cron calls under a tight Vercel
+// Hobby timeout budget — see post-match-scorecard.md §8's MAX_PER_RUN
+// history). Override/alias lookups are one bulk query each regardless of
+// how many names are unresolved; only the squad-disambiguation fallback
+// and the final backfill writes are per-name, and those are typically a
+// handful at most (most players in any given match were already resolved
+// by an earlier match). Best-effort: any error here is swallowed and never
+// fails the sync it's attached to, same posture as milestone detection in
+// matchStatsSync.ts.
+export async function autoResolveMatch(
+  analytics: SupabaseClient,
+  hub: ReturnType<typeof createServiceClient>,
+  matchId: string
+): Promise<{ updated: number }> {
+  const tables = ['batting_stats', 'bowling_stats', 'fielding_stats', 'team_list'] as const
+
+  try {
+    const names = new Set<string>()
+    for (const table of tables) {
+      const { data } = await analytics
+        .from(table)
+        .select('player_name')
+        .eq('match_id', matchId)
+        .is('player_id', null)
+      for (const row of data ?? []) {
+        const name = (row as any).player_name
+        if (name) names.add(name)
+      }
+    }
+    if (names.size === 0) return { updated: 0 }
+
+    const nameList = Array.from(names)
+    const resolved = new Map<string, string>() // scorecard_name -> player_id
+
+    const [{ data: overrides }, { data: aliases }] = await Promise.all([
+      analytics.from('match_name_overrides').select('scorecard_name, player_id').eq('match_id', matchId),
+      analytics.from('player_name_aliases').select('scorecard_name, player_id').in('scorecard_name', nameList),
+    ])
+    for (const row of overrides ?? []) {
+      if (nameList.includes((row as any).scorecard_name)) resolved.set((row as any).scorecard_name, (row as any).player_id)
+    }
+    for (const row of aliases ?? []) {
+      if (!resolved.has((row as any).scorecard_name)) resolved.set((row as any).scorecard_name, (row as any).player_id)
+    }
+
+    // Step 3 fallback (squad disambiguation) — only for names neither an
+    // override nor an alias already covered.
+    const stillUnresolved = nameList.filter(n => !resolved.has(n))
+    if (stillUnresolved.length > 0) {
+      const { data: bookingRows } = await hub.from('bookings').select('id').eq('match_id', matchId)
+      if (bookingRows?.length === 1) {
+        const bookingId = bookingRows[0].id
+        const [{ data: candidates }, { data: squadRows }] = await Promise.all([
+          hub.from('players').select('id, name, cricheroes_player_id'),
+          hub.from('squad').select('player_id').eq('booking_id', bookingId),
+        ])
+        const squadIds = new Set((squadRows ?? []).map((r: any) => r.player_id))
+        for (const name of stillUnresolved) {
+          const normalisedTarget = name.trim().toLowerCase()
+          const nameMatches = (candidates ?? []).filter(
+            (p: any) => (p.name ?? '').trim().toLowerCase() === normalisedTarget
+          )
+          if (nameMatches.length <= 1) continue
+          const inSquad = nameMatches.filter((p: any) => squadIds.has(p.id))
+          if (inSquad.length !== 1) continue
+
+          const resolvedId = inSquad[0].id
+          await analytics.from('match_name_overrides').upsert(
+            {
+              match_id: matchId,
+              scorecard_name: name,
+              player_id: resolvedId,
+              resolved_via: 'squad_disambiguation',
+              cricheroes_player_id: inSquad[0].cricheroes_player_id ?? null,
+            },
+            { onConflict: 'match_id,scorecard_name' }
+          )
+          resolved.set(name, resolvedId)
+        }
+      }
+    }
+
+    if (resolved.size === 0) return { updated: 0 }
+
+    const results = await Promise.all(
+      Array.from(resolved.entries()).map(([scorecardName, playerId]) =>
+        backfillPlayerIdForName({ analytics, scorecardName, playerId, matchId })
+      )
+    )
+    return { updated: results.reduce((sum, r) => sum + r.updated, 0) }
+  } catch {
+    return { updated: 0 }
+  }
 }
 
 // Closes the "no automated re-sync-on-reconcile hook" gap documented in
