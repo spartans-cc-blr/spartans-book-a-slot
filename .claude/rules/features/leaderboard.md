@@ -303,12 +303,72 @@ its existing callers."
 
 ---
 
+## 8.1 Incident — 22 Aug 2026, PostgREST's default row cap silently
+undercounting the Honor Board
+
+**Symptom:** a player crossed a season dismissals milestone (the
+celebration modal correctly announced 50) but `/leaderboard`'s "Most
+Dismissals" card kept showing 49 for that same player, even after a full
+logout/login. No error anywhere — the page just quietly disagreed with the
+milestone log.
+
+**Root cause:** `fetchAnalyticsRows()` and the direct analytics-DB reads in
+`getPerformances()`/`getRecentForm()` all issued a plain unpaginated
+`.select('*')` (or a narrow column list) against `batting_stats`/
+`bowling_stats`/`fielding_stats`/`team_list`. PostgREST silently caps an
+unpaginated response at a fixed row limit — 1000 for this project — with no
+error surfaced to the caller. `getLeaderboard()`'s season-wide, all-players
+fetch is exactly the shape that hits this: confirmed live, the current
+2026-season scope alone was **1,045 rows** per table — just over the cap,
+so roughly the last 45 rows (in whatever order Postgres happened to return
+them) were silently dropped from every player's aggregated totals, not just
+the one that happened to surface it.
+
+`detectAndLogMilestones()` (which calls `getPlayerSeasonStats()`,
+single-player-scoped via `.eq('player_id', ...)`) never hit the cap — at
+most ~150 rows for any one player's whole career — which is why the
+milestone modal was correct while the Honor Board, built off the exact same
+underlying data, quietly wasn't. Confirmed by reproducing the true total
+directly against the analytics DB via raw SQL (which has no PostgREST-layer
+cap) and getting 50, matching the milestone exactly.
+
+**Fix:** every multi-row analytics-DB read in `src/lib/playerStats.ts` now
+pages through with `fetchAllRows()` — a shared helper that loops
+`.range(from, from + 999)` until a page comes back short — instead of
+trusting one request to return everything. Applied to `fetchAnalyticsRows()`
+(the shared helper behind `getPlayerStats`/`getPlayerMatchHistory`/
+`getLeaderboard`/`scopedPlayerStats`), and to the two direct queries each in
+`getPerformances()` and `getRecentForm()`. Each paginated query also gained
+an explicit `.order('match_id').order('player_name')` — every one of the
+four analytics tables has `(match_id, player_name)` as its real composite
+primary key, and `.range()` pagination is only guaranteed not to skip or
+repeat rows across pages when the underlying order is deterministic.
+`getInningsMatchIds()` (one row per *match*, not per player-per-match) was
+left unpaginated — the club's full match history is nowhere near 1000 rows
+by that count, so it isn't at risk the same way.
+
+No data was wrong or needed fixing — the analytics DB and Hub cache were
+already correct after the reconciliation work earlier that same session;
+this was purely an application-layer read bug. Once deployed, the next
+request recomputes correctly with no backfill needed.
+
+**Take-away:** any Supabase/PostgREST read that scopes to *many* rows
+across *many* players (a leaderboard, a squad-wide form panel) — as
+opposed to one player's own history — needs to either page explicitly or
+have an explicit reason it can't cross the row cap. This bug was invisible
+for months because the season's synced-match count only recently grew
+large enough to cross it; it will recur in any future unpaginated
+multi-player analytics query added to this file without the same
+`fetchAllRows()` treatment.
+
+---
+
 ## 9. File Map
 
 | File | Role |
 |---|---|
 | `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`), glossary building |
-| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10) |
+| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10); `fetchAllRows()` pages every multi-row analytics-DB read past PostgREST's default 1000-row cap (§8.1) |
 | `src/components/players/PlayerStatsClient.tsx` | `/players/[id]/stats` filter bar — Year/Ground/Format/As Captain/Defending/Chasing, plus the "Include Practice Games" opt-in (§10) |
 | `src/app/api/players/[id]/match-history/route.ts` | Feeds `PlayerStatsClient.tsx` — parses `practice=1` into `includePractice` (§10) |
 | `supabase/migrations/054_tournament_is_practice.sql` | `tournaments.is_practice` flag (§10) |
