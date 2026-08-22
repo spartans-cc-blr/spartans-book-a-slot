@@ -21,6 +21,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { syncMatchStatsForBooking } from '@/lib/matchStatsSync'
+import { hasMatchEnded } from '@/lib/matchStatus'
 
 const MICROSERVICE_TIMEOUT_MS = 45_000
 
@@ -38,7 +39,7 @@ export async function backfillOneBooking(bookingId: string): Promise<BackfillRes
 
   const { data: booking, error: bookingErr } = await supabase
     .from('bookings')
-    .select('id, match_id, game_date, status')
+    .select('id, match_id, game_date, slot_time, format, status')
     .eq('id', bookingId)
     .eq('status', 'confirmed')
     .single()
@@ -50,8 +51,7 @@ export async function backfillOneBooking(bookingId: string): Promise<BackfillRes
     return { booking_id: bookingId, match_id: null, ok: false, parsed: false, synced: false, error: 'No match_id set on this booking' }
   }
 
-  const today = new Date().toISOString().split('T')[0]
-  if (booking.game_date >= today) {
+  if (!hasMatchEnded(booking.game_date, booking.slot_time, booking.format)) {
     return { booking_id: bookingId, match_id: booking.match_id, ok: false, parsed: false, synced: false, error: 'Match not yet completed' }
   }
 
