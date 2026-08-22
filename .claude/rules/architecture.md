@@ -740,7 +740,7 @@ Next.js API Routes (server-side)
 | `src/app/api/matches/[id]/flag-reconciliation/route.ts` | POST reports a stats discrepancy (Zod-validated note), re-queuing into the backfill pipeline; DELETE is an admin-only clear-without-reprocessing override |
 | `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking verify/flag auth, includes the top-performer grant; see `features/post-match-scorecard.md` §15 |
 | `src/lib/matchTopPerformers.ts` | Resolves a match's top scorer/wicket-taker to a Hub `player_id`; see `features/post-match-scorecard.md` §15 |
-| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; last step calls `detectAndLogMilestones()` |
+| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; calls `autoResolveMatch()` before reading analytics rows, last step calls `detectAndLogMilestones()` |
 | `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` (season) + `detectAndLogMatchPerformances()` (single-match highlights) — club-wide milestone recognition detection; see `features/milestone-recognition.md` |
 | `src/app/api/milestones/unseen/route.ts` + `src/app/api/milestones/mark-seen/route.ts` | Broadcast feed + seen-cursor advance for the milestone recognition modal |
 | `src/components/milestones/MilestoneCelebrationModal.tsx` | Club-wide milestone recognition modal |
