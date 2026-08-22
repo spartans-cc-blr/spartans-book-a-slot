@@ -43,6 +43,34 @@ function groupBy<T>(rows: T[], key: (row: T) => string | null | undefined): Map<
   return map
 }
 
+// PostgREST caps an unpaginated `.select()` response at a fixed row limit
+// (this project's default is 1000) — silently, with no error surfaced to
+// the caller. Any analytics-DB read here that isn't scoped to a single
+// player can realistically exceed that as the season's synced-match count
+// grows: confirmed live on 2026-08-22 at 1,045 rows per table for the
+// current season's scope alone, which was silently truncating
+// getLeaderboard()'s season totals for every player, not just the one that
+// happened to surface it (a milestone crossed per getPlayerSeasonStats(),
+// which is single-player-scoped and never hits the cap, while the Honor
+// Board built off this same match scope quietly undercounted). Every
+// multi-row analytics fetch in this file pages through with `.range()`
+// instead of trusting one request to return everything.
+const ANALYTICS_PAGE_SIZE = 1000
+
+async function fetchAllRows<T = any>(buildQuery: () => any): Promise<T[]> {
+  const rows: T[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await buildQuery().range(from, from + ANALYTICS_PAGE_SIZE - 1)
+    if (error) throw new Error(error.message)
+    if (!data || data.length === 0) break
+    rows.push(...data)
+    if (data.length < ANALYTICS_PAGE_SIZE) break
+    from += ANALYTICS_PAGE_SIZE
+  }
+  return rows
+}
+
 // Cricket overs notation ("3.4" = 3 overs + 4 balls) is NOT decimal — the
 // digit after the point is balls bowled in the current over, not tenths of
 // an over. Converting to a common balls unit before summing avoids a
@@ -306,27 +334,33 @@ async function fetchAnalyticsRows(opts: {
   const analytics = createAnalyticsClient()
   if (!analytics) throw new Error('Analytics database is not configured')
 
-  function scope(q: any) {
-    if (opts.playerId)  q = q.eq('player_id', opts.playerId)
-    if (opts.playerIds) q = q.in('player_id', opts.playerIds)
-    if (!opts.playerId && !opts.playerIds) q = q.not('player_id', 'is', null)
-    if (opts.matchIds)  q = q.in('match_id', opts.matchIds)
-    return q
+  function scope(table: string) {
+    return () => {
+      // .order() on the table's own composite primary key (match_id,
+      // player_name) — required for fetchAllRows()'s .range() pagination
+      // to be stable; without a deterministic order, Postgres offers no
+      // guarantee that two successive pages don't skip or repeat rows.
+      let q = analytics!.from(table).select('*').order('match_id').order('player_name')
+      if (opts.playerId)  q = q.eq('player_id', opts.playerId)
+      if (opts.playerIds) q = q.in('player_id', opts.playerIds)
+      if (!opts.playerId && !opts.playerIds) q = q.not('player_id', 'is', null)
+      if (opts.matchIds)  q = q.in('match_id', opts.matchIds)
+      return q
+    }
   }
 
   const [batting, bowling, fielding, team] = await Promise.all([
-    scope(analytics.from('batting_stats').select('*')),
-    scope(analytics.from('bowling_stats').select('*')),
-    scope(analytics.from('fielding_stats').select('*')),
-    scope(analytics.from('team_list').select('*')),
+    fetchAllRows(scope('batting_stats')),
+    fetchAllRows(scope('bowling_stats')),
+    fetchAllRows(scope('fielding_stats')),
+    fetchAllRows(scope('team_list')),
   ])
-  for (const r of [batting, bowling, fielding, team]) if (r.error) throw new Error(r.error.message)
 
   return {
-    batting:  batting.data ?? [],
-    bowling:  bowling.data ?? [],
-    fielding: fielding.data ?? [],
-    team:     team.data ?? [],
+    batting,
+    bowling,
+    fielding,
+    team,
   }
 }
 
@@ -567,15 +601,13 @@ export async function getPerformances(filters: { year?: number; month?: string; 
 
   const analytics = createAnalyticsClient()
   if (!analytics) throw new Error('Analytics database is not configured')
-  const [{ data: battingRows, error: battErr }, { data: bowlingRows, error: bowlErr }] = await Promise.all([
-    analytics.from('batting_stats').select('*').in('match_id', scoped).not('player_id', 'is', null),
-    analytics.from('bowling_stats').select('*').in('match_id', scoped).not('player_id', 'is', null),
+  const [battingRows, bowlingRows] = await Promise.all([
+    fetchAllRows(() => analytics.from('batting_stats').select('*').order('match_id').order('player_name').in('match_id', scoped).not('player_id', 'is', null)),
+    fetchAllRows(() => analytics.from('bowling_stats').select('*').order('match_id').order('player_name').in('match_id', scoped).not('player_id', 'is', null)),
   ])
-  if (battErr) throw new Error(battErr.message)
-  if (bowlErr) throw new Error(bowlErr.message)
 
-  const qualifyingBatting = (battingRows ?? []).filter((r: any) => r.batted && num(r.runs) >= 50)
-  const qualifyingBowling = (bowlingRows ?? []).filter((r: any) => r.did_bowl && num(r.wickets) >= 3)
+  const qualifyingBatting = battingRows.filter((r: any) => r.batted && num(r.runs) >= 50)
+  const qualifyingBowling = bowlingRows.filter((r: any) => r.did_bowl && num(r.wickets) >= 3)
   if (qualifyingBatting.length === 0 && qualifyingBowling.length === 0) return EMPTY_PERFORMANCES
 
   // One shared bookings + players fetch for both bands — cheaper than
@@ -662,18 +694,11 @@ export async function getRecentForm(playerIds: string[], matchCount: number = 5)
   const analytics = createAnalyticsClient()
   if (!analytics) throw new Error('Analytics database is not configured')
 
-  const [teamRes, battingRes, bowlingRes] = await Promise.all([
-    analytics.from('team_list').select('match_id, player_id').in('player_id', playerIds),
-    analytics.from('batting_stats').select('match_id, player_id, runs, batted').in('player_id', playerIds),
-    analytics.from('bowling_stats').select('match_id, player_id, wickets, did_bowl').in('player_id', playerIds),
+  const [team, batting, bowling] = await Promise.all([
+    fetchAllRows(() => analytics.from('team_list').select('match_id, player_id').order('match_id').order('player_name').in('player_id', playerIds)),
+    fetchAllRows(() => analytics.from('batting_stats').select('match_id, player_id, runs, batted').order('match_id').order('player_name').in('player_id', playerIds)),
+    fetchAllRows(() => analytics.from('bowling_stats').select('match_id, player_id, wickets, did_bowl').order('match_id').order('player_name').in('player_id', playerIds)),
   ])
-  if (teamRes.error)    throw new Error(teamRes.error.message)
-  if (battingRes.error) throw new Error(battingRes.error.message)
-  if (bowlingRes.error) throw new Error(bowlingRes.error.message)
-
-  const team    = teamRes.data ?? []
-  const batting = battingRes.data ?? []
-  const bowling = bowlingRes.data ?? []
 
   const matchIds = Array.from(new Set<string>(team.map((r: any) => r.match_id).filter(Boolean)))
   let dateByMatch = new Map<string, string>()
