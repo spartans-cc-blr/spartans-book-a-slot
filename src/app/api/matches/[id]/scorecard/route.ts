@@ -25,6 +25,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
+import { hasMatchEnded } from '@/lib/matchStatus'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10MB
 
@@ -70,15 +71,14 @@ export async function POST(
 
   const { data: booking, error: bookingErr } = await supabase
     .from('bookings')
-    .select('id, match_id, game_date, status')
+    .select('id, match_id, game_date, slot_time, format, status')
     .eq('id', bookingId)
     .eq('status', 'confirmed')
     .single()
 
   if (bookingErr || !booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 
-  const today = new Date().toISOString().split('T')[0]
-  if (booking.game_date >= today) {
+  if (!hasMatchEnded(booking.game_date, booking.slot_time, booking.format)) {
     return NextResponse.json({ error: 'Match not yet completed' }, { status: 400 })
   }
 
