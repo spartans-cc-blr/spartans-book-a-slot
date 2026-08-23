@@ -402,10 +402,11 @@ tournament — or a second practice-style umbrella tournament — doesn't
 silently break the exclusion.
 
 **Where it's enforced — `getScopedMatchIds()` in `src/lib/playerStats.ts`:**
-every caller of this shared resolver (`getLeaderboard()`, `getPerformances()`,
-`getPlayerStats()`, `getPlayerMatchHistory()`) excludes bookings under any
-`is_practice` tournament by default. Two ways to see through the exclusion,
-both already-established patterns in this file rather than new concepts:
+every caller of this shared resolver excludes bookings under any
+`is_practice` tournament by default. Three ways to see through the
+exclusion, all already-established patterns in this file rather than new
+concepts (the third added when the Centuries/5-Wicket Hauls lists' own
+exception, above, shipped):
 
 1. **An explicit `tournamentId` filter always wins.** Scoping to one
    specific tournament (whichever one that is) is a deliberate, narrow
@@ -421,17 +422,45 @@ both already-established patterns in this file rather than new concepts:
    The compact "My Stats" summary on `/profile` (`getPlayerCareerStats()`/
    `getPlayerSeasonStats()`, no filter UI at all) always excludes practice
    games — there's no toggle there, only a link to the Full Stats page.
+3. **`includePractice` — unconditionally passed by `getPerformances()`'s one
+   caller, `/leaderboard` itself.** Not a user-facing toggle like #2 above —
+   `src/app/leaderboard/page.tsx` always passes `includePractice: true` on
+   both of its `getPerformances()` calls, so the Centuries/Half-Centuries/
+   5-Wicket/3-Wicket Hauls lists always include practice-game performances.
+   See the "Exception, added August 2026" callout below for the full
+   reasoning — this is deliberately narrower than #2: it only ever affects
+   `getPerformances()`, never `getLeaderboard()`.
 
 **Leaderboard itself has no toggle** — `/leaderboard` always excludes
-practice games, and `getFilterOptions()` drops the Practice games
-tournament from the Tournament dropdown entirely (both the unrestricted
-and format-restricted branches), so it isn't offered as something to
-scope to from that page. The footer disclaimer under the tables/cards
-(`src/app/leaderboard/page.tsx`, same line as the "stats synced from
-CricHeroes on a best-effort basis" note) says so explicitly — "Practice
-games are excluded — only real tournament fixtures count towards these
-numbers" — since the exclusion is otherwise silent (there's no filter
-control whose absence would hint at it).
+practice games from every ranking/aggregate, and `getFilterOptions()` drops
+the Practice games tournament from the Tournament dropdown entirely (both
+the unrestricted and format-restricted branches), so it isn't offered as
+something to scope to from that page. The footer disclaimer under the
+tables/cards (`src/app/leaderboard/page.tsx`, same line as the "stats
+synced from CricHeroes on a best-effort basis" note) says so explicitly —
+since the exclusion is otherwise silent (there's no filter control whose
+absence would hint at it).
+
+**Exception, added August 2026 — the Centuries/Half-Centuries/5-Wicket/
+3-Wicket Hauls lists include practice games.** `getPerformances()` (§3) is
+the one caller of `getScopedMatchIds()` that passes `includePractice: true`
+— every other caller (`getLeaderboard()` itself, `getPlayerCareerStats()`/
+`getPlayerSeasonStats()`, and `getPlayerStats()`/`getPlayerMatchHistory()`
+absent the personal stats page's own opt-in) still excludes practice by
+default. The reasoning: a century or 5-wicket haul is a genuine, nameable
+individual performance worth recognising wherever it happened, but it
+shouldn't move an aggregate "best" ranking — so the **lists** (§5's
+year-scoped collapsible bands, §5.1's Tournament/Ground-scoped always-open
+lists, and Monthly's own always-open panels) now surface a practice-game
+century/50/5-for/3-for alongside the tournament ones, while the **cards**
+(Leading Run Scorer, MVP, Best Average, the tied Most 100s/50s cards — all
+sourced from `getLeaderboard()`'s `rows`, not `getPerformances()`) are
+completely unaffected and still practice-excluded. `src/app/leaderboard/page.tsx`
+passes `includePractice: true` on both of its `getPerformances()` calls
+(`monthlyPerformances` and `yearlyPerformances`); `getPerformances()`
+itself has no default of its own — the flag is required from the caller,
+same "explicit opt-in only" posture as the personal stats page's own
+`includePractice` toggle above.
 
 **Deliberately unaffected:** `getPlayerBookingContextStats()` (the
 Captains' Corner "Form" panel's tournament/ground/format context stats)

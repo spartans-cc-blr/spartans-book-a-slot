@@ -595,7 +595,15 @@ function resolveTournamentName(booking: any): string | null {
 // "5-Wicket Hauls" collapsible lists (scoped by `year` + whatever
 // tournament/ground/format filter is active), since 100s and 5-fors are
 // rare enough that a whole year's worth is still a reasonably short list.
-export async function getPerformances(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[] }): Promise<Performances> {
+//
+// `includePractice` is passed by every caller (see `src/app/leaderboard/page.tsx`)
+// — deliberately unlike `getLeaderboard()`, which has no such flag and always
+// excludes practice games. A century or 5-wicket haul is still a genuine,
+// nameable performance worth recognising even from a practice game; it just
+// shouldn't move an aggregate "best" ranking (Leading Run Scorer, MVP, the
+// tied Most 100s/50s cards — all sourced from `getLeaderboard()`, untouched
+// by this). See `features/leaderboard.md` §5/§5.1/§10.
+export async function getPerformances(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; includePractice?: boolean }): Promise<Performances> {
   const scoped = await getScopedMatchIds(filters)
   if (!scoped || scoped.length === 0) return EMPTY_PERFORMANCES
 

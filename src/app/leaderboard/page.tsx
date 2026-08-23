@@ -109,7 +109,13 @@ export default async function LeaderboardPage({
     ? await getLeaderboard({ month, formats: restrictedFormats })
     : await getLeaderboard(overallFilters)
 
-  const monthlyPerformances = category === 'monthly' ? await getPerformances({ month }) : null
+  // `includePractice: true` on both calls below — these lists are individual
+  // performance recognitions (a century, a 5-for), not the aggregate "best"
+  // rankings (`rows`, from `getLeaderboard()`, a few lines up — deliberately
+  // left excluding practice games). A rare performance is still worth
+  // surfacing even from a practice game; see `features/leaderboard.md` §10
+  // and the comment on `getPerformances()` in `playerStats.ts`.
+  const monthlyPerformances = category === 'monthly' ? await getPerformances({ month, includePractice: true }) : null
 
   // Individual centuries/half-centuries/5-wicket/3-wicket-haul lists for the
   // Overall tab's bands — fetched for a specific year (not "All Time") or
@@ -117,7 +123,7 @@ export default async function LeaderboardPage({
   // same scope as `rows` above. Neither condition met ("All Time", no
   // scope) keeps the plain tied-cards Most 100s/50s treatment instead.
   const scoped = !!(tournamentName || groundName)
-  const yearlyPerformances = category === 'overall' && (year !== 'all' || scoped) ? await getPerformances(overallFilters) : null
+  const yearlyPerformances = category === 'overall' && (year !== 'all' || scoped) ? await getPerformances({ ...overallFilters, includePractice: true }) : null
 
   const glossaryTitle = category === 'overall' ? 'Overall'
     : category === 'monthly' ? 'Monthly'
@@ -199,7 +205,7 @@ export default async function LeaderboardPage({
         )}
 
         <p className="font-rajdhani text-xs text-zinc-500 text-center mt-8 px-4">
-          Stats are synced from CricHeroes, a third-party platform, on a best-effort basis. Small discrepancies may appear from time to time — we're actively working to catch these up. Practice games are excluded — only real tournament fixtures count towards these numbers.
+          Stats are synced from CricHeroes, a third-party platform, on a best-effort basis. Small discrepancies may appear from time to time — we're actively working to catch these up. Practice games are excluded from every ranking and aggregate above — only real tournament fixtures count towards these numbers — though a standout century, half-century, or wicket-haul from a practice game is still recognised in the Centuries/Half-Centuries/5-Wicket/3-Wicket Hauls lists.
         </p>
 
         <LeaderboardGlossary title={glossaryTitle} entries={glossaryEntries} />
