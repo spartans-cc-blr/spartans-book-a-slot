@@ -107,7 +107,7 @@ are already logged.
 `year` is the calendar year of the match's own `game_date`, not "today" —
 correct even when an old match is synced or re-synced long after the fact.
 
-### Single-match performances — `detectAndLogMatchPerformances(bookingId, batting, bowling, fielding)`
+### Single-match performances — `detectAndLogMatchPerformances(bookingId, batting, bowling, fielding, squad, isPractice)`
 
 Reads directly off the batting/bowling/fielding rows already fetched for
 **this one match** inside `syncMatchStatsForBooking()` — no extra round
@@ -125,11 +125,25 @@ Upserts into `match_performance_achievements` with
 `ON CONFLICT (player_id, booking_id, performance_type) DO NOTHING` — a
 re-sync of the same match can't double-log the same performance.
 
-**Skipped entirely for practice-tournament bookings** (`tournaments.is_practice`
-— see `features/leaderboard.md` §10), same "real stats only" posture as
-every other performance/stats surface in this app. Season milestones don't
-need this same explicit check — they already inherit the exclusion via
-`getPlayerSeasonStats()`'s own default scoping.
+**Century and five-wicket-haul are recognised even for a practice-tournament
+booking (added August 2026) — every other band still isn't.**
+`tournaments.is_practice` (see `features/leaderboard.md` §10) is passed in
+as `isPractice` from `syncMatchStatsForBooking()`. Half-century,
+three-wicket-haul, and five-dismissals rows are skipped whenever
+`isPractice` is true — same "real stats only" posture as every other
+aggregate/ranking surface in this app — but `century` and `five_wicket_haul`
+are logged unconditionally regardless of `isPractice`. This mirrors the
+Honour Board's own carve-out for its Centuries/5-Wicket Hauls recognition
+lists (`features/leaderboard.md` §5.1's trim note): a century or 5-wicket
+haul is still a genuine, nameable performance worth celebrating wherever it
+happened, but the club didn't want the rarer-but-more-common bands
+(half-centuries, 3-wicket hauls, 5-dismissal matches) diluted by practice
+games. Season milestones don't need any of this — they already inherit the
+practice exclusion via `getPlayerSeasonStats()`'s own default scoping, and
+weren't part of this carve-out (a season *total* crossing 500 runs isn't a
+single-match highlight, and mixing in practice-game runs would move that
+aggregate the same way the Honour Board's ranking cards were deliberately
+kept practice-excluded).
 
 ---
 
@@ -255,8 +269,8 @@ has no user present at detection time to show anything to.
 |---|---|
 | `supabase/migrations/059_milestone_achievements.sql` | `milestone_achievements` table + `players.milestones_seen_at` |
 | `supabase/migrations/060_match_performance_achievements.sql` | `match_performance_achievements` table |
-| `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` (season) + `detectAndLogMatchPerformances()` (single-match) |
-| `src/lib/matchStatsSync.ts` | Calls both detection functions (in parallel) as the last step of `syncMatchStatsForBooking()`; skips match-performance detection for practice-tournament bookings |
+| `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` (season) + `detectAndLogMatchPerformances()` (single-match) — the latter's `isPractice` param lets century/five_wicket_haul through for a practice game while still excluding half_century/three_wicket_haul/five_dismissals |
+| `src/lib/matchStatsSync.ts` | Calls both detection functions (in parallel) as the last step of `syncMatchStatsForBooking()`; resolves `tournament.is_practice` into `isPractice` and always calls `detectAndLogMatchPerformances()` (no longer skipped outright for practice-tournament bookings) |
 | `src/app/api/milestones/unseen/route.ts` | GET — broadcast feed, merges both achievement tables |
 | `src/app/api/milestones/mark-seen/route.ts` | POST — advances the player's own seen-cursor |
 | `src/components/milestones/MilestoneCelebrationModal.tsx` | The modal itself |
@@ -365,6 +379,19 @@ Unix epoch — same technique as §8, confirmed against every player's
 Breakdown: 71 half-centuries, 53 three-wicket hauls, 6 five-wicket hauls, 5
 centuries. Zero five-dismissal matches — no fielder has ever recorded 5+
 dismissals in a single match in the Hub's synced history to date.
+
+**Known gap, not backfilled:** this pass explicitly scoped to non-practice
+bookings only — correct at the time (`detectAndLogMatchPerformances()` had
+no practice-game exception yet), but now stale against the August 2026
+carve-out (§3) that lets century/five_wicket_haul through for a practice
+game. Any practice-game century or 5-wicket haul scored *before* this doc
+pass won't retroactively surface in the celebration modal — only a future
+sync or reconciliation re-sync of that specific booking picks it up (same
+"a merged code change isn't the same as a re-run of history" caveat this
+app's other backfill write-ups already flag, e.g.
+`features/post-match-scorecard.md` §15). Not re-run as a one-off backfill
+here since the practice-game exception is new and low-volume; worth doing
+if a captain reports a specific missed practice-game highlight.
 
 ---
 
