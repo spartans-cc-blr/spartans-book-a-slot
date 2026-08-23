@@ -2,13 +2,16 @@
 // "Monthly" sub-tab under Honor Board on /leaderboard — see
 // src/app/leaderboard/page.tsx. Same six-stat card treatment as
 // LeaderboardMilestones ("Overall"), but scoped to a single month rather
-// than a year, plus four innings lists below, agreed with the club
-// coordinator:
+// than a year, plus a Centuries + 5-Wicket Hauls list below, agreed with
+// the club coordinator:
 //   1. "Leading X" becomes "Top X" — Best Average / Highest S/R / Best
 //      Economy already read fine and are left as-is.
-//   2. Every qualifying century/half-century/5-for/3-for in the month is
-//      listed individually rather than a single "who has the most" card —
-//      a month can genuinely have more than one of each.
+//   2. Every qualifying century/5-for in the month is listed individually
+//      rather than a single "who has the most" card — a month can
+//      genuinely have more than one of each. Half-centuries and 3-wicket
+//      hauls are common enough that they don't get their own list here
+//      either — same reasoning as `LeaderboardMilestones.tsx`'s Overall
+//      tab, kept in sync deliberately.
 //   3. Each row shows the tournament, not the opponent — a straight swap.
 //   4. Each row is a whole-row link to its match page
 //      (/matches/history/[bookingId]), same tab, so the browser back
@@ -17,6 +20,12 @@
 //      rather than nesting two <a> tags, which isn't valid HTML — click
 //      the name to go to the player, click anywhere else in the row to go
 //      to the match.
+//
+// Centuries and 5-Wicket Hauls here include practice-game performances
+// (`includePractice: true`, set by the page's `getPerformances()` call) —
+// the cards above them (Top MVP/Runs/Wickets, Best Average/S/R/Economy) are
+// still computed from `rows` (`getLeaderboard()`), which never sees
+// practice games. See `features/leaderboard.md` §5/§10.
 //
 // Qualification is deliberately much looser than Milestones' quarterly-
 // ratchet minGamesThreshold(): a club month is realistically 1-4 games per
@@ -31,7 +40,6 @@ import { bestBy, MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE } from '@/lib/
 import { PlayerAvatar } from './PlayerAvatar'
 import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
 import { BallIcon } from '@/components/matches/BallIcon'
-import { WicketIcon } from './WicketIcon'
 import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
 interface Milestone {
@@ -56,12 +64,10 @@ function InningsPanel({ icon, label, count, children }: { icon: React.ReactNode;
   )
 }
 
-export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketHauls, threeWicketHauls, monthLabel }: {
+export function LeaderboardMonthly({ rows, centuries, fiveWicketHauls, monthLabel }: {
   rows: LeaderboardRow[]
   centuries: MonthlyInnings[]
-  halfCenturies: MonthlyInnings[]
   fiveWicketHauls: MonthlyBowlingInnings[]
-  threeWicketHauls: MonthlyBowlingInnings[]
   monthLabel: string
 }) {
   const qualifies = (r: LeaderboardRow) => r.stats.matches >= 1
@@ -85,7 +91,7 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
     { label: 'Best Economy',   icon: '🛡️', row: bestEconomy, valueText: bestEconomy ? `Econ ${bestEconomy.stats.economy!.toFixed(2)}` : '' },
   ].filter(m => m.row)
 
-  const noInnings = centuries.length === 0 && halfCenturies.length === 0 && fiveWicketHauls.length === 0 && threeWicketHauls.length === 0
+  const noInnings = centuries.length === 0 && fiveWicketHauls.length === 0
   if (rows.length === 0 && noInnings) {
     return (
       <p className="font-rajdhani text-sm text-zinc-500 py-8 text-center">No stats for {monthLabel} yet.</p>
@@ -131,16 +137,8 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
         {centuries.map(i => <BattingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
       </InningsPanel>
 
-      <InningsPanel icon="5️⃣0️⃣" label="Half-Centuries" count={halfCenturies.length}>
-        {halfCenturies.map(i => <BattingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
-      </InningsPanel>
-
       <InningsPanel icon={<BallIcon type="gold" size={16} />} label="5-Wicket Hauls" count={fiveWicketHauls.length}>
         {fiveWicketHauls.map(i => <BowlingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
-      </InningsPanel>
-
-      <InningsPanel icon={<WicketIcon size={16} />} label="3-Wicket Hauls" count={threeWicketHauls.length}>
-        {threeWicketHauls.map(i => <BowlingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
       </InningsPanel>
     </div>
   )

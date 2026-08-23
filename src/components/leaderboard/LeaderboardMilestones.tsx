@@ -26,17 +26,25 @@
 // is small enough — a single tournament might only run a handful of games
 // all season — that even the year's ">1" gate doesn't rescue a "most"
 // card from being a tie-break artifact most of the time. So when scoped,
-// all four rare-performance categories (Centuries, Half-Centuries,
-// 5-Wicket Hauls, 3-Wicket Hauls) drop the card/band treatment entirely in
+// Centuries and 5-Wicket Hauls drop the card/band treatment entirely in
 // favour of the Monthly tab's always-open individual-list treatment —
 // every qualifying performance listed, no "most" card, no collapsing.
+// Half-centuries and 3-wicket hauls are common enough (and the "Most 50s"
+// card already covers half-centuries) that neither gets its own list here,
+// scoped or not — see `features/leaderboard.md` §5/§5.1.
+//
+// Centuries and 5-Wicket Hauls are also the only two rare-performance
+// categories that include practice-game performances (`includePractice:
+// true`, set by the page's `getPerformances()` calls) — every card above
+// (Leading MVP/Runs/Wickets, Most 100s/50s, Best Average/S/R/Economy) is
+// still computed from `rows` (`getLeaderboard()`), which never sees
+// practice games, so none of that ranking is affected.
 
 import { useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { PlayerAvatar } from './PlayerAvatar'
 import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
 import { BallIcon } from '@/components/matches/BallIcon'
-import { WicketIcon } from './WicketIcon'
 import { MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE_OVERALL, minGamesThreshold, minDismissalsThreshold, bestByAll, totalDismissals } from '@/lib/leaderboardMilestones'
 import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
@@ -92,7 +100,7 @@ function ScopedInningsPanel({ icon, label, count, children }: { icon: React.Reac
   )
 }
 
-export function LeaderboardMilestones({ rows, year, scoped, centuries, halfCenturies, fiveWicketHauls, threeWicketHauls }: {
+export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicketHauls }: {
   rows: LeaderboardRow[]
   year: number | 'all'
   scoped: boolean
@@ -100,9 +108,7 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, halfCentu
   // fetched by the page for a specific year or a scoped (tournament/ground)
   // filter; null means "not applicable", not "none scored".
   centuries?: MonthlyInnings[] | null
-  halfCenturies?: MonthlyInnings[] | null
   fiveWicketHauls?: MonthlyBowlingInnings[] | null
-  threeWicketHauls?: MonthlyBowlingInnings[] | null
 }) {
   // Scoped (Tournament/Ground filter) always wins over the year-band
   // treatment — see the header comment. Monthly-style always-open lists
@@ -227,16 +233,8 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, halfCentu
             {(centuries ?? []).map(i => <BattingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
           </ScopedInningsPanel>
 
-          <ScopedInningsPanel icon="5️⃣0️⃣" label="Half-Centuries" count={halfCenturies?.length ?? 0}>
-            {(halfCenturies ?? []).map(i => <BattingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
-          </ScopedInningsPanel>
-
           <ScopedInningsPanel icon={<BallIcon type="gold" size={16} />} label="5-Wicket Hauls" count={fiveWicketHauls?.length ?? 0}>
             {(fiveWicketHauls ?? []).map(i => <BowlingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
-          </ScopedInningsPanel>
-
-          <ScopedInningsPanel icon={<WicketIcon size={16} />} label="3-Wicket Hauls" count={threeWicketHauls?.length ?? 0}>
-            {(threeWicketHauls ?? []).map(i => <BowlingInningsRow key={i.playerId + i.gameDate} innings={i} />)}
           </ScopedInningsPanel>
         </div>
       )}
