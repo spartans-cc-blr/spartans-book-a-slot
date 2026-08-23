@@ -572,6 +572,39 @@ MICROSERVICE_SECRET  = <same value as Hub's MICROSERVICE_SECRET>
 | `import_from_dict` on `SupabaseImporter` | ✅ Done, live on Render |
 | CricHeroes match URL backfill for pre-existing bookings | ⏳ See `pending-backlog.md` E-3 — separate, ongoing coordinator task |
 | `match_stats_cache` carrying stale `player_id: null` for names reconciled in the analytics DB *after* that booking last synced — 63 of ~65 bookings affected | ✅ Bulk-patched 2026-08-01 — see Section 15's second incident write-up. No automated re-sync-on-reconcile hook exists yet, so this class of drift can recur for any newly-confirmed alias/override until one is built |
+| A match played *today* 404'd when clicked through from the profile stats page (and, less visibly, from `/matches/history`'s own inline expand) | ✅ Fixed 2026-08-23 — see the incident write-up below |
+
+**Incident (2026-08-23) — the standalone match page and its squad-detail API
+used a stricter "past match" test than the list route, 404-ing on any match
+played today.** `GET /api/matches/history` (the list) has always resolved
+"is this booking past" via `isPastMatch()` — `game_date < today` is
+unambiguous, but `game_date === today` needs the real end time
+(`hasMatchEnded()`, `src/lib/matchStatus.ts`: `slot_time` + a format-based
+duration), since a match played today is still "upcoming" until it
+actually ends. `/matches/history/[bookingId]/page.tsx` (the standalone page
+`/players/[id]/stats`'s match-history rows, the Honour Board's
+Centuries/5-Wicket-Hauls rows, and `PerformerShareButton`'s share link all
+link to) and `GET /api/matches/history/[bookingId]` (the squad-detail
+endpoint `MatchHistoryClient.tsx`'s own inline row-expand calls) instead
+used a bare `.lt('game_date', today)` Supabase filter — correct for
+yesterday-or-earlier, but wrong for today: it excluded a match the instant
+it was created, and stayed wrong for the rest of that calendar day even
+hours after the game had actually finished and its scorecard had synced.
+Reported via the profile stats page specifically (its match-history table
+is the only surface that always renders a match the moment analytics stats
+exist for it, regardless of date — see `getPlayerMatchHistory()`'s own
+lack of a date filter), but the squad-detail API carried the identical bug.
+
+**Fixed** by extracting the list route's private `isPastMatch()` into
+`src/lib/matchStatus.ts` (alongside `hasMatchEnded()`, which it already
+wrapped) so all three call sites share one implementation instead of two
+copies drifting apart. `/matches/history/[bookingId]/page.tsx` and
+`GET /api/matches/history/[bookingId]` now both filter the DB query with
+`.lte('game_date', today)` (ruling out only genuinely future dates) and
+then apply `isPastMatch()` in code once `slot_time`/`format` are in hand —
+same two-step shape the list route already used. `GET /api/matches/history`
+itself was only touched to import the now-shared `isPastMatch()` instead of
+defining its own; its behaviour is unchanged.
 
 ---
 
