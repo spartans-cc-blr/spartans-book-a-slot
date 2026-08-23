@@ -20,6 +20,17 @@ export function hasMatchEnded(gameDate: string, slotTime: string, format: string
   return new Date() >= getMatchEndTime(gameDate, slotTime, format)
 }
 
+// A match only belongs in "past" once it has actually ended — game_date
+// alone can't distinguish "starts later today" from "already finished".
+// Yesterday-or-earlier is unambiguous; today needs the real end time via
+// hasMatchEnded() above. `today` is passed in (rather than derived here)
+// so every caller shares one exact "now" snapshot within a single request.
+export function isPastMatch(gameDate: string, slotTime: string, format: string, today: string): boolean {
+  if (gameDate < today) return true
+  if (gameDate > today) return false
+  return hasMatchEnded(gameDate, slotTime, format)
+}
+
 // Formats a 24h "HH:MM" string as 12h — "07:30" -> "7:30", optionally with
 // an AM/PM suffix. Drops a :00 minute the same way the reporting-time
 // calc elsewhere in the app already does, for a consistent look.

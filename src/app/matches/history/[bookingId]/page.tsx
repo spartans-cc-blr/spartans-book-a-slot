@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { isPastMatch } from '@/lib/matchStatus'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { computeTopPerformers, summarizeTopPerformance } from '@/lib/matchTopPerformers'
@@ -51,8 +52,12 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   const today = new Date().toISOString().split('T')[0]
 
   // vibe-security: only a past, confirmed booking is servable here — same
-  // predicate as /api/matches/history/[bookingId], so a future or
-  // not-yet-confirmed booking's id can't be used to peek at anything.
+  // predicate as /api/matches/history/[bookingId]. `.lte()` here, not
+  // `.lt()` — game_date alone can't tell "starts later today" apart from
+  // "already finished" (isPastMatch(), below, makes that call using
+  // slot_time/format once the row is in hand), so the DB-level filter can
+  // only rule out a true future date; a future or not-yet-confirmed
+  // booking's id still can't be used to peek at anything.
   const { data: booking, error: bookingErr } = await supabase
     .from('bookings')
     .select(`
@@ -62,10 +67,17 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
     `)
     .eq('id', params.bookingId)
     .eq('status', 'confirmed')
-    .lt('game_date', today)
+    .lte('game_date', today)
     .single()
 
   if (bookingErr || !booking) notFound()
+  // A booking dated today whose slot hasn't ended yet isn't a "past match"
+  // yet either — same isPastMatch() cutoff /api/matches/history uses to
+  // decide what belongs in the Past list at all. Previously this page used
+  // a strict `game_date < today` DB filter instead, which 404'd every
+  // match played today regardless of how long ago it had actually ended —
+  // real bug hit via the profile stats page's match-history row links.
+  if (!isPastMatch(booking.game_date, booking.slot_time, booking.format, today)) notFound()
 
   const tournament = Array.isArray(booking.tournament) ? booking.tournament[0] ?? null : booking.tournament
   const ownGround = (booking as any).ground

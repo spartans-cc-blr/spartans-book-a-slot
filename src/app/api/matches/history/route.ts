@@ -51,7 +51,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { computeTopPerformers, computeMatchMVP, summarizeTopPerformance, type SquadRef } from '@/lib/matchTopPerformers'
-import { hasMatchEnded } from '@/lib/matchStatus'
+import { isPastMatch } from '@/lib/matchStatus'
 
 const DEFAULT_LIMIT = 15
 const MAX_LIMIT = 50
@@ -60,22 +60,9 @@ const MONTH_RE  = /^(\d{4})-(\d{2})$/
 // Max slot_times per day (07:30/10:30/12:30/14:30) — the buffer fetched
 // beyond `limit` so that filtering out today's not-yet-ended games (below)
 // can never leave a page short of `limit` rows unless the table itself is
-// exhausted. See the isPastMatch() comment for why game_date alone can't
-// drive this filter.
+// exhausted. See isPastMatch() (src/lib/matchStatus.ts) for why game_date
+// alone can't drive this filter.
 const TODAY_SLOT_BUFFER = 4
-
-// A match only belongs in "past" once it has actually ended — game_date
-// alone can't distinguish "starts later today" from "already finished".
-// Yesterday-or-earlier is unambiguous; today needs the real end time
-// (slot_time + format duration, same calc /fixtures uses to drop ended
-// games from Upcoming) — without this a match played today falls into a
-// gap: gone from Upcoming the instant it ends, but not eligible for Past
-// until game_date < today rolls over the next calendar day.
-function isPastMatch(gameDate: string, slotTime: string, format: string, today: string): boolean {
-  if (gameDate < today) return true
-  if (gameDate > today) return false
-  return hasMatchEnded(gameDate, slotTime, format)
-}
 
 function nextMonthStr(month: string): string {
   const [y, m] = month.split('-').map(Number)

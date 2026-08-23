@@ -4,17 +4,18 @@
 // than being public like /schedule.
 //
 // vibe-security: also gated to bookings that actually satisfy the "past"
-// predicate (status = 'confirmed' AND game_date < today) — the same one the
-// list route uses. Without this, a signed-in-but-non-privileged request for
-// a *future* confirmed booking's id would leak its in-progress squad
-// selection (draft captain/VC/WK picks, not yet announced) to anyone who can
-// guess or enumerate a booking_id. Non-past bookings are treated as
-// not-found here, matching the list view's scope.
+// predicate (status = 'confirmed' AND isPastMatch(), src/lib/matchStatus.ts)
+// — the same one the list route uses. Without this, a signed-in-but-non-
+// privileged request for a *future* confirmed booking's id would leak its
+// in-progress squad selection (draft captain/VC/WK picks, not yet
+// announced) to anyone who can guess or enumerate a booking_id. Non-past
+// bookings are treated as not-found here, matching the list view's scope.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { isPastMatch } from '@/lib/matchStatus'
 
 export async function GET(
   req: NextRequest,
@@ -30,13 +31,16 @@ export async function GET(
 
   const { data: booking, error: bookingErr } = await supabase
     .from('bookings')
-    .select('id, game_date, opponent_name, format, tournament_id, cricheroes_url, tournament:tournaments(name)')
+    .select('id, game_date, slot_time, opponent_name, format, tournament_id, cricheroes_url, tournament:tournaments(name)')
     .eq('id', params.bookingId)
     .eq('status', 'confirmed')
-    .lt('game_date', today)
+    .lte('game_date', today)
     .single()
 
   if (bookingErr || !booking) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
+  if (!isPastMatch(booking.game_date, booking.slot_time, booking.format, today)) {
+    return NextResponse.json({ error: 'Match not found' }, { status: 404 })
+  }
 
   const { data: squadRows, error: squadErr } = await supabase
     .from('squad')
