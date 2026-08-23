@@ -602,7 +602,11 @@ function resolveTournamentName(booking: any): string | null {
 // nameable performance worth recognising even from a practice game; it just
 // shouldn't move an aggregate "best" ranking (Leading Run Scorer, MVP, the
 // tied Most 100s/50s cards — all sourced from `getLeaderboard()`, untouched
-// by this). See `features/leaderboard.md` §5/§5.1/§10.
+// by this). This function still computes and returns all four bands (it's
+// one shared batting/bowling fetch, splitting them out is free) — only
+// `centuries`/`fiveWicketHauls` are actually rendered any more (neither
+// `LeaderboardMilestones.tsx` nor `LeaderboardMonthly.tsx` shows
+// halfCenturies/threeWicketHauls). See `features/leaderboard.md` §5/§5.1/§10.
 export async function getPerformances(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; includePractice?: boolean }): Promise<Performances> {
   const scoped = await getScopedMatchIds(filters)
   if (!scoped || scoped.length === 0) return EMPTY_PERFORMANCES
