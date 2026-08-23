@@ -102,12 +102,23 @@ export type MatchPerformanceType = 'century' | 'half_century' | 'five_wicket_hau
 // byte-for-byte — the same class of bug post-match-scorecard.md §15
 // already fixed for computeTopPerformers()/computeMatchMVP(), just never
 // applied here.
+//
+// `isPractice` (added August 2026, mirroring the Honour Board's own
+// century/5-wicket-haul carve-out — see features/leaderboard.md §5.1's
+// trim note) narrows rather than blanket-skips: a century or 5-wicket haul
+// is still a genuine, nameable performance worth celebrating wherever it
+// happened, so those two bands are logged regardless of `isPractice`.
+// Half-centuries, 3-wicket hauls, and 5-dismissal matches stay excluded for
+// a practice game — same "real stats only" posture as every other
+// aggregate/ranking surface in this app; only the two rare, standout
+// categories get the practice-game exception.
 export async function detectAndLogMatchPerformances(
   bookingId: string,
   batting: any[],
   bowling: any[],
   fielding: any[],
-  squad: SquadRef[]
+  squad: SquadRef[],
+  isPractice: boolean = false
 ): Promise<void> {
   try {
     const rows: { player_id: string; booking_id: string; performance_type: MatchPerformanceType; value: number }[] = []
@@ -118,7 +129,7 @@ export async function detectAndLogMatchPerformances(
       if (!playerId) continue
       const runs = Number(r.runs) || 0
       if (runs >= 100) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'century', value: runs })
-      else if (runs >= 50) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'half_century', value: runs })
+      else if (!isPractice && runs >= 50) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'half_century', value: runs })
     }
 
     for (const r of bowling) {
@@ -127,14 +138,16 @@ export async function detectAndLogMatchPerformances(
       if (!playerId) continue
       const wickets = Number(r.wickets) || 0
       if (wickets >= 5) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'five_wicket_haul', value: wickets })
-      else if (wickets >= 3) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'three_wicket_haul', value: wickets })
+      else if (!isPractice && wickets >= 3) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'three_wicket_haul', value: wickets })
     }
 
-    for (const r of fielding) {
-      const playerId = resolveSquadMatch(r, r.player_name, squad)?.player_id
-      if (!playerId) continue
-      const dismissals = (Number(r.catches) || 0) + (Number(r.caught_behind) || 0) + (Number(r.run_outs) || 0) + (Number(r.stumpings) || 0)
-      if (dismissals >= 5) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'five_dismissals', value: dismissals })
+    if (!isPractice) {
+      for (const r of fielding) {
+        const playerId = resolveSquadMatch(r, r.player_name, squad)?.player_id
+        if (!playerId) continue
+        const dismissals = (Number(r.catches) || 0) + (Number(r.caught_behind) || 0) + (Number(r.run_outs) || 0) + (Number(r.stumpings) || 0)
+        if (dismissals >= 5) rows.push({ player_id: playerId, booking_id: bookingId, performance_type: 'five_dismissals', value: dismissals })
+      }
     }
 
     if (rows.length === 0) return

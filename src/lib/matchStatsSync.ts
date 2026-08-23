@@ -116,9 +116,13 @@ export async function syncMatchStatsForBooking(
   // it was a manual click or the unattended cron path (both funnel through
   // this one function). Never allowed to fail the sync itself — see
   // src/lib/milestones.ts. Practice games (see features/leaderboard.md
-  // §10) are excluded from match-performance highlights, same as every
-  // other "real stats" surface in this app — season milestones already
-  // exclude them via getPlayerSeasonStats()'s own default scoping.
+  // §10) are excluded from most match-performance highlights, same as
+  // every other "real stats" surface in this app — season milestones
+  // already exclude them via getPlayerSeasonStats()'s own default scoping.
+  // Century and five-wicket-haul are the exception (mirrors the Honour
+  // Board's own carve-out, features/leaderboard.md §5.1) — those two are
+  // still logged for a practice game; detectAndLogMatchPerformances()
+  // enforces the narrower exclusion itself via the isPractice param.
   //
   // playerIds is resolved via this booking's own squad (resolveSquadMatch,
   // same helper computeTopPerformers()/computeMatchMVP() already use),
@@ -149,7 +153,7 @@ export async function syncMatchStatsForBooking(
 
   await Promise.all([
     detectAndLogMilestones(bookingId, year, playerIds),
-    isPractice ? Promise.resolve() : detectAndLogMatchPerformances(bookingId, batting.data ?? [], bowling.data ?? [], fielding.data ?? [], squad),
+    detectAndLogMatchPerformances(bookingId, batting.data ?? [], bowling.data ?? [], fielding.data ?? [], squad, isPractice),
   ])
 
   return { ok: true }
