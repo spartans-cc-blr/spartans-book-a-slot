@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { computeSlotStatus } from '@/lib/validation'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { addDays, format, parseISO, formatDistanceToNow } from 'date-fns'
-import type { SlotTime, WeekAvailability, DayAvailability, SlotInfo } from '@/types'
+import type { SlotTime, SlotStatus, WeekAvailability, DayAvailability, SlotInfo } from '@/types'
 import { isInformalFormat } from '@/types'
 
 const SLOT_TIMES: SlotTime[] = ['07:30', '10:30', '12:30', '14:30']
@@ -99,6 +99,7 @@ export async function GET(req: NextRequest) {
   }
 
   const weeks: WeekAvailability[] = []
+  const now = new Date()
 
   for (let w = 0; w < weeksParam; w++) {
     const sat = addDays(from, w * 7)
@@ -111,7 +112,17 @@ export async function GET(req: NextRequest) {
       const dayLabel = format(d, "EEEE d MMM")
 
       const slots: SlotInfo[] = SLOT_TIMES.map(time => {
-        const status = computeSlotStatus(dateStr, time, bookings ?? [])
+        let status: SlotStatus = computeSlotStatus(dateStr, time, bookings ?? [])
+
+        // An unbooked slot whose own start time has already passed can no
+        // longer be enquired about — nobody can retroactively book it. Only
+        // affects 'open'/'t20only' (a slot that was actually booked/reserved
+        // still needs to render as such regardless of time).
+        if (status === 'open' || status === 't20only') {
+          const slotStart = new Date(`${dateStr}T${time}:00+05:30`)
+          if (now >= slotStart) status = 'na'
+        }
+
         const slotInfo: SlotInfo = { time, status }
 
         if (status === 'open' || status === 't20only') {
