@@ -1,9 +1,15 @@
 // app/captains-corner/unavailable-dates/page.tsx
 //
-// Captain-only. Lets a captain mark dates/slots they already know they
-// can't lead a game — before a real booking even exists — so the
+// Captain-only for marking. Lets a captain mark dates/slots they already
+// know they can't lead a game — before a real booking even exists — so the
 // tournament share page's suggestion engines stop offering those dates to
 // organisers. See .claude/rules/features/player-future-availability.md.
+//
+// Admins additionally get a captain picker (?captainId=) so they can look
+// up any captain's marked dates read-only — see CaptainPicker.tsx and the
+// isOwnView branch below. This was the only way to see someone else's
+// marks at all; previously the page (and its API route) only ever
+// exposed the signed-in session's own rows.
 //
 // Layout mirrors the public /schedule page (one continuous sticky-header
 // table with inline month dividers, no week pagination) and its warm-light
@@ -26,6 +32,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { UnavailableDatesPanel } from '@/components/captains/UnavailableDatesPanel'
 import type { DayInfo, DaySlotInfo } from '@/components/captains/UnavailableDatesPanel'
+import { CaptainPicker } from '@/components/captains/CaptainPicker'
 import { upcomingWeekendDates } from '@/lib/suggestedSlots'
 import { computeSlotStatus, getClashSource } from '@/lib/validation'
 import { SLOT_TIMES } from '@/types'
@@ -49,18 +56,54 @@ interface BookingRow {
   tournament: { name: string | null } | null
 }
 
-export default async function UnavailableDatesPage() {
+export default async function UnavailableDatesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ captainId?: string }>
+}) {
   const session = await getServerSession(authOptions)
   const user    = session?.user as any
 
   if (!session) redirect('/login')
   if (!user?.isCaptain && !user?.isAdmin) redirect('/fixtures')
 
+  const supabase = createServiceClient()
+
+  // Admin-only captain picker. The write gate for this whole feature is
+  // players.is_captain (see the API route), so that's the same list used
+  // here — not the separate captains master-data table, which tracks
+  // tournament-level captain assignment and can diverge from it.
+  let captainOptions: { id: string; name: string }[] = []
+  let viewingPlayerId: string | null = null
+  let viewingName: string | null = null
+  let isOwnView = true
+
+  if (user.isAdmin) {
+    const { data: captainRows } = await supabase
+      .from('players')
+      .select('id, name')
+      .eq('is_captain', true)
+      .order('name')
+    captainOptions = captainRows ?? []
+
+    if (captainOptions.length > 0) {
+      const requested = (await searchParams).captainId
+      const requestedValid = requested && captainOptions.some(c => c.id === requested)
+      viewingPlayerId = requestedValid
+        ? requested!
+        : (user.isCaptain && captainOptions.some(c => c.id === user.playerId))
+          ? user.playerId
+          : captainOptions[0].id
+
+      viewingName = captainOptions.find(c => c.id === viewingPlayerId)?.name ?? null
+      isOwnView = viewingPlayerId === user.playerId
+    }
+  }
+
   const dates = upcomingWeekendDates()
   const firstDate = dates[0]?.game_date
   const lastDate  = dates[dates.length - 1]?.game_date
 
-  const supabase = createServiceClient()
   const { data: existingRaw } = firstDate && lastDate
     ? await supabase
         .from('bookings')
@@ -147,13 +190,18 @@ export default async function UnavailableDatesPage() {
           🚫 Unavailable Dates
         </h1>
         <p style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '14px', color: '#78716C', maxWidth: '520px', lineHeight: 1.5 }}>
-          Mark dates and times you already know you can&rsquo;t lead a game. This keeps the tournament
-          share page from suggesting those slots to organisers — booked and reserved slots are shown
-          too, just so you can see the full day at a glance.
+          {isOwnView
+            ? <>Mark dates and times you already know you can&rsquo;t lead a game. This keeps the tournament
+                share page from suggesting those slots to organisers — booked and reserved slots are shown
+                too, just so you can see the full day at a glance.</>
+            : <>Read-only — showing <b style={{ color: '#1C1917' }}>{viewingName}</b>&rsquo;s marked-unavailable dates. Only they can add or clear a mark.</>}
         </p>
+        {user.isAdmin && captainOptions.length > 0 && (
+          <CaptainPicker captains={captainOptions} selectedId={viewingPlayerId ?? ''} ownPlayerId={user.playerId ?? null} />
+        )}
       </div>
 
-      <UnavailableDatesPanel days={days} />
+      <UnavailableDatesPanel days={days} viewingPlayerId={isOwnView ? undefined : (viewingPlayerId ?? undefined)} />
 
       <footer style={{ textAlign: 'center', color: '#A8A29E', fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '12px', padding: '20px', borderTop: '1px solid #D4C9B0' }}>
         © 2026 Spartans Cricket Club · Bengaluru · Est. 2014

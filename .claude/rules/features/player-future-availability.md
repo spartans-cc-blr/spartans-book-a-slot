@@ -87,9 +87,9 @@ reverting it would need its own migration for no benefit.
 
 | Method | Auth | Purpose |
 |---|---|---|
-| GET | `isCaptain \|\| isAdmin` | Own rows only — `{ availability: {game_date, slot_time, response}[] }` |
-| POST | `isCaptain \|\| isAdmin`, non-expelled | `{game_date, slot_time, response: 'L'}` (single slot) or `{game_date, response: 'L', whole_day: true}` (fans out server-side to all 4 slot_times as independent rows) |
-| DELETE | `isCaptain \|\| isAdmin`, non-expelled | `{game_date, slot_time}` — clears one slot |
+| GET | `isCaptain \|\| isAdmin` | Own rows by default — `{ availability: {game_date, slot_time, response}[] }`. **Admin-only, added August 2026:** an optional `?player_id=` query param looks up a *different* player's rows instead — only ever honoured when `session.user.isAdmin` is true; a non-admin caller (including a captain) always gets their own rows regardless of what's in the query string. See §6.1. |
+| POST | `isCaptain \|\| isAdmin`, non-expelled | `{game_date, slot_time, response: 'L'}` (single slot) or `{game_date, response: 'L', whole_day: true}` (fans out server-side to all 4 slot_times as independent rows) — always writes under the caller's own `session.user.playerId`, `player_id` is never accepted from the request body or query string |
+| DELETE | `isCaptain \|\| isAdmin`, non-expelled | `{game_date, slot_time}` — clears one slot, always the caller's own |
 
 **Route path/table name still say "player"** — left as-is rather than
 renamed when the captain-only gate was added, since this is an internal
@@ -275,6 +275,48 @@ directory now that this is captain-specific UI, not general-purpose):
 
 ---
 
+## 6.1 Admin captain picker (added August 2026)
+
+Before this, an admin visiting `/captains-corner/unavailable-dates` only
+ever saw *their own* marked dates (or nothing, if they aren't themselves a
+captain) — there was no way for an admin to look up which dates a
+*different* captain had marked unavailable. Widened rather than building a
+second page: `page.tsx` now, for `isAdmin` sessions only, fetches every
+`players` row with `is_captain = true` (the same flag that gates writes to
+this feature — not the separate `captains` master-data table, which tracks
+tournament-level captain assignment and can diverge from it) and renders a
+`CaptainPicker` dropdown in the hero.
+
+- **Selection lives in the URL** (`?captainId=<player_id>`), not client
+  state — `CaptainPicker.tsx` (`'use client'`) pushes the new query string
+  via `next/navigation`'s `useRouter`, so the page stays a server
+  component and a chosen captain's view is bookmarkable/shareable.
+- **Default selection**: the requested `captainId` if it resolves to a
+  real captain, else the admin's own `playerId` if they themselves are a
+  captain, else the first captain alphabetically. An admin with zero
+  captains in the roster at all (`captainOptions.length === 0`) never
+  enters this branch — the page falls back to its original own-rows-only
+  behaviour, picker hidden.
+- **Read-only whenever the admin isn't viewing their own rows**
+  (`isOwnView = viewingPlayerId === user.playerId`) — `UnavailableDatesPanel`
+  takes an optional `viewingPlayerId` prop; when set, every "L" toggle
+  renders disabled (still shows marked/unmarked state, just not tappable)
+  and the whole-day "Mark day" button doesn't render at all. This is
+  deliberate, not just a UI nicety: **the write routes (`POST`/`DELETE`)
+  always write under the caller's own session `playerId`**, never a
+  `player_id` from the request — so if the panel let an admin tap "L"
+  while viewing someone else's calendar, it would silently create a mark
+  under the *admin's* own identity while the screen still showed the
+  captain's data. Making the panel read-only in that state is what
+  prevents that mismatch, not a server-side check (there's nothing to
+  check — a write while viewing someone else always lands on the admin's
+  own row regardless).
+- A captain who is *not* an admin never sees the picker and always gets
+  their own editable calendar, exactly as before this change — `isAdmin`
+  gates the entire branch in `page.tsx`.
+
+---
+
 ## 7. Removed — Internal Tournament Planner "Suggested Slots" panel
 
 The internal Hub `/tournament-planner` page previously had its own
@@ -318,6 +360,8 @@ the historical note.
 | R8 is a non-blocking warning, same severity as R2 — never stricter than the pattern it mirrors | ✅ |
 | `player_future_availability` writes never touch `bookings` | ✅ |
 | `/captains-corner/unavailable-dates` hard-redirects non-captains server-side, mirroring `/captains-corner/page.tsx` | ✅ |
+| `GET ?player_id=` cross-player lookup is admin-only, re-checked server-side — never trusts the client to only send it when appropriate | ✅ |
+| Writes always target the caller's own `session.user.playerId` — `player_id` is never accepted from POST/DELETE body or query string, so an admin viewing another captain's calendar can't write under that captain's identity even if the client were compromised | ✅ |
 
 ---
 
@@ -334,8 +378,10 @@ the historical note.
 | `src/types/index.ts` | `ValidationError['rule']` includes `'R8'` |
 | `src/app/api/validate/route.ts` + `src/app/api/bookings/route.ts` | Fetch and pass `captainFutureAvailability` into `validateBooking()` |
 | `src/app/admin/bookings/new/page.tsx` + `src/app/admin/bookings/[id]/page.tsx` | `RULES` lists include `R8` |
-| `src/app/captains-corner/unavailable-dates/page.tsx` | The page (§6) — hard-redirect gate, `computeSlotStatus()`-filtered open dates/slots |
-| `src/components/captains/UnavailableDatesPanel.tsx` | The captain-facing UI (§6) — toggle-only, no response picker |
+| `src/app/captains-corner/unavailable-dates/page.tsx` | The page (§6) — hard-redirect gate, `computeSlotStatus()`-filtered open dates/slots; admin captain-picker branch (§6.1) |
+| `src/components/captains/UnavailableDatesPanel.tsx` | The captain-facing UI (§6) — toggle-only, no response picker; `viewingPlayerId` prop switches it read-only for an admin viewing another captain (§6.1) |
+| `src/components/captains/CaptainPicker.tsx` | Admin-only `?captainId=` dropdown (§6.1) — client component, pushes the query string via `next/navigation` |
+| `src/components/schedule/ClashArrow.tsx` | Shared `getArrowDirection()`/`ArrowIcon` — the directional-arrow convention for a blocked/clash slot, used by both `ScheduleGrid.tsx` (admin schedule grid) and `UnavailableDatesPanel.tsx` |
 | `src/components/ui/SiteNav.tsx` | "Captains' Corner ▾" dropdown (Squad Selection + Unavailable Dates), desktop + mobile |
 | `src/app/api/captain-availability/route.ts` | Unrelated fix bundled in earlier work: was missing `RATE_LIMITS.captainWrite`, which its sibling `player-availability/route.ts` already had |
 
