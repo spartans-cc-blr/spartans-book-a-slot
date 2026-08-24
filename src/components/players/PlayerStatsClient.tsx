@@ -18,7 +18,7 @@
 // was the match-specific captain (squad.is_captain — not players.is_captain,
 // the permanent club-captain flag; see features/squad-selection.md).
 //
-// Match History below the summary is split into Batting/Bowling/Fielding
+// Innings History below the summary is split into Batting/Bowling/Fielding
 // tabs (plain text, no icons — the tab itself already says what kind of
 // innings this is). Each tab only lists matches carrying that stat line
 // (e.g. Batting hides matches this player didn't bat in) and cards are
@@ -257,7 +257,7 @@ export function PlayerStatsClient({
 
         {/* Match by match */}
         <div className="bg-white border border-parchment-3 rounded-2xl p-5">
-          <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">Match History</h2>
+          <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">Innings History</h2>
           <div className="flex gap-2 mb-4">
             {STAT_TABS.map(t => (
               <button key={t} onClick={() => setStatTab(t)}
@@ -299,7 +299,7 @@ function MvpStat({ label, value, color }: { label: string; value: number; color:
   )
 }
 
-// Match History table — each row is a full <tr>, whole-row clickable to
+// Innings History table — each row is a full <tr>, whole-row clickable to
 // /matches/history/[bookingId] (rows with no bookingId render inert, same
 // as the earlier card view's fallback). Column 3's content flips per tab.
 // Row identity (format + date) uses <th scope="row"> — an accessible table,
