@@ -54,6 +54,13 @@ export interface DayInfo {
 
 interface Props {
   days: DayInfo[]
+  // Admin-only: view another captain's marked dates instead of the signed-in
+  // user's own. Undefined/omitted means "my own dates" (the normal captain
+  // path) — the API route itself re-checks isAdmin before honouring this,
+  // never trusts the client alone. When set, the panel is read-only: an
+  // admin browsing someone else's calendar can't accidentally write a mark
+  // under their own player_id while looking at someone else's data.
+  viewingPlayerId?: string
 }
 
 const FONT_UI   = "var(--font-rajdhani), sans-serif"
@@ -61,14 +68,19 @@ const FONT_DISP = "var(--font-cinzel), serif"
 
 const SLOT_TIMES: SlotTime[] = ['07:30', '10:30', '12:30', '14:30']
 
-export function UnavailableDatesPanel({ days }: Props) {
+export function UnavailableDatesPanel({ days, viewingPlayerId }: Props) {
+  const readOnly = !!viewingPlayerId
   const [loaded, setLoaded] = useState(false)
   const [marked, setMarked] = useState<Record<string, Set<SlotTime>>>({})
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/player/future-availability')
+    setLoaded(false)
+    const url = viewingPlayerId
+      ? `/api/player/future-availability?player_id=${viewingPlayerId}`
+      : '/api/player/future-availability'
+    fetch(url)
       .then(r => r.json())
       .then(d => {
         const next: Record<string, Set<SlotTime>> = {}
@@ -81,10 +93,10 @@ export function UnavailableDatesPanel({ days }: Props) {
         setLoaded(true)
       })
       .catch(() => {
-        setError('Could not load your unavailable dates.')
+        setError('Could not load unavailable dates.')
         setLoaded(true)
       })
-  }, [])
+  }, [viewingPlayerId])
 
   async function toggleSlot(date: string, slot: SlotTime) {
     const key = `${date}|${slot}`
@@ -160,8 +172,8 @@ export function UnavailableDatesPanel({ days }: Props) {
   return (
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', padding: '12px 16px', borderBottom: '1px solid #D4C9B0', background: '#F8F4EE' }}>
-        <LegendItem swatchBg="transparent" swatchBorder="#D4C9B0" label="Tap to mark unavailable" />
-        <LegendItem swatchBg="#F3E8FF" swatchBorder="#C084FC" label="Marked — tap to clear" />
+        <LegendItem swatchBg="transparent" swatchBorder="#D4C9B0" label={readOnly ? 'Not marked' : 'Tap to mark unavailable'} />
+        <LegendItem swatchBg="#F3E8FF" swatchBorder="#C084FC" label={readOnly ? 'Marked unavailable' : 'Marked — tap to clear'} />
         <LegendLink color="#B91C1C" underline="#FCA5A5" sample="View match" label="Booked" />
         <LegendItem swatchBg="#FEF3C7" swatchBorder="#FCD34D" label="Reserved" />
         <LegendLink color="#78716C" underline="#D4C9B0" sample="Play in progress" label="Blocked by another slot that day" />
@@ -229,7 +241,7 @@ export function UnavailableDatesPanel({ days }: Props) {
                         <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '12px', fontWeight: 700, color: '#1C1917', whiteSpace: 'nowrap' }}>
                           {day.label.replace(/^\w+\s/, '')}
                         </span>
-                        {unscheduledSlots.length > 1 && (
+                        {!readOnly && unscheduledSlots.length > 1 && (
                           <button
                             type="button"
                             disabled={savingKey === wholeKey}
@@ -254,6 +266,7 @@ export function UnavailableDatesPanel({ days }: Props) {
                           slot={slot}
                           isMarked={marked[day.date]?.has(slot.time) ?? false}
                           saving={savingKey === `${day.date}|${slot.time}`}
+                          readOnly={readOnly}
                           onToggle={() => toggleSlot(day.date, slot.time)}
                         />
                       ))}
@@ -304,28 +317,32 @@ const cellStyle: React.CSSProperties = {
 }
 
 function SlotCell({
-  slot, isMarked, saving, onToggle,
+  slot, isMarked, saving, readOnly, onToggle,
 }: {
   slot: DaySlotInfo
   isMarked: boolean
   saving: boolean
+  readOnly: boolean
   onToggle: () => void
 }) {
   if (slot.kind === 'unscheduled') {
-    // A tappable "button", not an informational tile — embossed so it
-    // reads as pressable at a glance, and deliberately single-line/no-wrap
-    // since it's ever only one character.
+    // A tappable "button" when the signed-in captain is looking at their
+    // own dates — embossed so it reads as pressable at a glance, and
+    // deliberately single-line/no-wrap since it's ever only one character.
+    // An admin browsing someone else's calendar (readOnly) gets the same
+    // visual treatment but disabled — it must never write under the
+    // admin's own player_id while displaying another captain's marks.
     return (
       <td style={{ ...cellStyle, textAlign: 'center' }}>
         <button
           type="button"
-          disabled={saving}
+          disabled={saving || readOnly}
           onClick={onToggle}
-          title={isMarked ? 'Tap to clear' : 'Tap to mark unavailable'}
+          title={readOnly ? undefined : (isMarked ? 'Tap to clear' : 'Tap to mark unavailable')}
           style={{
             width: '36px', height: '32px', borderRadius: '7px', borderWidth: '1px', borderStyle: 'solid',
             fontFamily: FONT_DISP, fontSize: '14px', fontWeight: 700, lineHeight: 1, whiteSpace: 'nowrap',
-            cursor: 'pointer', opacity: saving ? 0.5 : 1,
+            cursor: readOnly ? 'default' : 'pointer', opacity: saving ? 0.5 : 1,
             ...(isMarked
               ? {
                   background: 'linear-gradient(180deg, #F3E8FF 0%, #E9D5FF 100%)',

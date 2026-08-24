@@ -24,7 +24,7 @@ import { futureAvailabilityRequestSchema, futureAvailabilitySlotTimeSchema, GAME
 
 const ALL_SLOT_TIMES = futureAvailabilitySlotTimeSchema.options
 
-// ── GET — own rows ────────────────────────────────────────────────────────
+// ── GET — own rows, or (admin only) another captain's rows via ?player_id= ─
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const player  = session?.user as any
@@ -32,11 +32,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ availability: [] })
   }
 
+  // Only an admin can look up someone else's marks — a non-admin caller
+  // (including a captain) always sees their own rows regardless of what's
+  // in the query string.
+  const requestedPlayerId = req.nextUrl.searchParams.get('player_id')
+  const targetPlayerId = player.isAdmin && requestedPlayerId ? requestedPlayerId : player.playerId
+
   const supabase = createServiceClient()
   const { data } = await supabase
     .from('player_future_availability')
     .select('game_date, slot_time, response')
-    .eq('player_id', player.playerId)
+    .eq('player_id', targetPlayerId)
 
   return NextResponse.json({ availability: data ?? [] })
 }
