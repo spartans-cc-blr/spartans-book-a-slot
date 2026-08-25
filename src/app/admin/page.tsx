@@ -49,32 +49,13 @@ export default async function AdminDashboard({
     .order('slot_time')
     .limit(100) as { data: Booking[] | null }
 
-  // Past bookings — the only place a completed match's admin edit page
-  // (Post-Match panel: reset upload, sync stats, apply fees) is reachable
-  // from, since scorecard-backfill and match history intentionally don't
-  // link there — see the "Practice games" ground-stats investigation for
-  // why that gap mattered in practice.
-  const { data: pastBookings } = await supabase
-    .from('bookings')
-    .select(tournamentSelect)
-    .neq('status', 'cancelled')
-    .lt('game_date', today)
-    .order('game_date', { ascending: false })
-    .order('slot_time', { ascending: false })
-    .limit(100) as { data: Booking[] | null }
-
-  // Scorecard status per past booking — drives the "Apply Match Fee"
-  // shortcut on the Past tab: eligible only once synced, not yet applied,
-  // and not already reconciled outside the Hub via the legacy spreadsheet
-  // (fees_reconciled_externally — see migration 062). That flag, not just
-  // status, is why this can't be a plain `status === 'synced'` check.
-  const pastBookingIds = (pastBookings ?? []).map(b => b.id)
-  const { data: scorecardRows } = pastBookingIds.length
-    ? await supabase.from('scorecard_uploads').select('booking_id, status, fees_reconciled_externally').in('booking_id', pastBookingIds)
-    : { data: [] as { booking_id: string; status: string; fees_reconciled_externally: boolean }[] }
-  const applyFeeEligibleByBooking = new Map(
-    (scorecardRows ?? []).map(r => [r.booking_id, r.status === 'synced' && !r.fees_reconciled_externally])
-  )
+  // Past bookings are no longer fetched here — the "Past" tab
+  // (DashboardBookingsTabs / AdminPastMatchesPanel) now paginates them
+  // itself month-by-month via GET /api/admin/bookings/past, so a booking's
+  // admin edit page (Post-Match panel: reset upload, sync stats, apply
+  // fees) stays reachable from that tab no matter how far back its match
+  // was played — the old `.limit(100)` fetch here silently capped both the
+  // list and the "(100)" tab count once history grew past 100 bookings.
 
   const { data: captains }     = await supabase.from('captains').select('id, name').eq('active', true).order('name')
   const { data: grounds }      = await supabase.from('grounds').select('id, name').order('name')
@@ -162,7 +143,6 @@ export default async function AdminDashboard({
 
       <DashboardBookingsTabs
         upcoming={(bookings ?? []).map(b => toDashboardRow(b))}
-        past={(pastBookings ?? []).map(b => toDashboardRow(b, applyFeeEligibleByBooking.get(b.id)))}
       />
     </div>
   )
