@@ -5,5 +5,21 @@
       ".claude/rules/*.md",
       ".claude/rules/features/*.md"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/check-docs-updated.sh" }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/inject-doc-rule.sh" }
+        ]
+      }
+    ]
   }
 }
