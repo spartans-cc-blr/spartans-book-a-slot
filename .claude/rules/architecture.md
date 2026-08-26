@@ -688,6 +688,7 @@ Next.js API Routes (server-side)
 | `ANALYTICS_SUPABASE_KEY` | None | ✅ Yes | Analytics project's service role key — never anon (caused RLS violations once, see `features/post-match-scorecard.md`) |
 | `MICROSERVICE_URL` | None | No | Render URL for the `spartans-python` analytics microservice |
 | `MICROSERVICE_SECRET` | None | ✅ Yes | Shared secret for Hub ↔ microservice requests; same value set on Render |
+| `WHATSAPP_GROUP_INVITE_URL` | None | ⚠️ Not a secret in the credential sense, but sensitive — never `NEXT_PUBLIC_` | WhatsApp group invite link (`chat.whatsapp.com/...`); returned only in the `POST /api/players/register` response to a just-completed self-registration, never rendered on an unauthenticated page or included in the broadcast welcome push — see `features/push-notifications.md` |
  
 ### Rules enforced
 - No secret is prefixed with `NEXT_PUBLIC_` — secrets never enter the client bundle

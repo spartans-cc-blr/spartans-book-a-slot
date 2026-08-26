@@ -70,8 +70,9 @@ Generate VAPID keys once with: `npx web-push generate-vapid-keys`
 | `public/sw.js` | Service worker — handles `push` event (show notification) and `notificationclick` event (open URL). Also handles PWA caching |
 | `src/app/profile/page.tsx` | Subscribe button in Club Details section. `useEffect` checks `pushManager.getSubscription()` on mount to show correct subscribed state |
 | `src/app/api/squad/announce/route.ts` | Triggers push after squad status flips to `announced` |
-| `src/app/api/players/register/route.ts` | Triggers welcome push after a self-registered (invite-link) player row is created |
+| `src/app/api/players/register/route.ts` | Triggers welcome push after a self-registered (invite-link) player row is created; also returns `whatsappGroupUrl` (server env var, never `NEXT_PUBLIC_`) in the same response for the `/join` success screen |
 | `src/app/api/players/route.ts` | `POST` — triggers welcome push after an admin-added player row is created |
+| `src/app/join/page.tsx` | Self-registration form; success screen shows a congratulatory message + the WhatsApp group join link (if `whatsappGroupUrl` was returned) ahead of the "sign back in to activate" step |
 
 ---
 
@@ -132,6 +133,32 @@ Both wrap the push in try/catch — a push failure is logged
 (`[register] welcome push error:` / `[players] welcome push error:`) but
 never fails the registration/add itself, same posture as every other
 best-effort side effect in this app (audit logs, milestone detection).
+
+#### WhatsApp group invite link on the `/join` success screen (added August 2026)
+
+A separate, narrower addition to the *self-registration* path only (not the
+admin-add path — the admin isn't the one who needs to join the WhatsApp
+group). `POST /api/players/register`'s success response includes
+`whatsappGroupUrl: process.env.WHATSAPP_GROUP_INVITE_URL || null`, read
+server-side only. `src/app/join/page.tsx` stores it from that one response
+and, if present, renders a "📱 Join our WhatsApp Group ↗" link on its
+success screen — ahead of it, a congratulatory/thank-you line, per the
+product decision that this should read as a welcome, not a bare link dump.
+
+**vibe-security reasoning:** a WhatsApp group invite link is an unscoped,
+non-expiring bearer link — unlike this app's own `invite_tokens` (single-use,
+expiring, atomically consumed), anyone who obtains it can join, and it can't
+be revoked per-recipient if it leaks. So it's treated as sensitive even
+though it isn't a credential in the traditional sense:
+- Stored as a server-only env var (`WHATSAPP_GROUP_INVITE_URL`, no
+  `NEXT_PUBLIC_` prefix) — never shipped in the client bundle.
+- Returned **only** in the JSON response to a request that just passed every
+  check in `POST /api/players/register` (valid session, unused/unexpired
+  invite token, fresh player row) — never rendered on an unauthenticated
+  page, never included in the `notifyAllSubscribed()` broadcast above (which
+  fans out to every *existing* subscribed player, not the one new joiner).
+- If unset, the route still returns `whatsappGroupUrl: null` and the UI
+  simply omits the button — this is additive, not a hard dependency.
 
 ---
 

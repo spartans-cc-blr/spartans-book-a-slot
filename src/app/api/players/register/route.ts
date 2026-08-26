@@ -172,5 +172,15 @@ export async function POST(req: NextRequest) {
     console.error('[register] welcome push error:', err?.message ?? err)
   }
 
-  return NextResponse.json({ success: true, player }, { status: 201 })
+  // ── 10. WhatsApp group invite link ────────────────────────────────────────────
+  // Server-side env var only (never NEXT_PUBLIC_) — returned exclusively in the
+  // response to this one successful registration, never on an unauthenticated
+  // page or in the broadcast welcome push. See features/push-notifications.md
+  // and this route's own vibe-security notes above for the reasoning: a
+  // WhatsApp group invite link is an unscoped, non-expiring bearer link (unlike
+  // this app's own invite_tokens), so it's only ever handed to the specific
+  // session that just completed registration — not rendered anywhere public.
+  const whatsappGroupUrl = process.env.WHATSAPP_GROUP_INVITE_URL || null
+
+  return NextResponse.json({ success: true, player, whatsappGroupUrl }, { status: 201 })
 }
