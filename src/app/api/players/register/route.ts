@@ -16,6 +16,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 import { playerRegisterSchema } from '@/lib/schemas'
+import { notifyAllSubscribed } from '@/lib/webpush'
 
 export async function POST(req: NextRequest) {
   // ── 1. Rate limit by IP (no playerId exists yet) ───────────────────────────
@@ -132,6 +133,7 @@ export async function POST(req: NextRequest) {
       is_captain:     false,
       is_gc:          false,
       wallet_balance: 0,
+      inducted_on:    new Date().toISOString().split('T')[0],
     })
     .select('id, name, gmail_id')
     .single()
@@ -157,5 +159,28 @@ export async function POST(req: NextRequest) {
     console.error('[register] token consume error — player created but token not marked used:', consumeErr.message)
   }
 
-  return NextResponse.json({ success: true, player }, { status: 201 })
+  // ── 9. Welcome push to every subscribed player ───────────────────────────────
+  // Best-effort — a push failure must never fail a successful registration.
+  try {
+    await notifyAllSubscribed(
+      '🎉 Welcome to the Club!',
+      `${player.name} just joined Spartans CC — give them a warm welcome!`,
+      '/',
+      player.id
+    )
+  } catch (err: any) {
+    console.error('[register] welcome push error:', err?.message ?? err)
+  }
+
+  // ── 10. WhatsApp group invite link ────────────────────────────────────────────
+  // Server-side env var only (never NEXT_PUBLIC_) — returned exclusively in the
+  // response to this one successful registration, never on an unauthenticated
+  // page or in the broadcast welcome push. See features/push-notifications.md
+  // and this route's own vibe-security notes above for the reasoning: a
+  // WhatsApp group invite link is an unscoped, non-expiring bearer link (unlike
+  // this app's own invite_tokens), so it's only ever handed to the specific
+  // session that just completed registration — not rendered anywhere public.
+  const whatsappGroupUrl = process.env.WHATSAPP_GROUP_INVITE_URL || null
+
+  return NextResponse.json({ success: true, player, whatsappGroupUrl }, { status: 201 })
 }

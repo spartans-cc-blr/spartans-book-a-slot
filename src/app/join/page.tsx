@@ -53,6 +53,7 @@ const SKILLS = [
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
   const [success,  setSuccess]  = useState(false)
+  const [whatsappGroupUrl, setWhatsappGroupUrl] = useState<string | null>(null)
 
   // Already registered — send home
   useEffect(() => {
@@ -93,6 +94,7 @@ const SKILLS = [
         return
       }
 
+      setWhatsappGroupUrl(data.whatsappGroupUrl ?? null)
       setSuccess(true)
     } catch {
       setError('Network error. Please check your connection and try again.')
@@ -120,7 +122,20 @@ const SKILLS = [
             Welcome to Spartans!
           </h1>
           <p className="font-rajdhani text-zinc-300 text-sm leading-relaxed">
-            Your account has been created. Sign out and sign back in with Google to activate your full access.
+            Thank you for your interest in joining Spartans CC — we're thrilled to have you on board! Your account has been created.
+          </p>
+          {whatsappGroupUrl && (
+            <a
+              href={whatsappGroupUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full font-rajdhani text-sm font-bold tracking-widest uppercase bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded transition-colors"
+            >
+              📱 Join our WhatsApp Group ↗
+            </a>
+          )}
+          <p className="font-rajdhani text-zinc-400 text-sm leading-relaxed">
+            Sign out and sign back in with Google to activate your full access.
           </p>
           <button
             onClick={() => signIn('google')}
