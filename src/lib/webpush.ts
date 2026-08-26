@@ -58,3 +58,21 @@ export async function notifyGCs(
     await Promise.all(recipients.map(p => sendPushToPlayer(p.id, { title, body, url })))
   }
 }
+
+// Broadcast to every player with at least one active push subscription —
+// used by GC announcements. Queries push_subscriptions directly (distinct
+// player_id) rather than looping every player through sendPushToPlayer,
+// which would otherwise be one wasted subscriptions lookup per player with
+// no subscription at all (most of the roster, at least until opt-in grows).
+export async function notifyAllSubscribedPlayers(
+  title: string,
+  body: string,
+  url: string = '/'
+): Promise<{ recipientCount: number }> {
+  const supabase = createServiceClient()
+  const { data: subs } = await supabase.from('push_subscriptions').select('player_id')
+  const playerIds = Array.from(new Set((subs ?? []).map(s => s.player_id)))
+  if (!playerIds.length) return { recipientCount: 0 }
+  await Promise.all(playerIds.map(id => sendPushToPlayer(id, { title, body, url })))
+  return { recipientCount: playerIds.length }
+}

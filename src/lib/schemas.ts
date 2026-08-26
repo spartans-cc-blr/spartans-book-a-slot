@@ -166,3 +166,20 @@ export const playerReconciliationRequestSchema = z.discriminatedUnion('mode', [
   playerReconciliationIgnoreSchema,
   playerReconciliationReconcileSchema,
 ])
+
+// ── GC ANNOUNCEMENTS (POST /api/gc/announcements[/polish]) ──────────────────
+// Capped for push-notification display, not arbitrary long-form text.
+
+export const gcAnnouncementPolishSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(80),
+  body:  z.string().min(1, 'Body is required').max(500),
+})
+
+export const gcAnnouncementSendSchema = z.object({
+  title:         z.string().min(1, 'Title is required').max(80),
+  body:          z.string().min(1, 'Body is required').max(500),
+  // Present only when the AI polish step was used — lets the send route
+  // record a before/after audit trail without requiring every send to
+  // have gone through polish.
+  original_body: z.string().max(500).optional(),
+})

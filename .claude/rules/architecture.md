@@ -75,6 +75,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Route | Component | Data source |
 |---|---|---|
 | `/gc-review` | Server → `GCReviewClient` (client) | `bookings`, `availability`, `squad` (pending/approved/announced) |
+| `/gc/announcements` | Server → `GCAnnouncementsClient` (client) | `gc_announcements` (last 20) + AI-polish preview; broadcasts a push to every subscribed player on send — see `features/gc-announcements.md` |
  
 ### Wrangler Routes (`isWrangler` or `isAdmin`)
  
@@ -130,6 +131,8 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
 | `/api/gc/weekend-review` | PATCH | GC or Admin | `approved` → `pending_approval` → `approved`; `returned` → `draft` |
+| `/api/gc/announcements/polish` | POST | GC or Admin | AI grammar/clarity cleanup preview for a drafted announcement — no DB write, no push sent; `RATE_LIMITS.captainWrite` |
+| `/api/gc/announcements` | GET, POST | GC or Admin | GET: last 20 sent announcements. POST: broadcasts a push to every player with an active subscription, then writes the audit row; `RATE_LIMITS.broadcast` (5/hour) — see `features/gc-announcements.md` |
  
 ### Match History & Scorecard APIs
  
@@ -289,6 +292,16 @@ Read-through cache of the separate analytics Supabase project — source of trut
  
 #### `fee_exemptions`
 Full lockdown RLS. Joined to `players` in admin view.
+
+#### `gc_announcements`
+`id, sent_by FK, title, body, original_body (nullable), recipient_count, created_at`
+Immutable audit trail for GC-authored broadcast push announcements — one
+row per send, insert-only. `original_body` is only populated when the AI
+polish step changed the sender's draft. `recipient_count` reflects the
+real send (recorded after `notifyAllSubscribedPlayers()` runs), not a
+pre-send estimate. RLS enabled, no anon/authenticated policies — service
+role only. Migration `048_gc_announcements.sql`. See
+`features/gc-announcements.md`.
  
 ### Planned Tables (Future Sprints)
  
@@ -505,6 +518,7 @@ Next.js API Routes (server-side)
 | `ANALYTICS_SUPABASE_KEY` | None | ✅ Yes | Analytics project's service role key — never anon (caused RLS violations once, see `features/post-match-scorecard.md`) |
 | `MICROSERVICE_URL` | None | No | Render URL for the `spartans-python` analytics microservice |
 | `MICROSERVICE_SECRET` | None | ✅ Yes | Shared secret for Hub ↔ microservice requests; same value set on Render |
+| `ANTHROPIC_API_KEY` | None | ✅ Yes | Claude API key — server-only. Used by `/api/admin/nlp-parse` (booking command parsing) and `/api/gc/announcements/polish` (AI grammar/clarity cleanup) |
  
 ### Rules enforced
 - No secret is prefixed with `NEXT_PUBLIC_` — secrets never enter the client bundle
@@ -517,7 +531,7 @@ Next.js API Routes (server-side)
 | File | Role |
 |---|---|
 | `src/lib/auth.ts` | NextAuth config; JWT callback enriches token with player context; email lowercased; Google photo seeded on first sign-in; `session.maxAge` + `jwt.maxAge` aligned to 30 days |
-| `src/lib/rateLimit.ts` | Upstash Redis sliding-window rate limiter; `RATE_LIMITS` presets: `playerWrite` (20/min), `captainWrite` (30/min), `adminWrite` (60/min), `publicRead` (100/min) |
+| `src/lib/rateLimit.ts` | Upstash Redis sliding-window rate limiter; `RATE_LIMITS` presets: `playerWrite` (20/min), `captainWrite` (30/min), `adminWrite` (60/min), `publicRead` (100/min), `broadcast` (5/hour — GC announcement sends only) |
 | `src/lib/supabase.ts` | Three client factories: browser (anon), server (anon), service (bypasses RLS) |
 | `src/lib/validation.ts` | Booking rules engine R1–R6; used by both API and client |
 | `src/middleware.ts` | Route protection; redirects unauthenticated/unauthorised requests |
@@ -540,7 +554,9 @@ Next.js API Routes (server-side)
 | `src/lib/announcement.ts` | `buildSquadAnnouncement()` — WhatsApp message builder |
 | `supabase/migrations/` | All schema migrations as SQL files — source of truth for DB state |
 | `vercel.json` | Cron job config + security headers |
-| src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup |
+| src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup; `notifyAllSubscribedPlayers()` broadcasts to every player with a push subscription (GC announcements) |
+| `src/app/api/gc/announcements/route.ts` + `.../polish/route.ts` | GC/admin broadcast announcements — GET history, POST sends + audits, POST polish previews an AI grammar/clarity cleanup (no DB write, no push) — see `features/gc-announcements.md` |
+| `src/components/gc/GCAnnouncementsClient.tsx` | Compose form, polish preview/revert, send confirmation, history list |
 | src/app/api/push/subscribe/route.ts | POST — saves browser push subscription; player_id from session only |
 | public/sw.js | Service worker — PWA caching + push notification display + notificationclick handler |
 | `src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` | `/matches/history` — past-match list, `MatchHistoryCard` (result badge, subtle sync status, ground/CricHeroes links, Did-not-bat line) |
