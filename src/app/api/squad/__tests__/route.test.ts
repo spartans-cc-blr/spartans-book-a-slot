@@ -8,7 +8,7 @@
 // in-memory fake Supabase client (src/app/api/squad/__tests__/fakeSupabase.ts)
 // — no live database is touched.
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { createFakeSupabase, type FakeTables } from './fakeSupabase'
 import { EMPTY_SQUAD_VERSION } from '@/lib/squadVersion'
@@ -53,9 +53,23 @@ function seedAvailability(bookingId: string, playerIds: string[], response: 'Y' 
   tables.availability.push(...playerIds.map(player_id => ({ player_id, booking_id: bookingId, response })))
 }
 
+// POST /api/squad time-gates brand-new squad creation to Thu 08:00 IST
+// through Sunday (route.ts's isBlockedWindow check). Every test here starts
+// from an empty in-memory squad table, so without freezing the clock these
+// tests silently pass or fail depending on which real-world day the suite
+// happens to run on. Frozen to a fixed Thursday well inside the open
+// window so the result is deterministic regardless of wall-clock date.
+const WITHIN_SQUAD_WINDOW = new Date('2026-01-01T04:30:00Z') // Thu 2026-01-01, 10:00 IST
+
 beforeEach(() => {
   tables = { squad: [], availability: [], bookings: [], squad_audit: [], players: [] }
   mockGetServerSession.mockReset()
+  vi.useFakeTimers()
+  vi.setSystemTime(WITHIN_SQUAD_WINDOW)
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('POST /api/squad — stale write blocking (Issue 1)', () => {
