@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
       is_captain:     false,
       is_gc:          false,
       wallet_balance: 0,
+      inducted_on:    new Date().toISOString().split('T')[0],
     })
     .select('id, name, gmail_id')
     .single()
