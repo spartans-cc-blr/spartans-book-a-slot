@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { withCricheroesPlayerId } from '@/lib/cricheroesId'
 import { cricheroesUrlSchema } from '@/lib/schemas'
+import { notifyAllSubscribed } from '@/lib/webpush'
 
 function validateCricheroesUrl(url: unknown): NextResponse | null {
   if (!url) return null
@@ -70,6 +71,19 @@ export async function POST(request: Request) {
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Welcome push to every subscribed player — best-effort, never fails the add.
+  try {
+    await notifyAllSubscribed(
+      '🎉 Welcome to the Club!',
+      `${data.name} just joined Spartans CC — give them a warm welcome!`,
+      '/',
+      data.id
+    )
+  } catch (err: any) {
+    console.error('[players] welcome push error:', err?.message ?? err)
+  }
+
   return NextResponse.json({ player: data })
 }
 

@@ -58,3 +58,22 @@ export async function notifyGCs(
     await Promise.all(recipients.map(p => sendPushToPlayer(p.id, { title, body, url })))
   }
 }
+
+// Broadcast a push notification to every player who has subscribed for
+// push notifications at all (i.e. has at least one push_subscriptions
+// row) — used for club-wide announcements like a new player being
+// inducted. `excludePlayerId` skips the subject of the announcement
+// themselves, in case they already happen to have a subscription.
+export async function notifyAllSubscribed(
+  title: string,
+  body: string,
+  url: string = '/',
+  excludePlayerId?: string
+) {
+  const supabase = createServiceClient()
+  const { data: subs } = await supabase.from('push_subscriptions').select('player_id')
+  if (!subs?.length) return
+  const playerIds = Array.from(new Set(subs.map(s => s.player_id))).filter(id => id !== excludePlayerId)
+  if (!playerIds.length) return
+  await Promise.all(playerIds.map(id => sendPushToPlayer(id, { title, body, url })))
+}

@@ -16,6 +16,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 import { playerRegisterSchema } from '@/lib/schemas'
+import { notifyAllSubscribed } from '@/lib/webpush'
 
 export async function POST(req: NextRequest) {
   // ── 1. Rate limit by IP (no playerId exists yet) ───────────────────────────
@@ -156,6 +157,19 @@ export async function POST(req: NextRequest) {
 
   if (consumeErr) {
     console.error('[register] token consume error — player created but token not marked used:', consumeErr.message)
+  }
+
+  // ── 9. Welcome push to every subscribed player ───────────────────────────────
+  // Best-effort — a push failure must never fail a successful registration.
+  try {
+    await notifyAllSubscribed(
+      '🎉 Welcome to the Club!',
+      `${player.name} just joined Spartans CC — give them a warm welcome!`,
+      '/',
+      player.id
+    )
+  } catch (err: any) {
+    console.error('[register] welcome push error:', err?.message ?? err)
   }
 
   return NextResponse.json({ success: true, player }, { status: 201 })

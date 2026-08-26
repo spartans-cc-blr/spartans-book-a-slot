@@ -70,6 +70,8 @@ Generate VAPID keys once with: `npx web-push generate-vapid-keys`
 | `public/sw.js` | Service worker — handles `push` event (show notification) and `notificationclick` event (open URL). Also handles PWA caching |
 | `src/app/profile/page.tsx` | Subscribe button in Club Details section. `useEffect` checks `pushManager.getSubscription()` on mount to show correct subscribed state |
 | `src/app/api/squad/announce/route.ts` | Triggers push after squad status flips to `announced` |
+| `src/app/api/players/register/route.ts` | Triggers welcome push after a self-registered (invite-link) player row is created |
+| `src/app/api/players/route.ts` | `POST` — triggers welcome push after an admin-added player row is created |
 
 ---
 
@@ -100,6 +102,36 @@ Generate VAPID keys once with: `npx web-push generate-vapid-keys`
 **URL:** `/fixtures/<booking_id>`
 
 **Fires:** Every time the announce route succeeds — first announcement, re-announcement after squad change, or re-announcement of unchanged squad.
+
+---
+
+### New Player Inducted (added August 2026)
+**Who gets it:** Every player who has subscribed for push notifications at all
+(any player with ≥1 row in `push_subscriptions`) — a genuine broadcast, not
+scoped to captains/GC. Uses `notifyAllSubscribed()` (`src/lib/webpush.ts`),
+a new sibling to `notifyGCs()` that queries `push_subscriptions` directly for
+distinct `player_id`s rather than filtering `players` by a role flag. The
+newly-inducted player themselves is excluded via `excludePlayerId` (moot in
+practice — a brand-new player has no subscription yet — but defensive for an
+admin re-adding a previously-removed player who might still have one).
+
+**Title:** `🎉 Welcome to the Club!`
+
+**Body:**
+```
+"<Name> just joined Spartans CC — give them a warm welcome!"
+```
+
+**URL:** `/`
+
+**Fires from two places, both "a new player row was successfully created":**
+- `POST /api/players/register` — the `/join` invite-link self-registration flow
+- `POST /api/players` — admin directly adding a player from `/admin/players`
+
+Both wrap the push in try/catch — a push failure is logged
+(`[register] welcome push error:` / `[players] welcome push error:`) but
+never fails the registration/add itself, same posture as every other
+best-effort side effect in this app (audit logs, milestone detection).
 
 ---
 
@@ -224,6 +256,8 @@ Players who reinstall the PWA must re-subscribe once — the old subscription en
 | Subscribe endpoint auth-gated | ✅ 401 if no session |
 | Notification payload contains no sensitive data | ✅ Only match details, no wallet/personal data |
 | Rate limiting on subscribe route | ⚠️ Not yet applied — S-2 backlog |
+| New-player welcome push payload contains only the player's own name (already public roster info) | ✅ No gmail/whatsapp/wallet data in the broadcast |
+| Welcome push failure never fails player registration/add | ✅ Wrapped in try/catch in both `register/route.ts` and `players/route.ts` |
 
 ---
 
