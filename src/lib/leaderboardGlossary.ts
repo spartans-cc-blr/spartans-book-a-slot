@@ -66,7 +66,9 @@ export function buildMonthlyGlossary(monthLabel: string): GlossaryEntry[] {
     { term: 'Highest S/R', definition: `Highest batting strike rate — runs per 100 balls faced — among players who faced at least ${MIN_BALLS_FOR_STRIKE_RATE} balls in ${monthLabel}.` },
     { term: 'Best Economy', definition: `Fewest runs conceded per over among bowlers who bowled at least ${MIN_BALLS_FOR_ECONOMY} balls (${MIN_BALLS_FOR_ECONOMY / 6} overs) in ${monthLabel}.` },
     { term: 'Centuries', definition: `Every individual batting innings of 100+ runs in ${monthLabel} — every one, not just the highest, including practice games.` },
+    { term: 'Half-Centuries', definition: `Every individual batting innings of 50-99 runs in ${monthLabel}.` },
     { term: '5-Wicket Hauls', definition: `Every bowling innings of 5 or more wickets in ${monthLabel}, including practice games.` },
+    { term: '3-Wicket Hauls', definition: `Every bowling innings of 3-4 wickets in ${monthLabel}.` },
   ]
 }
 
