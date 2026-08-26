@@ -76,7 +76,7 @@ export default function AdminPlayersPage() {
   const [addForm, setAddForm] = useState({
     name: '', gmail_id: '', whatsapp: '', dob: '', jersey_name: '',
     jersey_number: '', blood_group: '', primary_skill: '', secondary_skill: '',
-    referred_by: '', inducted_on: '', wallet_balance: '0', cricheroes_url: '',
+    referred_by: '', inducted_on: new Date().toISOString().split('T')[0], wallet_balance: '0', cricheroes_url: '',
   })
 
   useEffect(() => {
@@ -139,7 +139,7 @@ export default function AdminPlayersPage() {
       setShowAdd(false)
       setAddForm({ name: '', gmail_id: '', whatsapp: '', dob: '', jersey_name: '',
         jersey_number: '', blood_group: '', primary_skill: '', secondary_skill: '',
-        referred_by: '', inducted_on: '', wallet_balance: '0', cricheroes_url: '' })
+        referred_by: '', inducted_on: new Date().toISOString().split('T')[0], wallet_balance: '0', cricheroes_url: '' })
     } else {
       setError('Failed to add player.')
     }
