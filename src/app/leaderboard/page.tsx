@@ -109,17 +109,17 @@ export default async function LeaderboardPage({
     ? await getLeaderboard({ month, formats: restrictedFormats })
     : await getLeaderboard(overallFilters)
 
-  // `includePractice: true` on both calls below — the Centuries/5-Wicket
-  // Hauls lists these feed are individual performance recognitions, not the
-  // aggregate "best" rankings (`rows`, from `getLeaderboard()`, a few lines
-  // up — deliberately left excluding practice games, same as every other
-  // top-performance metric on Overall/Monthly/Detailed). A century or
-  // 5-wicket haul is still worth surfacing even from a practice game.
-  // `getPerformances()` also returns half-centuries/3-wicket-hauls bands,
-  // but neither `LeaderboardMonthly` nor `LeaderboardMilestones` renders
-  // them any more (Centuries + 5-Wicket Hauls only) — see
-  // `features/leaderboard.md` §5/§5.1/§10.
+  // Two calls for Monthly — `getPerformances()`'s `includePractice` scopes
+  // the *whole* match set a call draws from, so Centuries/5-Wicket Hauls
+  // (practice-inclusive) and Half-Centuries/3-Wicket Hauls (practice-
+  // exclusive, same as every other aggregate/ranking metric) can't come off
+  // one shared call without one side leaking into the other. A century or
+  // 5-wicket haul is still worth surfacing even from a practice game; the
+  // two more common bands stay "real stats only". See `features/leaderboard.md`
+  // §5/§5.1/§10 for the full history (removed, then restored, on the
+  // Monthly tab specifically).
   const monthlyPerformances = category === 'monthly' ? await getPerformances({ month, includePractice: true }) : null
+  const monthlyPerformancesNoPractice = category === 'monthly' ? await getPerformances({ month }) : null
 
   // Individual centuries/5-wicket-haul lists for the Overall tab's bands —
   // fetched for a specific year (not "All Time") or whenever a
@@ -197,7 +197,9 @@ export default async function LeaderboardPage({
           <LeaderboardMonthly
             rows={rows}
             centuries={monthlyPerformances!.centuries}
+            halfCenturies={monthlyPerformancesNoPractice!.halfCenturies}
             fiveWicketHauls={monthlyPerformances!.fiveWicketHauls}
+            threeWicketHauls={monthlyPerformancesNoPractice!.threeWicketHauls}
             monthLabel={monthLabel(month)}
           />
         ) : (

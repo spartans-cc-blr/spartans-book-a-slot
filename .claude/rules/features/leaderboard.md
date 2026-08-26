@@ -216,35 +216,45 @@ Average/S/R/Economy, Most 50s) is unaffected — `minGamesThreshold()`/
 for exactly this filter, and that's unchanged; only Centuries and 5-Wicket
 Hauls change presentation.
 
-**Half-Centuries and 3-Wicket Hauls lists — trimmed August 2026.** Both
-`LeaderboardMilestones.tsx`'s scoped lists and `LeaderboardMonthly.tsx`'s
-always-open panels originally showed all four rare-performance categories
-(Centuries, Half-Centuries, 5-Wicket Hauls, 3-Wicket Hauls). Per a product
-decision, Half-Centuries and 3-Wicket Hauls were dropped from both — common
-enough club-wide that an individual list wasn't adding much (and "Most 50s"
-already covers half-centuries as a tied card) — leaving **Centuries and
-5-Wicket Hauls only** as the Honour Board's rare-performance recognition
-lists, on both Overall (year-scoped and Tournament/Ground-scoped) and
-Monthly. `getPerformances()` (§3) still computes and returns all four bands
-internally (no query-level change — one shared batting/bowling fetch, the
-split is free), but `LeaderboardMilestones.tsx`/`LeaderboardMonthly.tsx` no
-longer accept `halfCenturies`/`threeWicketHauls` props at all, and
-`page.tsx` doesn't pass them. `WicketIcon.tsx` (the 3-wicket-haul icon) is
-no longer imported by either Honour Board component as a result — its only
-remaining consumer is `MilestoneCelebrationModal.tsx`'s unrelated 3-wicket
-badge (see `features/milestone-recognition.md`), not this feature.
+**Half-Centuries and 3-Wicket Hauls lists — trimmed August 2026, Monthly's
+restored days later.** `LeaderboardMilestones.tsx`'s scoped lists and
+`LeaderboardMonthly.tsx`'s always-open panels originally showed all four
+rare-performance categories (Centuries, Half-Centuries, 5-Wicket Hauls,
+3-Wicket Hauls). Per a product decision, Half-Centuries and 3-Wicket Hauls
+were dropped from both — common enough club-wide that an individual list
+wasn't adding much (and "Most 50s" already covers half-centuries as a tied
+card) — leaving **Centuries and 5-Wicket Hauls only** on each. Days later, a
+follow-up request restored Half-Centuries and 3-Wicket Hauls **on Monthly
+only** — Overall (both the year-scoped bands and the Tournament/Ground-
+scoped lists) stays Centuries + 5-Wicket Hauls only, per that request's
+explicit scope. `LeaderboardMonthly.tsx` once again accepts
+`halfCenturies`/`threeWicketHauls` props and renders all four panels;
+`LeaderboardMilestones.tsx` still only accepts `centuries`/`fiveWicketHauls`.
+`WicketIcon.tsx` (the 3-wicket-haul icon) is imported by
+`LeaderboardMonthly.tsx` again as a result — `LeaderboardMilestones.tsx`
+still doesn't import it, so its only other consumer remains
+`MilestoneCelebrationModal.tsx`'s unrelated 3-wicket badge (see
+`features/milestone-recognition.md`).
 
-**Same trim also carried `includePractice: true`.** Centuries and 5-Wicket
-Hauls are the Honour Board's individual-performance recognition lists, not
-an aggregate ranking — a century or 5-wicket haul scored in a practice game
-is still a real, nameable performance worth surfacing, so both
-`getPerformances()` calls in `page.tsx` (`monthlyPerformances` and
-`yearlyPerformances`) now pass `includePractice: true`. This is narrower
-than the personal stats page's own `includePractice` opt-in (§10, point 2
-below) — it's not a user-facing toggle, it's unconditional for these two
-lists specifically. **Every aggregate/ranking metric on Overall, Monthly,
-and Detailed — Leading MVP/Runs/Wickets, Most Dismissals, Best
-Average/S/R/Economy, the tied Most 100s/50s cards, and every Detailed
+**`includePractice: true` stays scoped to Centuries and 5-Wicket Hauls
+only — Half-Centuries and 3-Wicket Hauls are practice-excluded even on
+Monthly, both before and after the restoration.** Centuries and 5-Wicket
+Hauls are the Honour Board's rarest individual-performance recognitions,
+so a century or 5-wicket haul scored in a practice game is still worth
+surfacing — but Half-Centuries/3-Wicket Hauls are common enough to stay
+"real stats only", same posture as every aggregate/ranking metric. Because
+`getPerformances()`'s `includePractice` scopes the *entire match set* a
+call draws from (not a per-band filter), `page.tsx` makes **two**
+`getPerformances({ month })` calls for Monthly — `monthlyPerformances`
+(`includePractice: true`, feeds `centuries`/`fiveWicketHauls`) and
+`monthlyPerformancesNoPractice` (default, feeds `halfCenturies`/
+`threeWicketHauls`) — rather than one call feeding all four props, which
+would have leaked practice games into the two bands meant to exclude them.
+Overall's single `getPerformances({ ...overallFilters, includePractice: true })`
+call didn't need this split since it only ever renders `centuries`/
+`fiveWicketHauls` in the first place. **Every aggregate/ranking metric on
+Overall, Monthly, and Detailed — Leading MVP/Runs/Wickets, Most Dismissals,
+Best Average/S/R/Economy, the tied Most 100s/50s cards, and every Detailed
 table — is still sourced from `getLeaderboard()`, which has no
 `includePractice` flag and always excludes practice games.** See §10 for
 the full practice-games exclusion writeup and the third "way to see through
@@ -417,12 +427,12 @@ multi-player analytics query added to this file without the same
 | `src/lib/leaderboardGlossary.ts` | `buildOverallGlossary()`/`buildMonthlyGlossary()`/`buildDetailedGlossary()` — server-side, quotes real thresholds |
 | `src/components/leaderboard/LeaderboardFilters.tsx` | Nav tree + filter bar (§2) — pushes `searchParams`, page re-fetches server-side |
 | `src/components/leaderboard/LeaderboardMilestones.tsx` | Overall tab — tie-inclusive cards (§4) + year-scoped collapsible bands (§5) + Tournament/Ground-scoped always-open lists (§5.1) + Most Dismissals (§6) |
-| `src/components/leaderboard/LeaderboardMonthly.tsx` | Monthly tab — single-winner cards + always-open Centuries/5-Wicket Hauls panels only (Half-Centuries/3-Wicket Hauls trimmed, §5.1) |
+| `src/components/leaderboard/LeaderboardMonthly.tsx` | Monthly tab — single-winner cards + always-open Centuries/Half-Centuries/5-Wicket/3-Wicket Hauls panels (trimmed to 2, then Half-Centuries/3-Wicket Hauls restored on Monthly only, §5.1) |
 | `src/components/leaderboard/InningsRow.tsx` | Shared `ClickableRow`/`BattingInningsRow`/`BowlingInningsRow` — whole-row click to `/matches/history/[bookingId]`, used by both Milestones and Monthly |
 | `src/components/leaderboard/LeaderboardTable.tsx` | Detailed branch — sortable MVP/Bat/Bowl/Field tables |
 | `src/components/leaderboard/LeaderboardGlossary.tsx` | Renders the glossary entries built server-side |
 | `src/components/leaderboard/PlayerAvatar.tsx` | Shared avatar (photo or initials) used across every card/row on this page |
-| `src/components/leaderboard/WicketIcon.tsx` | 3-wicket-haul icon — no longer used on `/leaderboard` as of the §5.1 trim; its only consumer today is `MilestoneCelebrationModal.tsx` (`features/milestone-recognition.md`) |
+| `src/components/leaderboard/WicketIcon.tsx` | 3-wicket-haul icon — used by `LeaderboardMonthly.tsx`'s 3-Wicket Hauls panel (restored, §5.1) and by `MilestoneCelebrationModal.tsx`'s unrelated 3-wicket badge (`features/milestone-recognition.md`); not used by `LeaderboardMilestones.tsx` (Overall stays trimmed) |
 | `src/components/matches/BallIcon.tsx` | Gold-ball icon reused here for the 5-Wicket Hauls band header |
 | `src/types/index.ts` | `LeaderboardRow`, `MonthlyInnings`, `MonthlyBowlingInnings` |
 
@@ -532,13 +542,18 @@ and wasn't part of this change.
   not scoped) is the one case §5/§5.1 don't cover, since a scoped filter
   (§5.1) or a specific year (§5) each independently supply a list-based
   fallback, but neither is present here.
-- No individual-performance list for Half-Centuries or 3-Wicket Hauls
-  anywhere on `/leaderboard` — year-scoped Overall (§5) never had one;
-  Tournament/Ground-scoped Overall (§5.1) and Monthly both used to, and had
-  it trimmed in the same August 2026 pass that added `includePractice` to
-  Centuries/5-Wicket Hauls (§5.1's trim note, §10's Exception callout).
-  "Most 50s" (the tied card, not a list) is the only surviving half-century
-  surface, and it never included practice games nor was asked to.
+- No individual-performance list for Half-Centuries or 3-Wicket Hauls on
+  **Overall** — year-scoped Overall (§5) never had one; Tournament/Ground-
+  scoped Overall (§5.1) used to, and had it trimmed in the same August 2026
+  pass that added `includePractice` to Centuries/5-Wicket Hauls (§5.1's trim
+  note, §10). Monthly's own Half-Centuries/3-Wicket Hauls lists were trimmed
+  the same pass and then restored days later — see §5.1. "Most 50s" (the
+  tied card, not a list) is the only half-century surface on Overall, and
+  it never included practice games nor was asked to.
+- Half-Centuries and 3-Wicket Hauls (wherever they're shown — Monthly, or
+  the Detailed tables) never include practice games — only Centuries and
+  5-Wicket Hauls carry the `includePractice: true` exception, on both
+  Overall and Monthly.
 
 ---
 
