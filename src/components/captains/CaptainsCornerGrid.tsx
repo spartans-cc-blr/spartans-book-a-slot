@@ -774,10 +774,13 @@ function statCell(v: number | null | undefined): { text: string; dash: boolean }
 }
 
 function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
-  const rows: { icon: string; label: string; totals: PlayerStatsTotals | null }[] = [
-    { icon: '🏆', label: 'Tourn',  totals: stats.tournament },
-    { icon: '📍', label: 'Ground', totals: stats.ground },
-    { icon: '🏏', label: 'Format', totals: stats.format },
+  // Format row is a last-3-months "recent form" read (min 6 games — see
+  // MIN_GAMES_FOR_FORMAT_ROW in src/lib/playerStats.ts), not an all-time
+  // record like Tourn/Ground — hence its own label and empty-state text.
+  const rows: { icon: string; label: string; totals: PlayerStatsTotals | null; emptyText: string }[] = [
+    { icon: '🏆', label: 'Tourn',       totals: stats.tournament, emptyText: 'No matches yet' },
+    { icon: '📍', label: 'Ground',      totals: stats.ground,     emptyText: 'No matches yet' },
+    { icon: '🏏', label: 'Form (3mo)',  totals: stats.format,     emptyText: 'Not enough data' },
   ]
   const anyData = rows.some(r => r.totals)
   if (!anyData) {
@@ -803,7 +806,7 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
               {row.icon} {row.label}
             </td>
             {row.totals == null ? (
-              <td colSpan={8} className="text-[10.5px] italic py-1" style={{ color: '#6B7280' }}>No matches yet</td>
+              <td colSpan={8} className="text-[10.5px] italic py-1" style={{ color: '#6B7280' }}>{row.emptyText}</td>
             ) : (
               [
                 row.totals.matches, row.totals.runs, statCell(row.totals.battingAverage).text,
