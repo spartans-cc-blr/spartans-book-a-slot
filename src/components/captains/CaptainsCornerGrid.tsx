@@ -778,52 +778,59 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
   // MIN_GAMES_FOR_FORMAT_ROW in src/lib/playerStats.ts), not an all-time
   // record like Tourn/Ground — hence its own label and empty-state text.
   const rows: { icon: string; label: string; totals: PlayerStatsTotals | null; emptyText: string }[] = [
-    { icon: '🏆', label: 'Tourn',       totals: stats.tournament, emptyText: 'No matches yet' },
-    { icon: '📍', label: 'Ground',      totals: stats.ground,     emptyText: 'No matches yet' },
-    { icon: '🏏', label: 'Form (3mo)',  totals: stats.format,     emptyText: 'Not enough data' },
+    { icon: '🏆', label: 'Tourn',           totals: stats.tournament, emptyText: 'No matches yet' },
+    { icon: '📍', label: 'Ground',          totals: stats.ground,     emptyText: 'No matches yet' },
+    { icon: '🏏', label: 'Last 3 Months',   totals: stats.format,     emptyText: 'Not enough data' },
   ]
   const anyData = rows.some(r => r.totals)
   if (!anyData) {
     return <p className="font-rajdhani text-[11px] text-zinc-500 italic">No reconciled matches yet in any scope.</p>
   }
   return (
-    <table className="w-full" style={{ fontVariantNumeric: 'tabular-nums' }}>
-      <thead>
-        <tr>
-          <th></th>
-          {['M', 'R', 'Avg', 'SR', 'Wk', 'Econ', 'BSR', 'Dis'].map(h => (
-            <th key={h} className="font-rajdhani text-[8.5px] font-bold uppercase tracking-wide text-right pb-1"
-              style={{ color: '#6B7280' }}>
-              {h}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map(row => (
-          <tr key={row.label} style={{ borderTop: '1px solid rgba(45,55,72,0.6)' }}>
-            <td className="font-rajdhani text-[11px] font-semibold py-1 whitespace-nowrap text-right" style={{ color: '#9CA3AF' }}>
-              {row.icon} {row.label}
-            </td>
-            {row.totals == null ? (
-              <td colSpan={8} className="text-[10.5px] italic py-1" style={{ color: '#6B7280' }}>{row.emptyText}</td>
-            ) : (
-              [
-                row.totals.matches, row.totals.runs, statCell(row.totals.battingAverage).text,
-                statCell(row.totals.strikeRate).text, row.totals.wickets, statCell(row.totals.economy).text,
-                statCell(row.totals.bowlingStrikeRate).text,
-                row.totals.catches + row.totals.runOuts + row.totals.stumpings,
-              ].map((v, i) => (
-                <td key={i} className="font-cinzel text-[11.5px] font-bold text-right py-1"
-                  style={{ color: v === '—' ? '#4B5563' : '#F9FAFB' }}>
-                  {v}
-                </td>
-              ))
-            )}
+    <>
+      <table className="w-full" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <thead>
+          <tr>
+            <th></th>
+            {['M', 'R', 'Avg', 'SR', 'Wk', 'Econ', 'BSR', 'Dis'].map(h => (
+              <th key={h} className="font-rajdhani text-[8.5px] font-bold uppercase tracking-wide text-right pb-1"
+                style={{ color: '#6B7280' }}>
+                {h}
+              </th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row.label} style={{ borderTop: '1px solid rgba(45,55,72,0.6)' }}>
+              <td className="font-rajdhani text-[11px] font-semibold py-1 whitespace-nowrap text-right" style={{ color: '#9CA3AF' }}>
+                {row.icon} {row.label}
+              </td>
+              {row.totals == null ? (
+                <td colSpan={8} className="text-[10.5px] italic py-1" style={{ color: '#6B7280' }}>{row.emptyText}</td>
+              ) : (
+                [
+                  row.totals.matches, row.totals.runs, statCell(row.totals.battingAverage).text,
+                  statCell(row.totals.strikeRate).text, row.totals.wickets, statCell(row.totals.economy).text,
+                  statCell(row.totals.bowlingStrikeRate).text,
+                  row.totals.catches + row.totals.runOuts + row.totals.stumpings,
+                ].map((v, i) => (
+                  <td key={i} className="font-cinzel text-[11.5px] font-bold text-right py-1"
+                    style={{ color: v === '—' ? '#4B5563' : '#F9FAFB' }}>
+                    {v}
+                  </td>
+                ))
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* Disclaimer for the "Last 3 Months" row's gating — see
+          MIN_GAMES_FOR_FORMAT_ROW in src/lib/playerStats.ts. */}
+      <p className="font-rajdhani text-[9px] text-zinc-600 italic pt-1.5">
+        Last 3 Months requires a minimum of 6 games played in that format.
+      </p>
+    </>
   )
 }
 
