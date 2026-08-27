@@ -924,7 +924,7 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
   // rather than either a thin stats line or a bare "No matches yet" — this
   // collapses the zero-games and few-games cases into the same message,
   // since neither is a meaningful "recent form" read.
-  const format = formatStats && formatStats.matches >= MIN_GAMES_FOR_FORMAT_ROW ? formatStats : null
+  const gatedFormatStats = formatStats && formatStats.matches >= MIN_GAMES_FOR_FORMAT_ROW ? formatStats : null
 
-  return { tournament, ground, format }
+  return { tournament, ground, format: gatedFormatStats }
 }
