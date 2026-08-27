@@ -775,6 +775,7 @@ async function matchIdsForFilter(filter: {
   groundId?:        string
   venue?:           string
   format?:          string
+  gameDateFrom?:    string   // inclusive — 'YYYY-MM-DD'
 }): Promise<string[]> {
   const hub = createServiceClient()
   let query = hub.from('bookings').select('match_id').not('match_id', 'is', null).eq('status', 'confirmed')
@@ -786,11 +787,20 @@ async function matchIdsForFilter(filter: {
   // (see getPlayerBookingContextStats) — never combined with groundId.
   if (filter.venue)          query = query.ilike('venue', filter.venue)
   if (filter.format)         query = query.eq('format', filter.format)
+  if (filter.gameDateFrom)   query = query.gte('game_date', filter.gameDateFrom)
 
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return Array.from(new Set<string>((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
 }
+
+// Minimum matches required for the Form panel's "Format" row (last 3
+// calendar months) to be considered a meaningful sample — below this it
+// renders as "Not enough data" rather than a stats line, same spirit as
+// the leaderboard's own minimum-sample gates (see features/leaderboard.md
+// §4/§6). Tournament/Ground rows are unaffected — still all-time, still
+// "No matches yet" when empty.
+const MIN_GAMES_FOR_FORMAT_ROW = 6
 
 // match_id values for every confirmed booking where this player was the
 // match-specific captain (squad.is_captain — see features/squad-selection.md;
@@ -888,11 +898,19 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
   // recorded under that ground) over this booking's raw venue text.
   const legacyVenueToMatch = !groundId ? (groundName ?? venue ?? null) : null
 
+  // Format row is windowed to the last 3 calendar months (not all-time,
+  // unlike Tournament/Ground) and gated on MIN_GAMES_FOR_FORMAT_ROW below —
+  // it's meant to answer "how is this player playing lately", not "what's
+  // their career record in this format".
+  const threeMonthsAgo = new Date()
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+  const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0]
+
   const [tournamentMatchIds, groundDirectIds, groundByLegacyVenue, formatMatchIds] = await Promise.all([
     tournamentId ? matchIdsForFilter({ tournamentId }) : Promise.resolve([]),
     groundId ? matchIdsForFilter({ groundId }) : Promise.resolve([]),
     legacyVenueToMatch ? matchIdsForFilter({ venue: legacyVenueToMatch }) : Promise.resolve([]),
-    format ? matchIdsForFilter({ format }) : Promise.resolve([]),
+    format ? matchIdsForFilter({ format, gameDateFrom: threeMonthsAgoStr }) : Promise.resolve([]),
   ])
   const groundMatchIds = Array.from(new Set([...groundDirectIds, ...groundByLegacyVenue]))
 
@@ -902,5 +920,11 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
     scopedPlayerStats(playerId, formatMatchIds),
   ])
 
-  return { tournament, ground, format: formatStats }
+  // Below the minimum sample, the Format row renders "Not enough data"
+  // rather than either a thin stats line or a bare "No matches yet" — this
+  // collapses the zero-games and few-games cases into the same message,
+  // since neither is a meaningful "recent form" read.
+  const format = formatStats && formatStats.matches >= MIN_GAMES_FOR_FORMAT_ROW ? formatStats : null
+
+  return { tournament, ground, format }
 }
