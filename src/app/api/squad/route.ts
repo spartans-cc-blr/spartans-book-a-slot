@@ -209,6 +209,62 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // Reopen authorization — a squad that's pending review, approved, or
+  // announced is only reopenable by this match's captain/VC or an admin.
+  // Starting a fresh draft, or resaving one still in draft, stays open to
+  // any captain — this only gates the locked -> draft transition, which is
+  // the high-consequence step (a real incident: an unrelated captain
+  // accidentally reopened an already-announced squad while working a
+  // different match's squad).
+  //
+  // "This match's captain/VC" checks two distinct things, either sufficient:
+  //   1. squad.is_captain / squad.is_vc — the on-field match captain/VC for
+  //      this specific game.
+  //   2. tournaments.captain_id / vc_captain_id — the club's assigned
+  //      captain/VC for the tournament this booking belongs to. These
+  //      genuinely differ in practice (the person who builds/announces a
+  //      tournament's squads is often not the player designated to lead
+  //      the XI on the field for one match) — checking only #1 would block
+  //      the tournament's own captain from reopening a squad they manage
+  //      whenever someone else is tagged as on-field captain.
+  if (currentStatus && LOCKED_STATUSES.includes(currentStatus)) {
+    const squadCaptainId = currentRows.find(r => r.is_captain)?.player_id ?? null
+    const squadVcId      = currentRows.find(r => r.is_vc)?.player_id ?? null
+
+    let tournamentCaptainId: string | null = null
+    let tournamentVcId: string | null = null
+    const { data: bookingRow } = await supabase
+      .from('bookings')
+      .select('tournament:tournaments(captain_id, vc_captain_id)')
+      .eq('id', booking_id)
+      .single()
+    const tournamentRow = (bookingRow as any)?.tournament ?? null
+    if (tournamentRow) {
+      const captainRowIds = [tournamentRow.captain_id, tournamentRow.vc_captain_id].filter(Boolean)
+      if (captainRowIds.length > 0) {
+        const { data: captainRows } = await supabase
+          .from('captains')
+          .select('id, player_id')
+          .in('id', captainRowIds)
+        tournamentCaptainId = (captainRows ?? []).find((c: any) => c.id === tournamentRow.captain_id)?.player_id ?? null
+        tournamentVcId      = (captainRows ?? []).find((c: any) => c.id === tournamentRow.vc_captain_id)?.player_id ?? null
+      }
+    }
+
+    const isMatchLeader =
+      player!.playerId === squadCaptainId ||
+      player!.playerId === squadVcId ||
+      player!.playerId === tournamentCaptainId ||
+      player!.playerId === tournamentVcId
+
+    if (!player!.isAdmin && !isMatchLeader) {
+      return NextResponse.json(
+        { error: "Only this match's captain, vice-captain, or an admin can reopen a squad that is pending review, approved, or announced." },
+        { status: 403 }
+      )
+    }
+  }
+
   // Availability gate — reject rather than silently drop; role assignments
   // (captain/VC/WK) could be affected by dropping a player after the fact.
   let ineligible: string[]

@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { createFakeSupabase, type FakeTables } from './fakeSupabase'
-import { EMPTY_SQUAD_VERSION } from '@/lib/squadVersion'
+import { EMPTY_SQUAD_VERSION, computeSquadVersion } from '@/lib/squadVersion'
 
 let tables: FakeTables
 
@@ -191,8 +191,9 @@ describe('POST /api/squad — role preservation and status-transition guard (Iss
     expect(stillLocked.find(r => r.player_id === 'p2')?.is_vc).toBe(true)
     expect(tables.squad_audit.length).toBe(0) // no phantom transition logged for the blocked attempt
 
-    // The captain explicitly reopens for editing (the "Edit" button flow).
-    mockGetServerSession.mockResolvedValue(captainSession('captain-a'))
+    // This match's own captain (p1, tagged is_captain on the squad itself)
+    // explicitly reopens for editing (the "Edit" button flow).
+    mockGetServerSession.mockResolvedValue(captainSession('p1'))
     const reopened = await POST(postRequest({
       booking_id: bookingId,
       player_ids: ['p1', 'p2'],
@@ -213,9 +214,107 @@ describe('POST /api/squad — role preservation and status-transition guard (Iss
     expect(tables.squad_audit[0]).toMatchObject({
       booking_id: bookingId,
       action: 'returned',
-      actor_id: 'captain-a',
+      actor_id: 'p1',
     })
     expect(tables.squad_audit[0].note).toMatch(/reopened for editing/i)
     expect(tables.squad_audit[0].note).toMatch(/pending_approval/)
+  })
+})
+
+// Seeds an already-announced squad directly into the fake table (bypassing
+// the create-a-fresh-draft POST flow, which is gated by a separate,
+// unrelated Thursday-opens time gate that these authorization tests have
+// no reason to depend on) and returns its version fingerprint.
+function seedAnnouncedSquad(bookingId: string, rows: Array<Partial<{ player_id: string; is_captain: boolean; is_vc: boolean; is_wk: boolean; match_role: string | null }>>) {
+  const full = rows.map(r => ({
+    booking_id: bookingId,
+    status: 'announced',
+    is_captain: false,
+    is_vc: false,
+    is_wk: false,
+    match_role: null,
+    created_at: new Date().toISOString(),
+    ...r,
+  }))
+  tables.squad.push(...full)
+  return computeSquadVersion(full as any)
+}
+
+describe('POST /api/squad — reopen authorization is scoped to this match\'s captain/VC or admin', () => {
+  it('blocks a captain unrelated to this match from reopening an announced squad', async () => {
+    const bookingId = 'booking-4'
+    seedAvailability(bookingId, ['p1', 'p2'])
+    const roles = { captain: 'p1', vc: 'p2', wk: [] }
+    const version = seedAnnouncedSquad(bookingId, [
+      { player_id: 'p1', is_captain: true },
+      { player_id: 'p2', is_vc: true },
+    ])
+
+    // A different captain — not this match's is_captain/is_vc, and this
+    // booking has no tournament row (no tournament-level captain either) —
+    // tries to reopen. This mirrors the real incident: a captain leading a
+    // different match accidentally reopening this one's announced squad.
+    mockGetServerSession.mockResolvedValue(captainSession('unrelated-captain'))
+    const blocked = await POST(postRequest({
+      booking_id: bookingId,
+      player_ids: ['p1', 'p2'],
+      roles,
+      match_roles: {},
+      expected_version: version,
+      reopen: true,
+    }))
+    expect(blocked.status).toBe(403)
+    const blockedBody = await blocked.json()
+    expect(blockedBody.error).toMatch(/captain, vice-captain, or an admin/i)
+
+    // Nothing changed and nothing was logged for the blocked attempt.
+    const stillAnnounced = tables.squad.filter(r => r.booking_id === bookingId)
+    expect(stillAnnounced.every(r => r.status === 'announced')).toBe(true)
+    expect(tables.squad_audit.length).toBe(0)
+  })
+
+  it('allows this match\'s own captain (squad.is_captain) to reopen', async () => {
+    const bookingId = 'booking-5'
+    seedAvailability(bookingId, ['p1', 'p2'])
+    const roles = { captain: 'p1', vc: 'p2', wk: [] }
+    const version = seedAnnouncedSquad(bookingId, [
+      { player_id: 'p1', is_captain: true },
+      { player_id: 'p2', is_vc: true },
+    ])
+
+    mockGetServerSession.mockResolvedValue(captainSession('p1'))
+    const reopened = await POST(postRequest({
+      booking_id: bookingId,
+      player_ids: ['p1', 'p2'],
+      roles,
+      match_roles: {},
+      expected_version: version,
+      reopen: true,
+    }))
+    expect(reopened.status).toBe(200)
+    expect(tables.squad.filter(r => r.booking_id === bookingId).every(r => r.status === 'draft')).toBe(true)
+    expect(tables.squad_audit[0]).toMatchObject({ booking_id: bookingId, action: 'returned', actor_id: 'p1' })
+  })
+
+  it('still allows an admin to reopen an announced squad they have no role in', async () => {
+    const bookingId = 'booking-6'
+    seedAvailability(bookingId, ['p1', 'p2'])
+    const roles = { captain: 'p1', vc: 'p2', wk: [] }
+    const version = seedAnnouncedSquad(bookingId, [
+      { player_id: 'p1', is_captain: true },
+      { player_id: 'p2', is_vc: true },
+    ])
+
+    mockGetServerSession.mockResolvedValue({ user: { playerId: 'admin-1', isCaptain: false, isAdmin: true } })
+    const reopened = await POST(postRequest({
+      booking_id: bookingId,
+      player_ids: ['p1', 'p2'],
+      roles,
+      match_roles: {},
+      expected_version: version,
+      reopen: true,
+    }))
+    expect(reopened.status).toBe(200)
+    expect(tables.squad_audit[0]).toMatchObject({ booking_id: bookingId, action: 'returned', actor_id: 'admin-1' })
   })
 })
