@@ -28,6 +28,7 @@ interface Booking {
   tournament: {
      name: string
      ball_type: string
+     is_practice?: boolean
      ground: { name: string; maps_url: string; hospital_url: string } | null
    } | null
   // This booking's own ground (migration 066) — takes priority over the
@@ -557,7 +558,7 @@ function MatchRoleIcon({ role, ballType = 'red' }: {
 // FIX 5: Added matchRole and onMatchRoleToggle to props
 function SelectablePlayerRow({
   player, response, selected, atCap, status, takenLabel, roles,
-  matchRole, ballType, bookingId, onToggle, onRoleToggle, onMatchRoleToggle,
+  matchRole, ballType, bookingId, isPractice, onToggle, onRoleToggle, onMatchRoleToggle,
 }: {
   player:             Player
   response:           string
@@ -569,6 +570,7 @@ function SelectablePlayerRow({
   matchRole:          'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null   // FIX 5
   ballType: 'red' | 'white' | 'pink'   // ADD
   bookingId:          string   // for the tap-to-expand "Form" panel — see ContextStatsPanel
+  isPractice:         boolean  // practice games go with whoever's available — Form guidance is noise here
   onToggle:           (id: string) => void
   onRoleToggle:       (id: string, role: 'captain' | 'vc' | 'wk') => void
   onMatchRoleToggle:  (id: string, role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null) => void  // FIX 5
@@ -639,8 +641,10 @@ function SelectablePlayerRow({
         <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} />
 
         {/* Form toggle — only shown for players with at least one reconciled
-            match; opens the tournament/ground/format panel below. */}
-        {player.recent_form && (
+            match; opens the tournament/ground/format panel below. Hidden
+            entirely for practice games — selection there is "whoever's
+            available", so form guidance is noise, not a decision aid. */}
+        {!isPractice && player.recent_form && (
           <button
             onClick={handleFormToggle}
             className="font-rajdhani text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-[#1E3A5F] text-[#93C5FD] flex-shrink-0">
@@ -1112,6 +1116,9 @@ function SlotCard({
   const eligible = getSlotPlayers(booking.id, bookings, players, { ...availMap, [booking.id]: liveAvailMap })
   const atCap           = selected.size >= MAX_SQUAD
   const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
+  // Practice games go with whoever's available — Form guidance is only
+  // useful when there's a real pool to choose between.
+  const isPractice = booking.tournament?.is_practice ?? false
   const priorityPlayers = eligible.filter(e => e.player.priority_pick)
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
   const exemptInSquad   = players.filter(p => selected.has(p.id) && p.is_fee_exempt).length
@@ -1487,6 +1494,7 @@ function SlotCard({
                   matchRole={matchRoles[player.id] ?? null}
                   ballType={ballType}
                   bookingId={booking.id}
+                  isPractice={isPractice}
                   onToggle={toggle}
                   onRoleToggle={handleRoleToggle}
                   onMatchRoleToggle={handleMatchRoleToggle}
@@ -1535,6 +1543,7 @@ function SlotCard({
                 matchRole={matchRoles[player.id] ?? null}
                 ballType={ballType}
                 bookingId={booking.id}
+                isPractice={isPractice}
                 onToggle={toggle}
                 onRoleToggle={handleRoleToggle}
                 onMatchRoleToggle={handleMatchRoleToggle}

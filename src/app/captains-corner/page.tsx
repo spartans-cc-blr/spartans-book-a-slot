@@ -60,7 +60,7 @@ export default async function CaptainsCornerPage() {
       .select(`
         id, game_date, slot_time, format, opponent_name,
         match_time, cricheroes_url, gc_return_note,
-        tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url)),
+        tournament:tournaments(name, ball_type, is_practice, ground:grounds(name, maps_url, hospital_url)),
         ground:grounds(name, maps_url, hospital_url)
       `)
       .eq('status', 'confirmed')
