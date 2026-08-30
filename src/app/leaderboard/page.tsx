@@ -9,7 +9,6 @@ import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
 import { LeaderboardGlossary } from '@/components/leaderboard/LeaderboardGlossary'
-import { MonthlyRecognitionShare } from '@/components/leaderboard/MonthlyRecognitionShare'
 import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
 import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
 import { getMonthSyncStatus } from '@/lib/monthlyRecognition'
@@ -200,6 +199,8 @@ export default async function LeaderboardPage({
           formats={formats}
           innings={innings}
           category={category}
+          monthFullLabel={category === 'monthly' ? monthLabel(month) : null}
+          monthSyncStatus={monthSyncStatus}
         />
 
         {category === 'overall' ? (
@@ -211,21 +212,14 @@ export default async function LeaderboardPage({
             fiveWicketHauls={yearlyPerformances?.fiveWicketHauls ?? null}
           />
         ) : category === 'monthly' ? (
-          <>
-            <MonthlyRecognitionShare
-              month={month}
-              monthLabel={monthLabel(month)}
-              syncStatus={monthSyncStatus!}
-            />
-            <LeaderboardMonthly
-              rows={rows}
-              centuries={monthlyPerformances!.centuries}
-              halfCenturies={monthlyPerformancesNoPractice!.halfCenturies}
-              fiveWicketHauls={monthlyPerformances!.fiveWicketHauls}
-              threeWicketHauls={monthlyPerformancesNoPractice!.threeWicketHauls}
-              monthLabel={monthLabel(month)}
-            />
-          </>
+          <LeaderboardMonthly
+            rows={rows}
+            centuries={monthlyPerformances!.centuries}
+            halfCenturies={monthlyPerformancesNoPractice!.halfCenturies}
+            fiveWicketHauls={monthlyPerformances!.fiveWicketHauls}
+            threeWicketHauls={monthlyPerformancesNoPractice!.threeWicketHauls}
+            monthLabel={monthLabel(month)}
+          />
         ) : (
           <LeaderboardTable key={category} rows={rows} category={category} tournamentFiltered={tournamentId !== 'all'} />
         )}

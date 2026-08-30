@@ -7,6 +7,12 @@
 // scorecard — see src/lib/monthlyRecognition.ts for that check, and
 // features/leaderboard.md for the Monthly tab this points at.
 //
+// Sits in the 10% slot next to the month stepper (LeaderboardFilters.tsx's
+// Row 4) as a compact icon-only button, same circular treatment as the
+// stepper's own ‹/› nav buttons — WA_ICON is the same glyph used by
+// PerformerShareButton/TournamentShareButton elsewhere in the app, so this
+// reads as the same "share on WhatsApp" affordance everywhere it appears.
+//
 // Destination-free wa.me/?text=... — same convention as every other
 // WhatsApp group nudge in this app (birthday wishes, availability nudges):
 // the sender picks the recipient (the club WhatsApp group), unlike
@@ -31,11 +37,12 @@ export function MonthlyRecognitionShare({ month, monthLabel, syncStatus }: {
   }
 
   return (
-    <div className="flex items-center justify-end -mt-1">
-      <button onClick={openWhatsApp}
-        className="inline-flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide text-emerald-400 hover:text-emerald-300 transition-colors">
-        {WA_ICON} Share {monthLabel} Recognition
-      </button>
-    </div>
+    <button
+      onClick={openWhatsApp}
+      title={`Share ${monthLabel} Recognition on WhatsApp`}
+      aria-label={`Share ${monthLabel} Recognition on WhatsApp`}
+      className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-emerald-600 text-emerald-400 rounded-full hover:bg-emerald-600/20 transition-colors">
+      {WA_ICON}
+    </button>
   )
 }
