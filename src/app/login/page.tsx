@@ -3,9 +3,18 @@ import { Suspense } from 'react'
 import { signIn } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 
+// Only ever follow a same-origin relative path — a bare leading '/' but not
+// '//' (protocol-relative, resolves to an arbitrary external host). Guards
+// against an open redirect via a hand-crafted or tampered callbackUrl.
+function safeCallbackUrl(raw: string | null): string {
+  if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw
+  return '/'
+}
+
 function LoginForm() {
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
+  const callbackUrl = safeCallbackUrl(searchParams.get('callbackUrl'))
 
   return (
     <div className="min-h-screen bg-ink flex items-center justify-center px-4">
@@ -34,7 +43,7 @@ function LoginForm() {
           )}
 
           <button
-            onClick={() => signIn('google', { callbackUrl: '/' })}
+            onClick={() => signIn('google', { callbackUrl })}
             className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-800 font-rajdhani font-bold text-sm tracking-wide py-3 px-4 rounded transition-colors">
             <GoogleIcon />
             Continue with Google

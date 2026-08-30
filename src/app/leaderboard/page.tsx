@@ -11,6 +11,7 @@ import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
 import { LeaderboardGlossary } from '@/components/leaderboard/LeaderboardGlossary'
 import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
 import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
+import { getMonthSyncStatus } from '@/lib/monthlyRecognition'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Yours Statistically — Spartans CC' }
@@ -38,7 +39,17 @@ export default async function LeaderboardPage({
   const session = await getServerSession(authOptions)
   const user = session?.user as any
 
-  if (!session) redirect('/login')
+  // Preserve the deep link (month/category etc.) through sign-in — a
+  // Monthly Recognition link shared to WhatsApp is often opened signed-out,
+  // and without this an unauthenticated visitor lands on '/' after signing
+  // in instead of back on the specific month they were sent. See
+  // src/app/login/page.tsx for the other half of this.
+  if (!session) {
+    const qs = new URLSearchParams(
+      Object.entries(searchParams ?? {}).filter(([, v]) => v !== undefined) as [string, string][]
+    ).toString()
+    redirect(`/login?callbackUrl=${encodeURIComponent('/leaderboard' + (qs ? `?${qs}` : ''))}`)
+  }
   if (user?.playerStatus === 'expelled') redirect('/')
 
   const currentYear = new Date().getFullYear()
@@ -121,6 +132,11 @@ export default async function LeaderboardPage({
   const monthlyPerformances = category === 'monthly' ? await getPerformances({ month, includePractice: true }) : null
   const monthlyPerformancesNoPractice = category === 'monthly' ? await getPerformances({ month }) : null
 
+  // WhatsApp share for the Monthly tab, open to any signed-in player — see
+  // src/lib/monthlyRecognition.ts. The share button itself only renders
+  // once every real match scheduled this month has a synced scorecard.
+  const monthSyncStatus = category === 'monthly' ? await getMonthSyncStatus(month) : null
+
   // Individual centuries/5-wicket-haul lists for the Overall tab's bands —
   // fetched for a specific year (not "All Time") or whenever a
   // Tournament/Ground filter is active (scoped), matching the same scope as
@@ -183,6 +199,8 @@ export default async function LeaderboardPage({
           formats={formats}
           innings={innings}
           category={category}
+          monthFullLabel={category === 'monthly' ? monthLabel(month) : null}
+          monthSyncStatus={monthSyncStatus}
         />
 
         {category === 'overall' ? (

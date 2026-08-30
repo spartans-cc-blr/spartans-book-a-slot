@@ -24,6 +24,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { MonthlyRecognitionShare } from './MonthlyRecognitionShare'
+import type { MonthSyncStatus } from '@/lib/monthlyRecognition'
 
 // Table-backed categories — each renders a sortable LeaderboardTable, and
 // together make up the "Detailed" branch.
@@ -104,9 +106,15 @@ interface Props {
   formats:      Set<Format>
   innings:      Set<InningsKey>
   category:     LeaderboardCategory
+  // Monthly Recognition share — full "August 2026"-style label (for the
+  // WhatsApp message text, distinct from this file's own short
+  // monthChipLabel()) and the readiness check it's gated on. Both null
+  // outside Honor Board → Monthly, where the share button never renders.
+  monthFullLabel:   string | null
+  monthSyncStatus:  MonthSyncStatus | null
 }
 
-export function LeaderboardFilters({ years, months, tournaments, grounds, year, month, tournamentId, groundId, formats, innings, category }: Props) {
+export function LeaderboardFilters({ years, months, tournaments, grounds, year, month, tournamentId, groundId, formats, innings, category, monthFullLabel, monthSyncStatus }: Props) {
   const router = useRouter()
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
 
@@ -302,30 +310,41 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
         </div>
       )}
 
-      {/* Row 4 — month stepper, Monthly only */}
+      {/* Row 4 — month stepper, Monthly only. 90/10 split with the
+          Monthly Recognition share button — the button itself only
+          renders once monthSyncStatus.allSynced, so most of the time
+          that 10% slot is simply empty rather than shifting the
+          stepper's own width around. */}
       {isMonthly && (
         <div>
-          <div className="flex items-center gap-2 bg-ink-4 border border-ink-5 rounded-full px-2 py-1.5">
-            <button
-              onClick={goOlder}
-              disabled={!canGoOlder}
-              aria-label="Older month"
-              className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
-              ‹
-            </button>
-            <button
-              onClick={() => setMonthPickerOpen(v => !v)}
-              className="flex-1 flex items-center justify-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide text-gold py-1">
-              {monthChipLabel(month)}
-              <span className="text-zinc-500 text-[10px]">{monthPickerOpen ? '▲' : '▾'}</span>
-            </button>
-            <button
-              onClick={goNewer}
-              disabled={!canGoNewer}
-              aria-label="Newer month"
-              className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
-              ›
-            </button>
+          <div className="flex items-stretch gap-2">
+            <div className="w-[90%] flex items-center gap-2 bg-ink-4 border border-ink-5 rounded-full px-2 py-1.5">
+              <button
+                onClick={goOlder}
+                disabled={!canGoOlder}
+                aria-label="Older month"
+                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
+                ‹
+              </button>
+              <button
+                onClick={() => setMonthPickerOpen(v => !v)}
+                className="flex-1 flex items-center justify-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide text-gold py-1">
+                {monthChipLabel(month)}
+                <span className="text-zinc-500 text-[10px]">{monthPickerOpen ? '▲' : '▾'}</span>
+              </button>
+              <button
+                onClick={goNewer}
+                disabled={!canGoNewer}
+                aria-label="Newer month"
+                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
+                ›
+              </button>
+            </div>
+            <div className="w-[10%] flex items-center justify-center">
+              {monthFullLabel && monthSyncStatus && (
+                <MonthlyRecognitionShare month={month} monthLabel={monthFullLabel} syncStatus={monthSyncStatus} />
+              )}
+            </div>
           </div>
 
           {monthPickerOpen && (
