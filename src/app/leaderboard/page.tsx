@@ -9,8 +9,10 @@ import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
 import { LeaderboardGlossary } from '@/components/leaderboard/LeaderboardGlossary'
+import { MonthlyRecognitionShare } from '@/components/leaderboard/MonthlyRecognitionShare'
 import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
 import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
+import { getMonthSyncStatus } from '@/lib/monthlyRecognition'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Yours Statistically — Spartans CC' }
@@ -38,7 +40,17 @@ export default async function LeaderboardPage({
   const session = await getServerSession(authOptions)
   const user = session?.user as any
 
-  if (!session) redirect('/login')
+  // Preserve the deep link (month/category etc.) through sign-in — a
+  // Monthly Recognition link shared to WhatsApp is often opened signed-out,
+  // and without this an unauthenticated visitor lands on '/' after signing
+  // in instead of back on the specific month they were sent. See
+  // src/app/login/page.tsx for the other half of this.
+  if (!session) {
+    const qs = new URLSearchParams(
+      Object.entries(searchParams ?? {}).filter(([, v]) => v !== undefined) as [string, string][]
+    ).toString()
+    redirect(`/login?callbackUrl=${encodeURIComponent('/leaderboard' + (qs ? `?${qs}` : ''))}`)
+  }
   if (user?.playerStatus === 'expelled') redirect('/')
 
   const currentYear = new Date().getFullYear()
@@ -121,6 +133,14 @@ export default async function LeaderboardPage({
   const monthlyPerformances = category === 'monthly' ? await getPerformances({ month, includePractice: true }) : null
   const monthlyPerformancesNoPractice = category === 'monthly' ? await getPerformances({ month }) : null
 
+  // Coordinator-only WhatsApp share for the Monthly tab — gated until every
+  // real match scheduled this month has a synced scorecard. See
+  // src/lib/monthlyRecognition.ts. isWrangler isn't on the session type
+  // used elsewhere in this file, so read it the same defensive way as the
+  // rest of this route's `user?.xyz` accesses.
+  const canShareMonthly = !!(user?.isAdmin || user?.isWrangler)
+  const monthSyncStatus = category === 'monthly' ? await getMonthSyncStatus(month) : null
+
   // Individual centuries/5-wicket-haul lists for the Overall tab's bands —
   // fetched for a specific year (not "All Time") or whenever a
   // Tournament/Ground filter is active (scoped), matching the same scope as
@@ -194,14 +214,22 @@ export default async function LeaderboardPage({
             fiveWicketHauls={yearlyPerformances?.fiveWicketHauls ?? null}
           />
         ) : category === 'monthly' ? (
-          <LeaderboardMonthly
-            rows={rows}
-            centuries={monthlyPerformances!.centuries}
-            halfCenturies={monthlyPerformancesNoPractice!.halfCenturies}
-            fiveWicketHauls={monthlyPerformances!.fiveWicketHauls}
-            threeWicketHauls={monthlyPerformancesNoPractice!.threeWicketHauls}
-            monthLabel={monthLabel(month)}
-          />
+          <>
+            <MonthlyRecognitionShare
+              month={month}
+              monthLabel={monthLabel(month)}
+              syncStatus={monthSyncStatus!}
+              canShare={canShareMonthly}
+            />
+            <LeaderboardMonthly
+              rows={rows}
+              centuries={monthlyPerformances!.centuries}
+              halfCenturies={monthlyPerformancesNoPractice!.halfCenturies}
+              fiveWicketHauls={monthlyPerformances!.fiveWicketHauls}
+              threeWicketHauls={monthlyPerformancesNoPractice!.threeWicketHauls}
+              monthLabel={monthLabel(month)}
+            />
+          </>
         ) : (
           <LeaderboardTable key={category} rows={rows} category={category} tournamentFiltered={tournamentId !== 'all'} />
         )}
