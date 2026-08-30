@@ -133,12 +133,9 @@ export default async function LeaderboardPage({
   const monthlyPerformances = category === 'monthly' ? await getPerformances({ month, includePractice: true }) : null
   const monthlyPerformancesNoPractice = category === 'monthly' ? await getPerformances({ month }) : null
 
-  // Coordinator-only WhatsApp share for the Monthly tab — gated until every
-  // real match scheduled this month has a synced scorecard. See
-  // src/lib/monthlyRecognition.ts. isWrangler isn't on the session type
-  // used elsewhere in this file, so read it the same defensive way as the
-  // rest of this route's `user?.xyz` accesses.
-  const canShareMonthly = !!(user?.isAdmin || user?.isWrangler)
+  // WhatsApp share for the Monthly tab, open to any signed-in player — see
+  // src/lib/monthlyRecognition.ts. The share button itself only renders
+  // once every real match scheduled this month has a synced scorecard.
   const monthSyncStatus = category === 'monthly' ? await getMonthSyncStatus(month) : null
 
   // Individual centuries/5-wicket-haul lists for the Overall tab's bands —
@@ -219,7 +216,6 @@ export default async function LeaderboardPage({
               month={month}
               monthLabel={monthLabel(month)}
               syncStatus={monthSyncStatus!}
-              canShare={canShareMonthly}
             />
             <LeaderboardMonthly
               rows={rows}
