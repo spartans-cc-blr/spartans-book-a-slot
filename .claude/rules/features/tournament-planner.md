@@ -112,6 +112,60 @@ today; it's unused scaffolding, not a bug.
 
 ---
 
+### 2.1 Zero-Booking Tournament Visibility (added August 2026)
+
+Before this, the whole page was **entirely booking-driven** —
+`TournamentPlannerClient.tsx`'s `tournamentMap` is built purely by
+grouping the `bookings` fetched in §2 step 1, and nothing on this page
+ever queried the `tournaments` table directly on its own. A brand-new
+tournament with zero confirmed bookings therefore had nothing to group
+and never appeared anywhere on the page — not even under "Upcoming" —
+which is exactly the moment a coordinator most wants to hand its share
+link (`TournamentShareButton`, organiser self-service — see
+`features/organiser-self-service.md`) to the organiser.
+
+**Fix:** `page.tsx` additionally fetches every active, non-practice
+tournament and computes `emptyTournaments` — tournaments whose id isn't
+already present among the confirmed bookings — and passes it down as a
+new prop. `TournamentPlannerClient.tsx`'s `tournamentMap` merges these in
+as zero-game entries (`{ tournament, games: [] }`) after the
+booking-derived pass, only when a tournament isn't already represented.
+Every downstream computation (`classifiedTournaments`'s
+`isUpcoming`/`isOngoing`/`isCompleted`, `paceSignal()`, `computeGapStats()`,
+`MatchTabsSection`, slot targets) already had null/empty-array guards for
+a tournament with no games, so no changes were needed there — a
+zero-game tournament simply classifies as `isUpcoming` (`completedGames.length
+=== 0`) and renders with an `unbooked` count equal to its
+`total_league_games`.
+
+**Incident (same month) — the zero-booking check itself used the wrong
+booking list, resurrecting already-finished tournaments as "Upcoming".**
+The set of "tournaments that already have a confirmed booking" was first
+computed from the *informal-format-filtered* `bookings` array from §2
+step 1 — the same array that deliberately excludes T10/T25 games. A
+tournament whose **only** confirmed bookings are T10/T25 (e.g.
+"Independence Day Cup 2026" — two confirmed T10 games, both already
+played and finished; "Mario Turner Daybreak 3 - Weekday" — four
+confirmed T10/T25 bookings, same issue) therefore had zero entries in
+that filtered array, looked indistinguishable from a genuinely
+zero-booking tournament, and was wrongly resurrected as a fresh
+"Upcoming" entry with a phantom unbooked-games count — even though both
+are long finished and, by this page's own long-standing design, T10/T25
+tournaments are supposed to be excluded from Tournament Planner
+entirely (§2 step 1), not shown as upcoming.
+
+**Fixed** by deriving the "already has a confirmed booking" set from
+`rawBookings` (every confirmed booking joined to a tournament, any
+format — the pre-filter array from §2 step 1) instead of the
+informal-filtered `bookings`. This correctly restores the pre-existing
+behaviour: a tournament with real confirmed games of any format —
+including T10/T25-only ones — is excluded from `emptyTournaments` and so
+never appears on this page at all, exactly as it didn't before §2.1
+existed. Only a tournament with *zero* confirmed bookings of *any*
+format now gets the zero-game treatment.
+
+---
+
 ## 3. Slot Model — `ALL_SLOTS` / `distributeSlotTargets()`
 
 Both the in-file copy (`TournamentPlannerClient.tsx`) and the extracted
@@ -383,6 +437,7 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 | Squad/booking IDs capped at 100 for the `.in()` query (§2 step 3) — same S-4-class uncapped-query risk mitigated | ✅ |
 | Per-tournament stats scoped by `tournamentId` server-side in `getLeaderboard()` — never career-wide data leaking into a tournament-scoped view | ✅ |
 | No write path exists on this page beyond the single admin-only inline game-count edit | ✅ |
+| `emptyTournaments` (§2.1) only ever adds zero-game display entries, never a write path or a widened data grant — same `active`/`is_practice` scoping as everything else on this page | ✅ |
 
 ---
 
@@ -390,8 +445,8 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 
 | File | Role |
 |---|---|
-| `src/app/tournament-planner/page.tsx` | Server component — role guard, all data fetching described in §2 |
-| `src/components/tournament-planner/TournamentPlannerClient.tsx` | Root client component — `BandwidthSection`, `TournamentBlock`, `MatchTabsSection`, `SlotBalanceByDay`, `GameTimelineCard`, `InlineGameCountEditor`; owns `classifiedTournaments`/Show-filter state and `expandRequest` (view-to-scroll-and-expand) |
+| `src/app/tournament-planner/page.tsx` | Server component — role guard, all data fetching described in §2, `emptyTournaments` computation (§2.1) |
+| `src/components/tournament-planner/TournamentPlannerClient.tsx` | Root client component — `BandwidthSection`, `TournamentBlock`, `MatchTabsSection`, `SlotBalanceByDay`, `GameTimelineCard`, `InlineGameCountEditor`; owns `classifiedTournaments`/Show-filter state and `expandRequest` (view-to-scroll-and-expand); `tournamentMap` merges `emptyTournaments` in as zero-game entries (§2.1) |
 | `src/components/tournament-planner/TournamentShareButton.tsx` | Native-share-or-clipboard-copy button for the public share page's URL — used both here (admin/GC only) and on `TournamentShareCard.tsx` |
 | `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` — the extracted copy used by the public share page and the organiser self-service suggestion engine; this page keeps its own historical in-file duplicate (§1) |
 | `src/lib/playerStats.ts` | `getLeaderboard({ tournamentId })` — this page's source for §5.7's per-tournament Player Stats table |
