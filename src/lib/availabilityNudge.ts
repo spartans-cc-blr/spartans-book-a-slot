@@ -18,6 +18,8 @@
 // no defined trigger day, separate from this Sun–Wed cadence.
 
 import { createServiceClient } from '@/lib/supabase'
+import type { BookingLeaderInfo, LeaderMetric } from '@/lib/nudgeLeaderboard'
+import { attachGroundTournamentInfo, getBookingLeaders } from '@/lib/nudgeLeaderboard'
 
 type ServiceClient = ReturnType<typeof createServiceClient>
 
@@ -28,6 +30,7 @@ export type NudgeTheme =
   | 'same_format_new_slot'
   | 'tournament_eligibility'
   | 'gap_reminder'
+  | 'leaderboard_leader'
   | 'reactivation_1'
   | 'reactivation_2'
   | 'deadline'
@@ -38,7 +41,7 @@ export type NudgeTheme =
 // fallback (matches any remaining gap), which is what guarantees a nudge
 // every day rather than going silent when today's "expected" theme happens
 // not to match any current gap.
-const ACTIVE_THEME_PRIORITY: readonly Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2'>[] = [
+const ACTIVE_THEME_PRIORITY: readonly Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader'>[] = [
   'habitual',
   'same_format_new_slot',
   'tournament_eligibility',
@@ -53,12 +56,31 @@ export interface NudgeBooking {
   format: string
   tournament_id: string | null
   tournament_name: string | null
+  // Populated by nudgeLeaderboard.ts's attachGroundTournamentInfo() only —
+  // fetchNextLockWeekendBookings() leaves these null/false so every other
+  // theme's code path doesn't have to pull leaderboard-only fields it
+  // doesn't need. Only the 'leaderboard_leader' theme reads them.
+  ground_id: string | null
+  ground_name: string | null
+  tournament_is_practice: boolean
 }
 
 export interface NudgeCandidate {
   playerId: string
   booking: NudgeBooking
-  theme: Exclude<NudgeTheme, 'deadline'>
+  theme: Exclude<NudgeTheme, 'deadline' | 'leaderboard_leader'>
+}
+
+// A player who's the leading MVP/run-scorer/wicket-taker/dismissals at this
+// booking's ground and/or tournament — see nudgeLeaderboard.ts. Kept as its
+// own candidate shape (same precedent as DeadlineNudgeCandidate) because it
+// carries `leaderInfo`, which buildNudgeCopy()'s theme+booking-only switch
+// has no use for.
+export interface LeaderboardLeaderCandidate {
+  playerId: string
+  theme: 'leaderboard_leader'
+  booking: NudgeBooking
+  leaderInfo: BookingLeaderInfo
 }
 
 // Wednesday is a last-chance warning, not an invitation to one opportunity —
@@ -212,7 +234,7 @@ export async function buildPlayerHistories(
 // matches every remaining gap booking, which is what makes it a true
 // fallback of last resort in the priority loop below.
 function matchThemesCandidates(
-  theme: Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2'>,
+  theme: Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader'>,
   gapBookings: NudgeBooking[],
   history: PlayerHistory
 ): NudgeBooking[] {
@@ -251,8 +273,9 @@ export function pickNudgeCandidate(
   history: PlayerHistory,
   priorNudgeThisWeek: PriorNudge | null,
   usedThemesThisWeek: Set<NudgeTheme>,
-  referencedBookingIds: Set<string>
-): NudgeCandidate | DeadlineNudgeCandidate | null {
+  referencedBookingIds: Set<string>,
+  bookingLeaders: Map<string, BookingLeaderInfo[]>
+): NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate | null {
   if (!gapBookings.length) return null
 
   // Wednesday — always fires if still unanswered, overrides theme choice,
@@ -269,6 +292,24 @@ export function pickNudgeCandidate(
       : undefined
     const representativeBooking = carried ?? gapBookings[0]
     return { playerId, theme: 'deadline', representativeBooking, gapBookings }
+  }
+
+  // Ground/tournament leaderboard recognition — checked before the
+  // reactivation/priority-list branches below since it applies regardless
+  // of activity or history depth: being the club's leading wicket-taker at
+  // a ground is a compelling hook on its own, not conditioned on recent
+  // availability engagement. Still respects the once-per-week cap like
+  // every other theme, and the same soft "prefer an unreferenced booking"
+  // preference if the player leads at more than one of this week's gaps.
+  if (!usedThemesThisWeek.has('leaderboard_leader')) {
+    const leadingBookings = gapBookings.filter(b =>
+      bookingLeaders.get(b.id)?.some(l => l.playerId === playerId)
+    )
+    if (leadingBookings.length) {
+      const booking = pickPreferredBooking(leadingBookings, referencedBookingIds)
+      const leaderInfo = bookingLeaders.get(booking.id)!.find(l => l.playerId === playerId)!
+      return { playerId, booking, theme: 'leaderboard_leader', leaderInfo }
+    }
   }
 
   // Deliberate: inactive players always get generic reactivation copy,
@@ -343,6 +384,39 @@ export function buildNudgeCopy(theme: NudgeCandidate['theme'], booking: NudgeBoo
   }
 }
 
+const METRIC_LABELS: Record<LeaderMetric, string> = {
+  mvp:        'MVP',
+  runs:       'run-scorer',
+  wickets:    'wicket-taker',
+  dismissals: 'dismissals leader',
+}
+
+function joinWithAnd(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? ''
+  if (items.length === 2) return `${items[0]} and ${items[1]}`
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`
+}
+
+// Ground/tournament leaderboard recognition — deliberately an exception to
+// the self-referential/no-comparison rule every other theme follows. Every
+// other theme compares a player only to their own history; this one names
+// an achievement relative to the rest of the club on purpose, the same way
+// the separate Milestone Recognition feature does — "leading wicket-taker
+// at X" is a flattering, specific hook, not the others'-response-count
+// scarcity pattern the no-comparison rule was written to prevent.
+export function buildLeaderCopy(booking: NudgeBooking, leaderInfo: BookingLeaderInfo): { title: string; body: string } {
+  const dt = formatNudgeDateTime(booking)
+  const clauses = leaderInfo.scopes.map(s => {
+    const metrics = joinWithAnd(s.metrics.map(m => METRIC_LABELS[m]))
+    const preposition = s.scope === 'ground' ? 'at' : 'in'
+    return `${metrics} ${preposition} ${s.label}`
+  })
+  return {
+    title: "🏆 You're the one to beat",
+    body: `You're the leading ${joinWithAnd(clauses)} — ${dt} is coming up. Mark your availability!`,
+  }
+}
+
 // Wednesday's last-chance warning — must name every booking the player still
 // has a gap on. Naming a player's own count/list of outstanding items is
 // consistent with the existing Pending Availability dashboard card (which
@@ -401,6 +475,12 @@ export async function fetchNextLockWeekendBookings(
       format: b.format,
       tournament_id: b.tournament_id,
       tournament_name: (b.tournament as any)?.name ?? null,
+      // Populated by attachGroundTournamentInfo() (nudgeLeaderboard.ts) —
+      // only the 'leaderboard_leader' theme needs these, so they're not
+      // part of this base fetch.
+      ground_id: null,
+      ground_name: null,
+      tournament_is_practice: false,
     }))
     .sort((a, b) => (a.game_date === b.game_date
       ? a.slot_time.localeCompare(b.slot_time)
@@ -631,21 +711,34 @@ export async function getNudgeForPlayer(
   const usedThemesThisWeek = await getThemesUsedThisWeek(supabase, playerId, now)
   const referencedBookingIds = await getReferencedBookingIdsThisWeek(supabase, playerId, now)
 
+  // Ground/tournament leader lookup, scoped to just this player's own gaps
+  // (1-2 bookings) — trivial cost for the single-player dashboard pipeline,
+  // unlike the cron's roster-wide call which is what actually needs to
+  // dedupe by unique ground/tournament (see nudgeLeaderboard.ts).
+  const enrichedGapBookings = await attachGroundTournamentInfo(supabase, gapBookings)
+  const bookingLeaders = await getBookingLeaders(enrichedGapBookings)
+
   const candidate = pickNudgeCandidate(
     dow,
     playerId,
     playerStatus === 'inactive' ? 'inactive' : 'active',
-    gapBookings,
+    enrichedGapBookings,
     history,
     prior,
     usedThemesThisWeek,
-    referencedBookingIds
+    referencedBookingIds,
+    bookingLeaders
   )
   if (!candidate) return null
 
   if (candidate.theme === 'deadline') {
     const { title, body } = buildDeadlineCopy(candidate.gapBookings)
     return { theme: candidate.theme, booking: candidate.representativeBooking, title, body }
+  }
+
+  if (candidate.theme === 'leaderboard_leader') {
+    const { title, body } = buildLeaderCopy(candidate.booking, candidate.leaderInfo)
+    return { theme: candidate.theme, booking: candidate.booking, title, body }
   }
 
   const { title, body } = buildNudgeCopy(candidate.theme, candidate.booking)
