@@ -170,8 +170,16 @@ export default async function TournamentPlannerPage() {
   // the organiser its share link (self-service slot recommendations, see
   // features/organiser-self-service.md). Fetched separately and merged in
   // client-side as zero-game entries.
+  // Deliberately derived from `rawBookings` (every confirmed booking joined
+  // to a tournament), not the informal-format-filtered `bookings` above —
+  // otherwise a tournament whose only confirmed games are T10/T25 (e.g.
+  // Independence Day Cup 2026, all-T10) has zero entries in `bookings` and
+  // would wrongly look "unbooked", surfacing an already-finished tournament
+  // as a fresh "Upcoming" one with a phantom unbooked count.
   const bookedTournamentIds = new Set(
-    bookings.map(b => b.tournament?.id).filter((id): id is string => !!id)
+    (rawBookings ?? [])
+      .map(b => (Array.isArray(b.tournament) ? b.tournament[0] : b.tournament)?.id)
+      .filter((id): id is string => !!id)
   )
   const { data: allTournaments } = await supabase
     .from('tournaments')
