@@ -19,7 +19,8 @@ Also functions as a re-engagement channel: submitting any availability response 
 | File | Role |
 |---|---|
 | `src/app/api/cron/availability-nudge/route.ts` | Cron entry point — `CRON_SECRET` bearer auth, orchestrates the daily run, writes to `availability_nudge_log`, sends pushes |
-| `src/lib/availabilityNudge.ts` | Core logic — `nextLockWeekend` date calc, historical frequency (`buildPlayerHistories`), priority-list theme selection (`pickNudgeCandidate`), copy generation (`buildNudgeCopy`, `buildDeadlineCopy`), weekly history lookups (`getThemesUsedThisWeek`, `getReferencedBookingIdsThisWeek`, batched as `getWeeklyNudgeHistoryForPlayers`) |
+| `src/lib/availabilityNudge.ts` | Core logic — `nextLockWeekend` date calc, historical frequency (`buildPlayerHistories`), priority-list theme selection (`pickNudgeCandidate`), copy generation (`buildNudgeCopy`, `buildDeadlineCopy`, `buildLeaderCopy`), weekly history lookups (`getThemesUsedThisWeek`, `getReferencedBookingIdsThisWeek`, batched as `getWeeklyNudgeHistoryForPlayers`) |
+| `src/lib/nudgeLeaderboard.ts` | Ground/tournament leaderboard recognition (see §3a) — `attachGroundTournamentInfo()` resolves each booking's ground/tournament, `getBookingLeaders()` computes MVP/run-scorer/wicket-taker/dismissals leaders per unique ground/tournament this weekend via `getLeaderboard()` (`src/lib/playerStats.ts`) |
 | `src/app/page.tsx` | Read-only rendering of the same day's nudge as a dashboard card, next to the existing Pending Availability count |
 | `supabase/migrations/029_availability_nudge_log.sql` | `availability_nudge_log` table — idempotency guard (`UNIQUE(player_id, nudge_date)`) and per-day audit trail |
 | `supabase/migrations/030_availability_nudge_log_delivery_status.sql` | Adds `status` (`pending`/`sent`/`failed`) and `error_message` — per-player delivery outcome, not just attempt |
@@ -55,6 +56,22 @@ When a theme matches more than one gap booking (e.g. two bookings both satisfy `
 
 ---
 
+## 3a. Ground/Tournament Leaderboard Recognition (`leaderboard_leader`)
+
+For each `nextLockWeekend` booking, if any player is the leading **MVP, run-scorer, wicket-taker, or dismissals** leader at that booking's **ground** and/or **tournament** (all-time), and that player still has a gap on that booking, nudge them by name-dropping the achievement — e.g. *"You're the leading wicket-taker at Mario Turner — Sat 12 Jul, 7:15 AM is coming up. Mark your availability!"* If a player leads at both the ground and the tournament for the same booking, one nudge combines both clauses (*"...wicket-taker at Mario Turner and in the Trumphate League..."*) — leadership at a *different* booking's ground/tournament is never mixed in; the check and the copy are always scoped to one specific match.
+
+**Checked before the reactivation/priority-list split**, not folded into `ACTIVE_THEME_PRIORITY` — it applies to active and inactive players alike (an inactive player can easily still be the club's all-time leading wicket-taker at a ground; this has nothing to do with recent response volume). Still respects the once-per-week cap and the soft unreferenced-booking preference like every other theme — see `pickNudgeCandidate()` in `src/lib/availabilityNudge.ts`. Wednesday's `deadline` override still wins unconditionally (checked first; this branch never runs on `dow === 3`).
+
+**No minimum-sample threshold** — unlike every qualification bar elsewhere on the leaderboard (`minGamesThreshold`, `minDismissalsThreshold`), a player who's played just one game at a ground but leads it is still nudged. The only floor is "> 0" (excludes crowning a leader who's contributed nothing at that scope), a correctness guard rather than a sample-size bar. Ties are fully inclusive — `bestByAll()` — so three players tied for most wickets at a ground all get nudged, with no cap.
+
+**Deliberate exception to the no-comparison rule:** every other theme in this feature is self-referential (a player's own history vs. their own gap), explicitly avoiding any comparison to other players. This theme is the one intentional departure — an achievement callout, same spirit as the separate Milestone Recognition feature, not the others'-response-count scarcity pattern the no-comparison rule was written to prevent.
+
+**Practice-tournament exclusion:** the *tournament* scope skips a booking whose tournament is the practice-games umbrella (`tournaments.is_practice`) — same "real stats only" posture every other ranking surface in this app applies. The *ground* scope is unaffected (grounds aren't practice-specific).
+
+**Data flow:** `attachGroundTournamentInfo()` resolves each booking's `ground_id` (`booking.ground_id ?? tournament.ground_id` — the same pattern `getPlayerBookingContextStats()` in `playerStats.ts` uses, no legacy venue-text fallback) and `ground_name`/`tournament_is_practice`. `getBookingLeaders()` then computes leaders once per *unique* ground/tournament across the weekend's bookings (not once per player, not once per booking) via `getLeaderboard({ groundId })` / `getLeaderboard({ tournamentId })`, and maps the result back onto each booking. Cost scales with distinct grounds/tournaments in play that weekend (typically 1–3, given the R1 weekend cap), never with roster size.
+
+---
+
 ## 4. Scope Guards
 
 - Only `bookings.status = 'confirmed'` and `availability_locked = false` are considered
@@ -85,6 +102,7 @@ When a theme matches more than one gap booking (e.g. two bookings both satisfy `
 > - [ ] Failure-alerting fix has actually fired a test alert successfully, not just been merged
 > - [x] `030_availability_nudge_log_delivery_status.sql` migration is applied and rows correctly show `status = 'sent'` vs `'failed'` — see the July 2026 incident below; confirmed applied 8 Jul 2026
 > - [ ] Priority-list selection (Fix 7) actually closes the silent-day gap observed in manual simulation — confirm via a live cycle that active players with a real gap get nudged every day, not just on days matching their "expected" theme
+> - [ ] `leaderboard_leader` (§3a) fires correctly on a live weekend with a real ground/tournament leader who has a gap, and the combined ground+tournament copy reads naturally rather than run-on
 
 **Product decision recorded:** an `inactive` player always gets generic reactivation copy regardless of history depth (Fix 3, Option A) — see the comment above `noHistory` in `pickNudgeCandidate()`. Deliberate, not an oversight.
 

@@ -9,10 +9,13 @@ import {
   pickNudgeCandidate,
   buildNudgeCopy,
   buildDeadlineCopy,
+  buildLeaderCopy,
   type NudgeCandidate,
   type DeadlineNudgeCandidate,
+  type LeaderboardLeaderCandidate,
   type WeeklyNudgeHistoryEntry,
 } from '@/lib/availabilityNudge'
+import { attachGroundTournamentInfo, getBookingLeaders } from '@/lib/nudgeLeaderboard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -44,10 +47,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ sent: 0, skipped: 'outside Sun-Wed nudge window' })
     }
 
-    const bookingList = await fetchNextLockWeekendBookings(supabase, now)
+    let bookingList = await fetchNextLockWeekendBookings(supabase, now)
     if (!bookingList.length) {
       return NextResponse.json({ sent: 0, reason: 'no qualifying bookings for nextLockWeekend' })
     }
+    // Enriches each booking with ground_id/ground_name/tournament_is_practice
+    // — one query for the whole weekend, not one per player — so the
+    // 'leaderboard_leader' theme (see nudgeLeaderboard.ts) has what it needs.
+    bookingList = await attachGroundTournamentInfo(supabase, bookingList)
     const bookingIds = bookingList.map(b => b.id)
     const bookingSlotMap = new Map(bookingList.map(b => [b.id, b.slot_time]))
 
@@ -82,7 +89,12 @@ export async function GET(req: NextRequest) {
     const weeklyHistory = await getWeeklyNudgeHistoryForPlayers(supabase, playerIds, now)
     const emptyWeeklyHistory: WeeklyNudgeHistoryEntry = { usedThemes: new Set(), referencedBookingIds: new Set() }
 
-    const candidates: (NudgeCandidate | DeadlineNudgeCandidate)[] = []
+    // Ground/tournament leaders for this weekend's bookings — one call for
+    // the whole run, scaling with distinct grounds/tournaments this
+    // weekend, not with roster size. See nudgeLeaderboard.ts.
+    const bookingLeaders = await getBookingLeaders(bookingList)
+
+    const candidates: (NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate)[] = []
     for (const player of players) {
       const gapBookings = bookingList.filter(b => !answeredKey.has(`${player.id}|${b.id}`))
       if (!gapBookings.length) continue
@@ -95,7 +107,7 @@ export async function GET(req: NextRequest) {
       const status: 'active' | 'inactive' = player.status === 'inactive' ? 'inactive' : 'active'
 
       const candidate = pickNudgeCandidate(
-        dow, player.id, status, gapBookings, history, prior, usedThemes, referencedBookingIds
+        dow, player.id, status, gapBookings, history, prior, usedThemes, referencedBookingIds, bookingLeaders
       )
       if (candidate) candidates.push(candidate)
     }
@@ -150,7 +162,9 @@ export async function GET(req: NextRequest) {
         try {
           const { title, body } = candidate.theme === 'deadline'
             ? buildDeadlineCopy(candidate.gapBookings)
-            : buildNudgeCopy(candidate.theme, candidate.booking)
+            : candidate.theme === 'leaderboard_leader'
+              ? buildLeaderCopy(candidate.booking, candidate.leaderInfo)
+              : buildNudgeCopy(candidate.theme, candidate.booking)
           const pushResults = await sendPushToPlayer(candidate.playerId, {
             title,
             body,
