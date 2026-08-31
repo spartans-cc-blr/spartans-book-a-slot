@@ -31,6 +31,11 @@ interface Booking {
   } | null
 }
 
+// Shared alias for the tournament shape embedded in a booking — also used
+// standalone for a tournament with zero confirmed bookings (see
+// `emptyTournaments` below).
+type TournamentInfo = NonNullable<Booking['tournament']>
+
 interface Captain { id: string; name: string }
 
 interface TournamentPlayer { id: string; name: string; cricheroes_url: string | null }
@@ -60,6 +65,13 @@ interface Props {
   // linked to this tournament, if one exists. Read-only here; creation
   // happens on /admin/soft-blocks/new, not in this view.
   knockoutHoldsByTournament: Record<string, { game_date: string; slot_time: string }>
+  // Active, non-practice tournaments with zero confirmed bookings. This page
+  // is otherwise entirely booking-driven (see `tournamentMap` below) — a
+  // brand-new tournament with nothing scheduled yet would never appear,
+  // even though that's exactly when a coordinator most wants its share link
+  // (organiser self-service) handy. Merged into `tournamentMap` as
+  // zero-game entries so it still shows up under "By Tournament".
+  emptyTournaments: TournamentInfo[]
 }
 
 // ── Slot definitions ───────────────────────────────────────────────
@@ -1294,7 +1306,7 @@ function SlotBalanceByDay({
 // ── Root client component ──────────────────────────────────────────
 export function TournamentPlannerClient({
   bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, tournamentStatsMap, bookingCaptainMap,
-  knockoutHoldsByTournament,
+  knockoutHoldsByTournament, emptyTournaments,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
   const [showUpcoming,  setShowUpcoming]  = useState(true)
@@ -1308,15 +1320,20 @@ export function TournamentPlannerClient({
   const expandTokenRef = useRef(0)
 
   const tournamentMap = useMemo(() => {
-    const map = new Map<string, { tournament: NonNullable<Booking['tournament']>; games: Booking[] }>()
+    const map = new Map<string, { tournament: TournamentInfo; games: Booking[] }>()
     bookings.forEach(b => {
       if (!b.tournament) return
       const tid = b.tournament.id
       if (!map.has(tid)) map.set(tid, { tournament: b.tournament, games: [] })
       map.get(tid)!.games.push(b)
     })
+    // Zero-booking tournaments never appear in `bookings` at all — add them
+    // as empty entries so a brand-new tournament still shows up below.
+    emptyTournaments.forEach(t => {
+      if (!map.has(t.id)) map.set(t.id, { tournament: t, games: [] })
+    })
     return map
-  }, [bookings])
+  }, [bookings, emptyTournaments])
 
   // Classified + sorted independent of the show/hide filters, so the filter
   // cards below can display a true count per bucket regardless of which

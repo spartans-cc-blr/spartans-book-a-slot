@@ -163,6 +163,38 @@ export default async function TournamentPlannerPage() {
     }
   }
 
+  // 2b. Active, non-practice tournaments with zero confirmed bookings.
+  // This page is otherwise entirely booking-driven (see `bookings` above) —
+  // a brand-new tournament with nothing scheduled yet would never appear at
+  // all, even though that's exactly when a coordinator most wants to hand
+  // the organiser its share link (self-service slot recommendations, see
+  // features/organiser-self-service.md). Fetched separately and merged in
+  // client-side as zero-game entries.
+  const bookedTournamentIds = new Set(
+    bookings.map(b => b.tournament?.id).filter((id): id is string => !!id)
+  )
+  const { data: allTournaments } = await supabase
+    .from('tournaments')
+    .select(`
+      id, name, organiser_name, organiser_contact,
+      total_league_games, cricheroes_points_table_url, captain_id, is_practice,
+      captains!tournaments_captain_id_fkey(id, name, player_id)
+    `)
+    .eq('active', true)
+
+  const emptyTournaments = (allTournaments ?? [])
+    .filter(t => !t.is_practice && !bookedTournamentIds.has(t.id))
+    .map(t => ({
+      id: t.id,
+      name: t.name,
+      organiser_name: t.organiser_name,
+      organiser_contact: t.organiser_contact,
+      total_league_games: t.total_league_games,
+      cricheroes_points_table_url: t.cricheroes_points_table_url,
+      captain_id: t.captain_id,
+      captains: Array.isArray(t.captains) ? t.captains[0] ?? null : t.captains,
+    }))
+
   // 3. All active captains
   const { data: captains } = await supabase
     .from('captains')
@@ -204,6 +236,7 @@ export default async function TournamentPlannerPage() {
           tournamentStatsMap={tournamentStatsMap}
           bookingCaptainMap={bookingCaptainMap}
           knockoutHoldsByTournament={knockoutHoldsByTournament}
+          emptyTournaments={emptyTournaments}
           viewerRole={{
             isCaptain: !!user?.isCaptain,
             isGC:      !!user?.isGC,
