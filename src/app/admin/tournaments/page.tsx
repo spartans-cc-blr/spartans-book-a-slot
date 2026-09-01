@@ -19,6 +19,10 @@ type Tournament = {
   captain_id: string | null
   captains: Captain | null
   organiser_self_service: boolean
+  // Declared up front so slot-target/suggestion engines don't have to guess
+  // (both T20 and T30) before this tournament's first booking exists — see
+  // features/tournament-planner.md §3.1.
+  intended_formats: ('T20' | 'T30')[] | null
 }
 
 const BALL_LABELS = { red: '🔴 Red', white: '⚪ White', pink: '🩷 Pink' }
@@ -35,6 +39,7 @@ export default function AdminTournamentsPage() {
     name: '', organiser_name: '', organiser_contact: '', cricheroes_points_table_url: '',
     ball_type: 'white' as 'red'|'white'|'pink', ground_id: '',
     total_league_games: '' as string, match_fee: '' as string, captain_id: '',
+    intended_formats: [] as ('T20' | 'T30')[],
   })
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
@@ -62,6 +67,7 @@ export default function AdminTournamentsPage() {
       active: t.active, total_league_games: t.total_league_games,
       match_fee: t.match_fee, captain_id: t.captain_id ?? '',
       organiser_self_service: t.organiser_self_service,
+      intended_formats: t.intended_formats ?? [],
     })
     setError('')
   }
@@ -80,6 +86,7 @@ export default function AdminTournamentsPage() {
           : null,
         match_fee: editForm.match_fee ? parseInt(editForm.match_fee as unknown as string) : null,
         captain_id: editForm.captain_id || null,
+        intended_formats: editForm.intended_formats?.length ? editForm.intended_formats : null,
       }),
     })
     if (res.ok) {
@@ -118,6 +125,7 @@ export default function AdminTournamentsPage() {
         total_league_games: addForm.total_league_games ? parseInt(addForm.total_league_games, 10) : null,
         match_fee: addForm.match_fee ? parseInt(addForm.match_fee) : null,
         captain_id: addForm.captain_id || null,
+        intended_formats: addForm.intended_formats.length ? addForm.intended_formats : null,
       }),
     })
     if (res.ok) {
@@ -127,7 +135,7 @@ export default function AdminTournamentsPage() {
       setAddForm({
         name: '', organiser_name: '', organiser_contact: '', ball_type: 'white',
         ground_id: '', total_league_games: '', cricheroes_points_table_url: '',
-        match_fee: '', captain_id: '',
+        match_fee: '', captain_id: '', intended_formats: [],
       })
     } else {
       const d = await res.json().catch(() => ({}))
@@ -137,6 +145,10 @@ export default function AdminTournamentsPage() {
   }
 
   const groundName = (id: string | null) => grounds.find(g => g.id === id)?.name ?? '—'
+
+  function toggleFormatIn(current: ('T20' | 'T30')[], f: 'T20' | 'T30'): ('T20' | 'T30')[] {
+    return current.includes(f) ? current.filter(x => x !== f) : [...current, f]
+  }
 
   return (
     <div>
@@ -205,6 +217,24 @@ export default function AdminTournamentsPage() {
               />
               <p className="font-rajdhani text-xs text-zinc-600 mt-1">
                 League games only — knockouts added separately if Spartans qualify.
+              </p>
+            </div>
+            <div>
+              <label className="form-label">Intended Format</label>
+              <div className="flex gap-2">
+                {(['T20', 'T30'] as const).map(fmt => (
+                  <button key={fmt} type="button"
+                    onClick={() => setAddForm(f => ({ ...f, intended_formats: toggleFormatIn(f.intended_formats, fmt) }))}
+                    className={`flex-1 py-2 rounded border font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
+                      ${addForm.intended_formats.includes(fmt) ? 'border-gold bg-gold/10 text-gold' : 'border-ink-5 bg-ink-4 text-zinc-500 hover:border-gold-dim'}`}>
+                    {fmt}
+                  </button>
+                ))}
+              </div>
+              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                Optional — declares the format up front so slot targets/suggestions
+                don&apos;t fall back to both T20 and T30 before the first game is booked.
+                Ignored once a real booking exists (its own format wins then).
               </p>
             </div>
             <div>
@@ -325,6 +355,22 @@ export default function AdminTournamentsPage() {
                              className="form-input w-24"
                            />
                          </div>
+                        <div>
+                          <label className="form-label">Intended Format</label>
+                          <div className="flex gap-2">
+                            {(['T20', 'T30'] as const).map(fmt => (
+                              <button key={fmt} type="button"
+                                onClick={() => setEditForm(f => ({ ...f, intended_formats: toggleFormatIn(f.intended_formats ?? [], fmt) }))}
+                                className={`flex-1 py-2 rounded border font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
+                                  ${(editForm.intended_formats ?? []).includes(fmt) ? 'border-gold bg-gold/10 text-gold' : 'border-ink-5 bg-ink-4 text-zinc-500 hover:border-gold-dim'}`}>
+                                {fmt}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                            Only matters while this tournament has zero confirmed bookings.
+                          </p>
+                        </div>
                         <div>
                           <label className="form-label">Organiser Fee (₹ total per match)</label>
                           <input

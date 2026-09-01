@@ -42,6 +42,11 @@ export interface Tournament {
   // features/leaderboard.md §10. Drives the per-booking ground picker on
   // /admin/bookings/new and /admin/bookings/[id].
   is_practice:                 boolean
+  // Admin-declared format(s), used only as the slot-distribution/suggestion
+  // fallback for a tournament with zero confirmed bookings yet — see
+  // resolveActiveFormats() in src/lib/slotTargets.ts. Null means
+  // undeclared; a real booking's own format always wins once one exists.
+  intended_formats:            GameFormat[] | null
   captains: {
     id:      string
     name:    string
