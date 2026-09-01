@@ -147,6 +147,23 @@ already mid-flow on one particular card. Same R8 exact-slot input as
 `getSuggestedSlotDates()` above — fetched independently since this is a
 separate call, not a shared code path.
 
+### Suggestion window — anchor and horizon (added September 2026)
+
+All three functions above (`getSuggestedOpenDates()`, `getSuggestedSlotDates()`,
+`findNextSlotDate()`) now derive where their search starts and how far
+forward it looks via a single shared `computeSuggestionWindow()` helper in
+the same file, rather than each hardcoding "next Saturday after today,
+16 weeks out." When a tournament has declared `tournaments.tentative_start_date`
+(admin-set, `/admin/tournaments`) and it's still in the future, the window
+anchors to that date instead of today, and — combined with
+`total_league_games` — extends to roughly `games ÷ 2` months out (the
+club's "2 games a month" pace) instead of the flat default. Full detail,
+including the exact anchor/horizon rules and why a past-or-today start
+date is treated as unset, lives in `features/tournament-planner.md` §3.2 —
+this is purely a suggestion-engine input, so it changes nothing about R1–R8
+validation itself, `distributeSlotTargets()`, or the `count/target` display
+this feature's slot balance section (§7) shows.
+
 ---
 
 ## 5. API Routes — all public, no session
@@ -302,7 +319,8 @@ CricHeroes URL to show, same as any other unset-URL player.
 |---|---|
 | `supabase/migrations/053_tournament_organiser_self_service.sql` | The opt-in column |
 | `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` |
-| `src/lib/suggestedSlots.ts` | `getSuggestedSlotDates()`, `findNextSlotDate()` — alongside the pre-existing `getSuggestedOpenDates()` |
+| `src/lib/suggestedSlots.ts` | `getSuggestedSlotDates()`, `findNextSlotDate()` — alongside the pre-existing `getSuggestedOpenDates()`; `computeSuggestionWindow()` — shared anchor/horizon helper, see "Suggestion window" above and `features/tournament-planner.md` §3.2 |
+| `supabase/migrations/070_tournament_tentative_start_date.sql` | `tournaments.tentative_start_date date` — admin-declared expected start date feeding `computeSuggestionWindow()` |
 | `src/app/api/tournaments/[id]/organiser-reserve/route.ts` | Public reserve |
 | `src/app/api/tournaments/[id]/organiser-next-slot/route.ts` | Public decline lookup |
 | `src/app/api/tournaments/[id]/organiser-attach-url/route.ts` | Public match-URL attach + GC notify |

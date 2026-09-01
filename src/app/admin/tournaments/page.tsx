@@ -23,6 +23,9 @@ type Tournament = {
   // (both T20 and T30) before this tournament's first booking exists — see
   // features/tournament-planner.md §3.1.
   intended_formats: ('T20' | 'T30')[] | null
+  // Expected start date — anchors and sizes the suggestion window before
+  // this tournament's first booking exists. See features/tournament-planner.md §3.2.
+  tentative_start_date: string | null
 }
 
 const BALL_LABELS = { red: '🔴 Red', white: '⚪ White', pink: '🩷 Pink' }
@@ -39,7 +42,7 @@ export default function AdminTournamentsPage() {
     name: '', organiser_name: '', organiser_contact: '', cricheroes_points_table_url: '',
     ball_type: 'white' as 'red'|'white'|'pink', ground_id: '',
     total_league_games: '' as string, match_fee: '' as string, captain_id: '',
-    intended_formats: [] as ('T20' | 'T30')[],
+    intended_formats: [] as ('T20' | 'T30')[], tentative_start_date: '',
   })
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
@@ -68,6 +71,7 @@ export default function AdminTournamentsPage() {
       match_fee: t.match_fee, captain_id: t.captain_id ?? '',
       organiser_self_service: t.organiser_self_service,
       intended_formats: t.intended_formats ?? [],
+      tentative_start_date: t.tentative_start_date ?? '',
     })
     setError('')
   }
@@ -87,6 +91,7 @@ export default function AdminTournamentsPage() {
         match_fee: editForm.match_fee ? parseInt(editForm.match_fee as unknown as string) : null,
         captain_id: editForm.captain_id || null,
         intended_formats: editForm.intended_formats?.length ? editForm.intended_formats : null,
+        tentative_start_date: editForm.tentative_start_date || null,
       }),
     })
     if (res.ok) {
@@ -126,6 +131,7 @@ export default function AdminTournamentsPage() {
         match_fee: addForm.match_fee ? parseInt(addForm.match_fee) : null,
         captain_id: addForm.captain_id || null,
         intended_formats: addForm.intended_formats.length ? addForm.intended_formats : null,
+        tentative_start_date: addForm.tentative_start_date || null,
       }),
     })
     if (res.ok) {
@@ -135,7 +141,7 @@ export default function AdminTournamentsPage() {
       setAddForm({
         name: '', organiser_name: '', organiser_contact: '', ball_type: 'white',
         ground_id: '', total_league_games: '', cricheroes_points_table_url: '',
-        match_fee: '', captain_id: '', intended_formats: [],
+        match_fee: '', captain_id: '', intended_formats: [], tentative_start_date: '',
       })
     } else {
       const d = await res.json().catch(() => ({}))
@@ -235,6 +241,21 @@ export default function AdminTournamentsPage() {
                 Optional — declares the format up front so slot targets/suggestions
                 don&apos;t fall back to both T20 and T30 before the first game is booked.
                 Ignored once a real booking exists (its own format wins then).
+              </p>
+            </div>
+            <div>
+              <label className="form-label">Tentative Start Date</label>
+              <input
+                type="date"
+                value={addForm.tentative_start_date}
+                onChange={e => setAddForm(f => ({ ...f, tentative_start_date: e.target.value }))}
+                className="form-input"
+              />
+              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                Optional — a future date anchors suggested slots to start from
+                there instead of today, and (with Total League Games set) extends
+                the suggestion window to roughly games ÷ 2 months out. Ignored
+                once a real booking exists.
               </p>
             </div>
             <div>
@@ -367,6 +388,18 @@ export default function AdminTournamentsPage() {
                               </button>
                             ))}
                           </div>
+                          <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                            Only matters while this tournament has zero confirmed bookings.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="form-label">Tentative Start Date</label>
+                          <input
+                            type="date"
+                            value={editForm.tentative_start_date ?? ''}
+                            onChange={e => setEditForm(f => ({ ...f, tentative_start_date: e.target.value }))}
+                            className="form-input"
+                          />
                           <p className="font-rajdhani text-xs text-zinc-600 mt-1">
                             Only matters while this tournament has zero confirmed bookings.
                           </p>
