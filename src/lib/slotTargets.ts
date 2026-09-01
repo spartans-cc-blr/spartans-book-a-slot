@@ -27,6 +27,24 @@ export const ALL_SLOTS = [
 
 export type SlotKey = `${'Sat' | 'Sun'}-${SlotTime}`
 
+// Which format(s) a tournament's slot distribution should honour, in order:
+// (1) the formats its own confirmed bookings actually use — ground truth
+// once games exist; (2) an admin-declared `tournaments.intended_formats`,
+// for a tournament with no bookings yet; (3) both T20 and T30, the
+// last-resort fallback for a genuinely undeclared, bookingless tournament.
+// Without (2), a brand-new T20-only tournament looked format-agnostic to
+// every slot-distribution/suggestion engine — including the T30-only
+// 12:30 slot — until its first game was booked.
+export function resolveActiveFormats(
+  bookedFormats: (string | null | undefined)[],
+  intendedFormats?: readonly string[] | null
+): GameFormat[] {
+  const fromBookings = Array.from(new Set(bookedFormats.filter((f): f is GameFormat => !!f)))
+  if (fromBookings.length) return fromBookings
+  if (intendedFormats && intendedFormats.length) return intendedFormats as GameFormat[]
+  return ['T20', 'T30']
+}
+
 export function distributeSlotTargets(validKeys: SlotKey[], totalLeague: number): Record<SlotKey, number> {
   const n = validKeys.length
   const targets = {} as Record<SlotKey, number>

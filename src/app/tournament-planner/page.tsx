@@ -31,7 +31,7 @@ export default async function TournamentPlannerPage() {
       tournament:tournaments!bookings_tournament_id_fkey(
         id, name, organiser_name, organiser_contact,
         total_league_games, cricheroes_points_table_url,
-        captain_id, is_practice,
+        captain_id, is_practice, intended_formats,
         captains!tournaments_captain_id_fkey(id, name, player_id)
       )
     `)
@@ -83,6 +83,7 @@ export default async function TournamentPlannerPage() {
       cricheroes_points_table_url: string | null
       captain_id: string | null
       is_practice: boolean
+      intended_formats: string[] | null
       captains: { id: string; name: string; player_id: string | null } | null
     } | null
   }>
@@ -186,6 +187,7 @@ export default async function TournamentPlannerPage() {
     .select(`
       id, name, organiser_name, organiser_contact,
       total_league_games, cricheroes_points_table_url, captain_id, is_practice,
+      intended_formats,
       captains!tournaments_captain_id_fkey(id, name, player_id)
     `)
     .eq('active', true)
@@ -200,6 +202,7 @@ export default async function TournamentPlannerPage() {
       total_league_games: t.total_league_games,
       cricheroes_points_table_url: t.cricheroes_points_table_url,
       captain_id: t.captain_id,
+      intended_formats: t.intended_formats,
       captains: Array.isArray(t.captains) ? t.captains[0] ?? null : t.captains,
     }))
 

@@ -48,6 +48,10 @@ interface Tournament {
   vc_captain_id: string | null
   organiser_self_service: boolean
   cricheroes_points_table_url: string | null
+  // Admin-declared format(s) — used only as the slot-target fallback for a
+  // tournament with zero confirmed games yet. See resolveActiveFormats in
+  // src/lib/slotTargets.ts.
+  intended_formats: string[] | null
   captain: { id: string; name: string; cricheroes_url: string | null } | null
 }
 
@@ -103,7 +107,9 @@ export function TournamentShareCard({
   const isSlotImbalanced = maxSlotCount > Math.ceil(sorted.length / 2) && sorted.length >= 3
 
   const formats         = Array.from(new Set(sorted.map(g => g.format).filter((f): f is string => !!f)))
-  const activeFormats   = formats.length === 0 ? ['T20', 'T30'] : formats
+  const activeFormats   = formats.length === 0
+    ? (tournament.intended_formats?.length ? tournament.intended_formats : ['T20', 'T30'])
+    : formats
 
   // Even split of totalLeague across every slot valid for this tournament's
   // format(s) — same distributeSlotTargets formula the internal Tournament

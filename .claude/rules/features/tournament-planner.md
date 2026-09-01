@@ -183,13 +183,74 @@ buckets:
 `distributeSlotTargets(validKeys, totalLeague)` splits a tournament's
 `total_league_games` evenly across only the slot keys valid for that
 tournament's actual format mix (`activeFormats`, derived from the
-formats its own booked games actually use — falling back to both T20 and
-T30 if the tournament has no games booked yet). The remainder from
+formats its own booked games actually use — falling back to
+`tournaments.intended_formats` if set, else both T20 and T30, if the
+tournament has no games booked yet — see §3.1). The remainder from
 integer division goes to the earliest slots in display order (Sat 07:30 →
 Sun 14:30) — an arbitrary but stable tie-break, not a scheduling
 preference. This target feeds the `count/target` display in both
 `SlotBalanceByDay` (this page) and the public share card's own slot
 balance section.
+
+---
+
+## 3.1 `tournaments.intended_formats` — declaring a format before the first booking (added September 2026)
+
+**The bug this closes:** `activeFormats` (§3) is derived purely from the
+formats a tournament's own confirmed bookings already use. Before this
+column existed, a tournament with **zero** bookings had no way to declare
+its format at all, so every slot-distribution/suggestion engine fell back
+to treating it as valid for **both** T20 and T30 — which silently pulled
+the T30-only 12:30 slot into a brand-new T20-only tournament's slot
+targets and (for a self-service tournament, see
+`features/organiser-self-service.md`) its public reserve suggestions,
+before its first game was ever booked. Reported and root-caused live: a
+tournament named "Thunder 5" (a T20 tournament by name and intent) with
+`total_league_games = 9` and zero confirmed bookings was showing a
+12:30 target of 1 game on both Sat and Sun — confirmed by querying the
+live DB directly (`select * from bookings where tournament_id = ...`
+returned zero rows).
+
+**The fix:** `tournaments.intended_formats text[]` (migration
+`069_tournament_intended_formats.sql`, `CHECK (intended_formats IS NULL OR
+intended_formats <@ ARRAY['T20','T30'])`) lets an admin declare a
+tournament's format(s) up front, from the "Intended Format" T20/T30
+toggle buttons on `/admin/tournaments` (both the Add form and the Edit
+form). `resolveActiveFormats(bookedFormats, intendedFormats)`
+(`src/lib/slotTargets.ts`) is the shared resolution order, used everywhere
+`activeFormats` is computed:
+
+1. The formats this tournament's own confirmed bookings actually use —
+   ground truth once games exist, exactly as before this change.
+2. `tournaments.intended_formats`, when set and no bookings exist yet.
+3. Both T20 and T30 — the last-resort fallback for a genuinely
+   undeclared, bookingless tournament (unchanged prior behaviour).
+
+**Once a real booking exists, `intended_formats` is ignored** — step 1
+always wins, so a stale or wrong declaration can never override what the
+tournament is actually playing.
+
+**Where it's wired in** (every site that used to compute the
+both-formats-fallback locally): `src/lib/suggestedSlots.ts`'s
+`getSuggestedOpenDates()` and `getSuggestedSlotDates()` (both now select
+`intended_formats` on their `tournaments` fetch and call
+`resolveActiveFormats()`), `TournamentPlannerClient.tsx`'s per-tournament
+`activeFormats` calc (fed via `page.tsx`'s `rawBookings` tournament join
+and the `emptyTournaments` fetch — the exact path a zero-booking
+tournament like Thunder 5 renders through, see §2.1), and
+`TournamentShareCard.tsx`'s own `activeFormats` calc (fed via the share
+page's `tournaments` select). `TournamentPlannerClient.tsx` and
+`TournamentShareCard.tsx` keep their historical independent inline
+fallback expressions (consistent with §1's note on their standalone
+`ALL_SLOTS`/`distributeSlotTargets` copies) rather than importing
+`resolveActiveFormats` — only `suggestedSlots.ts`, which already imports
+from `slotTargets.ts`, uses the shared helper directly.
+
+**Data fix applied the same session:** `Mario Sixers Thunder 5`
+(`dd318e2b-b144-4859-b767-b1f27b8fcda1`) had `intended_formats` set to
+`['T20']` directly via Supabase MCP, closing the 12:30 slot-target leak
+for that tournament immediately (no code deploy needed for an
+already-applied migration + a plain data update).
 
 ---
 
@@ -438,6 +499,8 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 | Per-tournament stats scoped by `tournamentId` server-side in `getLeaderboard()` — never career-wide data leaking into a tournament-scoped view | ✅ |
 | No write path exists on this page beyond the single admin-only inline game-count edit | ✅ |
 | `emptyTournaments` (§2.1) only ever adds zero-game display entries, never a write path or a widened data grant — same `active`/`is_practice` scoping as everything else on this page | ✅ |
+| `tournaments.intended_formats` (§3.1) is admin-only write (`/admin/tournaments`, `isAdmin`-gated same as every other tournament field); `POST`/`PATCH /api/tournaments` accept it exactly like every other admin-only tournament field, no new access surface | ✅ |
+| `intended_formats` never widens a booking's own validation — R1–R8 (`validateBooking()`) still validate every real slot/format independently; this column only ever feeds the *display/suggestion* fallback (§3.1), never the booking-rules engine itself | ✅ |
 
 ---
 
@@ -448,9 +511,11 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 | `src/app/tournament-planner/page.tsx` | Server component — role guard, all data fetching described in §2, `emptyTournaments` computation (§2.1) |
 | `src/components/tournament-planner/TournamentPlannerClient.tsx` | Root client component — `BandwidthSection`, `TournamentBlock`, `MatchTabsSection`, `SlotBalanceByDay`, `GameTimelineCard`, `InlineGameCountEditor`; owns `classifiedTournaments`/Show-filter state and `expandRequest` (view-to-scroll-and-expand); `tournamentMap` merges `emptyTournaments` in as zero-game entries (§2.1) |
 | `src/components/tournament-planner/TournamentShareButton.tsx` | Native-share-or-clipboard-copy button for the public share page's URL — used both here (admin/GC only) and on `TournamentShareCard.tsx` |
-| `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` — the extracted copy used by the public share page and the organiser self-service suggestion engine; this page keeps its own historical in-file duplicate (§1) |
+| `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` / `resolveActiveFormats()` (§3.1) — the extracted copy used by the public share page and the organiser self-service suggestion engine; this page keeps its own historical in-file duplicate of `ALL_SLOTS`/`distributeSlotTargets` (§1) but not of `resolveActiveFormats`, which it inlines instead |
 | `src/lib/playerStats.ts` | `getLeaderboard({ tournamentId })` — this page's source for §5.7's per-tournament Player Stats table |
 | `supabase/migrations/066_bookings_ground_captain.sql` | Per-booking `ground_id`/`captain_id` override columns (§7) |
+| `supabase/migrations/069_tournament_intended_formats.sql` | `tournaments.intended_formats text[]` — admin-declared format(s) for a tournament with zero bookings yet (§3.1) |
+| `src/app/admin/tournaments/page.tsx` | Admin CRUD for tournaments, including the "Intended Format" T20/T30 toggle (§3.1) |
 | `src/types/index.ts` | `isInformalFormat()`, `INFORMAL_FORMATS`, `KNOCKOUT_HOLD_REASON` |
 | `src/app/tournament-planner/share/[tournamentId]/page.tsx` + `src/components/tournament-planner/TournamentShareCard.tsx` | The separate public/unauthenticated counterpart — see `features/organiser-self-service.md` |
 

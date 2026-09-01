@@ -28,6 +28,10 @@ interface Booking {
     cricheroes_points_table_url: string | null
     captain_id: string | null
     captains: { id: string; name: string; player_id: string | null } | null
+    // Admin-declared format(s) — used only as the slot-target fallback for
+    // a tournament with zero confirmed games yet (see resolveActiveFormats
+    // in src/lib/slotTargets.ts and the local activeFormats calc below).
+    intended_formats: string[] | null
   } | null
 }
 
@@ -794,7 +798,9 @@ function TournamentBlock({
   const tournamentFormats = Array.from(
     new Set(games.map(g => g.format).filter((f): f is string => !!f))
   )
-  const activeFormats = tournamentFormats.length === 0 ? ['T20', 'T30'] : tournamentFormats
+  const activeFormats = tournamentFormats.length === 0
+    ? (tournament.intended_formats?.length ? tournament.intended_formats : ['T20', 'T30'])
+    : tournamentFormats
 
   // Even split of totalLeague across every slot valid for this tournament's
   // format(s) — drives the "2/3" per-slot target shown in SlotBalanceByDay.

@@ -52,7 +52,7 @@
 import { parseISO } from 'date-fns'
 import { createServiceClient } from '@/lib/supabase'
 import { validateBooking, getYearMonth } from '@/lib/validation'
-import { ALL_SLOTS, distributeSlotTargets } from '@/lib/slotTargets'
+import { ALL_SLOTS, distributeSlotTargets, resolveActiveFormats } from '@/lib/slotTargets'
 import type { SlotKey } from '@/lib/slotTargets'
 import type { CreateBookingRequest, GameFormat, SlotTime } from '@/types'
 
@@ -154,7 +154,7 @@ export async function getSuggestedOpenDates(
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
-    .select('id, name, captain_id, total_league_games, captains!tournaments_captain_id_fkey(id, name, player_id)')
+    .select('id, name, captain_id, total_league_games, intended_formats, captains!tournaments_captain_id_fkey(id, name, player_id)')
     .eq('id', tournamentId)
     .single()
 
@@ -215,9 +215,10 @@ export async function getSuggestedOpenDates(
   for (const g of ownGames ?? []) {
     ownSlotCounts[g.slot_time] = (ownSlotCounts[g.slot_time] ?? 0) + 1
   }
-  const activeFormats = Array.from(new Set(
-    (ownGames ?? []).map(g => g.format).filter((f): f is GameFormat => !!f)
-  ))
+  const activeFormats = resolveActiveFormats(
+    (ownGames ?? []).map(g => g.format),
+    tournament.intended_formats
+  )
 
   // Latest date already on this tournament's own calendar (scheduled or
   // completed) — candidates on or before it are excluded below. Without
@@ -416,7 +417,7 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
-    .select('id, name, captain_id, total_league_games, captains!tournaments_captain_id_fkey(id, name, player_id)')
+    .select('id, name, captain_id, total_league_games, intended_formats, captains!tournaments_captain_id_fkey(id, name, player_id)')
     .eq('id', tournamentId)
     .single()
 
@@ -436,10 +437,10 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
   if (ownErr) return { ok: false, error: ownErr.message, status: 500 }
 
   const totalLeague = tournament.total_league_games ?? (ownGames ?? []).length
-  const activeFormatsRaw = Array.from(
-    new Set((ownGames ?? []).map(g => g.format).filter((f): f is GameFormat => !!f))
+  const activeFormats: GameFormat[] = resolveActiveFormats(
+    (ownGames ?? []).map(g => g.format),
+    tournament.intended_formats
   )
-  const activeFormats: GameFormat[] = activeFormatsRaw.length ? activeFormatsRaw : ['T20', 'T30']
 
   const validSlots = ALL_SLOTS.filter(s => s.validFor.some(f => activeFormats.includes(f)))
   const validKeys = validSlots.map(s => `${s.day}-${s.time}` as SlotKey)
