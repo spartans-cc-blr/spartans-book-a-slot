@@ -64,6 +64,15 @@ const SLOT_DEFS: { time: SlotTime; validFor: GameFormat[] }[] = [
 ]
 
 export const HORIZON_WEEKS = 16
+// Average weeks per calendar month — used to convert a tournament's
+// "months of lookahead" (total_league_games / 2, at a 2-games-a-month
+// pace) into a week count for the suggestion horizon. See
+// computeSuggestionWindow() below.
+const WEEKS_PER_MONTH = 52 / 12
+// Floor so a tournament with very few games still gets a workable window
+// to search — half a game's worth of months would otherwise collapse to
+// almost no lookahead at all.
+const MIN_HORIZON_WEEKS = 4
 // Fallback when a tournament has no total_league_games set and no explicit
 // maxSuggestions override was passed.
 const DEFAULT_SUGGESTIONS = 3
@@ -137,6 +146,47 @@ function blockSurroundingWeeks(blocked: Set<string>, dateStr: string): void {
   blocked.add(toISODate(addDays(anchor, 7)))
 }
 
+// ── Suggestion window (anchor + horizon) ─────────────────────────────
+// Default, unchanged from before `tentative_start_date` existed: start
+// from the next Saturday strictly after today, look ahead a flat
+// HORIZON_WEEKS.
+//
+// When a tournament has declared `tentative_start_date` and it's still in
+// the future, the window instead starts from the first Sat/Sun on or
+// after that date — a future date landing exactly on a Saturday is itself
+// a valid first suggestion, not "too soon," so (unlike the today-anchored
+// default) it is never pushed forward a week. A start date that's today or
+// already in the past is treated the same as "not set": suggestions still
+// need to look forward from today regardless of what was originally
+// planned.
+//
+// The horizon also extends past the flat default once a future start date
+// AND total_league_games are both known — "2 league games a month" is the
+// club's own rule of thumb (e.g. 9 games ~= 4.5 months), converted to a
+// week count via WEEKS_PER_MONTH and floored at MIN_HORIZON_WEEKS so a
+// short (1-2 game) tournament still gets a workable window to search.
+function computeSuggestionWindow(
+  tentativeStartDate: string | null | undefined,
+  totalLeagueGames: number | null | undefined
+): { firstSat: Date; horizonEnd: Date; horizonWeeks: number } {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const start = tentativeStartDate ? parseISO(tentativeStartDate) : null
+  if (start) start.setHours(0, 0, 0, 0)
+  const anchorIsFuture = !!start && start > today
+
+  const anchorBase = anchorIsFuture ? start! : today
+  let firstSat = addDays(anchorBase, (6 - anchorBase.getDay() + 7) % 7)
+  if (!anchorIsFuture && toISODate(firstSat) === toISODate(today)) firstSat = addDays(firstSat, 7)
+
+  const horizonWeeks = anchorIsFuture && totalLeagueGames
+    ? Math.max(MIN_HORIZON_WEEKS, Math.ceil((totalLeagueGames / 2) * WEEKS_PER_MONTH))
+    : HORIZON_WEEKS
+
+  return { firstSat, horizonEnd: addDays(firstSat, horizonWeeks * 7), horizonWeeks }
+}
+
 export interface SuggestedDate {
   game_date: string
   day: 'Sat' | 'Sun'
@@ -154,7 +204,7 @@ export async function getSuggestedOpenDates(
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
-    .select('id, name, captain_id, total_league_games, intended_formats, captains!tournaments_captain_id_fkey(id, name, player_id)')
+    .select('id, name, captain_id, total_league_games, intended_formats, tentative_start_date, captains!tournaments_captain_id_fkey(id, name, player_id)')
     .eq('id', tournamentId)
     .single()
 
@@ -167,12 +217,9 @@ export async function getSuggestedOpenDates(
   const captainName = (tournament.captains as any)?.name ?? 'This captain'
   const tournamentName = tournament.name
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  // Start from the next Saturday strictly after today — never suggest a same-day slot.
-  let firstSat = addDays(today, (6 - today.getDay() + 7) % 7)
-  if (toISODate(firstSat) === toISODate(today)) firstSat = addDays(firstSat, 7)
-  const horizonEnd = addDays(firstSat, HORIZON_WEEKS * 7)
+  const { firstSat, horizonEnd, horizonWeeks } = computeSuggestionWindow(
+    tournament.tentative_start_date, tournament.total_league_games
+  )
 
   // Days the leading captain has pre-marked themselves fully unavailable
   // (player_future_availability) — dropped from candidates entirely below.
@@ -268,7 +315,7 @@ export async function getSuggestedOpenDates(
   // date first as a tie-break.
   type Candidate = { game_date: string; slot_time: SlotTime; format: GameFormat; day: 'Sat' | 'Sun' }
   const candidates: Candidate[] = []
-  for (let week = 0; week < HORIZON_WEEKS; week++) {
+  for (let week = 0; week < horizonWeeks; week++) {
     const sat = addDays(firstSat, week * 7)
     const sun = addDays(sat, 1)
     for (const [date, day] of [[sat, 'Sat'], [sun, 'Sun']] as const) {
@@ -417,7 +464,7 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
-    .select('id, name, captain_id, total_league_games, intended_formats, captains!tournaments_captain_id_fkey(id, name, player_id)')
+    .select('id, name, captain_id, total_league_games, intended_formats, tentative_start_date, captains!tournaments_captain_id_fkey(id, name, player_id)')
     .eq('id', tournamentId)
     .single()
 
@@ -463,11 +510,9 @@ export async function getSuggestedSlotDates(tournamentId: string): Promise<Sugge
 
   if (deficientSlots.length === 0) return { ok: true, buckets: [] }
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  let firstSat = addDays(today, (6 - today.getDay() + 7) % 7)
-  if (toISODate(firstSat) === toISODate(today)) firstSat = addDays(firstSat, 7)
-  const horizonEnd = addDays(firstSat, HORIZON_WEEKS * 7)
+  const { firstSat, horizonEnd } = computeSuggestionWindow(
+    tournament.tentative_start_date, tournament.total_league_games
+  )
 
   const { data: existingRaw, error: existingErr } = await supabase
     .from('bookings')
@@ -582,7 +627,7 @@ export async function findNextSlotDate(
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
-    .select('id, name, captain_id, captains!tournaments_captain_id_fkey(id, name, player_id)')
+    .select('id, name, captain_id, total_league_games, tentative_start_date, captains!tournaments_captain_id_fkey(id, name, player_id)')
     .eq('id', tournamentId)
     .single()
 
@@ -604,11 +649,9 @@ export async function findNextSlotDate(
   for (const g of ownGames ?? []) blockSurroundingWeeks(blockedWeeks, g.game_date)
   for (const d of avoidNearDates) blockSurroundingWeeks(blockedWeeks, d)
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  let firstSat = addDays(today, (6 - today.getDay() + 7) % 7)
-  if (toISODate(firstSat) === toISODate(today)) firstSat = addDays(firstSat, 7)
-  const horizonEnd = addDays(firstSat, HORIZON_WEEKS * 7)
+  const { firstSat, horizonEnd } = computeSuggestionWindow(
+    tournament.tentative_start_date, tournament.total_league_games
+  )
 
   const { data: existingRaw, error: existingErr } = await supabase
     .from('bookings')

@@ -47,6 +47,10 @@ export interface Tournament {
   // resolveActiveFormats() in src/lib/slotTargets.ts. Null means
   // undeclared; a real booking's own format always wins once one exists.
   intended_formats:            GameFormat[] | null
+  // Admin-declared expected start date (ISO 'YYYY-MM-DD'), used only to
+  // anchor and size the suggestion window — see computeSuggestionWindow()
+  // in src/lib/suggestedSlots.ts. Ignored once it's today or in the past.
+  tentative_start_date:        string | null
   captains: {
     id:      string
     name:    string

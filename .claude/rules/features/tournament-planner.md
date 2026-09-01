@@ -254,6 +254,64 @@ already-applied migration + a plain data update).
 
 ---
 
+## 3.2 `tournaments.tentative_start_date` — anchoring and sizing the suggestion window (added September 2026)
+
+**The gap this closes:** every suggestion engine in `src/lib/suggestedSlots.ts`
+(`getSuggestedOpenDates()`, `getSuggestedSlotDates()`, `findNextSlotDate()`)
+always anchored its search to "the next Saturday strictly after today" and
+scanned a flat `HORIZON_WEEKS` (16 weeks, ~3.7 months) window regardless of
+when a tournament was actually expected to start or how many games it had
+left to place. A tournament known to start well in the future (an
+off-season sign-up, or one the coordinator is negotiating ahead of time)
+had no way to say so — suggestions would start immediately and could run
+out of horizon before reaching a realistic finish date for a
+longer-running tournament.
+
+**The fix:** `tournaments.tentative_start_date date` (migration
+`070_tournament_tentative_start_date.sql`), set from the "Tentative Start
+Date" field on `/admin/tournaments` (both Add and Edit forms). Consumed
+entirely inside `computeSuggestionWindow(tentativeStartDate,
+totalLeagueGames)` (`src/lib/suggestedSlots.ts`), the single shared helper
+now used by all three suggestion functions above:
+
+- **Anchor.** When `tentative_start_date` is set and still in the future,
+  the search starts from the first Sat/Sun **on or after** that date
+  instead of the default "next Saturday after today" — and unlike the
+  today-anchored default, a start date that itself falls on a Saturday is
+  offered as-is, never pushed a week later (the "never suggest a same-day
+  slot" skip only applies when the anchor is literally today). A start
+  date that is today or already in the past is treated exactly like "not
+  set" — suggestions still need to look forward from today regardless of
+  what was originally planned.
+- **Horizon.** When the anchor is a future `tentative_start_date` **and**
+  `total_league_games` is also set, the horizon extends past the flat
+  16-week default to roughly `(total_league_games / 2)` months out — the
+  club's own "2 league games a month" pace (e.g. a 9-game tournament
+  starting mid-October gets suggestions out to roughly 4.5 months later,
+  early March). Converted to a week count via `WEEKS_PER_MONTH` (52/12)
+  and floored at `MIN_HORIZON_WEEKS` (4) so a very short tournament (1-2
+  games) still gets a workable window to search rather than collapsing to
+  almost no lookahead. Without a future start date, or without
+  `total_league_games`, the horizon stays the flat 16-week default exactly
+  as before this change.
+
+**Once a real booking exists, this field stops mattering in practice** —
+not because it's explicitly ignored (unlike `intended_formats`, nothing
+here checks whether bookings exist), but because a start date that's
+already passed is already treated as "not set" by the anchor rule above,
+and any tournament with a real booking has necessarily already reached its
+declared start.
+
+**Where it's wired in:** all three tournament `.select()` calls in
+`suggestedSlots.ts` now also fetch `tentative_start_date` (and, for
+`findNextSlotDate()`, `total_league_games` too — it previously fetched
+neither, since its flat-horizon decline lookup didn't need them before
+this change). `TournamentPlannerClient.tsx` and `TournamentShareCard.tsx`
+are unaffected — this field only feeds the suggestion engines, not the
+slot-target `count/target` display §3/§3.1 already covers.
+
+---
+
 ## 4. Captain Bandwidth — `BandwidthSection`
 
 Renders one card per active captain (or, for a resolved captain viewer,
@@ -501,6 +559,8 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 | `emptyTournaments` (§2.1) only ever adds zero-game display entries, never a write path or a widened data grant — same `active`/`is_practice` scoping as everything else on this page | ✅ |
 | `tournaments.intended_formats` (§3.1) is admin-only write (`/admin/tournaments`, `isAdmin`-gated same as every other tournament field); `POST`/`PATCH /api/tournaments` accept it exactly like every other admin-only tournament field, no new access surface | ✅ |
 | `intended_formats` never widens a booking's own validation — R1–R8 (`validateBooking()`) still validate every real slot/format independently; this column only ever feeds the *display/suggestion* fallback (§3.1), never the booking-rules engine itself | ✅ |
+| `tournaments.tentative_start_date` (§3.2) is admin-only write, same as `intended_formats` — no new access surface | ✅ |
+| `tentative_start_date` never widens or bypasses R1–R8 — every candidate the suggestion engines produce, at whatever anchor/horizon `computeSuggestionWindow()` picks, still passes the full `validateBooking()` check before being offered | ✅ |
 
 ---
 
@@ -515,7 +575,8 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 | `src/lib/playerStats.ts` | `getLeaderboard({ tournamentId })` — this page's source for §5.7's per-tournament Player Stats table |
 | `supabase/migrations/066_bookings_ground_captain.sql` | Per-booking `ground_id`/`captain_id` override columns (§7) |
 | `supabase/migrations/069_tournament_intended_formats.sql` | `tournaments.intended_formats text[]` — admin-declared format(s) for a tournament with zero bookings yet (§3.1) |
-| `src/app/admin/tournaments/page.tsx` | Admin CRUD for tournaments, including the "Intended Format" T20/T30 toggle (§3.1) |
+| `supabase/migrations/070_tournament_tentative_start_date.sql` | `tournaments.tentative_start_date date` — admin-declared expected start date, feeds `computeSuggestionWindow()` (§3.2) |
+| `src/app/admin/tournaments/page.tsx` | Admin CRUD for tournaments, including the "Intended Format" T20/T30 toggle (§3.1) and "Tentative Start Date" field (§3.2) |
 | `src/types/index.ts` | `isInformalFormat()`, `INFORMAL_FORMATS`, `KNOCKOUT_HOLD_REASON` |
 | `src/app/tournament-planner/share/[tournamentId]/page.tsx` + `src/components/tournament-planner/TournamentShareCard.tsx` | The separate public/unauthenticated counterpart — see `features/organiser-self-service.md` |
 

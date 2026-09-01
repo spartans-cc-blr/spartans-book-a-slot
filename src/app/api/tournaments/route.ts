@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const {
     name, organiser_name, organiser_contact, ball_type = 'red', ground_id,
     total_league_games, cricheroes_points_table_url, match_fee, captain_id,
-    intended_formats,
+    intended_formats, tentative_start_date,
   } = safeBody
   if (!name?.trim()) return NextResponse.json({ error: 'name is required' }, { status: 400 })
 
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       match_fee: match_fee ?? null,
       captain_id: captain_id || null,
       intended_formats: Array.isArray(intended_formats) && intended_formats.length ? intended_formats : null,
+      tentative_start_date: tentative_start_date || null,
     })
     .select('*, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url, whatsapp))')
     .single()
