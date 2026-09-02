@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 import { findIneligiblePlayers } from '@/lib/squadValidation'
 import { computeSquadVersion, type SquadVersionRow } from '@/lib/squadVersion'
+import { isWeekend } from '@/lib/validation'
 
 async function requireCaptain() {
   const session = await getServerSession(authOptions)
@@ -144,8 +145,13 @@ export async function POST(req: NextRequest) {
   const currentStatus  = currentRows[0]?.status ?? null
   const currentVersion = computeSquadVersion(currentRows)
 
-  // Time gate — only applies when no squad exists yet for this booking.
-  // Editing an existing draft (any status) is always allowed.
+  // Time gate — only applies when no squad exists yet for this booking,
+  // and only for a weekend (Sat/Sun) booking. Editing an existing draft
+  // (any status) is always allowed, and a weekday game is never gated by
+  // this window at all — Thu 8am governs the weekend lock-availability
+  // cron, which has nothing to do with a Monday/Tuesday/etc. fixture (see
+  // features/player-availability.md §4 — weekday games are fully isolated
+  // from weekend-scoped constraints elsewhere in the app too).
   // Window: blocked Mon–Wed and Thursday before 08:00 IST; allowed
   // Thursday 08:00 IST onward through Sunday — but only for the booking
   // whose own game_date is the weekend that window governs. Without this,
@@ -153,30 +159,33 @@ export async function POST(req: NextRequest) {
   // thereby freeze — see the lock write below) a squad for a weekend
   // still over a week out, well before that weekend's own Thursday.
   if (currentRows.length === 0) {
-    const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000)
-    const day     = nowIST.getDay()   // 0=Sun .. 6=Sat
-    const hour    = nowIST.getHours()
-    const isBlockedWindow = (day >= 1 && day <= 3) || (day === 4 && hour < 8)
-    if (isBlockedWindow) {
-      return NextResponse.json(
-        { error: 'Squad selection opens Thursday 08:00 IST' },
-        { status: 403 }
-      )
-    }
-
-    const { data: bookingRow } = await supabase
+    const { data: newSquadBooking } = await supabase
       .from('bookings')
       .select('game_date')
       .eq('id', booking_id)
       .single()
-    const activeWeekend = getActiveLockWeekend(nowIST)
-    const isActiveWeekend = !!bookingRow &&
-      (bookingRow.game_date === activeWeekend.saturday || bookingRow.game_date === activeWeekend.sunday)
-    if (!isActiveWeekend) {
-      return NextResponse.json(
-        { error: 'Squad selection for this match opens on the Thursday before its own weekend' },
-        { status: 403 }
-      )
+
+    if (newSquadBooking && isWeekend(newSquadBooking.game_date)) {
+      const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000)
+      const day     = nowIST.getDay()   // 0=Sun .. 6=Sat
+      const hour    = nowIST.getHours()
+      const isBlockedWindow = (day >= 1 && day <= 3) || (day === 4 && hour < 8)
+      if (isBlockedWindow) {
+        return NextResponse.json(
+          { error: 'Squad selection opens Thursday 08:00 IST' },
+          { status: 403 }
+        )
+      }
+
+      const activeWeekend = getActiveLockWeekend(nowIST)
+      const isActiveWeekend =
+        newSquadBooking.game_date === activeWeekend.saturday || newSquadBooking.game_date === activeWeekend.sunday
+      if (!isActiveWeekend) {
+        return NextResponse.json(
+          { error: 'Squad selection for this match opens on the Thursday before its own weekend' },
+          { status: 403 }
+        )
+      }
     }
   }
 

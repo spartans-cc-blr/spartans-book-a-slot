@@ -365,8 +365,10 @@ if (player_ids.length > 0) {
 ```
 
 and, upstream of that, the first-draft time gate only allows creating a squad for a
-booking whose own `game_date` falls in the weekend currently open for selection
-(Thu 8am IST → Sun), via `getActiveLockWeekend()` — not just "today is Thu–Sun."
+**weekend** booking (`isWeekend(game_date)`) whose own `game_date` falls in the weekend
+currently open for selection (Thu 8am IST → Sun), via `getActiveLockWeekend()` — not just
+"today is Thu–Sun." A weekday booking skips this gate entirely, at any time — see
+`features/squad-selection.md` §4's September 2026 incident note for why.
 
 > ⚠️ **Incident (28 Jul 2026) — this trigger existed undocumented and unscoped since
 > squad selection shipped, and it froze a booking more than a week early.**

@@ -31,7 +31,7 @@ export function getWeekendDates(dateStr: string): string[] {
   ]
 }
 
-function isWeekend(dateStr: string): boolean {
+export function isWeekend(dateStr: string): boolean {
   const day = parseISO(dateStr).getDay()
   return day === 0 || day === 6 // 0 = Sunday, 6 = Saturday
 }
