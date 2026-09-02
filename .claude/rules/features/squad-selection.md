@@ -258,10 +258,25 @@ These are distinct. A player with `players.is_captain = false` can be designated
 - Deletes **all** existing rows for the booking regardless of status, then re-inserts with role flags
 - Hard cap of 12 enforced server-side
 - Validates that captain/vc/wk player IDs are all within `player_ids`
-- **Time gate (first draft only):** creating a squad where none exists yet is blocked Mon–Wed and
-  before Thu 8am IST, and — as of 28 Jul 2026 — also requires the booking's own `game_date` to be
-  in the weekend the Thu 8am–Sun window is currently governing (`getActiveLockWeekend()`).
-  Editing an already-existing draft is always allowed regardless of window.
+- **Time gate (first draft only, weekend bookings only):** creating a squad where none exists yet,
+  for a booking whose `game_date` falls on a Saturday or Sunday (`isWeekend()`, shared from
+  `src/lib/validation.ts`), is blocked Mon–Wed and before Thu 8am IST, and — as of 28 Jul 2026 —
+  also requires the booking's own `game_date` to be in the weekend the Thu 8am–Sun window is
+  currently governing (`getActiveLockWeekend()`). **A weekday (Mon–Fri) booking is never subject to
+  this gate at all** (fixed September 2026 — see the incident note below) — a captain can draft its
+  squad any day, since the Thursday lock-availability cron and its Sat/Sun-scoped window have
+  nothing to do with a weekday fixture (weekday games are already fully isolated from every other
+  weekend-scoped constraint in the app — see `features/player-availability.md` §4). Editing an
+  already-existing draft is always allowed regardless of window, for any day of week.
+
+  > **Incident (September 2026)** — the time gate checked only the calendar day/time when the
+  > request arrived, never the target booking's own `game_date`, until the `isBlockedWindow` check.
+  > A captain reported being unable to start a squad for a plain weekday fixture on a Monday, even
+  > though the gate's entire purpose (per the comment above it) is to keep a squad from freezing a
+  > *weekend* booking's availability more than a week early — a concern that doesn't exist for a
+  > weekday game, which was never part of the Thu 8am–Sun lock window to begin with. Fixed by
+  > fetching the booking's `game_date` first and skipping the whole gate (`isBlockedWindow` check
+  > and `getActiveLockWeekend()` check both) whenever `!isWeekend(game_date)`.
 - **Lock on draft save:** sets `bookings.availability_locked = true` the moment a *non-empty*
   draft is saved — this is a third freeze trigger alongside the Thursday cron and GC submission.
   See `features/player-availability.md` §10/§10.1 for the full freeze design and a 28 Jul 2026
