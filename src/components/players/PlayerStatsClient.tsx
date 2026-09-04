@@ -75,8 +75,15 @@ export function PlayerStatsClient({
   const [matches, setMatches] = useState<PlayerMatchHistoryRow[]>(initialMatches)
   const [loading, setLoading] = useState(false)
   const [statTab, setStatTab] = useState<StatTab>('batting')
+  // Batting-position bar chart selection — filters the Innings History
+  // table below across all three tabs (batting/bowling/fielding), not just
+  // Batting. Reset whenever the top-of-page filters change and pull in a
+  // new match set, since a position that had matches under the old filter
+  // may not exist at all under the new one.
+  const [selectedPosition, setSelectedPosition] = useState<number | null>(null)
 
   const fetchScoped = useCallback(async () => {
+    setSelectedPosition(null)
     if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain && innings.size === 2 && !includePractice) {
       setScoped(initialCareer)
       setMatches(initialMatches)
@@ -131,14 +138,40 @@ export function PlayerStatsClient({
 
   const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain || innings.size === 1 || includePractice
 
+  // Total runs scored at each batting position, across the currently
+  // filtered match set — independent of statTab, since the chart sits
+  // above and feeds all three tabs. Positions with no batting_order on
+  // record (a scorecard synced before that column existed, never
+  // re-synced since — see player-stats-batting-position.md) are simply
+  // excluded from the chart rather than shown as an unlabeled bucket.
+  const positionData = useMemo(() => {
+    const totals = new Map<number, number>()
+    for (const m of matches) {
+      if (!m.batting || m.batting.battingOrder == null) continue
+      totals.set(m.batting.battingOrder, (totals.get(m.batting.battingOrder) ?? 0) + m.batting.runs)
+    }
+    return Array.from(totals.entries())
+      .map(([position, runs]) => ({ position, runs }))
+      .sort((a, b) => a.position - b.position)
+  }, [matches])
+
+  const matchesForPosition = useMemo(
+    () => selectedPosition == null ? matches : matches.filter(m => m.batting?.battingOrder === selectedPosition),
+    [matches, selectedPosition],
+  )
+
   const tabMatches = useMemo(
-    () => matches.filter(m => {
+    () => matchesForPosition.filter(m => {
       if (statTab === 'batting') return !!m.batting
       if (statTab === 'bowling') return !!m.bowling
       return !!m.fielding && (m.fielding.catches > 0 || m.fielding.stumpings > 0 || m.fielding.runOuts > 0)
     }),
-    [matches, statTab],
+    [matchesForPosition, statTab],
   )
+
+  function togglePosition(position: number) {
+    setSelectedPosition(prev => prev === position ? null : position)
+  }
 
   return (
     <>
@@ -255,9 +288,26 @@ export function PlayerStatsClient({
           )}
         </div>
 
+        {/* Runs by batting position */}
+        {positionData.length > 0 && (
+          <div className="bg-white border border-parchment-3 rounded-2xl p-5 mb-5">
+            <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-1">Runs by Batting Position</h2>
+            <p className="font-rajdhani text-xs text-stone-500 mb-4">Tap a position to filter the innings history below.</p>
+            <BattingPositionChart data={positionData} selected={selectedPosition} onSelect={togglePosition} />
+          </div>
+        )}
+
         {/* Match by match */}
         <div className="bg-white border border-parchment-3 rounded-2xl p-5">
-          <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">Innings History</h2>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+            <h2 className="font-cinzel text-sm text-gold-dim font-semibold">Innings History</h2>
+            {selectedPosition != null && (
+              <button onClick={() => setSelectedPosition(null)}
+                className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded-full bg-gold/10 border border-gold-dim text-gold-dim hover:bg-gold/20 transition-colors">
+                Position {selectedPosition} ✕
+              </button>
+            )}
+          </div>
           <div className="flex gap-2 mb-4">
             {STAT_TABS.map(t => (
               <button key={t} onClick={() => setStatTab(t)}
@@ -295,6 +345,55 @@ function MvpStat({ label, value, color }: { label: string; value: number; color:
     <div className="text-center">
       <p className="font-rajdhani text-[9px] font-bold tracking-widest uppercase text-stone-500 mb-0.5">{label}</p>
       <p className={`font-cinzel text-base font-bold ${color}`}>{value.toFixed(2)}</p>
+    </div>
+  )
+}
+
+// Vertical column chart — batting position (1, 2, 3...) along the bottom,
+// total runs scored from that position rising up the bar. Each bar is a
+// real <button> (keyboard-operable, aria-pressed) rather than a div with an
+// onClick — tapping it toggles selectedPosition in the parent, which
+// filters Innings History below across all three stat tabs, not just
+// Batting. Runs values are always printed above the bar rather than shown
+// only on hover — this app is used outdoors on mobile (see ui-theme.md's
+// "daylight-first" principle), so nothing here depends on a hover state.
+function BattingPositionChart({
+  data, selected, onSelect,
+}: {
+  data: { position: number; runs: number }[]
+  selected: number | null
+  onSelect: (position: number) => void
+}) {
+  const max = Math.max(...data.map(d => d.runs), 1)
+  return (
+    <div className="flex items-end gap-1.5 sm:gap-2.5 h-36">
+      {data.map(({ position, runs }) => {
+        const isSelected = selected === position
+        const pct = Math.max((runs / max) * 100, runs > 0 ? 4 : 1.5)
+        return (
+          <button
+            key={position}
+            type="button"
+            aria-pressed={isSelected}
+            aria-label={`Batting position ${position} — ${runs} runs. Tap to ${isSelected ? 'clear filter' : 'filter innings history'}.`}
+            onClick={() => onSelect(position)}
+            className="flex-1 min-w-0 h-full flex flex-col items-center justify-end gap-1 group"
+          >
+            <span className={`font-rajdhani text-[10px] font-bold whitespace-nowrap ${isSelected ? 'text-blue-700' : 'text-stone-600'}`}>
+              {runs}
+            </span>
+            <div
+              style={{ height: `${pct}%` }}
+              className={`w-full rounded-t transition-colors ${
+                isSelected ? 'bg-blue-700' : 'bg-gold/50 group-hover:bg-gold/70'
+              }`}
+            />
+            <span className={`font-rajdhani text-[10px] font-bold uppercase whitespace-nowrap ${isSelected ? 'text-blue-700' : 'text-stone-500'}`}>
+              {position}
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }

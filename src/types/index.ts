@@ -324,6 +324,11 @@ export interface PlayerMatchHistoryRow {
   batting: {
     runs: number; balls: number; fours: number; sixes: number
     notOut: boolean; strikeRate: number | null; howOut: string | null
+    // batting_stats.batting_order from the analytics DB — the real
+    // scorecard "No." position. Null for rows synced before that column
+    // was captured, or a match never re-synced since. See
+    // .claude/rules/features/player-stats-batting-position.md.
+    battingOrder: number | null
   } | null
   bowling: {
     overs: string | number; dots: number; wickets: number; runsConceded: number; economy: number | null
