@@ -308,7 +308,7 @@ export function PlayerStatsClient({
               </button>
             )}
           </div>
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-3">
             {STAT_TABS.map(t => (
               <button key={t} onClick={() => setStatTab(t)}
                 className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors capitalize
@@ -317,6 +317,16 @@ export function PlayerStatsClient({
               </button>
             ))}
           </div>
+          {statTab === 'batting' && selectedPosition != null && (
+            <p className="font-rajdhani text-xs text-stone-500 mb-4">
+              {tabMatches.length} of {scoped.battingInnings} innings batted at Position {selectedPosition}
+            </p>
+          )}
+          {statTab === 'bowling' && (
+            <p className="font-rajdhani text-xs text-stone-500 mb-4">
+              {tabMatches.length} innings bowled
+            </p>
+          )}
           {loading ? (
             <p className="font-rajdhani text-sm text-stone-500">Loading…</p>
           ) : tabMatches.length === 0 ? (

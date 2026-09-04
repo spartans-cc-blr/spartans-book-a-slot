@@ -115,6 +115,30 @@ a position that had matches under the old filter set may not exist at all
 under the new one, so carrying a stale selection forward could silently
 produce an empty, confusing Innings History with no visible reason.
 
+### Innings-count line (added September 2026)
+
+Directly under the Batting/Bowling/Fielding tab row, above the table:
+
+- **Batting tab, only while a position is selected:**
+  `{tabMatches.length} of {scoped.battingInnings} innings batted at
+  Position {selectedPosition}` — `tabMatches.length` is the innings count
+  at that position (every row in it already has `battingOrder ===
+  selectedPosition` by construction), `scoped.battingInnings` is the
+  player's total batting-innings count under the page's top-of-page
+  filters *before* the position narrows it further — the same value
+  already shown in the Summary card's "Bat N · Bowl N" caption, so this
+  reuses existing state rather than a new aggregate.
+- **Bowling tab, always:** `{tabMatches.length} innings bowled` — a plain
+  count, not a fraction (bowling has no "position" concept to be a
+  fraction of). Reflects whatever match set is currently active, so it
+  narrows automatically when a batting position is selected too — showing
+  how many of the innings at that position also had a bowling line.
+- **Fielding tab:** no count line — not requested, and fielding dismissals
+  are already surfaced per-row in the table itself.
+
+Both lines are free reads off state the page already computes
+(`tabMatches`, `scoped.battingInnings`) — no new data fetch.
+
 ---
 
 ## 5. Security (vibe-security)
