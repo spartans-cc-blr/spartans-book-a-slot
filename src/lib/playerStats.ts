@@ -476,6 +476,7 @@ export async function getPlayerMatchHistory(
         notOut: bat.not_out === 'Y',
         strikeRate: num(bat.balls) > 0 ? round2((num(bat.runs) / num(bat.balls)) * 100) : null,
         howOut: bat.dismissal_method ?? null,
+        battingOrder: bat.batting_order != null ? num(bat.batting_order) : null,
       } : null,
       bowling: bowledThisMatch ? {
         overs: bowl.overs, dots: num(bowl.dots), wickets: num(bowl.wickets), runsConceded: num(bowl.runs),
