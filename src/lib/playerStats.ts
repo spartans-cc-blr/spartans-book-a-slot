@@ -558,8 +558,13 @@ export async function getLeaderboard(filters: { year?: number; month?: string; t
 // no includePractice flag, so practice games are excluded by default, same
 // as every other Detailed table/card. Capped to positions 1-12 (a batting
 // order value outside that range would be a data anomaly, not a real
-// position) and tie-inclusive at the top of each position — see
-// BattingPositionLeader's doc comment in src/types/index.ts.
+// position).
+//
+// Tie-break on runs: whoever scored the same total in fewer innings at
+// that position wins (the more efficient knock) — not shown side by side.
+// Only if runs AND innings both tie is more than one name ever returned,
+// same tie-inclusive fallback bestByAll() (leaderboardMilestones.ts) uses
+// when there's genuinely nothing left to break a tie on.
 export async function getTopScorersByBattingPosition(
   filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
 ): Promise<BattingPositionLeader[]> {
@@ -576,28 +581,29 @@ export async function getTopScorersByBattingPosition(
     return scoped ? q.in('match_id', scoped) : q
   })
 
-  // Sum runs per (position, player_id).
-  const totalsByPosition = new Map<number, Map<string, number>>()
+  // Sum runs and count innings per (position, player_id).
+  const totalsByPosition = new Map<number, Map<string, { runs: number; innings: number }>>()
   for (const r of battingRows as any[]) {
     if (!r.batted) continue
     const position = num(r.batting_order)
     if (!Number.isInteger(position) || position < 1 || position > 12) continue
     if (!totalsByPosition.has(position)) totalsByPosition.set(position, new Map())
     const byPlayer = totalsByPosition.get(position)!
-    byPlayer.set(r.player_id, (byPlayer.get(r.player_id) ?? 0) + num(r.runs))
+    const prev = byPlayer.get(r.player_id) ?? { runs: 0, innings: 0 }
+    byPlayer.set(r.player_id, { runs: prev.runs + num(r.runs), innings: prev.innings + 1 })
   }
   if (totalsByPosition.size === 0) return []
 
-  // Tie-inclusive: every player tied for the max at a position, not an
-  // arbitrary single pick — same convention bestByAll() in
-  // leaderboardMilestones.ts established after a real single-winner bug.
   const leaders: { position: number; runs: number; playerIds: string[] }[] = []
   const allPlayerIds = new Set<string>()
   for (const [position, byPlayer] of Array.from(totalsByPosition)) {
-    const max = Math.max(...Array.from(byPlayer.values()))
-    const top = Array.from(byPlayer.entries()).filter(([, runs]) => runs === max).map(([playerId]) => playerId)
+    const entries = Array.from(byPlayer.entries())
+    const maxRuns = Math.max(...entries.map(([, v]) => v.runs))
+    const tiedOnRuns = entries.filter(([, v]) => v.runs === maxRuns)
+    const minInnings = Math.min(...tiedOnRuns.map(([, v]) => v.innings))
+    const top = tiedOnRuns.filter(([, v]) => v.innings === minInnings).map(([playerId]) => playerId)
     top.forEach(id => allPlayerIds.add(id))
-    leaders.push({ position, runs: max, playerIds: top })
+    leaders.push({ position, runs: maxRuns, playerIds: top })
   }
 
   const hub = createServiceClient()

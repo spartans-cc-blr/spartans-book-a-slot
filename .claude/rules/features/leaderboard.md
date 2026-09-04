@@ -301,16 +301,18 @@ is no click-to-filter here: `LeaderboardTable` already shows one row per
 position" has no natural target to narrow down to.
 
 **Data — `getTopScorersByBattingPosition()`** (`src/lib/playerStats.ts`):
-sums `batting_stats.runs` per `(batting_order, player_id)` across the same
-match scope `getScopedMatchIds()` gives `getLeaderboard()` — no
-`includePractice` flag, so practice games are excluded by default, same as
-every other Detailed card/table on this page. For each position, the
-player(s) with the max total are kept — **tie-inclusive**, the same
-convention `bestByAll()` (`leaderboardMilestones.ts`, §4) established after
-a real single-winner-pick bug on the Overall tab's Most 100s card. A
-position with no batting_order data on record at all (see
-`player-stats-batting-position.md` §2 for why some analytics rows still
-lack it) simply has no entry — never a fabricated zero bar.
+sums `batting_stats.runs` **and** counts innings per `(batting_order,
+player_id)` across the same match scope `getScopedMatchIds()` gives
+`getLeaderboard()` — no `includePractice` flag, so practice games are
+excluded by default, same as every other Detailed card/table on this page.
+For each position, the max total wins; **a runs tie is broken by fewest
+innings** (the more efficient knock — fewer innings to reach the same
+total). `players` holds more than one name only if a pair is still tied on
+*both* runs and innings — the tie-inclusive fallback `bestByAll()`
+(`leaderboardMilestones.ts`, §4) uses when there's genuinely nothing left
+to break a tie on. A position with no batting_order data on record at all
+(see `player-stats-batting-position.md` §2 for why some analytics rows
+still lack it) simply has no entry — never a fabricated zero bar.
 
 **UI — `BattingPositionLeaders.tsx`:** plain component, no `'use client'`
 — nothing here is interactive, so unlike `LeaderboardTable.tsx` it doesn't

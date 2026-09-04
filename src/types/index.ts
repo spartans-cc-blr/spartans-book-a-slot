@@ -248,10 +248,12 @@ export interface LeaderboardRow {
   halfCenturies: number
 }
 
-// Top run-scorer(s) at one batting position (1-12), aggregated across the
-// currently-filtered match set on /leaderboard's Detailed → Bat tab. Tie-
-// inclusive — `players` holds every player tied for the max, same
-// convention as bestByAll() in src/lib/leaderboardMilestones.ts. See
+// Top run-scorer at one batting position (1-12), aggregated across the
+// currently-filtered match set on /leaderboard's Detailed → Bat tab. A
+// runs tie is broken by fewest innings (the more efficient knock) —
+// `players` holds more than one entry only if both runs AND innings are
+// still tied, the tie-inclusive fallback bestByAll() in
+// src/lib/leaderboardMilestones.ts uses in the same situation. See
 // features/leaderboard.md's "Runs by Batting Position" section.
 export interface BattingPositionLeader {
   position: number
