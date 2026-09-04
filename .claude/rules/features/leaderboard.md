@@ -287,6 +287,43 @@ so an early-season "everyone's tied at 0" state never produces a card.
 
 ---
 
+## 6.1 Runs by Batting Position (Detailed → Bat) — added September 2026
+
+A horizontal bar chart rendered above `LeaderboardTable` on Detailed → Bat
+only (`category === 'batting'`) — one bar per batting position (capped
+1-12), showing whoever leads runs at that position for the currently
+applied Year/Tournament/Ground/Format filters (the exact same
+`overallFilters` scope `rows`/the table itself already uses, so the two
+never disagree). Pure display — unlike the per-player chart on
+`/players/[id]/stats` (`features/player-stats-batting-position.md`), there
+is no click-to-filter here: `LeaderboardTable` already shows one row per
+*player's season aggregate*, not per-innings, so "filter the table to this
+position" has no natural target to narrow down to.
+
+**Data — `getTopScorersByBattingPosition()`** (`src/lib/playerStats.ts`):
+sums `batting_stats.runs` per `(batting_order, player_id)` across the same
+match scope `getScopedMatchIds()` gives `getLeaderboard()` — no
+`includePractice` flag, so practice games are excluded by default, same as
+every other Detailed card/table on this page. For each position, the
+player(s) with the max total are kept — **tie-inclusive**, the same
+convention `bestByAll()` (`leaderboardMilestones.ts`, §4) established after
+a real single-winner-pick bug on the Overall tab's Most 100s card. A
+position with no batting_order data on record at all (see
+`player-stats-batting-position.md` §2 for why some analytics rows still
+lack it) simply has no entry — never a fabricated zero bar.
+
+**UI — `BattingPositionLeaders.tsx`:** plain component, no `'use client'`
+— nothing here is interactive, so unlike `LeaderboardTable.tsx` it doesn't
+need the client boundary. Each row is a horizontal progress-bar shape
+(track `bg-ink-4`, fill `bg-gold/40` sized to that position's runs relative
+to the chart's own max), with the leader's name(s) — `PlayerNameLink`,
+comma-joined on a tie — and their run total overlaid as text rather than
+placed outside the bar, since a name can be longer than a short bar's
+fill width. Hidden entirely (not shown empty) when the aggregate comes
+back with zero positions for the current filter.
+
+---
+
 ## 7. Architecture — `src/lib/leaderboardMilestones.ts`
 
 Plain module, deliberately **not** `'use client'` and **not** importing
@@ -418,8 +455,9 @@ multi-player analytics query added to this file without the same
 
 | File | Role |
 |---|---|
-| `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`), glossary building |
-| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10); `fetchAllRows()` pages every multi-row analytics-DB read past PostgREST's default 1000-row cap (§8.1) |
+| `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`, `getTopScorersByBattingPosition` for Detailed → Bat only — §6.1), glossary building |
+| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), `getTopScorersByBattingPosition()` (§6.1), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10); `fetchAllRows()` pages every multi-row analytics-DB read past PostgREST's default 1000-row cap (§8.1) |
+| `src/components/leaderboard/BattingPositionLeaders.tsx` | Detailed → Bat only — horizontal bar chart of the leading run-scorer(s) per batting position (§6.1) |
 | `src/components/players/PlayerStatsClient.tsx` | `/players/[id]/stats` filter bar — Year/Ground/Format/As Captain/Defending/Chasing, plus the "Include Practice Games" opt-in (§10) |
 | `src/app/api/players/[id]/match-history/route.ts` | Feeds `PlayerStatsClient.tsx` — parses `practice=1` into `includePractice` (§10) |
 | `supabase/migrations/054_tournament_is_practice.sql` | `tournaments.is_practice` flag (§10) |
@@ -434,7 +472,7 @@ multi-player analytics query added to this file without the same
 | `src/components/leaderboard/PlayerAvatar.tsx` | Shared avatar (photo or initials) used across every card/row on this page |
 | `src/components/leaderboard/WicketIcon.tsx` | 3-wicket-haul icon — used by `LeaderboardMonthly.tsx`'s 3-Wicket Hauls panel (restored, §5.1) and by `MilestoneCelebrationModal.tsx`'s unrelated 3-wicket badge (`features/milestone-recognition.md`); not used by `LeaderboardMilestones.tsx` (Overall stays trimmed) |
 | `src/components/matches/BallIcon.tsx` | Gold-ball icon reused here for the 5-Wicket Hauls band header |
-| `src/types/index.ts` | `LeaderboardRow`, `MonthlyInnings`, `MonthlyBowlingInnings` |
+| `src/types/index.ts` | `LeaderboardRow`, `MonthlyInnings`, `MonthlyBowlingInnings`, `BattingPositionLeader` (§6.1) |
 
 ---
 

@@ -248,6 +248,17 @@ export interface LeaderboardRow {
   halfCenturies: number
 }
 
+// Top run-scorer(s) at one batting position (1-12), aggregated across the
+// currently-filtered match set on /leaderboard's Detailed → Bat tab. Tie-
+// inclusive — `players` holds every player tied for the max, same
+// convention as bestByAll() in src/lib/leaderboardMilestones.ts. See
+// features/leaderboard.md's "Runs by Batting Position" section.
+export interface BattingPositionLeader {
+  position: number
+  runs:     number
+  players:  { playerId: string; playerName: string; cricheroesUrl: string | null }[]
+}
+
 export interface RecentForm {
   matches: number
   runs:    number

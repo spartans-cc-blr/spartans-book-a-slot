@@ -2,10 +2,11 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances } from '@/lib/playerStats'
+import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances, getTopScorersByBattingPosition } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { LeaderboardFilters, type LeaderboardCategory, type Format, type InningsKey } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
+import { BattingPositionLeaders } from '@/components/leaderboard/BattingPositionLeaders'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
 import { LeaderboardGlossary } from '@/components/leaderboard/LeaderboardGlossary'
@@ -145,6 +146,11 @@ export default async function LeaderboardPage({
   const scoped = !!(tournamentName || groundName)
   const yearlyPerformances = category === 'overall' && (year !== 'all' || scoped) ? await getPerformances({ ...overallFilters, includePractice: true }) : null
 
+  // Bar chart above Detailed → Bat — leading run-scorer(s) at each batting
+  // position, same scope as `rows` (overallFilters, practice excluded by
+  // default). See features/leaderboard.md.
+  const battingPositionLeaders = category === 'batting' ? await getTopScorersByBattingPosition(overallFilters) : null
+
   const glossaryTitle = category === 'overall' ? 'Overall'
     : category === 'monthly' ? 'Monthly'
     : detailedGlossaryTitle(category)
@@ -221,7 +227,12 @@ export default async function LeaderboardPage({
             monthLabel={monthLabel(month)}
           />
         ) : (
-          <LeaderboardTable key={category} rows={rows} category={category} tournamentFiltered={tournamentId !== 'all'} />
+          <>
+            {battingPositionLeaders && battingPositionLeaders.length > 0 && (
+              <BattingPositionLeaders leaders={battingPositionLeaders} />
+            )}
+            <LeaderboardTable key={category} rows={rows} category={category} tournamentFiltered={tournamentId !== 'all'} />
+          </>
         )}
 
         <p className="font-rajdhani text-xs text-zinc-500 text-center mt-8 px-4">
