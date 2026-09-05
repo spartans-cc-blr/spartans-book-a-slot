@@ -435,39 +435,9 @@ export async function getPlayerMatchHistory(
   if (bookingErr) throw new Error(bookingErr.message)
   const bookingByMatchId = new Map((bookingRows ?? []).map((b: any) => [b.match_id, b]))
 
-  // Keyed by match_id alone (not match_id+player_name) — deliberately, since
-  // this map is per-match detail for one already-resolved playerId, and a
-  // player has at most one real innings/spell per match. But a player can
-  // legitimately have *two* scorecard-name rows for the same match here: if
-  // CricHeroes lists them under two different name spellings in one match
-  // (e.g. "Sagar" and "Sagar S"), and both names are separately aliased to
-  // the same Hub player_id via player_name_aliases (see
-  // player-identity-resolution.md), fetchAnalyticsRows returns both rows for
-  // this one match_id. A plain `new Map(rows.map(r => [r.match_id, r]))`
-  // keeps whichever row is last in array order (rows are ordered by
-  // player_name — alphabetically later, not necessarily the real one),
-  // which can silently overwrite a real 32-run/4-wicket innings with an
-  // all-zero duplicate row and make the whole match vanish from this
-  // player's history. Real incident: match_id 24477742, Gunasagar aliased
-  // under both "Sagar" (batted, 32 runs, 4 wickets) and "Sagar S" (all
-  // zeros) — fixed by always preferring the row that shows real
-  // participation over one that doesn't, regardless of array order.
-  const battingByMatch  = new Map<string, any>()
-  for (const r of batting) {
-    const prev = battingByMatch.get(r.match_id)
-    if (!prev || (r.batted && !prev.batted)) battingByMatch.set(r.match_id, r)
-  }
-  const bowlingByMatch  = new Map<string, any>()
-  for (const r of bowling) {
-    const prev = bowlingByMatch.get(r.match_id)
-    if (!prev || (r.did_bowl && !prev.did_bowl)) bowlingByMatch.set(r.match_id, r)
-  }
-  const fieldingDismissals = (r: any) => num(r.catches) + num(r.caught_behind) + num(r.run_outs) + num(r.stumpings)
-  const fieldingByMatch = new Map<string, any>()
-  for (const r of fielding) {
-    const prev = fieldingByMatch.get(r.match_id)
-    if (!prev || fieldingDismissals(r) > fieldingDismissals(prev)) fieldingByMatch.set(r.match_id, r)
-  }
+  const battingByMatch  = new Map(batting.map((r: any) => [r.match_id, r]))
+  const bowlingByMatch  = new Map(bowling.map((r: any) => [r.match_id, r]))
+  const fieldingByMatch = new Map(fielding.map((r: any) => [r.match_id, r]))
 
   // Sort match_ids by date+time (most recent first) before building the
   // final rows — game_date alone can't break a tie between two matches
@@ -584,17 +554,21 @@ export async function getLeaderboard(filters: { year?: number; month?: string; t
 }
 
 // Top run-scorer(s) at each batting position, for the bar chart above
-// Detailed → Bat on /leaderboard. Same match scope as getLeaderboard() —
-// no includePractice flag, so practice games are excluded by default, same
-// as every other Detailed table/card. Capped to positions 1-12 (a batting
-// order value outside that range would be a data anomaly, not a real
-// position).
+// Detailed → Bat on /leaderboard and the "Top 3 at Position N" modal it
+// opens on tap. Same match scope as getLeaderboard() — no includePractice
+// flag, so practice games are excluded by default, same as every other
+// Detailed table/card. Capped to positions 1-12 (a batting order value
+// outside that range would be a data anomaly, not a real position).
 //
-// Tie-break on runs: whoever scored the same total in fewer innings at
-// that position wins (the more efficient knock) — not shown side by side.
-// Only if runs AND innings both tie is more than one name ever returned,
-// same tie-inclusive fallback bestByAll() (leaderboardMilestones.ts) uses
-// when there's genuinely nothing left to break a tie on.
+// Ranking at every rank (not just 1st): runs desc, fewest innings as
+// tiebreak (the more efficient knock). A rank is a genuine tie — shares one
+// podium spot and can list more than one player — only when both runs AND
+// innings match exactly; same tie-inclusive fallback bestByAll()
+// (leaderboardMilestones.ts) uses when there's nothing left to break a tie
+// on. `topThree` normally holds 3 ranks, occasionally more rows within the
+// 3rd rank on a genuine tie there — never fewer than 3 ranks are considered
+// when picking who's in, but a position with under 3 distinct performances
+// just returns however many it has.
 export async function getTopScorersByBattingPosition(
   filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
 ): Promise<BattingPositionLeader[]> {
@@ -624,16 +598,23 @@ export async function getTopScorersByBattingPosition(
   }
   if (totalsByPosition.size === 0) return []
 
-  const leaders: { position: number; runs: number; playerIds: string[] }[] = []
+  // Group players by identical (runs, innings) — a genuine tie, sharing one
+  // podium rank — then sort those tiers runs desc, innings asc, and keep
+  // the top 3.
+  const leaders: { position: number; tiers: { runs: number; innings: number; playerIds: string[] }[] }[] = []
   const allPlayerIds = new Set<string>()
   for (const [position, byPlayer] of Array.from(totalsByPosition)) {
-    const entries = Array.from(byPlayer.entries())
-    const maxRuns = Math.max(...entries.map(([, v]) => v.runs))
-    const tiedOnRuns = entries.filter(([, v]) => v.runs === maxRuns)
-    const minInnings = Math.min(...tiedOnRuns.map(([, v]) => v.innings))
-    const top = tiedOnRuns.filter(([, v]) => v.innings === minInnings).map(([playerId]) => playerId)
-    top.forEach(id => allPlayerIds.add(id))
-    leaders.push({ position, runs: maxRuns, playerIds: top })
+    const byTuple = new Map<string, { runs: number; innings: number; playerIds: string[] }>()
+    for (const [playerId, v] of Array.from(byPlayer.entries())) {
+      const key = `${v.runs}:${v.innings}`
+      if (!byTuple.has(key)) byTuple.set(key, { runs: v.runs, innings: v.innings, playerIds: [] })
+      byTuple.get(key)!.playerIds.push(playerId)
+    }
+    const tiers = Array.from(byTuple.values())
+      .sort((a, b) => b.runs - a.runs || a.innings - b.innings)
+      .slice(0, 3)
+    tiers.forEach(t => t.playerIds.forEach(id => allPlayerIds.add(id)))
+    leaders.push({ position, tiers })
   }
 
   const hub = createServiceClient()
@@ -641,18 +622,29 @@ export async function getTopScorersByBattingPosition(
   if (error) throw new Error(error.message)
   const playerById = new Map((players ?? []).map((p: any) => [p.id, p]))
 
+  // Reconciled to a player_id no longer in Hub — same skip as
+  // getLeaderboard() rather than attributing runs to an unverifiable name.
+  function resolvePlayers(ids: string[]) {
+    return ids
+      .map(id => playerById.get(id))
+      .filter((p): p is { id: string; name: string; cricheroes_url: string | null } => !!p)
+      .map(p => ({ playerId: p.id, playerName: p.name, cricheroesUrl: p.cricheroes_url ?? null }))
+  }
+
   return leaders
-    .map(l => ({
-      position: l.position,
-      runs: l.runs,
-      // Reconciled to a player_id no longer in Hub — same skip as
-      // getLeaderboard() rather than attributing runs to an unverifiable name.
-      players: l.playerIds
-        .map(id => playerById.get(id))
-        .filter((p): p is { id: string; name: string; cricheroes_url: string | null } => !!p)
-        .map(p => ({ playerId: p.id, playerName: p.name, cricheroesUrl: p.cricheroes_url ?? null })),
-    }))
-    .filter(l => l.players.length > 0)
+    .map(l => {
+      // Rank is assigned after resolving/filtering, not before — a tier
+      // that resolves to zero real players (rare: every one of them was
+      // later deleted from Hub) is dropped entirely rather than leaving a
+      // gap in the podium numbering (e.g. rank 1 missing, jumping to 2).
+      const resolvedTiers = l.tiers
+        .map(t => ({ runs: t.runs, innings: t.innings, players: resolvePlayers(t.playerIds) }))
+        .filter(t => t.players.length > 0)
+      if (resolvedTiers.length === 0) return null
+      const topThree = resolvedTiers.map((t, i) => ({ rank: i + 1, ...t }))
+      return { position: l.position, runs: topThree[0].runs, players: topThree[0].players, topThree }
+    })
+    .filter((l): l is BattingPositionLeader => l !== null)
     .sort((a, b) => a.position - b.position)
 }
 

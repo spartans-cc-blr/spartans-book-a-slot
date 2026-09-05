@@ -248,17 +248,35 @@ export interface LeaderboardRow {
   halfCenturies: number
 }
 
-// Top run-scorer at one batting position (1-12), aggregated across the
-// currently-filtered match set on /leaderboard's Detailed → Bat tab. A
-// runs tie is broken by fewest innings (the more efficient knock) —
-// `players` holds more than one entry only if both runs AND innings are
-// still tied, the tie-inclusive fallback bestByAll() in
-// src/lib/leaderboardMilestones.ts uses in the same situation. See
-// features/leaderboard.md's "Runs by Batting Position" section.
+// One ranked tier of the batting-position leaderboard (see
+// BattingPositionLeader below) — `rank` is a podium position (1/2/3), not a
+// row index, so a genuine tie (same runs AND same innings) shares one rank
+// and can carry more than one player rather than being arbitrarily split
+// across two ranks.
+export interface BattingPositionRankEntry {
+  rank:    number
+  runs:    number
+  innings: number
+  players: { playerId: string; playerName: string; cricheroesUrl: string | null }[]
+}
+
+// Top run-scorer(s) at one batting position (1-12), aggregated across the
+// currently-filtered match set on /leaderboard's Detailed → Bat tab. `runs`/
+// `players` mirror `topThree[0]` — kept flat for the bar chart itself, which
+// only ever shows the outright leader. `topThree` is the fuller ranking
+// (1-3 tiers, occasionally more rows within a tier on a genuine tie) shown
+// in the "Top 3 at Position N" modal when a bar is tapped. A runs tie is
+// broken by fewest innings (the more efficient knock) at every rank, same
+// rule the modal and the bar chart share; a tier holds more than one player
+// only when both runs AND innings are still tied — the tie-inclusive
+// fallback bestByAll() in src/lib/leaderboardMilestones.ts uses in the same
+// situation. See features/leaderboard.md's "Runs by Batting Position"
+// section.
 export interface BattingPositionLeader {
   position: number
   runs:     number
   players:  { playerId: string; playerName: string; cricheroesUrl: string | null }[]
+  topThree: BattingPositionRankEntry[]
 }
 
 export interface RecentForm {
