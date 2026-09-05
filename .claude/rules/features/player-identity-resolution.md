@@ -212,6 +212,14 @@ go ask the player to link their profile first.
   the old case-insensitive name match only when `player_id` is absent
   (unreconciled historical rows degrade gracefully rather than losing the
   link entirely).
+- `src/lib/playerStats.ts` — `getPlayerMatchHistory()` reads `batting_stats`/
+  `bowling_stats`/`fielding_stats` filtered by `player_id` directly (the
+  `/players/[id]/stats` full match-by-match view). Since a single Hub player
+  can have more than one `player_name_aliases` row (CricHeroes has used more
+  than one spelling for them across different matches), a match where both
+  spellings appear on the same scorecard resolves to *two* rows sharing one
+  `(match_id, player_id)` — see §5.2 for the incident this caused and the
+  fix.
 
 ---
 
@@ -271,6 +279,66 @@ that's already cached and stale (that's what `resyncBookingsForMatchIds()`
 and the admin `confirm`/`reconcile` flows are for). It also doesn't newly
 resolve anything for a name CricHeroes has never shown before — that
 genuinely needs an admin's one-time confirm, exactly as before.
+
+---
+
+## 5.2 Two aliases resolving to one player within the same match (fixed 5 Sep 2026)
+
+**Symptom:** match_id `24477742` (Mario Turner Flash 5 vs Concorde ManU, 16
+Aug 2026 — a real 32-run, 4-wicket performance) was completely missing from
+Gunasagar's `/players/[id]/stats` match history, on every tab (Batting,
+Bowling, Fielding) — not shown with wrong numbers, just absent entirely.
+
+**Root cause:** `player_name_aliases` correctly has *two* separate rows
+pointing at Gunasagar's Hub `player_id` — `"Sagar"` and `"Sagar S"` — both
+confirmed legitimately at different times via `/admin/player-reconciliation`,
+since CricHeroes has used both spellings for him across different matches.
+This one match's CricHeroes scorecard happened to carry rows for *both*
+name spellings (`"Sagar"`: batted, 32 runs, 4 wickets; `"Sagar S"`: an
+all-zero, non-participating row) — so once resolved, `batting_stats` and
+`bowling_stats` in the analytics DB each end up with **two rows sharing the
+same `(match_id, player_id)`**, one real and one a zeroed duplicate.
+
+`getPlayerMatchHistory()` (`src/lib/playerStats.ts`) built its per-match
+lookup as a plain `new Map(rows.map(r => [r.match_id, r]))`. `fetchAnalyticsRows()`
+orders every table by `player_name` ascending, so `"Sagar"` (the real
+innings) sorted *before* `"Sagar S"` (the zero row) — and a `Map`, keyed
+only by `match_id`, keeps whichever entry is inserted *last*. The zero row
+silently overwrote the real one, so `bat.batted`/`bowl.did_bowl` both read
+`false` for this match, `m.batting`/`m.bowling` both resolved to `null`, and
+`PlayerStatsClient.tsx`'s per-tab filter (`!!m.batting` / `!!m.bowling`)
+dropped the match from every tab — not a display-only miscount, the whole
+match vanished.
+
+No data was wrong — `player_name_aliases`, `batting_stats`, `bowling_stats`,
+and the confirmed Hub `booking` all had correct, complete data throughout.
+This was purely an application-layer read bug, same class as
+`features/leaderboard.md` §8.1's PostgREST-row-cap incident: the analytics
+DB is the source of truth, and the DB doesn't need fixing, only the code
+reading it.
+
+**Fix:** `battingByMatch`/`bowlingByMatch`/`fieldingByMatch` in
+`getPlayerMatchHistory()` no longer use last-wins `Map` construction. Each
+is built by iterating rows explicitly and only overwriting an existing
+entry for a `match_id` when the new row shows *more* real participation
+than the one already stored (`r.batted && !prev.batted` for batting,
+`r.did_bowl && !prev.did_bowl` for bowling, a higher total dismissal count
+for fielding) — so a real innings/spell can never be silently replaced by a
+zeroed duplicate row, regardless of alphabetical row order. This is a
+general fix, not specific to Gunasagar — it protects any player who ends up
+with two (or more) scorecard-name aliases that both surface in the same
+match.
+
+**Deliberately not touched:** `aggregate()` (career/season totals) and
+`getLeaderboard()` still sum every row in the fetched `batting`/`bowling`/
+`fielding` arrays without deduping by `(match_id, player_id)` — harmless
+here since the duplicate row was all zeros (summing it added nothing), but
+it means a *hypothetical* future case where a player's two aliased names
+both carry non-zero stats in the same match would double-count their
+totals. Not fixed as part of this pass — no such case has actually been
+observed, and de-risking `aggregate()`/`getLeaderboard()` against it is a
+separate, broader change than the reported symptom (an invisible match)
+required. Worth revisiting if a real double-counted total is ever reported.
 
 ---
 
