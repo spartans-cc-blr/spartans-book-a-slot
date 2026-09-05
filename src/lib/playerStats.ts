@@ -435,9 +435,39 @@ export async function getPlayerMatchHistory(
   if (bookingErr) throw new Error(bookingErr.message)
   const bookingByMatchId = new Map((bookingRows ?? []).map((b: any) => [b.match_id, b]))
 
-  const battingByMatch  = new Map(batting.map((r: any) => [r.match_id, r]))
-  const bowlingByMatch  = new Map(bowling.map((r: any) => [r.match_id, r]))
-  const fieldingByMatch = new Map(fielding.map((r: any) => [r.match_id, r]))
+  // Keyed by match_id alone (not match_id+player_name) — deliberately, since
+  // this map is per-match detail for one already-resolved playerId, and a
+  // player has at most one real innings/spell per match. But a player can
+  // legitimately have *two* scorecard-name rows for the same match here: if
+  // CricHeroes lists them under two different name spellings in one match
+  // (e.g. "Sagar" and "Sagar S"), and both names are separately aliased to
+  // the same Hub player_id via player_name_aliases (see
+  // player-identity-resolution.md), fetchAnalyticsRows returns both rows for
+  // this one match_id. A plain `new Map(rows.map(r => [r.match_id, r]))`
+  // keeps whichever row is last in array order (rows are ordered by
+  // player_name — alphabetically later, not necessarily the real one),
+  // which can silently overwrite a real 32-run/4-wicket innings with an
+  // all-zero duplicate row and make the whole match vanish from this
+  // player's history. Real incident: match_id 24477742, Gunasagar aliased
+  // under both "Sagar" (batted, 32 runs, 4 wickets) and "Sagar S" (all
+  // zeros) — fixed by always preferring the row that shows real
+  // participation over one that doesn't, regardless of array order.
+  const battingByMatch  = new Map<string, any>()
+  for (const r of batting) {
+    const prev = battingByMatch.get(r.match_id)
+    if (!prev || (r.batted && !prev.batted)) battingByMatch.set(r.match_id, r)
+  }
+  const bowlingByMatch  = new Map<string, any>()
+  for (const r of bowling) {
+    const prev = bowlingByMatch.get(r.match_id)
+    if (!prev || (r.did_bowl && !prev.did_bowl)) bowlingByMatch.set(r.match_id, r)
+  }
+  const fieldingDismissals = (r: any) => num(r.catches) + num(r.caught_behind) + num(r.run_outs) + num(r.stumpings)
+  const fieldingByMatch = new Map<string, any>()
+  for (const r of fielding) {
+    const prev = fieldingByMatch.get(r.match_id)
+    if (!prev || fieldingDismissals(r) > fieldingDismissals(prev)) fieldingByMatch.set(r.match_id, r)
+  }
 
   // Sort match_ids by date+time (most recent first) before building the
   // final rows — game_date alone can't break a tie between two matches
