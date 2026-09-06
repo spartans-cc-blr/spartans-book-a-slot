@@ -457,27 +457,38 @@ Every classic FOW fact (cumulative score, over, who got out) is already
 recoverable from a partnership row, so a second list underneath would just
 show the same wickets again in a less useful format. The one value carried
 over from the raw FOW convention is the over the partnership *ended*
-(`overTo`), printed next to the runs value; `overFrom` is computed by
-`computePartnerships()` but not surfaced here (available if a future view
-needs the span). "Score" (cumulative team total) was considered and
-deliberately dropped — it's recoverable by summing the runs values
-top-to-bottom and is shown elsewhere on the card already; the interesting
-fact here is stand size, not running total.
+(`overTo`), printed next to the runs value — but see the ball-count fix
+below for how it's actually rendered. "Score" (cumulative team total) was
+considered and deliberately dropped — it's recoverable by summing the
+runs values top-to-bottom and is shown elsewhere on the card already; the
+interesting fact here is stand size, not running total.
 
-**Shown as a ball count, not `X.Y ov` (fixed shortly after the previous UI
-pass, September 2026).** CricHeroes' own overs.balls notation (`9.2` = 9
-overs and 2 balls, never a true decimal) reads fine on a full scorecard
-but was awkward compressed onto a narrow partnership bar next to a runs
-value. `oversToBalls()` (a local helper, same file) converts `overTo` into
-a plain ball count — `56` instead of `9.2 ov`, with no unit suffix in the
-UI (a bare number reads as balls by default in this context; the label
-was judged to only add clutter). Parses the value as a
-**string**, not float subtraction (`over - Math.floor(over)`): `over` can
-arrive from Supabase as a numeric-typed string, and subtracting the whole
-part in floating point reintroduces exactly the precision error this is
-meant to avoid (`9.2 - 9` → `0.19999999999999982` in JS, not `0.2`).
-`overFrom` isn't rendered here at all (see above), so it was never
-converted.
+**Shown as a ball *span*, not `X.Y ov` (fixed shortly after the previous UI
+pass, September 2026).** Two separate fixes, made together once real data
+was on screen:
+- CricHeroes' own overs.balls notation (`9.2` = 9 overs and 2 balls, never
+  a true decimal) reads fine on a full scorecard but was awkward compressed
+  onto a narrow partnership bar next to a runs value. `oversToBalls()` (a
+  local helper, same file) converts an over value into a plain ball
+  count — no unit suffix in the UI (a bare number reads as balls by
+  default in this context; the label was judged to only add clutter).
+  Parses the value as a **string**, not float subtraction
+  (`over - Math.floor(over)`): `over` can arrive from Supabase as a
+  numeric-typed string, and subtracting the whole part in floating point
+  reintroduces exactly the precision error this is meant to avoid
+  (`9.2 - 9` → `0.19999999999999982` in JS, not `0.2`).
+- **The first cut converted `overTo` alone** — the cumulative ball count
+  since the start of the innings (10, 64, 74, 77, …), which only ever
+  increases row over row. That's the wrong number next to a `runs` value
+  that's already partnership-specific, not cumulative — a reader could
+  reasonably read "61 (64)" as "61 runs off 64 balls," which isn't what
+  that partnership actually took. Fixed to
+  `oversToBalls(overTo) - oversToBalls(overFrom)` — the ball *span* of
+  that one partnership specifically, consistent with `runs` right next to
+  it. Verified against real data (`22730364`'s five Fall of Wickets entries
+  plus its unbroken closing stand): the six spans sum to exactly 180 balls
+  (30 overs × 6), confirming they partition the whole innings with no gap
+  or overlap.
 
 Each bar shows: wicket number (left label), both partnership players
 overlaid on the bar (both render as `PlayerNameLink`s — the larger name is
