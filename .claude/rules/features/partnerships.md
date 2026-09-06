@@ -492,12 +492,16 @@ was on screen:
 
 Each bar shows: wicket number (left label), both partnership players
 overlaid on the bar (both render as `PlayerNameLink`s — the larger name is
-not distinguished), and runs + over overlaid on the right. An unbroken
-partnership (§4.2) gets the standard cricket `*` suffix on its runs value
-(`87*`), matching the not-out convention already used on the Batting table
-above it. Hidden entirely (not shown empty) when `computePartnerships()`
-returns `[]` or `null` — same "hidden, not empty" convention as the
-Fielding table.
+not distinguished), and runs + ball span **outside the bar**, in a
+fixed-width (`w-20`) right-aligned column — not overlaid on the bar itself
+(fixed shortly after the ball-span change, September 2026: a short bar
+from a quick dismissal was squeezing that text down to almost nothing,
+and a fixed external column keeps every row's value right-aligned to the
+same edge regardless of bar length). An unbroken partnership (§4.2) gets
+the standard cricket `*` suffix on its runs value (`87*`), matching the
+not-out convention already used on the Batting table above it. Hidden
+entirely (not shown empty) when `computePartnerships()` returns `[]` or
+`null` — same "hidden, not empty" convention as the Fielding table.
 
 **First name only, no `(out)` marker (fixed shortly after the first real
 production render, September 2026).** The initial ship rendered each

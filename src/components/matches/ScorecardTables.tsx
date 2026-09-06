@@ -234,7 +234,7 @@ export function ScorecardTables({
                   <span className="font-cinzel text-xs text-zinc-500 w-5 flex-shrink-0 text-right">{p.wicketNumber}</span>
                   <div className="flex-1 relative h-7 bg-ink-4 rounded overflow-hidden">
                     <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
-                    <div className="absolute inset-0 flex items-center justify-between gap-2 px-2.5">
+                    <div className="absolute inset-0 flex items-center px-2.5">
                       <span className="font-rajdhani text-xs font-semibold text-parchment truncate">
                         {p.players.map((player, i) => {
                           // player.playerId already comes straight from
@@ -270,11 +270,16 @@ export function ScorecardTables({
                           )
                         })}
                       </span>
-                      <span className="font-rajdhani text-xs font-bold text-gold flex-shrink-0">
-                        {p.runs}{p.outPlayer == null && '*'} <span className="text-zinc-500 font-normal">({oversToBalls(p.overTo) - oversToBalls(p.overFrom)})</span>
-                      </span>
                     </div>
                   </div>
+                  {/* Outside the bar, not overlaid — a short bar (a quick
+                      dismissal) used to squeeze this text down to nothing.
+                      Fixed-width column keeps every row's runs/balls
+                      right-aligned to the same edge regardless of bar
+                      length. */}
+                  <span className="font-rajdhani text-xs font-bold text-gold w-20 flex-shrink-0 text-right">
+                    {p.runs}{p.outPlayer == null && '*'} <span className="text-zinc-500 font-normal">({oversToBalls(p.overTo) - oversToBalls(p.overFrom)})</span>
+                  </span>
                 </div>
               )
             })}
