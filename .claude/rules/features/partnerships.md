@@ -43,17 +43,24 @@ crease still holds two never-separated batters once Fall of Wickets is
 exhausted — see §4.2.
 
 **Status as of this doc:** the extraction, storage, Hub-sync, derivation,
-and UI layers (Phases 1–6) are all built. Phases 1–3 are validated against
-6 real innings across 3 different match PDFs; Phase 5's derivation is
-additionally validated against the real, live analytics-DB rows for an
-already-synced match (§4.1). Phase 4's Hub-side sync additions are a
-small, mechanical mirror of four already-proven patterns in the same
-function (see §9) and haven't yet been exercised by a real sync — the
-next automated `backfill-scorecards` cron run against the live "Extreme
-Cricket Summer Cup" match (§5) will be the first real proof of the sync
-path end-to-end, and will also be the first time the Phase 6 UI (§6.6)
-has real data to render for a match synced after this feature shipped.
-Update this section once that run has been observed.
+and UI layers (Phases 1–6) are all built and, as of 6 Sep 2026, proven
+end-to-end against real production syncs, not just simulated data. Phases
+1–3 were validated against 6 real innings across 3 different match PDFs;
+Phase 5's derivation was additionally validated against the real, live
+analytics-DB rows for an already-synced match (§4.1). The full Phase 1–6
+chain — CricHeroes PDF fetch → parse → analytics DB → Hub sync → bar chart
+— was then proven live via the `backfill-scorecards` cron (triggered
+manually once, since the twice-daily schedule hadn't fired yet that day)
+against three real matches in the same session: match `26908096`
+("Extreme Cricket Summer Cup") synced with its expected 7 Fall of Wickets
+rows plus an unbroken 8th closing partnership; match `22730364` (a
+re-sync of an older match, predating this feature) synced with 5 rows
+plus an unbroken closing partnership between the two real not-out
+batters, cross-checked against their `batting_stats.dismissal_method`
+independently of the derivation logic. See §4.2 for the unbroken-stand
+mechanics these two matches confirmed, and §6.6 for a subsequent UI fix
+(first-name-only labels, no `(out)` marker) made after seeing the chart
+render against this real data for the first time.
 
 ---
 
@@ -370,24 +377,35 @@ see the Hub-sync note below.
 
 ---
 
-## 6.5 Real-sync proof still pending — Hub side (Phase 4)
+## 6.5 Real-sync proof — Hub side (Phase 4) — confirmed 6 Sep 2026
 
-The manual validation above proves the analytics-DB half of the pipeline
+The manual validation above proved the analytics-DB half of the pipeline
 end-to-end for a genuinely new match. It deliberately did **not** touch
 Hub's `scorecard_uploads`/`match_stats_cache` for that booking — the plan
-is to let the twice-daily `backfill-scorecards` cron (see
+was to let the twice-daily `backfill-scorecards` cron (see
 `features/post-match-scorecard.md` §8) pick this booking up naturally,
-now that both the `spartans-python` FOW code (pushed to `main`, confirmed
-live on Render as of 5 Sep 2026) and this Hub-side sync code are in place.
-Since the booking's own `scorecard_uploads` row doesn't exist yet, the
-cron has no way to know analytics-DB rows already exist for it — it will
-run its normal first-time path (re-fetch the PDF from CricHeroes, re-parse,
-upsert) and simply overwrite the manually-inserted rows with identical
-freshly-parsed data, then complete the part left undone here: flipping
+once both the `spartans-python` FOW code (pushed to `main`, confirmed
+live on Render as of 5 Sep 2026) and this Hub-side sync code were in
+place. Confirmed the next day: the scheduled run hadn't fired yet by the
+time this was checked (GitHub Actions' scheduler delay — see
+`limitations.md`), so the workflow was triggered manually
+(`workflow_dispatch`) instead of waiting. Since the booking's own
+`scorecard_uploads` row didn't exist yet, the cron had no way to know
+analytics-DB rows already existed for it — it ran its normal first-time
+path (re-fetched the PDF from CricHeroes, re-parsed, upserted) and simply
+overwrote the manually-inserted rows with identical freshly-parsed data,
+then completed the part left undone here: flipping
 `scorecard_uploads.status` to `synced` and populating
-`match_stats_cache.fall_of_wickets` for real. This will be the first live,
-fully-automated proof of Phases 1–4 together. Update this section once
-that run has been observed.
+`match_stats_cache.fall_of_wickets` for real (7 rows, matching the
+manually-verified count exactly). This was the first live,
+fully-automated proof of Phases 1–4 together, and — since `team_total`/
+`team_overs` for this chase-completed match are 87/17.3 — also the first
+live proof of §4.2's unbroken-partnership logic: the resulting chart shows
+8 partnerships, the 8th an unbroken `2*` stand rather than a Fall of
+Wickets entry. A second booking (`22730364`, an older match re-synced the
+same run) confirmed the same logic independently: its unbroken closing
+stand's two players matched exactly the two batters `batting_stats`
+itself marks `not_out` for that match.
 
 ---
 
@@ -431,15 +449,34 @@ fact here is stand size, not running total.
 
 Each bar shows: wicket number (left label), both partnership players
 overlaid on the bar (both render as `PlayerNameLink`s — the larger name is
-not distinguished), and runs + over overlaid on the right. The dismissed
-player gets a trailing `(out)` marker (muted text, not color-only, same
-`ui-theme.md` principle as above) — shown only when `outPlayer` is
-non-null; an unbroken partnership (§4.2) instead gets the standard cricket
-`*` suffix on its runs value (`87*`), matching the not-out convention
-already used on the Batting table above it, and neither player gets an
-`(out)` marker since neither was dismissed. Hidden entirely (not shown
-empty) when `computePartnerships()` returns `[]` or `null` — same "hidden,
-not empty" convention as the Fielding table.
+not distinguished), and runs + over overlaid on the right. An unbroken
+partnership (§4.2) gets the standard cricket `*` suffix on its runs value
+(`87*`), matching the not-out convention already used on the Batting table
+above it. Hidden entirely (not shown empty) when `computePartnerships()`
+returns `[]` or `null` — same "hidden, not empty" convention as the
+Fielding table.
+
+**First name only, no `(out)` marker (fixed shortly after the first real
+production render, September 2026).** The initial ship rendered each
+player's full name plus a trailing `(out)` tag on whichever one was
+dismissed — against real data this immediately proved too cramped: a name
+like "Shivashankara GS" paired with a second name in the same bar,
+sometimes with `(out)` added on top, routinely truncated to
+`"Shivashankara G…"` with nothing else fitting. Fixed two ways:
+- **`firstName()`** (a local one-line helper, same convention
+  `PerformerShareButton.tsx` already uses for its WhatsApp greeting — "Hi
+  Kushal," not "Hi Kushal Vidya,") shortens only the visible label passed
+  to `PlayerNameLink`'s `name` prop. The link target (`playerId`) and the
+  `findCricHeroesUrl()` lookup both still use the full `player_name` —
+  identity resolution is completely unaffected, only the on-screen text
+  shortens.
+- **The `(out)` marker was dropped entirely**, for both players in every
+  row — not just shortened. It was judged redundant rather than trimmed
+  for space: the very next row down already carries the survivor forward
+  (e.g. row 2 ends "… & Siva", row 3 begins "Sudarshan Bhat & Keshav" —
+  Siva's absence from row 3 already tells the reader Siva was the one
+  dismissed), so which name in a row was the one given out is already
+  readable from the sequence itself, without a per-row label.
 
 **`teamTotal`/`teamOvers` props (added September 2026)** — `ScorecardTables`
 now accepts these two (both `number | null | undefined`, from
@@ -509,7 +546,7 @@ as the external-link fallback when there's no `playerId` at all.
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
 | `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2) |
-| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, `(out)` marker on a dismissed pair or a `*` suffix on an unbroken one; `teamTotal`/`teamOvers` props feed `finalScore` |
+| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, first-name-only labels via a local `firstName()` helper, `*` suffix on an unbroken partnership's runs value, no `(out)` marker; `teamTotal`/`teamOvers` props feed `finalScore` |
 | `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets`; passes `teamTotal`/`teamOvers` from `match.stats` |
 | `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` along with `teamTotal`/`teamOvers` |
 

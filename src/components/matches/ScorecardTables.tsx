@@ -59,6 +59,14 @@ function fieldingTotal(row: any): number {
   return num(row, ['catches']) + num(row, ['caught_behind']) + num(row, ['stumpings']) + num(row, ['run_outs'])
 }
 
+// Same one-line convention PerformerShareButton.tsx already uses for a
+// WhatsApp greeting ("Hi Kushal," not "Hi Kushal Vidya,") — here it's for
+// fitting two names on one partnership bar rather than a greeting, so kept
+// as its own local copy rather than importing (that one isn't exported).
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0]
+}
+
 export function ScorecardTables({
   batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, squad,
 }: {
@@ -216,13 +224,6 @@ export function ScorecardTables({
                     <div className="absolute inset-0 flex items-center justify-between gap-2 px-2.5">
                       <span className="font-rajdhani text-xs font-semibold text-parchment truncate">
                         {p.players.map((player, i) => {
-                          // outPlayer is null for an unbroken stand (zero
-                          // wickets lost, or the innings ended not-all-out
-                          // mid-partnership) — neither player is marked
-                          // out in that case; the runs value itself gets
-                          // the cricket-convention "*" instead, below.
-                          const isOut = p.outPlayer != null
-                            && player.playerName.trim().toLowerCase() === p.outPlayer.playerName.trim().toLowerCase()
                           // player.playerId already comes straight from
                           // batting_stats.player_id — the authoritative,
                           // already-reconciled identity (see
@@ -234,15 +235,24 @@ export function ScorecardTables({
                           // and squad detail fetch in parallel above).
                           // findCricHeroesUrl() is still used for the
                           // fallback link when there's no playerId at all.
+                          // First name only, not the full name — a bar this
+                          // narrow can't fit two full names plus an "(out)"
+                          // tag legibly (see the truncated "Shivashankara
+                          // G..." this replaced). The link target and the
+                          // CricHeroes lookup below both still use the full
+                          // player_name — only the visible label shortens.
+                          // No separate "(out)" marker either: the next row
+                          // down already carries the survivor forward, so
+                          // which of this row's two names was dismissed is
+                          // readable from the sequence itself.
                           return (
                             <span key={i}>
                               {i > 0 && ' & '}
                               <PlayerNameLink
-                                name={player.playerName}
+                                name={firstName(player.playerName)}
                                 playerId={player.playerId}
                                 cricHeroesUrl={findCricHeroesUrl({ player_id: player.playerId }, player.playerName, squad)}
                               />
-                              {isOut && <span className="text-zinc-500"> (out)</span>}
                             </span>
                           )
                         })}
