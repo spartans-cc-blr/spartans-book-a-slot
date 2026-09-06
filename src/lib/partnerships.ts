@@ -11,7 +11,11 @@
 // remove whichever one the entry names as dismissed, bring in the next
 // batter by batting_order. See features/partnerships.md §4 for the full
 // worked example this was validated against (FCC-Rockers, 6 real innings
-// across 3 match PDFs, zero mismatches).
+// across 3 match PDFs, zero mismatches). If the caller supplies the
+// innings' final score/overs, one closing "unbroken" partnership is also
+// emitted when the crease still holds two never-separated batters once
+// Fall of Wickets is exhausted — covering both a team that lost no
+// wickets at all, and any innings that ends not-all-out mid-stand.
 //
 // Deliberately does NOT use matchTopPerformers.ts's resolveSquadMatch()
 // pattern. That function exists because a top-performer row's own
@@ -34,9 +38,28 @@ export interface Partnership {
   wicketNumber: number
   runs:         number
   overFrom:     number   // over of the previous wicket, 0 for the first partnership
-  overTo:       number   // over this partnership ended (this wicket's own over)
+  overTo:       number   // over this partnership ended (this wicket's own over) — or the innings' final over, if unbroken
   players:      [PartnershipPlayer, PartnershipPlayer]
-  outPlayer:    PartnershipPlayer   // whichever of players[] this wicket's entry names as dismissed
+  // Whichever of players[] this wicket's entry names as dismissed — null
+  // means this stand was never separated (the innings ended first: overs
+  // ran out, the chase was won, or the team finished with zero wickets
+  // down at all). See FinalScore below for why this can only be populated
+  // when the caller supplies one.
+  outPlayer:    PartnershipPlayer | null
+}
+
+// The innings' final total/overs — needed to close out an unbroken
+// partnership, since fall_of_wickets alone has no way to express "the
+// innings just ended," only "a wicket fell." Without this, two real cases
+// silently produced zero information about the batters actually at the
+// crease when the innings finished: a team that lost no wickets at all
+// (fallOfWickets is empty even though a real opening stand happened), and
+// any innings that ends not-all-out mid-partnership (overs run out, or a
+// chase is completed) — the last, often match-deciding stand was simply
+// never emitted.
+export interface FinalScore {
+  total: number
+  overs: number
 }
 
 interface BattingRow {
@@ -74,10 +97,10 @@ function normalize(name: string | null | undefined): string {
 // nothing" note).
 export function computePartnerships(
   batting: BattingRow[] | null | undefined,
-  fallOfWickets: FallOfWicketRow[] | null | undefined
+  fallOfWickets: FallOfWicketRow[] | null | undefined,
+  finalScore?: FinalScore | null
 ): Partnership[] | null {
   const fow = (fallOfWickets ?? []).slice().sort((a, b) => a.wicket_number - b.wicket_number)
-  if (fow.length === 0) return []
 
   // Real batters only, in true batting order — a placeholder "did not
   // bat" row (batting_order 0, see spartans-python's BattingStatsWriter)
@@ -88,6 +111,11 @@ export function computePartnerships(
     .sort((a, b) => (a.batting_order ?? 0) - (b.batting_order ?? 0))
 
   if (order.length < 2) return []
+  // No wickets fell AND no final score supplied — genuinely nothing
+  // computable (not even the opening stand's runs). A caller that does
+  // supply finalScore still gets the unbroken-opening-stand entry below,
+  // even though fow itself is empty.
+  if (fow.length === 0 && !finalScore) return []
 
   const toPlayer = (row: BattingRow): PartnershipPlayer => ({
     playerId:   row.player_id ?? null,
@@ -127,6 +155,27 @@ export function computePartnerships(
     }
     prevScore = entry.team_score
     prevOver  = entry.over
+  }
+
+  // Unbroken closing partnership — the innings ended (overs ran out, or
+  // the chase was completed) with two batters never separated. This is
+  // the same check for both extremes: zero wickets lost at all (the loop
+  // above never ran, so crease is still exactly the two openers,
+  // untouched) and any innings that finishes not-all-out partway through
+  // a stand (crease still holds whoever was in when the last wicket fell,
+  // if a partner was still available in `order`). `finalScore.total >
+  // prevScore` is what distinguishes a real unbroken stand from an
+  // innings that genuinely ended exactly on the last recorded wicket —
+  // it also guards against ever emitting a negative-runs row.
+  if (crease.length === 2 && finalScore && finalScore.total > prevScore) {
+    partnerships.push({
+      wicketNumber: fow.length + 1,
+      runs:         finalScore.total - prevScore,
+      overFrom:     prevOver,
+      overTo:       finalScore.overs,
+      players:      [toPlayer(crease[0]), toPlayer(crease[1])],
+      outPlayer:    null,
+    })
   }
 
   return partnerships

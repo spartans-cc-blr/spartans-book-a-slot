@@ -1,6 +1,6 @@
 # Batting Partnerships — Feature Summary
 
-**Spartans Hub · Added: September 2026 · Status: All 6 phases shipped**
+**Spartans Hub · Added: September 2026 · Status: All 6 phases shipped, plus unbroken-partnership support (§4.2)**
 
 ---
 
@@ -28,6 +28,19 @@ previous entry to whichever two players are currently paired, remove
 whichever one the entry names as dismissed, and bring in the next
 batter by `batting_order`. See §4 for the full algorithm and a worked
 example.
+
+**Unbroken (undefeated) partnerships (added September 2026).** Fall of
+Wickets only ever records a wicket *falling* — it has no entry for "the
+innings just ended." Two real cases fall through the walk above with no
+partnership emitted at all unless the caller also supplies the innings'
+final score/overs: a team that lost **zero** wickets (the crease-pointer
+loop never runs, so the entire opening stand goes unrecorded), and any
+innings that ends **not-all-out mid-stand** (overs run out, or a chase is
+completed, while two batters are still at the crease). `computePartnerships()`
+now takes an optional `FinalScore { total, overs }` third argument and, when
+supplied, emits one closing partnership with `outPlayer: null` whenever the
+crease still holds two never-separated batters once Fall of Wickets is
+exhausted — see §4.2.
 
 **Status as of this doc:** the extraction, storage, Hub-sync, derivation,
 and UI layers (Phases 1–6) are all built. Phases 1–3 are validated against
@@ -215,6 +228,68 @@ derivation logic only, called by nothing in the running app yet.
 
 ---
 
+## 4.2 Unbroken partnerships — `FinalScore` (added September 2026)
+
+**The gap:** the crease-pointer walk (§4) only ever advances on a Fall of
+Wickets entry, so it has no way to close out a stand that the innings
+ended without breaking. Two real shapes hit this:
+
+- **Zero wickets lost.** `fallOfWickets` is empty, so the loop body never
+  runs at all — the entire opening stand (a real, often large partnership)
+  produced zero output.
+- **Not-all-out, mid-stand.** Overs run out, or a chase is completed,
+  while two batters are still at the crease. Every wicket that *did* fall
+  is correctly reported, but the final, often match-deciding stand between
+  whoever was in when the last wicket fell and their partner is silently
+  dropped — the walk just ends when Fall of Wickets is exhausted, with no
+  signal that two players were still out there.
+
+**The fix:** `computePartnerships()` takes an optional third argument,
+`finalScore: FinalScore | null` (`{ total, overs }` — the innings' final
+score and over count). `Partnership.outPlayer` is now `PartnershipPlayer |
+null` (`null` = this stand was never separated). After the Fall of Wickets
+loop, if the crease still holds exactly two players *and* `finalScore.total
+> prevScore` (the running score reached after the last processed wicket,
+or `0` if none fell), one closing partnership is emitted with
+`outPlayer: null`, `runs: finalScore.total - prevScore`, and
+`overTo: finalScore.overs`. The `total > prevScore` guard is what
+distinguishes a genuine unbroken stand from an innings that finished
+exactly on the last recorded wicket (crease would still be length 2 there
+too, since a new batter is brought in for every fallen wicket except the
+very last) — without it this would double-count the last wicket's own
+partnership as a second, phantom, zero/negative-run entry.
+
+Without `finalScore` (the parameter is optional, `undefined`/`null` both
+skip this branch entirely), behaviour is byte-for-byte unchanged from
+Phase 5 — every existing caller that hasn't been updated keeps working
+exactly as before.
+
+**Validated against three cases, all via a standalone Node script mirroring
+the exact TypeScript logic (not just type-checked):**
+1. **Real match `26908096`** (the "Extreme Cricket Summer Cup" match — see
+   §5 below) with `finalScore { total: 87, overs: 17.3 }` — correctly adds
+   an 8th partnership beyond the 7 Fall-of-Wickets-derived ones: `2*` runs
+   between Suyash Pancholi and Manoj Borse, the pair left at the crease
+   when the chase was completed.
+2. **Synthetic zero-wickets case** (`219/0`, no Fall of Wickets rows at
+   all) with `finalScore { total: 219, overs: 20.0 }` — correctly returns
+   exactly one partnership: a `219*` unbroken opening stand between the
+   two openers. Without `finalScore`, the same input still correctly
+   returns `[]` (nothing computable, not an error).
+3. **The FCC-Rockers all-out-166 match** (§4's worked example — a genuine
+   last-man-standing finish) with `finalScore { total: 166, overs: 20.0 }`
+   — correctly still returns exactly the same 10 partnerships, with **no**
+   phantom 11th entry. After the 10th wicket falls, the crease has length
+   1 (no batter left in `order` to bring in), so the `crease.length === 2`
+   guard alone prevents a spurious closing partnership on a genuinely
+   complete all-out innings — the `total > prevScore` check is a second,
+   independent safeguard for the id-length-2-but-nothing-left-to-add case.
+
+`tsc --noEmit` passes clean with the new `finalScore` parameter and the
+now-nullable `outPlayer` threaded through every consumer.
+
+---
+
 ## 5. Database
 
 ### Analytics DB — `fall_of_wickets` (migration `005_fall_of_wickets.sql`)
@@ -358,9 +433,21 @@ Each bar shows: wicket number (left label), both partnership players
 overlaid on the bar (both render as `PlayerNameLink`s — the larger name is
 not distinguished), and runs + over overlaid on the right. The dismissed
 player gets a trailing `(out)` marker (muted text, not color-only, same
-`ui-theme.md` principle as above). Hidden entirely (not shown empty) when
-`computePartnerships()` returns `[]` or `null` — same "hidden, not empty"
-convention as the Fielding table.
+`ui-theme.md` principle as above) — shown only when `outPlayer` is
+non-null; an unbroken partnership (§4.2) instead gets the standard cricket
+`*` suffix on its runs value (`87*`), matching the not-out convention
+already used on the Batting table above it, and neither player gets an
+`(out)` marker since neither was dismissed. Hidden entirely (not shown
+empty) when `computePartnerships()` returns `[]` or `null` — same "hidden,
+not empty" convention as the Fielding table.
+
+**`teamTotal`/`teamOvers` props (added September 2026)** — `ScorecardTables`
+now accepts these two (both `number | null | undefined`, from
+`match_stats_cache.team_total`/`team_overs`, already fetched for the
+result-strip display elsewhere on the card) and builds the `FinalScore`
+`computePartnerships()` needs from them when both are present; omitted
+(both consumers still pass them, see below) it degrades to the pre-§4.2
+behaviour with no unbroken closing partnership ever shown.
 
 **Player identity — deliberately bypasses this file's own `findPlayerId()`
 helper.** Every other table here resolves a Hub `player_id` via
@@ -379,11 +466,16 @@ as the external-link fallback when there's no `playerId` at all.
 **Threaded through both consumers:**
 - `MatchHistoryClient.tsx` — `fall_of_wickets` was already flowing through
   the scorecard fetch since Phase 4; just needed adding to the
-  `FullScorecard` type and passed down as a new prop.
+  `FullScorecard` type and passed down as a new prop. Now also passes
+  `teamTotal={match.stats?.team_total}` / `teamOvers={match.stats?.team_overs}`
+  (§4.2) — both fields were already present on `match.stats`, fetched for
+  the existing result-strip display; no new query.
 - The standalone `/matches/history/[bookingId]/page.tsx` — its
   server-side `match_stats_cache` select was deliberately left without
   `fall_of_wickets` in Phase 4 (nothing rendered it yet); added here now
-  that something does.
+  that something does. Now also passes `teamTotal={stats.team_total}` /
+  `teamOvers={stats.team_overs}` — same already-fetched fields, no new
+  query.
 
 ---
 
@@ -416,10 +508,10 @@ as the external-link fallback when there's no `playerId` at all.
 | `supabase/migrations/071_match_stats_cache_fall_of_wickets.sql` | Hub-side cache column (§5) |
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
-| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function |
-| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, `(out)` marker on the dismissed player |
-| `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets` |
-| `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` |
+| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2) |
+| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, `(out)` marker on a dismissed pair or a `*` suffix on an unbroken one; `teamTotal`/`teamOvers` props feed `finalScore` |
+| `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets`; passes `teamTotal`/`teamOvers` from `match.stats` |
+| `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` along with `teamTotal`/`teamOvers` |
 
 ---
 
@@ -428,6 +520,7 @@ as the external-link fallback when there's no `playerId` at all.
 | Item | Notes |
 |---|---|
 | First real end-to-end cron proof | See §6.5 — the manual Phase 3 validation and this feature's own Phase 4/6 code are both in place, but no match has yet gone through the automated `backfill-scorecards` cron with the FOW-aware pipeline live end-to-end. Worth a follow-up note here once that's been observed. |
+| Highest partnership by runs/wickets on the Honour Board (`/leaderboard`) | Explicitly deferred — requested as a follow-on once the base feature was confirmed working, not yet started. Would need a season-wide aggregation over `computePartnerships()` output across every synced match, distinct from `getLeaderboard()`'s existing per-player season totals (`src/lib/playerStats.ts`) — probably its own function in that file rather than a batch call to `computePartnerships()` per match, given `getLeaderboard()`'s existing pagination-cap lessons (`features/leaderboard.md` §8.1). |
 
 ---
 

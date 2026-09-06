@@ -276,7 +276,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
         <div className="mt-5">
           {stats ? (
-            <ScorecardTables batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} fallOfWickets={stats.fall_of_wickets ?? []} squad={squad} />
+            <ScorecardTables batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} fallOfWickets={stats.fall_of_wickets ?? []} teamTotal={stats.team_total} teamOvers={stats.team_overs} squad={squad} />
           ) : (
             <p className="font-rajdhani text-sm text-zinc-500">
               Scorecard not yet synced to Hub for this match.

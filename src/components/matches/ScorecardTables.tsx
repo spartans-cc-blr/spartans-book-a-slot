@@ -60,13 +60,19 @@ function fieldingTotal(row: any): number {
 }
 
 export function ScorecardTables({
-  batting, bowling, fielding, teamList, fallOfWickets, squad,
+  batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, squad,
 }: {
   batting: any[]
   bowling: any[]
   fielding?: any[]
   teamList?: any[]
   fallOfWickets?: any[]
+  // The innings' own final score/overs — lets computePartnerships() close
+  // out an unbroken final stand (zero wickets lost, or the innings ended
+  // not-all-out mid-partnership) that Fall of Wickets alone can't express.
+  // See src/lib/partnerships.ts's FinalScore doc comment.
+  teamTotal?: number | null
+  teamOvers?: number | null
   squad?: SquadRef[]
 }) {
   // Players who didn't bat/bowl get a zero-filled row (dismissal_method:
@@ -103,7 +109,8 @@ export function ScorecardTables({
   // null on a genuine data-integrity mismatch — nothing further to do here
   // besides not rendering, same as the ordinary "no Fall of Wickets synced
   // yet" [] case just below it.
-  const partnerships = computePartnerships(batting, fallOfWickets ?? []) ?? []
+  const finalScore = teamTotal != null && teamOvers != null ? { total: teamTotal, overs: teamOvers } : null
+  const partnerships = computePartnerships(batting, fallOfWickets ?? [], finalScore) ?? []
   const topPartnershipRuns = partnerships.reduce((max, p) => Math.max(max, p.runs), 0)
 
   // The batting table filters out players who didn't bat, so on its own it
@@ -209,7 +216,13 @@ export function ScorecardTables({
                     <div className="absolute inset-0 flex items-center justify-between gap-2 px-2.5">
                       <span className="font-rajdhani text-xs font-semibold text-parchment truncate">
                         {p.players.map((player, i) => {
-                          const isOut = player.playerName.trim().toLowerCase() === p.outPlayer.playerName.trim().toLowerCase()
+                          // outPlayer is null for an unbroken stand (zero
+                          // wickets lost, or the innings ended not-all-out
+                          // mid-partnership) — neither player is marked
+                          // out in that case; the runs value itself gets
+                          // the cricket-convention "*" instead, below.
+                          const isOut = p.outPlayer != null
+                            && player.playerName.trim().toLowerCase() === p.outPlayer.playerName.trim().toLowerCase()
                           // player.playerId already comes straight from
                           // batting_stats.player_id — the authoritative,
                           // already-reconciled identity (see
@@ -235,7 +248,7 @@ export function ScorecardTables({
                         })}
                       </span>
                       <span className="font-rajdhani text-xs font-bold text-gold flex-shrink-0">
-                        {p.runs} <span className="text-zinc-500 font-normal">({p.overTo} ov)</span>
+                        {p.runs}{p.outPlayer == null && '*'} <span className="text-zinc-500 font-normal">({p.overTo} ov)</span>
                       </span>
                     </div>
                   </div>

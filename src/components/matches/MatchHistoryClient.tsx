@@ -931,6 +931,8 @@ function MatchHistoryCard({
                   fielding={scorecard.fielding}
                   teamList={scorecard.team_list}
                   fallOfWickets={scorecard.fall_of_wickets}
+                  teamTotal={match.stats?.team_total}
+                  teamOvers={match.stats?.team_overs}
                   squad={detail?.squad}
                 />
               )}
