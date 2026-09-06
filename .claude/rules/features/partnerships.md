@@ -289,6 +289,11 @@ skip this branch entirely), behaviour is byte-for-byte unchanged from
 Phase 5 — every existing caller that hasn't been updated keeps working
 exactly as before.
 
+> **Updated below (§4.3):** the "one closing partnership" condition above
+> is accurate for this fix as originally shipped, but was found to be
+> unsafe against real historical data the same week — see §4.3 for the
+> completeness check since added on top of it (`finalScore.wickets`).
+
 **Validated against three cases, all via a standalone Node script mirroring
 the exact TypeScript logic (not just type-checked):**
 1. **Real match `26908096`** (the "Extreme Cricket Summer Cup" match — see
@@ -312,6 +317,76 @@ the exact TypeScript logic (not just type-checked):**
 
 `tsc --noEmit` passes clean with the new `finalScore` parameter and the
 now-nullable `outPlayer` threaded through every consumer.
+
+---
+
+## 4.3 Completeness check — don't fabricate a partnership for a match with
+no Fall of Wickets data at all (fixed the same week)
+
+**The bug §4.2 introduced:** `fallOfWickets` is empty for two completely
+different reasons, and §4.2's fix couldn't tell them apart. A team that
+genuinely lost zero wickets has `fallOfWickets: []` — but so does *every*
+match synced before this feature shipped (6 Sep 2026) or not re-synced
+since, regardless of how many wickets actually fell, since Fall of Wickets
+extraction simply didn't exist yet for those syncs. Once §4.2 started
+synthesizing a closing partnership whenever `crease.length === 2 &&
+finalScore.total > prevScore`, any historical match with real wickets but
+no FOW rows satisfied that condition too (`crease` untouched at `[order[0],
+order[1]]`, `prevScore` still `0`) — and the chart rendered one fabricated
+"partnership" spanning the *entire* team total, labelled wicket 1, as if
+the two openers had batted the whole innings unbroken. Confirmed live: a
+138-all-out innings (10 wickets, zero synced FOW rows) was rendering as a
+`138*` opening stand between two players who, per the real scorecard, were
+both long since out.
+
+**The fix:** `FinalScore` gained a third field, `wickets: number | null` —
+the scorecard's own summary wicket count (`match_stats_cache.team_wickets`,
+independent of `fall_of_wickets` and present on every synced match, both
+before and after this feature). The unbroken-partnership synthesis now
+also requires `finalScore.wickets != null && fow.length ===
+finalScore.wickets` — i.e., the number of Fall of Wickets rows actually
+matches how many wickets really fell, so the crease genuinely reflects who
+was left not-out rather than "we just don't have the breakdown." A
+`wickets` value that's missing entirely (`null`) fails safe the same way —
+a genuine zero-wicket innings always has `wickets === 0`, never `null`, so
+there's no real case this excludes that should have been included.
+
+This only gates the *synthesis* step, not the main Fall-of-Wickets loop —
+a match with some real FOW rows already synced still shows exactly those
+partnerships regardless of this check (the loop only ever reports data
+that's actually present). In practice this distinction is moot for this
+codebase today: extraction is all-or-nothing per match (§3's single joined
+text block, parsed as one unit), so a genuinely *partial* FOW set — some
+real rows synced, but fewer than the true wicket count — isn't a case this
+pipeline currently produces. The `<` comparison (via `===`, not just
+truthiness) is still the right general check rather than a narrower
+`fow.length === 0` special-case, since it costs nothing extra and
+correctly covers that hypothetical case too, should a future parsing
+regression ever produce one.
+
+**Validated:** re-ran the exact three §4.2 scenarios (real match
+`26908096`, synthetic `219/0`, FCC-Rockers all-out-166) against the
+updated logic — all three unaffected, since each already had
+`fow.length === finalScore.wickets` (7=7, 0=0, 10=10 respectively). Added
+a fourth case, the actual reported bug: a synthetic 138-all-out innings
+(`wickets: 10`) with zero Fall of Wickets rows now correctly returns `[]`
+instead of a fabricated `138*` partnership. Cross-checked directly against
+the live analytics DB: `team_wickets` equals the Fall of Wickets row count
+for both `26908096` (7=7) and `22730364` (5=5), confirming the check holds
+for real synced data, not just the synthetic cases. Also confirmed via a
+direct query that this is a real, widespread gap in the historical
+backlog, not a one-off — e.g. match `23783143` (138 all out) has 10
+wickets and zero Fall of Wickets rows, exactly the bug shape. Closing this
+gap is one motivation for backfilling Fall of Wickets across the
+historical backlog (a pending item — see §9): until a match is re-synced,
+its Partnerships chart now stays correctly hidden rather than showing
+fabricated data.
+
+**`teamWickets` threaded through both consumers** the same way
+`teamTotal`/`teamOvers` already were — `match.stats?.team_wickets` in
+`MatchHistoryClient.tsx`, `stats.team_wickets` in the standalone page (both
+already fetched for the existing result-strip display, so no new query in
+either case).
 
 ---
 
@@ -596,10 +671,10 @@ as the external-link fallback when there's no `playerId` at all.
 | `supabase/migrations/071_match_stats_cache_fall_of_wickets.sql` | Hub-side cache column (§5) |
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
-| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2) |
-| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, first-name-only labels via a local `firstName()` helper, `*` suffix on an unbroken partnership's runs value, no `(out)` marker, `oversToBalls()` renders `overTo` as a ball count; `teamTotal`/`teamOvers` props feed `finalScore` |
-| `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets`; passes `teamTotal`/`teamOvers` from `match.stats` |
-| `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` along with `teamTotal`/`teamOvers` |
+| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2), gated on FOW completeness via `finalScore.wickets` (§4.3) |
+| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, first-name-only labels via a local `firstName()` helper, `*` suffix on an unbroken partnership's runs value, no `(out)` marker, `oversToBalls()` renders `overTo` as a ball count; `teamTotal`/`teamOvers`/`teamWickets` props feed `finalScore` |
+| `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets`; passes `teamTotal`/`teamOvers`/`teamWickets` from `match.stats` |
+| `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` along with `teamTotal`/`teamOvers`/`teamWickets` |
 
 ---
 

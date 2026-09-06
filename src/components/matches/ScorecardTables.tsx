@@ -81,19 +81,22 @@ function oversToBalls(over: number | string): number {
 }
 
 export function ScorecardTables({
-  batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, squad,
+  batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, teamWickets, squad,
 }: {
   batting: any[]
   bowling: any[]
   fielding?: any[]
   teamList?: any[]
   fallOfWickets?: any[]
-  // The innings' own final score/overs — lets computePartnerships() close
-  // out an unbroken final stand (zero wickets lost, or the innings ended
-  // not-all-out mid-partnership) that Fall of Wickets alone can't express.
-  // See src/lib/partnerships.ts's FinalScore doc comment.
+  // The innings' own final score/overs/wickets — lets computePartnerships()
+  // close out an unbroken final stand (zero wickets lost, or the innings
+  // ended not-all-out mid-partnership) that Fall of Wickets alone can't
+  // express, and — via teamWickets — tell that genuine case apart from a
+  // match that simply has no Fall of Wickets data synced yet. See
+  // src/lib/partnerships.ts's FinalScore doc comment.
   teamTotal?: number | null
   teamOvers?: number | null
+  teamWickets?: number | null
   squad?: SquadRef[]
 }) {
   // Players who didn't bat/bowl get a zero-filled row (dismissal_method:
@@ -130,7 +133,7 @@ export function ScorecardTables({
   // null on a genuine data-integrity mismatch — nothing further to do here
   // besides not rendering, same as the ordinary "no Fall of Wickets synced
   // yet" [] case just below it.
-  const finalScore = teamTotal != null && teamOvers != null ? { total: teamTotal, overs: teamOvers } : null
+  const finalScore = teamTotal != null && teamOvers != null ? { total: teamTotal, overs: teamOvers, wickets: teamWickets ?? null } : null
   const partnerships = computePartnerships(batting, fallOfWickets ?? [], finalScore) ?? []
   const topPartnershipRuns = partnerships.reduce((max, p) => Math.max(max, p.runs), 0)
 

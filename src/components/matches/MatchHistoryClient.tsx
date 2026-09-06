@@ -933,6 +933,7 @@ function MatchHistoryCard({
                   fallOfWickets={scorecard.fall_of_wickets}
                   teamTotal={match.stats?.team_total}
                   teamOvers={match.stats?.team_overs}
+                  teamWickets={match.stats?.team_wickets}
                   squad={detail?.squad}
                 />
               )}

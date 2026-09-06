@@ -12,10 +12,14 @@
 // batter by batting_order. See features/partnerships.md §4 for the full
 // worked example this was validated against (FCC-Rockers, 6 real innings
 // across 3 match PDFs, zero mismatches). If the caller supplies the
-// innings' final score/overs, one closing "unbroken" partnership is also
-// emitted when the crease still holds two never-separated batters once
-// Fall of Wickets is exhausted — covering both a team that lost no
-// wickets at all, and any innings that ends not-all-out mid-stand.
+// innings' final score/overs/wickets, one closing "unbroken" partnership
+// is also emitted when the crease still holds two never-separated batters
+// once Fall of Wickets is exhausted AND the FOW row count matches the
+// scorecard's own wicket count — covering both a team that lost no
+// wickets at all, and any innings that ends not-all-out mid-stand, while
+// refusing to fabricate a fake full-innings "partnership" for a match
+// that simply has no Fall of Wickets data synced yet (see FinalScore and
+// the completeness check further down).
 //
 // Deliberately does NOT use matchTopPerformers.ts's resolveSquadMatch()
 // pattern. That function exists because a top-performer row's own
@@ -48,18 +52,25 @@ export interface Partnership {
   outPlayer:    PartnershipPlayer | null
 }
 
-// The innings' final total/overs — needed to close out an unbroken
-// partnership, since fall_of_wickets alone has no way to express "the
-// innings just ended," only "a wicket fell." Without this, two real cases
-// silently produced zero information about the batters actually at the
-// crease when the innings finished: a team that lost no wickets at all
+// The innings' final total/overs/wickets — needed to close out an
+// unbroken partnership, since fall_of_wickets alone has no way to express
+// "the innings just ended," only "a wicket fell." Without this, two real
+// cases silently produced zero information about the batters actually at
+// the crease when the innings finished: a team that lost no wickets at all
 // (fallOfWickets is empty even though a real opening stand happened), and
 // any innings that ends not-all-out mid-partnership (overs run out, or a
 // chase is completed) — the last, often match-deciding stand was simply
 // never emitted.
+//
+// `wickets` (the scorecard's own summary wicket count, independent of
+// fall_of_wickets) is what lets computePartnerships() tell a genuine
+// zero-wicket innings apart from a match that simply has no Fall of
+// Wickets data at all — both look identical as `fallOfWickets: []`
+// otherwise. See the completeness check below.
 export interface FinalScore {
-  total: number
-  overs: number
+  total:   number
+  overs:   number
+  wickets: number | null
 }
 
 interface BattingRow {
@@ -90,11 +101,12 @@ function normalize(name: string | null | undefined): string {
 // silently patched over with a guess.
 //
 // Returns [] (not null) for the ordinary "nothing to show yet" cases: no
-// Fall of Wickets synced for this match, or fewer than two players with
-// a real batting_order to seed the crease from (both expected on a
-// booking whose scorecard predates this feature, or hasn't been
-// re-synced since — see features/partnerships.md §5's "Nullable on
-// nothing" note).
+// Fall of Wickets synced for this match (and no way to safely show even
+// an unbroken opening stand without it, per the completeness check
+// below), or fewer than two players with a real batting_order to seed
+// the crease from (both expected on a booking whose scorecard predates
+// this feature, or hasn't been re-synced since — see
+// features/partnerships.md §5's "Nullable on nothing" note).
 export function computePartnerships(
   batting: BattingRow[] | null | undefined,
   fallOfWickets: FallOfWicketRow[] | null | undefined,
@@ -111,11 +123,6 @@ export function computePartnerships(
     .sort((a, b) => (a.batting_order ?? 0) - (b.batting_order ?? 0))
 
   if (order.length < 2) return []
-  // No wickets fell AND no final score supplied — genuinely nothing
-  // computable (not even the opening stand's runs). A caller that does
-  // supply finalScore still gets the unbroken-opening-stand entry below,
-  // even though fow itself is empty.
-  if (fow.length === 0 && !finalScore) return []
 
   const toPlayer = (row: BattingRow): PartnershipPlayer => ({
     playerId:   row.player_id ?? null,
@@ -176,7 +183,25 @@ export function computePartnerships(
   // prevScore` is what distinguishes a real unbroken stand from an
   // innings that genuinely ended exactly on the last recorded wicket —
   // it also guards against ever emitting a negative-runs row.
-  if (crease.length === 2 && finalScore && finalScore.total > prevScore) {
+  //
+  // `fow.length === finalScore.wickets` is the completeness check this
+  // was missing before: without it, a match with real wickets but zero
+  // synced Fall of Wickets rows (predates this feature, or hasn't been
+  // re-synced since) looked identical to a genuine not-out innings —
+  // `fow` empty either way — and silently rendered one fabricated
+  // "partnership" spanning the entire team total, mislabelled as an
+  // unbroken opening stand. Requiring the FOW row count to match the
+  // scorecard's own wicket count means the synthesis only ever fires when
+  // the crease truly reflects reality; `finalScore.wickets == null` (the
+  // column itself missing) fails safe the same way, since a genuine
+  // zero-wicket innings always has `wickets === 0`, never null.
+  if (
+    crease.length === 2 &&
+    finalScore &&
+    finalScore.wickets != null &&
+    fow.length === finalScore.wickets &&
+    finalScore.total > prevScore
+  ) {
     partnerships.push({
       wicketNumber: fow.length + 1,
       runs:         finalScore.total - prevScore,
