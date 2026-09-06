@@ -160,11 +160,26 @@ prev_score = 0
 for entry in fall_of_wickets (ordered by wicket_number):
     partnership_runs = entry.team_score - prev_score
     partners = tuple(crease)                     # who added these runs
-    crease.remove(entry.player_name)              # the one who got out
+    out_idx = crease.index(entry.player_name)     # which slot just fell
     if next_in < len(batting_order):
-        crease.append(batting_order[next_in]); next_in += 1
+        crease[out_idx] = batting_order[next_in]; next_in += 1  # incoming batter fills the vacated slot
+    else:
+        crease.pop(out_idx)                       # no one left — last wicket of the innings
     prev_score = entry.team_score
 ```
+
+**Slot-stable ordering (fixed shortly after the first real production
+render, September 2026).** The incoming batter fills the *vacated* slot,
+not always the second one — an earlier version did `crease.remove(...)`
+then unconditionally `crease.append(...)`, which silently shifted the
+surviving batter into the other slot whenever the dismissed player had
+been in slot 0, making them appear to swap sides between one partnership
+and the next for no reason a reader could see. Keeping the survivor's slot
+stable means the same name visually persists in the same position across
+consecutive rows on the UI (§6.6), and only the incoming name changes —
+this is what let a real user (viewing the bar chart, not this table) spot
+the bug in the first place: a name that should have "carried over" between
+two adjacent bars was flipping sides instead.
 
 **Worked example** (FCC-Rockers, 166 all out — see the sample PDF this
 was validated against): batting order 1 Sunil Reddy, 2 Karthik V, 3 Ravi
@@ -175,17 +190,20 @@ Madhusudhan, 9 Rajeevan, 10 RITURAJ SINHA, 11 Manoj..
 |---|---|---|---|---|
 | 1 | 8 | 8 | Sunil Reddy & Karthik V | Karthik V |
 | 2 | 72 | 64 | Sunil Reddy & Ravi Thakur | Sunil Reddy |
-| 3 | 85 | 13 | Ravi Thakur & Priyaranjan | Ravi Thakur |
+| 3 | 85 | 13 | Priyaranjan & Ravi Thakur | Ravi Thakur |
 | 4 | 110 | 25 | Priyaranjan & Khanush (SR) | Priyaranjan |
-| 5 | 117 | 7 | Khanush (SR) & Mohan Chimbili | Khanush (SR) |
+| 5 | 117 | 7 | Mohan Chimbili & Khanush (SR) | Khanush (SR) |
 | 6 | 140 | 23 | Mohan Chimbili & Kaushik | Mohan Chimbili |
-| 7 | 157 | 17 | Kaushik & Madhusudhan | Madhusudhan |
-| 8 | 160 | 3 | Kaushik & Rajeevan | Rajeevan |
-| 9 | 165 | 5 | Kaushik & RITURAJ SINHA | RITURAJ SINHA |
-| 10 | 166 | 1 | Kaushik & Manoj.. | Manoj.. |
+| 7 | 157 | 17 | Madhusudhan & Kaushik | Madhusudhan |
+| 8 | 160 | 3 | Rajeevan & Kaushik | Rajeevan |
+| 9 | 165 | 5 | RITURAJ SINHA & Kaushik | RITURAJ SINHA |
+| 10 | 166 | 1 | Manoj.. & Kaushik | Manoj.. |
 
 Kaushik — never named as "out" in any entry — is the batting table's own
-"not out" batter, a clean cross-check that the derivation is correct.
+"not out" batter, a clean cross-check that the derivation is correct. Note
+he holds the same (second) slot in every row from wicket 6 onward — the
+slot-stability fix above is what keeps him there instead of drifting
+between columns as new partners rotate through the other slot.
 
 ---
 

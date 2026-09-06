@@ -148,10 +148,19 @@ export function computePartnerships(
       outPlayer:    toPlayer(crease[outIdx]),
     })
 
-    crease.splice(outIdx, 1)
+    // The incoming batter fills the vacated slot (outIdx) rather than
+    // always landing at index 1 — crease.splice()+push() would shift the
+    // survivor down to fill the gap whenever index 0 was the one dismissed,
+    // making them silently swap sides from one partnership to the next
+    // (e.g. "Keshav & Darshan" reads as a new pairing even though Darshan
+    // was already there, continuing). Keeping the survivor's index stable
+    // means the same name visually persists in the same column across
+    // consecutive rows, and only the incoming name changes each time.
     if (nextIn < order.length) {
-      crease.push(order[nextIn])
+      crease[outIdx] = order[nextIn]
       nextIn += 1
+    } else {
+      crease.splice(outIdx, 1) // no one left to bring in — last wicket of the innings
     }
     prevScore = entry.team_score
     prevOver  = entry.over
