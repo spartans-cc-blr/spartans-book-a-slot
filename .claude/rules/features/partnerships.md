@@ -491,13 +491,17 @@ was on screen:
   or overlap.
 
 Each bar shows: wicket number (left label), both partnership players
-overlaid on the bar (both render as `PlayerNameLink`s — the larger name is
-not distinguished), and runs + ball span **outside the bar**, in a
-fixed-width (`w-20`) right-aligned column — not overlaid on the bar itself
-(fixed shortly after the ball-span change, September 2026: a short bar
-from a quick dismissal was squeezing that text down to almost nothing,
-and a fixed external column keeps every row's value right-aligned to the
-same edge regardless of bar length). An unbroken partnership (§4.2) gets
+overlaid on the bar and right-aligned within it (both render as
+`PlayerNameLink`s — the larger name is not distinguished), and runs + ball
+span **outside the bar**, in a fixed-width (`w-20`) right-aligned column —
+not overlaid on the bar itself (fixed shortly after the ball-span change,
+September 2026: a short bar from a quick dismissal was squeezing that text
+down to almost nothing, and a fixed external column keeps every row's
+value right-aligned to the same edge regardless of bar length). Player
+names were themselves changed to right-align within the bar the same
+session, so both name and value sit against a consistent edge on every
+row — a short bar's fill no longer determines where its names land. An
+unbroken partnership (§4.2) gets
 the standard cricket `*` suffix on its runs value (`87*`), matching the
 not-out convention already used on the Batting table above it. Hidden
 entirely (not shown empty) when `computePartnerships()` returns `[]` or
