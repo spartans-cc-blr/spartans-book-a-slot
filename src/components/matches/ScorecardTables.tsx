@@ -271,7 +271,7 @@ export function ScorecardTables({
                         })}
                       </span>
                       <span className="font-rajdhani text-xs font-bold text-gold flex-shrink-0">
-                        {p.runs}{p.outPlayer == null && '*'} <span className="text-zinc-500 font-normal">({oversToBalls(p.overTo)} balls)</span>
+                        {p.runs}{p.outPlayer == null && '*'} <span className="text-zinc-500 font-normal">({oversToBalls(p.overTo)})</span>
                       </span>
                     </div>
                   </div>

@@ -451,7 +451,9 @@ pass, September 2026).** CricHeroes' own overs.balls notation (`9.2` = 9
 overs and 2 balls, never a true decimal) reads fine on a full scorecard
 but was awkward compressed onto a narrow partnership bar next to a runs
 value. `oversToBalls()` (a local helper, same file) converts `overTo` into
-a plain ball count — `56 balls` instead of `9.2 ov`. Parses the value as a
+a plain ball count — `56` instead of `9.2 ov`, with no unit suffix in the
+UI (a bare number reads as balls by default in this context; the label
+was judged to only add clutter). Parses the value as a
 **string**, not float subtraction (`over - Math.floor(over)`): `over` can
 arrive from Supabase as a numeric-typed string, and subtracting the whole
 part in floating point reintroduces exactly the precision error this is
