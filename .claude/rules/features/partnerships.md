@@ -1,6 +1,6 @@
 # Batting Partnerships — Feature Summary
 
-**Spartans Hub · Added: September 2026 · Status: In progress (Phases 1–4 done)**
+**Spartans Hub · Added: September 2026 · Status: In progress (Phases 1–5 done)**
 
 ---
 
@@ -36,8 +36,10 @@ are a small, mechanical mirror of four already-proven patterns in the
 same function (see §9) and haven't yet been exercised by a real sync —
 the next automated `backfill-scorecards` cron run against the live
 "Extreme Cricket Summer Cup" match (§5) will be the first real proof of
-the sync path end-to-end. No derivation or UI exists yet (Phases 5–6).
-This doc will be updated as those land.
+the sync path end-to-end. Phase 5 (derivation) is built and validated
+against real production data — see §4.1. No UI exists yet (Phase 6,
+deliberately not started — the derivation function isn't wired into any
+API route or component). This doc will be updated as those land.
 
 ---
 
@@ -127,8 +129,8 @@ sizes from single digits up to 145 runs):
 
 ## 4. Partnership derivation algorithm
 
-Not yet implemented on the Hub side (Phase 5) — documented here since it's
-already been validated standalone against real data:
+Implemented in `src/lib/partnerships.ts` (`computePartnerships()`) — see
+§4.1 for the real-data validation this ran through.
 
 ```
 crease = [batting_order[0], batting_order[1]]   # the two openers
@@ -163,6 +165,52 @@ Madhusudhan, 9 Rajeevan, 10 RITURAJ SINHA, 11 Manoj..
 
 Kaushik — never named as "out" in any entry — is the batting table's own
 "not out" batter, a clean cross-check that the derivation is correct.
+
+---
+
+## 4.1 Implementation and validation (Phase 5)
+
+`computePartnerships(batting, fallOfWickets)` in `src/lib/partnerships.ts`
+is a pure function — no DB access of its own. Deliberately does **not**
+reuse `matchTopPerformers.ts`'s `resolveSquadMatch()` pattern: that
+function exists because a top-performer row's `player_id` can be null
+pre-reconciliation, so it falls back to a squad name match. Here, both a
+partnership's two players and a Fall of Wickets entry's dismissed name
+resolve against the exact same `batting` array passed in — there's no
+second, independent source to fall back to, and `batting_stats.player_id`
+is already the authoritative, already-reconciled identity for that
+scorecard name (see `features/player-identity-resolution.md`). A null
+`player_id` here just means this player hasn't been reconciled yet, same
+as anywhere else that reads `batting_stats` directly.
+
+**Two return values carry distinct meaning, not just "empty vs not":**
+- `[]` — nothing to show yet, not an error: no Fall of Wickets rows for
+  this match, or fewer than two batters with a real `batting_order` (a
+  booking whose scorecard predates this feature, or hasn't been
+  re-synced since — see §5's "Nullable on nothing" note).
+- `null` — a genuine data-integrity signal: a Fall of Wickets entry names
+  someone who isn't one of the two current crease occupants. Against
+  correct data this should never happen (see §3's cross-checks), so it's
+  surfaced (`console.error`, prefixed `[partnerships]`) and the whole
+  match's derivation is dropped rather than silently guessing a wrong
+  pairing.
+
+**Validated two ways before being considered done:**
+1. Against a deliberately corrupted input (an unresolvable name) —
+   correctly returns `null` and logs the mismatch instead of producing a
+   partial or wrong partnership list. Also checked both `[]` cases (empty
+   Fall of Wickets; fewer than two real batters).
+2. Against the real, live analytics-DB rows for the "Extreme Cricket
+   Summer Cup" match synced in Phase 3 (`match_id 26908096` — fetched
+   fresh via SQL, not the locally-cached test fixtures from earlier
+   phases) — reproduced the exact same 7-partnership breakdown, including
+   correctly ignoring the three `did_not_bat` placeholder rows (which sort
+   *before* the real batting order in a plain `ORDER BY batting_order`
+   fetch, since their `batting_order` is `0`) rather than mistaking one
+   for an opener.
+
+Not yet wired into any API route or UI component (Phase 6) — this is
+derivation logic only, called by nothing in the running app yet.
 
 ---
 
@@ -272,7 +320,8 @@ that run has been observed.
 | Check | Status |
 |---|---|
 | `fall_of_wickets` RLS enabled, no anon/authenticated policies | ✅ |
-| No `player_id`/identity data written from anything but the existing, already-audited `batting_stats` join path | ✅ (join happens at read time, not yet built — Phase 5) |
+| No `player_id`/identity data written from anything but the existing, already-audited `batting_stats` join path | ✅ (join happens at read time in `computePartnerships()`, see §4.1) |
+| `computePartnerships()` is a pure function — no DB access, no new write path, not yet called from anywhere in the running app | ✅ |
 | Extraction is read-only against the PDF; no new write path introduced anywhere in the Hub | ✅ |
 | Spartans-only scope maintained — no opponent data newly persisted | ✅ |
 | Existing production parsing (`batting_stats`/`bowling_stats`/`team_list` extraction) verified byte-for-byte unchanged before shipping the shared name-normalization refactor | ✅ |
@@ -294,6 +343,7 @@ that run has been observed.
 | `supabase/migrations/071_match_stats_cache_fall_of_wickets.sql` | Hub-side cache column (§5) |
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
+| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function, not yet called from anywhere |
 
 ---
 
@@ -301,7 +351,6 @@ that run has been observed.
 
 | Phase | Item |
 |---|---|
-| 5 | Hub derivation — `src/lib/partnerships.ts`, the crease-pointer algorithm (§4) implemented against real `batting_stats`/`fall_of_wickets` data, with an assertion (not silent fallback) when a name doesn't resolve |
 | 6 | UI — a Partnerships table on the match scorecard (`ScorecardTables.tsx` or a new sibling component), hidden entirely for a match with no Fall of Wickets data yet |
 
 ---
