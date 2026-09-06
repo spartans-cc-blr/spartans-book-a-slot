@@ -438,14 +438,26 @@ outdoor mobile users, and hover doesn't work on touch anyway). Floored at
 Every classic FOW fact (cumulative score, over, who got out) is already
 recoverable from a partnership row, so a second list underneath would just
 show the same wickets again in a less useful format. The one value carried
-over from the raw FOW convention is **"Over"** — the over the partnership
-*ended* (`overTo`), matching the over value CricHeroes' own FOW line
-shows, printed next to the runs value; `overFrom` is computed by
+over from the raw FOW convention is the over the partnership *ended*
+(`overTo`), printed next to the runs value; `overFrom` is computed by
 `computePartnerships()` but not surfaced here (available if a future view
 needs the span). "Score" (cumulative team total) was considered and
 deliberately dropped — it's recoverable by summing the runs values
 top-to-bottom and is shown elsewhere on the card already; the interesting
 fact here is stand size, not running total.
+
+**Shown as a ball count, not `X.Y ov` (fixed shortly after the previous UI
+pass, September 2026).** CricHeroes' own overs.balls notation (`9.2` = 9
+overs and 2 balls, never a true decimal) reads fine on a full scorecard
+but was awkward compressed onto a narrow partnership bar next to a runs
+value. `oversToBalls()` (a local helper, same file) converts `overTo` into
+a plain ball count — `56 balls` instead of `9.2 ov`. Parses the value as a
+**string**, not float subtraction (`over - Math.floor(over)`): `over` can
+arrive from Supabase as a numeric-typed string, and subtracting the whole
+part in floating point reintroduces exactly the precision error this is
+meant to avoid (`9.2 - 9` → `0.19999999999999982` in JS, not `0.2`).
+`overFrom` isn't rendered here at all (see above), so it was never
+converted.
 
 Each bar shows: wicket number (left label), both partnership players
 overlaid on the bar (both render as `PlayerNameLink`s — the larger name is
@@ -546,7 +558,7 @@ as the external-link fallback when there's no `playerId` at all.
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
 | `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2) |
-| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, first-name-only labels via a local `firstName()` helper, `*` suffix on an unbroken partnership's runs value, no `(out)` marker; `teamTotal`/`teamOvers` props feed `finalScore` |
+| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, first-name-only labels via a local `firstName()` helper, `*` suffix on an unbroken partnership's runs value, no `(out)` marker, `oversToBalls()` renders `overTo` as a ball count; `teamTotal`/`teamOvers` props feed `finalScore` |
 | `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets`; passes `teamTotal`/`teamOvers` from `match.stats` |
 | `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` along with `teamTotal`/`teamOvers` |
 

@@ -67,6 +67,19 @@ function firstName(name: string): string {
   return name.trim().split(/\s+/)[0]
 }
 
+// Converts CricHeroes' own "overs.balls" notation (e.g. 9.2 = 9 overs and
+// 2 balls, never a true decimal) into a plain ball count (9*6+2 = 56).
+// Parsed as a string rather than done with float math — `over` can arrive
+// from Supabase as a numeric-typed string, and subtracting the whole part
+// via floating point (9.2 - 9) reintroduces the exact precision error this
+// sidesteps (e.g. 0.19999999999999982 instead of 0.2).
+function oversToBalls(over: number | string): number {
+  const [wholeStr, ballStr] = String(over).split('.')
+  const whole = parseInt(wholeStr, 10) || 0
+  const ball = ballStr ? parseInt(ballStr[0], 10) || 0 : 0
+  return whole * 6 + ball
+}
+
 export function ScorecardTables({
   batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, squad,
 }: {
@@ -258,7 +271,7 @@ export function ScorecardTables({
                         })}
                       </span>
                       <span className="font-rajdhani text-xs font-bold text-gold flex-shrink-0">
-                        {p.runs}{p.outPlayer == null && '*'} <span className="text-zinc-500 font-normal">({p.overTo} ov)</span>
+                        {p.runs}{p.outPlayer == null && '*'} <span className="text-zinc-500 font-normal">({oversToBalls(p.overTo)} balls)</span>
                       </span>
                     </div>
                   </div>
