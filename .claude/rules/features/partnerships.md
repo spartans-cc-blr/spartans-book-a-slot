@@ -1,6 +1,6 @@
 # Batting Partnerships — Feature Summary
 
-**Spartans Hub · Added: September 2026 · Status: In progress (Phases 1–3 done)**
+**Spartans Hub · Added: September 2026 · Status: In progress (Phases 1–4 done)**
 
 ---
 
@@ -29,9 +29,14 @@ whichever one the entry names as dismissed, and bring in the next
 batter by `batting_order`. See §4 for the full algorithm and a worked
 example.
 
-**Status as of this doc:** the extraction and storage layers (Phases 1–3
-below) are built and validated against 6 real innings across 3 different
-match PDFs — no derivation or UI exists yet (Phases 4–6, not started).
+**Status as of this doc:** the extraction, storage, and Hub-sync layers
+(Phases 1–4 below) are built. Phases 1–3 are validated against 6 real
+innings across 3 different match PDFs; Phase 4's Hub-side sync additions
+are a small, mechanical mirror of four already-proven patterns in the
+same function (see §9) and haven't yet been exercised by a real sync —
+the next automated `backfill-scorecards` cron run against the live
+"Extreme Cricket Summer Cup" match (§5) will be the first real proof of
+the sync path end-to-end. No derivation or UI exists yet (Phases 5–6).
 This doc will be updated as those land.
 
 ---
@@ -197,10 +202,13 @@ always resolves against whatever `batting_stats.player_id` currently is.
 until it's re-synced, same "code merged ≠ history re-run" posture as
 `004_bowling_order.sql`.
 
-### Hub DB
+### Hub DB — `match_stats_cache.fall_of_wickets` (migration `071_match_stats_cache_fall_of_wickets.sql`)
 
-No changes yet — `match_stats_cache` doesn't carry Fall of Wickets data
-until Phase 4 (Hub-side sync) lands.
+Nullable `jsonb` column, same one-column-per-analytics-table pattern
+`044_match_stats_cache.sql` already established for `batting`/`bowling`/
+`fielding`/`team_list`. Additive, no backfill — an existing booking's
+cache row simply has `NULL` here until its next re-sync, same posture as
+the analytics DB's own `bowling_order` rollout.
 
 ---
 
@@ -220,6 +228,43 @@ until Phase 4 (Hub-side sync) lands.
   both updated so the new CSV surfaces in dry-run summaries and gets
   uploaded alongside the others.
 
+**Real-match validation (5 Sep 2026):** rather than waiting for the next
+scheduled cron, this match's own PDF (Extreme Cricket Summer Cup Season 1,
+Spartans CC Bengaluru vs Kalinga Cricket Club, `match_id 26908096`, played
+the morning of 6 Sep 2026) was run through the exact production pipeline
+by hand and upserted directly into the live analytics DB — `match_stats`,
+`team_list`, `batting_stats`, `bowling_stats`, `fielding_stats` (12 rows
+each) and `fall_of_wickets` (7 rows) all landed correctly. One real gotcha
+caught in the process: the extractor's own filename-derived `match_id`
+(`'Scorecard_26908096'`) is *not* what production actually uses — both
+`api.py`'s `/fetch-and-parse-scorecard` and the manual upload route always
+override it with the Hub's own `bookings.match_id` before writing anything
+(`match_id_override`), and the manual validation had to replicate that
+override explicitly to land on the correct key. `scorecard_uploads` and
+`match_stats_cache` were deliberately left untouched for this booking —
+see the Hub-sync note below.
+
+---
+
+## 6.5 Real-sync proof still pending — Hub side (Phase 4)
+
+The manual validation above proves the analytics-DB half of the pipeline
+end-to-end for a genuinely new match. It deliberately did **not** touch
+Hub's `scorecard_uploads`/`match_stats_cache` for that booking — the plan
+is to let the twice-daily `backfill-scorecards` cron (see
+`features/post-match-scorecard.md` §8) pick this booking up naturally,
+now that both the `spartans-python` FOW code (pushed to `main`, confirmed
+live on Render as of 5 Sep 2026) and this Hub-side sync code are in place.
+Since the booking's own `scorecard_uploads` row doesn't exist yet, the
+cron has no way to know analytics-DB rows already exist for it — it will
+run its normal first-time path (re-fetch the PDF from CricHeroes, re-parse,
+upsert) and simply overwrite the manually-inserted rows with identical
+freshly-parsed data, then complete the part left undone here: flipping
+`scorecard_uploads.status` to `synced` and populating
+`match_stats_cache.fall_of_wickets` for real. This will be the first live,
+fully-automated proof of Phases 1–4 together. Update this section once
+that run has been observed.
+
 ---
 
 ## 7. Security (vibe-security)
@@ -231,6 +276,8 @@ until Phase 4 (Hub-side sync) lands.
 | Extraction is read-only against the PDF; no new write path introduced anywhere in the Hub | ✅ |
 | Spartans-only scope maintained — no opponent data newly persisted | ✅ |
 | Existing production parsing (`batting_stats`/`bowling_stats`/`team_list` extraction) verified byte-for-byte unchanged before shipping the shared name-normalization refactor | ✅ |
+| `GET /api/matches/history/[bookingId]/scorecard`'s new `fall_of_wickets` field reuses the existing route's auth (any signed-in, non-expelled member) — no new access surface, matches every other field already returned there | ✅ |
+| `match_stats_cache.fall_of_wickets` written only by `syncMatchStatsForBooking()`, same service-role-only path as every other column on that row | ✅ |
 
 ---
 
@@ -244,6 +291,9 @@ until Phase 4 (Hub-side sync) lands.
 | `spartans-python/utils/csv_writers.py` | `FallOfWicketsWriter` |
 | `spartans-python/scripts/import_to_supabase.py` | `fall_of_wickets.csv` → `fall_of_wickets` table mapping, `CONFLICT_KEYS` |
 | `spartans-python/api.py`, `spartans-python/main.py` | `match_data['fall_of_wickets']` populated; dry-run summary + Drive upload lists updated |
+| `supabase/migrations/071_match_stats_cache_fall_of_wickets.sql` | Hub-side cache column (§5) |
+| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
+| `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
 
 ---
 
@@ -251,7 +301,6 @@ until Phase 4 (Hub-side sync) lands.
 
 | Phase | Item |
 |---|---|
-| 4 | Hub sync — `src/lib/matchStatsSync.ts` pulls `fall_of_wickets` into `match_stats_cache` (new jsonb column, Hub migration) |
 | 5 | Hub derivation — `src/lib/partnerships.ts`, the crease-pointer algorithm (§4) implemented against real `batting_stats`/`fall_of_wickets` data, with an assertion (not silent fallback) when a name doesn't resolve |
 | 6 | UI — a Partnerships table on the match scorecard (`ScorecardTables.tsx` or a new sibling component), hidden entirely for a match with no Fall of Wickets data yet |
 
