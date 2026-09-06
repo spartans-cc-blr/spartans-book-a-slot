@@ -318,36 +318,49 @@ that run has been observed.
 
 ## 6.6 UI (Phase 6)
 
-A "Partnerships" table in `ScorecardTables.tsx`, positioned between
-Batting and Bowling — not appended after Fielding like the fielding table
-was. Partnerships describe how the batting innings unfolded, so they read
-as part of the batting story; since `batting` and `fall_of_wickets` are
-both always scoped to the same (Spartans) innings (§2), there's no
-ambiguity about which side's partnerships are shown — it always lines up
-1:1 with the Batting table directly above it.
+A "Partnerships" **horizontal bar chart** in `ScorecardTables.tsx`,
+positioned between Batting and Bowling — not appended after Fielding like
+the fielding table was. Partnerships describe how the batting innings
+unfolded, so they read as part of the batting story; since `batting` and
+`fall_of_wickets` are both always scoped to the same (Spartans) innings
+(§2), there's no ambiguity about which side's partnerships are shown — it
+always lines up 1:1 with the Batting table directly above it.
 
-**Deliberately one merged table, not a separate raw Fall-of-Wickets list.**
+**Bar chart, not a table** (changed shortly after the initial ship) — one
+row per wicket, in wicket order, bar length proportional to that stand's
+runs against the innings' biggest partnership. Reuses
+`BattingPositionLeaders.tsx`'s exact bar treatment (the leaderboard's own
+single-series magnitude-per-category chart — `bg-ink-4` track, `bg-gold/40`
+fill, labels overlaid directly on the bar rather than hidden behind
+hover) rather than inventing a new visual language, and for the same
+reason that component has no separate "top" highlight: bar length already
+encodes rank, so a second gold-text highlight on top of it (the original
+table version's `isTop` treatment) would be redundant. Labels stay
+always-visible text on the bar, not hover-only tooltips — consistent with
+this app's daylight-first/no-hover-dependency UI principle (`ui-theme.md`;
+outdoor mobile users, and hover doesn't work on touch anyway). Floored at
+6% width so a 0-run partnership still renders a visible bar.
+
+**Deliberately one merged view, not a separate raw Fall-of-Wickets list.**
 Every classic FOW fact (cumulative score, over, who got out) is already
 recoverable from a partnership row, so a second list underneath would just
-show the same wickets again in a less useful format. The one column
-carried over from the raw FOW convention is **"Over"** — the over the
-partnership *ended* (`overTo`), matching the over value CricHeroes' own
-FOW line shows; `overFrom` is computed by `computePartnerships()` but not
-surfaced here (available if a future view needs the span). "Score"
-(cumulative team total) was considered and deliberately dropped — it's
-recoverable by summing the Runs column top-to-bottom and is shown
-elsewhere on the card already; the interesting fact in this table is
-stand size, not running total.
+show the same wickets again in a less useful format. The one value carried
+over from the raw FOW convention is **"Over"** — the over the partnership
+*ended* (`overTo`), matching the over value CricHeroes' own FOW line
+shows, printed next to the runs value; `overFrom` is computed by
+`computePartnerships()` but not surfaced here (available if a future view
+needs the span). "Score" (cumulative team total) was considered and
+deliberately dropped — it's recoverable by summing the runs values
+top-to-bottom and is shown elsewhere on the card already; the interesting
+fact here is stand size, not running total.
 
-Rendered columns: **Wkt / Runs / Players / Over**. The larger of the two
-partnership players' names is not distinguished — both render as
-`PlayerNameLink`s — but the dismissed one gets a trailing `(out)` marker
-(muted text, not color-only, consistent with this app's daylight-first/
-no-hover-dependency UI principle — see `ui-theme.md`). The biggest
-partnership in the innings is highlighted gold, the same `isTop` pattern
-already used for top scorer/wicket-taker/fielder in this same file. Hidden
-entirely (not shown empty) when `computePartnerships()` returns `[]` or
-`null` — same "hidden, not empty" convention as the Fielding table.
+Each bar shows: wicket number (left label), both partnership players
+overlaid on the bar (both render as `PlayerNameLink`s — the larger name is
+not distinguished), and runs + over overlaid on the right. The dismissed
+player gets a trailing `(out)` marker (muted text, not color-only, same
+`ui-theme.md` principle as above). Hidden entirely (not shown empty) when
+`computePartnerships()` returns `[]` or `null` — same "hidden, not empty"
+convention as the Fielding table.
 
 **Player identity — deliberately bypasses this file's own `findPlayerId()`
 helper.** Every other table here resolves a Hub `player_id` via
@@ -404,7 +417,7 @@ as the external-link fallback when there's no `playerId` at all.
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
 | `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function |
-| `src/components/matches/ScorecardTables.tsx` | Partnerships table (§6.6) — between Batting and Bowling, gold-highlights the biggest stand, `(out)` marker on the dismissed player |
+| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, `(out)` marker on the dismissed player |
 | `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets` |
 | `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` |
 

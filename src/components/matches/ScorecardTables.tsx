@@ -191,30 +191,23 @@ export function ScorecardTables({
       {partnerships.length > 0 && (
         <div>
           <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Partnerships</p>
-          <div className="overflow-x-auto">
-            <table className="w-full table-fixed text-xs font-rajdhani">
-              <colgroup>
-                <col className="w-[10%]" />
-                <col className="w-[16%]" />
-                <col className="w-[59%]" />
-                <col className="w-[15%]" />
-              </colgroup>
-              <thead>
-                <tr className="text-zinc-600 border-b border-ink-5">
-                  <th className="text-center py-1">Wkt</th>
-                  <th className="text-center px-1">Runs</th>
-                  <th className="text-center px-1">Players</th>
-                  <th className="text-right pl-1">Over</th>
-                </tr>
-              </thead>
-              <tbody>
-                {partnerships.map(p => {
-                  const isTop = topPartnershipRuns > 0 && p.runs === topPartnershipRuns
-                  return (
-                    <tr key={p.wicketNumber} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
-                      <td className="text-center py-1">{p.wicketNumber}</td>
-                      <td className="text-center px-1">{p.runs}</td>
-                      <td className="px-1">
+          <div className="space-y-1.5">
+            {partnerships.map(p => {
+              // Bar length already encodes rank, same reasoning
+              // BattingPositionLeaders.tsx (the leaderboard's identical
+              // single-series magnitude-per-category chart) uses — no
+              // separate "biggest stand" highlight needed on top of it.
+              // Floored at 6% so a 0-run stand still renders a visible bar
+              // (and guards divide-by-zero on the rare innings where every
+              // partnership is 0 runs, e.g. a string of wickets in one over).
+              const pct = topPartnershipRuns > 0 ? Math.max((p.runs / topPartnershipRuns) * 100, 6) : 6
+              return (
+                <div key={p.wicketNumber} className="flex items-center gap-2">
+                  <span className="font-cinzel text-xs text-zinc-500 w-5 flex-shrink-0 text-right">{p.wicketNumber}</span>
+                  <div className="flex-1 relative h-7 bg-ink-4 rounded overflow-hidden">
+                    <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
+                    <div className="absolute inset-0 flex items-center justify-between gap-2 px-2.5">
+                      <span className="font-rajdhani text-xs font-semibold text-parchment truncate">
                         {p.players.map((player, i) => {
                           const isOut = player.playerName.trim().toLowerCase() === p.outPlayer.playerName.trim().toLowerCase()
                           // player.playerId already comes straight from
@@ -236,17 +229,19 @@ export function ScorecardTables({
                                 playerId={player.playerId}
                                 cricHeroesUrl={findCricHeroesUrl({ player_id: player.playerId }, player.playerName, squad)}
                               />
-                              {isOut && <span className="text-zinc-600"> (out)</span>}
+                              {isOut && <span className="text-zinc-500"> (out)</span>}
                             </span>
                           )
                         })}
-                      </td>
-                      <td className="text-right pl-1">{p.overTo}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                      </span>
+                      <span className="font-rajdhani text-xs font-bold text-gold flex-shrink-0">
+                        {p.runs} <span className="text-zinc-500 font-normal">({p.overTo} ov)</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
