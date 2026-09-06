@@ -151,7 +151,7 @@ Access here is genuinely mixed per-route rather than one role — see
 |---|---|---|---|
 | `/api/matches/history` | GET | Any signed-in, non-expelled member | Paginated past-match list; computes `can_upload`, `can_verify`, `top_performers`, `roles_complete`, `scorecard_status`, `ground` join server-side |
 | `/api/matches/history/[bookingId]` | GET | Any signed-in member | Squad detail for one booking |
-| `/api/matches/history/[bookingId]/scorecard` | GET | Any signed-in member | Full batting/bowling/fielding/team_list — stats aren't sensitive |
+| `/api/matches/history/[bookingId]/scorecard` | GET | Any signed-in member | Full batting/bowling/fielding/team_list/fall_of_wickets — stats aren't sensitive |
 | `/api/matches/history/[bookingId]/roles` | PATCH | GC/admin/wrangler | Correct C/VC/WK post-hoc |
 | `/api/matches/history/[bookingId]/tournament` | PATCH | Admin | Reassign tournament post-hoc |
 | `/api/matches/[id]/scorecard` | POST | Captain/VC (own booking) or wrangler/admin | Manual PDF upload — streamed progress, `%PDF` magic-byte + 10MB validation |
@@ -306,8 +306,8 @@ Immutable audit trail for the verify/reconciliation flow above, same insert-only
 Immutable audit trail for admin-only R1–R6 overrides — see §7.1. One row per overridden rule per booking. **RLS enabled, no anon/authenticated policies.** Migration `052_booking_rule_overrides.sql`.
  
 #### `match_stats_cache`
-`match_id PK, booking_id FK, match_result, team_total/wickets/overs, opponent_total/wickets/overs, opponent_name, ground, tournament_name, match_date, batting/bowling/fielding/team_list (jsonb arrays), synced_at, synced_by FK`
-Read-through cache of the separate analytics Supabase project — source of truth stays there. **RLS enabled, no anon/authenticated policies** (same fix as above). See `features/post-match-scorecard.md`.
+`match_id PK, booking_id FK, match_result, team_total/wickets/overs, opponent_total/wickets/overs, opponent_name, ground, tournament_name, match_date, batting/bowling/fielding/team_list/fall_of_wickets (jsonb arrays), synced_at, synced_by FK`
+Read-through cache of the separate analytics Supabase project — source of truth stays there. **RLS enabled, no anon/authenticated policies** (same fix as above). See `features/post-match-scorecard.md`. `fall_of_wickets` — migration `071_match_stats_cache_fall_of_wickets.sql` — mirrors the analytics DB's own `fall_of_wickets` table (§ below), raw facts only; see `features/partnerships.md` for the derivation this feeds.
  
 #### `fee_exemptions`
 Full lockdown RLS. Joined to `players` in admin view.
@@ -743,7 +743,7 @@ Next.js API Routes (server-side)
 | `src/app/api/matches/[id]/flag-reconciliation/route.ts` | POST reports a stats discrepancy (Zod-validated note), re-queuing into the backfill pipeline; DELETE is an admin-only clear-without-reprocessing override |
 | `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking verify/flag auth, includes the top-performer grant; see `features/post-match-scorecard.md` §15 |
 | `src/lib/matchTopPerformers.ts` | Resolves a match's top scorer/wicket-taker to a Hub `player_id`; see `features/post-match-scorecard.md` §15 |
-| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; calls `autoResolveMatch()` before reading analytics rows, last step calls `detectAndLogMilestones()` |
+| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; calls `autoResolveMatch()` before reading analytics rows (now including `fall_of_wickets`, ordered by `wicket_number`), last step calls `detectAndLogMilestones()` |
 | `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` (season) + `detectAndLogMatchPerformances()` (single-match highlights) — club-wide milestone recognition detection; see `features/milestone-recognition.md` |
 | `src/app/api/milestones/unseen/route.ts` + `src/app/api/milestones/mark-seen/route.ts` | Broadcast feed + seen-cursor advance for the milestone recognition modal |
 | `src/components/milestones/MilestoneCelebrationModal.tsx` | Club-wide milestone recognition modal |

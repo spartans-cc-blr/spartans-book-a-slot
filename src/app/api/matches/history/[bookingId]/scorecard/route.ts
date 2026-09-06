@@ -31,7 +31,7 @@ export async function GET(
 
   const { data: stats, error: statsErr } = await supabase
     .from('match_stats_cache')
-    .select('batting, bowling, fielding, team_list')
+    .select('batting, bowling, fielding, team_list, fall_of_wickets')
     .eq('match_id', booking.match_id)
     .maybeSingle()
 
@@ -39,9 +39,10 @@ export async function GET(
   if (!stats) return NextResponse.json({ error: 'Stats not synced yet' }, { status: 404 })
 
   return NextResponse.json({
-    batting:   stats.batting ?? [],
-    bowling:   stats.bowling ?? [],
-    fielding:  stats.fielding ?? [],
-    team_list: stats.team_list ?? [],
+    batting:         stats.batting ?? [],
+    bowling:         stats.bowling ?? [],
+    fielding:        stats.fielding ?? [],
+    team_list:       stats.team_list ?? [],
+    fall_of_wickets: stats.fall_of_wickets ?? [],
   })
 }

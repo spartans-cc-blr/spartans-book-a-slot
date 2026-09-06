@@ -61,12 +61,13 @@ export async function syncMatchStatsForBooking(
   // match_stats_cache (and therefore every other consumer of that jsonb
   // array) is whatever Postgres feels like returning, not the real
   // batting/bowling order.
-  const [match, batting, bowling, fielding, team] = await Promise.all([
+  const [match, batting, bowling, fielding, team, fallOfWickets] = await Promise.all([
     analyticsSupabase.from('match_stats').select('*').eq('match_id', mid).single(),
     analyticsSupabase.from('batting_stats').select('*').eq('match_id', mid).order('batting_order', { ascending: true }),
     analyticsSupabase.from('bowling_stats').select('*').eq('match_id', mid).order('bowling_order', { ascending: true, nullsFirst: false }),
     analyticsSupabase.from('fielding_stats').select('*').eq('match_id', mid),
     analyticsSupabase.from('team_list').select('*').eq('match_id', mid),
+    analyticsSupabase.from('fall_of_wickets').select('*').eq('match_id', mid).order('wicket_number', { ascending: true }),
   ])
 
   if (!match.data) {
@@ -93,6 +94,7 @@ export async function syncMatchStatsForBooking(
     bowling:          bowling.data ?? [],
     fielding:         fielding.data ?? [],
     team_list:        team.data ?? [],
+    fall_of_wickets:  fallOfWickets.data ?? [],
     synced_at:        new Date().toISOString(),
     synced_by:        syncedBy,
   }, { onConflict: 'match_id' })

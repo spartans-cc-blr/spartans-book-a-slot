@@ -88,10 +88,11 @@ interface MatchDetail {
 }
 
 interface FullScorecard {
-  batting:   any[]
-  bowling:   any[]
-  fielding:  any[]
-  team_list: any[]
+  batting:         any[]
+  bowling:         any[]
+  fielding:        any[]
+  team_list:       any[]
+  fall_of_wickets: any[]
 }
 
 interface Tournament {
@@ -929,6 +930,7 @@ function MatchHistoryCard({
                   bowling={scorecard.bowling}
                   fielding={scorecard.fielding}
                   teamList={scorecard.team_list}
+                  fallOfWickets={scorecard.fall_of_wickets}
                   squad={detail?.squad}
                 />
               )}
