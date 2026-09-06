@@ -1,6 +1,7 @@
 'use client'
 
 import { PlayerNameLink } from '@/lib/playerLink'
+import { computePartnerships } from '@/lib/partnerships'
 
 interface SquadRef {
   player_id:      string
@@ -59,12 +60,13 @@ function fieldingTotal(row: any): number {
 }
 
 export function ScorecardTables({
-  batting, bowling, fielding, teamList, squad,
+  batting, bowling, fielding, teamList, fallOfWickets, squad,
 }: {
   batting: any[]
   bowling: any[]
   fielding?: any[]
   teamList?: any[]
+  fallOfWickets?: any[]
   squad?: SquadRef[]
 }) {
   // Players who didn't bat/bowl get a zero-filled row (dismissal_method:
@@ -96,6 +98,13 @@ export function ScorecardTables({
   const topBatRuns  = battingRows.reduce((max, r) => Math.max(max, num(r, ['runs', 'total_runs'])), 0)
   const topBowlWkts = bowlingRows.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
   const topFieldingTotal = fieldingRows.reduce((max, r) => Math.max(max, fieldingTotal(r)), 0)
+
+  // computePartnerships() logs its own [partnerships] error and returns
+  // null on a genuine data-integrity mismatch — nothing further to do here
+  // besides not rendering, same as the ordinary "no Fall of Wickets synced
+  // yet" [] case just below it.
+  const partnerships = computePartnerships(batting, fallOfWickets ?? []) ?? []
+  const topPartnershipRuns = partnerships.reduce((max, p) => Math.max(max, p.runs), 0)
 
   // The batting table filters out players who didn't bat, so on its own it
   // can't answer "who else was in the squad that day" — team_list (the full
@@ -178,6 +187,69 @@ export function ScorecardTables({
           </p>
         )}
       </div>
+
+      {partnerships.length > 0 && (
+        <div>
+          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Partnerships</p>
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed text-xs font-rajdhani">
+              <colgroup>
+                <col className="w-[10%]" />
+                <col className="w-[16%]" />
+                <col className="w-[59%]" />
+                <col className="w-[15%]" />
+              </colgroup>
+              <thead>
+                <tr className="text-zinc-600 border-b border-ink-5">
+                  <th className="text-center py-1">Wkt</th>
+                  <th className="text-center px-1">Runs</th>
+                  <th className="text-center px-1">Players</th>
+                  <th className="text-right pl-1">Over</th>
+                </tr>
+              </thead>
+              <tbody>
+                {partnerships.map(p => {
+                  const isTop = topPartnershipRuns > 0 && p.runs === topPartnershipRuns
+                  return (
+                    <tr key={p.wicketNumber} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
+                      <td className="text-center py-1">{p.wicketNumber}</td>
+                      <td className="text-center px-1">{p.runs}</td>
+                      <td className="px-1">
+                        {p.players.map((player, i) => {
+                          const isOut = player.playerName.trim().toLowerCase() === p.outPlayer.playerName.trim().toLowerCase()
+                          // player.playerId already comes straight from
+                          // batting_stats.player_id — the authoritative,
+                          // already-reconciled identity (see
+                          // src/lib/partnerships.ts's own header comment).
+                          // Used directly rather than routed through
+                          // findPlayerId(), which would incorrectly discard
+                          // an already-good id if `squad` hasn't loaded yet
+                          // (a real, non-hypothetical race here: scorecard
+                          // and squad detail fetch in parallel above).
+                          // findCricHeroesUrl() is still used for the
+                          // fallback link when there's no playerId at all.
+                          return (
+                            <span key={i}>
+                              {i > 0 && ' & '}
+                              <PlayerNameLink
+                                name={player.playerName}
+                                playerId={player.playerId}
+                                cricHeroesUrl={findCricHeroesUrl({ player_id: player.playerId }, player.playerName, squad)}
+                              />
+                              {isOut && <span className="text-zinc-600"> (out)</span>}
+                            </span>
+                          )
+                        })}
+                      </td>
+                      <td className="text-right pl-1">{p.overTo}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div>
         <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Bowling</p>

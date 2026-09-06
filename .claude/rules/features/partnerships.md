@@ -1,6 +1,6 @@
 # Batting Partnerships — Feature Summary
 
-**Spartans Hub · Added: September 2026 · Status: In progress (Phases 1–5 done)**
+**Spartans Hub · Added: September 2026 · Status: All 6 phases shipped**
 
 ---
 
@@ -29,17 +29,18 @@ whichever one the entry names as dismissed, and bring in the next
 batter by `batting_order`. See §4 for the full algorithm and a worked
 example.
 
-**Status as of this doc:** the extraction, storage, and Hub-sync layers
-(Phases 1–4 below) are built. Phases 1–3 are validated against 6 real
-innings across 3 different match PDFs; Phase 4's Hub-side sync additions
-are a small, mechanical mirror of four already-proven patterns in the
-same function (see §9) and haven't yet been exercised by a real sync —
-the next automated `backfill-scorecards` cron run against the live
-"Extreme Cricket Summer Cup" match (§5) will be the first real proof of
-the sync path end-to-end. Phase 5 (derivation) is built and validated
-against real production data — see §4.1. No UI exists yet (Phase 6,
-deliberately not started — the derivation function isn't wired into any
-API route or component). This doc will be updated as those land.
+**Status as of this doc:** the extraction, storage, Hub-sync, derivation,
+and UI layers (Phases 1–6) are all built. Phases 1–3 are validated against
+6 real innings across 3 different match PDFs; Phase 5's derivation is
+additionally validated against the real, live analytics-DB rows for an
+already-synced match (§4.1). Phase 4's Hub-side sync additions are a
+small, mechanical mirror of four already-proven patterns in the same
+function (see §9) and haven't yet been exercised by a real sync — the
+next automated `backfill-scorecards` cron run against the live "Extreme
+Cricket Summer Cup" match (§5) will be the first real proof of the sync
+path end-to-end, and will also be the first time the Phase 6 UI (§6.6)
+has real data to render for a match synced after this feature shipped.
+Update this section once that run has been observed.
 
 ---
 
@@ -315,13 +316,72 @@ that run has been observed.
 
 ---
 
+## 6.6 UI (Phase 6)
+
+A "Partnerships" table in `ScorecardTables.tsx`, positioned between
+Batting and Bowling — not appended after Fielding like the fielding table
+was. Partnerships describe how the batting innings unfolded, so they read
+as part of the batting story; since `batting` and `fall_of_wickets` are
+both always scoped to the same (Spartans) innings (§2), there's no
+ambiguity about which side's partnerships are shown — it always lines up
+1:1 with the Batting table directly above it.
+
+**Deliberately one merged table, not a separate raw Fall-of-Wickets list.**
+Every classic FOW fact (cumulative score, over, who got out) is already
+recoverable from a partnership row, so a second list underneath would just
+show the same wickets again in a less useful format. The one column
+carried over from the raw FOW convention is **"Over"** — the over the
+partnership *ended* (`overTo`), matching the over value CricHeroes' own
+FOW line shows; `overFrom` is computed by `computePartnerships()` but not
+surfaced here (available if a future view needs the span). "Score"
+(cumulative team total) was considered and deliberately dropped — it's
+recoverable by summing the Runs column top-to-bottom and is shown
+elsewhere on the card already; the interesting fact in this table is
+stand size, not running total.
+
+Rendered columns: **Wkt / Runs / Players / Over**. The larger of the two
+partnership players' names is not distinguished — both render as
+`PlayerNameLink`s — but the dismissed one gets a trailing `(out)` marker
+(muted text, not color-only, consistent with this app's daylight-first/
+no-hover-dependency UI principle — see `ui-theme.md`). The biggest
+partnership in the innings is highlighted gold, the same `isTop` pattern
+already used for top scorer/wicket-taker/fielder in this same file. Hidden
+entirely (not shown empty) when `computePartnerships()` returns `[]` or
+`null` — same "hidden, not empty" convention as the Fielding table.
+
+**Player identity — deliberately bypasses this file's own `findPlayerId()`
+helper.** Every other table here resolves a Hub `player_id` via
+`findPlayerId(row, name, squad)`, which returns `null` outright if `squad`
+hasn't loaded yet (a real race in `MatchHistoryClient.tsx`: the scorecard
+and squad-detail fetches run in parallel, and squad can still be
+`undefined` when scorecard data is already in). That's harmless for the
+other tables, whose own `row.player_id` is usually still null
+pre-reconciliation anyway. It would be a real regression for partnerships,
+whose `PartnershipPlayer.playerId` already comes straight from
+`batting_stats.player_id` — the authoritative, already-reconciled identity
+(§4.1) — so it's used directly as `PlayerNameLink`'s `playerId` prop, with
+`findCricHeroesUrl()` (which degrades gracefully without squad) kept only
+as the external-link fallback when there's no `playerId` at all.
+
+**Threaded through both consumers:**
+- `MatchHistoryClient.tsx` — `fall_of_wickets` was already flowing through
+  the scorecard fetch since Phase 4; just needed adding to the
+  `FullScorecard` type and passed down as a new prop.
+- The standalone `/matches/history/[bookingId]/page.tsx` — its
+  server-side `match_stats_cache` select was deliberately left without
+  `fall_of_wickets` in Phase 4 (nothing rendered it yet); added here now
+  that something does.
+
+---
+
 ## 7. Security (vibe-security)
 
 | Check | Status |
 |---|---|
 | `fall_of_wickets` RLS enabled, no anon/authenticated policies | ✅ |
 | No `player_id`/identity data written from anything but the existing, already-audited `batting_stats` join path | ✅ (join happens at read time in `computePartnerships()`, see §4.1) |
-| `computePartnerships()` is a pure function — no DB access, no new write path, not yet called from anywhere in the running app | ✅ |
+| `computePartnerships()` is a pure function — no DB access, no new write path | ✅ |
+| `ScorecardTables.tsx`'s Partnerships table reuses the existing scorecard route's auth — no new access surface, no new data exposed beyond what `batting`/`fall_of_wickets` already carry | ✅ |
 | Extraction is read-only against the PDF; no new write path introduced anywhere in the Hub | ✅ |
 | Spartans-only scope maintained — no opponent data newly persisted | ✅ |
 | Existing production parsing (`batting_stats`/`bowling_stats`/`team_list` extraction) verified byte-for-byte unchanged before shipping the shared name-normalization refactor | ✅ |
@@ -343,15 +403,18 @@ that run has been observed.
 | `supabase/migrations/071_match_stats_cache_fall_of_wickets.sql` | Hub-side cache column (§5) |
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
-| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function, not yet called from anywhere |
+| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function |
+| `src/components/matches/ScorecardTables.tsx` | Partnerships table (§6.6) — between Batting and Bowling, gold-highlights the biggest stand, `(out)` marker on the dismissed player |
+| `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets` |
+| `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` |
 
 ---
 
-## 9. Pending (not yet built)
+## 9. Pending
 
-| Phase | Item |
+| Item | Notes |
 |---|---|
-| 6 | UI — a Partnerships table on the match scorecard (`ScorecardTables.tsx` or a new sibling component), hidden entirely for a match with no Fall of Wickets data yet |
+| First real end-to-end cron proof | See §6.5 — the manual Phase 3 validation and this feature's own Phase 4/6 code are both in place, but no match has yet gone through the automated `backfill-scorecards` cron with the FOW-aware pipeline live end-to-end. Worth a follow-up note here once that's been observed. |
 
 ---
 
