@@ -166,6 +166,56 @@ format now gets the zero-game treatment.
 
 ---
 
+## 2.2 Per-Tournament Stats Board — Batched, Not N+1 (fixed September 2026)
+
+**The bug:** §2 step 4's per-tournament stats board (§5.7's Player Stats
+table's data source) called `getLeaderboard({ tournamentId })`
+(`src/lib/playerStats.ts`) once **per tournament** with at least one player
+represented — `Promise.all(tournamentIdsWithPlayers.map(tid =>
+getLeaderboard({ tournamentId: tid })))`. Each call is a full,
+independently-paginated analytics-DB round trip: `getScopedMatchIds()`
+(one Hub query) followed by `fetchAnalyticsRows()` (4 parallel,
+`.range()`-paginated reads against `batting_stats`/`bowling_stats`/
+`fielding_stats`/`team_list`). `Promise.all` parallelized the *tournaments*,
+but the total number of analytics-DB round trips still scaled linearly
+with how many tournaments the club has ever played — every additional
+tournament in the club's history added another full 4-table fetch to this
+page's load, with no way for more tournaments to ever make it faster.
+This was the dominant cause of `/tournament-planner` being slow to load as
+the tournament count grew.
+
+**Fixed** with `getLeaderboardsByTournament(tournamentIds: string[])`
+(`src/lib/playerStats.ts`) — computes the identical per-tournament,
+per-player aggregates (same `aggregate()`/tie-handling/skip-unresolved-player
+logic `getLeaderboard()` already used) but in **one** round trip regardless
+of tournament count: a single `bookings` query resolves every relevant
+`match_id` → `tournament_id` up front, a single `fetchAnalyticsRows()` call
+fetches the union of those match IDs' batting/bowling/fielding/team rows,
+and the results are partitioned by tournament in memory before the normal
+per-player grouping runs. `page.tsx` now calls this once
+(`getLeaderboardsByTournament(tournamentIdsWithPlayers)`) instead of
+looping `getLeaderboard()` per tournament.
+
+**The page's other independent Supabase reads were also parallelized** in
+the same pass — `rawBookings`/`captains` now fire together at the top of
+the function, and the four reads that only depend on `rawBookings`
+(`match_stats_cache` lookup, `squad` rows, `tournaments` for
+`emptyTournaments`, and the admin-only knockout-holds query) now fire
+together via `Promise.all` instead of one after another. None of these
+were ever actually dependent on each other's *results* — only on
+`rawBookings` having resolved — so sequencing them was pure unnecessary
+latency. The final data shape returned to `TournamentPlannerClient` is
+byte-for-byte the same as before; only the number and ordering of round
+trips changed.
+
+**`getLeaderboard({ tournamentId })` itself is untouched** and still used
+as-is by `/leaderboard`'s Detailed → tournament-scoped views and anywhere
+else that only ever needs one tournament at a time — the batched sibling
+exists specifically for this page's "many tournaments in one request"
+shape.
+
+---
+
 ## 3. Slot Model — `ALL_SLOTS` / `distributeSlotTargets()`
 
 Both the in-file copy (`TournamentPlannerClient.tsx`) and the extracted
@@ -568,11 +618,11 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 
 | File | Role |
 |---|---|
-| `src/app/tournament-planner/page.tsx` | Server component — role guard, all data fetching described in §2, `emptyTournaments` computation (§2.1) |
+| `src/app/tournament-planner/page.tsx` | Server component — role guard, all data fetching described in §2, `emptyTournaments` computation (§2.1); fires its independent Supabase reads via `Promise.all` and its per-tournament stats board via one batched `getLeaderboardsByTournament()` call instead of one `getLeaderboard()` call per tournament (§2.2) |
 | `src/components/tournament-planner/TournamentPlannerClient.tsx` | Root client component — `BandwidthSection`, `TournamentBlock`, `MatchTabsSection`, `SlotBalanceByDay`, `GameTimelineCard`, `InlineGameCountEditor`; owns `classifiedTournaments`/Show-filter state and `expandRequest` (view-to-scroll-and-expand); `tournamentMap` merges `emptyTournaments` in as zero-game entries (§2.1) |
 | `src/components/tournament-planner/TournamentShareButton.tsx` | Native-share-or-clipboard-copy button for the public share page's URL — used both here (admin/GC only) and on `TournamentShareCard.tsx` |
 | `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` / `resolveActiveFormats()` (§3.1) — the extracted copy used by the public share page and the organiser self-service suggestion engine; this page keeps its own historical in-file duplicate of `ALL_SLOTS`/`distributeSlotTargets` (§1) but not of `resolveActiveFormats`, which it inlines instead |
-| `src/lib/playerStats.ts` | `getLeaderboard({ tournamentId })` — this page's source for §5.7's per-tournament Player Stats table |
+| `src/lib/playerStats.ts` | `getLeaderboard({ tournamentId })` — single-tournament lookup, used by `/leaderboard`; `getLeaderboardsByTournament(tournamentIds)` — batched multi-tournament sibling (§2.2), this page's source for §5.7's per-tournament Player Stats table |
 | `supabase/migrations/066_bookings_ground_captain.sql` | Per-booking `ground_id`/`captain_id` override columns (§7) |
 | `supabase/migrations/069_tournament_intended_formats.sql` | `tournaments.intended_formats text[]` — admin-declared format(s) for a tournament with zero bookings yet (§3.1) |
 | `supabase/migrations/070_tournament_tentative_start_date.sql` | `tournaments.tentative_start_date date` — admin-declared expected start date, feeds `computeSuggestionWindow()` (§3.2) |

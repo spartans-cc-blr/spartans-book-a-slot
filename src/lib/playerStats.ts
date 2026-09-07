@@ -553,6 +553,121 @@ export async function getLeaderboard(filters: { year?: number; month?: string; t
   return rows
 }
 
+// Batched sibling of getLeaderboard({ tournamentId }) — computes the exact
+// same per-player aggregates for many tournaments in ONE round trip to the
+// analytics DB instead of one full fetchAnalyticsRows() (4 tables, each
+// paginated) per tournament. /tournament-planner used to call
+// getLeaderboard() once per tournament with players represented — a classic
+// N+1 pattern that scaled the page's analytics-DB round trips linearly with
+// the number of tournaments the club has ever played, and was the dominant
+// cause of that page's slow load. See features/tournament-planner.md.
+export async function getLeaderboardsByTournament(tournamentIds: string[]): Promise<Record<string, LeaderboardRow[]>> {
+  const result: Record<string, LeaderboardRow[]> = {}
+  for (const tid of tournamentIds) result[tid] = []
+  if (tournamentIds.length === 0) return result
+
+  const hub = createServiceClient()
+  const { data: bookingRows, error: bookErr } = await hub
+    .from('bookings')
+    .select('match_id, tournament_id')
+    .in('tournament_id', tournamentIds)
+    .eq('status', 'confirmed')
+    .not('match_id', 'is', null)
+  if (bookErr) throw new Error(bookErr.message)
+
+  // A match_id should belong to exactly one confirmed tournament booking;
+  // last-write-wins here is a non-issue in practice, same assumption
+  // getLeaderboard({ tournamentId }) already made implicitly (one tournament
+  // at a time).
+  const tournamentByMatch = new Map<string, string>()
+  const allMatchIds: string[] = []
+  for (const row of bookingRows ?? []) {
+    const matchId = (row as any).match_id as string
+    const tournamentId = (row as any).tournament_id as string
+    if (!tournamentByMatch.has(matchId)) allMatchIds.push(matchId)
+    tournamentByMatch.set(matchId, tournamentId)
+  }
+  if (allMatchIds.length === 0) return result
+
+  const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ matchIds: allMatchIds })
+
+  // Partition each table's rows by resolved tournament up front, then run
+  // the identical per-tournament grouping/aggregation getLeaderboard() does
+  // — just against an in-memory slice instead of a fresh fetch.
+  function bucketByTournament(rows: any[]): Map<string, any[]> {
+    const byTournament = new Map<string, any[]>()
+    for (const r of rows) {
+      const tid = tournamentByMatch.get(r.match_id)
+      if (!tid) continue
+      if (!byTournament.has(tid)) byTournament.set(tid, [])
+      byTournament.get(tid)!.push(r)
+    }
+    return byTournament
+  }
+
+  const battingByT  = bucketByTournament(batting)
+  const bowlingByT  = bucketByTournament(bowling)
+  const fieldingByT = bucketByTournament(fielding)
+  const teamByT     = bucketByTournament(team)
+
+  const allPlayerIds = new Set<string>()
+  for (const r of team) if ((r as any).player_id) allPlayerIds.add((r as any).player_id)
+  if (allPlayerIds.size === 0) return result
+
+  const { data: players, error: pErr } = await hub.from('players').select('id, name, cricheroes_url, photo_url').in('id', Array.from(allPlayerIds))
+  if (pErr) throw new Error(pErr.message)
+  const playerById = new Map((players ?? []).map((p: any) => [p.id, p]))
+
+  for (const tid of tournamentIds) {
+    const tBatting  = battingByT.get(tid)  ?? []
+    const tBowling  = bowlingByT.get(tid)  ?? []
+    const tFielding = fieldingByT.get(tid) ?? []
+    const tTeam     = teamByT.get(tid)     ?? []
+    if (tBatting.length === 0 && tBowling.length === 0 && tFielding.length === 0 && tTeam.length === 0) continue
+
+    const battingByPlayer  = groupBy(tBatting,  (r: any) => r.player_id)
+    const bowlingByPlayer  = groupBy(tBowling,  (r: any) => r.player_id)
+    const fieldingByPlayer = groupBy(tFielding, (r: any) => r.player_id)
+    const teamByPlayer     = groupBy(tTeam,     (r: any) => r.player_id)
+
+    const playerIds = new Set<string>()
+    for (const id of Array.from(battingByPlayer.keys()))  playerIds.add(id)
+    for (const id of Array.from(bowlingByPlayer.keys()))  playerIds.add(id)
+    for (const id of Array.from(fieldingByPlayer.keys())) playerIds.add(id)
+    for (const id of Array.from(teamByPlayer.keys()))     playerIds.add(id)
+
+    const rows: LeaderboardRow[] = []
+    for (const playerId of Array.from(playerIds)) {
+      const player = playerById.get(playerId)
+      if (!player) continue
+
+      const matchIds = new Set<string>((teamByPlayer.get(playerId) ?? []).map((r: any) => r.match_id).filter(Boolean))
+      const playerBatting = battingByPlayer.get(playerId) ?? []
+      const stats = aggregate(
+        matchIds,
+        playerBatting,
+        bowlingByPlayer.get(playerId)  ?? [],
+        fieldingByPlayer.get(playerId) ?? [],
+      )
+      if (stats.matches === 0) continue
+
+      let centuries = 0
+      let halfCenturies = 0
+      for (const r of playerBatting) {
+        if (!(r as any).batted) continue
+        const runs = num((r as any).runs)
+        if (runs >= 100) centuries++
+        else if (runs >= 50) halfCenturies++
+      }
+
+      rows.push({ playerId, playerName: player.name, cricheroesUrl: player.cricheroes_url ?? null, photoUrl: player.photo_url ?? null, stats, centuries, halfCenturies })
+    }
+    result[tid] = rows
+  }
+
+  return result
+}
+
 // Top run-scorer(s) at each batting position, for the bar chart above
 // Detailed → Bat on /leaderboard and the "Top 3 at Position N" modal it
 // opens on tap. Same match scope as getLeaderboard() — no includePractice

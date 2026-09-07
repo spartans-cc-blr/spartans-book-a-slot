@@ -117,10 +117,19 @@ export default async function LeaderboardPage({
     innings: category === 'mvp' ? restrictedInnings?.[0] : undefined,
   }
 
-  const rows = category === 'monthly'
-    ? await getLeaderboard({ month, formats: restrictedFormats })
-    : await getLeaderboard(overallFilters)
+  // Individual centuries/5-wicket-haul lists for the Overall tab's bands —
+  // fetched for a specific year (not "All Time") or whenever a
+  // Tournament/Ground filter is active (scoped), matching the same scope as
+  // `rows` below. Neither condition met ("All Time", no scope) keeps the
+  // plain tied-cards Most 100s/50s treatment instead.
+  const scoped = !!(tournamentName || groundName)
 
+  // Every one of these is an independent analytics-DB read — none depends on
+  // another's result — so they're fired together instead of one after
+  // another. This page used to await them sequentially (up to 4 full
+  // analytics-DB round trips back to back on the default view alone), which
+  // was a large share of its slow load; see features/leaderboard.md.
+  //
   // Two calls for Monthly — `getPerformances()`'s `includePractice` scopes
   // the *whole* match set a call draws from, so Centuries/5-Wicket Hauls
   // (practice-inclusive) and Half-Centuries/3-Wicket Hauls (practice-
@@ -130,26 +139,20 @@ export default async function LeaderboardPage({
   // two more common bands stay "real stats only". See `features/leaderboard.md`
   // §5/§5.1/§10 for the full history (removed, then restored, on the
   // Monthly tab specifically).
-  const monthlyPerformances = category === 'monthly' ? await getPerformances({ month, includePractice: true }) : null
-  const monthlyPerformancesNoPractice = category === 'monthly' ? await getPerformances({ month }) : null
-
-  // WhatsApp share for the Monthly tab, open to any signed-in player — see
-  // src/lib/monthlyRecognition.ts. The share button itself only renders
-  // once every real match scheduled this month has a synced scorecard.
-  const monthSyncStatus = category === 'monthly' ? await getMonthSyncStatus(month) : null
-
-  // Individual centuries/5-wicket-haul lists for the Overall tab's bands —
-  // fetched for a specific year (not "All Time") or whenever a
-  // Tournament/Ground filter is active (scoped), matching the same scope as
-  // `rows` above. Neither condition met ("All Time", no scope) keeps the
-  // plain tied-cards Most 100s/50s treatment instead.
-  const scoped = !!(tournamentName || groundName)
-  const yearlyPerformances = category === 'overall' && (year !== 'all' || scoped) ? await getPerformances({ ...overallFilters, includePractice: true }) : null
-
-  // Bar chart above Detailed → Bat — leading run-scorer(s) at each batting
-  // position, same scope as `rows` (overallFilters, practice excluded by
-  // default). See features/leaderboard.md.
-  const battingPositionLeaders = category === 'batting' ? await getTopScorersByBattingPosition(overallFilters) : null
+  const [rows, monthlyPerformances, monthlyPerformancesNoPractice, monthSyncStatus, yearlyPerformances, battingPositionLeaders] = await Promise.all([
+    category === 'monthly' ? getLeaderboard({ month, formats: restrictedFormats }) : getLeaderboard(overallFilters),
+    category === 'monthly' ? getPerformances({ month, includePractice: true }) : Promise.resolve(null),
+    category === 'monthly' ? getPerformances({ month }) : Promise.resolve(null),
+    // WhatsApp share for the Monthly tab, open to any signed-in player — see
+    // src/lib/monthlyRecognition.ts. The share button itself only renders
+    // once every real match scheduled this month has a synced scorecard.
+    category === 'monthly' ? getMonthSyncStatus(month) : Promise.resolve(null),
+    category === 'overall' && (year !== 'all' || scoped) ? getPerformances({ ...overallFilters, includePractice: true }) : Promise.resolve(null),
+    // Bar chart above Detailed → Bat — leading run-scorer(s) at each batting
+    // position, same scope as `rows` (overallFilters, practice excluded by
+    // default). See features/leaderboard.md.
+    category === 'batting' ? getTopScorersByBattingPosition(overallFilters) : Promise.resolve(null),
+  ])
 
   const glossaryTitle = category === 'overall' ? 'Overall'
     : category === 'monthly' ? 'Monthly'
