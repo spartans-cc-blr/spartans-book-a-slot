@@ -578,21 +578,17 @@ not-out convention already used on the Batting table above it. Hidden
 entirely (not shown empty) when `computePartnerships()` returns `[]` or
 `null` — same "hidden, not empty" convention as the Fielding table.
 
-**Player-name layout inside the bar — split-justified (added September
-2026, experimental).** Player names went through two prior layouts before
-this — a single right-aligned block ("Shabarinath & Sarath"), and before
-that left-aligned — both of which put the whole `Name1 & Name2` label at
-one edge of the bar. This version instead splits it into three
-independent flex children in one row: the first player left-aligned, `&`
-centered between them, the second player right-aligned — each name span
-carries `flex-1 min-w-0 truncate` so it still degrades gracefully if a
-name is long, and the two name spans' equal `flex-1` weighting is what
-pushes `&` toward the middle rather than pinning it to a fixed pixel
-position. Tried specifically to see whether spreading both names to the
-bar's own edges (matching how the runs/balls column is already anchored
-outside it) reads better than a single block — not settled as the final
-treatment; revert to the single right-aligned span if it doesn't hold up
-once seen live.
+**Player-name layout inside the bar — split-justified, tried and reverted
+(September 2026).** Briefly tried splitting the label into three
+independent flex children — first player left-aligned, `&` centered
+between them (via both name spans sharing equal `flex-1` weight), second
+player right-aligned — instead of one right-aligned block. Reverted the
+same day: with a short first name (e.g. "Kushal", "Loki"), equal `flex-1`
+sizing still stretched that name's own column edge-to-edge toward the
+center, leaving a wide dead gap between the name and `&` — the opposite
+of tighter. Back to the single right-aligned `Name1 & Name2` span, which
+naturally leaves any leftover space on the left rather than stretching
+individual names apart to fill it.
 
 **First name only, no `(out)` marker (fixed shortly after the first real
 production render, September 2026).** The initial ship rendered each
