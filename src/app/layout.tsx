@@ -5,6 +5,7 @@ import { Providers } from './providers'
 import { ChunkErrorBoundary } from '@/components/ui/ChunkErrorBoundary'
 import { GlobalMilestoneModal } from '@/components/ui/GlobalMilestoneModal'
 import { GlobalBirthdayModal } from '@/components/ui/GlobalBirthdayModal'
+import { GlobalFeeReminderModal } from '@/components/ui/GlobalFeeReminderModal'
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ChunkErrorBoundary>
             <GlobalBirthdayModal />
             <GlobalMilestoneModal />
+            <GlobalFeeReminderModal />
             {children}
           </ChunkErrorBoundary>
         </Providers>
