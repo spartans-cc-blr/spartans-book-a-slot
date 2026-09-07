@@ -1,0 +1,60 @@
+name: Keep-warm ping
+
+# Vercel Hobby serverless functions spin down after a period of inactivity —
+# the next hit to a spun-down route pays a real cold-start cost (container
+# boot + module init, ~3-4s observed live) before the page renders at all;
+# a route that's still warm responds fast. Reported live: nearly every
+# page's *first* load in a session is slow, then fast on repeat visits —
+# the signature of this, not a per-page query problem (see the N+1/
+# sequential-await fixes on Leaderboard and Tournament Planner from a prior
+# session for that separate class of issue — those help warm-request
+# latency, not the cold-start cost itself).
+#
+# This does NOT eliminate cold starts — a long enough idle gap still
+# cold-starts, and any route not pinged here is unaffected — it only
+# reduces how often the most-visited/most-reported-slow routes hit that
+# state. The real fix for cold starts themselves is a Vercel plan with
+# better warm-retention (e.g. Pro's Fluid Compute); this is a cheap partial
+# mitigation, not a replacement for that.
+#
+# Deliberately scoped to a handful of routes, not the app's full ~118
+# pages/API routes — pinging everything would multiply both the run time
+# and the GitHub Actions minutes cost for little extra benefit, since most
+# routes are visited far less often than these.
+#
+# Cost: ~4,320 runs/month at this cadence. Pings fire in parallel within a
+# single run (backgrounded + `wait`), so job wall time stays ~10-20s
+# regardless of route count — well under GitHub's free Actions minutes even
+# if this repo is private. An unauthenticated GET is enough to warm a
+# route: even a page that redirects a signed-out visitor to /login (e.g.
+# Leaderboard, Tournament Planner) still has to load and execute its module
+# imports (next-auth, the Supabase client, etc.) before that redirect
+# fires, which is the expensive part of a cold start.
+#
+# Same "GitHub Actions auto-disables a schedule after 60 days with no
+# commits to the repo" caveat as every other cron-*.yml workflow here — see
+# .claude/rules/limitations.md.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping key routes to keep them warm
+        run: |
+          urls=(
+            "https://hub.spartanscricketclub.in/"
+            "https://hub.spartanscricketclub.in/fixtures"
+            "https://hub.spartanscricketclub.in/leaderboard"
+            "https://hub.spartanscricketclub.in/tournament-planner"
+          )
+          for url in "${urls[@]}"; do
+            curl --silent --show-error --max-time 20 --output /dev/null \
+              --write-out "%{url_effective} -> %{http_code} (%{time_total}s)\n" \
+              "$url" &
+          done
+          wait

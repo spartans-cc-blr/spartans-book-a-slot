@@ -107,6 +107,48 @@ quiet for an extended period.
 
 ---
 
+## Vercel Hobby — Serverless Cold Starts (~3-4s on a page's first hit)
+
+Confirmed live (September 2026): almost every page's *first* load in a
+session is slow (~4s), then fast on repeat visits — including pages with
+no expensive queries at all (e.g. `/fixtures`), and even after the N+1/
+sequential-await fixes documented in `features/leaderboard.md` §8.2 and
+`features/tournament-planner.md` §2.2. This ruled out a per-page query
+problem — the pattern (slow-then-fast, hitting unrelated pages equally) is
+the signature of a Vercel serverless cold start: a route's function spins
+down after a period of inactivity, and the next hit pays the cost of a
+fresh container booting and initialising the Next.js server + its module
+imports before any app code runs.
+
+**Audited and ruled out as the cause:** this app's own code isn't
+bloated — only 11 runtime dependencies (no PDF/image-processing/chart
+libraries; the CricHeroes PDF parsing lives entirely in the separate
+`spartans-python` repo), compiled page bundles are 16-52KB, and per-route
+traced server files run ~1.1MB (mostly Next.js's own runtime, not app
+code). The cold-start cost is the baseline tax of the Next.js 14 App
+Router's server runtime (React Server Components + streaming) on Vercel's
+Node.js functions — not something reachable by trimming this app's
+imports further. Real Vercel-side Lambda size data (the number that would
+confirm this precisely) couldn't be pulled directly — `vercel build`
+needs the project linked/authenticated, which no session so far has had
+credentials for.
+
+**Mitigation, not a fix — `.github/workflows/keep-warm.yml` (added
+September 2026):** pings a small set of the most-visited/most-reported-slow
+routes (`/`, `/fixtures`, `/leaderboard`, `/tournament-planner`) every 10
+minutes to keep them from going idle, mirroring the `cron-*.yml` backstop
+pattern this repo already uses for Vercel's unreliable scheduled crons —
+see the section above. Deliberately scoped to a handful of routes, not the
+app's full ~118 pages/API routes, to keep GitHub Actions minutes usage
+low (~4,320 runs/month, pings fired in parallel per run so job wall time
+stays ~10-20s regardless of route count). This only reduces *how often*
+these specific routes go cold — it doesn't eliminate cold starts (a long
+enough idle gap still cold-starts, and any unpinged route is unaffected)
+and isn't a substitute for the actual fix, a Vercel plan with better
+warm-retention (e.g. Pro's Fluid Compute).
+
+---
+
 ## Supabase Free Tier — Storage Cap
 
 50MB storage limit. Approximately 100+ players at up to 5MB Google
