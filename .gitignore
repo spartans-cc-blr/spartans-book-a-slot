@@ -2,5 +2,12 @@ node_modules
 tsconfig.tsbuildinfo
 next-env.d.ts
 .next
+# Local secrets — repo is public; never let a real env file get committed.
+# security.md documents .env.local as gitignored, but the rule itself was
+# missing here until now (nothing had actually been committed — checked
+# git history — this closes the gap before it happens).
+.env
+.env.local
+.env*.local
 # Claude session state — ephemeral, not architecture
 .claude/rules/session_context.md
