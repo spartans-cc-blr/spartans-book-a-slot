@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { TournamentPlannerClient } from '@/components/tournament-planner/TournamentPlannerClient'
-import { getLeaderboard } from '@/lib/playerStats'
+import { getLeaderboardsByTournament } from '@/lib/playerStats'
 import type { Metadata } from 'next'
 import type { PlayerStatsTotals } from '@/types'
 import { KNOCKOUT_HOLD_REASON, isInformalFormat } from '@/types'
@@ -22,34 +22,32 @@ export default async function TournamentPlannerPage() {
 
   const supabase = createServiceClient()
 
-  // 1. All confirmed bookings with tournament + captain joins (via tournament)
-  const { data: rawBookings } = await supabase
-    .from('bookings')
-    .select(`
-      id, game_date, slot_time, format, cricheroes_url, match_id, opponent_name,
-      captain_id,
-      tournament:tournaments!bookings_tournament_id_fkey(
-        id, name, organiser_name, organiser_contact,
-        total_league_games, cricheroes_points_table_url,
-        captain_id, is_practice, intended_formats,
-        captains!tournaments_captain_id_fkey(id, name, player_id)
-      )
-    `)
-    .eq('status', 'confirmed')
-    .not('tournament_id', 'is', null)
-    .order('game_date', { ascending: true })
+  // 1. All confirmed bookings with tournament + captain joins (via tournament),
+  //    and active captains — independent of each other, run in parallel.
+  const [{ data: rawBookings }, { data: captains }] = await Promise.all([
+    supabase
+      .from('bookings')
+      .select(`
+        id, game_date, slot_time, format, cricheroes_url, match_id, opponent_name,
+        captain_id,
+        tournament:tournaments!bookings_tournament_id_fkey(
+          id, name, organiser_name, organiser_contact,
+          total_league_games, cricheroes_points_table_url,
+          captain_id, is_practice, intended_formats,
+          captains!tournaments_captain_id_fkey(id, name, player_id)
+        )
+      `)
+      .eq('status', 'confirmed')
+      .not('tournament_id', 'is', null)
+      .order('game_date', { ascending: true }),
+    supabase
+      .from('captains')
+      .select('id, name, player_id')
+      .eq('active', true)
+      .order('name'),
+  ])
 
-  // Match result for any finished games with a synced scorecard — read-through
-  // cache table, same source matches/history and the tournament share page
-  // use. Not every past game has one yet (scorecard sync is a separate
-  // manual/cron step), so this is a best-effort attach, not a requirement.
-  const matchIds = (rawBookings ?? []).map(b => b.match_id).filter((id): id is string => !!id)
-  const { data: statsRows } = matchIds.length
-    ? await supabase.from('match_stats_cache').select('match_id, match_result').in('match_id', matchIds)
-    : { data: [] }
-  const resultByMatchId = new Map((statsRows ?? []).map(r => [r.match_id, r.match_result]))
-
-  // Supabase returns FK joins as arrays — cast to single objects to match Booking type.
+  // Supabase returns FK joins as arrays — normalize to a single object.
   // T10/T25 are rare, informal, admin-only quick games that don't participate
   // in the slot-target/bandwidth model this page is built around (ALL_SLOTS
   // has no entry for them) — excluded here so they don't skew captain
@@ -59,13 +57,83 @@ export default async function TournamentPlannerPage() {
   // umbrella tournament has no league games, no captain workload, and no
   // slot-target model that makes sense here — same "real stats only"
   // posture as the leaderboard (see features/leaderboard.md §10).
-  const bookings = (rawBookings ?? [])
+  const normalizedBookings = (rawBookings ?? [])
     .map(b => ({
       ...b,
-      match_result: b.match_id ? resultByMatchId.get(b.match_id) ?? null : null,
       tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
     }))
-    .filter(b => !isInformalFormat(b.format) && !b.tournament?.is_practice) as unknown as Array<{
+    .filter(b => !isInformalFormat(b.format) && !b.tournament?.is_practice)
+
+  // match_stats_cache lookup is scoped to every confirmed booking with a
+  // tournament (not just the informal/practice-filtered set) — matches the
+  // original behaviour exactly; filtered-out bookings simply never look up
+  // their entry.
+  const matchIds = (rawBookings ?? []).map(b => b.match_id).filter((id): id is string => !!id)
+
+  // Squad status per booking — only need announced rows to determine "completed".
+  // Cap at 100 booking IDs (vibe-security: uncapped .in() is S-4 risk).
+  const bookingIds = normalizedBookings.map(b => b.id).slice(0, 100)
+
+  // Active, non-practice tournaments with zero confirmed bookings (§2.1) —
+  // deliberately derived from `rawBookings` (every confirmed booking joined
+  // to a tournament), not the informal-format-filtered set above — otherwise
+  // a tournament whose only confirmed games are T10/T25 has zero entries in
+  // the filtered list and would wrongly look "unbooked".
+  const bookedTournamentIds = new Set(
+    (rawBookings ?? [])
+      .map(b => (Array.isArray(b.tournament) ? b.tournament[0] : b.tournament)?.id)
+      .filter((id): id is string => !!id)
+  )
+
+  // 2. Match results, squad rows, all active tournaments, and (admin-only)
+  //    knockout holds — none of these depend on each other, so they all run
+  //    together instead of one after another.
+  const [
+    { data: statsRows },
+    { data: squads },
+    { data: allTournaments },
+    { data: knockoutRows },
+  ] = await Promise.all([
+    matchIds.length
+      ? supabase.from('match_stats_cache').select('match_id, match_result').in('match_id', matchIds)
+      : Promise.resolve({ data: [] as { match_id: string; match_result: string | null }[] }),
+    bookingIds.length
+      ? supabase
+          .from('squad')
+          .select('booking_id, status, is_captain, players(id, name, cricheroes_url)')
+          .in('booking_id', bookingIds)
+          .eq('status', 'announced')
+      : Promise.resolve({ data: [] as any[] }),
+    supabase
+      .from('tournaments')
+      .select(`
+        id, name, organiser_name, organiser_contact,
+        total_league_games, cricheroes_points_table_url, captain_id, is_practice,
+        intended_formats,
+        captains!tournaments_captain_id_fkey(id, name, player_id)
+      `)
+      .eq('active', true),
+    // Admin-only, read-only knockout awareness — existing Knockout-reason
+    // soft-block holds, keyed by tournament. Creation happens on
+    // /admin/soft-blocks/new; this is purely a display lookup. Only fetched
+    // for admins since nobody else can see or act on this section anyway.
+    user?.isAdmin
+      ? supabase
+          .from('bookings')
+          .select('tournament_id, game_date, slot_time')
+          .eq('block_reason', KNOCKOUT_HOLD_REASON)
+          .neq('status', 'cancelled')
+          .not('tournament_id', 'is', null)
+          .order('game_date', { ascending: true })
+      : Promise.resolve({ data: [] as { tournament_id: string | null; game_date: string; slot_time: string }[] }),
+  ])
+
+  const resultByMatchId = new Map((statsRows ?? []).map(r => [r.match_id, r.match_result]))
+
+  const bookings = normalizedBookings.map(b => ({
+    ...b,
+    match_result: b.match_id ? resultByMatchId.get(b.match_id) ?? null : null,
+  })) as unknown as Array<{
     id: string
     game_date: string
     slot_time: string
@@ -90,17 +158,12 @@ export default async function TournamentPlannerPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  // 2. Squad status per booking — only need announced rows to determine "completed"
-  //    A game is "completed" when game_date < today AND squad status = announced.
-  //    Cap at 100 booking IDs (vibe-security: uncapped .in() is S-4 risk)
-  const bookingIds = bookings.map(b => b.id).slice(0, 100)
-  const { data: squads } = bookingIds.length
-    ? await supabase
-        .from('squad')
-        .select('booking_id, status, is_captain, players(id, name, cricheroes_url)')
-        .in('booking_id', bookingIds)
-        .eq('status', 'announced')
-    : { data: [] }
+  const knockoutHoldsByTournament: Record<string, { game_date: string; slot_time: string }> = {}
+  for (const row of knockoutRows ?? []) {
+    if (row.tournament_id && !knockoutHoldsByTournament[row.tournament_id]) {
+      knockoutHoldsByTournament[row.tournament_id] = { game_date: row.game_date, slot_time: row.slot_time }
+    }
+  }
 
   // Players represented per tournament + per-booking squad captain — dedupe + sort,
   // sourced from announced squads only. "Players represented" is specifically a
@@ -128,69 +191,25 @@ export default async function TournamentPlannerPage() {
     list.sort((a, b) => a.name.localeCompare(b.name))
   }
 
-  // Per-tournament player stats board — aggregated purely from THIS
-  // tournament's own synced matches via getLeaderboard({ tournamentId }),
-  // never career-wide analytics. Keyed by real Hub player_id (reconciled —
-  // see src/lib/playerIdentityResolution.ts), so a player represented in the
-  // squad above with no reconciled match for this tournament simply has no
-  // entry and the UI shows "No stats synced" instead of a zero row.
+  // Per-tournament player stats board — aggregated purely from each
+  // tournament's own synced matches, never career-wide analytics. Keyed by
+  // real Hub player_id (reconciled — see src/lib/playerIdentityResolution.ts),
+  // so a player represented in the squad above with no reconciled match for
+  // this tournament simply has no entry and the UI shows "No stats synced"
+  // instead of a zero row.
+  //
+  // Batched into a single analytics-DB round trip via
+  // getLeaderboardsByTournament() rather than one getLeaderboard() call per
+  // tournament — the previous per-tournament loop was an N+1 pattern that
+  // scaled this page's analytics-DB round trips linearly with the number of
+  // tournaments ever played, and was the dominant cause of this page being
+  // slow to load. See features/tournament-planner.md.
   const tournamentIdsWithPlayers = Object.keys(tournamentPlayersMap)
-  const leaderboardsByTournament = await Promise.all(
-    tournamentIdsWithPlayers.map(async tid => [tid, await getLeaderboard({ tournamentId: tid })] as const)
-  )
+  const leaderboardsByTournament = await getLeaderboardsByTournament(tournamentIdsWithPlayers)
   const tournamentStatsMap: Record<string, Record<string, PlayerStatsTotals>> = {}
-  for (const [tid, rows] of leaderboardsByTournament) {
-    tournamentStatsMap[tid] = Object.fromEntries(rows.map(r => [r.playerId, r.stats]))
+  for (const tid of tournamentIdsWithPlayers) {
+    tournamentStatsMap[tid] = Object.fromEntries((leaderboardsByTournament[tid] ?? []).map(r => [r.playerId, r.stats]))
   }
-
-  // Admin-only, read-only knockout awareness — existing Knockout-reason
-  // soft-block holds, keyed by tournament. Creation happens on
-  // /admin/soft-blocks/new; this is purely a display lookup. Only fetched
-  // for admins since nobody else can see or act on this section anyway.
-  const knockoutHoldsByTournament: Record<string, { game_date: string; slot_time: string }> = {}
-  if (user?.isAdmin) {
-    const { data: knockoutRows } = await supabase
-      .from('bookings')
-      .select('tournament_id, game_date, slot_time')
-      .eq('block_reason', KNOCKOUT_HOLD_REASON)
-      .neq('status', 'cancelled')
-      .not('tournament_id', 'is', null)
-      .order('game_date', { ascending: true })
-
-    for (const row of knockoutRows ?? []) {
-      if (row.tournament_id && !knockoutHoldsByTournament[row.tournament_id]) {
-        knockoutHoldsByTournament[row.tournament_id] = { game_date: row.game_date, slot_time: row.slot_time }
-      }
-    }
-  }
-
-  // 2b. Active, non-practice tournaments with zero confirmed bookings.
-  // This page is otherwise entirely booking-driven (see `bookings` above) —
-  // a brand-new tournament with nothing scheduled yet would never appear at
-  // all, even though that's exactly when a coordinator most wants to hand
-  // the organiser its share link (self-service slot recommendations, see
-  // features/organiser-self-service.md). Fetched separately and merged in
-  // client-side as zero-game entries.
-  // Deliberately derived from `rawBookings` (every confirmed booking joined
-  // to a tournament), not the informal-format-filtered `bookings` above —
-  // otherwise a tournament whose only confirmed games are T10/T25 (e.g.
-  // Independence Day Cup 2026, all-T10) has zero entries in `bookings` and
-  // would wrongly look "unbooked", surfacing an already-finished tournament
-  // as a fresh "Upcoming" one with a phantom unbooked count.
-  const bookedTournamentIds = new Set(
-    (rawBookings ?? [])
-      .map(b => (Array.isArray(b.tournament) ? b.tournament[0] : b.tournament)?.id)
-      .filter((id): id is string => !!id)
-  )
-  const { data: allTournaments } = await supabase
-    .from('tournaments')
-    .select(`
-      id, name, organiser_name, organiser_contact,
-      total_league_games, cricheroes_points_table_url, captain_id, is_practice,
-      intended_formats,
-      captains!tournaments_captain_id_fkey(id, name, player_id)
-    `)
-    .eq('active', true)
 
   const emptyTournaments = (allTournaments ?? [])
     .filter(t => !t.is_practice && !bookedTournamentIds.has(t.id))
@@ -206,15 +225,8 @@ export default async function TournamentPlannerPage() {
       captains: Array.isArray(t.captains) ? t.captains[0] ?? null : t.captains,
     }))
 
-  // 3. All active captains
-  const { data: captains } = await supabase
-    .from('captains')
-    .select('id, name, player_id')
-    .eq('active', true)
-    .order('name')
-
-  // 4. Resolve captainId for the current viewer if they are a captain
-  //    Use player_id FK — no fragile name matching
+  // Resolve captainId for the current viewer if they are a captain — via
+  // the player_id FK, no fragile name matching.
   let viewerCaptainId: string | null = null
 
   if (user?.isCaptain && user?.playerId) {

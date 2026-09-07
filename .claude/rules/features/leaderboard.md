@@ -472,11 +472,49 @@ multi-player analytics query added to this file without the same
 
 ---
 
+## 8.2 Performance — sequential analytics-DB round trips parallelized
+(fixed September 2026)
+
+**Symptom:** `/leaderboard` was reported slow to load, on top of §8.1's
+already-fixed pagination bug.
+
+**Root cause:** `src/app/leaderboard/page.tsx` awaited several independent
+analytics-DB reads one after another instead of together, even though none
+of them depends on another's result. On the default view alone (Overall,
+current year, no Tournament/Ground filter) this meant two full sequential
+analytics-DB round trips back to back — `getLeaderboard(overallFilters)`
+(4 paginated tables) followed by `getPerformances({ ...overallFilters,
+includePractice: true })` (2 more paginated tables), each waiting for the
+previous to fully resolve before starting. The Monthly tab was worse: up
+to four sequential calls (`getLeaderboard`, two separate `getPerformances`
+calls — one practice-inclusive for Centuries/5-Wicket Hauls, one
+practice-exclusive for Half-Centuries/3-Wicket Hauls, see §5.1's trim/
+restore note — plus `getMonthSyncStatus()`), none of which depend on each
+other either.
+
+**Fixed** by collecting all of `rows`/`monthlyPerformances`/
+`monthlyPerformancesNoPractice`/`monthSyncStatus`/`yearlyPerformances`/
+`battingPositionLeaders` into one `Promise.all()`, each entry still gated
+by the same category/year/scope conditions as before (a branch not needed
+for the current view resolves to `Promise.resolve(null)` rather than
+firing an unnecessary query). This changes nothing about what's fetched or
+when it's considered stale — `revalidate = 0` is untouched, and every
+branch's condition is byte-for-byte the same as before — only the number
+of round trips that block the page's first paint went from up to four
+sequential fetches down to one parallel batch.
+
+See `features/tournament-planner.md` §2.2 for the matching fix on
+`/tournament-planner`, which had a much larger version of the same class
+of problem (an N+1 `getLeaderboard()` call per tournament) plus this same
+sequential-await pattern on its own independent Supabase reads.
+
+---
+
 ## 9. File Map
 
 | File | Role |
 |---|---|
-| `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`, `getTopScorersByBattingPosition` for Detailed → Bat only — §6.1), glossary building |
+| `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`, `getTopScorersByBattingPosition` for Detailed → Bat only — §6.1), glossary building; the six category-gated analytics reads run as one `Promise.all()` batch rather than sequential awaits (§8.2) |
 | `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), `getTopScorersByBattingPosition()` (§6.1), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10); `fetchAllRows()` pages every multi-row analytics-DB read past PostgREST's default 1000-row cap (§8.1) |
 | `src/components/leaderboard/BattingPositionLeaders.tsx` | Detailed → Bat only — horizontal bar chart of the leading run-scorer(s) per batting position, tap a bar for the "Top 3" modal (§6.1) |
 | `src/components/ui/Dialog.tsx` | Shared modal — reused as-is for the "Top 3 at Position N" popup, no new modal primitive needed (§6.1) |
