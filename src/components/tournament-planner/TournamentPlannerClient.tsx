@@ -280,23 +280,7 @@ function BandwidthSection({
       }, 0)
     const total = mine.length + unbooked
 
-    const slotCounts = Object.fromEntries(
-      ALL_SLOTS.map(s => [`${s.day}-${s.time}`, 0])
-    ) as Record<SlotKey, number>
-    mine.forEach(b => {
-      const k = slotKey(b.game_date, b.slot_time)
-      if (slotCounts[k] !== undefined) slotCounts[k]++
-    })
-
-    const maxSlot      = Math.max(...Object.values(slotCounts), 1)
-    const dominantSlot = Object.entries(slotCounts).find(([, v]) => v === maxSlot)?.[0]
-    const isImbalanced = maxSlot > Math.ceil(mine.length / 2) && mine.length >= 3
-
     const isLowLoad = total <= 4 && unbooked <= 1
-
-    // Format mix for this captain's bookings
-    const captainFormats = Array.from(new Set(mine.map(b => b.format).filter((f): f is string => !!f)))
-    const captainActiveFormats = captainFormats.length === 0 ? ['T20', 'T30'] : captainFormats
 
     return (
       <div
@@ -472,51 +456,6 @@ function BandwidthSection({
           </div>
         )}
 
-        {/* Overall slot balance — secondary to the per-tournament breakdown above */}
-        {mine.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-parchment-3">
-            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 mb-3">
-              Overall slot balance
-            </p>
-            <div className="grid grid-cols-8 gap-1.5">
-              {ALL_SLOTS.map(s => {
-                const k: SlotKey = `${s.day}-${s.time}`
-                const count = slotCounts[k]
-                const barH  = count > 0 ? Math.round((count / maxSlot) * 100) : 0
-                const isSat = s.day === 'Sat'
-                const isApplicable = s.validFor.some(f => captainActiveFormats.includes(f))
-                return (
-                  <div key={k} className="bg-parchment-2 border border-parchment-3 rounded p-1.5 flex flex-col items-center">
-                    <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
-                      isSat ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
-                    }`}>{s.day}</span>
-                    <span className="font-rajdhani text-[10px] text-stone-500 mb-1.5">{s.time}</span>
-                    <div className="w-full h-8 bg-parchment-3 rounded overflow-hidden flex flex-col-reverse mb-1">
-                      {count > 0 && isApplicable && (
-                        <div
-                          className="w-full rounded bg-amber-600 transition-all"
-                          style={{ height: `${barH}%` }}
-                        />
-                      )}
-                    </div>
-                    <span className={`font-cinzel text-xs font-bold ${
-                      !isApplicable ? 'text-stone-300' :
-                      count > 0 ? 'text-amber-700' : 'text-stone-500'
-                    }`}>
-                      {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
-                    </span>
-                    <span className="font-rajdhani text-[8px] text-stone-400 mt-0.5">{s.formats}</span>
-                  </div>
-                )
-              })}
-            </div>
-            {isImbalanced && (
-              <p className="font-rajdhani text-xs text-blue-700 mt-2">
-                ↗ Heavy on {dominantSlot} — route unbooked games to other slots for balance
-              </p>
-            )}
-          </div>
-        )}
       </div>
     )
   }

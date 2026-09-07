@@ -388,18 +388,26 @@ silent filter.
   games read as "free" at a glance. `staggerRows()` alternates a 0/1 row
   for date labels whose anchor points land within 10% of each other
   horizontally, so close dates (e.g. two games a day apart) don't
-  visually collide. Additive to — not a replacement for — the per-slot
-  bar further down; the timeline answers "when are they free," the bar
-  answers "how much load, by slot."
+  visually collide.
 - **By-tournament breakdown** — one row per ongoing tournament this
   captain leads, each clickable (`onViewTournament`) to scroll to and
   force-expand the matching `TournamentBlock` further down the page (see
   §5's `forceOpenToken`).
-- **Overall slot balance** — a per-slot bar chart (not target-relative
-  here, unlike §5's per-tournament version — this is `count` scaled
-  against this captain's own `maxSlot`, not a `count/target` ratio) with
-  an imbalance nudge (`↗ Heavy on <slot>`) when one slot holds more than
-  half this captain's total bookings across 3+ games.
+
+**Removed — "Overall slot balance" (September 2026).** A per-slot bar
+chart summing this captain's bookings across *every* ongoing tournament
+combined, scaled against their own busiest slot (`count / maxSlot`), with
+an imbalance nudge when one slot held more than half their total bookings.
+Pulled because the underlying number didn't mean anything actionable:
+unlike §5.6's per-tournament slot balance (`count/target`, a real target
+derived from that one tournament's `total_league_games`), this view
+lumped bookings from unrelated tournaments — different organisers,
+different formats, different targets — into one bar per slot, so "heavy
+on Sat 07:30" told a captain nothing about whether any specific
+tournament's own distribution was actually off. The per-tournament version
+in §5.6 remains the real signal for that; this card's Schedule timeline
+and By-tournament breakdown above cover what a captain actually needs at
+the bandwidth-overview level.
 
 ---
 
