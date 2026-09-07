@@ -566,21 +566,33 @@ was on screen:
   or overlap.
 
 Each bar shows: wicket number (left label), both partnership players
-overlaid on the bar and right-aligned within it (both render as
-`PlayerNameLink`s — the larger name is not distinguished), and runs + ball
-span **outside the bar**, in a fixed-width (`w-20`) right-aligned column —
-not overlaid on the bar itself (fixed shortly after the ball-span change,
-September 2026: a short bar from a quick dismissal was squeezing that text
-down to almost nothing, and a fixed external column keeps every row's
-value right-aligned to the same edge regardless of bar length). Player
-names were themselves changed to right-align within the bar the same
-session, so both name and value sit against a consistent edge on every
-row — a short bar's fill no longer determines where its names land. An
-unbroken partnership (§4.2) gets
+overlaid on the bar (both render as `PlayerNameLink`s — the larger name is
+not distinguished), and runs + ball span **outside the bar**, in a
+fixed-width (`w-20`) right-aligned column — not overlaid on the bar itself
+(fixed shortly after the ball-span change, September 2026: a short bar
+from a quick dismissal was squeezing that text down to almost nothing,
+and a fixed external column keeps every row's value right-aligned to the
+same edge regardless of bar length). An unbroken partnership (§4.2) gets
 the standard cricket `*` suffix on its runs value (`87*`), matching the
 not-out convention already used on the Batting table above it. Hidden
 entirely (not shown empty) when `computePartnerships()` returns `[]` or
 `null` — same "hidden, not empty" convention as the Fielding table.
+
+**Player-name layout inside the bar — split-justified (added September
+2026, experimental).** Player names went through two prior layouts before
+this — a single right-aligned block ("Shabarinath & Sarath"), and before
+that left-aligned — both of which put the whole `Name1 & Name2` label at
+one edge of the bar. This version instead splits it into three
+independent flex children in one row: the first player left-aligned, `&`
+centered between them, the second player right-aligned — each name span
+carries `flex-1 min-w-0 truncate` so it still degrades gracefully if a
+name is long, and the two name spans' equal `flex-1` weighting is what
+pushes `&` toward the middle rather than pinning it to a fixed pixel
+position. Tried specifically to see whether spreading both names to the
+bar's own edges (matching how the runs/balls column is already anchored
+outside it) reads better than a single block — not settled as the final
+treatment; revert to the single right-aligned span if it doesn't hold up
+once seen live.
 
 **First name only, no `(out)` marker (fixed shortly after the first real
 production render, September 2026).** The initial ship rendered each
