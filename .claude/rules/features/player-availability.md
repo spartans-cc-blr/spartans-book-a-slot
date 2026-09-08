@@ -425,11 +425,56 @@ The old partial-lock carve-out (allowing L/O for Y-holders when `slotLocked`) is
 
 ---
 
+## 10.1 Date-Chip Quick Filter (added September 2026)
+
+A horizontal date-chip row ("All" + one chip per distinct upcoming
+`game_date`, day-of-week/day-number/month stacked) sits above the weekend
+groups on `/fixtures`, in the Warm Light palette (`#F8F4EE` panel, `#D97706`
+active chip) rather than the page's existing dark-ink theme — a
+self-contained light "island" on the page, same convention as the Home
+Page dashboard rebuild (`navigation.md` §3.1).
+
+**Deliberately a "jump to this weekend" control, not a per-card date
+filter.** A Sat/Sun weekend group shares one `weekendResponses` OYE
+validation state by design (§5's `FixturesWeekendGroup`) — hiding just the
+Sunday card while a Saturday chip is selected would visually separate two
+games whose availability responses constrain each other, which is exactly
+the thing this page's shared-state architecture exists to keep visible
+together. So selecting a chip shows the **whole weekend group** that date
+belongs to, not just that one card; an isolated weekday game (already its
+own group, §4) shows alone as expected.
+
+**Implementation stays entirely outside `FixturesWeekendGroup` — zero
+changes to its live availability/validation logic.** `fixtures/page.tsx`
+wraps each rendered `<FixturesWeekendGroup>` in a plain
+`<div data-dates="2026-09-12,2026-09-13">` (the group's own distinct
+`game_date`s, comma-joined). `FixturesDateFilterBar` (new client component,
+wraps the whole list as `{children}`) renders the chip row and, when a chip
+is selected, injects one `<style>` rule —
+`[data-dates]:not([data-dates*="<selected>"]) { display: none }` — a plain
+CSS attribute-substring selector. Safe here specifically because every
+date token is a fixed 10-character ISO string (`YYYY-MM-DD`), so a
+substring match can't accidentally hit a different date. No prop threading,
+no state lifted into `FixturesWeekendGroup`, no risk of disturbing its
+`weekendResponses`/`savingMap`/`errorMap` state — the filter is purely a
+CSS visibility toggle over server-rendered output that already exists.
+
+`DateChipSlider` (`src/components/ui/DateChipSlider.tsx`) is the shared,
+presentational chip-row component — also used by `/matches/history`'s own
+day-level filter (`features/post-match-scorecard.md` §16) with the same
+Warm Light styling, so the two "date slider" surfaces the club coordinator
+asked for don't drift visually. Purely controlled (`dates`, `selected`,
+`onSelect`) — no logic of its own beyond rendering chips.
+
+---
+
 ## 11. File Map
 
 | File | Role |
 |---|---|
-| `src/app/fixtures/page.tsx` | Server component — fetches bookings, availability, squads; groups by `validationGroupKey`; renders `FixturesWeekendGroup` per group |
+| `src/app/fixtures/page.tsx` | Server component — fetches bookings, availability, squads; groups by `validationGroupKey`; renders `FixturesWeekendGroup` per group, each wrapped in a `data-dates` div for §10.1's date-chip filter |
+| `src/components/fixtures/FixturesDateFilterBar.tsx` | Date-chip quick filter (§10.1) — wraps the weekend-group list, toggles visibility via a CSS attribute-substring rule; never touches `FixturesWeekendGroup`'s own state |
+| `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component, also used by `/matches/history` (`features/post-match-scorecard.md` §16) |
 | `src/app/fixtures/[id]/page.tsx` | Single match share page — same squad fetch pattern as fixtures page |
 | `src/components/fixtures/FixturesWeekend.tsx` | `FixturesWeekendGroup` — shared state owner; handles API calls; renders card + availability pairs |
 | `src/components/fixtures/FixturesAvailability.tsx` | Controlled availability button row; runs `getBlockReason()` validation on every render |

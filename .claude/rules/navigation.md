@@ -42,69 +42,85 @@ Server component with `revalidate = 60`. Session is read server-side via `getSer
  
 ### Role Detection
  
-Six distinct states are resolved from the session token:
+`isAdmin` is checked and `redirect('/admin')`'d **before** any dashboard data is fetched or rendered — an admin never actually sees this page's player dashboard. (The pre-September-2026 version of this doc listed an "Admin shortcut" panel on the dashboard; that JSX was already dead code by the time this page's admin-redirect shipped, since `isAdmin` can never be `true` inside the dashboard branch. Removed in the September 2026 dashboard rebuild rather than left as unreachable code.)
  
 | State | Condition | What they see |
 |---|---|---|
 | Logged out | No session | Both audience cards + sign-in prompt |
-| Registered player | `player.playerId` set, status ≠ `expelled` | Personalised dashboard + both audience cards below |
-| Captain | `player.isCaptain = true` | Player dashboard + Captains Corner shortcut |
-| Admin | `player.isAdmin = true` | Player dashboard + Admin Panel shortcut |
+| Registered player | `player.playerId` set, status ≠ `expelled` | Personalised dashboard (§3.1) + both audience cards below |
+| Captain | `player.isCaptain = true` | Player dashboard + "Squad Selection" quick action |
+| GC | `player.isGC = true` | Player dashboard + "Squad Review" quick action |
+| Admin | `player.isAdmin = true` | Redirected to `/admin` — never reaches this page's dashboard |
 | Expelled | `player.playerStatus === 'expelled'` | Suspension notice only |
 | Unmatched Gmail | Signed in but no `playerId` | "Not registered yet" callout — contact admin |
- 
+
+---
+
+## 3.1 Player Dashboard — Warm Light rebuild (September 2026)
+
+Rebuilt from a dark-ink 3-card layout to a stat-tile dashboard, modelled on a
+reference screenshot the club coordinator shared (a different app's home
+screen — welcome banner, 2×2 stat tiles, an Upcoming Fixtures card, a Quick
+Actions list). The dashboard is a **self-contained Warm Light "island"**
+(`background: '#F0F4F5'`, white/parchment cards, `#D97706` gold accent) —
+the same "light content on an otherwise dark app" pattern already
+established by `/gc-players` (Slate & Teal) and the admin Kit Room page, not
+a site-wide reskin. The dark hero band above it (`SPARTANS HUB` title) and
+everything below it (Quick Links divider, split-audience cards, footer) are
+unchanged, still dark-ink themed — only the dashboard section itself
+switched palette.
+
 ### `getPlayerData(playerId)` — Server Function
- 
-Called only when `isPlayer = true`. Makes 4 Supabase queries in sequence:
- 
-```ts
-// 1. Total upcoming confirmed fixtures count
-supabase.from('bookings')
-  .select('id', { count: 'exact', head: true })
-  .eq('status', 'confirmed')
-  .gte('game_date', today)
- 
-// 2. Player's existing availability responses (all upcoming)
-supabase.from('availability')
-  .select('booking_id, response')
-  .eq('player_id', playerId)
- 
-// 3. Next confirmed fixture with tournament join
-supabase.from('bookings')
-  .select('id, game_date, slot_time, format, opponent_name, tournament:tournaments(name, ball_type)')
-  .eq('status', 'confirmed')
-  .gte('game_date', today)
-  .order('game_date', { ascending: true })
-  .order('slot_time', { ascending: true })
-  .limit(1).single()
- 
-// 4. All upcoming booking IDs (for pending count computation)
-supabase.from('bookings')
-  .select('id')
-  .eq('status', 'confirmed')
-  .gte('game_date', today)
-```
- 
-**Derived values:**
-- `nextFixtureResponse` — cross-references query 2 against query 3 to find the player's response for the very next match
-- `pendingCount` — Set difference between all upcoming booking IDs and the set of booking IDs the player has already responded to
-### Dashboard UI (Player View)
- 
-Three stat cards link to `/fixtures`:
- 
-| Card | Content | Highlight |
+
+Called only when `isPlayer = true`. Eight independent queries fetched via
+one `Promise.all` (unchanged from the pre-existing parallelization pass —
+see §7's architectural-decisions table):
+
+| # | Query | Feeds |
 |---|---|---|
-| Upcoming Fixtures | Total count of upcoming confirmed bookings | Always gold |
-| Pending Availability | Count of matches with no response yet | Amber/warning if > 0, green if all done |
-| My Profile | Player name + edit prompt | Always neutral |
- 
-**Next Match callout** — inline panel showing the next fixture's tournament name, opponent, date, and slot. Displays current availability response badge (Y/O/E/L with colour-coding) or a "Not marked yet" amber warning, plus a direct link to mark/update.
- 
-**Captain shortcut** — gold bordered panel linking to `/captains-corner` (shown only if `isCaptain = true`).
- 
-**Admin shortcut** — crimson bordered panel linking to `/admin` (shown only if `isAdmin = true`).
- 
-**Audience cards divider** — when the player dashboard is shown, the two public-facing cards below are separated by a "Quick Links" divider label, so it reads as secondary navigation rather than the primary content.
+| 1 | `bookings` count, `status='confirmed' AND game_date >= today` | Upcoming Matches stat tile |
+| 2 | `availability` rows for this player | `nextFixtureResponse`, `pendingCount` |
+| 3 | Next **3** confirmed bookings (`.limit(3)`, was `.limit(1).single()` pre-rebuild) with tournament join | Upcoming Fixtures preview list; `nextFixture = upcomingPreview[0]` |
+| 4 | All upcoming booking IDs | `pendingCount` (set difference against query 2) |
+| 5 | `players.wallet_balance, dues_override` | Dues stat tile — **new** |
+| 6 | `squad` rows for this player, joined to `bookings(tournament_id)` | My Tournaments stat tile (distinct tournament count) — **new** |
+| 7 | `getNudgeForPlayer()` | Availability nudge banner |
+| 8 | `getWeekendGapForPlayer()` | First-open-of-day greeting dialog |
+
+**Query 3 change (single → preview array):** the pre-rebuild version fetched
+exactly one row via `.single()`. The rebuild widens this to `.limit(3)` and
+derives `nextFixture` as `upcomingPreview[0]` — one query now serves both
+the existing "Next Match" nudge logic and the new Upcoming Fixtures preview
+list, rather than adding a second overlapping query.
+
+**My Tournaments (query 6)** counts distinct `tournament_id`s from every
+`squad` row this player has ever been announced in — Hub-side only (`squad`
+→ `bookings.tournament_id`), deliberately not sourced from the analytics DB,
+same "avoid the player_id reconciliation gaps" reasoning
+`features/gc-players.md`'s "last played" field documents for an identical
+choice. Counts a tournament regardless of whether the match has been
+played yet — a player announced in an upcoming squad already counts.
+
+**Dues (query 5)** reuses the same `wallet_balance`/`dues_override` fields
+`/fixtures` already reads for its own dues gate — `duesCleared = wallet_balance
+>= 0 || dues_override`. The stat tile shows `₹0` / "Clear" when cleared,
+otherwise the absolute amount owed / "Pending" — there is no separate
+"ground fee" vs "match contribution" breakdown in this schema (single
+`wallet_balance` per player), so the reference screenshot's two separate fee
+tiles were deliberately collapsed into this one real tile rather than
+fabricated as two.
+
+### Dashboard Sections
+
+| Section | Content |
+|---|---|
+| Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle, a static "🛡️ Spartans CC Bengaluru" badge pill |
+| Stat tiles (2×2) | Upcoming Matches (gold) · My Tournaments (gold) · Pending Availability (amber if > 0, else emerald "Clear") · Dues (crimson if owed, else emerald "Clear") |
+| Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
+| Upcoming Fixtures | Header + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `upcomingPreview`, or a dashed empty-state box ("No Upcoming Matches Scheduled") when there are none |
+| Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |
+
+**Audience cards divider** — unchanged: when the player dashboard is shown, the two public-facing cards below are still separated by a "Quick Links" divider label (still dark-themed), so the dashboard reads as the primary content and the split-audience cards read as secondary.
  
 ### Split Audience Cards (All Visitors)
  

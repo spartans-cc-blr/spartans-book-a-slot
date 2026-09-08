@@ -7,6 +7,7 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import { FixturesCard } from '@/components/fixtures/FixturesCard'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
 import { PushSubscribePrompt } from '@/components/fixtures/PushSubscribePrompt'
+import { FixturesDateFilterBar } from '@/components/fixtures/FixturesDateFilterBar'
 import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
 
@@ -312,21 +313,27 @@ export default async function FixturesPage() {
         {weekendOrder.length === 0 ? (
           <p className="font-rajdhani text-zinc-500 text-sm">No upcoming fixtures confirmed yet. Check back soon.</p>
         ) : (
-          weekendOrder.map(wk => (
-            <FixturesWeekendGroup
-              key={wk}
-              isPlayer={isPlayer}
-              isCaptain={isCaptain}
-              bookings={weekendMap[wk]}
-              initialWeekendResponses={
-                Object.fromEntries(
-                  weekendMap[wk]
-                    .filter(b => b.initialResponse)
-                    .map(b => [b.id, b.initialResponse!])
-                )
-              }
+          <>
+            <FixturesDateFilterBar
+              dates={Array.from(new Set(weekendOrder.flatMap(wk => weekendMap[wk].map(b => b.game_date)))).sort()}
             />
-          ))
+            {weekendOrder.map(wk => (
+              <div key={wk} data-dates={Array.from(new Set(weekendMap[wk].map(b => b.game_date))).join(',')}>
+                <FixturesWeekendGroup
+                  isPlayer={isPlayer}
+                  isCaptain={isCaptain}
+                  bookings={weekendMap[wk]}
+                  initialWeekendResponses={
+                    Object.fromEntries(
+                      weekendMap[wk]
+                        .filter(b => b.initialResponse)
+                        .map(b => [b.id, b.initialResponse!])
+                    )
+                  }
+                />
+              </div>
+            ))}
+          </>
         )}
       </div>
 

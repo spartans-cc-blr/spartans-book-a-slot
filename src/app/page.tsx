@@ -18,14 +18,16 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
   const supabase = createServiceClient()
   const today = new Date().toISOString().split('T')[0]
 
-  // All six queries below are independent of each other — none consumes
+  // All seven queries below are independent of each other — none consumes
   // another's result — so they're issued together instead of one-after-
-  // another. Same queries, same shapes, just no longer serialized.
+  // another.
   const [
     { count: upcomingCount },
     { data: avail },
-    { data: nextFixture },
+    { data: upcomingPreview },
     { data: upcomingBookings },
+    { data: playerRow },
+    { data: squadTournamentRows },
     nudge,
     weekendGap,
   ] = await Promise.all([
@@ -42,7 +44,8 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       .select('booking_id, response')
       .eq('player_id', playerId),
 
-    // Next confirmed fixture
+    // Next few confirmed fixtures — feeds both the "Next Match" callout
+    // (first row) and the Upcoming Fixtures preview list on the dashboard.
     supabase
       .from('bookings')
       .select(`
@@ -53,8 +56,7 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       .gte('game_date', today)
       .order('game_date', { ascending: true })
       .order('slot_time', { ascending: true })
-      .limit(1)
-      .single(),
+      .limit(3),
 
     // All upcoming booking IDs (for pending count computation)
     supabase
@@ -62,6 +64,23 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       .select('id')
       .eq('status', 'confirmed')
       .gte('game_date', today),
+
+    // Wallet balance — feeds the Dues stat tile
+    supabase
+      .from('players')
+      .select('wallet_balance, dues_override')
+      .eq('id', playerId)
+      .single(),
+
+    // Distinct tournaments this player has ever been announced in a squad
+    // for — feeds the My Tournaments stat tile. A plain count over `squad`
+    // rather than the analytics DB, consistent with this app's existing
+    // "Hub-side only" posture for anything that doesn't need synced stats
+    // (see gc-players.md's "last played" note for the same reasoning).
+    supabase
+      .from('squad')
+      .select('booking:bookings!inner(tournament_id)')
+      .eq('player_id', playerId),
 
     // Read-only rendering of the same Sun-Wed nudge logic the cron uses —
     // shows this player's own "still open, matches your pattern" nudge, if any.
@@ -72,6 +91,8 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     getWeekendGapForPlayer(supabase, playerId, playerStatus),
   ])
 
+  const nextFixture = upcomingPreview?.[0] ?? null
+
   // Player's availability for next fixture
   const nextFixtureResponse = nextFixture
     ? avail?.find(a => a.booking_id === nextFixture.id)?.response ?? null
@@ -81,7 +102,21 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
   const respondedIds = new Set((avail ?? []).map(a => a.booking_id))
   const pendingCount = (upcomingBookings ?? []).filter(b => !respondedIds.has(b.id)).length
 
-  return { upcomingCount: upcomingCount ?? 0, nextFixture, nextFixtureResponse, pendingCount, nudge, weekendGap }
+  const duesAmount = playerRow?.wallet_balance ?? 0
+  const duesCleared = duesAmount >= 0 || !!playerRow?.dues_override
+
+  const tournamentCount = new Set(
+    (squadTournamentRows ?? [])
+      .map(r => (r as any).booking?.tournament_id)
+      .filter(Boolean)
+  ).size
+
+  return {
+    upcomingCount: upcomingCount ?? 0,
+    upcomingPreview: upcomingPreview ?? [],
+    nextFixture, nextFixtureResponse, pendingCount, nudge, weekendGap,
+    duesAmount, duesCleared, tournamentCount,
+  }
 }
 
 function formatDate(dateStr: string) {
@@ -96,11 +131,127 @@ function slotLabel(slot: string) {
   return map[slot] || slot
 }
 
+function formatRupees(n: number) {
+  return `₹${Math.abs(n).toLocaleString('en-IN')}`
+}
+
 const AVAIL_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
   Y: { color: '#4ade80', bg: '#1a4731', border: '#166534', label: 'Available' },
   E: { color: '#60a5fa', bg: '#1e3a5f', border: '#1d4ed8', label: 'Either game today' },
   O: { color: '#fbbf24', bg: '#3d2e00', border: '#d97706', label: 'One game this weekend' },
   L: { color: '#c084fc', bg: '#2e1a47', border: '#7e22ce', label: 'On leave' },
+}
+
+// --- icons — light-theme dashboard set, 20px stroke ---
+function CalendarGlyph({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="5" width="17" height="15" rx="2" /><line x1="3.5" y1="9.5" x2="20.5" y2="9.5" /><line x1="8" y1="3" x2="8" y2="7" /><line x1="16" y1="3" x2="16" y2="7" />
+    </svg>
+  )
+}
+function TrophyGlyph({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 4h10v4a5 5 0 0 1-10 0V4z" /><path d="M7 5H4.5A2.5 2.5 0 0 0 4 9.9c.4 1.3 1.6 2.1 3 2.1" /><path d="M17 5h2.5A2.5 2.5 0 0 1 20 9.9c-.4 1.3-1.6 2.1-3 2.1" /><line x1="12" y1="13" x2="12" y2="17" /><path d="M9 20h6" /><path d="M10 17h4v3h-4z" />
+    </svg>
+  )
+}
+function AlertGlyph({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 4.5 21 19H3L12 4.5z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="16.8" r="0.2" fill={color} stroke="none" />
+    </svg>
+  )
+}
+function CheckGlyph({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="8.5" /><polyline points="8.5 12.5 11 15 15.5 9.5" />
+    </svg>
+  )
+}
+function RupeeGlyph({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="6" y1="4" x2="18" y2="4" /><line x1="6" y1="8" x2="18" y2="8" /><path d="M6 8c5 0 7.5 1.5 7.5 4.5S13 17 8 17" /><line x1="8" y1="17" x2="18" y2="21" />
+    </svg>
+  )
+}
+function ClipboardGlyph({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="6" y="4.5" width="12" height="16" rx="1.6" /><path d="M9 4.5V3.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" /><polyline points="8.5 12.5 10.5 14.5 15 10" />
+    </svg>
+  )
+}
+function ScalesGlyph({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="3" x2="12" y2="19" /><line x1="5" y1="7" x2="19" y2="7" /><path d="M5 7l-3 6a3 3 0 0 0 6 0l-3-6z" /><path d="M19 7l-3 6a3 3 0 0 0 6 0l-3-6z" /><path d="M8 21h8" />
+    </svg>
+  )
+}
+function PersonGlyph({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="3.5" /><path d="M4.5 20c1.2-4 4-6 7.5-6s6.3 2 7.5 6" />
+    </svg>
+  )
+}
+function ChevronGlyph({ color = '#A8A29E' }: { color?: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 5 16 12 9 19" />
+    </svg>
+  )
+}
+
+// Stat tile — light card, Warm Light palette
+function StatTile({ icon, value, label, tag, tone }: {
+  icon: React.ReactNode; value: string | number; label: string; tag: string
+  tone: 'gold' | 'amber' | 'emerald' | 'crimson'
+}) {
+  const toneMap = {
+    gold:    { bg: '#FEF3C7', tagBg: '#FEF3C7', tagText: '#B45309' },
+    amber:   { bg: '#FEF3C7', tagBg: '#FEF3C7', tagText: '#B45309' },
+    emerald: { bg: '#D1FAE5', tagBg: '#D1FAE5', tagText: '#059669' },
+    crimson: { bg: '#FEE2E2', tagBg: '#FEE2E2', tagText: '#DC2626' },
+  }[tone]
+
+  return (
+    <div className="rounded-xl p-4" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
+      <div className="flex items-start justify-between mb-3">
+        <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: toneMap.bg }}>
+          {icon}
+        </span>
+        <span className="font-rajdhani text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full"
+          style={{ background: toneMap.tagBg, color: toneMap.tagText }}>
+          {tag}
+        </span>
+      </div>
+      <p className="font-cinzel text-2xl font-bold" style={{ color: '#1C1917' }}>{value}</p>
+      <p className="font-rajdhani text-xs mt-1" style={{ color: '#78716C' }}>{label}</p>
+    </div>
+  )
+}
+
+function QuickActionRow({ href, icon, title, subtitle }: {
+  href: string; icon: React.ReactNode; title: string; subtitle: string
+}) {
+  return (
+    <Link href={href}
+      className="flex items-center gap-3 py-3 px-3 -mx-1 rounded-lg transition-colors hover:bg-black/[0.03]">
+      <span className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#FEF3C7' }}>
+        {icon}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="font-rajdhani text-sm font-bold" style={{ color: '#1C1917' }}>{title}</p>
+        <p className="font-rajdhani text-xs" style={{ color: '#78716C' }}>{subtitle}</p>
+      </div>
+      <ChevronGlyph />
+    </Link>
+  )
 }
 
 export default async function HomePage() {
@@ -110,12 +261,14 @@ export default async function HomePage() {
   const isLoggedIn  = !!session
   const isPlayer    = isLoggedIn && !!player?.playerId && player?.playerStatus !== 'expelled'
   const isCaptain   = isPlayer && !!player?.isCaptain
+  const isGC        = isPlayer && !!player?.isGC
   const isAdmin     = isLoggedIn && !!player?.isAdmin
   if (isAdmin) redirect('/admin')
   const isExpelled  = isLoggedIn && player?.playerStatus === 'expelled'
   const isUnmatched = isLoggedIn && !player?.playerId && !isExpelled
 
   const playerData = isPlayer ? await getPlayerData(player.playerId, player?.playerStatus) : null
+  const firstName  = player?.playerName?.split(' ')[0] ?? 'Spartan'
 
   return (
     <div className="min-h-screen bg-ink grain">
@@ -143,21 +296,22 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <div className="px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
-
-        {/* ── EXPELLED STATE ── */}
-        {isExpelled && (
-          <div className="bg-red-950/40 border border-red-800 rounded p-6 text-center mb-8">
+      {/* ── EXPELLED STATE ── */}
+      {isExpelled && (
+        <div className="px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
+          <div className="bg-red-950/40 border border-red-800 rounded p-6 text-center">
             <p className="font-cinzel text-red-400 font-semibold mb-1">Account Suspended</p>
             <p className="font-rajdhani text-sm text-red-600">
               Your account has been suspended. Contact the club admin for more information.
             </p>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ── UNMATCHED (signed in but not a registered player) ── */}
-        {isUnmatched && (
-          <div className="bg-amber-950/30 border border-amber-800/50 rounded p-5 mb-8 flex items-start gap-4">
+      {/* ── UNMATCHED (signed in but not a registered player) ── */}
+      {isUnmatched && (
+        <div className="px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
+          <div className="bg-amber-950/30 border border-amber-800/50 rounded p-5 flex items-start gap-4">
             <span className="text-2xl flex-shrink-0">👋</span>
             <div>
               <p className="font-cinzel text-sm text-amber-300 font-semibold mb-1">
@@ -168,194 +322,173 @@ export default async function HomePage() {
               </p>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ── PLAYER DASHBOARD ── */}
-        {isPlayer && playerData && (
-          <div className="mb-10">
+      {/* ── PLAYER DASHBOARD — Warm Light, self-contained (nav + hero above stay dark) ── */}
+      {isPlayer && playerData && (
+        <div style={{ background: '#F0F4F5' }} className="px-5 md:px-8 lg:px-10 py-6">
+          <div className="max-w-4xl mx-auto">
             <WeekendAvailabilityGreeting
               playerId={player.playerId}
-              firstName={player?.playerName?.split(' ')[0] ?? 'Spartan'}
+              firstName={firstName}
               bookings={playerData.weekendGap}
             />
-            {/* Welcome */}
-            <div className="flex items-center gap-3 mb-6">
-              <img
-                src={player?.photoUrl ?? player?.image ?? '/default-avatar.png'}
-                alt=""
-                className="w-10 h-10 rounded-full object-cover border border-gold-dim flex-shrink-0"
-              />
+
+            {/* Welcome banner */}
+            <div className="rounded-2xl p-6 mb-5 flex flex-wrap items-start justify-between gap-4"
+              style={{ background: 'linear-gradient(135deg, #FEF3C7 0%, #FFF7ED 100%)' }}>
               <div>
-                <p className="font-cinzel text-base font-semibold text-parchment">
-                  Welcome back, {player?.playerName?.split(' ')[0] ?? 'Spartan'}
+                <img
+                  src={player?.photoUrl ?? player?.image ?? '/default-avatar.png'}
+                  alt=""
+                  className="w-10 h-10 rounded-full object-cover border-2 mb-3"
+                  style={{ borderColor: '#D97706' }}
+                />
+                <p className="font-cinzel text-2xl font-bold leading-snug" style={{ color: '#1C1917' }}>
+                  Welcome back, {firstName}! 👋
                 </p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {isCaptain && (
-                    <span className="font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1.5 py-0.5 rounded">
-                      CAPTAIN
-                    </span>
-                  )}
-                  {isAdmin && (
-                    <span className="font-rajdhani text-[9px] font-bold bg-crimson/10 border border-crimson/40 text-crimson px-1.5 py-0.5 rounded">
-                      ADMIN
-                    </span>
-                  )}
-                  <span className="font-rajdhani text-xs text-zinc-600">Spartans CC BLR</span>
-                </div>
+                <p className="font-rajdhani text-sm mt-1 max-w-md" style={{ color: '#57534E' }}>
+                  Here's your real-time overview for matches &amp; availability.
+                </p>
               </div>
+              <span className="font-rajdhani text-xs font-bold px-4 py-2 rounded-full flex items-center gap-2 flex-shrink-0"
+                style={{ background: '#FFFFFF', color: '#B45309', border: '1px solid #F5D9A8' }}>
+                🛡️ Spartans CC Bengaluru
+              </span>
             </div>
 
-            {/* Action cards row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-
-              {/* Upcoming fixtures */}
-              <Link href="/fixtures"
-                className="bg-ink-3 border border-ink-5 rounded p-4 hover:border-gold-dim hover:bg-ink-4 transition-all group">
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-2xl">🏏</span>
-                  <span className="font-rajdhani text-[10px] font-bold tracking-wide uppercase text-zinc-600 group-hover:text-gold transition-colors">
-                    View Fixtures →
-                  </span>
-                </div>
-                <p className="font-cinzel text-2xl font-bold text-gold">{playerData.upcomingCount}</p>
-                <p className="font-rajdhani text-xs text-zinc-500 mt-1">Upcoming confirmed matches</p>
-              </Link>
-
-              {/* Pending availability */}
-              <Link href="/fixtures"
-                className={`rounded p-4 transition-all group border ${
-                  playerData.pendingCount > 0
-                    ? 'bg-amber-950/30 border-amber-800/60 hover:border-amber-600'
-                    : 'bg-ink-3 border-ink-5 hover:border-gold-dim hover:bg-ink-4'
-                }`}>
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-2xl">{playerData.pendingCount > 0 ? '⚠️' : '✅'}</span>
-                  <span className={`font-rajdhani text-[10px] font-bold tracking-wide uppercase transition-colors ${
-                    playerData.pendingCount > 0 ? 'text-amber-600 group-hover:text-amber-400' : 'text-zinc-600 group-hover:text-gold'
-                  }`}>
-                    Mark Availability →
-                  </span>
-                </div>
-                <p className={`font-cinzel text-2xl font-bold ${playerData.pendingCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                  {playerData.pendingCount}
-                </p>
-                <p className={`font-rajdhani text-xs mt-1 ${playerData.pendingCount > 0 ? 'text-amber-600' : 'text-zinc-500'}`}>
-                  {playerData.pendingCount > 0 ? 'Matches awaiting your response' : 'All marked — you\'re up to date'}
-                </p>
-              </Link>
-
-              {/* Profile */}
-              <Link href="/profile"
-                className="bg-ink-3 border border-ink-5 rounded p-4 hover:border-gold-dim hover:bg-ink-4 transition-all group">
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-2xl">👤</span>
-                  <span className="font-rajdhani text-[10px] font-bold tracking-wide uppercase text-zinc-600 group-hover:text-gold transition-colors">
-                    Edit Profile →
-                  </span>
-                </div>
-                <p className="font-cinzel text-sm font-semibold text-parchment truncate">{player?.playerName}</p>
-                <p className="font-rajdhani text-xs text-zinc-500 mt-1">Update your details &amp; photo</p>
-              </Link>
-
+            {/* Stat tiles — 2x2 */}
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <StatTile
+                icon={<CalendarGlyph color="#B45309" />}
+                value={playerData.upcomingCount}
+                label="Upcoming Matches"
+                tag="Upcoming"
+                tone="gold"
+              />
+              <StatTile
+                icon={<TrophyGlyph color="#B45309" />}
+                value={playerData.tournamentCount}
+                label="My Tournaments"
+                tag="Tournaments"
+                tone="gold"
+              />
+              <StatTile
+                icon={playerData.pendingCount > 0 ? <AlertGlyph color="#B45309" /> : <CheckGlyph color="#059669" />}
+                value={playerData.pendingCount}
+                label="Pending Availability"
+                tag={playerData.pendingCount > 0 ? 'Action needed' : 'Clear'}
+                tone={playerData.pendingCount > 0 ? 'amber' : 'emerald'}
+              />
+              <StatTile
+                icon={<RupeeGlyph color={playerData.duesCleared ? '#059669' : '#DC2626'} />}
+                value={playerData.duesCleared ? formatRupees(0) : formatRupees(playerData.duesAmount)}
+                label="Dues"
+                tag={playerData.duesCleared ? 'Clear' : 'Pending'}
+                tone={playerData.duesCleared ? 'emerald' : 'crimson'}
+              />
             </div>
 
             {/* Availability nudge — read-only rendering of the Sun-Wed cron logic */}
             {playerData.nudge && (
               <Link href={`/fixtures/${playerData.nudge.booking.id}`}
-                className="mb-3 flex items-center justify-between gap-4 bg-amber-950/20 border border-amber-800/40 rounded p-4 hover:border-amber-600 transition-colors group">
+                className="mb-5 flex items-center justify-between gap-4 rounded-xl p-4 transition-colors group"
+                style={{ background: '#FEF3C7', border: '1px solid #F5D9A8' }}>
                 <div className="flex items-start gap-3 min-w-0">
                   <span className="text-xl flex-shrink-0">{playerData.nudge.title.split(' ')[0]}</span>
                   <div className="min-w-0">
-                    <p className="font-cinzel text-xs font-semibold text-amber-300 truncate">
+                    <p className="font-cinzel text-xs font-semibold truncate" style={{ color: '#92400E' }}>
                       {playerData.nudge.title.replace(/^\S+\s/, '')}
                     </p>
-                    <p className="font-rajdhani text-xs text-amber-600/90 mt-0.5">
+                    <p className="font-rajdhani text-xs mt-0.5" style={{ color: '#B45309' }}>
                       {playerData.nudge.body}
                     </p>
                   </div>
                 </div>
-                <span className="font-rajdhani text-xs text-amber-500 group-hover:text-amber-300 transition-colors flex-shrink-0">
+                <span className="font-rajdhani text-xs font-bold flex-shrink-0" style={{ color: '#B45309' }}>
                   Mark now →
                 </span>
               </Link>
             )}
 
-            {/* Next fixture callout */}
-            {playerData.nextFixture && (
-              <div className="bg-ink-3 border border-ink-5 rounded p-4">
-                <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-3">
-                  Next Match
-                </p>
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div>
-                    <p className="font-cinzel text-sm font-semibold text-parchment">
-                      {(playerData.nextFixture as any).tournament?.name ?? '—'}
-                    </p>
-                    <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
-                      vs {(playerData.nextFixture as any).opponent_name ?? 'TBD'} · {formatDate((playerData.nextFixture as any).game_date)} · {slotLabel((playerData.nextFixture as any).slot_time)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {playerData.nextFixtureResponse ? (
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="font-rajdhani text-xs font-bold w-7 h-7 flex items-center justify-center rounded-sm"
-                          style={{
-                            background: AVAIL_CONFIG[playerData.nextFixtureResponse]?.bg,
-                            color: AVAIL_CONFIG[playerData.nextFixtureResponse]?.color,
-                            border: `1px solid ${AVAIL_CONFIG[playerData.nextFixtureResponse]?.border}`,
-                          }}>
-                          {playerData.nextFixtureResponse}
-                        </span>
-                        <span className="font-rajdhani text-xs text-zinc-500">
-                          {AVAIL_CONFIG[playerData.nextFixtureResponse]?.label}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="font-rajdhani text-xs text-amber-500 font-semibold">
-                        ⚠ Not marked yet
-                      </span>
-                    )}
-                    <Link href="/fixtures"
-                      className="font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold px-3 py-1.5 rounded transition-colors">
-                      {playerData.nextFixtureResponse ? 'Update' : 'Mark Now'}
-                    </Link>
-                  </div>
-                </div>
+            {/* Upcoming Fixtures */}
+            <div className="rounded-xl p-5 mb-5" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-cinzel text-lg font-bold flex items-center gap-2" style={{ color: '#1C1917' }}>
+                  <span className="w-1 h-5 rounded-full inline-block" style={{ background: '#D97706' }} />
+                  Upcoming Fixtures
+                </h2>
+                <Link href="/fixtures" className="font-rajdhani text-sm font-bold" style={{ color: '#D97706' }}>
+                  View All →
+                </Link>
               </div>
-            )}
 
-            {/* Captain shortcut */}
-            {isCaptain && (
-              <Link href="/captains-corner"
-                className="mt-3 flex items-center justify-between bg-gold/5 border border-gold-dim rounded p-4 hover:bg-gold/10 transition-colors group">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">⚔️</span>
-                  <div>
-                    <p className="font-cinzel text-sm font-semibold text-gold">Captains Corner</p>
-                    <p className="font-rajdhani text-xs text-zinc-500">View availability grid &amp; announce squad</p>
-                  </div>
+              {playerData.upcomingPreview.length === 0 ? (
+                <div className="rounded-xl py-10 flex flex-col items-center text-center border-2 border-dashed" style={{ borderColor: '#D4C9B0' }}>
+                  <CalendarGlyph color="#A8A29E" />
+                  <p className="font-cinzel text-base font-bold mt-3" style={{ color: '#1C1917' }}>
+                    No Upcoming Matches Scheduled
+                  </p>
+                  <p className="font-rajdhani text-sm mt-1 max-w-xs" style={{ color: '#78716C' }}>
+                    Check fixtures for your next match once it's confirmed.
+                  </p>
                 </div>
-                <span className="font-rajdhani text-xs text-gold-dim group-hover:text-gold transition-colors">→</span>
-              </Link>
-            )}
+              ) : (
+                <div className="space-y-2">
+                  {playerData.upcomingPreview.map((fx: any) => {
+                    const resp = fx.id === playerData.nextFixture?.id ? playerData.nextFixtureResponse : null
+                    return (
+                      <Link key={fx.id} href="/fixtures"
+                        className="flex items-center justify-between gap-3 rounded-lg p-3 transition-colors hover:bg-black/[0.03]"
+                        style={{ background: '#F8F4EE' }}>
+                        <div className="min-w-0">
+                          <p className="font-rajdhani text-sm font-bold truncate" style={{ color: '#1C1917' }}>
+                            vs {fx.opponent_name ?? 'TBD'}
+                          </p>
+                          <p className="font-rajdhani text-xs mt-0.5" style={{ color: '#78716C' }}>
+                            {fx.tournament?.name ?? fx.format} · {formatDate(fx.game_date)} · {slotLabel(fx.slot_time)}
+                          </p>
+                        </div>
+                        {resp ? (
+                          <span className="font-rajdhani text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0"
+                            style={{ background: AVAIL_CONFIG[resp]?.bg, color: AVAIL_CONFIG[resp]?.color }}>
+                            {resp}
+                          </span>
+                        ) : (
+                          <span className="font-rajdhani text-[10px] font-bold flex-shrink-0" style={{ color: '#D97706' }}>
+                            Not marked
+                          </span>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
 
-            {/* Admin shortcut */}
-            {isAdmin && (
-              <Link href="/admin"
-                className="mt-3 flex items-center justify-between bg-crimson/5 border border-crimson/30 rounded p-4 hover:bg-crimson/10 transition-colors group">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">⚙️</span>
-                  <div>
-                    <p className="font-cinzel text-sm font-semibold text-crimson">Admin Panel</p>
-                    <p className="font-rajdhani text-xs text-zinc-500">Manage bookings, players &amp; master data</p>
-                  </div>
-                </div>
-                <span className="font-rajdhani text-xs text-crimson/50 group-hover:text-crimson transition-colors">→</span>
-              </Link>
-            )}
+            {/* Quick Actions */}
+            <div className="rounded-xl p-5" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
+              <h2 className="font-cinzel text-lg font-bold flex items-center gap-2 mb-2" style={{ color: '#1C1917' }}>
+                <span className="w-1 h-5 rounded-full inline-block" style={{ background: '#D97706' }} />
+                Quick Actions
+              </h2>
+              <div className="divide-y" style={{ borderColor: '#E7E0D3' }}>
+                <QuickActionRow href="/fixtures" icon={<CalendarGlyph color="#B45309" />} title="Set Availability" subtitle="Update weekend match availability" />
+                {isCaptain && (
+                  <QuickActionRow href="/captains-corner" icon={<ClipboardGlyph color="#B45309" />} title="Squad Selection" subtitle="Pick the squad & view availability grid" />
+                )}
+                {isGC && (
+                  <QuickActionRow href="/gc-review" icon={<ScalesGlyph color="#B45309" />} title="Squad Review" subtitle="Approve or return submitted squads" />
+                )}
+                <QuickActionRow href="/profile" icon={<PersonGlyph color="#B45309" />} title="My Profile" subtitle="Update your details & photo" />
+              </div>
+            </div>
           </div>
-        )}
+        </div>
+      )}
+
+      <div className="px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
 
         {/* ── DIVIDER between player section and public paths ── */}
         {isPlayer && (

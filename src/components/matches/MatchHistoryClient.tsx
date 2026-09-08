@@ -11,6 +11,7 @@ import {
 } from '@/components/matches/ScorecardVerifyPanel'
 import { PerformerShareButton, type TopPerformerInfo } from '@/components/matches/PerformerShareButton'
 import { BallIcon, type BallType } from '@/components/matches/BallIcon'
+import { DateChipSlider } from '@/components/ui/DateChipSlider'
 
 interface Ground {
   name:          string
@@ -223,6 +224,12 @@ export function MatchHistoryClient({
   // grounds row (a genuine one-off away venue) — see buildParams().
   const [groundSelection, setGroundSelection] = useState('')
   const [format, setFormat]             = useState('')
+  // Day-level refinement on top of everything else above — purely
+  // client-side, narrowing whatever's already been fetched for the current
+  // month/role/tournament/ground/format combination. Reset whenever those
+  // server-side filters change (see the fetch effect below), so it can
+  // never silently point at a date that's no longer in `matches`.
+  const [dayFilter, setDayFilter]       = useState<string | null>(null)
 
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({ tournaments: [], grounds: [], venues: [], months: [], results: [], formats: ['T20', 'T30'] })
 
@@ -259,6 +266,7 @@ export function MatchHistoryClient({
     let cancelled = false
     setLoading(true)
     setError('')
+    setDayFilter(null)
     fetch(`/api/matches/history?${buildParams()}`)
       .then(res => res.json())
       .then(data => {
@@ -316,6 +324,13 @@ export function MatchHistoryClient({
     setMonthPickerOpen(false)
   }
   const monthGroups = groupMonthsByYear(filterOptions.months)
+
+  // Distinct match dates currently loaded (already scoped by every
+  // server-side filter above) — feeds the date-chip slider. Sorted
+  // ascending so the chip row reads left-to-right chronologically, unlike
+  // `matches` itself which the API returns most-recent-first.
+  const distinctDates = Array.from(new Set(matches.map(m => m.game_date))).sort()
+  const visibleMatches = dayFilter ? matches.filter(m => m.game_date === dayFilter) : matches
 
   return (
     <div className="space-y-4">
@@ -466,9 +481,27 @@ export function MatchHistoryClient({
       {loading && (
         <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">Loading…</p>
       )}
-      {!loading && !error && matches.length === 0 && (
+
+      {/* Date-chip slider — Warm Light palette, a self-contained light card
+          on the otherwise dark page (same treatment as the mockup). Purely
+          a client-side refinement over whatever `matches` already holds —
+          see the `distinctDates`/`visibleMatches` derivation above. */}
+      {!loading && !error && distinctDates.length > 0 && (
+        <div className="rounded-xl p-3" style={{ background: '#F8F4EE', border: '1px solid #D4C9B0' }}>
+          <DateChipSlider dates={distinctDates} selected={dayFilter} onSelect={setDayFilter} />
+        </div>
+      )}
+
+      {!loading && !error && visibleMatches.length === 0 && (
         <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">
-          {hasActiveFilters ? (
+          {dayFilter ? (
+            <>
+              No matches on that date.{' '}
+              <button onClick={() => setDayFilter(null)} className="text-gold underline">
+                Show all dates
+              </button>
+            </>
+          ) : hasActiveFilters ? (
             'No matches found for these filters.'
           ) : (
             <>
@@ -488,6 +521,7 @@ export function MatchHistoryClient({
         <p className="font-rajdhani text-xs text-zinc-600">
           {totalCount} match{totalCount === 1 ? '' : 'es'}
           {matches.length < totalCount ? ` · showing ${matches.length}` : ''}
+          {dayFilter ? ` · ${visibleMatches.length} on this date` : ''}
         </p>
       )}
 
@@ -497,8 +531,8 @@ export function MatchHistoryClient({
           the admin backfill page at /admin/scorecard-backfill has the full,
           unpaginated view across every flagged match). */}
       {(() => {
-        const flagged = matches.filter(m => m.needs_reconciliation)
-        const rest    = matches.filter(m => !m.needs_reconciliation)
+        const flagged = visibleMatches.filter(m => m.needs_reconciliation)
+        const rest    = visibleMatches.filter(m => !m.needs_reconciliation)
         function patchMatch(bookingId: string, patch: Partial<MatchSummary>) {
           setMatches(prev => prev.map(x => x.booking_id === bookingId ? { ...x, ...patch } : x))
         }

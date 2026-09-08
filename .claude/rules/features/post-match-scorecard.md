@@ -1215,6 +1215,48 @@ tie-inclusive `computeTopPerformers()` path.
 
 ---
 
+## 16. Date-Chip Quick Filter on `/matches/history` (added September 2026)
+
+A horizontal date-chip row ("All" + one chip per distinct `game_date`
+currently loaded, day-of-week/day-number/month stacked, Warm Light palette —
+`#F8F4EE` panel, `#D97706` active chip) sits in `MatchHistoryClient.tsx`
+between the existing filter bar and the match list. Unlike the month
+stepper and the role (`I Played`/`I Led (C/VC)`/`All Matches`, unchanged —
+see §9's file map) and tournament/ground/format filters, which are all
+server-side query params on `GET /api/matches/history`, the date-chip
+filter is **purely client-side**: it narrows whatever `matches` the page
+has already fetched for the current month/role/tournament/ground/format
+combination, with no new API call and no new route param.
+
+`distinctDates` (sorted ascending, for the chip row) and `visibleMatches`
+(the day-filtered subset actually rendered) are both derived inline from
+the existing `matches` state on every render — no new fetch, no new
+loading state. `dayFilter` resets to `null` inside the same effect that
+already resets `matches` on any server-side filter change, so it can never
+silently point at a date no longer present in the loaded set. The flagged
+("⚠ Needs Reconciliation") / rest split, the "N matches" count line, and
+the empty-state message all now read from `visibleMatches` rather than
+`matches` directly; pagination (`loadMore`/`nextCursor`) is unaffected —
+"Load Older Matches" still pages the server-side `matches` array regardless
+of whether a day chip is currently narrowing what's shown.
+
+**Shares `DateChipSlider` with `/fixtures`'s own date-chip filter**
+(`features/player-availability.md` §10.1) — same component, same Warm
+Light styling, so the two "date slider" surfaces requested together don't
+visually drift. The two integrations are otherwise unrelated: `/fixtures`
+toggles CSS visibility over server-rendered weekend groups (to avoid
+touching `FixturesWeekendGroup`'s live validation state), while this page —
+already a fully client-managed list with its own `matches` state — just
+filters an array in React, no CSS trick needed.
+
+### File Map addition
+
+| File | Role |
+|---|---|
+| `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component (`dates`, `selected`, `onSelect`), also used by `/fixtures` |
+
+---
+
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*
 *Security audit: vibe-security patterns applied per SKILL.md*
 *Analytics pipeline: `spartans-python` repo (Render) · Hub: `spartans-book-a-slot` repo (Vercel)*
