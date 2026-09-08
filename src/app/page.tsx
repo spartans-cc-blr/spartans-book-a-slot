@@ -98,6 +98,14 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     ? avail?.find(a => a.booking_id === nextFixture.id)?.response ?? null
     : null
 
+  // Player's availability for every fixture in the preview list (not just
+  // the first) — feeds the badge on each row of the Upcoming Fixtures card.
+  const previewResponses: Record<string, string> = {}
+  for (const fx of upcomingPreview ?? []) {
+    const r = avail?.find(a => a.booking_id === fx.id)?.response
+    if (r) previewResponses[fx.id] = r
+  }
+
   // Count of upcoming fixtures player has NOT responded to
   const respondedIds = new Set((avail ?? []).map(a => a.booking_id))
   const pendingCount = (upcomingBookings ?? []).filter(b => !respondedIds.has(b.id)).length
@@ -114,7 +122,7 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
   return {
     upcomingCount: upcomingCount ?? 0,
     upcomingPreview: upcomingPreview ?? [],
-    nextFixture, nextFixtureResponse, pendingCount, nudge, weekendGap,
+    nextFixture, nextFixtureResponse, previewResponses, pendingCount, nudge, weekendGap,
     duesAmount, duesCleared, tournamentCount,
   }
 }
@@ -437,7 +445,7 @@ export default async function HomePage() {
               ) : (
                 <div className="space-y-2">
                   {playerData.upcomingPreview.map((fx: any) => {
-                    const resp = fx.id === playerData.nextFixture?.id ? playerData.nextFixtureResponse : null
+                    const resp = playerData.previewResponses[fx.id] ?? null
                     return (
                       <Link key={fx.id} href="/fixtures"
                         className="flex items-center justify-between gap-3 rounded-lg p-3 transition-colors hover:bg-black/[0.03]"

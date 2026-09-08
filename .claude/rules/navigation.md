@@ -79,7 +79,7 @@ see §7's architectural-decisions table):
 | # | Query | Feeds |
 |---|---|---|
 | 1 | `bookings` count, `status='confirmed' AND game_date >= today` | Upcoming Matches stat tile |
-| 2 | `availability` rows for this player | `nextFixtureResponse`, `pendingCount` |
+| 2 | `availability` rows for this player | `nextFixtureResponse`, `previewResponses`, `pendingCount` |
 | 3 | Next **3** confirmed bookings (`.limit(3)`, was `.limit(1).single()` pre-rebuild) with tournament join | Upcoming Fixtures preview list; `nextFixture = upcomingPreview[0]` |
 | 4 | All upcoming booking IDs | `pendingCount` (set difference against query 2) |
 | 5 | `players.wallet_balance, dues_override` | Dues stat tile — **new** |
@@ -92,6 +92,21 @@ exactly one row via `.single()`. The rebuild widens this to `.limit(3)` and
 derives `nextFixture` as `upcomingPreview[0]` — one query now serves both
 the existing "Next Match" nudge logic and the new Upcoming Fixtures preview
 list, rather than adding a second overlapping query.
+
+**Bug fixed (September 2026) — only the first preview row ever showed its
+availability badge.** The initial rebuild computed a single
+`nextFixtureResponse` scoped to `nextFixture` (`upcomingPreview[0]`) and
+reused that same value for every row's badge via `fx.id ===
+playerData.nextFixture?.id ? nextFixtureResponse : null` — so the 2nd and
+3rd cards in the preview list always fell through to `null` and rendered
+"Not marked," even when the player had genuinely responded (visible
+correctly on `/fixtures` itself, which reads the full per-booking
+`availability` set with no such truncation). Fixed by deriving a
+`previewResponses: Record<bookingId, response>` map over all of
+`upcomingPreview` from the same already-fetched `avail` rows (query 2) —
+no new query — and having each row look itself up in that map instead of
+comparing against `nextFixture.id`. `nextFixtureResponse` is kept
+unchanged for the nudge logic that already depended on it.
 
 **My Tournaments (query 6)** counts distinct `tournament_id`s from every
 `squad` row this player has ever been announced in — Hub-side only (`squad`
