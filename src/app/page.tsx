@@ -25,7 +25,7 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     { count: upcomingCount },
     { data: avail },
     { data: upcomingPreview },
-    { data: upcomingBookings },
+    { data: squadPlayedRows },
     { data: playerRow },
     { data: squadTournamentRows },
     nudge,
@@ -58,14 +58,18 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       .order('slot_time', { ascending: true })
       .limit(3),
 
-    // All upcoming booking IDs (for pending count computation)
+    // Every squad row this player has ever been announced in, joined to
+    // its booking's game_date/status — feeds the Matches Played stat tile
+    // (this year's count + all-time last-played date). Same Hub-side
+    // squad-join approach GC Players' "last played" field uses (see
+    // gc-players.md §7/§9), rather than the analytics DB, to avoid the
+    // player_id reconciliation gaps documented there.
     supabase
-      .from('bookings')
-      .select('id')
-      .eq('status', 'confirmed')
-      .gte('game_date', today),
+      .from('squad')
+      .select('booking:bookings!inner(game_date, status)')
+      .eq('player_id', playerId),
 
-    // Wallet balance — feeds the Dues stat tile
+    // Wallet balance — feeds the Wallet Balance stat tile
     supabase
       .from('players')
       .select('wallet_balance, dues_override')
@@ -74,9 +78,8 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
 
     // Distinct tournaments this player has ever been announced in a squad
     // for — feeds the My Tournaments stat tile. A plain count over `squad`
-    // rather than the analytics DB, consistent with this app's existing
-    // "Hub-side only" posture for anything that doesn't need synced stats
-    // (see gc-players.md's "last played" note for the same reasoning).
+    // rather than the analytics DB, deliberately not sourced from the
+    // analytics DB, same reasoning as above.
     supabase
       .from('squad')
       .select('booking:bookings!inner(tournament_id)')
@@ -106,10 +109,6 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     if (r) previewResponses[fx.id] = r
   }
 
-  // Count of upcoming fixtures player has NOT responded to
-  const respondedIds = new Set((avail ?? []).map(a => a.booking_id))
-  const pendingCount = (upcomingBookings ?? []).filter(b => !respondedIds.has(b.id)).length
-
   const walletBalance = playerRow?.wallet_balance ?? 0
   const duesOverride = !!playerRow?.dues_override
 
@@ -119,11 +118,23 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       .filter(Boolean)
   ).size
 
+  // Confirmed bookings only, already played (game_date <= today) —
+  // announced-but-upcoming squad rows don't count as "played" yet.
+  const playedBookings = (squadPlayedRows ?? [])
+    .map(r => (r as any).booking)
+    .filter((b: any) => b?.status === 'confirmed' && b.game_date <= today)
+  const currentYear = String(new Date().getFullYear())
+  const matchesPlayedThisYear = playedBookings.filter((b: any) => b.game_date.startsWith(currentYear)).length
+  const lastPlayedOn = playedBookings.length
+    ? playedBookings.reduce((max: string, b: any) => (b.game_date > max ? b.game_date : max), playedBookings[0].game_date)
+    : null
+
   return {
     upcomingCount: upcomingCount ?? 0,
     upcomingPreview: upcomingPreview ?? [],
-    nextFixture, nextFixtureResponse, previewResponses, pendingCount, nudge, weekendGap,
+    nextFixture, nextFixtureResponse, previewResponses, nudge, weekendGap,
     walletBalance, duesOverride, tournamentCount,
+    matchesPlayedThisYear, lastPlayedOn,
   }
 }
 
@@ -147,6 +158,18 @@ function formatSignedRupees(n: number) {
   return `${n < 0 ? '-' : ''}₹${Math.abs(n).toLocaleString('en-IN')}`
 }
 
+// Short "last played" caption for the Matches Played stat tile — no
+// weekday (unlike formatDate, used for fixture rows where the day of week
+// matters); year included only when it isn't the current one, to keep a
+// tile-width caption from wrapping.
+function formatLastPlayed(dateStr: string) {
+  const d = new Date(dateStr)
+  const year = d.getFullYear()
+  const currentYear = new Date().getFullYear()
+  const short = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  return `Last played ${short}${year === currentYear ? '' : `, ${year}`}`
+}
+
 const AVAIL_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
   Y: { color: '#4ade80', bg: '#1a4731', border: '#166534', label: 'Available' },
   E: { color: '#60a5fa', bg: '#1e3a5f', border: '#1d4ed8', label: 'Either game today' },
@@ -166,13 +189,6 @@ function TrophyGlyph({ color }: { color: string }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M7 4h10v4a5 5 0 0 1-10 0V4z" /><path d="M7 5H4.5A2.5 2.5 0 0 0 4 9.9c.4 1.3 1.6 2.1 3 2.1" /><path d="M17 5h2.5A2.5 2.5 0 0 1 20 9.9c-.4 1.3-1.6 2.1-3 2.1" /><line x1="12" y1="13" x2="12" y2="17" /><path d="M9 20h6" /><path d="M10 17h4v3h-4z" />
-    </svg>
-  )
-}
-function AlertGlyph({ color }: { color: string }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 4.5 21 19H3L12 4.5z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="16.8" r="0.2" fill={color} stroke="none" />
     </svg>
   )
 }
@@ -223,10 +239,11 @@ function ChevronGlyph({ color = '#A8A29E' }: { color?: string }) {
 // tile a tap target (e.g. "Upcoming Matches" → /fixtures); omitted for tiles
 // with no drill-down destination yet (e.g. "My Tournaments" — see
 // navigation.md's Home page section for why that one stays static for now).
-function StatTile({ icon, value, label, tag, tone, href }: {
+function StatTile({ icon, value, label, tag, tone, href, sublabel }: {
   icon: React.ReactNode; value: string | number; label: string; tag: string
   tone: 'gold' | 'amber' | 'emerald' | 'crimson'
   href?: string
+  sublabel?: string
 }) {
   const toneMap = {
     gold:    { bg: '#FEF3C7', tagBg: '#FEF3C7', tagText: '#B45309' },
@@ -248,6 +265,9 @@ function StatTile({ icon, value, label, tag, tone, href }: {
       </div>
       <p className="font-cinzel text-2xl font-bold" style={{ color: '#1C1917' }}>{value}</p>
       <p className="font-rajdhani text-xs mt-1" style={{ color: '#78716C' }}>{label}</p>
+      {sublabel && (
+        <p className="font-rajdhani text-[10px] mt-0.5" style={{ color: '#A8A29E' }}>{sublabel}</p>
+      )}
     </>
   )
 
@@ -408,11 +428,13 @@ export default async function HomePage() {
                 tone="gold"
               />
               <StatTile
-                icon={playerData.pendingCount > 0 ? <AlertGlyph color="#B45309" /> : <CheckGlyph color="#059669" />}
-                value={playerData.pendingCount}
-                label="Pending Availability"
-                tag={playerData.pendingCount > 0 ? 'Action needed' : 'Clear'}
-                tone={playerData.pendingCount > 0 ? 'amber' : 'emerald'}
+                icon={<CheckGlyph color="#B45309" />}
+                value={playerData.matchesPlayedThisYear}
+                label="Matches Played"
+                sublabel={playerData.lastPlayedOn ? formatLastPlayed(playerData.lastPlayedOn) : 'No matches yet'}
+                tag={String(new Date().getFullYear())}
+                tone="gold"
+                href="/matches/history?month=all"
               />
               <StatTile
                 icon={<RupeeGlyph color={playerData.walletBalance >= 0 ? '#059669' : '#DC2626'} />}

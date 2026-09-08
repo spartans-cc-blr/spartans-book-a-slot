@@ -79,11 +79,11 @@ see §7's architectural-decisions table):
 | # | Query | Feeds |
 |---|---|---|
 | 1 | `bookings` count, `status='confirmed' AND game_date >= today` | Upcoming Matches stat tile |
-| 2 | `availability` rows for this player | `nextFixtureResponse`, `previewResponses`, `pendingCount` |
+| 2 | `availability` rows for this player | `nextFixtureResponse`, `previewResponses` |
 | 3 | Next **3** confirmed bookings (`.limit(3)`, was `.limit(1).single()` pre-rebuild) with tournament join | Upcoming Fixtures preview list; `nextFixture = upcomingPreview[0]` |
-| 4 | All upcoming booking IDs | `pendingCount` (set difference against query 2) |
-| 5 | `players.wallet_balance, dues_override` | Wallet Balance stat tile — **new** |
-| 6 | `squad` rows for this player, joined to `bookings(tournament_id)` | My Tournaments stat tile (distinct tournament count) — **new** |
+| 4 | `squad` rows for this player, joined to `bookings(game_date, status)` | Matches Played stat tile (this year's count + all-time last-played date) |
+| 5 | `players.wallet_balance, dues_override` | Wallet Balance stat tile |
+| 6 | `squad` rows for this player, joined to `bookings(tournament_id)` | My Tournaments stat tile (distinct tournament count) |
 | 7 | `getNudgeForPlayer()` | Availability nudge banner |
 | 8 | `getWeekendGapForPlayer()` | First-open-of-day greeting dialog |
 
@@ -116,6 +116,44 @@ same "avoid the player_id reconciliation gaps" reasoning
 choice. Counts a tournament regardless of whether the match has been
 played yet — a player announced in an upcoming squad already counts.
 
+**Matches Played (query 4, replaced the old Pending Availability tile —
+added September 2026).** The original fourth tile showed a bare pending-
+response count with no way to see *which* match it referred to — flagged
+by the club coordinator as giving "no clue to user." Rather than build a
+second surface to name the specific match (the dashboard's separate
+availability nudge banner, `getNudgeForPlayer()`, already does that one
+job), and since the Upcoming Fixtures preview immediately below already
+shows a live "Not marked" badge per fixture, the tile itself was judged
+redundant with content already on the same page and was replaced outright
+with a genuinely new stat: a running tally of matches actually played.
+
+Sourced the same Hub-side way as My Tournaments — `squad` rows for this
+player joined to `bookings(game_date, status)`, filtered in code to
+`status = 'confirmed' && game_date <= today` (an announced-but-not-yet-
+played squad row doesn't count as "played"). From that filtered set:
+`matchesPlayedThisYear` counts rows whose `game_date` falls in the current
+calendar year (the tile's big number + its tag, e.g. `2026`);
+`lastPlayedOn` is the max `game_date` across *all* of them, all-time, not
+just this year — same "last played" convention `features/gc-players.md`
+§7/§9 already established for the GC roster grid, reused here rather than
+inventing a second one. Rendered as a small muted caption under the label
+via `StatTile`'s new optional `sublabel` prop (`formatLastPlayed()` — e.g.
+"Last played 6 Sep", year appended only when it isn't the current one) —
+`"No matches yet"` when `lastPlayedOn` is null (a brand-new player with no
+squad history at all).
+
+**Clickable → `/matches/history?month=all`.** Landing on Match History's
+own default view (current month only) would often show nothing at all for
+a tile whose whole point is career-to-date context, so the tile deep-links
+past that default. `MatchHistoryClient.tsx` reads `?month=all` once at
+mount (`useSearchParams()`) and seeds its `monthFilter` state to `''`
+(all-time) instead of the usual `currentMonthStr()`; every other filter on
+that page is still local component state, not URL-driven, so this is the
+one query param the page understands and nothing else changes. The role
+filter needed no equivalent param — `roleFilter` already defaults to
+`'played'` ("I Played") for any viewer with a `playerId`, which is exactly
+who this tile is rendered for.
+
 **Wallet Balance (query 5)** reuses the same `wallet_balance`/`dues_override`
 fields `/fixtures` already reads for its own dues gate — there is no
 separate "ground fee" vs "match contribution" breakdown in this schema
@@ -141,7 +179,7 @@ match.
 | Section | Content |
 |---|---|
 | Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle, a static "🛡️ Spartans CC Bengaluru" badge pill |
-| Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Pending Availability (amber if > 0, else emerald "Clear") · Wallet Balance (signed amount — emerald "Positive" if ≥ 0, amber "Exempted" if negative but dues-waived, else crimson "Overdue") |
+| Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald "Positive" if ≥ 0, amber "Exempted" if negative but dues-waived, else crimson "Overdue") |
 | Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
 | Upcoming Fixtures | Header + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `upcomingPreview`, or a dashed empty-state box ("No Upcoming Matches Scheduled") when there are none |
 | Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |

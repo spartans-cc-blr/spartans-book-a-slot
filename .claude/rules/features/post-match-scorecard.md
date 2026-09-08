@@ -465,7 +465,10 @@ and `year=all` specifically.
 
 ### Default filters — faster first paint
 `roleFilter` defaults to `'played'` ("I Played") for a viewer with a
-`playerId`, rather than `'all'` — see Section 14.
+`playerId`, rather than `'all'` — see Section 14. `monthFilter` defaults to
+the current calendar month rather than all-time, for the same "smaller
+result set, faster first paint" reason — see Section 16.1 for the one
+deep-link (`?month=all`) that overrides it.
 
 ---
 
@@ -1285,6 +1288,28 @@ carries its own hardcoded dark gradient background via inline `style`
 card sitting on the new light page shell with no changes needed. `SiteNav`
 on this page now passes `mobileTabBarTheme="light"` so the bottom tab bar
 matches. Scope is this page and `/fixtures` only, not a site-wide reskin.
+
+## 16.1 Deep-link support — `?month=all` (added September 2026)
+
+Every filter on this page is local `useState`, not driven by the URL — with
+one deliberate exception, added so the Home dashboard's Matches Played stat
+tile (`navigation.md` §3.1) has somewhere useful to link to.
+`MatchHistoryClient.tsx` reads `useSearchParams()` once, at mount, and seeds
+`monthFilter`'s initial state from it: `?month=all` starts the page on the
+all-time view (`monthFilter = ''`) instead of the usual current-month
+default (§9's "Default filters — faster first paint"). Nothing else reads
+the URL — `roleFilter`, `tournamentId`, `groundSelection`, `format`,
+`resultFilter`, `dayFilter` are all still plain component state exactly as
+before, and the month value is read only once (no ongoing sync if the URL
+changes after mount, which nothing on this page does anyway since filter
+changes are applied via `setState`, not `router.push`).
+
+No equivalent param was added for the role filter — `roleFilter` already
+defaults to `'played'` ("I Played") for any viewer with a `playerId`, and
+the Matches Played tile is only ever rendered for exactly that audience
+(`isPlayer` on the Home dashboard), so the existing default already lines
+up with what the tile promises without needing to say so explicitly in the
+URL.
 
 ### File Map addition
 

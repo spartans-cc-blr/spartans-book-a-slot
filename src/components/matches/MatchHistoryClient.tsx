@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { ScorecardUploadButton, type ScorecardStatus } from '@/components/matches/ScorecardUploadButton'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
@@ -204,6 +205,14 @@ export function MatchHistoryClient({
   // house convention as every other wrangler-gated affordance in this app.
   isWrangler: boolean
 }) {
+  // Deep-link support — e.g. the Home dashboard's "Matches Played" stat
+  // tile links here as `/matches/history?month=all` so a player lands
+  // straight on their full career history instead of just this month.
+  // Read once at mount; nothing re-syncs from the URL after that (matching
+  // every other filter on this page, which are local React state, not
+  // URL-driven).
+  const searchParams = useSearchParams()
+
   // Defaults to "I Played" for registered players — a much smaller result
   // set than the full club history, so the page's first paint is faster.
   // Falls back to 'all' for a viewer with no playerId (organiser/unmatched
@@ -216,8 +225,8 @@ export function MatchHistoryClient({
   // Defaults to the current month rather than all-time — the unfiltered
   // view was slow to load, and most visits are for "what happened
   // recently" anyway. Explicitly deselecting the month chip still shows
-  // everything.
-  const [monthFilter, setMonthFilter]   = useState(currentMonthStr())
+  // everything. `?month=all` overrides this to start on the all-time view.
+  const [monthFilter, setMonthFilter]   = useState(() => searchParams.get('month') === 'all' ? '' : currentMonthStr())
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
   const [tournamentId, setTournamentId] = useState('')
   // Encodes the selected ground option: 'g:<ground_id>' for a resolved

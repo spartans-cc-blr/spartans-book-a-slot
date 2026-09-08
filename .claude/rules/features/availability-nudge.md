@@ -21,7 +21,7 @@ Also functions as a re-engagement channel: submitting any availability response 
 | `src/app/api/cron/availability-nudge/route.ts` | Cron entry point — `CRON_SECRET` bearer auth, orchestrates the daily run, writes to `availability_nudge_log`, sends pushes |
 | `src/lib/availabilityNudge.ts` | Core logic — `nextLockWeekend` date calc, historical frequency (`buildPlayerHistories`), priority-list theme selection (`pickNudgeCandidate`), copy generation (`buildNudgeCopy`, `buildDeadlineCopy`, `buildLeaderCopy`), weekly history lookups (`getThemesUsedThisWeek`, `getReferencedBookingIdsThisWeek`, batched as `getWeeklyNudgeHistoryForPlayers`) |
 | `src/lib/nudgeLeaderboard.ts` | Ground/tournament leaderboard recognition (see §3a) — `attachGroundTournamentInfo()` resolves each booking's ground/tournament, `getBookingLeaders()` computes MVP/run-scorer/wicket-taker/dismissals leaders per unique ground/tournament this weekend via `getLeaderboard()` (`src/lib/playerStats.ts`) |
-| `src/app/page.tsx` | Read-only rendering of the same day's nudge as a dashboard card, next to the existing Pending Availability count |
+| `src/app/page.tsx` | Read-only rendering of the same day's nudge as a dashboard card, below the 2×2 stat-tile row (`navigation.md` §3.1) |
 | `supabase/migrations/029_availability_nudge_log.sql` | `availability_nudge_log` table — idempotency guard (`UNIQUE(player_id, nudge_date)`) and per-day audit trail |
 | `supabase/migrations/030_availability_nudge_log_delivery_status.sql` | Adds `status` (`pending`/`sent`/`failed`) and `error_message` — per-player delivery outcome, not just attempt |
 | `vercel.json` | Cron schedule entry: `"15 15 * * 0-3"` (15:15 UTC = 20:45 IST, Sun–Wed) |
