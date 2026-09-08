@@ -82,7 +82,7 @@ see §7's architectural-decisions table):
 | 2 | `availability` rows for this player | `nextFixtureResponse`, `previewResponses`, `pendingCount` |
 | 3 | Next **3** confirmed bookings (`.limit(3)`, was `.limit(1).single()` pre-rebuild) with tournament join | Upcoming Fixtures preview list; `nextFixture = upcomingPreview[0]` |
 | 4 | All upcoming booking IDs | `pendingCount` (set difference against query 2) |
-| 5 | `players.wallet_balance, dues_override` | Dues stat tile — **new** |
+| 5 | `players.wallet_balance, dues_override` | Wallet Balance stat tile — **new** |
 | 6 | `squad` rows for this player, joined to `bookings(tournament_id)` | My Tournaments stat tile (distinct tournament count) — **new** |
 | 7 | `getNudgeForPlayer()` | Availability nudge banner |
 | 8 | `getWeekendGapForPlayer()` | First-open-of-day greeting dialog |
@@ -116,21 +116,32 @@ same "avoid the player_id reconciliation gaps" reasoning
 choice. Counts a tournament regardless of whether the match has been
 played yet — a player announced in an upcoming squad already counts.
 
-**Dues (query 5)** reuses the same `wallet_balance`/`dues_override` fields
-`/fixtures` already reads for its own dues gate — `duesCleared = wallet_balance
->= 0 || dues_override`. The stat tile shows `₹0` / "Clear" when cleared,
-otherwise the absolute amount owed / "Pending" — there is no separate
-"ground fee" vs "match contribution" breakdown in this schema (single
-`wallet_balance` per player), so the reference screenshot's two separate fee
-tiles were deliberately collapsed into this one real tile rather than
-fabricated as two.
+**Wallet Balance (query 5)** reuses the same `wallet_balance`/`dues_override`
+fields `/fixtures` already reads for its own dues gate — there is no
+separate "ground fee" vs "match contribution" breakdown in this schema
+(single `wallet_balance` per player), so the reference screenshot's two
+separate fee tiles were deliberately collapsed into this one real tile
+rather than fabricated as two. **Changed September 2026 — shows the actual
+signed balance, not a zeroed dues-clearance state.** The tile originally
+showed `₹0`/"Clear" whenever `wallet_balance >= 0 || dues_override`, and
+only the absolute amount owed otherwise — i.e. a player in credit and a
+player with waived dues both rendered identically as "₹0 · Clear", with no
+way to see their real balance. Per a product decision, the tile now always
+renders `formatSignedRupees(wallet_balance)` (e.g. `-₹500`) — the actual
+number, never zeroed or absoluted-away — with the tag/tone reflecting
+context rather than clearance: `Positive`/emerald when `wallet_balance >= 0`,
+`Exempted`/amber when negative but `dues_override` is set (still not
+blocked from booking, but the tile is honest that the balance itself is
+negative), else `Overdue`/crimson. `duesAmount`/`duesCleared` were renamed
+to `walletBalance`/`duesOverride` in `getPlayerData()`'s return shape to
+match.
 
 ### Dashboard Sections
 
 | Section | Content |
 |---|---|
 | Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle, a static "🛡️ Spartans CC Bengaluru" badge pill |
-| Stat tiles (2×2) | Upcoming Matches (gold) · My Tournaments (gold) · Pending Availability (amber if > 0, else emerald "Clear") · Dues (crimson if owed, else emerald "Clear") |
+| Stat tiles (2×2) | Upcoming Matches (gold) · My Tournaments (gold) · Pending Availability (amber if > 0, else emerald "Clear") · Wallet Balance (signed amount — emerald "Positive" if ≥ 0, amber "Exempted" if negative but dues-waived, else crimson "Overdue") |
 | Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
 | Upcoming Fixtures | Header + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `upcomingPreview`, or a dashed empty-state box ("No Upcoming Matches Scheduled") when there are none |
 | Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |

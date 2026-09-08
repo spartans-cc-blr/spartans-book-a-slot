@@ -110,8 +110,8 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
   const respondedIds = new Set((avail ?? []).map(a => a.booking_id))
   const pendingCount = (upcomingBookings ?? []).filter(b => !respondedIds.has(b.id)).length
 
-  const duesAmount = playerRow?.wallet_balance ?? 0
-  const duesCleared = duesAmount >= 0 || !!playerRow?.dues_override
+  const walletBalance = playerRow?.wallet_balance ?? 0
+  const duesOverride = !!playerRow?.dues_override
 
   const tournamentCount = new Set(
     (squadTournamentRows ?? [])
@@ -123,7 +123,7 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     upcomingCount: upcomingCount ?? 0,
     upcomingPreview: upcomingPreview ?? [],
     nextFixture, nextFixtureResponse, previewResponses, pendingCount, nudge, weekendGap,
-    duesAmount, duesCleared, tournamentCount,
+    walletBalance, duesOverride, tournamentCount,
   }
 }
 
@@ -141,6 +141,10 @@ function slotLabel(slot: string) {
 
 function formatRupees(n: number) {
   return `₹${Math.abs(n).toLocaleString('en-IN')}`
+}
+
+function formatSignedRupees(n: number) {
+  return `${n < 0 ? '-' : ''}₹${Math.abs(n).toLocaleString('en-IN')}`
 }
 
 const AVAIL_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
@@ -390,11 +394,23 @@ export default async function HomePage() {
                 tone={playerData.pendingCount > 0 ? 'amber' : 'emerald'}
               />
               <StatTile
-                icon={<RupeeGlyph color={playerData.duesCleared ? '#059669' : '#DC2626'} />}
-                value={playerData.duesCleared ? formatRupees(0) : formatRupees(playerData.duesAmount)}
-                label="Dues"
-                tag={playerData.duesCleared ? 'Clear' : 'Pending'}
-                tone={playerData.duesCleared ? 'emerald' : 'crimson'}
+                icon={<RupeeGlyph color={playerData.walletBalance >= 0 ? '#059669' : '#DC2626'} />}
+                value={formatSignedRupees(playerData.walletBalance)}
+                label="Wallet Balance"
+                tag={
+                  playerData.walletBalance >= 0
+                    ? 'Positive'
+                    : playerData.duesOverride
+                    ? 'Exempted'
+                    : 'Overdue'
+                }
+                tone={
+                  playerData.walletBalance >= 0
+                    ? 'emerald'
+                    : playerData.duesOverride
+                    ? 'amber'
+                    : 'crimson'
+                }
               />
             </div>
 
