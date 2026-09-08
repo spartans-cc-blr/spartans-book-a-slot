@@ -80,6 +80,24 @@ export default async function CaptainsCornerPage() {
     !isMatchExpired(b.game_date, b.slot_time, b.format ?? 'T20')
   )
 
+  // ── Restrict to the next two rolling weekends only ───────────────
+  // Squad selection for a given weekend can't even start until that
+  // weekend's own Thu 8am lock window opens (see getActiveLockWeekend()
+  // in /api/squad/route.ts) — so there's nothing a captain can actually
+  // do for any weekend beyond the immediate next one, and showing more
+  // is just clutter. weekKey() (below) buckets a midweek game into the
+  // same ISO week as the Sat/Sun that follows it, so capping at the
+  // first two distinct weekKeys naturally keeps a weekday game grouped
+  // with its own weekend rather than showing it in isolation.
+  const seenWeekKeys: string[] = []
+  for (const b of activeBookings) {
+    const wk = weekKey(b.game_date)
+    if (!seenWeekKeys.includes(wk)) seenWeekKeys.push(wk)
+    if (seenWeekKeys.length >= 2) break
+  }
+  const allowedWeekKeys = new Set(seenWeekKeys)
+  const scopedBookings = activeBookings.filter(b => allowedWeekKeys.has(weekKey(b.game_date)))
+
   const today = new Date().toISOString().split('T')[0]
 
   // ── Fetch availability, existing squad rows, and recent-form data ──
@@ -96,7 +114,7 @@ export default async function CaptainsCornerPage() {
 
   }
 
-  const bookingIds = (activeBookings ?? []).map(b => b.id)
+  const bookingIds = scopedBookings.map(b => b.id)
 
   const [{ data: avail }, { data: squads }, recentFormByPlayer] = await Promise.all([
     bookingIds.length > 0
@@ -154,7 +172,7 @@ export default async function CaptainsCornerPage() {
   }
 
   const initialSquadMap: Record<string, InitialSquad> = {}
-  for (const b of activeBookings ?? []) {
+  for (const b of scopedBookings) {
     const rows      = rowsByBooking[b.id] ?? []
     const rawStatus = rows[0]?.status ?? 'draft'
     const mapped    = rawStatus === 'pending_approval' ? 'pending'
@@ -192,7 +210,7 @@ export default async function CaptainsCornerPage() {
     bookings: typeof bookings
   }> = {}
 
-  for (const b of activeBookings ?? []) {
+  for (const b of scopedBookings) {
     const wk = weekKey(b.game_date)
     if (!weekendMap[wk]) {
       weekendMap[wk] = { label: weekLabel(b.game_date), bookings: [] }
