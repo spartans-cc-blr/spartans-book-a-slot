@@ -490,71 +490,61 @@ export default async function HomePage() {
 
       <div className="px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
 
-        {/* ── DIVIDER between player section and public paths ── */}
-        {isPlayer && (
-          <div className="flex items-center gap-4 mb-8">
-            <div className="flex-1 h-px bg-ink-5" />
-            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-700">
-              Quick Links
-            </span>
-            <div className="flex-1 h-px bg-ink-5" />
+        {/* ── SPLIT AUDIENCE PATHS — logged-out / expelled / unmatched only.
+            A registered player already has the full dashboard above; these
+            "For Players" / "For Organisers" cards are the pre-sign-in pitch,
+            not something a signed-in player needs to see again. ── */}
+        {!isPlayer && (
+          <div className="grid sm:grid-cols-2 gap-4">
+
+            {/* Players path */}
+            <div className="rounded border p-6 flex flex-col bg-ink-3 border-gold-dim">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gold/10 border border-gold-dim rounded flex items-center justify-center flex-shrink-0">
+                  <span className="text-lg">🏏</span>
+                </div>
+                <div>
+                  <p className="font-cinzel text-sm font-semibold text-gold">For Players</p>
+                  <p className="font-rajdhani text-xs text-zinc-600">Spartans CC members</p>
+                </div>
+              </div>
+              <ul className="font-rajdhani text-xs text-zinc-500 space-y-1.5 mb-5 flex-1">
+                <li className="flex items-center gap-2"><span className="text-gold">·</span> View upcoming confirmed fixtures</li>
+                <li className="flex items-center gap-2"><span className="text-gold">·</span> Mark your Y/O/E/L availability</li>
+                <li className="flex items-center gap-2"><span className="text-gold">·</span> See squad announcements</li>
+                <li className="flex items-center gap-2"><span className="text-gold">·</span> Sign in with your club Gmail</li>
+              </ul>
+              <Link href="/fixtures"
+                className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 px-4 py-2.5 rounded text-center transition-colors">
+                View Fixtures →
+              </Link>
+            </div>
+
+            {/* Organisers path */}
+            <div className="rounded border p-6 flex flex-col bg-ink-3 border-ink-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-emerald-950 border border-emerald-800 rounded flex items-center justify-center flex-shrink-0">
+                  <span className="text-lg">📅</span>
+                </div>
+                <div>
+                  <p className="font-cinzel text-sm font-semibold text-emerald-400">For Organisers</p>
+                  <p className="font-rajdhani text-xs text-zinc-600">Tournament promoters</p>
+                </div>
+              </div>
+              <ul className="font-rajdhani text-xs text-zinc-500 space-y-1.5 mb-5 flex-1">
+                <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> Check live slot availability</li>
+                <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> 3-month rolling schedule view</li>
+                <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> WhatsApp us to book an open slot</li>
+                <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> No login required</li>
+              </ul>
+              <Link href="/schedule"
+                className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-emerald-950 border border-emerald-800 text-emerald-400 hover:bg-emerald-900 px-4 py-2.5 rounded text-center transition-colors">
+                View Available Slots →
+              </Link>
+            </div>
+
           </div>
         )}
-
-        {/* ── SPLIT AUDIENCE PATHS ── */}
-        <div className="grid sm:grid-cols-2 gap-4">
-
-          {/* Players path */}
-          <div className={`rounded border p-6 flex flex-col ${
-            isPlayer ? 'bg-ink-3 border-ink-5' : 'bg-ink-3 border-gold-dim'
-          }`}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gold/10 border border-gold-dim rounded flex items-center justify-center flex-shrink-0">
-                <span className="text-lg">🏏</span>
-              </div>
-              <div>
-                <p className="font-cinzel text-sm font-semibold text-gold">For Players</p>
-                <p className="font-rajdhani text-xs text-zinc-600">Spartans CC members</p>
-              </div>
-            </div>
-            <ul className="font-rajdhani text-xs text-zinc-500 space-y-1.5 mb-5 flex-1">
-              <li className="flex items-center gap-2"><span className="text-gold">·</span> View upcoming confirmed fixtures</li>
-              <li className="flex items-center gap-2"><span className="text-gold">·</span> Mark your Y/O/E/L availability</li>
-              <li className="flex items-center gap-2"><span className="text-gold">·</span> See squad announcements</li>
-              {!isPlayer && <li className="flex items-center gap-2"><span className="text-gold">·</span> Sign in with your club Gmail</li>}
-            </ul>
-            <Link href="/fixtures"
-              className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 px-4 py-2.5 rounded text-center transition-colors">
-              {isPlayer ? 'View My Fixtures →' : 'View Fixtures →'}
-            </Link>
-          </div>
-
-          {/* Organisers path */}
-          <div className={`rounded border p-6 flex flex-col ${
-            isPlayer ? 'bg-ink-3 border-ink-5' : 'bg-ink-3 border-ink-5'
-          }`}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-emerald-950 border border-emerald-800 rounded flex items-center justify-center flex-shrink-0">
-                <span className="text-lg">📅</span>
-              </div>
-              <div>
-                <p className="font-cinzel text-sm font-semibold text-emerald-400">For Organisers</p>
-                <p className="font-rajdhani text-xs text-zinc-600">Tournament promoters</p>
-              </div>
-            </div>
-            <ul className="font-rajdhani text-xs text-zinc-500 space-y-1.5 mb-5 flex-1">
-              <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> Check live slot availability</li>
-              <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> 3-month rolling schedule view</li>
-              <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> WhatsApp us to book an open slot</li>
-              <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> No login required</li>
-            </ul>
-            <Link href="/schedule"
-              className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-emerald-950 border border-emerald-800 text-emerald-400 hover:bg-emerald-900 px-4 py-2.5 rounded text-center transition-colors">
-              View Available Slots →
-            </Link>
-          </div>
-
-        </div>
 
         {/* ── SIGN IN PROMPT for logged-out non-admin visitors ── */}
         {!isLoggedIn && (

@@ -120,18 +120,16 @@ fabricated as two.
 | Upcoming Fixtures | Header + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `upcomingPreview`, or a dashed empty-state box ("No Upcoming Matches Scheduled") when there are none |
 | Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |
 
-**Audience cards divider** — unchanged: when the player dashboard is shown, the two public-facing cards below are still separated by a "Quick Links" divider label (still dark-themed), so the dashboard reads as the primary content and the split-audience cards read as secondary.
+**Split-audience cards hidden entirely for a registered player (changed September 2026).** The "Quick Links" divider + the "For Players"/"For Organisers" cards below it used to render for every visitor, including a signed-in player — who by that point already has the full dashboard above and doesn't need the pre-sign-in pitch repeated underneath it. Both are now wrapped in a single `{!isPlayer && (...)}` guard, so they render exactly as before for logged-out/expelled/unmatched visitors and not at all once `isPlayer` is true. The divider itself was removed outright rather than kept for a now-single-card case — with the dashboard the only thing left above it, a "Quick Links" separator had nothing left to separate. The player-conditional styling inside the two cards (border colour, "View My Fixtures" vs "View Fixtures" copy) was dead code once the guard made `isPlayer` always `false` inside this block, so it was simplified away rather than left in place.
+
+### Split Audience Cards (Logged-out / Expelled / Unmatched Only)
  
-### Split Audience Cards (All Visitors)
- 
-Two side-by-side cards (stacked on mobile):
+Two side-by-side cards (stacked on mobile), shown only when `!isPlayer`:
  
 | Card | Audience | Destination | Access |
 |---|---|---|---|
 | Players card | Spartans CC members | `/fixtures` | Public (sign-in is on the fixtures page) |
 | Organisers card | Tournament promoters | `/schedule` | Public — no login required |
- 
-The Players card border is gold (primary) and the Organisers card is neutral when a player is already logged in — emphasis shifts naturally.
  
 ### Sign-in Prompt (Logged-out Visitors)
  
