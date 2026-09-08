@@ -373,6 +373,29 @@ Server component. Fetches:
 The `initialSquadMap` is passed to `CaptainsCornerGrid` → `SlotCard`, which hydrates `status`, `selected`, and `roles` from it instead of always starting from scratch. This is what makes the GC Approved badge appear when a captain reopens the page.
  
 Status mapping on the server: `pending_approval` → `'pending'`, others pass through as-is.
+
+**Restricted to the next two rolling weekends only (added September 2026).**
+The page fetches up to 20 upcoming confirmed bookings, then groups them into
+weekend sections via `weekKey()` — an ISO-week bucket that already merges a
+midweek game into the same group as the Sat/Sun that follows it (ISO weeks
+run Monday–Sunday, so a Tuesday fixture and the Saturday/Sunday five days
+later share one `weekKey()`). After grouping, only the **first two distinct
+`weekKey()` groups** (in chronological order — the query is already ordered
+by `game_date` ascending, so this is just the first two encountered) are
+kept; every downstream step — the availability/squad fetch, `bookingIds`,
+`initialSquadMap`, and the rendered `weekendMap` — operates on this
+restricted `scopedBookings` set, not the full `activeBookings` fetch.
+
+**Why:** a squad for a given weekend can't even be drafted before that
+weekend's own Thu 8am–Sun lock window opens (`getActiveLockWeekend()`, this
+section's Time gate note above) — so a captain has nothing actionable to do
+on Captains' Corner for any weekend beyond the immediate next one. Showing
+a longer rolling list of future weekends was pure clutter with no
+corresponding action available on any of them. This only trims what's
+*displayed and hydrated* on this one page — it doesn't change the time gate
+itself, `getActiveLockWeekend()`, or which bookings are eligible for a
+draft; a booking two weekends out is simply not fetched into this page's
+view until it becomes one of the "next two."
  
 ### `src/components/admin/GCReviewClient.tsx`
  
