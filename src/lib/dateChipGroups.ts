@@ -7,7 +7,19 @@ function dayOfWeek(dateStr: string): number {
 function nextDay(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00`)
   d.setDate(d.getDate() + 1)
-  return d.toISOString().split('T')[0]
+  // Read the result back via local Y/M/D components, not toISOString()
+  // (which formats in UTC) — for any positive-offset timezone (IST,
+  // UTC+5:30, is what this club's users are in), a UTC round-trip lands
+  // back on the *same* calendar date as the input, since local midnight
+  // + 1 day is still within the previous UTC day. That silently made
+  // nextDay(saturday) === saturday, so every Saturday matched its own
+  // "Sunday" check and paired with itself (a real reported bug — a chip
+  // rendered "SAT–SAT · 5–5 · SEP" instead of combining with the actual
+  // Sunday, or just standing alone as one date).
+  const y   = d.getFullYear()
+  const m   = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 // Groups a list of ISO `game_date` strings into date-chip groups: a

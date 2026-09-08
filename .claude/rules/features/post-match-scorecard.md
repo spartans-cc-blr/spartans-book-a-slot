@@ -1284,6 +1284,29 @@ helper — its own `weekendMap`/`weekendOrder` grouping is already tied to
 real booking membership, so deriving chips from it directly stays the more
 authoritative source there.
 
+> **Incident (fixed same week) — every Saturday paired with itself instead
+> of the real Sunday.** `groupDatesIntoChips()`'s `nextDay()` helper
+> computed "Saturday + 1 day" via `d.setDate(d.getDate() + 1)` followed by
+> `d.toISOString().split('T')[0]` — but `toISOString()` formats in **UTC**,
+> while the `Date` was constructed and read back in the browser's **local**
+> time. For any positive-offset timezone — IST (UTC+5:30) is what this
+> club's users are actually in — local midnight plus one full day is still
+> within the *previous* UTC calendar day, so the UTC-formatted result
+> silently landed back on the same date the function started from:
+> `nextDay('2026-09-05')` returned `'2026-09-05'`, not `'2026-09-06'`.
+> Since the pairing check is `dateSet.has(nextDay(date))`, and a date is
+> always a member of the set it was drawn from, this made **every**
+> Saturday in the list match its own bogus "Sunday" and pair with itself —
+> reported live as a chip rendering `SAT–SAT · 5–5 · SEP` instead of either
+> combining with the real Sunday or standing alone. Fixed by reading the
+> incremented date back via local `getFullYear()`/`getMonth()`/`getDate()`
+> components instead of `toISOString()`, matching the same
+> local-components-only pattern `dayOfWeek()` (right above it in the same
+> file) and `chipParts()` in `DateChipSlider.tsx` already use — never
+> round-tripping a calendar date through a UTC string when the app's date
+> strings are meant to represent IST wall-clock dates, not UTC ones.
+> Verified in a `TZ=Asia/Kolkata` Node repro before and after the fix.
+
 **Reverse-chronological chip order (added September 2026).** `matches`
 itself is already returned most-recent-first, but the chip row initially
 read left-to-right chronologically (oldest first) regardless — the
