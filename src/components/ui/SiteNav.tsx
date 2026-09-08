@@ -3,14 +3,20 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { JerseyIcon } from '@/components/ui/JerseyIcon'
-import { MobileTabBar } from '@/components/ui/MobileTabBar'
+import { MobileTabBar, type MobileTabBarTheme } from '@/components/ui/MobileTabBar'
 import { GenerateInviteItem } from '@/components/ui/GenerateInviteItem'
 
 interface SiteNavProps {
   activePage?: string
+  // Theme for the mobile bottom tab bar only — the desktop nav and the
+  // slim mobile top row (both below) always stay dark. Defaults to 'dark'
+  // (unchanged look); pages that opted into the Warm Light treatment
+  // (currently /fixtures and /matches/history — see navigation.md §4.1)
+  // pass 'light' so the tab bar matches their own Warm Light page shell.
+  mobileTabBarTheme?: MobileTabBarTheme
 }
 
-export function SiteNav({ activePage }: SiteNavProps) {
+export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [gcOpen,       setGcOpen]       = useState(false)
   const [matchesOpen,  setMatchesOpen]  = useState(false)
@@ -316,6 +322,7 @@ export function SiteNav({ activePage }: SiteNavProps) {
       isCaptain={isCaptain}
       isWrangler={isWrangler}
       playerId={player?.playerId ?? null}
+      theme={mobileTabBarTheme}
     />
     </>
   )

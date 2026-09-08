@@ -466,6 +466,21 @@ Warm Light styling, so the two "date slider" surfaces the club coordinator
 asked for don't drift visually. Purely controlled (`dates`, `selected`,
 `onSelect`) — no logic of its own beyond rendering chips.
 
+**Page shell widened to Warm Light too (added September 2026).** After
+seeing the date-chip slider, the club coordinator asked for the same
+treatment on the rest of `/fixtures` — hero, the "not registered"/expelled
+banners, the Y/E/O/L legend, and the footer all switched from the dark
+ink theme to the Warm Light palette (`#F8F4EE` page bg, `#FFFFFF` hero/
+legend cards, `#D97706` gold accent). `FixturesCard`/`FixturesAvailability`
+themselves were explicitly asked to stay as they are — both already carry
+their own hardcoded dark gradient background via inline `style` (not a
+class inherited from the page), so they render correctly as dark cards on
+the new light page with zero changes needed. `SiteNav` on this page now
+passes `mobileTabBarTheme="light"` (`navigation.md` §4.1) so the bottom
+tab bar matches. Scope is deliberately just this page and
+`/matches/history` (§16 there) — not a site-wide reskin; see
+`navigation.md` §4.1's "Warm Light variant" note for the full reasoning.
+
 ---
 
 ## 11. File Map

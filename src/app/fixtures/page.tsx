@@ -253,40 +253,41 @@ export default async function FixturesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ink grain">
-      <SiteNav activePage="fixtures" />
+    <div className="min-h-screen" style={{ background: '#F8F4EE' }}>
+      <SiteNav activePage="fixtures" mobileTabBarTheme="light" />
       {isPlayer && <PushSubscribePrompt />}
 
       {/* Hero */}
-      <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden">
+      <div className="border-b px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden"
+        style={{ background: '#FFFFFF', borderColor: '#D4C9B0' }}>
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)' }} />
-        <p className="text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
-          <span className="w-4 h-px bg-gold inline-block" />
+          style={{ background: 'radial-gradient(circle, rgba(217,119,6,0.1) 0%, transparent 70%)' }} />
+        <p className="text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2" style={{ color: '#B45309' }}>
+          <span className="w-4 h-px inline-block" style={{ background: '#D97706' }} />
           Spartans Cricket Club · Bengaluru
         </p>
-        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-parchment mb-2 tracking-wide">
+        <h1 className="font-cinzel text-2xl md:text-3xl font-bold mb-2 tracking-wide" style={{ color: '#1C1917' }}>
           Upcoming Fixtures
         </h1>
-        <p className="text-muted text-sm md:text-base max-w-xl leading-relaxed font-rajdhani">
+        <p className="text-sm md:text-base max-w-xl leading-relaxed font-rajdhani" style={{ color: '#57534E' }}>
           Confirmed matches for Spartans CC. Mark your availability below each card.
         </p>
       </div>
 
       {/* Not registered */}
       {session && !player?.playerId && player?.playerStatus !== 'expelled' && (
-        <div className="px-5 md:px-8 lg:px-10 py-3 bg-amber-950/30 border-b border-amber-800/40">
-          <p className="font-rajdhani text-sm text-amber-300">
+        <div className="px-5 md:px-8 lg:px-10 py-3 border-b" style={{ background: '#FEF3C7', borderColor: '#F5D9A8' }}>
+          <p className="font-rajdhani text-sm" style={{ color: '#92400E' }}>
             You're signed in but not yet registered as a Spartans player.{' '}
-            <a href="/join" className="text-gold underline">Complete your registration →</a>
+            <a href="/join" className="underline" style={{ color: '#B45309' }}>Complete your registration →</a>
           </p>
         </div>
       )}
 
       {/* Expelled */}
       {player?.playerStatus === 'expelled' && (
-        <div className="px-5 md:px-8 lg:px-10 py-3 bg-red-950/30 border-b border-red-800/40">
-          <p className="font-rajdhani text-sm text-red-400">
+        <div className="px-5 md:px-8 lg:px-10 py-3 border-b" style={{ background: '#FEE2E2', borderColor: '#FCA5A5' }}>
+          <p className="font-rajdhani text-sm" style={{ color: '#991B1B' }}>
             Your account has been suspended. Contact the club admin for more information.
           </p>
         </div>
@@ -294,16 +295,16 @@ export default async function FixturesPage() {
 
       {/* Legend */}
       {isPlayer && (
-        <div className="px-5 md:px-8 lg:px-10 py-2 bg-ink-2 border-b border-ink-4 flex gap-4 flex-wrap">
+        <div className="px-5 md:px-8 lg:px-10 py-2 border-b flex gap-4 flex-wrap" style={{ background: '#FFFFFF', borderColor: '#D4C9B0' }}>
           {[
-            { code: 'Y', color: '#4ade80', label: 'Available' },
-            { code: 'E', color: '#60a5fa', label: 'Either game same day' },
-            { code: 'O', color: '#fbbf24', label: 'One game this weekend' },
-            { code: 'L', color: '#c084fc', label: 'On leave' },
+            { code: 'Y', color: '#16a34a', label: 'Available' },
+            { code: 'E', color: '#2563eb', label: 'Either game same day' },
+            { code: 'O', color: '#d97706', label: 'One game this weekend' },
+            { code: 'L', color: '#9333ea', label: 'On leave' },
           ].map(item => (
             <div key={item.code} className="flex items-center gap-1.5">
               <span className="font-rajdhani text-xs font-bold" style={{ color: item.color }}>{item.code}</span>
-              <span className="font-rajdhani text-xs text-zinc-600">{item.label}</span>
+              <span className="font-rajdhani text-xs" style={{ color: '#78716C' }}>{item.label}</span>
             </div>
           ))}
         </div>
@@ -311,7 +312,7 @@ export default async function FixturesPage() {
 
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
         {weekendOrder.length === 0 ? (
-          <p className="font-rajdhani text-zinc-500 text-sm">No upcoming fixtures confirmed yet. Check back soon.</p>
+          <p className="font-rajdhani text-sm" style={{ color: '#78716C' }}>No upcoming fixtures confirmed yet. Check back soon.</p>
         ) : (
           <>
             <FixturesDateFilterBar
@@ -337,8 +338,8 @@ export default async function FixturesPage() {
         )}
       </div>
 
-      <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
-        © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
+      <footer className="border-t py-5 text-center font-rajdhani text-xs mt-8" style={{ borderColor: '#D4C9B0', color: '#A8A29E' }}>
+        © 2026 <span style={{ color: '#B45309' }}>Spartans Cricket Club</span> · Bengaluru · Est. 2014
       </footer>
     </div>
   )

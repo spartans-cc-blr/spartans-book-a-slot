@@ -334,8 +334,9 @@ export function MatchHistoryClient({
 
   return (
     <div className="space-y-4">
-      {/* Filter bar — stacks on mobile, single row from sm up */}
-      <div className="bg-ink-3 border border-ink-5 rounded px-4 py-3 space-y-3">
+      {/* Filter bar — Warm Light palette (matches the date-chip slider);
+          stacks on mobile, single row from sm up */}
+      <div className="rounded-xl px-4 py-3 space-y-3" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
         {/* Won/Lost — top of the filter bar, per request */}
         {filterOptions.results.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -343,15 +344,14 @@ export function MatchHistoryClient({
               <button
                 key={r}
                 onClick={() => setResultFilter(prev => prev === r ? '' : r)}
-                className={`font-rajdhani text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full border transition-colors ${
-                  resultFilter === r
-                    ? r === 'WON'
-                      ? 'bg-emerald-900/40 border-emerald-700 text-emerald-400'
-                      : r === 'LOST'
-                        ? 'bg-crimson/20 border-red-800 text-red-400'
-                        : 'bg-gold/20 border-gold-dim text-gold'
-                    : 'bg-ink-4 border-ink-5 text-zinc-500 hover:text-zinc-300'
-                }`}>
+                className="font-rajdhani text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full border transition-colors"
+                style={resultFilter === r
+                  ? r === 'WON'
+                    ? { background: '#D1FAE5', borderColor: '#6EE7B7', color: '#047857' }
+                    : r === 'LOST'
+                      ? { background: '#FEE2E2', borderColor: '#FCA5A5', color: '#B91C1C' }
+                      : { background: '#FEF3C7', borderColor: '#F5D9A8', color: '#B45309' }
+                  : { background: '#F8F4EE', borderColor: '#D4C9B0', color: '#78716C' }}>
                 {r === 'WON' ? 'Won' : r === 'LOST' ? 'Lost' : r}
               </button>
             ))}
@@ -365,43 +365,45 @@ export function MatchHistoryClient({
             longer as match history accumulated. */}
         {filterOptions.months.length > 0 && (
           <div>
-            <div className="flex items-center gap-2 bg-ink-4 border border-ink-5 rounded-full px-2 py-1.5">
+            <div className="flex items-center gap-2 rounded-full px-2 py-1.5" style={{ background: '#F8F4EE', border: '1px solid #D4C9B0' }}>
               <button
                 onClick={goOlderMonth}
                 disabled={!canGoOlder}
                 aria-label="Older month"
-                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
+                className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full text-sm transition-colors disabled:opacity-30"
+                style={{ border: '1px solid #D97706', color: '#D97706' }}>
                 ‹
               </button>
               <button
                 onClick={() => setMonthPickerOpen(v => !v)}
-                className="flex-1 flex items-center justify-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide text-gold py-1">
+                className="flex-1 flex items-center justify-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide py-1"
+                style={{ color: '#D97706' }}>
                 {monthFilter ? monthChipLabel(monthFilter) : 'All time'}
-                <span className="text-zinc-500 text-[10px]">{monthPickerOpen ? '▲' : '▾'}</span>
+                <span className="text-[10px]" style={{ color: '#A8A29E' }}>{monthPickerOpen ? '▲' : '▾'}</span>
               </button>
               <button
                 onClick={goNewerMonth}
                 disabled={!canGoNewer}
                 aria-label="Newer month"
-                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
+                className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full text-sm transition-colors disabled:opacity-30"
+                style={{ border: '1px solid #D97706', color: '#D97706' }}>
                 ›
               </button>
             </div>
 
             {monthPickerOpen && (
-              <div className="mt-2 bg-ink-4 border border-ink-5 rounded-lg p-3 space-y-3">
+              <div className="mt-2 rounded-lg p-3 space-y-3" style={{ background: '#F8F4EE', border: '1px solid #D4C9B0' }}>
                 <button
                   onClick={() => { setMonthFilter(''); setMonthPickerOpen(false) }}
-                  className={`font-rajdhani text-xs font-bold tracking-wide px-3 py-1.5 rounded-full border transition-colors ${
-                    !monthFilter
-                      ? 'bg-gold/20 border-gold-dim text-gold'
-                      : 'bg-ink-3 border-ink-5 text-zinc-500 hover:text-zinc-300'
-                  }`}>
+                  className="font-rajdhani text-xs font-bold tracking-wide px-3 py-1.5 rounded-full border transition-colors"
+                  style={!monthFilter
+                    ? { background: '#FEF3C7', borderColor: '#F5D9A8', color: '#B45309' }
+                    : { background: '#FFFFFF', borderColor: '#D4C9B0', color: '#78716C' }}>
                   All time
                 </button>
                 {monthGroups.map(group => (
                   <div key={group.year} className="space-y-1.5">
-                    <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-600">
+                    <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase" style={{ color: '#A8A29E' }}>
                       {group.year}
                     </span>
                     <div className="flex flex-wrap gap-2">
@@ -409,11 +411,10 @@ export function MatchHistoryClient({
                         <button
                           key={month}
                           onClick={() => selectMonth(month)}
-                          className={`font-rajdhani text-xs font-bold tracking-wide px-3 py-1.5 rounded-full border transition-colors ${
-                            monthFilter === month
-                              ? 'bg-gold/20 border-gold-dim text-gold'
-                              : 'bg-ink-3 border-ink-5 text-zinc-500 hover:text-zinc-300'
-                          }`}>
+                          className="font-rajdhani text-xs font-bold tracking-wide px-3 py-1.5 rounded-full border transition-colors"
+                          style={monthFilter === month
+                            ? { background: '#FEF3C7', borderColor: '#F5D9A8', color: '#B45309' }
+                            : { background: '#FFFFFF', borderColor: '#D4C9B0', color: '#78716C' }}>
                           {monthOnlyLabel(month)}
                         </button>
                       ))}
@@ -431,11 +432,10 @@ export function MatchHistoryClient({
               <button
                 key={rf}
                 onClick={() => setRoleFilter(rf)}
-                className={`font-rajdhani text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full border transition-colors ${
-                  roleFilter === rf
-                    ? 'bg-gold/20 border-gold-dim text-gold'
-                    : 'bg-ink-4 border-ink-5 text-zinc-500 hover:text-zinc-300'
-                }`}>
+                className="font-rajdhani text-xs font-bold tracking-wide uppercase px-3 py-1.5 rounded-full border transition-colors"
+                style={roleFilter === rf
+                  ? { background: '#FEF3C7', borderColor: '#F5D9A8', color: '#B45309' }
+                  : { background: '#F8F4EE', borderColor: '#D4C9B0', color: '#78716C' }}>
                 {rf === 'all' ? 'All Matches' : rf === 'played' ? 'I Played' : 'I Led (C/VC)'}
               </button>
             ))}
@@ -443,13 +443,15 @@ export function MatchHistoryClient({
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <select value={tournamentId} onChange={e => setTournamentId(e.target.value)} className="form-input text-xs">
+          <select value={tournamentId} onChange={e => setTournamentId(e.target.value)} className="font-rajdhani text-xs rounded px-3 py-2.5"
+            style={{ background: '#F8F4EE', border: '1px solid #D4C9B0', color: '#1C1917' }}>
             <option value="">All tournaments</option>
             {filterOptions.tournaments.map(t => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
-          <select value={groundSelection} onChange={e => setGroundSelection(e.target.value)} className="form-input text-xs">
+          <select value={groundSelection} onChange={e => setGroundSelection(e.target.value)} className="font-rajdhani text-xs rounded px-3 py-2.5"
+            style={{ background: '#F8F4EE', border: '1px solid #D4C9B0', color: '#1C1917' }}>
             <option value="">All grounds</option>
             {filterOptions.grounds.map(g => (
               <option key={g.id} value={`g:${g.id}`}>{g.name}</option>
@@ -458,7 +460,8 @@ export function MatchHistoryClient({
               <option key={v} value={`v:${v}`}>{v}</option>
             ))}
           </select>
-          <select value={format} onChange={e => setFormat(e.target.value)} className="form-input text-xs">
+          <select value={format} onChange={e => setFormat(e.target.value)} className="font-rajdhani text-xs rounded px-3 py-2.5"
+            style={{ background: '#F8F4EE', border: '1px solid #D4C9B0', color: '#1C1917' }}>
             <option value="">All formats</option>
             {filterOptions.formats.map(f => (
               <option key={f} value={f}>{f}</option>
@@ -469,35 +472,35 @@ export function MatchHistoryClient({
         {hasActiveFilters && (
           <button
             onClick={clearFilters}
-            className="font-rajdhani text-xs font-semibold text-zinc-500 hover:text-gold transition-colors">
+            className="font-rajdhani text-xs font-semibold transition-colors"
+            style={{ color: '#78716C' }}>
             ✕ Clear filters
           </button>
         )}
       </div>
 
       {error && (
-        <p className="font-rajdhani text-sm text-red-400 bg-red-950/40 border border-red-800 rounded px-4 py-2.5">{error}</p>
+        <p className="font-rajdhani text-sm rounded px-4 py-2.5" style={{ color: '#B91C1C', background: '#FEE2E2', border: '1px solid #FCA5A5' }}>{error}</p>
       )}
       {loading && (
-        <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">Loading…</p>
+        <p className="font-rajdhani text-sm text-center py-6" style={{ color: '#A8A29E' }}>Loading…</p>
       )}
 
-      {/* Date-chip slider — Warm Light palette, a self-contained light card
-          on the otherwise dark page (same treatment as the mockup). Purely
-          a client-side refinement over whatever `matches` already holds —
-          see the `distinctDates`/`visibleMatches` derivation above. */}
+      {/* Date-chip slider — same Warm Light palette as the filter bar above it.
+          Purely a client-side refinement over whatever `matches` already
+          holds — see the `distinctDates`/`visibleMatches` derivation above. */}
       {!loading && !error && distinctDates.length > 0 && (
-        <div className="rounded-xl p-3" style={{ background: '#F8F4EE', border: '1px solid #D4C9B0' }}>
+        <div className="rounded-xl p-3" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
           <DateChipSlider dates={distinctDates} selected={dayFilter} onSelect={setDayFilter} />
         </div>
       )}
 
       {!loading && !error && visibleMatches.length === 0 && (
-        <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">
+        <p className="font-rajdhani text-sm text-center py-6" style={{ color: '#A8A29E' }}>
           {dayFilter ? (
             <>
               No matches on that date.{' '}
-              <button onClick={() => setDayFilter(null)} className="text-gold underline">
+              <button onClick={() => setDayFilter(null)} className="underline" style={{ color: '#D97706' }}>
                 Show all dates
               </button>
             </>
@@ -506,7 +509,7 @@ export function MatchHistoryClient({
           ) : (
             <>
               No completed matches yet this month.{' '}
-              <button onClick={() => setMonthFilter('')} className="text-gold underline">
+              <button onClick={() => setMonthFilter('')} className="underline" style={{ color: '#D97706' }}>
                 Show all matches
               </button>
             </>
@@ -518,7 +521,7 @@ export function MatchHistoryClient({
           tournament + venue + format) — unlike a per-chip count, this can't
           go stale relative to whatever's currently selected. */}
       {!loading && !error && matches.length > 0 && (
-        <p className="font-rajdhani text-xs text-zinc-600">
+        <p className="font-rajdhani text-xs" style={{ color: '#A8A29E' }}>
           {totalCount} match{totalCount === 1 ? '' : 'es'}
           {matches.length < totalCount ? ` · showing ${matches.length}` : ''}
           {dayFilter ? ` · ${visibleMatches.length} on this date` : ''}
@@ -540,7 +543,7 @@ export function MatchHistoryClient({
           <>
             {flagged.length > 0 && (
               <div className="space-y-3">
-                <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-amber-400">
+                <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase" style={{ color: '#B45309' }}>
                   ⚠ Needs Reconciliation
                 </h2>
                 {flagged.map(m => (
@@ -558,7 +561,7 @@ export function MatchHistoryClient({
             )}
             <div className="space-y-3">
               {flagged.length > 0 && rest.length > 0 && (
-                <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">
+                <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase" style={{ color: '#A8A29E' }}>
                   All Matches
                 </h2>
               )}
@@ -583,7 +586,8 @@ export function MatchHistoryClient({
           <button
             onClick={loadMore}
             disabled={loadingMore}
-            className="font-rajdhani text-xs font-bold tracking-wide uppercase bg-ink-3 border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
+            className="font-rajdhani text-xs font-bold tracking-wide uppercase disabled:opacity-40 px-5 py-2.5 rounded transition-colors"
+            style={{ background: '#FFFFFF', border: '1px solid #D4C9B0', color: '#78716C' }}>
             {loadingMore ? 'Loading…' : 'Load Older Matches'}
           </button>
         </div>

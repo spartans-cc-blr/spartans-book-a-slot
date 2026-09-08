@@ -25,11 +25,11 @@ export default async function MatchHistoryPage() {
 
   return (
     <>
-      <SiteNav activePage="matches" />
-      <main className="min-h-screen bg-ink-1 px-4 md:px-8 py-8 max-w-4xl mx-auto">
+      <SiteNav activePage="matches" mobileTabBarTheme="light" />
+      <main className="min-h-screen px-4 md:px-8 py-8 max-w-4xl mx-auto" style={{ background: '#F8F4EE' }}>
         <div className="mb-6">
-          <h1 className="font-cinzel text-xl font-bold text-gold">Past Matches</h1>
-          <p className="font-rajdhani text-sm text-zinc-500 mt-1">
+          <h1 className="font-cinzel text-xl font-bold" style={{ color: '#B45309' }}>Past Matches</h1>
+          <p className="font-rajdhani text-sm mt-1" style={{ color: '#78716C' }}>
             Squad history for completed matches.
           </p>
         </div>

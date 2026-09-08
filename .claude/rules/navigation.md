@@ -237,6 +237,28 @@ A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `ma
 
 Since the tab bar is `fixed`, page content needs bottom padding so the bar doesn't cover it. `MobileTabBar` toggles a `document.body.classList.add('has-mobile-tabbar')` in a `useEffect` (removed on unmount), and `src/app/globals.css` reserves `padding-bottom: 4.5rem` on `body.has-mobile-tabbar` under a `max-width: 767px` media query. This means the padding only ever applies on pages that actually mount `MobileTabBar` (i.e. render `SiteNav`) — the `/admin/*` subtree (which uses `AdminLayout`/`AdminSidebar` instead, see `admin_console.md`) is unaffected.
 
+### Warm Light variant — `theme` prop (added September 2026)
+
+`MobileTabBar` accepts an optional `theme?: 'dark' | 'light'` prop (default
+`'dark'`, unchanged look). `SiteNav` forwards it through its own
+`mobileTabBarTheme` prop — `<SiteNav activePage="fixtures"
+mobileTabBarTheme="light" />` — never inferred from `activePage` or
+anything else, so a page opts in explicitly. Both the fixed tab bar and
+the "More" sheet read every colour from a small `tokens(theme)` lookup
+(`src/components/ui/MobileTabBar.tsx`) rather than hardcoded Tailwind
+classes — `'light'` swaps in the same Warm Light palette as
+`DateChipSlider` (`#FFFFFF`/`#F8F4EE` surfaces, `#D97706` gold, `#D4C9B0`
+borders), `'dark'` keeps the original ink/gold tokens byte-for-byte. Every
+icon in the file was changed from a hardcoded `stroke="#C9A84C"` to
+`stroke="currentColor"` so a single `color` set on each row's wrapping
+`<span>`/`<Link>` (from the token lookup) tints the icon too — no
+per-icon colour prop threading needed. Only `/fixtures` and
+`/matches/history` pass `'light'` today (see `features/player-availability.md`
+§10.1 and `features/post-match-scorecard.md` §16 for why those two pages
+went Warm Light in the first place) — the desktop nav and the slim mobile
+top row in `SiteNav` itself are unaffected either way, always dark,
+regardless of `mobileTabBarTheme`.
+
 ### One admin page had to drop its own `<SiteNav>`
 
 `src/app/admin/dugout/kit-room/page.tsx` is nested under `src/app/admin/layout.tsx` (which already renders the admin top bar + `AdminSidebar`, including `AdminSidebar`'s own `md:hidden fixed bottom-0` mobile nav) **and** was separately rendering its own `<SiteNav>` inside the page body — a pre-existing redundancy (double top bar) that predates this change. Before the mobile nav rebuild this only cost an extra header; once `SiteNav` started rendering a second `fixed bottom-0` bar of its own, the two mobile bottom bars would have visually stacked on this one page. Fixed by removing the redundant `<SiteNav>` import/render from this page — `AdminLayout`'s own nav (which already links to this exact page, "Store Orders" under "The Dugout" section) is sufficient, matching every other `/admin/**` page.

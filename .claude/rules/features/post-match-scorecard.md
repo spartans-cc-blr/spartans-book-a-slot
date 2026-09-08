@@ -1249,6 +1249,20 @@ touching `FixturesWeekendGroup`'s live validation state), while this page —
 already a fully client-managed list with its own `matches` state — just
 filters an array in React, no CSS trick needed.
 
+**Page shell widened to Warm Light too (added September 2026).** Beyond
+the date-chip slider itself, `/matches/history`'s page heading and the
+`MatchHistoryClient.tsx` filter bar (result chips, month stepper, role
+chips, the three `<select>`s, "Clear filters", the flagged-section
+headings, "Load Older Matches") all switched from the dark ink theme to
+the same Warm Light palette as `/fixtures` (`navigation.md` §4.1,
+`player-availability.md` §10.1). `MatchHistoryCard` itself — the actual
+scorecard/verify panel — was deliberately left untouched: it already
+carries its own hardcoded dark gradient background via inline `style`
+(the same pattern `FixturesCard` uses), so it renders correctly as a dark
+card sitting on the new light page shell with no changes needed. `SiteNav`
+on this page now passes `mobileTabBarTheme="light"` so the bottom tab bar
+matches. Scope is this page and `/fixtures` only, not a site-wide reskin.
+
 ### File Map addition
 
 | File | Role |
