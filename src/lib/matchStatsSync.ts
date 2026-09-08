@@ -11,6 +11,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { detectAndLogMilestones, detectAndLogMatchPerformances } from '@/lib/milestones'
 import { resolveSquadMatch, type SquadRef } from '@/lib/matchTopPerformers'
 import { autoResolveMatch } from '@/lib/playerIdentityResolution'
+import { notifyFeeReminderIfPending } from '@/lib/feeReminders'
 
 export interface SyncMatchStatsResult {
   ok:    boolean
@@ -157,6 +158,13 @@ export async function syncMatchStatsForBooking(
     detectAndLogMilestones(bookingId, year, playerIds),
     detectAndLogMatchPerformances(bookingId, batting.data ?? [], bowling.data ?? [], fielding.data ?? [], squad, isPractice),
   ])
+
+  // Match fee reminder — best-effort, same "never fail the sync" posture as
+  // the recognition detection above. Pushes admins immediately when this
+  // sync leaves the booking fee-pending (fee configured, squad announced,
+  // not yet applied); no-ops silently otherwise (no fee set, no squad yet,
+  // already applied, or externally reconciled). See features/fee-reminders.md.
+  await notifyFeeReminderIfPending(bookingId).catch(err => console.error('[fee-reminder]', err))
 
   return { ok: true }
 }

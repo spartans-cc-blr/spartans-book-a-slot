@@ -59,6 +59,31 @@ export async function notifyGCs(
   }
 }
 
+// Broadcast a push notification to every admin — resolved from ADMIN_EMAILS
+// (the same env-derived source of truth session.user.isAdmin uses, see
+// src/lib/auth.ts) rather than a DB role flag, since isAdmin is
+// deliberately not stored on `players`. An admin who has no players row at
+// all (email in ADMIN_EMAILS but never registered as a player) simply has
+// nowhere to push to and is silently skipped — same posture as any other
+// player with zero push_subscriptions rows. Used by the match-fee reminder
+// (see src/lib/feeReminders.ts) to alert admins the moment a scorecard
+// syncs into a fees-pending state.
+export async function notifyAdmins(title: string, body: string, url: string = '/admin') {
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean)
+  if (!adminEmails.length) return
+  const supabase = createServiceClient()
+  const { data: recipients } = await supabase
+    .from('players')
+    .select('id')
+    .in('gmail_id', adminEmails)
+  if (recipients?.length) {
+    await Promise.all(recipients.map(p => sendPushToPlayer(p.id, { title, body, url })))
+  }
+}
+
 // Broadcast a push notification to every player who has subscribed for
 // push notifications at all (i.e. has at least one push_subscriptions
 // row) — used for club-wide announcements like a new player being
