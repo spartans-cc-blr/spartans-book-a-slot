@@ -216,9 +216,24 @@ Tab set depends on auth state (mirrors the same gates the desktop `links` array 
 |---|---|
 | Expelled | Home only |
 | Not logged in | Home · Schedule |
-| Logged in, not expelled | Home · Fixtures · Matches · Dugout · **More** |
+| Logged in, not expelled | Home · Matches · Dugout · **More** |
 
-"Fixtures" → `/fixtures` (mark availability / upcoming), "Matches" → `/matches/history` (past scorecards) — these were previously both folded into the desktop "Matches ▾" dropdown's Upcoming/Past Matches items; on mobile they're promoted to their own tabs since they're the two highest-frequency destinations. **More** is always the last slot, a button (not a link) that toggles the bottom sheet — it shows the same active-gold treatment whenever the sheet is open, or whenever `activePage` is one of the values that only live inside the sheet (`isAdminOrGcHighlighted()`: `leaderboard`, `profile`, `planner`, `captains`, `captains-unavailable`, `gc`, `gc-players`, `wrangler`, `schedule`).
+**"Matches" always links to `/fixtures`** and is active for both
+`activePage === 'fixtures'` and `activePage === 'matches'` — as of
+September 2026 this is one tab, not two (was "Fixtures" + "Matches" as
+separate tabs when the hybrid nav first shipped; merged after the club
+coordinator pointed out the reference screenshot used a single "Matches"
+tab with Upcoming/Past Matches as an in-page toggle instead — see
+`features/player-availability.md` §10.2). The desktop `links` array's own
+"Matches ▾" dropdown (Upcoming/Past Matches) already worked this way from
+the start; this brings mobile in line with it rather than introducing a
+new pattern. **More** is always the last slot, a button (not a link) that
+toggles the bottom sheet — it shows the same active-gold treatment
+whenever the sheet is open, or whenever `activePage` is one of the values
+that only live inside the sheet (`isAdminOrGcHighlighted()`: `leaderboard`,
+`profile`, `planner`, `captains`, `captains-unavailable`, `gc`,
+`gc-players`, `wrangler`, `schedule` — deliberately excludes `matches`,
+which is now covered by the Matches tab's own `active` check instead).
 
 ### "More" sheet
 

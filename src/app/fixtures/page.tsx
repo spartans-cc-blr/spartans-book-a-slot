@@ -8,6 +8,7 @@ import { FixturesCard } from '@/components/fixtures/FixturesCard'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
 import { PushSubscribePrompt } from '@/components/fixtures/PushSubscribePrompt'
 import { FixturesDateFilterBar } from '@/components/fixtures/FixturesDateFilterBar'
+import { MatchesSegmentedTabs } from '@/components/matches/MatchesSegmentedTabs'
 import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
 
@@ -34,7 +35,7 @@ function getMatchStatus(gameDate: string, slotTime: string, format: string): 'up
 }
 
 export const metadata: Metadata = {
-  title: 'Upcoming Fixtures — Spartans Cricket Club',
+  title: 'Matches — Spartans Cricket Club',
 }
 
 // Groups bookings for OYE validation purposes:
@@ -267,11 +268,12 @@ export default async function FixturesPage() {
           Spartans Cricket Club · Bengaluru
         </p>
         <h1 className="font-cinzel text-2xl md:text-3xl font-bold mb-2 tracking-wide" style={{ color: '#1C1917' }}>
-          Upcoming Fixtures
+          Matches
         </h1>
-        <p className="text-sm md:text-base max-w-xl leading-relaxed font-rajdhani" style={{ color: '#57534E' }}>
+        <p className="text-sm md:text-base max-w-xl leading-relaxed font-rajdhani mb-4" style={{ color: '#57534E' }}>
           Confirmed matches for Spartans CC. Mark your availability below each card.
         </p>
+        <MatchesSegmentedTabs active="upcoming" />
       </div>
 
       {/* Not registered */}

@@ -483,6 +483,43 @@ tab bar matches. Scope is deliberately just this page and
 
 ---
 
+## 10.2 "Matches" — Fixtures + Match History merged into one bottom tab (added September 2026)
+
+The mobile bottom tab bar originally shipped with "Fixtures" and "Matches"
+as two separate tabs (`navigation.md` §4.1's first cut). After seeing the
+reference screenshot again, the club coordinator pointed out it used a
+single "Matches" tab with **Upcoming / Past Matches as an in-page toggle**
+instead of two tab slots — matching what the desktop nav's "Matches ▾"
+dropdown had already been doing since before the mobile rebuild (`SiteNav`
+§4's `links` array: one "Matches" menu, "🏏 Upcoming" → `/fixtures` and
+"📜 Past Matches" → `/matches/history` as its two items).
+
+**Deliberately two real routes still, not one merged page.** `/fixtures`
+(§4-§10 above) and `/matches/history` (`features/post-match-scorecard.md`
+§9) each carry substantial independent live architecture — Fixtures' own
+shared weekend availability state, Match History's own client-paginated
+filter/list — that would be riskier to fold into a single page than to
+link between. `MatchesSegmentedTabs` (`src/components/matches/
+MatchesSegmentedTabs.tsx`) is the shared two-pill control both pages
+render at the top of their hero: a plain server component (no client
+state) — two `<Link>`s, `active` passed in explicitly (`"upcoming"` on
+`/fixtures`, `"past"` on `/matches/history`) rather than derived from
+`usePathname()`, since each page already knows which one it is. Both
+pages' `<h1>` and `<title>` were retitled from "Upcoming Fixtures"/"Past
+Matches" to plain "Matches" to match — the segmented control is what now
+conveys which half you're looking at.
+
+**Bottom tab bar** (`MobileTabBar.tsx`) collapsed its two tabs into one:
+"Matches" always links to `/fixtures` and is active for both
+`activePage === 'fixtures'` and `activePage === 'matches'` — see
+`navigation.md` §4.1 for the updated tab table. Tapping it always lands on
+Upcoming; the segmented control is how a viewer gets to Past Matches from
+there. This also freed a tab slot (Home · Matches · Dugout · More, down
+from five) — deliberately left at four rather than filled with something
+new, since nothing else was asked for.
+
+---
+
 ## 11. File Map
 
 | File | Role |
@@ -490,6 +527,7 @@ tab bar matches. Scope is deliberately just this page and
 | `src/app/fixtures/page.tsx` | Server component — fetches bookings, availability, squads; groups by `validationGroupKey`; renders `FixturesWeekendGroup` per group, each wrapped in a `data-dates` div for §10.1's date-chip filter |
 | `src/components/fixtures/FixturesDateFilterBar.tsx` | Date-chip quick filter (§10.1) — wraps the weekend-group list, toggles visibility via a CSS attribute-substring rule; never touches `FixturesWeekendGroup`'s own state |
 | `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component, also used by `/matches/history` (`features/post-match-scorecard.md` §16) |
+| `src/components/matches/MatchesSegmentedTabs.tsx` | Shared "Upcoming / Past Matches" pill control (§10.2) — plain server component, rendered on both `/fixtures` and `/matches/history` |
 | `src/app/fixtures/[id]/page.tsx` | Single match share page — same squad fetch pattern as fixtures page |
 | `src/components/fixtures/FixturesWeekend.tsx` | `FixturesWeekendGroup` — shared state owner; handles API calls; renders card + availability pairs |
 | `src/components/fixtures/FixturesAvailability.tsx` | Controlled availability button row; runs `getBlockReason()` validation on every render |

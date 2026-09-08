@@ -184,8 +184,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
           ) : (
             <>
               <Tab t={t} href="/" icon={<HomeIcon />} label="Home" active={activePage === 'home'} />
-              <Tab t={t} href="/fixtures" icon={<BatBallIcon />} label="Fixtures" active={activePage === 'fixtures'} />
-              <Tab t={t} href="/matches/history" icon={<CalendarIcon />} label="Matches" active={activePage === 'matches'} />
+              <Tab t={t} href="/fixtures" icon={<BatBallIcon />} label="Matches" active={activePage === 'fixtures' || activePage === 'matches'} />
               <Tab t={t} href="/dugout" icon={<ShieldIcon />} label="Dugout" active={activePage === 'dugout'} />
             </>
           )}
@@ -210,7 +209,10 @@ export function MobileTabBar(props: MobileTabBarProps) {
 }
 
 // activePage values that live inside the More sheet (not their own tab) should
-// still show the tab bar's "More" entry point as the active one.
+// still show the tab bar's "More" entry point as the active one. 'matches'
+// is deliberately not listed here — it's covered by the merged Matches tab's
+// own `active` check (activePage === 'fixtures' || 'matches') instead, so it
+// doesn't also light up "More" at the same time.
 function isAdminOrGcHighlighted(activePage?: string) {
   return ['leaderboard', 'profile', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
 }
