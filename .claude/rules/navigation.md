@@ -141,10 +141,25 @@ match.
 | Section | Content |
 |---|---|
 | Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle, a static "🛡️ Spartans CC Bengaluru" badge pill |
-| Stat tiles (2×2) | Upcoming Matches (gold) · My Tournaments (gold) · Pending Availability (amber if > 0, else emerald "Clear") · Wallet Balance (signed amount — emerald "Positive" if ≥ 0, amber "Exempted" if negative but dues-waived, else crimson "Overdue") |
+| Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Pending Availability (amber if > 0, else emerald "Clear") · Wallet Balance (signed amount — emerald "Positive" if ≥ 0, amber "Exempted" if negative but dues-waived, else crimson "Overdue") |
 | Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
 | Upcoming Fixtures | Header + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `upcomingPreview`, or a dashed empty-state box ("No Upcoming Matches Scheduled") when there are none |
 | Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |
+
+**Stat tiles are drill-down targets, not just numbers (added September 2026).**
+The club coordinator flagged that "18 Upcoming Matches" / "9 My Tournaments"
+had no way to actually see what those 18/9 were. `StatTile` gained an
+optional `href` prop — when set, the whole tile renders as a `<Link>`
+(hover/active tint, otherwise identical markup) instead of a plain `<div>`.
+Upcoming Matches now links to `/fixtures`, which already lists exactly that
+set. **My Tournaments deliberately stays non-interactive for now** — there
+is no player-facing page listing "tournaments I've been announced in";
+`/tournament-planner` is the closest existing thing but is gated to
+`isCaptain || isGC || isAdmin` (`architecture.md` §3), so linking a plain
+player there would just bounce them off its own redirect. A dedicated
+tournaments page is a follow-up (see §9's Pending Tasks), not built in this
+pass — the tile was intentionally left static rather than pointed at a page
+that would reject most of its own viewers.
 
 **Split-audience cards hidden entirely for a registered player (changed September 2026).** The "Quick Links" divider + the "For Players"/"For Organisers" cards below it used to render for every visitor, including a signed-in player — who by that point already has the full dashboard above and doesn't need the pre-sign-in pitch repeated underneath it. Both are now wrapped in a single `{!isPlayer && (...)}` guard, so they render exactly as before for logged-out/expelled/unmatched visitors and not at all once `isPlayer` is true. The divider itself was removed outright rather than kept for a now-single-card case — with the dashboard the only thing left above it, a "Quick Links" separator had nothing left to separate. The player-conditional styling inside the two cards (border colour, "View My Fixtures" vs "View Fixtures" copy) was dead code once the guard made `isPlayer` always `false` inside this block, so it was simplified away rather than left in place.
 
@@ -415,6 +430,7 @@ Displays the player's Google profile photo (from `player.photoUrl ?? player.imag
 |---|---|---|
 | Update logo `href` in `SiteNav.tsx` from `/schedule` to `/` | ✅ Done | Logo now links to `/` |
 | Mobile nav — hamburger drawer → hybrid bottom tab bar + "More" sheet | ✅ Done (Sept 2026) | See §4.1 — `MobileTabBar.tsx`, replaces the old drawer entirely |
+| Player-facing "My Tournaments" page | Medium | The Home dashboard's My Tournaments stat tile (§3.1) has no drill-down destination yet — deliberately left non-interactive rather than pointed at the captain/GC/admin-only `/tournament-planner`. Needs its own page listing the tournaments a player has been announced in a squad for (same `squad → bookings.tournament_id` source the tile's count already uses), then the tile's `href` can be wired up the same way "Upcoming Matches" → `/fixtures` was |
 | Seed `players.photo_url` for existing members | Medium | Existing players who signed in before the auth.ts change won't have photos until their next sign-in. Passive approach is fine; no one-off migration needed |
 | CricHeroes hyperlink wherever player names appear | Medium | Agreed pattern: if `cricheroes_url` is set on the player's profile, their name should render as a hyperlink to that URL in squad announcements, availability grids, and Captains Corner |
 | `/join` route for unmatched Gmail users | Low | `SiteNav` links to `/join` for unmatched users but the page doesn't exist yet — currently dead link |

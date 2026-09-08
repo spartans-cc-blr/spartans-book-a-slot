@@ -427,10 +427,9 @@ The old partial-lock carve-out (allowing L/O for Y-holders when `slotLocked`) is
 
 ## 10.1 Date-Chip Quick Filter (added September 2026)
 
-A horizontal date-chip row ("All" + one chip per distinct upcoming
-`game_date`, day-of-week/day-number/month stacked) sits above the weekend
-groups on `/fixtures`, in the Warm Light palette (`#F8F4EE` panel, `#D97706`
-active chip) rather than the page's existing dark-ink theme — a
+A horizontal date-chip row ("All" + one chip per group) sits above the
+weekend groups on `/fixtures`, in the Warm Light palette (`#F8F4EE` panel,
+`#D97706` active chip) rather than the page's existing dark-ink theme — a
 self-contained light "island" on the page, same convention as the Home
 Page dashboard rebuild (`navigation.md` §3.1).
 
@@ -444,18 +443,37 @@ together. So selecting a chip shows the **whole weekend group** that date
 belongs to, not just that one card; an isolated weekday game (already its
 own group, §4) shows alone as expected.
 
+**Chips mirror the grouping, not the raw date list (fixed September
+2026).** The first cut rendered one chip per distinct `game_date` — so a
+weekend still showed two separate chips (e.g. "24 OCT" and "25 OCT"), and
+tapping either one correctly revealed both days (per the "jump to the whole
+weekend" behaviour above) but with no visual hint that was about to happen
+— a reported "why does tapping Oct 25 also show me Oct 24?" confusion. Fixed
+by deriving the chip row directly from the same `weekendOrder`/`weekendMap`
+grouping `fixtures/page.tsx` already uses to render each
+`<FixturesWeekendGroup>`, instead of a flat `Array.from(new Set(...))` over
+every booking's `game_date`. Each entry is now a `DateChipGroup { key,
+dates }` — `dates.length === 1` for an isolated weekday game (renders as
+before: day-of-week/day-number/month stacked), `dates.length === 2` for a
+Sat+Sun weekend (renders as one combined chip: `SAT–SUN` / `24–25` /
+`OCT`, or `OCT/NOV` if the pair straddles a month boundary). Weekday chips
+were already one-per-day and needed no change — only weekends were ever
+being split across two chips that both did the same thing.
+
 **Implementation stays entirely outside `FixturesWeekendGroup` — zero
 changes to its live availability/validation logic.** `fixtures/page.tsx`
 wraps each rendered `<FixturesWeekendGroup>` in a plain
 `<div data-dates="2026-09-12,2026-09-13">` (the group's own distinct
-`game_date`s, comma-joined). `FixturesDateFilterBar` (new client component,
-wraps the whole list as `{children}`) renders the chip row and, when a chip
-is selected, injects one `<style>` rule —
+`game_date`s, sorted and comma-joined). `FixturesDateFilterBar` (client
+component, wraps the whole list as `{children}`) renders the chip row and,
+when a chip is selected, injects one `<style>` rule —
 `[data-dates]:not([data-dates*="<selected>"]) { display: none }` — a plain
-CSS attribute-substring selector. Safe here specifically because every
-date token is a fixed 10-character ISO string (`YYYY-MM-DD`), so a
-substring match can't accidentally hit a different date. No prop threading,
-no state lifted into `FixturesWeekendGroup`, no risk of disturbing its
+CSS attribute-substring selector, matched against the chip group's first
+(earliest) date, which is always one of the tokens present in that same
+group's `data-dates` wrapper. Safe here specifically because every date
+token is a fixed 10-character ISO string (`YYYY-MM-DD`), so a substring
+match can't accidentally hit a different date. No prop threading, no state
+lifted into `FixturesWeekendGroup`, no risk of disturbing its
 `weekendResponses`/`savingMap`/`errorMap` state — the filter is purely a
 CSS visibility toggle over server-rendered output that already exists.
 
@@ -463,8 +481,10 @@ CSS visibility toggle over server-rendered output that already exists.
 presentational chip-row component — also used by `/matches/history`'s own
 day-level filter (`features/post-match-scorecard.md` §16) with the same
 Warm Light styling, so the two "date slider" surfaces the club coordinator
-asked for don't drift visually. Purely controlled (`dates`, `selected`,
-`onSelect`) — no logic of its own beyond rendering chips.
+asked for don't drift visually. Purely controlled (`groups`, `selected`,
+`onSelect`) — no logic of its own beyond rendering chips; a caller with no
+weekend-pairing concept of its own (Match History) just passes one
+single-date group per chip, same as before this change.
 
 **Page shell widened to Warm Light too (added September 2026).** After
 seeing the date-chip slider, the club coordinator asked for the same

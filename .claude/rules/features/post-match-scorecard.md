@@ -1267,7 +1267,7 @@ matches. Scope is this page and `/fixtures` only, not a site-wide reskin.
 
 | File | Role |
 |---|---|
-| `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component (`dates`, `selected`, `onSelect`), also used by `/fixtures` |
+| `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component (`groups: DateChipGroup[]`, `selected`, `onSelect`), also used by `/fixtures`; Match History passes one single-date group per chip (no weekend-pairing concept here, unlike `/fixtures` — see `features/player-availability.md` §10.1's September 2026 fix) |
 
 ---
 

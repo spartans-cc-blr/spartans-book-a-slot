@@ -330,6 +330,10 @@ export function MatchHistoryClient({
   // ascending so the chip row reads left-to-right chronologically, unlike
   // `matches` itself which the API returns most-recent-first.
   const distinctDates = Array.from(new Set(matches.map(m => m.game_date))).sort()
+  // Match History has no weekend-pairing concept (unlike /fixtures — each
+  // match here is its own independent card, not two games sharing OYE
+  // validation state), so every date gets its own single-date chip group.
+  const dateChipGroups = distinctDates.map(d => ({ key: d, dates: [d] }))
   const visibleMatches = dayFilter ? matches.filter(m => m.game_date === dayFilter) : matches
 
   return (
@@ -491,7 +495,7 @@ export function MatchHistoryClient({
           holds — see the `distinctDates`/`visibleMatches` derivation above. */}
       {!loading && !error && distinctDates.length > 0 && (
         <div className="rounded-xl p-3" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
-          <DateChipSlider dates={distinctDates} selected={dayFilter} onSelect={setDayFilter} />
+          <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={setDayFilter} />
         </div>
       )}
 

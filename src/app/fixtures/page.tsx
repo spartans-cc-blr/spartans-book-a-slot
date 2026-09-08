@@ -318,10 +318,13 @@ export default async function FixturesPage() {
         ) : (
           <>
             <FixturesDateFilterBar
-              dates={Array.from(new Set(weekendOrder.flatMap(wk => weekendMap[wk].map(b => b.game_date)))).sort()}
+              groups={weekendOrder.map(wk => {
+                const dates = Array.from(new Set(weekendMap[wk].map(b => b.game_date))).sort()
+                return { key: dates[0], dates }
+              })}
             />
             {weekendOrder.map(wk => (
-              <div key={wk} data-dates={Array.from(new Set(weekendMap[wk].map(b => b.game_date))).join(',')}>
+              <div key={wk} data-dates={Array.from(new Set(weekendMap[wk].map(b => b.game_date))).sort().join(',')}>
                 <FixturesWeekendGroup
                   isPlayer={isPlayer}
                   isCaptain={isCaptain}

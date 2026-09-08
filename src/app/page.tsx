@@ -219,10 +219,14 @@ function ChevronGlyph({ color = '#A8A29E' }: { color?: string }) {
   )
 }
 
-// Stat tile — light card, Warm Light palette
-function StatTile({ icon, value, label, tag, tone }: {
+// Stat tile — light card, Warm Light palette. Pass `href` to make the whole
+// tile a tap target (e.g. "Upcoming Matches" → /fixtures); omitted for tiles
+// with no drill-down destination yet (e.g. "My Tournaments" — see
+// navigation.md's Home page section for why that one stays static for now).
+function StatTile({ icon, value, label, tag, tone, href }: {
   icon: React.ReactNode; value: string | number; label: string; tag: string
   tone: 'gold' | 'amber' | 'emerald' | 'crimson'
+  href?: string
 }) {
   const toneMap = {
     gold:    { bg: '#FEF3C7', tagBg: '#FEF3C7', tagText: '#B45309' },
@@ -231,8 +235,8 @@ function StatTile({ icon, value, label, tag, tone }: {
     crimson: { bg: '#FEE2E2', tagBg: '#FEE2E2', tagText: '#DC2626' },
   }[tone]
 
-  return (
-    <div className="rounded-xl p-4" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
+  const content = (
+    <>
       <div className="flex items-start justify-between mb-3">
         <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: toneMap.bg }}>
           {icon}
@@ -244,6 +248,22 @@ function StatTile({ icon, value, label, tag, tone }: {
       </div>
       <p className="font-cinzel text-2xl font-bold" style={{ color: '#1C1917' }}>{value}</p>
       <p className="font-rajdhani text-xs mt-1" style={{ color: '#78716C' }}>{label}</p>
+    </>
+  )
+
+  if (href) {
+    return (
+      <Link href={href}
+        className="rounded-xl p-4 block transition-colors hover:bg-black/[0.02] active:bg-black/[0.04]"
+        style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <div className="rounded-xl p-4" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
+      {content}
     </div>
   )
 }
@@ -378,6 +398,7 @@ export default async function HomePage() {
                 label="Upcoming Matches"
                 tag="Upcoming"
                 tone="gold"
+                href="/fixtures"
               />
               <StatTile
                 icon={<TrophyGlyph color="#B45309" />}
