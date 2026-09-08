@@ -1,7 +1,7 @@
 # Site Navigation & Home Page — Feature Summary
  
-**Spartans Hub · Last updated: March 2026**
-**Sprint:** 2 (going live with player-facing features)
+**Spartans Hub · Last updated: September 2026**
+**Sprint:** 2 (going live with player-facing features); mobile nav rebuilt September 2026
  
 ---
  
@@ -25,7 +25,9 @@ The home page (`/`) replaced a simple redirect to `/schedule` that was organiser
 | File | Role |
 |---|---|
 | `src/app/page.tsx` | Server component — home/landing page, role-aware rendering |
-| `src/components/ui/SiteNav.tsx` | Sticky nav bar — shared across all pages, role-aware links and profile dropdown |
+| `src/components/ui/SiteNav.tsx` | Sticky top nav bar — shared across all pages; full desktop dropdown nav, plus a slim mobile row (avatar/admin/GC shortcuts) that renders `MobileTabBar` below it — see §4.1 |
+| `src/components/ui/MobileTabBar.tsx` | Mobile-only (`md:hidden`) fixed bottom tab bar + "More" bottom sheet — replaced the old hamburger drawer, September 2026 — see §4.1 |
+| `src/components/ui/GenerateInviteItem.tsx` | "Generate Invite Link" action (GC/admin) — extracted out of `SiteNav.tsx` so both it and `MobileTabBar.tsx` can import one copy without a circular import between the two nav components |
 | `src/app/profile/page.tsx` | Player self-service profile edit page |
 | `src/app/api/players/[id]/route.ts` | GET + PATCH for single player — IDOR-protected |
 | `src/lib/auth.ts` | JWT callback — enriches session with player context, saves Google photo on first sign-in |
@@ -149,38 +151,80 @@ const links = [
 ]
 ```
  
-Active page highlight is driven by the `activePage` prop passed from each page (`'home'`, `'schedule'`, `'fixtures'`, `'profile'`). The Club Site entry intentionally has no `key` — it is never highlighted.
+Active page highlight is driven by the `activePage` prop passed from each page (`'home'`, `'schedule'`, `'fixtures'`, `'profile'`, and the rest of the values listed in §4.1). The Club Site entry intentionally has no `key` — it is never highlighted. This `links` array (plus the Matches/Captains'/Council/Wrangler dropdowns rendered alongside it) is **desktop-only** as of September 2026 — see §4.1 for the mobile nav, which no longer reuses this array or these dropdowns.
  
 ### Logo Link
  
-The logo currently links to `/schedule`. This should be updated to link to `/` now that the home page exists.
+Links to `/`, matching the split-audience home page — the earlier "should be updated" pending task is done.
  
-### Profile Dropdown
+### Profile Dropdown (desktop)
  
-Shown when authenticated. Contains:
+Shown when authenticated, opened from the avatar in the top-right. Contains:
 - Player display name + email + role badges (CAPTAIN, GC)
 - "My Profile" link → `/profile` (hidden if `expelled`)
 - "Complete Registration" link → `/join` (shown if `playerId` is null and not expelled)
 - Sign out button
+
+This dropdown is desktop-only. On mobile the equivalent content (My Profile, Sign Out) lives in `MobileTabBar`'s "More" sheet instead — see §4.1.
+
 ### Role-conditional Nav Elements
  
 - **Admin button** — crimson pill linking to `/admin`, shown if `isAdmin`
 - **GC Review button** — gold bordered pill linking to `/gc-review`, shown if `isGC && !isAdmin`
-- Both are surfaced in the mobile drawer as text links
-### Nav by Role
+- Both are also surfaced in the slim mobile top row (`SiteNav`'s `md:hidden` block), as compact text links next to the avatar — unrelated to `MobileTabBar`, which handles everything else on mobile
+### Nav by Role (desktop)
 
 | Role | Nav items visible |
 |---|---|
 | Public (not signed in) | Schedule · Sign In |
-| Player | Home · Fixtures · The Dugout · My Profile |
-| Captain | Home · Fixtures · The Dugout · Captains Corner · Tournaments · My Profile |
-| GC | Home · Fixtures · The Dugout · GC Review · Tournaments · My Profile |
-| Admin | Home · Fixtures · The Dugout · Schedule · Admin ⚙ · My Profile |
-| Expelled | Home only (Fixtures, Dugout, Profile all hidden) |
-### Mobile Nav
- 
-Hamburger drawer (bottom sheet on mobile). All links included. Admin/GC shortcuts rendered inline before the hamburger icon for quick access without opening the drawer.
- 
+| Player | Home (logo) · Matches ▾ · The Dugout · Stats · My Profile |
+| Captain | Home (logo) · Matches ▾ · Captains' Corner ▾ · The Dugout · Stats · Tournaments · My Profile |
+| GC | Home (logo) · Matches ▾ · The Dugout · Stats · Tournaments · My Profile · Council ⚖ |
+| Wrangler | + Wrangler ⚒ dropdown (Squad Backfill, Grounds) |
+| Admin | All of the above · Schedule · Admin ⚙ |
+| Expelled | Home (logo) only — every other link/dropdown is gated on `!isExpelled` |
+
+---
+
+## 4.1 Mobile Nav — `MobileTabBar.tsx` (rebuilt September 2026)
+
+### Why
+
+The old mobile nav was a hamburger drawer that reproduced the desktop `links` array plus every dropdown's items as a flat, scrollable list — functional, but not the pattern players actually reach for on a phone. Replaced with a **hybrid nav**: a fixed bottom tab bar for the handful of destinations everyone taps constantly, plus a "More" bottom sheet for everything else, grouped by role the same way the desktop dropdowns already were. `SiteNav.tsx` itself is now `<>`-wrapped and renders `<MobileTabBar>` as a sibling right after `</nav>`, passing down the same role booleans it already computes (`isLoggedIn`, `isExpelled`, `isAdmin`, `isGC`, `isCaptain`, `isWrangler`, `playerId`) — `MobileTabBar` does not call `useSession()` itself.
+
+### Bottom tab bar — `md:hidden fixed inset-x-0 bottom-0`
+
+Tab set depends on auth state (mirrors the same gates the desktop `links` array uses):
+
+| State | Tabs |
+|---|---|
+| Expelled | Home only |
+| Not logged in | Home · Schedule |
+| Logged in, not expelled | Home · Fixtures · Matches · Dugout · **More** |
+
+"Fixtures" → `/fixtures` (mark availability / upcoming), "Matches" → `/matches/history` (past scorecards) — these were previously both folded into the desktop "Matches ▾" dropdown's Upcoming/Past Matches items; on mobile they're promoted to their own tabs since they're the two highest-frequency destinations. **More** is always the last slot, a button (not a link) that toggles the bottom sheet — it shows the same active-gold treatment whenever the sheet is open, or whenever `activePage` is one of the values that only live inside the sheet (`isAdminOrGcHighlighted()`: `leaderboard`, `profile`, `planner`, `captains`, `captains-unavailable`, `gc`, `gc-players`, `wrangler`, `schedule`).
+
+### "More" sheet
+
+A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `max-h-[70vh]`) with a full-screen scrim behind it. Content branches the same way `SiteNav`'s desktop dropdowns do:
+
+- **Expelled** — just an "Account suspended" notice, no links.
+- **Logged in** — Stats (Leaderboard), My Profile (or "Complete Registration" → `/join` if `playerId` is null), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
+  - **Captains' Corner** (`isCaptain || isAdmin`) — Squad Selection, Unavailable Dates
+  - **Council** (`isGC`) — Squad Review, Feedback, Players, Store Orders, Grounds, `GenerateInviteItem`
+  - **Wrangler** (`isWrangler`) — Squad Backfill, Grounds
+  - **Admin** (`isAdmin`) — Schedule, Admin Panel (crimson row)
+  - Club Site (muted, external) and Sign Out always last.
+- **Logged out** — Club Site + Sign In only.
+
+### Reserving space for the fixed bar — `.has-mobile-tabbar`
+
+Since the tab bar is `fixed`, page content needs bottom padding so the bar doesn't cover it. `MobileTabBar` toggles a `document.body.classList.add('has-mobile-tabbar')` in a `useEffect` (removed on unmount), and `src/app/globals.css` reserves `padding-bottom: 4.5rem` on `body.has-mobile-tabbar` under a `max-width: 767px` media query. This means the padding only ever applies on pages that actually mount `MobileTabBar` (i.e. render `SiteNav`) — the `/admin/*` subtree (which uses `AdminLayout`/`AdminSidebar` instead, see `admin_console.md`) is unaffected.
+
+### One admin page had to drop its own `<SiteNav>`
+
+`src/app/admin/dugout/kit-room/page.tsx` is nested under `src/app/admin/layout.tsx` (which already renders the admin top bar + `AdminSidebar`, including `AdminSidebar`'s own `md:hidden fixed bottom-0` mobile nav) **and** was separately rendering its own `<SiteNav>` inside the page body — a pre-existing redundancy (double top bar) that predates this change. Before the mobile nav rebuild this only cost an extra header; once `SiteNav` started rendering a second `fixed bottom-0` bar of its own, the two mobile bottom bars would have visually stacked on this one page. Fixed by removing the redundant `<SiteNav>` import/render from this page — `AdminLayout`'s own nav (which already links to this exact page, "Store Orders" under "The Dugout" section) is sufficient, matching every other `/admin/**` page.
+
 ---
  
 ## 5. Auth Flow — `src/lib/auth.ts`
@@ -292,8 +336,8 @@ Displays the player's Google profile photo (from `player.photoUrl ?? player.imag
  
 | Task | Priority | Notes |
 |---|---|---|
-| Update logo `href` in `SiteNav.tsx` from `/schedule` to `/` | High | Small one-line change — schedule is no longer the default landing |
-| Add `Home` link to the mobile nav drawer | High | The `links` array feeds both desktop and mobile — should already be included if SiteNav was updated |
+| Update logo `href` in `SiteNav.tsx` from `/schedule` to `/` | ✅ Done | Logo now links to `/` |
+| Mobile nav — hamburger drawer → hybrid bottom tab bar + "More" sheet | ✅ Done (Sept 2026) | See §4.1 — `MobileTabBar.tsx`, replaces the old drawer entirely |
 | Seed `players.photo_url` for existing members | Medium | Existing players who signed in before the auth.ts change won't have photos until their next sign-in. Passive approach is fine; no one-off migration needed |
 | CricHeroes hyperlink wherever player names appear | Medium | Agreed pattern: if `cricheroes_url` is set on the player's profile, their name should render as a hyperlink to that URL in squad announcements, availability grids, and Captains Corner |
 | `/join` route for unmatched Gmail users | Low | `SiteNav` links to `/join` for unmatched users but the page doesn't exist yet — currently dead link |

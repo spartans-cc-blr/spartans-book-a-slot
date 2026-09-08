@@ -13,6 +13,15 @@
     color: #F0E8D0;
   }
 
+  /* Reserve space above the fixed mobile bottom tab bar (SiteNav / MobileTabBar)
+     so page content doesn't render underneath it. Toggled by MobileTabBar's
+     own mount lifecycle — see useReserveBottomSpace() there. */
+  @media (max-width: 767px) {
+    body.has-mobile-tabbar {
+      padding-bottom: 4.5rem;
+    }
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar       { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: #111; }

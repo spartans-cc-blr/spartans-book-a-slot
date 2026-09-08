@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { SiteNav } from '@/components/ui/SiteNav'
 import { AdminKitRoomClient } from '@/components/dugout/AdminKitRoomClient'
 
 export const revalidate = 0
@@ -70,17 +69,14 @@ export default async function AdminKitRoomPage() {
 
   return (
     <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
-      <SiteNav activePage="dugout" />
-      <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
-        <div className="max-w-5xl mx-auto">
-          <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Kit Room — Admin</h1>
-          <AdminKitRoomClient
-            orders={orders}
-            batchDate={batchDate}
-            isAdmin={Boolean(user.isAdmin)}
-          />
-        </div>
-      </main>
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Kit Room — Admin</h1>
+        <AdminKitRoomClient
+          orders={orders}
+          batchDate={batchDate}
+          isAdmin={Boolean(user.isAdmin)}
+        />
+      </div>
     </div>
   )
 }

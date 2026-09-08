@@ -3,13 +3,14 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { JerseyIcon } from '@/components/ui/JerseyIcon'
+import { MobileTabBar } from '@/components/ui/MobileTabBar'
+import { GenerateInviteItem } from '@/components/ui/GenerateInviteItem'
 
 interface SiteNavProps {
   activePage?: string
 }
 
 export function SiteNav({ activePage }: SiteNavProps) {
-  const [open,         setOpen]         = useState(false)
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [gcOpen,       setGcOpen]       = useState(false)
   const [matchesOpen,  setMatchesOpen]  = useState(false)
@@ -49,6 +50,7 @@ export function SiteNav({ activePage }: SiteNavProps) {
   ]
 
   return (
+    <>
     <nav className="bg-ink-2 border-b border-gold-dim sticky top-0 z-50">
       <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
         {/* Logo */}
@@ -279,7 +281,7 @@ export function SiteNav({ activePage }: SiteNavProps) {
           </div>
         </div>
 
-        {/* Mobile: hamburger + auth */}
+        {/* Mobile: profile shortcut + auth (nav destinations live in the bottom tab bar) */}
         <div className="md:hidden ml-auto flex items-center gap-3">
           {isAdmin && (
             <Link href="/admin" className="font-rajdhani text-xs font-bold text-crimson">Admin</Link>
@@ -288,219 +290,34 @@ export function SiteNav({ activePage }: SiteNavProps) {
             <Link href="/gc-review" className="font-rajdhani text-xs font-bold text-gold">GC</Link>
           )}
           {isLoggedIn ? (
-            <button onClick={() => setProfileOpen(v => !v)}>
+            <Link href={isExpelled ? '/profile' : player?.playerId ? '/profile' : '/join'}>
               <img
                 src={player?.photoUrl ?? player?.image ?? '/default-avatar.png'}
                 alt=""
                 className="w-7 h-7 rounded-full object-cover border border-gold-dim"
               />
-            </button>
+            </Link>
           ) : (
             <button onClick={() => signIn('google')}
               className="font-rajdhani text-[10px] font-bold text-gold border border-gold-dim px-2 py-1 rounded">
               Sign in
             </button>
           )}
-          <button onClick={() => setOpen(v => !v)} className="flex flex-col gap-1.5 p-1">
-            <span className={`block w-5 h-px bg-gold-dim transition-transform ${open ? 'rotate-45 translate-y-2' : ''}`} />
-            <span className={`block w-5 h-px bg-gold-dim transition-opacity ${open ? 'opacity-0' : ''}`} />
-            <span className={`block w-5 h-px bg-gold-dim transition-transform ${open ? '-rotate-45 -translate-y-2' : ''}`} />
-          </button>
         </div>
       </div>
-
-      {/* Mobile profile dropdown */}
-      {profileOpen && isLoggedIn && (
-        <div className="md:hidden bg-ink-2 border-t border-ink-5 px-5 py-3">
-          <p className="font-rajdhani text-xs font-bold text-parchment">{player?.playerName ?? player?.name}</p>
-          <p className="font-rajdhani text-[10px] text-zinc-600 mb-3">{player?.email}</p>
-          {player?.playerId && !isExpelled && (
-            <Link href="/profile" onClick={() => setProfileOpen(false)}
-              className="block font-rajdhani text-sm text-zinc-400 hover:text-gold py-2 border-b border-ink-4">
-              My Profile
-            </Link>
-          )}
-          {!player?.playerId && (
-            <Link href="/join" onClick={() => setProfileOpen(false)}
-              className="block font-rajdhani text-sm text-zinc-400 hover:text-gold py-2 border-b border-ink-4">
-              Complete Registration
-            </Link>
-          )}
-          <button onClick={() => { signOut(); setProfileOpen(false) }}
-            className="font-rajdhani text-sm text-zinc-600 hover:text-zinc-300 py-2">
-            Sign out
-          </button>
-        </div>
-      )}
-
-      {/* Mobile nav dropdown */}
-      {open && (
-        <div className="md:hidden bg-ink-2 border-t border-ink-5 px-5 py-3 flex flex-col gap-1">
-          {isLoggedIn && !isExpelled && (
-            <>
-              <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 pt-1">
-                Matches
-              </p>
-              <Link href="/fixtures" onClick={() => setOpen(false)}
-                className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
-                  ${activePage === 'fixtures' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
-                🏏 Upcoming
-              </Link>
-              <Link href="/matches/history" onClick={() => setOpen(false)}
-                className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
-                  ${activePage === 'matches' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
-                📜 Past Matches
-              </Link>
-            </>
-          )}
-          {(isCaptain || isAdmin) && (
-            <>
-              <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 pt-3">
-                Captains' Corner
-              </p>
-              <Link href="/captains-corner" onClick={() => setOpen(false)}
-                className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
-                  ${activePage === 'captains' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
-                🏏 Squad Selection
-              </Link>
-              <Link href="/captains-corner/unavailable-dates" onClick={() => setOpen(false)}
-                className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
-                  ${activePage === 'captains-unavailable' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
-                🚫 Unavailable Dates
-              </Link>
-            </>
-          )}
-          {links.map(item => (
-            <Link key={item.label} href={item.href} onClick={() => setOpen(false)}
-              className={`font-rajdhani text-sm font-semibold tracking-wide uppercase py-2.5 border-b border-ink-4 transition-colors
-                ${activePage === item.key ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
-              {item.label}
-            </Link>
-          ))}
-          {isAdmin && (
-            <Link href="/admin" onClick={() => setOpen(false)}
-              className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 text-crimson">
-              Admin ⚙
-            </Link>
-          )}
-          {isGC && (
-            <>
-              <Link href="/gc-review" onClick={() => setOpen(false)}
-                className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 text-gold border-b border-ink-4">
-                ⚖ Squad Review
-              </Link>
-              <Link href="/gc/feedback" onClick={() => setOpen(false)}
-                className={`font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4
-                  ${activePage === 'gc-feedback' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
-                📋 Feedback
-              </Link>
-              <Link href="/gc-players" onClick={() => setOpen(false)}
-                className={`font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4
-                  ${activePage === 'gc-players' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
-                👤 Players
-              </Link>
-              <Link href="/dugout/store-orders" onClick={() => setOpen(false)}
-                className={`flex items-center gap-2 font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4
-                  ${activePage === 'dugout' ? 'text-gold' : 'text-zinc-400 hover:text-gold'}`}>
-                <JerseyIcon colour="gold" size={16} />
-                Store Orders
-              </Link>
-              <Link href="/wrangler/grounds" onClick={() => setOpen(false)}
-                className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4 text-zinc-400 hover:text-gold">
-                📍 Grounds
-              </Link>
-              <GenerateInviteItem mobile onClose={() => setOpen(false)} />
-            </>
-          )}
-          {isWrangler && (
-            <>
-              <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 pt-3">
-                Wrangler
-              </p>
-              <Link href="/wrangler/backfill-squad" onClick={() => setOpen(false)}
-                className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4 text-zinc-400 hover:text-gold">
-                🧩 Squad Backfill
-              </Link>
-              <Link href="/wrangler/grounds" onClick={() => setOpen(false)}
-                className="font-rajdhani text-sm font-bold tracking-wide uppercase py-2.5 border-b border-ink-4 text-zinc-400 hover:text-gold">
-                📍 Grounds
-              </Link>
-            </>
-          )}
-        </div>
-      )}
     </nav>
-  )
-}
 
-function GenerateInviteItem({ mobile, onClose }: { mobile?: boolean, onClose?: () => void }) {
-  const [loading,   setLoading]   = useState(false)
-  const [inviteUrl, setInviteUrl] = useState('')
-  const [copied,    setCopied]    = useState(false)
-  const [error,     setError]     = useState('')
-
-  async function generate() {
-    setLoading(true); setError(''); setInviteUrl(''); setCopied(false)
-    try {
-      const res  = await fetch('/api/invite-tokens', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Failed'); return }
-      setInviteUrl(data.url)
-    } catch { setError('Network error') }
-    finally { setLoading(false) }
-  }
-
-  async function copy() {
-    await navigator.clipboard.writeText(inviteUrl)
-    setCopied(true); setTimeout(() => setCopied(false), 2500)
-  }
-
-  const waText = encodeURIComponent(`Hi! Here's your invite link to join Spartans Hub:\n${inviteUrl}\n\n(Valid 72 hrs)`)
-
-  if (mobile) {
-    return (
-      <div className="py-2.5 border-b border-ink-4">
-        <button onClick={generate} disabled={loading}
-          className="font-rajdhani text-sm font-bold tracking-wide uppercase text-gold disabled:opacity-40">
-          {loading ? 'Generating…' : '🔗 Generate Invite Link'}
-        </button>
-        {inviteUrl && (
-          <div className="mt-2 flex gap-2">
-            <button onClick={copy}
-              className="font-rajdhani text-xs text-zinc-400 border border-zinc-700 px-2 py-1 rounded">
-              {copied ? '✓ Copied' : 'Copy'}
-            </button>
-            <a href={`https://wa.me/?text=${waText}`} target="_blank" rel="noopener noreferrer"
-              className="font-rajdhani text-xs text-emerald-400 border border-emerald-700 px-2 py-1 rounded">
-              WhatsApp
-            </a>
-          </div>
-        )}
-        {error && <p className="font-rajdhani text-[10px] text-red-400 mt-1">{error}</p>}
-      </div>
-    )
-  }
-
-  return (
-    <div className="px-4 py-3">
-      <button onClick={generate} disabled={loading}
-        className="w-full font-rajdhani text-xs font-semibold tracking-wide uppercase text-left text-zinc-400 hover:text-gold transition-colors flex items-center gap-2 disabled:opacity-40">
-        🔗 {loading ? 'Generating…' : 'Generate Invite Link'}
-      </button>
-      {inviteUrl && (
-        <div className="mt-2 flex gap-2">
-          <button onClick={copy}
-            className="font-rajdhani text-[10px] text-zinc-500 border border-zinc-700 px-2 py-1 rounded hover:text-zinc-300">
-            {copied ? '✓ Copied' : 'Copy link'}
-          </button>
-          <a href={`https://wa.me/?text=${waText}`} target="_blank" rel="noopener noreferrer"
-            className="font-rajdhani text-[10px] text-emerald-400 border border-emerald-700 px-2 py-1 rounded hover:bg-emerald-950/40">
-            WhatsApp
-          </a>
-        </div>
-      )}
-      {error && <p className="font-rajdhani text-[10px] text-red-400 mt-1">{error}</p>}
-    </div>
+    <MobileTabBar
+      activePage={activePage}
+      isLoggedIn={isLoggedIn}
+      isExpelled={isExpelled}
+      isAdmin={isAdmin}
+      isGC={isGC}
+      isCaptain={isCaptain}
+      isWrangler={isWrangler}
+      playerId={player?.playerId ?? null}
+    />
+    </>
   )
 }
 
