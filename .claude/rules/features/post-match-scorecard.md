@@ -227,6 +227,14 @@ sit before someone clicks "Sync Stats". No new failure-path UI was needed;
 the existing admin Post-Match panel and match-card indicator already handle
 that state.
 
+**Fees staying manual doesn't mean admins have to remember on their own
+(added September 2026).** The moment a sync leaves a booking `synced` with
+a real fee configured and a squad announced, admins are pushed an
+immediate reminder and nagged by a modal on their next Hub visit until the
+fee is actually applied — see `features/fee-reminders.md`. This is a pure
+reminder layered on top of the lifecycle above; it never applies a fee
+itself, same decoupling as everything else in this section.
+
 ---
 
 ## 7. API Routes (as shipped)

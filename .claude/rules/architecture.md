@@ -175,6 +175,7 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/tournaments` | GET, POST, PATCH | Admin | Tournament master data; PATCH also used by `InlineGameCountEditor` in Tournament Planner to update `total_league_games`; POST/PATCH both handle `cricheroes_points_table_url`, `intended_formats` (`features/tournament-planner.md` §3.1), and `tentative_start_date` (§3.2); PATCH also toggles `organiser_self_service` (opt-in for `features/organiser-self-service.md`) |
 | `/api/players` | GET, POST, PATCH | Admin | Full player directory management |
 | `/api/wallet/transactions` | POST | Admin | *(Planned Sprint 3)* Isolated wallet balance writes with immutable log |
+| `/api/admin/fee-reminders` | GET | Admin | Every currently fee-pending booking (scorecard synced, fee configured, squad announced, not yet applied/externally-reconciled) — feeds the admin-only fee reminder modal; see `features/fee-reminders.md` |
  
 ### Family Auth APIs *(Planned — U-24)*
  
@@ -734,8 +735,10 @@ Next.js API Routes (server-side)
 | `src/lib/bookingNotify.ts` | `buildOrganiserWhatsAppUrl()` / `buildCaptainWhatsAppUrl()` — shared message builders for `/admin/bookings/[id]`'s Notify panel; organiser message includes the tournament share page link, captain message includes the CricHeroes URL when set — see §8.1 |
 | `supabase/migrations/` | All schema migrations as SQL files — source of truth for DB state |
 | `vercel.json` | Cron job config + security headers |
-| src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup |
+| src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup; notifyGCs()/notifyAllSubscribed()/notifyAdmins() broadcast helpers |
 | src/app/api/push/subscribe/route.ts | POST — saves browser push subscription; player_id from session only |
+| `src/lib/feeReminders.ts` | `resolvePendingFee()`/`getPendingFeeBookings()`/`notifyFeeReminderIfPending()` — match fee payment reminder eligibility, shared by the push trigger and the admin modal; see `features/fee-reminders.md` |
+| `src/components/admin/FeeReminderModal.tsx` + `src/components/ui/GlobalFeeReminderModal.tsx` | Admin-only "fees pending" reminder modal, mounted once in the root layout |
 | public/sw.js | Service worker — PWA caching + push notification display + notificationclick handler |
 | `src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` | `/matches/history` — past-match list, `MatchHistoryCard` (result badge, subtle sync status, ground/CricHeroes links, Did-not-bat line) |
 | `src/app/api/matches/[id]/scorecard/route.ts` | Manual scorecard PDF upload — streamed progress, per-booking captain/VC or wrangler/admin auth |

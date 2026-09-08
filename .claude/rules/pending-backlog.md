@@ -427,6 +427,18 @@ ALTER TABLE squad ADD COLUMN match_role text CHECK (match_role IN ('bat','bowl',
 - Once announced: the "Announce" button is replaced by a WhatsApp share icon (📲) that opens the pre-filled `wa.me` link with `buildSquadAnnouncement()` text.
 - The WhatsApp icon should also be accessible from the standalone match page (`/fixtures/[id]`) for captains and admins.
 ---
+
+### U-30 · Tournament UPI ID — pay-organiser deep link + WhatsApp "payment made" nudge
+**Status:** 💡 Discussed, not built — raised alongside the fee reminder feature (see `features/fee-reminders.md`).
+
+**Idea:** add an optional `tournaments.organiser_upi_id` field. When an admin has settled a tournament's match fee with the organiser (a separate, real-money step outside the Hub — `match_fee`/wallet debits are the club's *internal* player-to-club ledger, not a club-to-organiser payment), give them two one-tap shortcuts from `/admin/bookings/[id]`:
+1. A `upi://pay?pa=<upi_id>&pn=<organiser_name>&am=<fee>&cu=INR&tn=<match note>` deep link — opens the phone's own UPI app chooser (GPay/PhonePe/Paytm/etc.) pre-filled with payee and amount. Standard Android/iOS UPI intent handling — no payment API, no keys, no backend integration.
+2. A `wa.me` link to `tournaments.organiser_contact` with a pre-filled "payment made" message (amount, match, date) — same pattern as every other WhatsApp nudge already in this app (`buildOrganiserWhatsAppUrl` etc.).
+
+**Deliberately excluded from any version of this:** actual payment verification. A UPI deep link and a WhatsApp message are both one-way — neither confirms money actually moved. Marking a payment "done" stays a manual admin action (a checkbox/button), same posture as `POST /api/fees/apply` staying manual. Real payment-success confirmation would need a payment gateway with signed webhooks (Razorpay/Stripe) — already flagged as a distinct, larger piece of work in `security.md` §10 ("Payment webhook signature verification") — not something to bolt onto a UPI deep link.
+
+**Not started** — no schema, no UI. Worth picking up once the fee-reminder feature has been used for a bit and there's a clear sense of how often admins actually need this shortcut.
+---
  ### U-28 · The Dugout — Kit Room (Jersey Orders)
 **Status:** ❌ Not built — spec finalised June 2026
 
