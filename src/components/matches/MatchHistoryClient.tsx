@@ -12,6 +12,7 @@ import {
 import { PerformerShareButton, type TopPerformerInfo } from '@/components/matches/PerformerShareButton'
 import { BallIcon, type BallType } from '@/components/matches/BallIcon'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
+import { groupDatesIntoChips } from '@/lib/dateChipGroups'
 
 interface Ground {
   name:          string
@@ -330,11 +331,17 @@ export function MatchHistoryClient({
   // ascending so the chip row reads left-to-right chronologically, unlike
   // `matches` itself which the API returns most-recent-first.
   const distinctDates = Array.from(new Set(matches.map(m => m.game_date))).sort()
-  // Match History has no weekend-pairing concept (unlike /fixtures — each
-  // match here is its own independent card, not two games sharing OYE
-  // validation state), so every date gets its own single-date chip group.
-  const dateChipGroups = distinctDates.map(d => ({ key: d, dates: [d] }))
-  const visibleMatches = dayFilter ? matches.filter(m => m.game_date === dayFilter) : matches
+  // Match History has no per-match weekend-pairing of its own (unlike
+  // /fixtures' FixturesWeekendGroup, each match here is an independent
+  // card) — but a Sat+Sun weekend where Spartans played both days still
+  // reads better as one combined chip than two, same as /fixtures. Reuses
+  // the shared pairing helper rather than re-deriving booking groups this
+  // page doesn't have — see `features/player-availability.md` §10.1.
+  const dateChipGroups = groupDatesIntoChips(distinctDates)
+  const selectedGroup = dayFilter ? dateChipGroups.find(g => g.key === dayFilter) : undefined
+  const visibleMatches = selectedGroup
+    ? matches.filter(m => selectedGroup.dates.includes(m.game_date))
+    : matches
 
   return (
     <div className="space-y-4">
@@ -503,7 +510,7 @@ export function MatchHistoryClient({
         <p className="font-rajdhani text-sm text-center py-6" style={{ color: '#A8A29E' }}>
           {dayFilter ? (
             <>
-              No matches on that date.{' '}
+              No matches on {selectedGroup && selectedGroup.dates.length > 1 ? 'those dates' : 'that date'}.{' '}
               <button onClick={() => setDayFilter(null)} className="underline" style={{ color: '#D97706' }}>
                 Show all dates
               </button>
@@ -528,7 +535,7 @@ export function MatchHistoryClient({
         <p className="font-rajdhani text-xs" style={{ color: '#A8A29E' }}>
           {totalCount} match{totalCount === 1 ? '' : 'es'}
           {matches.length < totalCount ? ` · showing ${matches.length}` : ''}
-          {dayFilter ? ` · ${visibleMatches.length} on this date` : ''}
+          {dayFilter ? ` · ${visibleMatches.length} on ${selectedGroup && selectedGroup.dates.length > 1 ? 'these dates' : 'this date'}` : ''}
         </p>
       )}
 

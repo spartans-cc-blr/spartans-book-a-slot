@@ -1217,28 +1217,31 @@ tie-inclusive `computeTopPerformers()` path.
 
 ## 16. Date-Chip Quick Filter on `/matches/history` (added September 2026)
 
-A horizontal date-chip row ("All" + one chip per distinct `game_date`
-currently loaded, day-of-week/day-number/month stacked, Warm Light palette —
-`#F8F4EE` panel, `#D97706` active chip) sits in `MatchHistoryClient.tsx`
-between the existing filter bar and the match list. Unlike the month
-stepper and the role (`I Played`/`I Led (C/VC)`/`All Matches`, unchanged —
-see §9's file map) and tournament/ground/format filters, which are all
-server-side query params on `GET /api/matches/history`, the date-chip
-filter is **purely client-side**: it narrows whatever `matches` the page
-has already fetched for the current month/role/tournament/ground/format
-combination, with no new API call and no new route param.
+A horizontal date-chip row ("All" + one chip per group, Warm Light
+palette — `#F8F4EE` panel, `#D97706` active chip) sits in
+`MatchHistoryClient.tsx` between the existing filter bar and the match
+list. Unlike the month stepper and the role (`I Played`/`I Led (C/VC)`/`All
+Matches`, unchanged — see §9's file map) and tournament/ground/format
+filters, which are all server-side query params on `GET
+/api/matches/history`, the date-chip filter is **purely client-side**: it
+narrows whatever `matches` the page has already fetched for the current
+month/role/tournament/ground/format combination, with no new API call and
+no new route param.
 
-`distinctDates` (sorted ascending, for the chip row) and `visibleMatches`
-(the day-filtered subset actually rendered) are both derived inline from
-the existing `matches` state on every render — no new fetch, no new
-loading state. `dayFilter` resets to `null` inside the same effect that
-already resets `matches` on any server-side filter change, so it can never
-silently point at a date no longer present in the loaded set. The flagged
-("⚠ Needs Reconciliation") / rest split, the "N matches" count line, and
-the empty-state message all now read from `visibleMatches` rather than
-`matches` directly; pagination (`loadMore`/`nextCursor`) is unaffected —
-"Load Older Matches" still pages the server-side `matches` array regardless
-of whether a day chip is currently narrowing what's shown.
+`distinctDates` (sorted ascending, deduped `game_date`s currently loaded)
+feeds `dateChipGroups` — see "Combined weekend chips" below. `visibleMatches`
+(the day-filtered subset actually rendered) is derived from the currently
+selected group's `dates` array, or `matches` unfiltered when nothing is
+selected. Both are recomputed inline from the existing `matches` state on
+every render — no new fetch, no new loading state. `dayFilter` resets to
+`null` inside the same effect that already resets `matches` on any
+server-side filter change, so it can never silently point at a date no
+longer present in the loaded set. The flagged ("⚠ Needs Reconciliation") /
+rest split, the "N matches" count line, and the empty-state message all now
+read from `visibleMatches` rather than `matches` directly; pagination
+(`loadMore`/`nextCursor`) is unaffected — "Load Older Matches" still pages
+the server-side `matches` array regardless of whether a day chip is
+currently narrowing what's shown.
 
 **Shares `DateChipSlider` with `/fixtures`'s own date-chip filter**
 (`features/player-availability.md` §10.1) — same component, same Warm
@@ -1248,6 +1251,26 @@ toggles CSS visibility over server-rendered weekend groups (to avoid
 touching `FixturesWeekendGroup`'s live validation state), while this page —
 already a fully client-managed list with its own `matches` state — just
 filters an array in React, no CSS trick needed.
+
+**Combined weekend chips (added September 2026).** Requested as a
+follow-on once `/fixtures`' own chip row got the same treatment for the
+same reason — a Sat+Sun weekend where Spartans played both days used to
+render as two separate date chips here too. Unlike `/fixtures`, this page
+has no per-match weekend grouping of its own to derive chips from (every
+match here is an independent card, not two games sharing live validation
+state) — so it reuses `groupDatesIntoChips()` (`src/lib/dateChipGroups.ts`),
+a pure helper extracted specifically for this: given a plain list of ISO
+dates, it pairs a Saturday with its immediately-following Sunday into one
+`DateChipGroup` only when *both* are actually present in the list, leaving
+an orphan Sat/Sun (only one day played that weekend) or a weekday as its
+own single-date chip. `dayFilter` still stores just the selected group's
+`key` (its earliest date); `visibleMatches` looks up that group's full
+`dates` array to filter `matches` by, rather than comparing `game_date`
+against a single string, so a weekend selection correctly shows both days'
+matches together. `/fixtures` itself was **not** changed to use this
+helper — its own `weekendMap`/`weekendOrder` grouping is already tied to
+real booking membership, so deriving chips from it directly stays the more
+authoritative source there.
 
 **Page shell widened to Warm Light too (added September 2026).** Beyond
 the date-chip slider itself, `/matches/history`'s page heading and the
@@ -1267,7 +1290,8 @@ matches. Scope is this page and `/fixtures` only, not a site-wide reskin.
 
 | File | Role |
 |---|---|
-| `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component (`groups: DateChipGroup[]`, `selected`, `onSelect`), also used by `/fixtures`; Match History passes one single-date group per chip (no weekend-pairing concept here, unlike `/fixtures` — see `features/player-availability.md` §10.1's September 2026 fix) |
+| `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component (`groups: DateChipGroup[]`, `selected`, `onSelect`), also used by `/fixtures` |
+| `src/lib/dateChipGroups.ts` | `groupDatesIntoChips()` — pure Sat+Sun pairing helper Match History uses to build combined weekend chips from its own flat date list, mirroring `/fixtures`' booking-level grouping without needing one |
 
 ---
 

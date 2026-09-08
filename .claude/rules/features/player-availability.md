@@ -479,12 +479,15 @@ CSS visibility toggle over server-rendered output that already exists.
 
 `DateChipSlider` (`src/components/ui/DateChipSlider.tsx`) is the shared,
 presentational chip-row component — also used by `/matches/history`'s own
-day-level filter (`features/post-match-scorecard.md` §16) with the same
+day-level filter (`features/post-match-scorecard.md` §16), including that
+page's own combined-weekend-chip treatment (via the shared
+`groupDatesIntoChips()` helper, `src/lib/dateChipGroups.ts`) with the same
 Warm Light styling, so the two "date slider" surfaces the club coordinator
-asked for don't drift visually. Purely controlled (`groups`, `selected`,
-`onSelect`) — no logic of its own beyond rendering chips; a caller with no
-weekend-pairing concept of its own (Match History) just passes one
-single-date group per chip, same as before this change.
+asked for don't drift visually. `DateChipSlider` itself is purely
+controlled (`groups`, `selected`, `onSelect`) — no grouping logic of its
+own; each page derives its own `DateChipGroup[]` the way that best fits its
+own data (`/fixtures` from its existing `weekendMap`, Match History via the
+shared helper since it has no per-match grouping of its own).
 
 **Page shell widened to Warm Light too (added September 2026).** After
 seeing the date-chip slider, the club coordinator asked for the same
