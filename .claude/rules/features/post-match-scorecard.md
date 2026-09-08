@@ -1232,7 +1232,8 @@ month/role/tournament/ground/format combination, with no new API call and
 no new route param.
 
 `distinctDates` (sorted ascending, deduped `game_date`s currently loaded)
-feeds `dateChipGroups` — see "Combined weekend chips" below. `visibleMatches`
+feeds `dateChipGroups` — see "Combined weekend chips" below for the pairing
+itself and the reverse-chronological chip order. `visibleMatches`
 (the day-filtered subset actually rendered) is derived from the currently
 selected group's `dates` array, or `matches` unfiltered when nothing is
 selected. Both are recomputed inline from the existing `matches` state on
@@ -1274,6 +1275,20 @@ matches together. `/fixtures` itself was **not** changed to use this
 helper — its own `weekendMap`/`weekendOrder` grouping is already tied to
 real booking membership, so deriving chips from it directly stays the more
 authoritative source there.
+
+**Reverse-chronological chip order (added September 2026).** `matches`
+itself is already returned most-recent-first, but the chip row initially
+read left-to-right chronologically (oldest first) regardless — the
+opposite of what a "recent history" page should lead with, and the
+opposite of `/fixtures`' own chip row (soonest-upcoming-first, correct for
+*that* page since it's about what's coming up next).
+`groupDatesIntoChips()` always re-sorts its input ascending internally
+before pairing weekends — required for the Sat-then-Sunday adjacency check
+— so passing it an already-reversed `distinctDates` has no effect on the
+output order. `dateChipGroups` is instead built as
+`groupDatesIntoChips(distinctDates).reverse()` — the pairing logic still
+runs on correctly-ordered input, and only the *display* order of the
+resulting groups flips to newest-first.
 
 **Page shell widened to Warm Light too (added September 2026).** Beyond
 the date-chip slider itself, `/matches/history`'s page heading and the

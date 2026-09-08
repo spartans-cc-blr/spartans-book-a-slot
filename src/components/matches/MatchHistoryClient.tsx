@@ -336,9 +336,7 @@ export function MatchHistoryClient({
   const monthGroups = groupMonthsByYear(filterOptions.months)
 
   // Distinct match dates currently loaded (already scoped by every
-  // server-side filter above) — feeds the date-chip slider. Sorted
-  // ascending so the chip row reads left-to-right chronologically, unlike
-  // `matches` itself which the API returns most-recent-first.
+  // server-side filter above) — feeds the date-chip slider.
   const distinctDates = Array.from(new Set(matches.map(m => m.game_date))).sort()
   // Match History has no per-match weekend-pairing of its own (unlike
   // /fixtures' FixturesWeekendGroup, each match here is an independent
@@ -346,7 +344,13 @@ export function MatchHistoryClient({
   // reads better as one combined chip than two, same as /fixtures. Reuses
   // the shared pairing helper rather than re-deriving booking groups this
   // page doesn't have — see `features/player-availability.md` §10.1.
-  const dateChipGroups = groupDatesIntoChips(distinctDates)
+  // groupDatesIntoChips() always re-sorts its input ascending internally
+  // (required for its Sat+Sun pairing), so the `.reverse()` here is what
+  // actually puts the chip row in reverse-chronological (most recent
+  // first) order — matching how `matches` itself is already returned by
+  // the API, unlike /fixtures' chip row, which stays soonest-first since
+  // that page is about what's coming up next.
+  const dateChipGroups = groupDatesIntoChips(distinctDates).reverse()
   const selectedGroup = dayFilter ? dateChipGroups.find(g => g.key === dayFilter) : undefined
   const visibleMatches = selectedGroup
     ? matches.filter(m => selectedGroup.dates.includes(m.game_date))
