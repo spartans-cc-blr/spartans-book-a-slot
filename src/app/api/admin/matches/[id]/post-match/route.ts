@@ -85,20 +85,38 @@ export async function GET(
   // per-player unit overrides an admin actually applied — showing that
   // instead of the real ledger here previously produced a misleading
   // "per share" figure that didn't match what was actually debited.
+  //
+  // Netted per player, not one row per transaction — a match-fee
+  // correction (PATCH /api/fees/apply, see
+  // features/post-match-scorecard.md §6.1) always adds a *fresh* adjusting
+  // debit/credit rather than editing the original row, so a corrected
+  // booking can carry more than one wallet_transactions row per player.
+  // Listing each row separately duplicated the player's name in this list
+  // instead of showing their one true total (and silently ignored any
+  // credit/refund row entirely, since the old query only fetched debits).
+  // A player netted down to zero or less (fully refunded, e.g. removed
+  // from the squad after being charged) is dropped from the list — they
+  // are no longer actually charged for this match.
   let feeBreakdown: { player_id: string; name: string; amount: number }[] = []
   if (upload?.status === 'fees_applied') {
     const { data: txRows } = await supabase
       .from('wallet_transactions')
-      .select('player_id, amount, players(name)')
+      .select('player_id, amount, type, players(name)')
       .eq('booking_id', params.id)
-      .eq('type', 'debit')
 
-    feeBreakdown = (txRows ?? [])
-      .map(t => ({
-        player_id: t.player_id,
-        name:      (t.players as any)?.name ?? 'Unknown',
-        amount:    Number(t.amount),
-      }))
+    const netByPlayer = new Map<string, { name: string; net: number }>()
+    for (const t of txRows ?? []) {
+      const delta = t.type === 'debit' ? Number(t.amount) : -Number(t.amount)
+      const existing = netByPlayer.get(t.player_id)
+      netByPlayer.set(t.player_id, {
+        name: (t.players as any)?.name ?? 'Unknown',
+        net:  (existing?.net ?? 0) + delta,
+      })
+    }
+
+    feeBreakdown = Array.from(netByPlayer.entries())
+      .map(([player_id, { name, net }]) => ({ player_id, name, amount: net }))
+      .filter(row => row.amount > 0)
       .sort((a, b) => a.name.localeCompare(b.name))
   }
 

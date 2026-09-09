@@ -359,6 +359,79 @@ disabled, an inline note pointing at "Correct Match Fee" on the booking
 page) but the server check is the real gate. See
 `features/wallet-ledger.md` §3 and §15.
 
+**The Post-Match panel's fee breakdown lists one row per player, not one
+per ledger entry (fixed September 2026).** The panel's "Fees Applied"
+section (`GET /api/admin/matches/[id]/post-match`) originally fetched
+every `debit`-type `wallet_transactions` row for the booking and listed
+each one as its own line, sourced by `player_id` + `amount` with no
+aggregation — correct back when a booking could only ever have exactly
+one debit row per player, but once a match-fee correction can add a
+second adjusting entry for the same player (§ above), the same name
+started appearing twice in the list (their original share, then the
+adjusting entry, as two separate lines an admin had to add up by hand),
+and a `credit` (refund) row was silently dropped entirely since the query
+only ever selected `type = 'debit'`. Fixed by fetching every
+`wallet_transactions` row for the booking regardless of type, netting
+`debit − credit` per `player_id`, and showing one line per player with
+their true current total — a player netted to zero or less (fully
+refunded, e.g. removed from the squad — see above) drops off the list
+entirely rather than showing a stale or zero row. The "₹X collected · N
+players charged" summary line above the list is unchanged code (it just
+sums/counts `feeBreakdown`), so it self-corrects once the underlying rows
+are netted correctly.
+
+**"Correct Match Fee" asked for the same reason twice (fixed September
+2026).** The correction UI originally had two separate required text
+inputs — "Reason for this player's share" (`adjustment_reason`, shown
+only when a unit diverges from the server-computed default) and "Reason
+for this correction" (`correction_reason`, always shown) — mirroring the
+two distinct fields the API accepts. In practice they're almost always
+the same explanation ("didn't bat, exclude them" answers both "why does
+this player's share differ" and "why is this match's fee being
+revisited"), so showing both boxes just asked the admin to type the same
+sentence twice. Collapsed to a single reason input in the UI, sent as
+both `adjustment_reason` (when any row's units diverge from default) and
+`correction_reason` in the same `PATCH /api/fees/apply` call — the API
+itself is unchanged and still accepts the two as logically distinct
+fields (`adjustment_reason` → `match_fee_waivers`, `correction_reason` →
+`match_fee_corrections`), this is purely a client-side simplification of
+what the admin has to type.
+
+**Incident (9 Sep 2026) — a match fee was applied on the Hub for a booking
+whose fee had already been collected offline, double-charging 8 players.**
+The 14 Aug 2026 "BK Weekdays Bash-1" booking (vs Notorious Xi, 07:30 T30)
+had its fee collected from the squad outside the Hub before this feature's
+scorecard sync ever ran; `scorecard_uploads.fees_reconciled_externally` was
+never set for it, so once the scorecard synced and an admin ran Apply Match
+Fees, all 8 squad players were debited ₹532 each on top of what they'd
+already paid — a real double-charge, not a bug in the split math itself
+(`total_before` = 4256 = 8 × ₹532, matching `Math.ceil(4250 / 8)` exactly).
+
+**Fixed via a direct, one-off database correction** (Supabase MCP SQL, not
+a re-run of `PATCH /api/fees/apply` through the running app, since this was
+diagnosed and applied outside a normal admin session): inserted one
+`credit` row per affected player for the full ₹532 each (net effect on
+that `booking_id` = ₹0, `players.wallet_balance` restored), zeroed
+`bookings.match_fee_override` to `0` so the tournament's own `match_fee`
+can never be silently re-applied to this booking again, set
+`scorecard_uploads.fees_reconciled_externally = true` to correctly reflect
+that this match's fee was always meant to be handled outside the Hub, and
+logged one `match_fee_corrections` row summarising the reversal —
+`scorecard_uploads.status` was left at `fees_applied`, unchanged, per the
+architectural invariant that it never reverts.
+
+**Why not fold this into `wallet_opening_balance` ("Brought Forward")
+instead, as first suggested when reporting this.** That field
+(`features/wallet-ledger.md` §5) is a pure display anchor for the
+statement's oldest visible line — it never feeds `players.wallet_balance`,
+which is the number every dues check, `/wallet` top balance, and squad-fee
+projection actually reads. These 8 debits were a same-day, in-ledger
+mistake, not a pre-ledger balance the app never had a transaction for — a
+genuine reversing `credit` transaction (as above) is the correct fix and
+is what actually restores the true balance; adjusting Brought Forward
+alongside it would have double-corrected the same ₹532 without fixing the
+real number anywhere the app checks it.
+
 ---
 
 ## 7. API Routes (as shipped)
