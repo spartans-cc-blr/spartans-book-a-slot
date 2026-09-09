@@ -374,44 +374,6 @@ The `initialSquadMap` is passed to `CaptainsCornerGrid` → `SlotCard`, which hy
  
 Status mapping on the server: `pending_approval` → `'pending'`, others pass through as-is.
 
-**Page shell — Warm Light (added September 2026).** The page's own chrome
-(hero banner, Y/O/E/dues legend row, page background, footer) was switched
-from the dark-ink theme to the same Warm Light "island" palette as the Home
-dashboard (`navigation.md` §3.1) — `#F0F4F5` page background, white
-(`#FFFFFF`) cards bordered `#D4C9B0`, the hero using the identical
-`linear-gradient(135deg, #FEF3C7 0%, #FFF7ED 100%)` welcome-banner treatment,
-`#D97706`/`#B45309` gold accents, `#1C1917`/`#57534E`/`#78716C` text tiers —
-same literal hex values as `src/app/page.tsx`'s dashboard section, not the
-separate `#F8F4EE`/`ink-*` Warm Light convention `/fixtures` and
-`/matches/history` use (`player-availability.md` §10.1,
-`post-match-scorecard.md` §16) — those two conventions coexist in this
-codebase and this page deliberately matches the Home dashboard specifically,
-per the request that prompted it. `SiteNav` now passes
-`mobileTabBarTheme="light"` to match.
-
-**`CaptainsCornerGrid` itself is untouched — same "dark card on a light
-page" pattern already established for `FixturesCard`/`FixturesAvailability`**
-(`player-availability.md` §10.1's page-shell note). `SlotCard` and
-`MatrixView` are each fully self-contained — their own `bg-ink-3`/`bg-ink-4`
-backgrounds and borders cover their whole visual footprint (confirmed via
-the live `tailwind.config.ts` `ink` scale, which is genuinely dark —
-`#1A1A1A`–`#2E2E2E` — not the lighter values `ui-theme.md`'s own "planned"
-Tailwind token mapping describes; that mapping was never actually applied
-to the `ink-*` scale itself, which is why every Warm Light surface in this
-app, this page included, uses literal inline hex styles rather than
-`bg-ink-*`/`border-ink-*` classes) — so they render as legitimate dark cards
-sitting on the new light page shell with zero changes needed, same as
-`FixturesCard` does on `/fixtures`. The per-weekend header row inside
-`CaptainsCornerGrid` (the week label, the Per Slot/Matrix view toggle, the
-inline eligibility-legend panel) was left as-is for the same reason — each
-piece there is either plain text with adequate contrast on the new light
-background, or a small self-contained dark pill/panel, not an unstyled seam.
-Rewriting `CaptainsCornerGrid`'s ~2,000 lines of squad-selection UI
-(`SlotCard`, `AddPlayerPanel`, role toggles, cross-slot blocking) to Warm
-Light was deliberately out of scope for this pass — same reasoning
-`player-availability.md` §10.1 already documents for leaving
-`FixturesCard`/`FixturesAvailability` dark.
-
 **Restricted to the next two rolling weekends only (added September 2026).**
 The page fetches up to 20 upcoming confirmed bookings, then groups them into
 weekend sections via `weekKey()` — an ISO-week bucket that already merges a
