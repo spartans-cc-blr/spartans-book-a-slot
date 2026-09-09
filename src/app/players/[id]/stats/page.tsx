@@ -37,9 +37,15 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
 
   if (!player) redirect('/')
 
+  // "My Stats" (mobile bottom tab bar) only highlights when the viewer is
+  // looking at their own stats page — this route is also reachable to view
+  // any other player's stats (see the vibe-security note above), where
+  // highlighting "My Stats" would be misleading.
+  const isOwnStats = !!user?.playerId && user.playerId === params.id
+
   return (
     <div className="min-h-screen bg-parchment">
-      <SiteNav />
+      <SiteNav activePage={isOwnStats ? 'my-stats' : undefined} />
       <PlayerStatsClient
         player={player}
         grounds={grounds ?? []}
