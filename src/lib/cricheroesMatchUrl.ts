@@ -30,20 +30,31 @@ function titleCaseWord(word: string): string {
   return word.toLowerCase() === 'cc' ? 'CC' : word.charAt(0).toUpperCase() + word.slice(1)
 }
 
+// Matched case-insensitively — CricHeroes' own slug casing isn't something
+// this app controls, and a bare `.includes('-vs-')`/`.split('-vs-')` would
+// silently fail to even find the separator on a slug like
+// "Spartans-CC-Bengaluru-VS-Whackers-Cricket-Club", leaving the Opponent
+// field empty rather than wrong.
+const VS_SEPARATOR = /-vs-/i
+
 // Extracts the opposing team's display name from a CricHeroes match URL's
 // own "<teamA>-vs-<teamB>" slug (the last path segment) — used by the
 // admin booking form to prefill the Opponent field when a CricHeroes match
 // URL is pasted in.
 //
-// Always case-insensitive. `/admin/bookings/new` and `/admin/bookings/[id]`
-// used to each inline their own copy of this check, and only the [id] page
-// lowercased teamA first — the new-booking page's `teamA.includes('spartans')`
-// was case-sensitive. A CricHeroes slug segment isn't guaranteed to be
-// all-lowercase, and when the case-sensitive check silently failed (teamA
-// really was Spartans, just cased differently), it fell through to
-// `opponent = teamA` — i.e. Spartans' own name landed in the Opponent
-// field. That's the exact "Spartans as opponent" bug this shared,
-// case-insensitive helper closes.
+// Fully case-insensitive, top to bottom: the "-vs-" separator itself
+// (`VS_SEPARATOR` above), the known-squad roster match (`isSpartansSlug()`,
+// via `normaliseSlugSegment()`'s `.toLowerCase()`), the loose "spartan"
+// substring fallback below, and `titleCaseWord()`'s "cc" special-case all
+// lowercase before comparing. `/admin/bookings/new` and
+// `/admin/bookings/[id]` used to each inline their own copy of the roster
+// check, and only the [id] page lowercased teamA first — the new-booking
+// page's `teamA.includes('spartans')` was case-sensitive. A CricHeroes
+// slug segment isn't guaranteed to be all-lowercase, and when the
+// case-sensitive check silently failed (teamA really was Spartans, just
+// cased differently), it fell through to `opponent = teamA` — i.e.
+// Spartans' own name landed in the Opponent field. That's the exact
+// "Spartans as opponent" bug this shared, case-insensitive helper closes.
 //
 // Matching against the known-squad roster above (rather than a bare
 // "spartan" substring) also means a practice match between the club's own
@@ -53,8 +64,8 @@ function titleCaseWord(word: string): string {
 // (e.g. "Spartans United"), rather than falling through to whatever the
 // old loose substring check happened to pick.
 export function opponentFromMatchSlug(slug: string): string | null {
-  if (!slug.includes('-vs-')) return null
-  const [teamA, teamB] = slug.split('-vs-')
+  if (!VS_SEPARATOR.test(slug)) return null
+  const [teamA, teamB] = slug.split(VS_SEPARATOR)
   if (!teamA || !teamB) return null
 
   const aIsSpartans = isSpartansSlug(teamA)
