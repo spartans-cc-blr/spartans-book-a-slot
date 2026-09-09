@@ -12,6 +12,7 @@ const NAV = [
   { href: '/admin/captains',         label: 'Captains',         icon: '👥', section: 'Master Data' },
   { href: '/admin/tournaments',      label: 'Tournaments',      icon: '🏆' },
   { href: '/admin/players',          label: 'Players',          icon: '🏏' },
+  { href: '/admin/wallet',           label: 'Wallet',            icon: '💰' },
   { href: '/schedule',               label: 'Free Schedules',            icon: '🌐', section: 'Hub Views' },
   { href: '/fixtures',               label: 'Fixtures - Players View',   icon: '🏏' },
   { href: '/tournament-planner',     label: 'Tournament Planner',   icon: '📊' },

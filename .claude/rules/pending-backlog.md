@@ -12,11 +12,8 @@ Priority order: **Security → External Dependencies → User Experience**
 These must be resolved before any payment code is written. Per the vibe-security audit principle: *never trust the client — every write path must be server-side validated and rate-limited.*
  
 ### S-1 · Dedicated wallet transaction route
-**File:** `src/app/api/players/route.ts`
-`wallet_balance` is currently patchable via the general admin PATCH with no audit trail. An admin error (or a compromised admin session) can silently modify balances with zero forensic trail.
- 
-**Fix:** Create `/api/wallet/transactions` — POST creates an immutable ledger row and derives the new balance. Remove `wallet_balance` from the PATCH allowlist on `/api/players`.
- 
+**Status:** ✅ Done. `POST`/`GET`/`PATCH /api/wallet/transactions` (immutable ledger + admin-only corrections, see `features/wallet-ledger.md`) exist, and `wallet_balance` is excluded from `/api/players`' PATCH allowlist (`PLAYER_COLUMNS` in `src/app/api/players/route.ts`). A player-facing bank-statement view (`/wallet`) and an admin hub (`/admin/wallet`) were added September 2026 on top of this — see that doc for the full picture, including U-30 below (organiser payment tracking is still a separate, unbuilt idea, not covered by this route).
+
 **Vibe-security check:** Client-side trust — price/balance manipulation vector. Ref: `payments.md`.
  
 ---
@@ -437,7 +434,7 @@ ALTER TABLE squad ADD COLUMN match_role text CHECK (match_role IN ('bat','bowl',
 
 **Deliberately excluded from any version of this:** actual payment verification. A UPI deep link and a WhatsApp message are both one-way — neither confirms money actually moved. Marking a payment "done" stays a manual admin action (a checkbox/button), same posture as `POST /api/fees/apply` staying manual. Real payment-success confirmation would need a payment gateway with signed webhooks (Razorpay/Stripe) — already flagged as a distinct, larger piece of work in `security.md` §10 ("Payment webhook signature verification") — not something to bolt onto a UPI deep link.
 
-**Not started** — no schema, no UI. Worth picking up once the fee-reminder feature has been used for a bit and there's a clear sense of how often admins actually need this shortcut.
+**Not started** — no schema, no UI. Worth picking up once the fee-reminder feature has been used for a bit and there's a clear sense of how often admins actually need this shortcut. Confirmed still unbuilt as of the September 2026 player payment ledger work (`features/wallet-ledger.md` §4) — that feature covers player→club wallet transactions only; this club→organiser direction remains a distinct, separate gap.
 ---
  ### U-28 · The Dugout — Kit Room (Jersey Orders)
 **Status:** ❌ Not built — spec finalised June 2026

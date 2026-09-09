@@ -182,7 +182,7 @@ match.
 | Section | Content |
 |---|---|
 | Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle, a static "🛡️ Spartans CC Bengaluru" badge pill |
-| Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald "Positive" if ≥ 0, amber "Exempted" if negative but dues-waived, else crimson "Overdue") |
+| Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald "Positive" if ≥ 0, amber "Exempted" if negative but dues-waived, else crimson "Overdue"; **clickable → `/wallet`**, added September 2026 — see `features/wallet-ledger.md`) |
 | Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
 | Upcoming Fixtures | Header + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `upcomingPreview`, or a dashed empty-state box ("No Upcoming Matches Scheduled") when there are none |
 | Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |
@@ -193,7 +193,10 @@ had no way to actually see what those 18/9 were. `StatTile` gained an
 optional `href` prop — when set, the whole tile renders as a `<Link>`
 (hover/active tint, otherwise identical markup) instead of a plain `<div>`.
 Upcoming Matches now links to `/fixtures`, which already lists exactly that
-set. **My Tournaments deliberately stays non-interactive for now** — there
+set. **Wallet Balance links to `/wallet`** (added September 2026, alongside
+that page itself shipping — see `features/wallet-ledger.md`), the
+player's own bank-statement view of every payment and fee debit.
+**My Tournaments deliberately stays non-interactive for now** — there
 is no player-facing page listing "tournaments I've been announced in";
 `/tournament-planner` is the closest existing thing but is gated to
 `isCaptain || isGC || isAdmin` (`architecture.md` §3), so linking a plain
@@ -258,10 +261,11 @@ Links to `/`, matching the split-audience home page — the earlier "should be u
 Shown when authenticated, opened from the avatar in the top-right. Contains:
 - Player display name + email + role badges (CAPTAIN, GC)
 - "My Profile" link → `/profile` (hidden if `expelled`)
+- "💰 My Wallet" link → `/wallet` (added September 2026, same gate as My Profile — hidden if `expelled` or `playerId` is null; see `features/wallet-ledger.md`)
 - "Complete Registration" link → `/join` (shown if `playerId` is null and not expelled)
 - Sign out button
 
-This dropdown is desktop-only. On mobile the equivalent content (My Profile, Sign Out) lives in `MobileTabBar`'s "More" sheet instead — see §4.1.
+This dropdown is desktop-only. On mobile the equivalent content (My Profile, My Wallet, Sign Out) lives in `MobileTabBar`'s "More" sheet instead — see §4.1.
 
 ### Role-conditional Nav Elements
  
@@ -357,7 +361,7 @@ tab's `active` check instead).
 A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `max-h-[70vh]`) with a full-screen scrim behind it. Content branches the same way `SiteNav`'s desktop dropdowns do:
 
 - **Expelled** — just an "Account suspended" notice, no links.
-- **Logged in** — The Dugout (moved here from its own tab slot, September 2026 — see above; `ShieldIcon` at its sheet-row `size={16}`), Leaderboard (the club Honour Board, `/leaderboard` — added back September 2026 once "My Stats" stopped pointing here, see above), My Profile (or "Complete Registration" → `/join` if `playerId` is null), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
+- **Logged in** — The Dugout (moved here from its own tab slot, September 2026 — see above; `ShieldIcon` at its sheet-row `size={16}`), Leaderboard (the club Honour Board, `/leaderboard` — added back September 2026 once "My Stats" stopped pointing here, see above), My Profile and My Wallet (both hidden together with the rest of the "logged in" content if `playerId` is null, in favour of "Complete Registration" → `/join`; My Wallet added September 2026, `RupeeIcon` — see `features/wallet-ledger.md`), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
   - **Captains' Corner** (`isCaptain || isAdmin`) — Squad Selection, Unavailable Dates
   - **Council** (`isGC`) — Squad Review, Feedback, Players, Store Orders, Grounds, `GenerateInviteItem`
   - **Wrangler** (`isWrangler`) — Squad Backfill, Grounds

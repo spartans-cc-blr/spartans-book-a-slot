@@ -292,8 +292,10 @@ export default function ProfilePage() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {/* Wallet */}
-                      <div className={`rounded-lg border px-4 py-3 ${
-                        (profile?.wallet_balance ?? 0) < 0 ? 'bg-amber-950/30 border-amber-800/60' : 'bg-ink-2 border-ink-5'
+                      <Link href="/wallet"
+                        aria-label="View full wallet statement"
+                        className={`rounded-lg border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
+                        (profile?.wallet_balance ?? 0) < 0 ? 'bg-amber-950/30 border-amber-800/60 hover:border-amber-600' : 'bg-ink-2 border-ink-5 hover:border-gold-dim'
                       }`}>
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="text-base leading-none" aria-hidden="true">💰</span>
@@ -305,7 +307,7 @@ export default function ProfilePage() {
                         <p className={`font-rajdhani text-xs mt-0.5 ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-500' : 'text-zinc-500'}`}>
                           {(profile?.wallet_balance ?? 0) < 0 ? 'Dues outstanding' : 'Balance'}
                         </p>
-                      </div>
+                      </Link>
 
                       {/* Pending availability */}
                       <Link href="/fixtures"
@@ -481,6 +483,9 @@ export default function ProfilePage() {
                 ₹{profile?.wallet_balance ?? 0}
                 {hasDues && <span className="font-normal text-amber-600 ml-2">(dues outstanding)</span>}
               </p>
+              <Link href="/wallet" className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors inline-block mt-1">
+                💰 View Full Statement →
+              </Link>
             </div>
             {profile?.inducted_on && (
               <ReadOnlyField label="Inducted On" value={new Date(profile.inducted_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} />

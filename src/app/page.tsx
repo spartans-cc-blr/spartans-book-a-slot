@@ -452,6 +452,7 @@ export default async function HomePage() {
                     ? 'amber'
                     : 'crimson'
                 }
+                href="/wallet"
               />
             </div>
 
