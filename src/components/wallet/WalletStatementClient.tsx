@@ -499,18 +499,38 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
 
             {admin && editingId === t.id && (
               <div className="bg-ink-4 mx-4 mb-3 p-3 rounded border border-ink-5">
+                {/* A row carrying booking_id is one player's share of a
+                    match-fee split, applied via /api/fees/apply — the
+                    server refuses a real amount/type change on it here
+                    regardless of what this form sends, so the fields are
+                    disabled rather than letting an admin fill them in and
+                    hit an error. See features/post-match-scorecard.md
+                    §6.1 — "Correct Match Fee" on the booking page is the
+                    only place that can change a fee-split amount, since
+                    it's the only one that recalculates the whole squad's
+                    shares together. */}
+                {t.booking_id && (
+                  <p className="font-rajdhani text-xs text-amber-400 mb-2">
+                    ⓘ This is a match fee entry — to change the amount, use{' '}
+                    <Link href={`/admin/bookings/${t.booking_id}`} className="underline hover:text-amber-300">
+                      Correct Match Fee
+                    </Link>{' '}on the booking page. Reason, notes, and date can still be fixed here.
+                  </p>
+                )}
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
                     <label className="form-label">Type</label>
-                    <select value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value as 'credit' | 'debit' }))} className="form-input">
+                    <select value={editForm.type} disabled={!!t.booking_id}
+                      onChange={e => setEditForm(f => ({ ...f, type: e.target.value as 'credit' | 'debit' }))}
+                      className="form-input disabled:opacity-50">
                       <option value="credit">Credit</option>
                       <option value="debit">Debit</option>
                     </select>
                   </div>
                   <div>
                     <label className="form-label">Amount (₹)</label>
-                    <input type="number" min="0" step="1" value={editForm.amount}
-                      onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} className="form-input" />
+                    <input type="number" min="0" step="1" value={editForm.amount} disabled={!!t.booking_id}
+                      onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} className="form-input disabled:opacity-50" />
                   </div>
                   <div className="sm:col-span-2">
                     <label className="form-label">Reason</label>

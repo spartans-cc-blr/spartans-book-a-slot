@@ -93,6 +93,12 @@ interface FeeCorrectionPreview {
   included_count:              number
   total_squad:                 number
   squad:                       FeeCorrectionSquadRow[]
+  // Charged for this booking but no longer in the announced squad at all
+  // (removed after fees were applied, not just zeroed within an unchanged
+  // squad) — always fully refunded, no include/units controls since
+  // there's no squad row left to attach one to. See
+  // features/post-match-scorecard.md §6.1.
+  removed_players:             { player_id: string; name: string; old_fee: number }[]
   total_collectable:           number
   total_previously_collected:  number
   net_change:                  number
@@ -1200,6 +1206,25 @@ function BookingDetailPageInner() {
                                   className="form-input mt-1.5 text-xs" />
                               )}
                             </div>
+
+                            {/* Charged for this match but no longer in the
+                                announced squad at all — always a full
+                                refund, no checkbox/stepper since there's no
+                                squad row left to attach one to. */}
+                            {correctPreview.removed_players.length > 0 && (
+                              <div className="space-y-1 bg-amber-950/20 border border-amber-800/40 rounded p-2.5">
+                                <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-amber-500">
+                                  No longer in squad — will be refunded
+                                </p>
+                                {correctPreview.removed_players.map(p => (
+                                  <div key={p.player_id} className="flex items-center justify-between gap-2 py-0.5">
+                                    <span className="font-rajdhani text-xs text-zinc-300 truncate">{p.name}</span>
+                                    <span className="font-rajdhani text-xs text-amber-400 shrink-0">₹{p.old_fee} → ₹0</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
                             <input type="text" value={correctionReason}
                               onChange={e => setCorrectionReason(e.target.value)}
                               placeholder="Reason for this correction — e.g. Ground fee was revised down by the organiser"

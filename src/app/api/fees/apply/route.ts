@@ -261,6 +261,46 @@ export async function PATCH(req: NextRequest) {
     })
     .filter(row => row.delta !== 0)
 
+  // A player can have a real charge on this booking without appearing in
+  // computeMatchFeeSplit()'s squad array at all — not just "set to 0 units
+  // within an unchanged squad" (which the loop above already handles), but
+  // removed from the announced squad entirely (a squad edit after fees were
+  // applied). computeMatchFeeSplit() has no way to know about them since it
+  // only ever looks at the *current* announced squad — so they're resolved
+  // here directly from the ledger instead, and always fully refunded (they
+  // owe nothing towards a match they're no longer squadded for).
+  const squadPlayerIds = new Set(split.squad.map(row => row.player_id))
+  const orphanIds = Array.from(currentNet.keys()).filter(
+    pid => !squadPlayerIds.has(pid) && (currentNet.get(pid) ?? 0) !== 0
+  )
+  let removedPlayers: { player_id: string; name: string; old_fee: number }[] = []
+  let orphanDiffRows: typeof diffRows = []
+  if (orphanIds.length) {
+    const { data: orphanPlayerRows } = await supabase
+      .from('players')
+      .select('id, name')
+      .in('id', orphanIds)
+    const nameById = new Map((orphanPlayerRows ?? []).map(p => [p.id, p.name]))
+    removedPlayers = orphanIds.map(pid => ({
+      player_id: pid,
+      name: nameById.get(pid) ?? 'Unknown',
+      old_fee: currentNet.get(pid) ?? 0,
+    }))
+    orphanDiffRows = removedPlayers.map(p => ({
+      player_id: p.player_id,
+      name: p.name,
+      exempt: false,
+      batted: false,
+      bowled: false,
+      units: 0,
+      default_units: 0,
+      fee: 0,
+      old_fee: p.old_fee,
+      delta: -p.old_fee,
+    }))
+  }
+  const allDiffRows = [...diffRows, ...orphanDiffRows]
+
   if (!confirm) {
     return NextResponse.json({
       base_fee:                    split.baseFee,
@@ -269,10 +309,11 @@ export async function PATCH(req: NextRequest) {
       included_count:              split.includedCount,
       total_squad:                 split.totalSquad,
       squad:                       split.squad.map(row => ({ ...row, old_fee: currentNet.get(row.player_id) ?? 0 })),
+      removed_players:             removedPlayers,
       total_collectable:           split.totalCollectable,
       total_previously_collected:  totalBefore,
       net_change:                  split.totalCollectable - totalBefore,
-      changed_count:               diffRows.length,
+      changed_count:               allDiffRows.length,
     })
   }
 
@@ -282,7 +323,7 @@ export async function PATCH(req: NextRequest) {
       { status: 400 }
     )
   }
-  if (!diffRows.length) {
+  if (!allDiffRows.length) {
     return NextResponse.json(
       { error: 'Nothing to correct — the recomputed split already matches what was charged.' },
       { status: 400 }
@@ -293,7 +334,7 @@ export async function PATCH(req: NextRequest) {
   const pushes: Promise<unknown>[] = []
   const changes: { player_id: string; name: string; old_fee: number; new_fee: number; action: 'added' | 'removed' | 'adjusted' }[] = []
 
-  for (const row of diffRows) {
+  for (const row of allDiffRows) {
     const { data: playerRow, error: playerErr } = await supabase
       .from('players')
       .select('wallet_balance')

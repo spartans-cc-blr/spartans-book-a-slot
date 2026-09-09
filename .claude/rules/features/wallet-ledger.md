@@ -79,6 +79,26 @@ which match it's tied to. Reassigning either would be a fundamentally
 different (and much riskier) operation than fixing a typo or a wrong
 amount, and wasn't asked for.
 
+**`amount`/`type` are refused outright on a row that already carries a
+`booking_id` (added September 2026).** Such a row is one player's *share*
+of a match-fee split (`/api/fees/apply`), not an independent figure —
+editing it here would silently desync that one player from what the rest
+of the squad was actually charged, with nothing recomputed. The check
+compares against the *resulting* value, not merely whether the field was
+sent (the client always resends the current type/amount alongside a
+reason-only edit, so a bare "was this field present" check would have
+wrongly blocked a cosmetic fix too — see the route's own comment).
+`reason`/`notes`/`created_at` stay editable on such a row exactly as
+before; only `amount`/`type` are blocked. `PATCH /api/fees/apply`
+("Correct Match Fee" on `/admin/bookings/[id]`) is the only path that can
+change a fee-split amount, since it's the only one that recalculates and
+re-propagates the whole squad's shares together — see
+`features/post-match-scorecard.md` §6.1. `WalletStatementClient.tsx`'s
+edit form mirrors this (Type/Amount disabled with an inline note when
+`booking_id` is set) but the server check is the real gate, same "UI
+mirrors the API, never replaces it" posture as everywhere else in this
+app.
+
 A push notification ("💰 Wallet Correction") fires only when the edit
 actually changes the player's current balance (`diff !== 0`) — a
 cosmetic-only edit (fixing a typo in the reason, correcting the date)
@@ -320,7 +340,7 @@ one (contrast with the `055_wallet_transactions.sql` reconstruction note).
 |---|---|---|---|
 | `/api/wallet/transactions` | GET | Own (any signed-in player with a `playerId`), or admin via `?player_id=`, or admin-only `?scope=all` | Cursor-paginated statement — own by default, matching the `/api/player/future-availability` convention; `scope=all` is the club-wide ledger feed for the admin hub |
 | `/api/wallet/transactions` | POST | Admin | Unchanged S-1 behaviour + optional `created_at` for backdating a historic entry |
-| `/api/wallet/transactions` | PATCH | Admin | New — corrects an existing row; writes to `wallet_transaction_edits` first, adjusts `players.wallet_balance` by the delta the correction introduces if `amount`/`type` changed |
+| `/api/wallet/transactions` | PATCH | Admin | New — corrects an existing row; writes to `wallet_transaction_edits` first, adjusts `players.wallet_balance` by the delta the correction introduces if `amount`/`type` changed. Refuses a genuine `amount`/`type` change on any row carrying `booking_id` — that's a match-fee split share, correctable only via `PATCH /api/fees/apply` (§3) |
 | `/api/wallet/opening-balance` | PATCH | Admin | New — sets or clears (`amount: null`) a player's Brought Forward override |
 
 All four re-derive `isAdmin`/own-`playerId` server-side on every call —
@@ -336,6 +356,7 @@ none of them trust a client-supplied role or player scope.
 | `POST`/`PATCH /api/wallet/transactions` and `PATCH /api/wallet/opening-balance` all admin-only, server-side | ✅ |
 | Every write rate-limited (`RATE_LIMITS.adminWrite`); the new GET paths rate-limited (`RATE_LIMITS.publicRead`), since this is now reachable by any signed-in player, not just admin | ✅ |
 | `PATCH /api/wallet/transactions` never accepts `player_id`/`booking_id` — a correction can't be used to reassign a transaction to a different player or match | ✅ |
+| `PATCH /api/wallet/transactions` refuses a genuine `amount`/`type` change on any row carrying `booking_id` — checked against the resulting value, not just field presence | ✅ |
 | Every correction requires a non-empty `edit_reason`, logged to `wallet_transaction_edits` before the row itself is touched | ✅ |
 | `wallet_transaction_edits` RLS enabled, no anon/authenticated policies — service role only | ✅ |
 | `wallet_opening_balance*` columns never feed `players.wallet_balance` — purely a display anchor, no way to use them to alter the live balance | ✅ |
@@ -616,19 +637,25 @@ own statement. No new page or route was added beyond the API endpoint.
 - **Reversing an applied match fee from this UI** — `PATCH /api/wallet/transactions`
   corrects one player's own debit/credit row at a time; it has no notion of
   "this row was one player's share of a match fee split" and can't
-  recompute or re-propagate a share across a whole squad. **Correcting a
-  match fee at the match level** (the base fee or the per-player unit
-  split was wrong, and the whole squad's charges need recalculating
-  together) is a separate, September 2026 addition —
+  recompute or re-propagate a share across a whole squad, so as of
+  September 2026 it **refuses outright** (server-side, not just a UI
+  omission) any genuine `amount`/`type` change on a row carrying
+  `booking_id` — see §3. **Correcting a match fee at the match level**
+  (the base fee or the per-player unit split was wrong, and the whole
+  squad's charges need recalculating together) is a separate addition —
   `PATCH /api/fees/apply`, reached from the "✏️ Correct Match Fee" action
   on `/admin/bookings/[id]`'s Post-Match panel, not from `/wallet` or
   `/admin/wallet`. It posts a fresh, append-only adjusting ledger entry per
-  affected player (never mutates the original debit rows) and logs one
-  summary row per correction event to `match_fee_corrections`. See
+  affected player (never mutates the original debit rows, and fully
+  refunds a player later removed from the squad entirely, not just one
+  zeroed within an unchanged squad) and logs one summary row per
+  correction event to `match_fee_corrections`. See
   `features/post-match-scorecard.md` §6.1 for the full mechanics — this
   doc's own `PATCH /api/wallet/transactions` (§3) remains the right tool
   for a genuinely single-player, non-fee-split mistake (a fat-fingered
-  top-up amount, a wrong reason string, backdating).
+  top-up amount, a wrong reason string, backdating) — `reason`/`notes`/
+  `created_at` stay editable there even on a fee-split row, only
+  `amount`/`type` are blocked.
 - **No admin review step for the membership fee** (§12) — unlike match
   fees, it debits unattended the moment a qualifying match syncs. A wrong
   charge is corrected the same way any other ledger mistake is: an admin

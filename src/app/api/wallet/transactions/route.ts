@@ -31,6 +31,16 @@
 //   needing to replay the whole ledger. player_id and booking_id are
 //   deliberately never editable — a correction fixes what happened, it
 //   never reassigns who or which match it happened to/for.
+//
+//   amount/type are additionally refused outright on any row that already
+//   carries a booking_id — that's one player's share of a match-fee split
+//   (see /api/fees/apply), not an independent figure, and editing it here
+//   would desync it from the rest of the squad with nothing recomputed.
+//   PATCH /api/fees/apply ("Correct Match Fee") is the only path that can
+//   change a fee-split amount, since it's the only one that recalculates
+//   and re-propagates the whole squad's shares together — see
+//   features/post-match-scorecard.md §6.1. reason/notes/created_at on a
+//   fee-split row stay editable here, same as any other transaction.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -261,11 +271,35 @@ export async function PATCH(req: NextRequest) {
 
   const { data: existing, error: fetchErr } = await supabase
     .from('wallet_transactions')
-    .select('id, player_id, type, amount, reason, notes, created_at')
+    .select('id, player_id, booking_id, type, amount, reason, notes, created_at')
     .eq('id', id)
     .single()
   if (fetchErr || !existing) {
     return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+  }
+
+  // A row carrying booking_id is a match-fee entry — the original per-share
+  // debit from POST /api/fees/apply, or an adjusting entry from a prior
+  // PATCH /api/fees/apply correction (see features/post-match-scorecard.md
+  // §6.1). Its amount is one player's *share* of a squad-wide split, not an
+  // independent figure — editing it here would silently desync it from
+  // what the rest of the squad was actually charged, with no recomputation
+  // of anyone else's share. A genuine amount/type change is refused;
+  // reason/notes/created_at (cosmetic, never money-moving) stay editable
+  // here same as any other transaction. Compared against the *resulting*
+  // value, not just whether the field was present in the request — the
+  // client always resends the current type/amount alongside a reason-only
+  // edit, so "field present" alone would wrongly block a cosmetic fix too.
+  const wouldChangeAmount = changes.amount !== undefined && Number(changes.amount) !== Number(existing.amount)
+  const wouldChangeType = changes.type !== undefined && changes.type !== existing.type
+  if (existing.booking_id && (wouldChangeAmount || wouldChangeType)) {
+    return NextResponse.json(
+      {
+        error: "This is a match fee entry — one player's share of a squad-wide split. "
+          + 'Use "Correct Match Fee" on the booking page to change the amount, not this editor.',
+      },
+      { status: 400 }
+    )
   }
 
   const newType = changes.type ?? existing.type

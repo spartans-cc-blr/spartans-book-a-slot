@@ -321,13 +321,43 @@ original apply flow uses, now showing each row's current charged amount
 next to its recomputed one (`₹old → ₹new`), plus the squad-wide net change
 (additional to collect, or a refund) before confirming.
 
-**Known limitation.** The correction only ever considers players in the
-*current* announced squad (via `computeMatchFeeSplit()`). If a player is
-removed from the squad entirely after being charged (rather than just set
-to `0` units within an unchanged squad), they drop out of the recomputed
-split and this route won't refund them — that's a squad-membership change,
-not a fee-share correction, and needs a manual `PATCH /api/wallet/transactions`
-refund instead.
+**A player removed from the squad entirely is still refunded (fixed
+September 2026).** The first cut only ever considered players in the
+*current* announced squad (via `computeMatchFeeSplit()`) — a player set to
+`0` units within an unchanged squad was correctly refunded, but a player
+removed from the squad *entirely* after being charged (a squad edit made
+after fees were applied, not just a units change) has no row in that
+squad array at all, so the diff loop never saw them and never refunded
+them. Fixed by resolving such players directly from the ledger instead:
+after computing the diff against the current squad, any player with a
+nonzero net charge on this `booking_id` who isn't in `computeMatchFeeSplit()`'s
+squad array (`orphanIds`) is looked up by `player_id` and always fully
+refunded (`old_fee → 0`) via the same adjusting-entry mechanism as every
+other row — they owe nothing towards a match they're no longer squadded
+for. Surfaced in the dry-run response as `removed_players` (no
+include/units controls, since there's no squad row left to attach one to)
+and rendered as a distinct amber "No longer in squad — will be refunded"
+block in the UI, separate from the include checklist.
+
+**The individual wallet editor can no longer touch a fee-split amount at
+all (added September 2026).** Before this, nothing stopped an admin from
+opening one player's own wallet row from `/wallet` or `/admin/wallet` and
+editing a match-fee debit's `amount` directly via `PATCH
+/api/wallet/transactions` — a single-row edit with no notion that the
+figure being changed was one share of a squad-wide split, so it could
+never recompute or re-propagate to the rest of the squad, silently
+desyncing that one player's charge from what everyone else was actually
+charged. `PATCH /api/wallet/transactions` now refuses any request that
+would genuinely change `amount` or `type` on a row carrying `booking_id`
+— checked against the *resulting* value, not just whether the field was
+present in the request (the client always resends the current type/amount
+alongside a reason-only edit, so "field present" alone would have wrongly
+blocked a cosmetic fix too). `reason`/`notes`/`created_at` stay editable
+on such a row exactly as before — only the money-moving fields are
+blocked. `WalletStatementClient.tsx`'s edit form mirrors this (Type/Amount
+disabled, an inline note pointing at "Correct Match Fee" on the booking
+page) but the server check is the real gate. See
+`features/wallet-ledger.md` §3 and §15.
 
 ---
 
