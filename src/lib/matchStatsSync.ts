@@ -12,6 +12,7 @@ import { detectAndLogMilestones, detectAndLogMatchPerformances } from '@/lib/mil
 import { resolveSquadMatch, type SquadRef } from '@/lib/matchTopPerformers'
 import { autoResolveMatch } from '@/lib/playerIdentityResolution'
 import { notifyFeeReminderIfPending } from '@/lib/feeReminders'
+import { chargeMembershipFeeIfDue } from '@/lib/membershipFee'
 
 export interface SyncMatchStatsResult {
   ok:    boolean
@@ -157,6 +158,9 @@ export async function syncMatchStatsForBooking(
   await Promise.all([
     detectAndLogMilestones(bookingId, year, playerIds),
     detectAndLogMatchPerformances(bookingId, batting.data ?? [], bowling.data ?? [], fielding.data ?? [], squad, isPractice),
+    // Quarterly membership fee — best-effort, same never-fail-the-sync
+    // posture as the two calls above. See src/lib/membershipFee.ts.
+    chargeMembershipFeeIfDue(bookingId, String(booking.game_date), batting.data ?? [], bowling.data ?? [], fielding.data ?? [], squad, isPractice),
   ])
 
   // Match fee reminder — best-effort, same "never fail the sync" posture as

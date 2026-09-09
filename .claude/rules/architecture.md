@@ -61,6 +61,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Route | Component | Data source |
 |---|---|---|
 | `/profile` | Server + client form | `players` (own row only — IDOR protected) |
+| `/wallet` | Server → `WalletStatementClient` (client) | `wallet_transactions` (own rows, paginated), `players.wallet_balance`/`wallet_opening_balance*`; see `features/wallet-ledger.md` |
 | `/matches/history` | Server → `MatchHistoryClient` (client) | `bookings` (past confirmed), `scorecard_uploads`, `match_stats_cache`, `squad`; upload/sync/verify/flag actions gated per-booking to captain/VC/wrangler/admin, but the verified status itself is visible to every viewer — see `features/post-match-scorecard.md` §14 |
 | `/leaderboard` | Server → `LeaderboardMilestones`/`LeaderboardMonthly`/`LeaderboardTable` (client) | Analytics DB (`batting_stats`/`bowling_stats`/`fielding_stats`/`team_list`) via `src/lib/playerStats.ts`, joined to Hub `players`; year/month/tournament/ground/format filters — see `features/leaderboard.md` |
  
@@ -98,6 +99,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/admin/soft-blocks/new` | Create reservation (soft block) |
 | `/admin/scorecard-backfill` | One-time catch-up UI — fetches scorecards directly from CricHeroes for past matches never uploaded; see `features/post-match-scorecard.md` |
 | `/admin/player-reconciliation` | Resolves analytics-DB scorecard `player_name` strings to Hub `players.id` — suggestions, confirm/ignore, "Run Reconciliation Pass"; see `features/player-identity-resolution.md` |
+| `/admin/wallet` | Hub for pending fee applications (links to `/admin/bookings/[id]`), player search + full statement/quick top-up/correction, club-wide recent-transactions feed; see `features/wallet-ledger.md` |
  
 ---
  
@@ -123,6 +125,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/api/milestones/mark-seen` | POST | Own session | Advances the signed-in player's own `milestones_seen_at` cursor to now; player_id and timestamp always server-derived |
 | `/api/birthdays/today` | GET | Any signed-in, non-expelled member | Broadcast feed for the birthday wishes modal — players whose `dob` falls on today's IST date, gated on the viewer's own `birthday_wishes_seen_date` cursor; see `features/birthday-wishes.md` |
 | `/api/birthdays/mark-seen` | POST | Own session | Advances the signed-in player's own `birthday_wishes_seen_date` cursor to today; player_id and date always server-derived |
+| `/api/wallet/transactions` | GET | Own (any signed-in player with a `playerId`), or admin via `?player_id=`/`?scope=all` | Cursor-paginated bank-statement read — own by default; feeds `/wallet` and, in admin mode, `/admin/wallet`; see `features/wallet-ledger.md` |
  
 ### Captain APIs
  
@@ -174,8 +177,11 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/captains` | GET, POST, PATCH | Admin | Captain master data |
 | `/api/tournaments` | GET, POST, PATCH | Admin | Tournament master data; PATCH also used by `InlineGameCountEditor` in Tournament Planner to update `total_league_games`; POST/PATCH both handle `cricheroes_points_table_url`, `intended_formats` (`features/tournament-planner.md` §3.1), and `tentative_start_date` (§3.2); PATCH also toggles `organiser_self_service` (opt-in for `features/organiser-self-service.md`) |
 | `/api/players` | GET, POST, PATCH | Admin | Full player directory management |
-| `/api/wallet/transactions` | POST | Admin | *(Planned Sprint 3)* Isolated wallet balance writes with immutable log |
-| `/api/admin/fee-reminders` | GET | Admin | Every currently fee-pending booking (scorecard synced, fee configured, squad announced, not yet applied/externally-reconciled) — feeds the admin-only fee reminder modal; see `features/fee-reminders.md` |
+| `/api/wallet/transactions` | POST | Admin | Wallet top-up/debit — writes an immutable `wallet_transactions` row, then updates `players.wallet_balance`; optional `created_at` for backdating; see `features/wallet-ledger.md` |
+| `/api/wallet/transactions` | PATCH | Admin | Corrects an existing transaction (amount/type/reason/notes/date), logging the pre-edit values to `wallet_transaction_edits` and adjusting `players.wallet_balance` by the delta the correction introduces |
+| `/api/wallet/opening-balance` | PATCH | Admin | Sets or clears (`amount: null`) a player's "Brought Forward" statement override |
+| `/api/wallet/transfers` | POST | Admin | Player-to-player sponsorship — debits `sponsor_player_id`, credits `beneficiary_player_id` by the same amount, linked via `wallet_transfers`; see `features/wallet-ledger.md` §14 |
+| `/api/admin/fee-reminders` | GET | Admin | Every currently fee-pending booking (scorecard synced, fee configured, squad announced, not yet applied/externally-reconciled) — feeds the admin-only fee reminder modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
  
 ### Family Auth APIs *(Planned — U-24)*
  
@@ -266,7 +272,8 @@ Full member directory.
 | `cricheroes_url` | Player-editable — **drives CricHeroes hyperlinks throughout the app** |
 | `cricheroes_player_id` | Server-derived only, never client-writable — numeric CricHeroes profile ID auto-extracted from `cricheroes_url` on save; see `features/player-identity-resolution.md` §3.1 |
 | `photo_url` | Set from Google OAuth on first sign-in |
-| `wallet_balance` | Admin-managed; shown amber if negative |
+| `wallet_balance` | Admin-managed only via `POST`/`PATCH /api/wallet/transactions` — excluded from `/api/players`' PATCH allowlist; shown amber if negative |
+| `wallet_opening_balance` / `wallet_opening_balance_note` / `wallet_opening_balance_set_by` / `wallet_opening_balance_set_at` | Nullable; admin override for the wallet statement's "Brought Forward" line (`NULL` = auto-computed) — see `features/wallet-ledger.md` §5 |
 | `dues_override` | Admin-managed boolean; allows player with negative balance to still mark availability |
 | `inducted_on`, `referred_by` | Admin-managed |
 | `is_captain`, `is_gc` | Admin-managed; surface as JWT token flags |
@@ -312,6 +319,46 @@ Read-through cache of the separate analytics Supabase project — source of trut
  
 #### `fee_exemptions`
 Full lockdown RLS. Joined to `players` in admin view.
+
+#### `wallet_transactions`
+`id, player_id FK, booking_id FK (nullable), type ('debit'|'credit'), amount, reason, notes, created_by, created_at, edited_at, edited_by`
+Immutable ledger — one row per `players.wallet_balance` change, written by
+`POST /api/wallet/transactions` (admin adjustments) and `/api/fees/apply`
+(match fee debits). `edited_at`/`edited_by` (migration
+`072_wallet_statement_corrections.sql`) flag a row corrected via
+`PATCH /api/wallet/transactions` — the row is still never blindly
+overwritten; see `features/wallet-ledger.md` §3 and `wallet_transaction_edits`
+below. **RLS enabled, no anon/authenticated policies** — service role only.
+
+#### `wallet_transaction_edits`
+`id, transaction_id FK, edited_by, edit_reason, old_type, old_amount, old_reason, old_notes, old_created_at, created_at`
+Immutable audit trail, one row per admin correction to a `wallet_transactions`
+row — captures every pre-edit value. Migration `072_wallet_statement_corrections.sql`.
+**RLS enabled, no anon/authenticated policies.**
+
+#### `membership_fee_charges`
+`id, player_id FK, booking_id FK (nullable, ON DELETE SET NULL), wallet_transaction_id FK (nullable, ON DELETE SET NULL), year, quarter, amount, created_at`
+One row per player per calendar quarter charged the ₹250 quarterly
+membership fee — `UNIQUE(player_id, year, quarter)` is the idempotency
+guard, checked by a plain `INSERT` (never upsert) before any wallet debit
+happens; see `features/wallet-ledger.md` §12. Detected and charged
+automatically inside `syncMatchStatsForBooking()` the moment a player's
+first role-fulfilling (batted/bowled/fielding dismissal) match of the
+quarter syncs — no admin review step, unlike match fees. The resulting
+`wallet_transactions` debit row deliberately omits `booking_id` (kept only
+here) to avoid colliding with `/api/fees/apply`'s "already applied" guard.
+Migration `073_membership_fee_charges.sql`. **RLS enabled, no
+anon/authenticated policies** — service role only.
+
+#### `wallet_transfers`
+`id, sponsor_player_id FK, beneficiary_player_id FK, amount, reason, sponsor_transaction_id FK (nullable), beneficiary_transaction_id FK (nullable), created_by, created_at`
+Admin-recorded player-to-player wallet sponsorship — links the debit
+(sponsor) and credit (beneficiary) `wallet_transactions` rows a transfer
+produces, purely for display/reporting; never itself read to derive a
+balance. `CHECK (sponsor_player_id != beneficiary_player_id)`. Admin-only,
+same trust model as every other wallet-balance-changing action — see
+`features/wallet-ledger.md` §14. Migration `074_wallet_transfers.sql`.
+**RLS enabled, no anon/authenticated policies** — service role only.
 
 #### `player_future_availability`
 `id, player_id FK, game_date, slot_time, response ('Y'|'O'|'E'|'L'), updated_at`
@@ -652,6 +699,10 @@ Next.js API Routes (server-side)
 | `scorecard_reconciliation_log` | ❌ Locked | ❌ Locked | Service role only |
 | `match_stats_cache` | ❌ Locked | ❌ Locked | Service role only *(same fix, same date)* |
 | `booking_rule_overrides` | ❌ Locked | ❌ Locked | Service role only — see §7.1 |
+| `wallet_transactions` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` |
+| `wallet_transaction_edits` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` §3 |
+| `membership_fee_charges` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` §12 |
+| `wallet_transfers` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` §14 |
 | `family_sessions` *(planned)* | ❌ Locked | ❌ Locked | Service role only |
  
 ### Security Checklist Status (vibe-security audit)
@@ -737,7 +788,12 @@ Next.js API Routes (server-side)
 | `vercel.json` | Cron job config + security headers |
 | src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup; notifyGCs()/notifyAllSubscribed()/notifyAdmins() broadcast helpers |
 | src/app/api/push/subscribe/route.ts | POST — saves browser push subscription; player_id from session only |
-| `src/lib/feeReminders.ts` | `resolvePendingFee()`/`getPendingFeeBookings()`/`notifyFeeReminderIfPending()` — match fee payment reminder eligibility, shared by the push trigger and the admin modal; see `features/fee-reminders.md` |
+| `src/lib/feeReminders.ts` | `resolvePendingFee()`/`getPendingFeeBookings()`/`notifyFeeReminderIfPending()` — match fee payment reminder eligibility, shared by the push trigger, the admin modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
+| `src/app/api/wallet/transactions/route.ts` | GET (own/admin/`scope=all`, paginated, Brought Forward calc), POST (top-up/debit), PATCH (admin corrections) — see `features/wallet-ledger.md` |
+| `src/app/api/wallet/opening-balance/route.ts` | PATCH — admin override of a player's Brought Forward line |
+| `src/app/api/wallet/transfers/route.ts` | POST — admin-recorded player-to-player sponsorship transfer; see `features/wallet-ledger.md` §14 |
+| `src/app/wallet/page.tsx` + `src/components/wallet/WalletStatementClient.tsx` | `/wallet` — player's own bank-statement view; the client component is reused in `admin` mode by `/admin/wallet`, including its "🎁 Sponsor" player-to-player transfer action — see `features/wallet-ledger.md` §14 |
+| `src/app/admin/wallet/page.tsx` | Admin wallet hub — pending fee applications, player search + drill-down, club-wide feed |
 | `src/components/admin/FeeReminderModal.tsx` + `src/components/ui/GlobalFeeReminderModal.tsx` | Admin-only "fees pending" reminder modal, mounted once in the root layout |
 | public/sw.js | Service worker — PWA caching + push notification display + notificationclick handler |
 | `src/app/matches/history/page.tsx` + `src/components/matches/MatchHistoryClient.tsx` | `/matches/history` — past-match list, `MatchHistoryCard` (result badge, subtle sync status, ground/CricHeroes links, Did-not-bat line) |
@@ -746,8 +802,9 @@ Next.js API Routes (server-side)
 | `src/app/api/matches/[id]/flag-reconciliation/route.ts` | POST reports a stats discrepancy (Zod-validated note), re-queuing into the backfill pipeline; DELETE is an admin-only clear-without-reprocessing override |
 | `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking verify/flag auth, includes the top-performer grant; see `features/post-match-scorecard.md` §15 |
 | `src/lib/matchTopPerformers.ts` | Resolves a match's top scorer/wicket-taker to a Hub `player_id`; see `features/post-match-scorecard.md` §15 |
-| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; calls `autoResolveMatch()` before reading analytics rows (now including `fall_of_wickets`, ordered by `wicket_number`), last step calls `detectAndLogMilestones()` |
+| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; calls `autoResolveMatch()` before reading analytics rows (now including `fall_of_wickets`, ordered by `wicket_number`); calls `detectAndLogMilestones()`, `detectAndLogMatchPerformances()`, and `chargeMembershipFeeIfDue()` together as its last data-writing step |
 | `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` (season) + `detectAndLogMatchPerformances()` (single-match highlights) — club-wide milestone recognition detection; see `features/milestone-recognition.md` |
+| `src/lib/membershipFee.ts` | `chargeMembershipFeeIfDue()` — automatic ₹250 quarterly membership fee debit on a player's first role-fulfilling match of the quarter; called from `syncMatchStatsForBooking()` alongside milestone detection; see `features/wallet-ledger.md` §12 |
 | `src/app/api/milestones/unseen/route.ts` + `src/app/api/milestones/mark-seen/route.ts` | Broadcast feed + seen-cursor advance for the milestone recognition modal |
 | `src/components/milestones/MilestoneCelebrationModal.tsx` | Club-wide milestone recognition modal |
 | `src/components/ui/GlobalMilestoneModal.tsx` | Mounts the modal once per session from the root layout — not from `SiteNav`, which isn't part of a shared layout and remounts per navigation; see `features/milestone-recognition.md` §7.1 |

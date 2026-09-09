@@ -233,7 +233,7 @@ Vercel's cron runner supplies this header automatically. The route is otherwise 
 
 These must be completed before any payment code is written:
 
-- [ ] **Wallet balance write route** — `wallet_balance` is currently patchable via the admin PATCH on `/api/players`. Before Sprint 3, wallet changes should go through a dedicated `/api/wallet/transactions` route that creates an immutable transaction log row, with `wallet_balance` removed from the general PATCH allowlist.
+- [x] **Wallet balance write route** — `wallet_balance` is removed from `/api/players`' PATCH allowlist (`PLAYER_COLUMNS` in `src/app/api/players/route.ts` — the comment there documents the exclusion is deliberate, not an oversight). All balance changes go through `POST`/`PATCH /api/wallet/transactions`, which write an immutable `wallet_transactions` ledger row before ever touching `players.wallet_balance` — see `features/wallet-ledger.md`. This shipped and was live before this checklist was last updated to reflect it.
 - [ ] **Rate limiting** — no rate limiting exists on any route. At minimum, `/api/player-availability` (POST) should be rate-limited per player to prevent accidental or intentional spam. Vercel KV or Upstash Redis is the recommended implementation.
 - [ ] **Input validation library** — all API routes currently do ad-hoc field checks. A lightweight schema validator (e.g. Zod) should be added before payment routes ship, since payment inputs require strict type and range validation.
 - [x] **`availability/weekend` array size limit** — the `booking_ids` query parameter is split and passed to `.in()` with no cap. Should be limited to 20 IDs maximum.

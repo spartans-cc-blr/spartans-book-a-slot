@@ -267,6 +267,12 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
                     My Profile
                   </Link>
                 )}
+                {player?.playerId && !isExpelled && (
+                  <Link href="/wallet" onClick={() => setProfileOpen(false)}
+                    className="block px-4 py-2.5 font-rajdhani text-xs text-zinc-400 hover:text-gold hover:bg-ink-3 transition-colors">
+                    💰 My Wallet
+                  </Link>
+                )}
                 {isExpelled && (
                   <div className="px-4 py-2.5 font-rajdhani text-xs text-red-400">
                     Account suspended

@@ -89,7 +89,10 @@ export function MobileTabBar(props: MobileTabBarProps) {
                 <SheetLink t={t} href="/dugout" icon={<ShieldIcon size={16} />} label="The Dugout" active={activePage === 'dugout'} onNavigate={() => setMoreOpen(false)} />
                 <SheetLink t={t} href="/leaderboard" icon={<TrophyIcon />} label="Leaderboard" active={activePage === 'leaderboard'} onNavigate={() => setMoreOpen(false)} />
                 {playerId ? (
-                  <SheetLink t={t} href="/profile" icon={<PersonIcon />} label="My Profile" active={activePage === 'profile'} onNavigate={() => setMoreOpen(false)} />
+                  <>
+                    <SheetLink t={t} href="/profile" icon={<PersonIcon />} label="My Profile" active={activePage === 'profile'} onNavigate={() => setMoreOpen(false)} />
+                    <SheetLink t={t} href="/wallet" icon={<RupeeIcon />} label="My Wallet" active={activePage === 'wallet'} onNavigate={() => setMoreOpen(false)} />
+                  </>
                 ) : (
                   <SheetLink t={t} href="/join" icon={<PersonIcon />} label="Complete Registration" active={false} onNavigate={() => setMoreOpen(false)} />
                 )}
@@ -219,7 +222,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
 // live in the sheet only (Dugout lost its tab slot to My Stats; Leaderboard
 // never had one — see navigation.md §4.1), so both are listed here.
 function isAdminOrGcHighlighted(activePage?: string) {
-  return ['dugout', 'leaderboard', 'profile', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
+  return ['dugout', 'leaderboard', 'profile', 'wallet', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
 }
 
 function Tab({ t, href, icon, label, active }: { t: Tokens; href: string; icon: React.ReactNode; label: string; active?: boolean }) {
@@ -306,6 +309,13 @@ function TrophyIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M7 4h10v4a5 5 0 0 1-10 0V4z" /><path d="M7 5H4.5A2.5 2.5 0 0 0 4 9.9c.4 1.3 1.6 2.1 3 2.1" /><path d="M17 5h2.5A2.5 2.5 0 0 1 20 9.9c-.4 1.3-1.6 2.1-3 2.1" /><line x1="12" y1="13" x2="12" y2="17" /><path d="M9 20h6" /><path d="M10 17h4v3h-4z" />
+    </svg>
+  )
+}
+function RupeeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="6" y1="4" x2="18" y2="4" /><line x1="6" y1="8" x2="18" y2="8" /><path d="M6 8a6 6 0 0 1 0 0h6a4 4 0 0 1 0 8H9l9 8" />
     </svg>
   )
 }
