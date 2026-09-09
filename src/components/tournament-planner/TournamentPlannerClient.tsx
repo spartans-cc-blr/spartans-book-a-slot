@@ -1024,8 +1024,13 @@ function TournamentBlock({
                     <thead>
                       <tr className="border-b border-parchment-3">
                         <th
+                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pl-3 pr-1 py-1.5 text-stone-500 whitespace-nowrap"
+                        >
+                          #
+                        </th>
+                        <th
                           onClick={() => handleStatsSort('name')}
-                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pl-3 pr-2 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
+                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pr-2 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
                         >
                           Player{statsSortKey === 'name' && (statsSortDir === 'asc' ? ' ▲' : ' ▼')}
                         </th>
@@ -1041,11 +1046,14 @@ function TournamentBlock({
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedPlayers.map(p => {
+                      {sortedPlayers.map((p, idx) => {
                         const stat = stats[p.id] ?? null
                         return (
                           <tr key={p.id} className="border-t border-parchment-3 first:border-t-0">
-                            <td className="font-rajdhani text-[11px] font-semibold text-ink text-right pl-3 pr-2 py-1.5 whitespace-nowrap">
+                            <td className="font-rajdhani text-[11px] text-stone-400 text-right pl-3 pr-1 py-1.5 whitespace-nowrap">
+                              {idx + 1}
+                            </td>
+                            <td className="font-rajdhani text-[11px] font-semibold text-ink text-right pr-2 py-1.5 whitespace-nowrap">
                               <span className="hidden sm:inline">
                                 <PlayerNameLink name={p.name} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
                               </span>

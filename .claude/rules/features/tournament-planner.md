@@ -521,6 +521,14 @@ reconciled stats yet for this tournament always sorts to the bottom
 regardless of direction ("No stats synced" isn't a value on any column's
 scale, so it must never jump to the top under a descending sort).
 
+**Serial number column (added September 2026).** A leading `#` column
+shows each row's 1-based position in the table (`sortedPlayers.map((p,
+idx) => ...)`, rendered as `idx + 1`). It's a plain display index, not a
+sortable column of its own — it isn't part of `STAT_COLUMNS`/`StatsSortKey`
+and carries no `onClick` — so it simply re-numbers 1..N in whatever order
+the table is currently sorted into, rather than tracking a fixed per-player
+value.
+
 ---
 
 ## 6. Classification & Sorting — `classifiedTournaments`
