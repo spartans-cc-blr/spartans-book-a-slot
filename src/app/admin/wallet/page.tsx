@@ -46,6 +46,7 @@ type LedgerRow = {
   reason: string
   notes: string | null
   created_at: string
+  booking_id: string | null
   edited_at: string | null
 }
 
@@ -180,9 +181,17 @@ export default function AdminWalletPage() {
             {ledger.map(t => {
               const player = players.find(p => p.id === t.player_id)
               return (
-                <button key={t.id}
+                <div key={t.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => player ? selectPlayer(player) : setSelectedPlayer({ id: t.player_id, name: t.player_name ?? 'Unknown', wallet_balance: 0 })}
-                  className="w-full text-left flex items-center justify-between gap-3 px-4 py-3 hover:bg-ink-4 transition-colors">
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      player ? selectPlayer(player) : setSelectedPlayer({ id: t.player_id, name: t.player_name ?? 'Unknown', wallet_balance: 0 })
+                    }
+                  }}
+                  className="w-full text-left flex items-center justify-between gap-3 px-4 py-3 hover:bg-ink-4 transition-colors cursor-pointer">
                   <div className="min-w-0">
                     <p className="font-rajdhani text-sm text-parchment truncate">
                       {t.player_name ?? 'Unknown'} <span className="text-zinc-500">· {t.reason}</span>
@@ -192,12 +201,24 @@ export default function AdminWalletPage() {
                         </span>
                       )}
                     </p>
-                    <p className="font-rajdhani text-xs text-zinc-600">{formatDate(t.created_at)}</p>
+                    <p className="font-rajdhani text-xs text-zinc-600">
+                      {formatDate(t.created_at)}
+                      {t.booking_id && (
+                        <>
+                          {' · '}
+                          <Link href={`/matches/history/${t.booking_id}`}
+                            onClick={e => e.stopPropagation()}
+                            className="text-gold-dim hover:text-gold transition-colors">
+                            📊 View Scorecard
+                          </Link>
+                        </>
+                      )}
+                    </p>
                   </div>
                   <span className={`font-rajdhani text-sm font-bold flex-shrink-0 ${t.type === 'credit' ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {t.type === 'credit' ? '+' : '-'}₹{Number(t.amount).toLocaleString('en-IN')}
                   </span>
-                </button>
+                </div>
               )
             })}
           </div>
