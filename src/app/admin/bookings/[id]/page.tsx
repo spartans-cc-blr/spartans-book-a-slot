@@ -78,6 +78,27 @@ interface FeePreview {
   squad:             FeeSquadRow[]
 }
 
+// PATCH /api/fees/apply — correcting an already-applied match fee at the
+// match level. See features/post-match-scorecard.md §6.1. Same shape as
+// FeePreview/FeeSquadRow plus each row's current charged amount and the
+// event-level totals needed to show a net refund/additional-charge figure.
+interface FeeCorrectionSquadRow extends FeeSquadRow {
+  old_fee: number
+}
+
+interface FeeCorrectionPreview {
+  base_fee:                    number
+  total_units:                 number
+  unit_price:                  number
+  included_count:              number
+  total_squad:                 number
+  squad:                       FeeCorrectionSquadRow[]
+  total_collectable:           number
+  total_previously_collected:  number
+  net_change:                  number
+  changed_count:               number
+}
+
 type TournamentWithCaptain = {
   id: string
   name: string
@@ -205,6 +226,18 @@ function BookingDetailPageInner() {
   // role) server-side.
   const [unitsMap,         setUnitsMap]          = useState<Record<string, number>>({})
   const [adjustmentReason, setAdjustmentReason]  = useState('')
+  // ── Correct Match Fee (PATCH /api/fees/apply) — only reachable once
+  // fees_applied. Deliberately separate state from the apply-flow state
+  // above so opening the correction panel never clobbers a still-pending
+  // apply preview, and vice versa. See features/post-match-scorecard.md §6.1.
+  const [correctionOpen,      setCorrectionOpen]      = useState(false)
+  const [correctPreview,      setCorrectPreview]      = useState<FeeCorrectionPreview | null>(null)
+  const [correctLoading,      setCorrectLoading]      = useState(false)
+  const [correctError,        setCorrectError]        = useState('')
+  const [correctConfirming,   setCorrectConfirming]   = useState(false)
+  const [correctUnitsMap,     setCorrectUnitsMap]     = useState<Record<string, number>>({})
+  const [correctAdjustReason, setCorrectAdjustReason] = useState('')
+  const [correctionReason,    setCorrectionReason]    = useState('')
   const [scorecardOpen,    setScorecardOpen]     = useState(false)
   const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[]; fielding?: any[]; team_list?: any[] } | null>(null)
   const [scorecardSquad,   setScorecardSquad]    = useState<{ player_id: string; player_name: string; cricheroes_url: string | null }[] | undefined>(undefined)
@@ -396,6 +429,95 @@ function BookingDetailPageInner() {
       setFeeError('Network error')
     } finally {
       setFeeConfirming(false)
+    }
+  }
+
+  // Shared by opening the correction panel and every checkbox/stepper
+  // change inside it — same "always recompute server-side, never guess
+  // client-side" posture as fetchFeePreview above.
+  function fetchCorrectionPreview(units: Record<string, number>) {
+    setCorrectLoading(true)
+    setCorrectError('')
+    return fetch('/api/fees/apply', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ booking_id: id, confirm: false, player_units: units }),
+    })
+      .then(res => res.json().then(data => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) { setCorrectError(data.error ?? 'Could not compute correction preview'); return }
+        setCorrectPreview(data)
+      })
+      .catch(() => setCorrectError('Network error'))
+      .finally(() => setCorrectLoading(false))
+  }
+
+  function openCorrection() {
+    setCorrectionOpen(true)
+    setCorrectUnitsMap({})
+    setCorrectAdjustReason('')
+    setCorrectionReason('')
+    setCorrectPreview(null)
+    fetchCorrectionPreview({})
+  }
+
+  function updateCorrectUnits(playerId: string, units: number) {
+    const clamped = Math.max(0, Math.min(12, units))
+    setCorrectUnitsMap(prev => {
+      const next = { ...prev, [playerId]: clamped }
+      fetchCorrectionPreview(next)
+      return next
+    })
+  }
+
+  function toggleCorrectInclude(row: FeeCorrectionSquadRow) {
+    updateCorrectUnits(row.player_id, row.units > 0 ? 0 : 1)
+  }
+
+  async function handleCorrectFees() {
+    if (!correctPreview) return
+    const adjustedRows = correctPreview.squad.filter(r => r.units !== r.default_units)
+    if (adjustedRows.length > 0 && !correctAdjustReason.trim()) {
+      setCorrectError("A reason is required when adjusting a player's fee share from the default.")
+      return
+    }
+    if (!correctionReason.trim()) {
+      setCorrectError('A reason is required for this correction — why is the match fee being revised?')
+      return
+    }
+    if (correctPreview.changed_count === 0) {
+      setCorrectError('Nothing to correct — the recomputed split already matches what was charged.')
+      return
+    }
+    const sign = correctPreview.net_change >= 0 ? 'additional ₹' : 'a refund of ₹'
+    const amount = Math.abs(correctPreview.net_change)
+    if (!confirm(
+      `This will adjust ${correctPreview.changed_count} player wallet${correctPreview.changed_count > 1 ? 's' : ''}` +
+      ` — net ${sign}${amount} across the squad. Continue?`
+    )) return
+    setCorrectConfirming(true)
+    setCorrectError('')
+    try {
+      const res = await fetch('/api/fees/apply', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          booking_id: id,
+          confirm: true,
+          player_units: correctUnitsMap,
+          adjustment_reason: adjustedRows.length > 0 ? correctAdjustReason.trim() : undefined,
+          correction_reason: correctionReason.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCorrectError(data.error ?? 'Failed to correct match fee'); return }
+      setCorrectionOpen(false)
+      setCorrectPreview(null)
+      await refreshPostMatch()
+    } catch {
+      setCorrectError('Network error')
+    } finally {
+      setCorrectConfirming(false)
     }
   }
 
@@ -1008,6 +1130,101 @@ function BookingDetailPageInner() {
                             ⓘ {w.name} — {w.units} share{w.units === 1 ? '' : 's'} · {w.reason}
                           </p>
                         ))}
+                      </div>
+                    )}
+
+                    {/* Correcting an already-applied fee never edits an
+                        individual player's wallet directly — it revises the
+                        whole match's split and adjusts every affected squad
+                        member's wallet together. See
+                        features/post-match-scorecard.md §6.1. */}
+                    {!correctionOpen && (
+                      <button onClick={openCorrection}
+                        className="font-rajdhani text-xs font-bold text-gold hover:underline">
+                        ✏️ Correct Match Fee
+                      </button>
+                    )}
+
+                    {correctionOpen && (
+                      <div className="space-y-2 border-t border-ink-5 pt-2 mt-1">
+                        <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">
+                          Correct Match Fee — recalculates every squad member&apos;s share
+                        </p>
+                        {correctLoading && <p className="font-rajdhani text-xs text-zinc-600">Calculating…</p>}
+                        {correctError && <p className="font-rajdhani text-xs text-red-400">{correctError}</p>}
+                        {correctPreview && (
+                          <>
+                            <p className="font-rajdhani text-xs text-zinc-400">
+                              ₹{correctPreview.unit_price} per share · {correctPreview.included_count} of {correctPreview.total_squad} players included
+                            </p>
+                            <div className="space-y-1 bg-ink-4 border border-ink-5 rounded p-2.5">
+                              <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">
+                                Include player in this match&apos;s fee
+                              </p>
+                              {correctPreview.squad.map(row => (
+                                <div key={row.player_id}
+                                  className={`flex items-center gap-2 py-0.5 ${row.exempt ? 'opacity-40' : ''}`}>
+                                  <label className={`flex items-center gap-2 flex-1 min-w-0 ${row.exempt ? '' : 'cursor-pointer'}`}>
+                                    <input type="checkbox"
+                                      checked={row.units > 0}
+                                      disabled={row.exempt}
+                                      onChange={() => toggleCorrectInclude(row)}
+                                      className="w-3.5 h-3.5 accent-emerald-600 shrink-0" />
+                                    <span className="font-rajdhani text-xs text-zinc-300 truncate">{row.name}</span>
+                                    {row.exempt && (
+                                      <span className="font-rajdhani text-[9px] font-bold text-zinc-500 shrink-0">standing exemption</span>
+                                    )}
+                                  </label>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button type="button" disabled={row.exempt || row.units <= 0}
+                                      onClick={() => updateCorrectUnits(row.player_id, row.units - 1)}
+                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                      −
+                                    </button>
+                                    <span className="font-rajdhani text-xs w-4 text-center text-parchment">{row.units}</span>
+                                    <button type="button" disabled={row.exempt || row.units >= 12}
+                                      onClick={() => updateCorrectUnits(row.player_id, row.units + 1)}
+                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                      +
+                                    </button>
+                                  </div>
+                                  <span className={`font-rajdhani text-[10px] w-24 text-right shrink-0 ${row.fee !== row.old_fee ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
+                                    {row.old_fee > 0 || row.fee > 0 ? `₹${row.old_fee} → ₹${row.fee}` : ''}
+                                  </span>
+                                </div>
+                              ))}
+                              {correctPreview.squad.some(r => r.units !== r.default_units) && (
+                                <input type="text" value={correctAdjustReason}
+                                  onChange={e => setCorrectAdjustReason(e.target.value)}
+                                  placeholder="Reason for this player's share — e.g. Did not bat or bowl, or covering a guest player"
+                                  className="form-input mt-1.5 text-xs" />
+                              )}
+                            </div>
+                            <input type="text" value={correctionReason}
+                              onChange={e => setCorrectionReason(e.target.value)}
+                              placeholder="Reason for this correction — e.g. Ground fee was revised down by the organiser"
+                              className="form-input text-xs" />
+                            <p className="font-rajdhani text-xs text-zinc-400">
+                              Previously collected: ₹{correctPreview.total_previously_collected} · Revised total: ₹{correctPreview.total_collectable}
+                              {' · '}
+                              <span className={correctPreview.net_change > 0 ? 'text-crimson' : correctPreview.net_change < 0 ? 'text-emerald-400' : ''}>
+                                {correctPreview.net_change > 0 ? `+₹${correctPreview.net_change} to collect` : correctPreview.net_change < 0 ? `₹${Math.abs(correctPreview.net_change)} to refund` : 'No change'}
+                              </span>
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <button onClick={handleCorrectFees} disabled={correctConfirming || correctLoading || correctPreview.changed_count === 0}
+                                className="font-rajdhani text-sm font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
+                                {correctConfirming
+                                  ? 'Correcting…'
+                                  : `Apply Correction — ${correctPreview.changed_count} player${correctPreview.changed_count === 1 ? '' : 's'} affected`}
+                              </button>
+                              <button onClick={() => { setCorrectionOpen(false); setCorrectPreview(null) }}
+                                className="font-rajdhani text-xs text-zinc-500 hover:text-parchment">
+                                Cancel
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

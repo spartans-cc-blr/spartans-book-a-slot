@@ -165,6 +165,7 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/admin/scorecard-backfill` | GET, POST | Admin | One-time catch-up: list eligible bookings, process one per POST |
 | `/api/admin/player-reconciliation` | GET, POST | Admin | Resolves analytics-DB `player_name` strings to Hub `players.id` — GET buckets pending names, POST confirms/ignores/reconciles; see `features/player-identity-resolution.md` |
 | `/api/fees/apply` | POST | Admin | Pre-existing — applies match fees, sets `scorecard_uploads.status = 'fees_applied'`. Always manual, never triggered by the scorecard automation |
+| `/api/fees/apply` | PATCH | Admin | Corrects an already-`fees_applied` booking's fee split at the match level — recomputes per-player shares and posts one adjusting ledger entry per affected squad member; never mutates original debit rows, never reverts `scorecard_uploads.status`. See `features/post-match-scorecard.md` §6.1 |
  
 ### Admin APIs
  
@@ -335,6 +336,18 @@ below. **RLS enabled, no anon/authenticated policies** — service role only.
 Immutable audit trail, one row per admin correction to a `wallet_transactions`
 row — captures every pre-edit value. Migration `072_wallet_statement_corrections.sql`.
 **RLS enabled, no anon/authenticated policies.**
+
+#### `match_fee_corrections`
+`id, booking_id FK, base_fee, total_before, total_after, changes (jsonb — per-player
+before/after/action), corrected_by FK (nullable), corrected_by_email, correction_reason,
+created_at`
+Immutable audit log — one row per `PATCH /api/fees/apply` correction *event*
+(recomputing an already-`fees_applied` booking's per-player split and
+adjusting every affected squad member's wallet). Distinct from the
+per-player adjusting entries themselves, which live in `wallet_transactions`
+as ordinary, append-only ledger rows. Migration `075_match_fee_corrections.sql`.
+See `features/post-match-scorecard.md` §6.1. **RLS enabled, no
+anon/authenticated policies** — service role only.
 
 #### `membership_fee_charges`
 `id, player_id FK, booking_id FK (nullable, ON DELETE SET NULL), wallet_transaction_id FK (nullable, ON DELETE SET NULL), year, quarter, amount, created_at`
@@ -789,6 +802,7 @@ Next.js API Routes (server-side)
 | src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup; notifyGCs()/notifyAllSubscribed()/notifyAdmins() broadcast helpers |
 | src/app/api/push/subscribe/route.ts | POST — saves browser push subscription; player_id from session only |
 | `src/lib/feeReminders.ts` | `resolvePendingFee()`/`getPendingFeeBookings()`/`notifyFeeReminderIfPending()` — match fee payment reminder eligibility, shared by the push trigger, the admin modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
+| `src/lib/matchFeeSplit.ts` | `computeMatchFeeSplit()` — shared per-player fee/units/exemption computation used by both `POST` (apply) and `PATCH` (correction) `/api/fees/apply`; see `features/post-match-scorecard.md` §6.1 |
 | `src/app/api/wallet/transactions/route.ts` | GET (own/admin/`scope=all`, paginated, Brought Forward calc), POST (top-up/debit), PATCH (admin corrections) — see `features/wallet-ledger.md` |
 | `src/app/api/wallet/opening-balance/route.ts` | PATCH — admin override of a player's Brought Forward line |
 | `src/app/api/wallet/transfers/route.ts` | POST — admin-recorded player-to-player sponsorship transfer; see `features/wallet-ledger.md` §14 |

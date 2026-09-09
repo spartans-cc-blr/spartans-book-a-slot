@@ -100,6 +100,11 @@ complexity wasn't duplicated here. This section exists purely to close the
 called out; the fee-mail admin still ends up on the same booking page they
 always did, just without having to go hunting for which one needs it.
 
+**Once a fee is applied and turns out to be wrong** (the base fee, or the
+per-player share split), the fix also stays on `/admin/bookings/[id]` — a
+"✏️ Correct Match Fee" action recomputes and re-propagates the split across
+the squad. See `features/post-match-scorecard.md` §6.1.
+
 **Recording payments made *to* an organiser (club → organiser, not player
 → club) is explicitly out of scope for this pass** — no such tracking
 exists anywhere in this app today. It's a different ledger domain (no
@@ -609,10 +614,21 @@ own statement. No new page or route was added beyond the API endpoint.
   statement.
 - **Editing `player_id`/`booking_id` on a transaction** — see §3.
 - **Reversing an applied match fee from this UI** — `PATCH /api/wallet/transactions`
-  can correct a debit's amount/reason, but nothing here bulk-reverses an
-  entire `/api/fees/apply` run; that's still whatever manual process
-  (admin corrections one row at a time, same as any other ledger mistake)
-  this app already relied on before this feature.
+  corrects one player's own debit/credit row at a time; it has no notion of
+  "this row was one player's share of a match fee split" and can't
+  recompute or re-propagate a share across a whole squad. **Correcting a
+  match fee at the match level** (the base fee or the per-player unit
+  split was wrong, and the whole squad's charges need recalculating
+  together) is a separate, September 2026 addition —
+  `PATCH /api/fees/apply`, reached from the "✏️ Correct Match Fee" action
+  on `/admin/bookings/[id]`'s Post-Match panel, not from `/wallet` or
+  `/admin/wallet`. It posts a fresh, append-only adjusting ledger entry per
+  affected player (never mutates the original debit rows) and logs one
+  summary row per correction event to `match_fee_corrections`. See
+  `features/post-match-scorecard.md` §6.1 for the full mechanics — this
+  doc's own `PATCH /api/wallet/transactions` (§3) remains the right tool
+  for a genuinely single-player, non-fee-split mistake (a fat-fingered
+  top-up amount, a wrong reason string, backdating).
 - **No admin review step for the membership fee** (§12) — unlike match
   fees, it debits unattended the moment a qualifying match syncs. A wrong
   charge is corrected the same way any other ledger mistake is: an admin

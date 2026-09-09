@@ -235,6 +235,100 @@ fee is actually applied — see `features/fee-reminders.md`. This is a pure
 reminder layered on top of the lifecycle above; it never applies a fee
 itself, same decoupling as everything else in this section.
 
+**`fees_applied` is still terminal even under a correction (see §6.1).**
+Nothing — not a wallet PATCH, not a match-fee correction — ever moves
+`scorecard_uploads.status` back off `fees_applied`. Fixing a wrong fee is
+a ledger-level operation layered on top of the status machine, never a
+rewind of it.
+
+### 6.1 Correcting an already-applied match fee (added September 2026)
+
+**Background — how the fee split actually works.** `POST /api/fees/apply`
+(dry-run with `confirm: false`, then a second call with `confirm: true`)
+derives the fee from `bookings.match_fee_override ?? tournaments.match_fee`,
+then splits it across the **announced squad** in whole "shares" (`units`):
+a standing `fee_exemptions` row always forces `0` units; otherwise a
+player defaults to `1` unit if the synced scorecard shows them batting or
+bowling, else `0` (no recorded role ⇒ assumed not to have actually played,
+never silently charged). An admin can override any player's units
+(0–12 — `2` covers a guest riding on that player's account, say) from the
+checklist on `/admin/bookings/[id]`'s Post-Match panel; any row that ends
+up diverging from its server-computed default requires a shared reason,
+logged to `match_fee_waivers` (`UNIQUE(booking_id, player_id)`, immutable,
+distinct from the standing `fee_exemptions` table — a one-off judgment
+call for this match only, never leaking into any other booking). The
+total fee is divided by the total units (`Math.ceil`) to get a per-unit
+price, and each included player is debited `unit_price × their units`, one
+`wallet_transactions` row per player, `booking_id`-tagged.
+
+**The gap this closes.** Once `fees_applied`, the only way to fix a wrong
+fee used to be `PATCH /api/wallet/transactions` — a single admin
+correcting one player's wallet row at a time (see `features/wallet-ledger.md`
+§3). In practice a wrong fee is almost never a single-player mistake — the
+*base* fee itself was often wrong (the organiser's ground fee got revised,
+say), which means every included player's per-unit share needs
+recalculating and re-applying across the whole squad, not just one row.
+Doing that by hand, one `PATCH` per player, was tedious and error-prone
+(easy to mis-key an amount, easy to forget a player).
+
+**`PATCH /api/fees/apply`** — admin-only, rate-limited (`adminWrite`) —
+recomputes the split at the match level, the identical way `POST` does
+(shared `computeMatchFeeSplit()`, `src/lib/matchFeeSplit.ts`), against the
+booking's **current** `match_fee_override`/`tournament.match_fee`, squad,
+exemptions, and batted/bowled signals — so if the base fee was corrected
+first (editing `match_fee_override` on the booking), or a player's
+exemption changed, or the scorecard was re-synced with different
+batted/bowled data, the correction reflects all of that, not just a
+manually-typed new number.
+
+- **Requires fees to have actually been applied already** — 400s
+  ("use Apply Match Fees, not Correct Match Fee") if
+  `scorecard_uploads.status !== 'fees_applied'`.
+- **Diffs against the current *net* position, not the original debit
+  amount** — every `wallet_transactions` row carrying this `booking_id` is
+  summed (`debit − credit`) per player first. `booking_id` on a wallet
+  transaction is exclusive to match-fee entries in this app (the admin
+  top-up/debit route doesn't accept the field at all, and the quarterly
+  membership fee deliberately omits it for this exact reason — see
+  `features/wallet-ledger.md` §12), so this net is always "what this
+  player has actually been charged for this match so far," correct even
+  after an earlier correction already ran.
+- **Never mutates an existing debit row.** For every player whose
+  recomputed share differs from their current net, it inserts one fresh,
+  self-descriptive adjusting entry — a `debit` for the shortfall if their
+  share went up, a `credit` for the difference if it went down or they were
+  removed from the split entirely, a fresh `debit` for their full new share
+  if they're newly included. The ledger stays append-only; nothing already
+  written is ever edited or deleted. `players.wallet_balance` is adjusted
+  by exactly that entry's amount, same as every other wallet write in this
+  app.
+- **Requires a `correction_reason`** (distinct from `adjustment_reason`,
+  which is per-player and only required when a share diverges from the
+  default) — logged, along with a `base_fee`/`total_before`/`total_after`
+  and a `changes` array (`added`/`removed`/`adjusted` per player), to
+  `match_fee_corrections` (migration `075_match_fee_corrections.sql`) —
+  one immutable audit row per correction *event*, independent of the
+  individual adjusting ledger rows it produced.
+- **Never touches `scorecard_uploads.status`** — stays `fees_applied`
+  forever, exactly as before. A correction is a ledger-level fix, not a
+  re-run of the apply step.
+- Each affected player gets a push (`💰 Wallet Debited`/`💰 Wallet
+  Credited`) naming the old and new total, linking to `/wallet`.
+
+**UI:** `/admin/bookings/[id]`'s Post-Match panel — once fees are applied,
+an "✏️ Correct Match Fee" toggle opens the same include/units checklist the
+original apply flow uses, now showing each row's current charged amount
+next to its recomputed one (`₹old → ₹new`), plus the squad-wide net change
+(additional to collect, or a refund) before confirming.
+
+**Known limitation.** The correction only ever considers players in the
+*current* announced squad (via `computeMatchFeeSplit()`). If a player is
+removed from the squad entirely after being charged (rather than just set
+to `0` units within an unchanged squad), they drop out of the recomputed
+split and this route won't refund them — that's a squad-membership change,
+not a fee-share correction, and needs a manual `PATCH /api/wallet/transactions`
+refund instead.
+
 ---
 
 ## 7. API Routes (as shipped)
@@ -254,6 +348,7 @@ itself, same decoupling as everything else in this section.
 | `/api/matches/history/[bookingId]/roles` | PATCH | Same as `canEditRoles` (GC/admin/wrangler) | Corrects C/VC/WK on a past match. |
 | `/api/matches/history/[bookingId]/tournament` | PATCH | Admin only | Reassigns a mis-tagged tournament after the fact. |
 | `/api/fees/apply` | POST | Admin only | Pre-existing route, untouched in spirit. Only addition: sets `scorecard_uploads.status = 'fees_applied'` and `fees_applied_at`/`fees_applied_by` after a successful debit. |
+| `/api/fees/apply` | PATCH | Admin only | Added September 2026 — corrects an already-`fees_applied` booking's fee split at the match level, adjusting every affected squad member's wallet via a fresh, append-only ledger entry each. Never mutates the original debit rows, never touches `scorecard_uploads.status`. See §6.1. |
 
 ### Microservice endpoints (`spartans-python/api.py`)
 
@@ -490,6 +585,9 @@ deep-link (`?month=all`) that overrides it.
 | File size capped at 10MB server-side | ✅ Both the Hub route and the microservice enforce independently |
 | `MICROSERVICE_SECRET` / `ANALYTICS_SUPABASE_KEY` / `ANALYTICS_SUPABASE_URL` never in client bundle | ✅ No `NEXT_PUBLIC_` prefix on any of them |
 | Fees never auto-triggered | ✅ `scorecardBackfill.ts` and its cron caller never call `/api/fees/apply` — verified by reading the file, not just by comment |
+| `PATCH /api/fees/apply` (correction) admin-only, rate-limited, requires `fees_applied` status first | ✅ See §6.1 |
+| Match-fee correction never mutates an existing ledger row — always a fresh, self-descriptive adjusting entry | ✅ Ledger stays append-only; `match_fee_corrections` is the separate summary audit trail |
+| Match-fee correction never reverts `scorecard_uploads.status` off `fees_applied` | ✅ Verified by reading the route — no write to `scorecard_uploads` anywhere in the PATCH handler |
 | Fee-exempt players skipped server-side | ✅ Pre-existing behaviour in `/api/fees/apply`, untouched |
 | `match_stats_cache` / `scorecard_uploads` RLS | ✅ **Fixed 2026-07-15** — see Section 5. Was disabled since table creation; closed via migration `046`. |
 | CricHeroes direct-fetch endpoint auth | ✅ Server-to-server only (`MICROSERVICE_SECRET` header), never called from the browser |
@@ -514,6 +612,8 @@ deep-link (`?month=all`) that overrides it.
 | `src/lib/scorecardBackfill.ts` | `backfillOneBooking()` — shared core for the admin backfill page and the daily cron; chains parse → sync, never touches fees |
 | `src/app/api/admin/sync-match-stats/route.ts` | Manual sync trigger — thin wrapper around `matchStatsSync.ts` |
 | `src/app/api/admin/matches/[id]/post-match/route.ts` | Admin Post-Match panel feed (GET) + stuck-upload reset (DELETE) |
+| `src/lib/matchFeeSplit.ts` | `computeMatchFeeSplit()` — shared per-player fee/units/exemption computation, used by both `POST` (initial apply) and `PATCH` (correction, §6.1) `/api/fees/apply` |
+| `supabase/migrations/075_match_fee_corrections.sql` | `match_fee_corrections` — one immutable audit row per match-fee correction event (§6.1) |
 | `src/app/api/admin/scorecard-backfill/route.ts` | One-time backfill: GET lists eligible bookings, POST processes one |
 | `src/app/admin/scorecard-backfill/page.tsx` | Admin UI driving the client-side backfill loop |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron |

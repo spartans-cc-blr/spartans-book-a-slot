@@ -3,18 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { sendPushToPlayer } from '@/lib/webpush'
-import { feesApplySchema } from '@/lib/schemas'
-
-// Analytics DB field names aren't part of this repo's schema, so every
-// lookup tries a couple of likely keys — same tolerance as ScorecardTables.tsx.
-function pickField(row: any, keys: string[]): any {
-  for (const k of keys) if (row?.[k] != null) return row[k]
-  return null
-}
-function num(row: any, keys: string[]): number {
-  const v = pickField(row, keys)
-  return v != null ? Number(v) : 0
-}
+import { feesApplySchema, feesCorrectSchema } from '@/lib/schemas'
+import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
+import { computeMatchFeeSplit } from '@/lib/matchFeeSplit'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -49,7 +40,9 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle()
     if (existingDebit) {
-      return NextResponse.json({ error: 'Fees have already been applied for this booking' }, { status: 400 })
+      return NextResponse.json({
+        error: 'Fees have already been applied for this booking — use Correct Match Fee to revise the split.',
+      }, { status: 400 })
     }
   }
 
@@ -70,118 +63,10 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Derive fee server-side — never trust client input
-  const { data: bookingRow } = await supabase
-    .from('bookings')
-    .select('match_id, match_fee_override, tournament:tournaments(match_fee)')
-    .eq('id', booking_id)
-    .single()
+  const split = await computeMatchFeeSplit(supabase, booking_id, player_units)
+  if ('error' in split) return NextResponse.json({ error: split.error }, { status: split.status })
 
-  const baseFee: number | null =
-    (bookingRow as any)?.match_fee_override ??
-    (bookingRow as any)?.tournament?.match_fee ??
-    null
-
-  if (!baseFee) {
-    return NextResponse.json({ error: 'No match fee configured for this booking' }, { status: 400 })
-  }
-
-  // Fetch announced squad with live exemption data
-  const { data: squad } = await supabase
-    .from('squad')
-    .select('player_id, players(id, name, wallet_balance, fee_exemptions(start_date, end_date))')
-    .eq('booking_id', booking_id)
-    .eq('status', 'announced')
-
-  if (!squad?.length) {
-    return NextResponse.json({ error: 'No announced squad for this booking' }, { status: 400 })
-  }
-
-  // Unit overrides must actually be for players in this booking's own
-  // squad — never trust a client-supplied player_id beyond that.
-  const squadIds = new Set(squad.map(row => row.player_id))
-  const unitOverrideIds = Object.keys(player_units)
-  if (unitOverrideIds.some(id => !squadIds.has(id))) {
-    return NextResponse.json(
-      { error: "One or more players are not in this booking's announced squad" },
-      { status: 400 }
-    )
-  }
-
-  const today = new Date().toISOString().split('T')[0]
-  const isExempt = (row: any) =>
-    (row.players?.fee_exemptions ?? []).some(
-      (e: any) => e.start_date <= today && (e.end_date === null || e.end_date >= today)
-    )
-
-  // Batting/bowling involvement — the "did they actually get a role" signal
-  // for the waiver checklist. Same did-not-bat/bowl convention as
-  // ScorecardTables.tsx. Best-effort: if the match isn't synced yet or a
-  // scorecard name hasn't been reconciled to a player_id, this just comes
-  // back empty rather than blocking anything.
-  const battedIds = new Set<string>()
-  const bowledIds = new Set<string>()
-  if (bookingRow?.match_id) {
-    const { data: statsRow } = await supabase
-      .from('match_stats_cache')
-      .select('batting, bowling')
-      .eq('match_id', bookingRow.match_id)
-      .maybeSingle()
-    const nameToId = new Map(
-      squad.map(row => [((row.players as any)?.name ?? '').trim().toLowerCase(), row.player_id])
-    )
-    for (const row of (statsRow as any)?.batting ?? []) {
-      if (pickField(row, ['dismissal_method']) === 'did_not_bat' || num(row, ['balls', 'balls_faced']) <= 0) continue
-      const pid = pickField(row, ['player_id']) ?? nameToId.get((pickField(row, ['player_name', 'name']) ?? '').trim().toLowerCase())
-      if (pid) battedIds.add(pid)
-    }
-    for (const row of (statsRow as any)?.bowling ?? []) {
-      if (num(row, ['overs', 'overs_bowled']) <= 0) continue
-      const pid = pickField(row, ['player_id']) ?? nameToId.get((pickField(row, ['player_name', 'name']) ?? '').trim().toLowerCase())
-      if (pid) bowledIds.add(pid)
-    }
-  }
-
-  // Default share count for a player who wasn't given an explicit override:
-  // 0 for a standing exemption (never overridable — see below) or a squad
-  // member with no recorded batting/bowling role, 1 for a recognized role.
-  // "No role recorded" defaults to excluded rather than included — a player
-  // who never appears on the scorecard at all is assumed not to have
-  // actually played, not silently charged unless an admin notices and
-  // unchecks them.
-  const defaultUnits = (row: any): number => {
-    if (isExempt(row)) return 0
-    return battedIds.has(row.player_id) || bowledIds.has(row.player_id) ? 1 : 0
-  }
-
-  // Final units per player: the client's override if one was sent for that
-  // player, clamped 0-12 (already enforced by the schema), else the
-  // server-computed default. A standing exemption always wins regardless of
-  // what the client sent — same as the old "waived: true, disabled" row,
-  // never client-overridable.
-  const finalUnits = (row: any): number =>
-    isExempt(row) ? 0 : (player_units[row.player_id] ?? defaultUnits(row))
-
-  const squadDetail = squad.map(row => ({
-    player_id:     row.player_id,
-    name:          (row.players as any)?.name ?? 'Unknown',
-    exempt:        isExempt(row),
-    batted:        battedIds.has(row.player_id),
-    bowled:        bowledIds.has(row.player_id),
-    units:         finalUnits(row),
-    default_units: defaultUnits(row),
-  }))
-
-  const totalUnits = squadDetail.reduce((sum, row) => sum + row.units, 0)
-  const unitPrice = totalUnits > 0 ? Math.ceil(baseFee / totalUnits) : 0
-  const squadWithFee = squadDetail.map(row => ({ ...row, fee: unitPrice * row.units }))
-  const includedCount = squadWithFee.filter(row => row.units > 0).length
-  const totalCollectable = squadWithFee.reduce((sum, row) => sum + row.fee, 0)
-
-  // Rows whose final share diverges from the server-computed default —
-  // these are the only ones that need (and get) a logged reason, and the
-  // only ones written to match_fee_waivers on confirm.
-  const adjustedRows = squadWithFee.filter(row => row.units !== row.default_units)
+  const { squad: squadWithFee, unitPrice, includedCount, totalCollectable, totalSquad, adjustedRows, baseFee, totalUnits } = split
 
   if (!confirm) {
     // Dry-run: return the computed fee without applying
@@ -191,7 +76,7 @@ export async function POST(req: NextRequest) {
       unit_price:        unitPrice,
       included_count:    includedCount,
       total_collectable: totalCollectable,
-      total_squad:       squad.length,
+      total_squad:       totalSquad,
       squad:             squadWithFee,
     })
   }
@@ -212,13 +97,18 @@ export async function POST(req: NextRequest) {
   // awaited before the response is returned (Vercel kills fire-and-forget
   // work the instant a serverless function returns — see webpush.ts).
   const pushes: Promise<unknown>[] = []
-  for (const row of squad) {
-    const units = finalUnits(row)
-    if (units <= 0) continue
-    const fee = unitPrice * units
+  for (const row of squadWithFee) {
+    if (row.units <= 0) continue
+    const fee = row.fee
 
-    const player = row.players as any
-    const currentBalance: number = player?.wallet_balance ?? 0
+    const { data: playerRow, error: fetchErr } = await supabase
+      .from('players')
+      .select('wallet_balance')
+      .eq('id', row.player_id)
+      .single()
+    if (fetchErr || !playerRow) { errors.push(`${row.player_id}: player not found`); continue }
+
+    const currentBalance: number = playerRow.wallet_balance ?? 0
     const newBalance = currentBalance - fee
 
     const { error } = await supabase
@@ -239,7 +129,7 @@ export async function POST(req: NextRequest) {
       amount:      fee,
       type:        'debit',
       booking_id,
-      reason:      `Match fee debit — ₹${fee}${units > 1 ? ` (${units} shares)` : ''}`,
+      reason:      `Match fee debit — ₹${fee}${row.units > 1 ? ` (${row.units} shares)` : ''}`,
     })
     if (txError) errors.push(`${row.player_id} (ledger): ${txError.message}`)
 
@@ -289,5 +179,205 @@ export async function POST(req: NextRequest) {
     total_collectable: totalCollectable,
     players_debited:   includedCount,
     players_adjusted:  adjustedRows.length,
+  })
+}
+
+// PATCH — corrects an already-applied match fee at the match level: the
+// per-player split is recomputed the same way POST does (same squad,
+// exemptions, batted/bowled defaults, plus any fresh unit overrides), and
+// every player whose recomputed share differs from what they've actually
+// been charged for this booking so far gets a single adjusting ledger
+// entry for exactly the difference — never a manual per-wallet edit, and
+// never a mutation of the original debit rows. See
+// features/post-match-scorecard.md §6.1.
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const limited = await rateLimit(req, RATE_LIMITS.adminWrite, user.playerId)
+  if (limited) return limited
+
+  const body = await req.json().catch(() => null)
+  const parsed = feesCorrectSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Invalid request' },
+      { status: 400 }
+    )
+  }
+  const { booking_id, confirm, player_units, adjustment_reason, correction_reason } = parsed.data
+
+  const supabase = createServiceClient()
+
+  const { data: uploadRow } = await supabase
+    .from('scorecard_uploads')
+    .select('status')
+    .eq('booking_id', booking_id)
+    .maybeSingle()
+  if (uploadRow?.status !== 'fees_applied') {
+    return NextResponse.json(
+      { error: 'Fees have not been applied for this booking yet — use Apply Match Fees, not Correct Match Fee.' },
+      { status: 400 }
+    )
+  }
+
+  // Every wallet_transactions row carrying this booking_id is a match-fee
+  // entry — nothing else in this app writes booking_id onto a wallet
+  // transaction (POST /api/wallet/transactions doesn't accept the field at
+  // all, and the quarterly membership fee deliberately omits it — see
+  // features/wallet-ledger.md §12 — specifically to avoid colliding with
+  // this same signal). So the net of every existing row per player here is
+  // exactly "what this player has actually been charged for this match so
+  // far," correct even after an earlier correction pass already ran.
+  const { data: existingRows, error: existingErr } = await supabase
+    .from('wallet_transactions')
+    .select('player_id, type, amount')
+    .eq('booking_id', booking_id)
+  if (existingErr) return NextResponse.json({ error: existingErr.message }, { status: 500 })
+  if (!existingRows?.length) {
+    return NextResponse.json(
+      { error: 'No existing match fee ledger entries found for this booking.' },
+      { status: 400 }
+    )
+  }
+
+  const currentNet = new Map<string, number>()
+  for (const row of existingRows) {
+    const delta = row.type === 'debit' ? Number(row.amount) : -Number(row.amount)
+    currentNet.set(row.player_id, (currentNet.get(row.player_id) ?? 0) + delta)
+  }
+  const totalBefore = existingRows.reduce(
+    (sum, row) => sum + (row.type === 'debit' ? Number(row.amount) : -Number(row.amount)), 0
+  )
+
+  const split = await computeMatchFeeSplit(supabase, booking_id, player_units)
+  if ('error' in split) return NextResponse.json({ error: split.error }, { status: split.status })
+
+  const diffRows = split.squad
+    .map(row => {
+      const oldFee = currentNet.get(row.player_id) ?? 0
+      return { ...row, old_fee: oldFee, delta: row.fee - oldFee }
+    })
+    .filter(row => row.delta !== 0)
+
+  if (!confirm) {
+    return NextResponse.json({
+      base_fee:                    split.baseFee,
+      total_units:                 split.totalUnits,
+      unit_price:                  split.unitPrice,
+      included_count:              split.includedCount,
+      total_squad:                 split.totalSquad,
+      squad:                       split.squad.map(row => ({ ...row, old_fee: currentNet.get(row.player_id) ?? 0 })),
+      total_collectable:           split.totalCollectable,
+      total_previously_collected:  totalBefore,
+      net_change:                  split.totalCollectable - totalBefore,
+      changed_count:               diffRows.length,
+    })
+  }
+
+  if (split.adjustedRows.length > 0 && !adjustment_reason) {
+    return NextResponse.json(
+      { error: "A reason is required when adjusting a player's fee share from the default" },
+      { status: 400 }
+    )
+  }
+  if (!diffRows.length) {
+    return NextResponse.json(
+      { error: 'Nothing to correct — the recomputed split already matches what was charged.' },
+      { status: 400 }
+    )
+  }
+
+  const errors: string[] = []
+  const pushes: Promise<unknown>[] = []
+  const changes: { player_id: string; name: string; old_fee: number; new_fee: number; action: 'added' | 'removed' | 'adjusted' }[] = []
+
+  for (const row of diffRows) {
+    const { data: playerRow, error: playerErr } = await supabase
+      .from('players')
+      .select('wallet_balance')
+      .eq('id', row.player_id)
+      .single()
+    if (playerErr || !playerRow) { errors.push(`${row.player_id}: player not found`); continue }
+
+    const currentBalance = Number(playerRow.wallet_balance ?? 0)
+    const action: 'added' | 'removed' | 'adjusted' =
+      row.old_fee <= 0 ? 'added' : row.fee <= 0 ? 'removed' : 'adjusted'
+
+    // Always an additive adjusting entry, never a mutation of an existing
+    // row — correct under any number of repeat corrections, since it's
+    // derived from the current net position rather than one specific
+    // transaction's id.
+    const isRefund = row.delta < 0
+    const magnitude = Math.abs(row.delta)
+    const { error: txErr } = await supabase.from('wallet_transactions').insert({
+      player_id: row.player_id,
+      amount:    magnitude,
+      type:      isRefund ? 'credit' : 'debit',
+      booking_id,
+      reason:    isRefund
+        ? `Match fee correction — refund ₹${magnitude} (revised total ₹${row.fee})`
+        : `Match fee correction — additional ₹${magnitude} (revised total ₹${row.fee})`,
+    })
+    if (txErr) { errors.push(`${row.player_id} (ledger): ${txErr.message}`); continue }
+
+    const newBalance = currentBalance + (isRefund ? magnitude : -magnitude)
+    const { error: balErr } = await supabase
+      .from('players')
+      .update({ wallet_balance: newBalance })
+      .eq('id', row.player_id)
+    if (balErr) { errors.push(`${row.player_id} (balance): ${balErr.message}`); continue }
+
+    pushes.push(sendPushToPlayer(row.player_id, {
+      title: isRefund ? '💰 Wallet Credited' : '💰 Wallet Debited',
+      body: `Match fee corrected — ₹${row.old_fee} → ₹${row.fee}. New balance: ₹${newBalance}`,
+      url: '/wallet',
+    }))
+    changes.push({ player_id: row.player_id, name: row.name, old_fee: row.old_fee, new_fee: row.fee, action })
+  }
+
+  if (split.adjustedRows.length) {
+    const { error: waiverErr } = await supabase.from('match_fee_waivers').insert(
+      split.adjustedRows.map(row => ({
+        booking_id,
+        player_id:       row.player_id,
+        units:           row.units,
+        reason:          `${adjustment_reason!} (correction)`,
+        waived_by:       user.playerId ?? null,
+        waived_by_email: user.email ?? '',
+      }))
+    )
+    if (waiverErr) errors.push(`adjustments: ${waiverErr.message}`)
+  }
+
+  await Promise.allSettled(pushes)
+
+  // The one summary record for "why was this match's fee revisited" —
+  // independent of hunting through the individual adjusting ledger rows
+  // above, which each only carry their own player's before/after.
+  const { error: logErr } = await supabase.from('match_fee_corrections').insert({
+    booking_id,
+    base_fee:           split.baseFee,
+    total_before:       totalBefore,
+    total_after:        split.totalCollectable,
+    changes,
+    corrected_by:       user.playerId ?? null,
+    corrected_by_email: user.email ?? '',
+    correction_reason,
+  })
+  if (logErr) errors.push(`correction log: ${logErr.message}`)
+
+  if (errors.length) {
+    return NextResponse.json({ error: 'Partial failure', details: errors }, { status: 500 })
+  }
+
+  return NextResponse.json({
+    ok:                          true,
+    unit_price:                  split.unitPrice,
+    total_collectable:           split.totalCollectable,
+    total_previously_collected:  totalBefore,
+    net_change:                  split.totalCollectable - totalBefore,
+    players_changed:             changes.length,
   })
 }
