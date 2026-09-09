@@ -42,7 +42,7 @@ Server component with `revalidate = 60`. Session is read server-side via `getSer
  
 ### Role Detection
  
-`isAdmin` is checked and `redirect('/admin')`'d **before** any dashboard data is fetched or rendered — an admin never actually sees this page's player dashboard. (The pre-September-2026 version of this doc listed an "Admin shortcut" panel on the dashboard; that JSX was already dead code by the time this page's admin-redirect shipped, since `isAdmin` can never be `true` inside the dashboard branch. Removed in the September 2026 dashboard rebuild rather than left as unreachable code.)
+**No forced admin redirect (changed September 2026).** This page previously checked `isAdmin` and `redirect('/admin')`'d **before** any dashboard data was fetched or rendered, so an admin could never reach this page's player dashboard — even one who is also a registered player, and even by deliberately clicking the logo/Home link. This was reported as a real usability problem for an admin who is *also* a signed-in club member: they had no way to land on their own player dashboard from Home, only the nav's "Admin" pill (`SiteNav.tsx`, ~line 217-218 desktop / ~292-293 mobile) to go the *other* direction, into `/admin`. The redirect was removed — `isAdmin` is now just another independent flag on this page, the same way `isCaptain`/`isGC` already were, and is no longer exclusive with `isPlayer`. (The pre-September-2026 version of this doc listed an "Admin shortcut" panel on the dashboard; that JSX was already dead code by the time this page's admin-redirect first shipped, since `isAdmin` could never be `true` inside the dashboard branch. Removed in the earlier September 2026 dashboard rebuild rather than left as unreachable code — unrelated to this later change, which removes the redirect itself.)
  
 | State | Condition | What they see |
 |---|---|---|
@@ -50,9 +50,12 @@ Server component with `revalidate = 60`. Session is read server-side via `getSer
 | Registered player | `player.playerId` set, status ≠ `expelled` | Personalised dashboard (§3.1) + both audience cards below |
 | Captain | `player.isCaptain = true` | Player dashboard + "Squad Selection" quick action |
 | GC | `player.isGC = true` | Player dashboard + "Squad Review" quick action |
-| Admin | `player.isAdmin = true` | Redirected to `/admin` — never reaches this page's dashboard |
+| Admin, also a registered player | `player.isAdmin = true` and `player.playerId` set | Personalised dashboard (§3.1), same as any other registered player — no admin-specific content on this page |
+| Admin, not a registered player | `player.isAdmin = true`, no `player.playerId` | "Not registered yet" callout (same as any unmatched Gmail) + both audience cards below |
 | Expelled | `player.playerStatus === 'expelled'` | Suspension notice only |
 | Unmatched Gmail | Signed in but no `playerId` | "Not registered yet" callout — contact admin |
+
+Reaching `/admin` itself is unchanged — still exclusively via the nav's "Admin" pill (`isAdmin`-gated, unaffected by this change) or a direct URL; `/admin/layout.tsx`'s own guard (redirect unauthenticated visitors to `/login`, redirect authenticated non-admins to `/?error=unauthorized`) is a separate, still-live check on the *admin* subtree and was not touched by this change.
 
 ---
 

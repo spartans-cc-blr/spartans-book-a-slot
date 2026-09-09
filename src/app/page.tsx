@@ -8,7 +8,6 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { getNudgeForPlayer, getWeekendGapForPlayer } from '@/lib/availabilityNudge'
 import { WeekendAvailabilityGreeting } from '@/components/ui/WeekendAvailabilityGreeting'
 
@@ -315,7 +314,6 @@ export default async function HomePage() {
   const isCaptain   = isPlayer && !!player?.isCaptain
   const isGC        = isPlayer && !!player?.isGC
   const isAdmin     = isLoggedIn && !!player?.isAdmin
-  if (isAdmin) redirect('/admin')
   const isExpelled  = isLoggedIn && player?.playerStatus === 'expelled'
   const isUnmatched = isLoggedIn && !player?.playerId && !isExpelled
 
