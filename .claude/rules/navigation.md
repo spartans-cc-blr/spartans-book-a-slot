@@ -296,7 +296,7 @@ Tab set depends on auth state (mirrors the same gates the desktop `links` array 
 |---|---|
 | Expelled | Home only |
 | Not logged in | Home · Schedule |
-| Logged in, not expelled | Home · Matches · Dugout · **More** |
+| Logged in, not expelled | Home · Matches · My Stats · **More** |
 
 **"Matches" always links to `/fixtures`** and is active for both
 `activePage === 'fixtures'` and `activePage === 'matches'` — as of
@@ -307,20 +307,36 @@ tab with Upcoming/Past Matches as an in-page toggle instead — see
 `features/player-availability.md` §10.2). The desktop `links` array's own
 "Matches ▾" dropdown (Upcoming/Past Matches) already worked this way from
 the start; this brings mobile in line with it rather than introducing a
-new pattern. **More** is always the last slot, a button (not a link) that
+new pattern.
+
+**"My Stats" replaced "Dugout" as the third tab slot (added September
+2026).** The club coordinator felt "Dugout" — a grab-bag landing page for
+Kit Room/Gear Exchange/Store Orders — wasn't the destination players would
+actually reach for from the bottom bar as often as their own stats. "My
+Stats" links to `/leaderboard` (the same destination the desktop nav's
+"Stats" link and the sheet's former "Stats" row both already pointed at)
+and is active for `activePage === 'leaderboard'`, reusing the sheet's
+existing `TrophyIcon` (now accepting an optional `size` prop — `21` in the
+tab, its original `16` default everywhere else it's used). Losing its own
+tab slot doesn't remove Dugout from mobile navigation entirely — it moved
+into the **More** sheet instead (see below), the same "still one tap away,
+just not a fixed slot" tradeoff every other sheet-only destination already
+makes. **More** is always the last slot, a button (not a link) that
 toggles the bottom sheet — it shows the same active-gold treatment
 whenever the sheet is open, or whenever `activePage` is one of the values
-that only live inside the sheet (`isAdminOrGcHighlighted()`: `leaderboard`,
+that only live inside the sheet (`isAdminOrGcHighlighted()`: `dugout`,
 `profile`, `planner`, `captains`, `captains-unavailable`, `gc`,
-`gc-players`, `wrangler`, `schedule` — deliberately excludes `matches`,
-which is now covered by the Matches tab's own `active` check instead).
+`gc-players`, `wrangler`, `schedule` — deliberately excludes `matches` and
+`leaderboard`, both now covered by their own tab's `active` check instead;
+`dugout` moved the other way, gaining an entry in this list now that it no
+longer has a tab of its own).
 
 ### "More" sheet
 
 A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `max-h-[70vh]`) with a full-screen scrim behind it. Content branches the same way `SiteNav`'s desktop dropdowns do:
 
 - **Expelled** — just an "Account suspended" notice, no links.
-- **Logged in** — Stats (Leaderboard), My Profile (or "Complete Registration" → `/join` if `playerId` is null), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
+- **Logged in** — The Dugout (moved here from its own tab slot, September 2026 — see above; `ShieldIcon` at its sheet-row `size={16}`), My Profile (or "Complete Registration" → `/join` if `playerId` is null), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
   - **Captains' Corner** (`isCaptain || isAdmin`) — Squad Selection, Unavailable Dates
   - **Council** (`isGC`) — Squad Review, Feedback, Players, Store Orders, Grounds, `GenerateInviteItem`
   - **Wrangler** (`isWrangler`) — Squad Backfill, Grounds
