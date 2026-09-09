@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Tournament, SlotTime, GameFormat, ValidationResult, RuleCheckItem } from '@/types'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
+import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
 
 type Ground   = { id: string; name: string; maps_url: string; hospital_url: string }
 type Captain  = { id: string; name: string; active: boolean }
@@ -119,14 +120,9 @@ export default function NewBookingPage() {
       }
 
       const matchSegment = parts[parts.length - 1]
-      if (matchSegment?.includes('-vs-')) {
-        const [teamA, teamB] = matchSegment.split('-vs-')
-        const opponent = teamA.includes('spartans') ? teamB : teamA
-        const formatted = opponent
-          .split('-')
-          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(' ')
-        setOpponentName(prev => prev || formatted)
+      const opponentGuess = matchSegment ? opponentFromMatchSlug(matchSegment) : null
+      if (opponentGuess) {
+        setOpponentName(prev => prev || opponentGuess)
       }
 
       const tournamentSlug = parts[2] ?? ''

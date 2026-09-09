@@ -7,6 +7,7 @@ import { SLOT_TIMES, SLOT_FORMATS, ORGANISER_SELF_SERVICE_REASON, isInformalForm
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 import { buildOrganiserWhatsAppUrl, buildCaptainWhatsAppUrl } from '@/lib/bookingNotify'
+import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
 
 type ScorecardUploadStatus = 'pending_parse' | 'parsed' | 'synced' | 'fees_applied'
 
@@ -565,13 +566,9 @@ function BookingDetailPageInner() {
       }
 
       const slug = parts[parts.length - 1] ?? ''
-      if (slug.includes('-vs-')) {
-        const [teamA, teamB] = slug.split('-vs-')
-        const opponent = teamA.toLowerCase().includes('spartan') ? teamB : teamA
-        const formatted = opponent.split('-')
-          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(' ')
-        setOpponentName(formatted)
+      const opponentGuess = opponentFromMatchSlug(slug)
+      if (opponentGuess) {
+        setOpponentName(opponentGuess)
       }
     } catch { /* invalid URL — ignore */ }
   }, [cricheroes])
