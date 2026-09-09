@@ -359,6 +359,44 @@ disabled, an inline note pointing at "Correct Match Fee" on the booking
 page) but the server check is the real gate. See
 `features/wallet-ledger.md` §3 and §15.
 
+**The Post-Match panel's fee breakdown lists one row per player, not one
+per ledger entry (fixed September 2026).** The panel's "Fees Applied"
+section (`GET /api/admin/matches/[id]/post-match`) originally fetched
+every `debit`-type `wallet_transactions` row for the booking and listed
+each one as its own line, sourced by `player_id` + `amount` with no
+aggregation — correct back when a booking could only ever have exactly
+one debit row per player, but once a match-fee correction can add a
+second adjusting entry for the same player (§ above), the same name
+started appearing twice in the list (their original share, then the
+adjusting entry, as two separate lines an admin had to add up by hand),
+and a `credit` (refund) row was silently dropped entirely since the query
+only ever selected `type = 'debit'`. Fixed by fetching every
+`wallet_transactions` row for the booking regardless of type, netting
+`debit − credit` per `player_id`, and showing one line per player with
+their true current total — a player netted to zero or less (fully
+refunded, e.g. removed from the squad — see above) drops off the list
+entirely rather than showing a stale or zero row. The "₹X collected · N
+players charged" summary line above the list is unchanged code (it just
+sums/counts `feeBreakdown`), so it self-corrects once the underlying rows
+are netted correctly.
+
+**"Correct Match Fee" asked for the same reason twice (fixed September
+2026).** The correction UI originally had two separate required text
+inputs — "Reason for this player's share" (`adjustment_reason`, shown
+only when a unit diverges from the server-computed default) and "Reason
+for this correction" (`correction_reason`, always shown) — mirroring the
+two distinct fields the API accepts. In practice they're almost always
+the same explanation ("didn't bat, exclude them" answers both "why does
+this player's share differ" and "why is this match's fee being
+revisited"), so showing both boxes just asked the admin to type the same
+sentence twice. Collapsed to a single reason input in the UI, sent as
+both `adjustment_reason` (when any row's units diverge from default) and
+`correction_reason` in the same `PATCH /api/fees/apply` call — the API
+itself is unchanged and still accepts the two as logically distinct
+fields (`adjustment_reason` → `match_fee_waivers`, `correction_reason` →
+`match_fee_corrections`), this is purely a client-side simplification of
+what the admin has to type.
+
 ---
 
 ## 7. API Routes (as shipped)

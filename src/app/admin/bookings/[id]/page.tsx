@@ -243,7 +243,8 @@ function BookingDetailPageInner() {
   const [correctError,        setCorrectError]        = useState('')
   const [correctConfirming,   setCorrectConfirming]   = useState(false)
   const [correctUnitsMap,     setCorrectUnitsMap]     = useState<Record<string, number>>({})
-  const [correctAdjustReason, setCorrectAdjustReason] = useState('')
+  // One reason field, used for both the per-player share divergence (if
+  // any) and the overall correction event — see handleCorrectFees().
   const [correctionReason,    setCorrectionReason]    = useState('')
   const [scorecardOpen,    setScorecardOpen]     = useState(false)
   const [scorecard,        setScorecard]         = useState<{ batting: any[]; bowling: any[]; fielding?: any[]; team_list?: any[] } | null>(null)
@@ -462,7 +463,6 @@ function BookingDetailPageInner() {
   function openCorrection() {
     setCorrectionOpen(true)
     setCorrectUnitsMap({})
-    setCorrectAdjustReason('')
     setCorrectionReason('')
     setCorrectPreview(null)
     fetchCorrectionPreview({})
@@ -484,12 +484,13 @@ function BookingDetailPageInner() {
   async function handleCorrectFees() {
     if (!correctPreview) return
     const adjustedRows = correctPreview.squad.filter(r => r.units !== r.default_units)
-    if (adjustedRows.length > 0 && !correctAdjustReason.trim()) {
-      setCorrectError("A reason is required when adjusting a player's fee share from the default.")
-      return
-    }
+    // One reason field covers both "why is this player's share off the
+    // default" and "why is this match's fee being revised" — in practice
+    // they're almost always the same story (e.g. "didn't bat, exclude
+    // them" is both), so asking for it twice was just re-asking the same
+    // question. Sent as both adjustment_reason and correction_reason below.
     if (!correctionReason.trim()) {
-      setCorrectError('A reason is required for this correction — why is the match fee being revised?')
+      setCorrectError('A reason is required for this correction.')
       return
     }
     if (correctPreview.changed_count === 0) {
@@ -512,7 +513,7 @@ function BookingDetailPageInner() {
           booking_id: id,
           confirm: true,
           player_units: correctUnitsMap,
-          adjustment_reason: adjustedRows.length > 0 ? correctAdjustReason.trim() : undefined,
+          adjustment_reason: adjustedRows.length > 0 ? correctionReason.trim() : undefined,
           correction_reason: correctionReason.trim(),
         }),
       })
@@ -1196,12 +1197,6 @@ function BookingDetailPageInner() {
                                   </span>
                                 </div>
                               ))}
-                              {correctPreview.squad.some(r => r.units !== r.default_units) && (
-                                <input type="text" value={correctAdjustReason}
-                                  onChange={e => setCorrectAdjustReason(e.target.value)}
-                                  placeholder="Reason for this player's share — e.g. Did not bat or bowl, or covering a guest player"
-                                  className="form-input mt-1.5 text-xs" />
-                              )}
                             </div>
 
                             {/* Charged for this match but no longer in the
@@ -1224,7 +1219,7 @@ function BookingDetailPageInner() {
 
                             <input type="text" value={correctionReason}
                               onChange={e => setCorrectionReason(e.target.value)}
-                              placeholder="Reason for this correction — e.g. Ground fee was revised down by the organiser"
+                              placeholder="Reason — e.g. Did not bat/bowl, covering a guest player, or organiser revised the ground fee"
                               className="form-input text-xs" />
                             <p className="font-rajdhani text-xs text-zinc-400">
                               Previously collected: ₹{correctPreview.total_previously_collected} · Revised total: ₹{correctPreview.total_collectable}
