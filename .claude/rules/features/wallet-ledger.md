@@ -178,6 +178,15 @@ admin drill-down both always page newest-first; Brought Forward is only
 ever the *last* thing you reach, never a starting point you page away
 from.
 
+**Not the tool for reversing a mistaken in-ledger transaction.** Because
+this column never feeds `players.wallet_balance`, it can't be used to fix
+an actual wrong balance — only to annotate the display anchor beneath
+already-correct ledger history. A real mistaken debit/credit (e.g. a match
+fee applied after it had already been settled outside the Hub — see
+`features/post-match-scorecard.md` §6.1's 9 Sep 2026 incident) needs a
+genuine reversing transaction in the ledger itself, not a Brought Forward
+adjustment alongside it.
+
 ---
 
 ## 6. Player statement — `/wallet`, `WalletStatementClient`

@@ -397,6 +397,41 @@ fields (`adjustment_reason` → `match_fee_waivers`, `correction_reason` →
 `match_fee_corrections`), this is purely a client-side simplification of
 what the admin has to type.
 
+**Incident (9 Sep 2026) — a match fee was applied on the Hub for a booking
+whose fee had already been collected offline, double-charging 8 players.**
+The 14 Aug 2026 "BK Weekdays Bash-1" booking (vs Notorious Xi, 07:30 T30)
+had its fee collected from the squad outside the Hub before this feature's
+scorecard sync ever ran; `scorecard_uploads.fees_reconciled_externally` was
+never set for it, so once the scorecard synced and an admin ran Apply Match
+Fees, all 8 squad players were debited ₹532 each on top of what they'd
+already paid — a real double-charge, not a bug in the split math itself
+(`total_before` = 4256 = 8 × ₹532, matching `Math.ceil(4250 / 8)` exactly).
+
+**Fixed via a direct, one-off database correction** (Supabase MCP SQL, not
+a re-run of `PATCH /api/fees/apply` through the running app, since this was
+diagnosed and applied outside a normal admin session): inserted one
+`credit` row per affected player for the full ₹532 each (net effect on
+that `booking_id` = ₹0, `players.wallet_balance` restored), zeroed
+`bookings.match_fee_override` to `0` so the tournament's own `match_fee`
+can never be silently re-applied to this booking again, set
+`scorecard_uploads.fees_reconciled_externally = true` to correctly reflect
+that this match's fee was always meant to be handled outside the Hub, and
+logged one `match_fee_corrections` row summarising the reversal —
+`scorecard_uploads.status` was left at `fees_applied`, unchanged, per the
+architectural invariant that it never reverts.
+
+**Why not fold this into `wallet_opening_balance` ("Brought Forward")
+instead, as first suggested when reporting this.** That field
+(`features/wallet-ledger.md` §5) is a pure display anchor for the
+statement's oldest visible line — it never feeds `players.wallet_balance`,
+which is the number every dues check, `/wallet` top balance, and squad-fee
+projection actually reads. These 8 debits were a same-day, in-ledger
+mistake, not a pre-ledger balance the app never had a transaction for — a
+genuine reversing `credit` transaction (as above) is the correct fix and
+is what actually restores the true balance; adjusting Brought Forward
+alongside it would have double-corrected the same ₹532 without fixing the
+real number anywhere the app checks it.
+
 ---
 
 ## 7. API Routes (as shipped)
