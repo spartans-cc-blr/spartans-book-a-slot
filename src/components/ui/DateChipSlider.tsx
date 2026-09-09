@@ -33,10 +33,20 @@ interface DateChipSliderProps {
   groups:   DateChipGroup[]
   selected: string | null // null = "All"
   onSelect: (key: string | null) => void
+  // Trailing "Load Older" chip — optional, only meaningful for a paginated
+  // caller (e.g. /matches/history's cursor-paginated match list). Omitted
+  // entirely (no chip rendered) for a non-paginated caller like /fixtures,
+  // which has nothing further to load. When provided, `onLoadMore` fetches
+  // the next page — the chip row then grows on its own since `groups` is
+  // derived from whatever's currently loaded, same as the existing
+  // "Load Older Matches" button at the bottom of the page.
+  hasMore?:     boolean
+  loadingMore?: boolean
+  onLoadMore?:  () => void
 }
 
-export function DateChipSlider({ groups, selected, onSelect }: DateChipSliderProps) {
-  if (groups.length === 0) return null
+export function DateChipSlider({ groups, selected, onSelect, hasMore, loadingMore, onLoadMore }: DateChipSliderProps) {
+  if (groups.length === 0 && !hasMore) return null
 
   return (
     <div
@@ -94,6 +104,20 @@ export function DateChipSlider({ groups, selected, onSelect }: DateChipSliderPro
           </button>
         )
       })}
+
+      {hasMore && onLoadMore && (
+        <button
+          onClick={onLoadMore}
+          disabled={loadingMore}
+          aria-label="Load older matches"
+          title="Load older matches"
+          className="flex-shrink-0 w-[58px] flex flex-col items-center justify-center rounded-xl py-1.5 transition-colors disabled:opacity-50"
+          style={{ background: '#EEEAE2', border: '1px dashed #D4C9B0', color: '#78716C' }}
+        >
+          <span className="font-rajdhani text-lg font-extrabold leading-tight">{loadingMore ? '…' : '+'}</span>
+          <span className="font-rajdhani text-[9px] font-bold leading-tight text-center">{loadingMore ? 'Loading' : 'Older'}</span>
+        </button>
+      )}
     </div>
   )
 }

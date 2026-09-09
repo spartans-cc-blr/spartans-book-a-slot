@@ -513,9 +513,16 @@ export function MatchHistoryClient({
       {/* Date-chip slider — same Warm Light palette as the filter bar above it.
           Purely a client-side refinement over whatever `matches` already
           holds — see the `distinctDates`/`visibleMatches` derivation above. */}
-      {!loading && !error && distinctDates.length > 0 && (
+      {!loading && !error && (distinctDates.length > 0 || !!nextCursor) && (
         <div className="rounded-xl p-3" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
-          <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={setDayFilter} />
+          <DateChipSlider
+            groups={dateChipGroups}
+            selected={dayFilter}
+            onSelect={setDayFilter}
+            hasMore={!!nextCursor}
+            loadingMore={loadingMore}
+            onLoadMore={loadMore}
+          />
         </div>
       )}
 

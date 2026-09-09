@@ -1251,9 +1251,31 @@ server-side filter change, so it can never silently point at a date no
 longer present in the loaded set. The flagged ("⚠ Needs Reconciliation") /
 rest split, the "N matches" count line, and the empty-state message all now
 read from `visibleMatches` rather than `matches` directly; pagination
-(`loadMore`/`nextCursor`) is unaffected — "Load Older Matches" still pages
-the server-side `matches` array regardless of whether a day chip is
-currently narrowing what's shown.
+(`loadMore`/`nextCursor`) is otherwise unaffected — "Load Older Matches"
+still pages the server-side `matches` array regardless of whether a day
+chip is currently narrowing what's shown. See "Load Older from inside the
+slider" below for the one addition to this.
+
+**Load Older from inside the slider (added September 2026).** Before this,
+the only way to reach an older match not yet loaded was the "Load Older
+Matches" button at the bottom of the whole page — the date-chip row itself
+just stopped at whatever `distinctDates` currently held, with no
+indication from the slider that more history existed. Reported directly:
+the slider should be able to grow itself, not just display whatever's
+already been paged in. `DateChipSlider` (`src/components/ui/DateChipSlider.tsx`)
+gained three optional props — `hasMore`, `loadingMore`, `onLoadMore` — all
+omitted by `/fixtures`' own use of the same component (`FixturesDateFilterBar.tsx`,
+which has nothing to paginate), so that page's behaviour is byte-for-byte
+unchanged. `MatchHistoryClient.tsx` passes `hasMore={!!nextCursor}`,
+`loadingMore={loadingMore}`, `onLoadMore={loadMore}` — the exact same
+`loadMore()`/`nextCursor` state the bottom button already drove, just
+wired to a second trigger. When present, a trailing dashed "+ Older" chip
+renders after the date groups; tapping it calls the same `loadMore()`,
+which appends matches to `matches` — `distinctDates`/`dateChipGroups` are
+recomputed on every render, so the slider grows in place as older matches
+land, with no separate "refresh the chip row" step needed. The bottom
+"Load Older Matches" button is unchanged and still present — this is an
+added entry point, not a replacement.
 
 **Shares `DateChipSlider` with `/fixtures`'s own date-chip filter**
 (`features/player-availability.md` §10.1) — same component, same Warm
@@ -1361,7 +1383,7 @@ URL.
 
 | File | Role |
 |---|---|
-| `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component (`groups: DateChipGroup[]`, `selected`, `onSelect`), also used by `/fixtures` |
+| `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component (`groups: DateChipGroup[]`, `selected`, `onSelect`), plus optional `hasMore`/`loadingMore`/`onLoadMore` for a trailing "Load Older" chip (used here only — `/fixtures` omits them, unaffected) |
 | `src/lib/dateChipGroups.ts` | `groupDatesIntoChips()` — pure Sat+Sun pairing helper Match History uses to build combined weekend chips from its own flat date list, mirroring `/fixtures`' booking-level grouping without needing one |
 
 ---
