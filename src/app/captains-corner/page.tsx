@@ -228,74 +228,69 @@ export default async function CaptainsCornerPage() {
   const weekendEntries = Object.entries(weekendMap)
 
   return (
-    <div className="min-h-screen" style={{ background: '#F0F4F5' }}>
-      <SiteNav activePage="captains" mobileTabBarTheme="light" />
+    <div className="min-h-screen bg-ink grain">
+      <SiteNav activePage="captains" />
 
-      <div className="px-5 md:px-8 lg:px-10 py-6">
-        {/* Hero */}
-        <div className="rounded-2xl p-6 mb-5"
-          style={{ background: 'linear-gradient(135deg, #FEF3C7 0%, #FFF7ED 100%)' }}>
-          <p className="text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2"
-            style={{ color: '#D97706' }}>
-            <span className="w-4 h-px inline-block" style={{ background: '#D97706' }} />
-            Captains Corner
-          </p>
-          <h1 className="font-cinzel text-2xl md:text-3xl font-bold mb-2 tracking-wide" style={{ color: '#1C1917' }}>
-            Player Availability
-          </h1>
-          <p className="text-sm max-w-xl leading-relaxed font-rajdhani" style={{ color: '#57534E' }}>
-            Showing Y / O / E responses. N and L are hidden. Amber names have outstanding dues.
-          </p>
-        </div>
+      {/* Hero */}
+      <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden">
+        <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)' }} />
+        <p className="text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
+          <span className="w-4 h-px bg-gold inline-block" />
+          Captains Corner
+        </p>
+        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-parchment mb-2 tracking-wide">
+          Player Availability
+        </h1>
+        <p className="text-muted text-sm max-w-xl leading-relaxed font-rajdhani">
+          Showing Y / O / E responses. N and L are hidden. Amber names have outstanding dues.
+        </p>
+      </div>
 
-        {/* Legend */}
-        <div className="rounded-xl px-5 py-3 mb-6 flex gap-5 flex-wrap"
-          style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
-          {[
-            { code: 'Y', color: '#16a34a', label: 'Available' },
-            { code: 'O', color: '#ea580c', label: 'One game this weekend' },
-            { code: 'E', color: '#B45309', label: 'Either game same day' },
-          ].map(item => (
-            <div key={item.code} className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded flex items-center justify-center font-rajdhani text-xs font-bold"
-                style={{ background: `${item.color}1A`, color: item.color, border: `1px solid ${item.color}40` }}>
-                {item.code}
-              </span>
-              <span className="font-rajdhani text-xs" style={{ color: '#57534E' }}>{item.label}</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-1.5">
+      {/* Legend */}
+      <div className="px-5 md:px-8 lg:px-10 py-2.5 bg-ink-2 border-b border-ink-4 flex gap-5 flex-wrap">
+        {[
+          { code: 'Y', color: '#4ade80', label: 'Available' },
+          { code: 'O', color: '#fb923c', label: 'One game this weekend' },
+          { code: 'E', color: '#fbbf24', label: 'Either game same day' },
+        ].map(item => (
+          <div key={item.code} className="flex items-center gap-1.5">
             <span className="w-5 h-5 rounded flex items-center justify-center font-rajdhani text-xs font-bold"
-              style={{ background: '#FEF3C7', color: '#B45309', border: '1px solid #F5D9A8' }}>
-              ₹
+              style={{ background: `${item.color}20`, color: item.color, border: `1px solid ${item.color}40` }}>
+              {item.code}
             </span>
-            <span className="font-rajdhani text-xs" style={{ color: '#57534E' }}>Has outstanding dues</span>
+            <span className="font-rajdhani text-xs text-zinc-500">{item.label}</span>
           </div>
-        </div>
-
-        <div className="max-w-full overflow-x-auto">
-          {weekendEntries.length === 0 ? (
-            <p className="font-rajdhani text-sm" style={{ color: '#78716C' }}>No upcoming fixtures found.</p>
-          ) : (
-            <div className="flex flex-col gap-10">
-              {weekendEntries.map(([wk, weekend]) => (
-                <CaptainsCornerGrid
-                  key={wk}
-                  weekLabel={weekend.label}
-                  bookings={(weekend.bookings ?? []) as any}
-                  players={playersWithExempt as any}
-                  availMap={availMap}
-                  initialSquadMap={initialSquadMap}
-                />
-              ))}
-            </div>
-          )}
+        ))}
+        <div className="flex items-center gap-1.5">
+          <span className="w-5 h-5 rounded flex items-center justify-center font-rajdhani text-xs font-bold bg-amber-950 text-amber-400 border border-amber-800">
+            ₹
+          </span>
+          <span className="font-rajdhani text-xs text-zinc-500">Has outstanding dues</span>
         </div>
       </div>
 
-      <footer className="py-5 text-center font-rajdhani text-xs mt-8"
-        style={{ borderTop: '1px solid #D4C9B0', color: '#78716C' }}>
-        © 2026 <span style={{ color: '#B45309' }}>Spartans Cricket Club</span> · Bengaluru · Est. 2014
+      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-full overflow-x-auto">
+        {weekendEntries.length === 0 ? (
+          <p className="font-rajdhani text-zinc-500 text-sm">No upcoming fixtures found.</p>
+        ) : (
+          <div className="flex flex-col gap-10">
+            {weekendEntries.map(([wk, weekend]) => (
+              <CaptainsCornerGrid
+                key={wk}
+                weekLabel={weekend.label}
+                bookings={(weekend.bookings ?? []) as any}
+                players={playersWithExempt as any}
+                availMap={availMap}
+                initialSquadMap={initialSquadMap}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
+        © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
       </footer>
     </div>
   )
