@@ -325,7 +325,126 @@ none of them trust a client-supplied role or player scope.
 
 ---
 
-## 12. Explicitly Out of Scope
+## 12. Quarterly Membership Fee — automatic ₹250 debit
+
+Added alongside this feature: a third transaction type layered onto the
+same ledger, distinct from the admin top-up/debit (§ above) and the
+existing match-fee debit (`/api/fees/apply`) — a **quarterly membership
+fee**, ₹250, debited automatically the moment a player's first
+role-fulfilling match of a calendar quarter (Jan–Mar, Apr–Jun, Jul–Sep,
+Oct–Dec) syncs. Unlike match fees, there is no admin review step here —
+per product decision, this fires unattended, the same way milestone
+recognition and fee reminders already do inside the scorecard sync
+pipeline.
+
+### "Role-fulfilling" — deliberately wider than the match-fee signal
+
+`/api/fees/apply` only credits a player as having "played" if they batted
+or bowled (`battedIds`/`bowledIds`, used to decide who owes a match-fee
+share). The membership fee's qualifying signal is wider, per product
+decision: **batted, bowled, or recorded a fielding dismissal** (catches +
+caught-behind + run-outs + stumpings > 0). A fielding-only contribution —
+a substitute who only took a catch, say — still counts as genuine
+participation for membership purposes even though it doesn't currently
+earn a match-fee share. The two signals are computed independently and can
+disagree on the same match; that's expected, not a bug.
+
+### Where it's detected — `src/lib/membershipFee.ts`
+
+`chargeMembershipFeeIfDue()` is called from `syncMatchStatsForBooking()`
+in the same `Promise.all()` as `detectAndLogMilestones()`/
+`detectAndLogMatchPerformances()` — one hook covers both the manual "Sync
+Stats" click and the unattended twice-daily backfill/cron path, same
+reasoning `features/milestone-recognition.md` §2 already documents for
+those two detectors. Best-effort: the whole function is wrapped so a bug
+here can never fail the scorecard sync it's attached to.
+
+**Practice-tournament matches are excluded** — same "real stats only"
+posture as every other aggregate/ranking surface in this app
+(`features/leaderboard.md` §10). A practice game producing a century still
+gets celebrated (see milestone-recognition.md's own carve-out for that),
+but it was judged that fielding a full team for an informal practice game
+shouldn't itself trigger a real money debit.
+
+### Idempotency — DB-enforced, not just checked in code
+
+`membership_fee_charges` (migration `073_membership_fee_charges.sql`) has
+`UNIQUE(player_id, year, quarter)`. `chargeOnePlayer()` inserts this row
+**first**, as a plain `INSERT` (never an upsert) — a `23505` unique-
+violation means this player was already charged this quarter (by an
+earlier match, or a concurrent/duplicate sync of this same one), and the
+function stops immediately, before ever touching the wallet. Only a
+successful, non-conflicting insert proceeds to look up the player's
+current balance, insert the `wallet_transactions` debit row, update
+`players.wallet_balance`, link `membership_fee_charges.wallet_transaction_id`
+back to that row, and push a notification. This mirrors the
+"claim the slot before doing the side effects" pattern
+`availability_nudge_log` already uses for the exact same reason (see
+`features/availability-nudge.md` §4) — safe under a re-sync or a
+theoretical concurrent double-invocation without needing a separate lock.
+
+### The ledger row deliberately omits `booking_id`
+
+Every other debit in this ledger that's tied to a specific match
+(`/api/fees/apply`'s match-fee debits) sets `wallet_transactions.booking_id`
+to that match. The membership-fee debit does **not**, even though the
+triggering match is fully known (it's recorded on
+`membership_fee_charges.booking_id` instead) — `/api/fees/apply`'s
+"has this booking's fee already been applied" guard
+(`.eq('booking_id', booking_id).eq('type', 'debit').limit(1)`) checks for
+*any* debit carrying that booking_id, regardless of reason. A membership-fee
+debit sharing the same `booking_id` as its triggering match would falsely
+trip that guard the next time an admin tried to apply a genuinely
+un-applied match fee for that same booking. Traceability is preserved two
+other ways instead: `membership_fee_charges.booking_id` (a separate table,
+never read by the fee-apply guard) and a `notes` value on the
+`wallet_transactions` row itself ("Triggered by match on 12 Jul 2026"),
+which renders on the player's statement the same way any other
+transaction's notes do.
+
+### Backfill — Q3 2026, run once at launch
+
+Per product decision, this didn't ship prospective-only: a one-time
+backfill was run the same session, over every confirmed, non-practice,
+already-synced booking in the **current** calendar quarter at the time
+(Q3 2026, 1 Jul–30 Sep), computing each player's first qualifying match
+that quarter directly from `match_stats_cache`'s already-cached
+batting/bowling/fielding arrays (real `player_id` values, already
+reconciled) and applying the identical qualification rule
+`chargeMembershipFeeIfDue()` now enforces going forward. Run directly
+against the live database via Supabase MCP SQL — same "one-off backfill
+documented here, not committed as a script" convention this app already
+established for prior baseline backfills (see
+`features/milestone-recognition.md` §8/§8.1). Charged **52 players** ₹250
+each, all correctly deduplicated (one charge per player for the quarter,
+confirmed via a post-hoc count) and each linked to its `wallet_transactions`
+row.
+
+No earlier quarter was backfilled — the request was specifically to catch
+up the quarter in progress, not retroactively invoice every past quarter
+the club has played.
+
+### Security (vibe-security)
+
+| Check | Status |
+|---|---|
+| No new API route, no new client-reachable input at all — this is triggered entirely from inside the server-side scorecard sync pipeline | ✅ |
+| Idempotency enforced by a DB unique constraint, not just an application-level check — safe under a concurrent or duplicate sync | ✅ |
+| `membership_fee_charges` RLS enabled, no anon/authenticated policies — service role only | ✅ |
+| Every debit still lands in the same `wallet_transactions` ledger — visible on the player's own `/wallet` statement and `/admin/wallet`'s club-wide feed with no additional code, since it's just another row of that same table | ✅ |
+| A detection failure can never fail the scorecard sync it's attached to (same posture as milestone detection and fee reminders) | ✅ |
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `supabase/migrations/073_membership_fee_charges.sql` | `membership_fee_charges` table — `UNIQUE(player_id, year, quarter)` is the idempotency guard |
+| `src/lib/membershipFee.ts` | `chargeMembershipFeeIfDue()` / `chargeOnePlayer()` / `quarterOf()` |
+| `src/lib/matchStatsSync.ts` | Calls `chargeMembershipFeeIfDue()` alongside milestone/performance detection, inside the same `Promise.all()` |
+
+---
+
+## 13. Explicitly Out of Scope
 
 - **Organiser payment tracking** (club → tournament organiser) — see §4.
   No schema, no route, no UI. A separate, unbuilt idea
@@ -345,6 +464,20 @@ none of them trust a client-supplied role or player scope.
   entire `/api/fees/apply` run; that's still whatever manual process
   (admin corrections one row at a time, same as any other ledger mistake)
   this app already relied on before this feature.
+- **No admin review step for the membership fee** (§12) — unlike match
+  fees, it debits unattended the moment a qualifying match syncs. A wrong
+  charge is corrected the same way any other ledger mistake is: an admin
+  edits or reverses the resulting `wallet_transactions` row via §3's
+  correction flow.
+- **No proration, refund, or exemption for the membership fee** — a
+  player who joins mid-quarter, is expelled mid-quarter, or has a standing
+  `fee_exemptions` row is not specially handled; the same fixed ₹250,
+  first-qualifying-match rule applies to everyone who plays a role-
+  fulfilling match in the quarter. Not requested, and would need its own
+  design pass if it ever is.
+- **No configurable amount or quarter boundary** — `MEMBERSHIP_FEE_AMOUNT`
+  (₹250) and the calendar-quarter definition are both hardcoded in
+  `src/lib/membershipFee.ts`, not admin-editable settings.
 
 ---
 

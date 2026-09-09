@@ -335,6 +335,20 @@ Immutable audit trail, one row per admin correction to a `wallet_transactions`
 row — captures every pre-edit value. Migration `072_wallet_statement_corrections.sql`.
 **RLS enabled, no anon/authenticated policies.**
 
+#### `membership_fee_charges`
+`id, player_id FK, booking_id FK (nullable, ON DELETE SET NULL), wallet_transaction_id FK (nullable, ON DELETE SET NULL), year, quarter, amount, created_at`
+One row per player per calendar quarter charged the ₹250 quarterly
+membership fee — `UNIQUE(player_id, year, quarter)` is the idempotency
+guard, checked by a plain `INSERT` (never upsert) before any wallet debit
+happens; see `features/wallet-ledger.md` §12. Detected and charged
+automatically inside `syncMatchStatsForBooking()` the moment a player's
+first role-fulfilling (batted/bowled/fielding dismissal) match of the
+quarter syncs — no admin review step, unlike match fees. The resulting
+`wallet_transactions` debit row deliberately omits `booking_id` (kept only
+here) to avoid colliding with `/api/fees/apply`'s "already applied" guard.
+Migration `073_membership_fee_charges.sql`. **RLS enabled, no
+anon/authenticated policies** — service role only.
+
 #### `player_future_availability`
 `id, player_id FK, game_date, slot_time, response ('Y'|'O'|'E'|'L'), updated_at`
 `UNIQUE(player_id, game_date, slot_time)`. Slot-level "I already know I
@@ -676,6 +690,7 @@ Next.js API Routes (server-side)
 | `booking_rule_overrides` | ❌ Locked | ❌ Locked | Service role only — see §7.1 |
 | `wallet_transactions` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` |
 | `wallet_transaction_edits` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` §3 |
+| `membership_fee_charges` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` §12 |
 | `family_sessions` *(planned)* | ❌ Locked | ❌ Locked | Service role only |
  
 ### Security Checklist Status (vibe-security audit)
@@ -774,8 +789,9 @@ Next.js API Routes (server-side)
 | `src/app/api/matches/[id]/flag-reconciliation/route.ts` | POST reports a stats discrepancy (Zod-validated note), re-queuing into the backfill pipeline; DELETE is an admin-only clear-without-reprocessing override |
 | `src/lib/scorecardAuth.ts` | `canActOnScorecard()` — shared per-booking verify/flag auth, includes the top-performer grant; see `features/post-match-scorecard.md` §15 |
 | `src/lib/matchTopPerformers.ts` | Resolves a match's top scorer/wicket-taker to a Hub `player_id`; see `features/post-match-scorecard.md` §15 |
-| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; calls `autoResolveMatch()` before reading analytics rows (now including `fall_of_wickets`, ordered by `wicket_number`), last step calls `detectAndLogMilestones()` |
+| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` — shared by manual "Sync Stats" and the automated backfill/cron path; calls `autoResolveMatch()` before reading analytics rows (now including `fall_of_wickets`, ordered by `wicket_number`); calls `detectAndLogMilestones()`, `detectAndLogMatchPerformances()`, and `chargeMembershipFeeIfDue()` together as its last data-writing step |
 | `src/lib/milestones.ts` | `MILESTONE_THRESHOLDS`, `detectAndLogMilestones()` (season) + `detectAndLogMatchPerformances()` (single-match highlights) — club-wide milestone recognition detection; see `features/milestone-recognition.md` |
+| `src/lib/membershipFee.ts` | `chargeMembershipFeeIfDue()` — automatic ₹250 quarterly membership fee debit on a player's first role-fulfilling match of the quarter; called from `syncMatchStatsForBooking()` alongside milestone detection; see `features/wallet-ledger.md` §12 |
 | `src/app/api/milestones/unseen/route.ts` + `src/app/api/milestones/mark-seen/route.ts` | Broadcast feed + seen-cursor advance for the milestone recognition modal |
 | `src/components/milestones/MilestoneCelebrationModal.tsx` | Club-wide milestone recognition modal |
 | `src/components/ui/GlobalMilestoneModal.tsx` | Mounts the modal once per session from the root layout — not from `SiteNav`, which isn't part of a shared layout and remounts per navigation; see `features/milestone-recognition.md` §7.1 |
