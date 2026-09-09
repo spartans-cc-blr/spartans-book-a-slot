@@ -292,6 +292,29 @@ export const feesApplySchema = z.object({
   adjustment_reason: z.string().min(3).max(300).trim().optional(),
 })
 
+// PATCH /api/fees/apply — corrects an already-applied match fee split at
+// the match level. Recomputes the per-player share the same way the
+// original apply did (computeMatchFeeSplit — same squad/exemptions/units
+// logic) and posts one adjusting debit/credit per affected player for
+// exactly the difference against what they've actually been charged so
+// far — never a per-wallet manual edit. correction_reason is required
+// whenever confirm is true — why the whole match's fee is being revisited,
+// distinct from adjustment_reason (a single player's share diverging from
+// the server-computed default). See features/post-match-scorecard.md §6.1.
+export const feesCorrectSchema = z.object({
+  booking_id: z.string().uuid('booking_id must be a valid UUID'),
+  confirm: z.boolean(),
+  player_units: z.record(z.string().uuid(), z.number().int().min(0).max(12))
+    .refine(units => Object.keys(units).length <= 20, 'Too many players')
+    .optional()
+    .default({}),
+  adjustment_reason: z.string().min(3).max(300).trim().optional(),
+  correction_reason: z.string().min(3, 'Correction reason must be at least 3 characters').max(300, 'Correction reason max 300 characters').trim().optional(),
+}).refine(
+  data => !data.confirm || !!data.correction_reason,
+  { message: 'A reason is required to confirm a match fee correction', path: ['correction_reason'] }
+)
+
 // A plain ISO datetime string, never in the future — used for admin
 // backdating (a historic transaction the ledger never captured at the
 // time) on both the create and edit wallet-transaction routes.
