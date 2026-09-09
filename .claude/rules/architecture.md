@@ -180,6 +180,7 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/wallet/transactions` | POST | Admin | Wallet top-up/debit — writes an immutable `wallet_transactions` row, then updates `players.wallet_balance`; optional `created_at` for backdating; see `features/wallet-ledger.md` |
 | `/api/wallet/transactions` | PATCH | Admin | Corrects an existing transaction (amount/type/reason/notes/date), logging the pre-edit values to `wallet_transaction_edits` and adjusting `players.wallet_balance` by the delta the correction introduces |
 | `/api/wallet/opening-balance` | PATCH | Admin | Sets or clears (`amount: null`) a player's "Brought Forward" statement override |
+| `/api/wallet/transfers` | POST | Admin | Player-to-player sponsorship — debits `sponsor_player_id`, credits `beneficiary_player_id` by the same amount, linked via `wallet_transfers`; see `features/wallet-ledger.md` §14 |
 | `/api/admin/fee-reminders` | GET | Admin | Every currently fee-pending booking (scorecard synced, fee configured, squad announced, not yet applied/externally-reconciled) — feeds the admin-only fee reminder modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
  
 ### Family Auth APIs *(Planned — U-24)*
@@ -348,6 +349,16 @@ quarter syncs — no admin review step, unlike match fees. The resulting
 here) to avoid colliding with `/api/fees/apply`'s "already applied" guard.
 Migration `073_membership_fee_charges.sql`. **RLS enabled, no
 anon/authenticated policies** — service role only.
+
+#### `wallet_transfers`
+`id, sponsor_player_id FK, beneficiary_player_id FK, amount, reason, sponsor_transaction_id FK (nullable), beneficiary_transaction_id FK (nullable), created_by, created_at`
+Admin-recorded player-to-player wallet sponsorship — links the debit
+(sponsor) and credit (beneficiary) `wallet_transactions` rows a transfer
+produces, purely for display/reporting; never itself read to derive a
+balance. `CHECK (sponsor_player_id != beneficiary_player_id)`. Admin-only,
+same trust model as every other wallet-balance-changing action — see
+`features/wallet-ledger.md` §14. Migration `074_wallet_transfers.sql`.
+**RLS enabled, no anon/authenticated policies** — service role only.
 
 #### `player_future_availability`
 `id, player_id FK, game_date, slot_time, response ('Y'|'O'|'E'|'L'), updated_at`
@@ -691,6 +702,7 @@ Next.js API Routes (server-side)
 | `wallet_transactions` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` |
 | `wallet_transaction_edits` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` §3 |
 | `membership_fee_charges` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` §12 |
+| `wallet_transfers` | ❌ Locked | ❌ Locked | Service role only — see `features/wallet-ledger.md` §14 |
 | `family_sessions` *(planned)* | ❌ Locked | ❌ Locked | Service role only |
  
 ### Security Checklist Status (vibe-security audit)
@@ -779,7 +791,8 @@ Next.js API Routes (server-side)
 | `src/lib/feeReminders.ts` | `resolvePendingFee()`/`getPendingFeeBookings()`/`notifyFeeReminderIfPending()` — match fee payment reminder eligibility, shared by the push trigger, the admin modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
 | `src/app/api/wallet/transactions/route.ts` | GET (own/admin/`scope=all`, paginated, Brought Forward calc), POST (top-up/debit), PATCH (admin corrections) — see `features/wallet-ledger.md` |
 | `src/app/api/wallet/opening-balance/route.ts` | PATCH — admin override of a player's Brought Forward line |
-| `src/app/wallet/page.tsx` + `src/components/wallet/WalletStatementClient.tsx` | `/wallet` — player's own bank-statement view; the client component is reused in `admin` mode by `/admin/wallet` |
+| `src/app/api/wallet/transfers/route.ts` | POST — admin-recorded player-to-player sponsorship transfer; see `features/wallet-ledger.md` §14 |
+| `src/app/wallet/page.tsx` + `src/components/wallet/WalletStatementClient.tsx` | `/wallet` — player's own bank-statement view; the client component is reused in `admin` mode by `/admin/wallet`, including its "🎁 Sponsor" player-to-player transfer action — see `features/wallet-ledger.md` §14 |
 | `src/app/admin/wallet/page.tsx` | Admin wallet hub — pending fee applications, player search + drill-down, club-wide feed |
 | `src/components/admin/FeeReminderModal.tsx` + `src/components/ui/GlobalFeeReminderModal.tsx` | Admin-only "fees pending" reminder modal, mounted once in the root layout |
 | public/sw.js | Service worker — PWA caching + push notification display + notificationclick handler |

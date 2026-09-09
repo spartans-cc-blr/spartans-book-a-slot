@@ -347,3 +347,20 @@ export const walletOpeningBalanceSchema = z.object({
   amount: z.number().max(1000000, 'amount is too large').nullable(),
   note: z.string().max(300, 'Note max 300 characters').trim().optional(),
 })
+
+// POST /api/wallet/transfers — admin-recorded player-to-player sponsorship.
+// Produces a debit on sponsor_player_id and an equal credit on
+// beneficiary_player_id; see that route's own header comment.
+export const walletTransferSchema = z.object({
+  sponsor_player_id: z.string().uuid('sponsor_player_id must be a valid UUID'),
+  beneficiary_player_id: z.string().uuid('beneficiary_player_id must be a valid UUID'),
+  amount: z.number().positive('amount must be greater than 0').max(100000, 'amount is too large'),
+  reason: z
+    .string()
+    .min(3, 'Reason must be at least 3 characters')
+    .max(200, 'Reason max 200 characters')
+    .trim(),
+}).refine(
+  data => data.sponsor_player_id !== data.beneficiary_player_id,
+  { message: 'Sponsor and beneficiary must be different players', path: ['beneficiary_player_id'] }
+)

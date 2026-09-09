@@ -83,6 +83,14 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
   const [openingSaving, setOpeningSaving] = useState(false)
   const [openingError, setOpeningError] = useState('')
 
+  const [showSponsor, setShowSponsor] = useState(false)
+  const [sponsorCandidates, setSponsorCandidates] = useState<{ id: string; name: string }[]>([])
+  const [sponsorSearch, setSponsorSearch] = useState('')
+  const [sponsorBeneficiary, setSponsorBeneficiary] = useState<{ id: string; name: string } | null>(null)
+  const [sponsorForm, setSponsorForm] = useState({ amount: '', reason: '' })
+  const [sponsorSaving, setSponsorSaving] = useState(false)
+  const [sponsorError, setSponsorError] = useState('')
+
   const fetchPage = useCallback(async (cursor: Cursor | null) => {
     const params = new URLSearchParams()
     if (playerId) params.set('player_id', playerId)
@@ -215,6 +223,58 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
     }
   }
 
+  async function toggleSponsor() {
+    const next = !showSponsor
+    setShowSponsor(next)
+    setSponsorError('')
+    if (next && sponsorCandidates.length === 0) {
+      const res = await fetch('/api/players')
+      if (res.ok) {
+        const d = await res.json()
+        setSponsorCandidates(
+          (d.players ?? [])
+            .filter((p: any) => p.id !== playerId)
+            .map((p: any) => ({ id: p.id, name: p.name }))
+        )
+      }
+    }
+  }
+
+  async function submitSponsor() {
+    const amount = parseFloat(sponsorForm.amount)
+    if (!sponsorBeneficiary || !amount || amount <= 0 || !sponsorForm.reason.trim()) {
+      setSponsorError('Pick a beneficiary, an amount, and a reason.')
+      return
+    }
+    setSponsorSaving(true)
+    setSponsorError('')
+    try {
+      const res = await fetch('/api/wallet/transfers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sponsor_player_id: playerId,
+          beneficiary_player_id: sponsorBeneficiary.id,
+          amount,
+          reason: sponsorForm.reason.trim(),
+        }),
+      })
+      const d = await res.json()
+      if (!res.ok) {
+        setSponsorError(d.error ?? 'Failed to record sponsorship.')
+        return
+      }
+      setTransactions(prev => [d.sponsor_transaction, ...prev])
+      setCurrentBalance(d.sponsor_player.wallet_balance)
+      setSponsorForm({ amount: '', reason: '' })
+      setSponsorBeneficiary(null)
+      setSponsorSearch('')
+      setShowSponsor(false)
+    } finally {
+      setSponsorSaving(false)
+    }
+  }
+
   function startOpeningEdit() {
     setOpeningEditing(true)
     setOpeningError('')
@@ -293,12 +353,73 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
           <p className={`font-cinzel text-2xl font-bold ${balanceTone}`}>{formatSigned(currentBalance ?? 0)}</p>
         </div>
         {admin && playerId && (
-          <button onClick={() => { setShowAdd(v => !v); setAddError('') }}
-            className="font-rajdhani text-xs font-bold tracking-wide bg-amber-700 hover:bg-amber-600 text-white px-3 py-1.5 rounded transition-colors">
-            {showAdd ? '✕ Cancel' : '＋ Add Entry'}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => { setShowAdd(v => !v); setAddError('') }}
+              className="font-rajdhani text-xs font-bold tracking-wide bg-amber-700 hover:bg-amber-600 text-white px-3 py-1.5 rounded transition-colors">
+              {showAdd ? '✕ Cancel' : '＋ Add Entry'}
+            </button>
+            <button onClick={toggleSponsor}
+              className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold hover:bg-gold/10 px-3 py-1.5 rounded transition-colors">
+              {showSponsor ? '✕ Cancel' : '🎁 Sponsor'}
+            </button>
+          </div>
         )}
       </div>
+
+      {admin && showSponsor && (
+        <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4">
+          <p className="font-rajdhani text-xs text-zinc-500 mb-3">
+            Debits {playerName ?? 'this player'}'s wallet and credits the beneficiary's by the same amount.
+          </p>
+          {!sponsorBeneficiary ? (
+            <div className="relative">
+              <label className="form-label">Beneficiary</label>
+              <input value={sponsorSearch} onChange={e => setSponsorSearch(e.target.value)}
+                placeholder="Search a player to sponsor..." className="form-input" />
+              {sponsorSearch.trim() && (
+                <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-ink-4 border border-ink-5 rounded shadow-xl max-h-48 overflow-y-auto">
+                  {sponsorCandidates
+                    .filter(p => p.name.toLowerCase().includes(sponsorSearch.trim().toLowerCase()))
+                    .slice(0, 8)
+                    .map(p => (
+                      <button key={p.id} onClick={() => { setSponsorBeneficiary(p); setSponsorSearch('') }}
+                        className="w-full text-left px-3 py-2 font-rajdhani text-sm text-zinc-300 hover:bg-ink-3 hover:text-gold transition-colors">
+                        {p.name}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-rajdhani text-sm text-parchment">
+                Sponsoring <span className="text-gold font-bold">{sponsorBeneficiary.name}</span>
+              </p>
+              <button onClick={() => setSponsorBeneficiary(null)}
+                className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                Change
+              </button>
+            </div>
+          )}
+          <div className="grid sm:grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="form-label">Amount (₹)</label>
+              <input type="number" min="0" step="1" value={sponsorForm.amount}
+                onChange={e => setSponsorForm(f => ({ ...f, amount: e.target.value }))} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Reason</label>
+              <input type="text" value={sponsorForm.reason} placeholder="e.g. Q3 membership fee"
+                onChange={e => setSponsorForm(f => ({ ...f, reason: e.target.value }))} className="form-input" />
+            </div>
+          </div>
+          {sponsorError && <p className="font-rajdhani text-xs text-red-400 mt-2">{sponsorError}</p>}
+          <button onClick={submitSponsor} disabled={sponsorSaving}
+            className="mt-3 font-rajdhani text-xs font-bold bg-gold-dim hover:bg-gold disabled:opacity-40 text-ink-2 px-4 py-2 rounded transition-colors">
+            {sponsorSaving ? 'Saving...' : '✓ Record Sponsorship & Notify Both'}
+          </button>
+        </div>
+      )}
 
       {admin && showAdd && (
         <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4">

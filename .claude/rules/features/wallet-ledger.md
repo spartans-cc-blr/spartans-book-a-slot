@@ -444,7 +444,121 @@ the club has played.
 
 ---
 
-## 13. Explicitly Out of Scope
+## 14. Sponsorship Transfers — player-to-player wallet transfers
+
+Added alongside the above: a fourth thing this ledger now records —
+**one player's wallet covering another's**, e.g. a senior player
+sponsoring a junior teammate's dues. This debits the sponsor's wallet and
+credits the beneficiary's by the same amount, as two ordinary
+`wallet_transactions` rows linked together by a new `wallet_transfers`
+row.
+
+### Admin-only — deliberately, not a self-service feature
+
+Every wallet-balance change in this app has always been admin-triggered
+(top-ups/debits via `POST /api/wallet/transactions`, match fees via
+`/api/fees/apply`, the membership fee via the sync pipeline — §12) — no
+player has ever been able to move money themselves, including their own.
+Per product decision, sponsorship transfers keep that same posture rather
+than becoming the first player-initiated wallet write in the app: an
+admin records the transfer from `/admin/wallet`, picking both the sponsor
+and the beneficiary, the same way they'd record any other top-up or
+debit. A self-service version (a player sponsoring a teammate directly
+from their own `/wallet`) was considered and explicitly deferred — it
+would need its own confirmation/consent UX and a real change to this
+app's trust model, neither of which was asked for here.
+
+### `wallet_transfers` — a link, not a source of truth
+
+```sql
+CREATE TABLE wallet_transfers (
+  id                         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sponsor_player_id          uuid NOT NULL REFERENCES players(id),
+  beneficiary_player_id      uuid NOT NULL REFERENCES players(id),
+  amount                     numeric NOT NULL,
+  reason                     text NOT NULL,
+  sponsor_transaction_id     uuid REFERENCES wallet_transactions(id) ON DELETE SET NULL,
+  beneficiary_transaction_id uuid REFERENCES wallet_transactions(id) ON DELETE SET NULL,
+  created_by                 text NOT NULL,
+  created_at                 timestamptz NOT NULL DEFAULT now(),
+  CHECK (sponsor_player_id != beneficiary_player_id)
+);
+```
+
+Mirrors `membership_fee_charges`' own pattern (§12) of a small table
+linking to the `wallet_transactions` row(s) it produced, purely for
+display/reporting — nothing in this app ever reads `wallet_transfers` to
+derive a balance. `players.wallet_balance` and `wallet_transactions` stay
+the sole source of truth for money, exactly as before this feature.
+Migration `074_wallet_transfers.sql`. RLS enabled, no anon/authenticated
+policies — service role only, same blanket-deny pattern as every other
+table in this app.
+
+### `POST /api/wallet/transfers` — admin-only
+
+Body: `{ sponsor_player_id, beneficiary_player_id, amount, reason }`
+(Zod-validated `walletTransferSchema`, `src/lib/schemas.ts` — rejects a
+sponsor sponsoring themselves). Writes, in order: sponsor's debit row →
+beneficiary's credit row → the `wallet_transfers` link row → sponsor's
+`wallet_balance` update → beneficiary's `wallet_balance` update. Same
+"ledger rows first, balance updates after" ordering every other wallet
+write in this app already uses, and the same sequential-writes-with-
+reported-partial-failure posture (no true cross-table atomicity — matches
+`PATCH /api/wallet/transactions`' own balance-sync-failure handling) —
+a failure partway through always leaves an inspectable ledger trail an
+admin can reconcile from, rather than a balance change with nothing
+behind it.
+
+**No balance check on the sponsor** — same posture as every other debit
+in this app (match fees, membership fees, admin debits): nothing here
+blocks a debit because the resulting balance would go negative. "Dues
+outstanding" is already a normal, tracked state throughout the Hub.
+
+Each side's `wallet_transactions.reason` names the other player, so both
+halves read clearly on their own statement even without cross-referencing
+`wallet_transfers`:
+- Sponsor: `Sponsorship for <beneficiary> — <reason>`
+- Beneficiary: `Sponsored by <sponsor> — <reason>`
+
+Both players get a push notification (`💰 Wallet Debited — Sponsorship` /
+`🎁 You Were Sponsored!`), same as every other balance-changing action in
+this app.
+
+### UI — inside the existing player drill-down, not a new page
+
+`WalletStatementClient.tsx`'s admin mode gained a second quick action,
+"🎁 Sponsor", next to "＋ Add Entry" (§6) — opens a small panel: search-
+and-select a beneficiary (lazily fetches `GET /api/players`, the same
+admin-gated roster `/admin/wallet`'s own player search already uses),
+amount, reason. The already-selected player (whoever the admin is
+currently viewing in `/admin/wallet`'s Player Wallet section) is always
+the sponsor — there's no separate "pick both players" flow, since an
+admin sponsoring on someone's behalf naturally starts from that person's
+own statement. No new page or route was added beyond the API endpoint.
+
+### Security (vibe-security)
+
+| Check | Status |
+|---|---|
+| Admin-only, server-side — same trust model as every other wallet-balance write in this app | ✅ |
+| `sponsor_player_id !== beneficiary_player_id` enforced both in the Zod schema and a DB `CHECK` constraint — never trusts one layer alone | ✅ |
+| Rate-limited (`RATE_LIMITS.adminWrite`) | ✅ |
+| `wallet_transfers` RLS enabled, no anon/authenticated policies — service role only | ✅ |
+| Both resulting `wallet_transactions` rows are ordinary ledger rows — visible on each player's own `/wallet` statement and `/admin/wallet`'s club-wide feed with no additional code | ✅ |
+| No new client-reachable path to alter a balance beyond the existing admin-only routes | ✅ |
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `supabase/migrations/074_wallet_transfers.sql` | `wallet_transfers` table |
+| `src/lib/schemas.ts` | `walletTransferSchema` |
+| `src/app/api/wallet/transfers/route.ts` | POST — admin-only sponsorship transfer |
+| `src/components/wallet/WalletStatementClient.tsx` | "🎁 Sponsor" quick action (admin mode) — beneficiary search, amount, reason |
+
+---
+
+## 15. Explicitly Out of Scope
 
 - **Organiser payment tracking** (club → tournament organiser) — see §4.
   No schema, no route, no UI. A separate, unbuilt idea
@@ -478,6 +592,13 @@ the club has played.
 - **No configurable amount or quarter boundary** — `MEMBERSHIP_FEE_AMOUNT`
   (₹250) and the calendar-quarter definition are both hardcoded in
   `src/lib/membershipFee.ts`, not admin-editable settings.
+- **Player-initiated sponsorship transfers** (§14) — a player sponsoring a
+  teammate directly from their own `/wallet`, with no admin step, was
+  considered and explicitly deferred; every transfer today is admin-
+  recorded.
+- **A "sponsorships given/received" report** — `wallet_transfers` makes
+  this queryable later (sum by `sponsor_player_id`/`beneficiary_player_id`
+  across a season, say), but no such view was built — not requested.
 
 ---
 
