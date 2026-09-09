@@ -86,7 +86,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
               </div>
             ) : isLoggedIn ? (
               <>
-                <SheetLink t={t} href="/leaderboard" icon={<TrophyIcon />} label="Stats" active={activePage === 'leaderboard'} onNavigate={() => setMoreOpen(false)} />
+                <SheetLink t={t} href="/dugout" icon={<ShieldIcon size={16} />} label="The Dugout" active={activePage === 'dugout'} onNavigate={() => setMoreOpen(false)} />
                 {playerId ? (
                   <SheetLink t={t} href="/profile" icon={<PersonIcon />} label="My Profile" active={activePage === 'profile'} onNavigate={() => setMoreOpen(false)} />
                 ) : (
@@ -185,7 +185,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
             <>
               <Tab t={t} href="/" icon={<HomeIcon />} label="Home" active={activePage === 'home'} />
               <Tab t={t} href="/fixtures" icon={<BatBallIcon />} label="Matches" active={activePage === 'fixtures' || activePage === 'matches'} />
-              <Tab t={t} href="/dugout" icon={<ShieldIcon />} label="Dugout" active={activePage === 'dugout'} />
+              <Tab t={t} href="/leaderboard" icon={<TrophyIcon size={21} />} label="My Stats" active={activePage === 'leaderboard'} />
             </>
           )}
 
@@ -210,11 +210,14 @@ export function MobileTabBar(props: MobileTabBarProps) {
 
 // activePage values that live inside the More sheet (not their own tab) should
 // still show the tab bar's "More" entry point as the active one. 'matches'
-// is deliberately not listed here — it's covered by the merged Matches tab's
-// own `active` check (activePage === 'fixtures' || 'matches') instead, so it
-// doesn't also light up "More" at the same time.
+// and 'leaderboard' are deliberately not listed here — 'matches' is covered
+// by the merged Matches tab's own `active` check (activePage === 'fixtures'
+// || 'matches'), and 'leaderboard' by the My Stats tab's own `active` check,
+// so neither also lights up "More" at the same time. 'dugout' moved the
+// other way — it lost its own tab slot to My Stats and now lives in the
+// sheet, so it's added here instead.
 function isAdminOrGcHighlighted(activePage?: string) {
-  return ['leaderboard', 'profile', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
+  return ['dugout', 'profile', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
 }
 
 function Tab({ t, href, icon, label, active }: { t: Tokens; href: string; icon: React.ReactNode; label: string; active?: boolean }) {
@@ -283,9 +286,9 @@ function CalendarIcon() {
     </svg>
   )
 }
-function ShieldIcon() {
+function ShieldIcon({ size = 21 }: { size?: number }) {
   return (
-    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
     </svg>
   )
@@ -297,9 +300,9 @@ function DotsIcon() {
     </svg>
   )
 }
-function TrophyIcon() {
+function TrophyIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M7 4h10v4a5 5 0 0 1-10 0V4z" /><path d="M7 5H4.5A2.5 2.5 0 0 0 4 9.9c.4 1.3 1.6 2.1 3 2.1" /><path d="M17 5h2.5A2.5 2.5 0 0 1 20 9.9c-.4 1.3-1.6 2.1-3 2.1" /><line x1="12" y1="13" x2="12" y2="17" /><path d="M9 20h6" /><path d="M10 17h4v3h-4z" />
     </svg>
   )
