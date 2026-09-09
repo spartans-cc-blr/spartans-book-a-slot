@@ -561,27 +561,45 @@ Admin → /admin/bookings/new
 > edit page is opened and saved — no DB backfill was run.
 
 > **Opponent name auto-fill from a pasted CricHeroes match URL (fixed
-> September 2026):** both `/admin/bookings/new` and `/admin/bookings/[id]`
-> read the last path segment of a pasted CricHeroes match URL (e.g.
+> September 2026, refined same month):** both `/admin/bookings/new` and
+> `/admin/bookings/[id]` read the last path segment of a pasted CricHeroes
+> match URL (e.g.
 > `.../scorecard/26452955/championship-league-edition-iii/spartans-cc-bengaluru-vs-whackers-cricket-club`)
-> and split it on `-vs-` to prefill the Opponent field — whichever side's
-> slug contains "spartan" is assumed to be Spartans, the other side is the
-> opponent. This used to be two separately-inlined copies of the same
-> check, and only the edit page's copy lowercased the slug before matching
-> (`teamA.toLowerCase().includes('spartan')`); the new-booking page's copy
-> was case-sensitive (`teamA.includes('spartans')`). Whenever a CricHeroes
-> slug segment wasn't all-lowercase, the new-booking page's check silently
-> failed and fell through to `opponent = teamA` — i.e. Spartans' own name
-> landed in the Opponent field, the "Spartans as opponent" bug reported
-> live. Fixed by extracting one shared, case-insensitive
-> `opponentFromMatchSlug()` helper (`src/lib/cricheroesMatchUrl.ts`) and
-> using it from both pages. **Known remaining limitation, not fixed by
-> this change:** an intra-club practice/scrimmage match (e.g. "Spartans A"
-> vs "Spartans B") has both sides containing "spartan" — the helper always
-> resolves the second side as "the opponent" even though it's still a
-> Spartans squad, since there's no way to tell that apart from the slug
-> text alone. A practice-game booking's auto-filled opponent may still
-> need a manual correction.
+> and split it on `-vs-` to prefill the Opponent field. This used to be two
+> separately-inlined copies of the same check, and only the edit page's
+> copy lowercased the slug before matching (`teamA.toLowerCase().includes('spartan')`);
+> the new-booking page's copy was case-sensitive (`teamA.includes('spartans')`).
+> Whenever a CricHeroes slug segment wasn't all-lowercase, the new-booking
+> page's check silently failed and fell through to `opponent = teamA` —
+> i.e. Spartans' own name landed in the Opponent field, the "Spartans as
+> opponent" bug reported live (confirmed against a real booking,
+> `match_id 26452955`'s 27 Sep 2026 14:30 game, which had
+> `opponent_name = 'Spartans CC Bengaluru'` — corrected directly in the DB
+> to `'Whackers Cricket Club'` as a one-off data fix; that same `match_id`
+> also has a second confirmed booking on 24 Oct 2026 07:30 for what looks
+> like the identical Qualifier 2 fixture — a likely duplicate booking,
+> flagged here but not merged/cancelled as part of this fix since only the
+> opponent-name bug was in scope). Fixed by extracting one shared,
+> case-insensitive `opponentFromMatchSlug()` helper
+> (`src/lib/cricheroesMatchUrl.ts`) and using it from both pages.
+>
+> **Refined the same month** to match against a small known-squad roster
+> (`KNOWN_SPARTANS_SLUGS` — "Spartans CC Bengaluru" for real fixtures,
+> "Spartans United" for practice/scrimmage games) instead of a bare
+> `includes('spartan')` substring, for two reasons: (1) a real opposing
+> club whose own name happens to contain "spartan" (e.g. a hypothetical
+> "Bangalore Spartans CC") would otherwise be misidentified as us and have
+> our own name land in the Opponent field instead of theirs — the original
+> fix's residual failure mode, now closed by checking the known roster
+> first and falling back to the loose substring check only when *neither*
+> side matches it; (2) an intra-club practice match between the club's own
+> two squads ("Spartans CC Bengaluru" vs "Spartans United") now correctly
+> resolves to the *other* squad's real name as the Opponent field, rather
+> than depending on whichever side the old loose check happened to treat
+> as "us". `titleCaseWord()` in the same helper also special-cases "CC" so
+> it renders as "CC" (not "Cc") in both our own name and any opponent
+> club's — a plain per-word `charAt(0).toUpperCase()` pass got this wrong
+> for every club with "CC" in its name, ours included.
 
 ### 8.2 Player Availability Flow
 ```
@@ -807,7 +825,7 @@ Next.js API Routes (server-side)
 | `src/lib/familyAuth.ts` | *(Planned U-24)* `validateFamilySession()` — re-queries `family_sessions` table; never trusts cookie value alone |
 | `src/lib/announcement.ts` | `buildSquadAnnouncement()` — WhatsApp message builder |
 | `src/lib/bookingNotify.ts` | `buildOrganiserWhatsAppUrl()` / `buildCaptainWhatsAppUrl()` — shared message builders for `/admin/bookings/[id]`'s Notify panel; organiser message includes the tournament share page link, captain message includes the CricHeroes URL when set — see §8.1 |
-| `src/lib/cricheroesMatchUrl.ts` | `opponentFromMatchSlug()` — shared, case-insensitive opponent-name guess from a pasted CricHeroes match URL's `<teamA>-vs-<teamB>` slug; used by both `/admin/bookings/new` and `/admin/bookings/[id]` — see §8.1 |
+| `src/lib/cricheroesMatchUrl.ts` | `opponentFromMatchSlug()` — shared, case-insensitive opponent-name guess from a pasted CricHeroes match URL's `<teamA>-vs-<teamB>` slug, matched against a known-squad roster (`KNOWN_SPARTANS_SLUGS`: "Spartans CC Bengaluru" + "Spartans United") rather than a bare "spartan" substring; used by both `/admin/bookings/new` and `/admin/bookings/[id]` — see §8.1 |
 | `supabase/migrations/` | All schema migrations as SQL files — source of truth for DB state |
 | `vercel.json` | Cron job config + security headers |
 | src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup; notifyGCs()/notifyAllSubscribed()/notifyAdmins() broadcast helpers |

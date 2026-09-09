@@ -1,8 +1,39 @@
+// The club fields exactly two squads that ever appear as "us" in a
+// CricHeroes match slug — the main squad for real tournament fixtures, and
+// a second squad used for practice/scrimmage games. Matched against a
+// normalised (hyphens stripped) slug segment so minor CricHeroes formatting
+// differences ("spartans-cc-bengaluru" vs a hypothetical "spartans-cricket-
+// club-bengaluru") don't need a second entry here — only the meaningful
+// word sequence has to match.
+const KNOWN_SPARTANS_SLUGS = ['spartansccbengaluru', 'spartansunited']
+
+function normaliseSlugSegment(segment: string): string {
+  return segment.toLowerCase().replace(/-/g, '')
+}
+
+// Whichever side's slug matches a known Spartans squad name is us. Checked
+// against the exact roster above first — an opposing club whose own name
+// happens to contain "spartan" (a plausible real team name, e.g. "Bangalore
+// Spartans CC") must never be misidentified as us just because of that
+// substring. Falls back to a loose "spartan" substring check only if
+// *neither* side matches the known roster, so a real Spartans slug this
+// list hasn't caught up with yet still resolves better than nothing.
+function isSpartansSlug(segment: string): boolean {
+  const normalised = normaliseSlugSegment(segment)
+  return KNOWN_SPARTANS_SLUGS.some(known => normalised.includes(known))
+}
+
+// Common cricket-club abbreviation that title-casing alone gets wrong
+// ("Cc" instead of "CC") — used both for our own "Spartans CC Bengaluru"
+// name and for the many opponent clubs whose own name ends in "CC".
+function titleCaseWord(word: string): string {
+  return word.toLowerCase() === 'cc' ? 'CC' : word.charAt(0).toUpperCase() + word.slice(1)
+}
+
 // Extracts the opposing team's display name from a CricHeroes match URL's
 // own "<teamA>-vs-<teamB>" slug (the last path segment) — used by the
 // admin booking form to prefill the Opponent field when a CricHeroes match
-// URL is pasted in. Whichever side's slug contains "spartan" is assumed to
-// be us; the other side is the opponent.
+// URL is pasted in.
 //
 // Always case-insensitive. `/admin/bookings/new` and `/admin/bookings/[id]`
 // used to each inline their own copy of this check, and only the [id] page
@@ -14,20 +45,29 @@
 // field. That's the exact "Spartans as opponent" bug this shared,
 // case-insensitive helper closes.
 //
-// Known remaining limitation: an intra-club practice/scrimmage match (e.g.
-// "Spartans A" vs "Spartans B") has both sides containing "spartan", so
-// this always resolves to teamB as "the opponent" even though it's still a
-// Spartans squad — there is no way to tell that apart from the slug text
-// alone, so a practice-game booking's opponent field may still need a
-// manual correction.
+// Matching against the known-squad roster above (rather than a bare
+// "spartan" substring) also means a practice match between the club's own
+// two squads — "Spartans CC Bengaluru" vs "Spartans United" — still
+// resolves cleanly: whichever side is listed first is recognised as us via
+// the roster, and the other squad's real name becomes the Opponent field
+// (e.g. "Spartans United"), rather than falling through to whatever the
+// old loose substring check happened to pick.
 export function opponentFromMatchSlug(slug: string): string | null {
   if (!slug.includes('-vs-')) return null
   const [teamA, teamB] = slug.split('-vs-')
   if (!teamA || !teamB) return null
-  const opponent = teamA.toLowerCase().includes('spartan') ? teamB : teamA
+
+  const aIsSpartans = isSpartansSlug(teamA)
+  const bIsSpartans = isSpartansSlug(teamB)
+  // Both — or neither — side matched the known roster: fall back to the
+  // original loose "spartan" substring check rather than guessing blindly.
+  const opponent = aIsSpartans !== bIsSpartans
+    ? (aIsSpartans ? teamB : teamA)
+    : (teamA.toLowerCase().includes('spartan') ? teamB : teamA)
+
   return opponent
     .split('-')
     .filter(Boolean)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .map(titleCaseWord)
     .join(' ')
 }
