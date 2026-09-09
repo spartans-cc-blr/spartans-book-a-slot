@@ -312,31 +312,52 @@ new pattern.
 **"My Stats" replaced "Dugout" as the third tab slot (added September
 2026).** The club coordinator felt "Dugout" — a grab-bag landing page for
 Kit Room/Gear Exchange/Store Orders — wasn't the destination players would
-actually reach for from the bottom bar as often as their own stats. "My
-Stats" links to `/leaderboard` (the same destination the desktop nav's
-"Stats" link and the sheet's former "Stats" row both already pointed at)
-and is active for `activePage === 'leaderboard'`, reusing the sheet's
-existing `TrophyIcon` (now accepting an optional `size` prop — `21` in the
-tab, its original `16` default everywhere else it's used). Losing its own
-tab slot doesn't remove Dugout from mobile navigation entirely — it moved
-into the **More** sheet instead (see below), the same "still one tap away,
-just not a fixed slot" tradeoff every other sheet-only destination already
-makes. **More** is always the last slot, a button (not a link) that
-toggles the bottom sheet — it shows the same active-gold treatment
-whenever the sheet is open, or whenever `activePage` is one of the values
-that only live inside the sheet (`isAdminOrGcHighlighted()`: `dugout`,
-`profile`, `planner`, `captains`, `captains-unavailable`, `gc`,
-`gc-players`, `wrangler`, `schedule` — deliberately excludes `matches` and
-`leaderboard`, both now covered by their own tab's `active` check instead;
-`dugout` moved the other way, gaining an entry in this list now that it no
-longer has a tab of its own).
+actually reach for from the bottom bar as often as their own stats. Losing
+its own tab slot doesn't remove Dugout from mobile navigation entirely — it
+moved into the **More** sheet instead (see below), the same "still one tap
+away, just not a fixed slot" tradeoff every other sheet-only destination
+already makes.
+
+**"My Stats" links to the viewer's own personal stats page, not the club
+Honour Board (corrected September 2026).** The first cut pointed "My Stats"
+at `/leaderboard` — reusing the desktop nav's "Stats" link and the sheet's
+then-removed "Stats" row — but that's the club-wide "Yours Statistically"
+board (milestone cards, monthly views, sortable Bat/Bowl/Field/MVP tables
+across every player, see `features/leaderboard.md`), not the individual's
+own numbers. Corrected to `/players/${playerId}/stats` — the same
+per-player page `/profile`'s own "📊 View Full Stats" link points at
+(`src/app/profile/page.tsx`) — falling back to `/join` when `playerId` is
+null (an unmatched Gmail has no stats page to show, same fallback the
+sheet's own My Profile row already uses in that case). Active for
+`activePage === 'my-stats'`, a new value distinct from `'leaderboard'` —
+the two are different pages and must not both light up for the same tab.
+`/players/[id]/stats/page.tsx` only passes `activePage="my-stats"` when the
+signed-in viewer's own `playerId` matches the `id` in the URL — that route
+is also reachable to view *any* player's stats (any signed-in, non-expelled
+member, not IDOR-restricted to self — see the route's own vibe-security
+comment), where highlighting "My Stats" as active would be wrong. Reuses
+the sheet's existing `TrophyIcon` (now accepting an optional `size` prop —
+`21` in the tab, its original `16` default everywhere else it's used).
+
+The club Honour Board itself didn't lose its mobile nav entry in the
+process — a **"🏆 Leaderboard" row was added back to the More sheet**
+(`/leaderboard`, `activePage === 'leaderboard'`), restoring the destination
+the sheet's original "Stats" row covered before that row was briefly
+repurposed as the tab. **More** is always the last slot, a button (not a
+link) that toggles the bottom sheet — it shows the same active-gold
+treatment whenever the sheet is open, or whenever `activePage` is one of
+the values that only live inside the sheet (`isAdminOrGcHighlighted()`:
+`dugout`, `leaderboard`, `profile`, `planner`, `captains`,
+`captains-unavailable`, `gc`, `gc-players`, `wrangler`, `schedule` —
+deliberately excludes `matches` and `my-stats`, both covered by their own
+tab's `active` check instead).
 
 ### "More" sheet
 
 A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `max-h-[70vh]`) with a full-screen scrim behind it. Content branches the same way `SiteNav`'s desktop dropdowns do:
 
 - **Expelled** — just an "Account suspended" notice, no links.
-- **Logged in** — The Dugout (moved here from its own tab slot, September 2026 — see above; `ShieldIcon` at its sheet-row `size={16}`), My Profile (or "Complete Registration" → `/join` if `playerId` is null), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
+- **Logged in** — The Dugout (moved here from its own tab slot, September 2026 — see above; `ShieldIcon` at its sheet-row `size={16}`), Leaderboard (the club Honour Board, `/leaderboard` — added back September 2026 once "My Stats" stopped pointing here, see above), My Profile (or "Complete Registration" → `/join` if `playerId` is null), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
   - **Captains' Corner** (`isCaptain || isAdmin`) — Squad Selection, Unavailable Dates
   - **Council** (`isGC`) — Squad Review, Feedback, Players, Store Orders, Grounds, `GenerateInviteItem`
   - **Wrangler** (`isWrangler`) — Squad Backfill, Grounds

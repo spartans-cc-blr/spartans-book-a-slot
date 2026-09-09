@@ -87,6 +87,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
             ) : isLoggedIn ? (
               <>
                 <SheetLink t={t} href="/dugout" icon={<ShieldIcon size={16} />} label="The Dugout" active={activePage === 'dugout'} onNavigate={() => setMoreOpen(false)} />
+                <SheetLink t={t} href="/leaderboard" icon={<TrophyIcon />} label="Leaderboard" active={activePage === 'leaderboard'} onNavigate={() => setMoreOpen(false)} />
                 {playerId ? (
                   <SheetLink t={t} href="/profile" icon={<PersonIcon />} label="My Profile" active={activePage === 'profile'} onNavigate={() => setMoreOpen(false)} />
                 ) : (
@@ -185,7 +186,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
             <>
               <Tab t={t} href="/" icon={<HomeIcon />} label="Home" active={activePage === 'home'} />
               <Tab t={t} href="/fixtures" icon={<BatBallIcon />} label="Matches" active={activePage === 'fixtures' || activePage === 'matches'} />
-              <Tab t={t} href="/leaderboard" icon={<TrophyIcon size={21} />} label="My Stats" active={activePage === 'leaderboard'} />
+              <Tab t={t} href={playerId ? `/players/${playerId}/stats` : '/join'} icon={<TrophyIcon size={21} />} label="My Stats" active={activePage === 'my-stats'} />
             </>
           )}
 
@@ -210,14 +211,15 @@ export function MobileTabBar(props: MobileTabBarProps) {
 
 // activePage values that live inside the More sheet (not their own tab) should
 // still show the tab bar's "More" entry point as the active one. 'matches'
-// and 'leaderboard' are deliberately not listed here — 'matches' is covered
-// by the merged Matches tab's own `active` check (activePage === 'fixtures'
-// || 'matches'), and 'leaderboard' by the My Stats tab's own `active` check,
-// so neither also lights up "More" at the same time. 'dugout' moved the
-// other way — it lost its own tab slot to My Stats and now lives in the
-// sheet, so it's added here instead.
+// is deliberately not listed here — it's covered by the merged Matches tab's
+// own `active` check (activePage === 'fixtures' || 'matches'). 'my-stats' is
+// also excluded — it's the My Stats tab's own `active` check (this player's
+// personal /players/[id]/stats page), which is a different destination from
+// the club-wide 'leaderboard' page below. 'dugout' and 'leaderboard' both
+// live in the sheet only (Dugout lost its tab slot to My Stats; Leaderboard
+// never had one — see navigation.md §4.1), so both are listed here.
 function isAdminOrGcHighlighted(activePage?: string) {
-  return ['dugout', 'profile', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
+  return ['dugout', 'leaderboard', 'profile', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
 }
 
 function Tab({ t, href, icon, label, active }: { t: Tokens; href: string; icon: React.ReactNode; label: string; active?: boolean }) {
