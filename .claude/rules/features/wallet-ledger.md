@@ -228,6 +228,41 @@ path for the common cases (a quick top-up, checking what needs a fee
 applied), not a replacement for the per-player admin edit form, which
 still owns everything else about a player's profile.
 
+### 7.1 Match-fee debit rows link to the scorecard (added September 2026)
+
+A wallet row for a match-fee debit already carried `booking_id` on
+`wallet_transactions` (`/api/fees/apply` always sets it — see §4) but
+nothing on either statement surface let a viewer act on that link. Any row
+whose `booking_id` is present now renders a small "📊 View Scorecard" link
+next to its date, pointing at `/matches/history/<booking_id>` (the same
+per-match scorecard page `/matches/history` itself links into — see
+`features/post-match-scorecard.md` §9/§11) — a top-up, quarterly
+membership fee, or sponsorship transfer (§12/§14, none of which ever set
+`booking_id`) simply has no link to show, same "absent field, absent UI"
+pattern the rest of this feature already uses.
+
+**`WalletStatementClient.tsx`** (both the player's own `/wallet` and the
+admin drill-down reuse it) renders the link inline in the date line — its
+rows are plain `<div>`s, so nesting a `<Link>` needed no structural change.
+
+**`admin/wallet/page.tsx`'s own club-wide "Recent Transactions" feed**
+needed one: each row there was a `<button>` (the whole row is a click
+target that selects that transaction's player into the Player Wallet
+section above) and HTML doesn't allow an `<a>`/`<Link>` to nest inside a
+`<button>`. Converted the row wrapper to `<div role="button" tabIndex={0}>`
+with its own `onClick`/`onKeyDown` (Enter/Space) handlers — the same
+pattern `BattingPositionLeaders.tsx` already uses for an identical
+link-inside-a-clickable-row shape (see `features/leaderboard.md` §6.1).
+The nested scorecard `<Link>` stops propagation on click so tapping it
+navigates to the scorecard instead of also triggering the row's own
+select-player behaviour.
+
+`GET /api/wallet/transactions?scope=all` was widened to select
+`booking_id` alongside its existing columns so this admin feed has it to
+render — the self/`?player_id=` paths already selected `booking_id` from
+the start (used by the running-balance/statement view), so only the
+`scope=all` branch needed the addition.
+
 ---
 
 ## 8. Database

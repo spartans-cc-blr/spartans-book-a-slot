@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from('wallet_transactions')
-      .select('id, player_id, type, amount, reason, notes, created_by, created_at, edited_at, edited_by, players(name)')
+      .select('id, player_id, type, amount, reason, notes, created_by, created_at, booking_id, edited_at, edited_by, players(name)')
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(PAGE_SIZE + 1)

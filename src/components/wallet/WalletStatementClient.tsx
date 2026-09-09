@@ -17,6 +17,7 @@
 // from trying to carry a running total across "Load older" clicks.
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 
 type Transaction = {
   id: string
@@ -469,7 +470,18 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                   )}
                 </p>
                 {t.notes && <p className="font-rajdhani text-xs text-zinc-500 truncate">{t.notes}</p>}
-                <p className="font-rajdhani text-[10px] text-zinc-600 mt-0.5">{formatDate(t.created_at)}</p>
+                <p className="font-rajdhani text-[10px] text-zinc-600 mt-0.5">
+                  {formatDate(t.created_at)}
+                  {t.booking_id && (
+                    <>
+                      {' · '}
+                      <Link href={`/matches/history/${t.booking_id}`}
+                        className="text-gold-dim hover:text-gold transition-colors">
+                        📊 View Scorecard
+                      </Link>
+                    </>
+                  )}
+                </p>
               </div>
               <div className="text-right flex-shrink-0">
                 <p className={`font-rajdhani text-sm font-bold ${t.type === 'credit' ? 'text-emerald-400' : 'text-amber-400'}`}>
