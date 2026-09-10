@@ -297,6 +297,35 @@ render — the self/`?player_id=` paths already selected `booking_id` from
 the start (used by the running-balance/statement view), so only the
 `scope=all` branch needed the addition.
 
+### 7.2 Statement row alignment fix — amount/Edit column no longer wobbles (fixed September 2026)
+
+**Reported symptom:** on the admin player drill-down, the amount/balance
+block and the "Edit" link visibly shifted left/right from row to row
+instead of lining up in a column, most noticeable once §7.1's "📊 View
+Scorecard" link (which lengthens the date line only on match-fee rows)
+was in the mix alongside rows with a longer/shorter `reason` string.
+
+**Root cause:** each row in `WalletStatementClient.tsx` was a 3-child flex
+container (`flex items-center justify-between`) — the label block (reason/
+notes/date), the amount+balance block, and (admin mode) the Edit button.
+`justify-between` across **three** items only pins the first flush-left and
+the last flush-right; it splits the *leftover* space into two equal gaps
+around the middle item, so the amount/balance block's actual x-position
+floated depending on how wide the label block's text happened to be on
+that particular row — never a fixed column the eye could track down the
+list.
+
+**Fix:** the label block is now `flex-1` (it genuinely grows to fill the
+row, rather than just sizing to its own content), and the amount/balance
+block + Edit button are grouped into one `flex-shrink-0` container so they
+move together as a single unit pinned to the row's right edge — a 2-region
+layout (grow / fixed) instead of 3 competing regions. The amount/balance
+block also got a fixed `min-w-[92px]`, so `₹38` and `₹1,748` both
+right-align to the same column instead of the digit count itself nudging
+Edit sideways. Purely a layout fix — no data, route, or behavior change;
+`admin/wallet/page.tsx`'s own club-wide feed was unaffected (its rows are
+only 2-child `justify-between`, which doesn't have this ambiguity).
+
 ---
 
 ## 8. Database

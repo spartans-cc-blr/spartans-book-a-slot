@@ -459,8 +459,16 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
 
         {rows.map(t => (
           <div key={t.id} className="border-b border-ink-4 last:border-b-0">
-            <div className="px-4 py-3 flex items-center justify-between gap-3">
-              <div className="min-w-0">
+            {/* flex-1 on the label block (not justify-between across all
+                three children) is what keeps the amount/Bal column and the
+                Edit button pinned to a consistent position row to row —
+                justify-between across 3 items only anchors the first/last,
+                leaving the middle one to float based on how much reason
+                text is in that row. The amount block also gets a fixed
+                min-width so ₹38 and ₹1,748 both right-align to the same
+                column instead of the text itself shifting Edit around. */}
+            <div className="px-4 py-3 flex items-center gap-3">
+              <div className="min-w-0 flex-1">
                 <p className="font-rajdhani text-sm text-parchment truncate">
                   {t.reason}
                   {t.edited_at && (
@@ -483,18 +491,20 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                   )}
                 </p>
               </div>
-              <div className="text-right flex-shrink-0">
-                <p className={`font-rajdhani text-sm font-bold ${t.type === 'credit' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {t.type === 'credit' ? '+' : '-'}₹{Number(t.amount).toLocaleString('en-IN')}
-                </p>
-                <p className="font-rajdhani text-xs text-zinc-500">Bal {formatSigned(t.balanceAfter)}</p>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="text-right min-w-[92px]">
+                  <p className={`font-rajdhani text-sm font-bold ${t.type === 'credit' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {t.type === 'credit' ? '+' : '-'}₹{Number(t.amount).toLocaleString('en-IN')}
+                  </p>
+                  <p className="font-rajdhani text-xs text-zinc-500">Bal {formatSigned(t.balanceAfter)}</p>
+                </div>
+                {admin && (
+                  <button onClick={() => editingId === t.id ? setEditingId(null) : startEdit(t)}
+                    className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors w-8 text-right flex-shrink-0">
+                    {editingId === t.id ? '✕' : 'Edit'}
+                  </button>
+                )}
               </div>
-              {admin && (
-                <button onClick={() => editingId === t.id ? setEditingId(null) : startEdit(t)}
-                  className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors flex-shrink-0">
-                  {editingId === t.id ? '✕' : 'Edit'}
-                </button>
-              )}
             </div>
 
             {admin && editingId === t.id && (
