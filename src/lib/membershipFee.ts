@@ -28,6 +28,12 @@
 // only" posture as every other aggregate in this app (see
 // features/leaderboard.md §10).
 //
+// A player with a standing fee_exemptions row covering the match's date is
+// skipped entirely — no membership_fee_charges row, no wallet debit — same
+// isExempt signal /api/fees/apply already uses for match fees (added
+// September 2026, after 6 already-fee-exempt players were found charged by
+// the Q3 2026 backfill and reversed — see features/wallet-ledger.md §12.1).
+//
 // The resulting wallet_transactions row deliberately does NOT set
 // booking_id, even though the triggering match is known (recorded on
 // membership_fee_charges.booking_id instead). /api/fees/apply's "has this
@@ -86,8 +92,28 @@ export async function chargeMembershipFeeIfDue(
     const { year, quarter } = quarterOf(gameDate)
     const supabase = createServiceClient()
 
+    // A player with a standing fee_exemptions row covering this match's
+    // date never owes the membership fee either — same isExempt check
+    // /api/fees/apply already applies to match fees, reused here so the
+    // two "does this player pay" signals can't drift apart. Checked
+    // against gameDate (the match, and therefore the quarter, this charge
+    // belongs to), not "today" — a sync running days after the match
+    // shouldn't change which exemption window applies.
+    const { data: exemptRows } = await supabase
+      .from('fee_exemptions')
+      .select('player_id, start_date, end_date')
+      .in('player_id', Array.from(qualifyingIds))
+
+    const exemptIds = new Set(
+      (exemptRows ?? [])
+        .filter(e => e.start_date <= gameDate && (e.end_date === null || e.end_date >= gameDate))
+        .map(e => e.player_id)
+    )
+    const chargeableIds = Array.from(qualifyingIds).filter(id => !exemptIds.has(id))
+    if (chargeableIds.length === 0) return
+
     await Promise.all(
-      Array.from(qualifyingIds).map(playerId =>
+      chargeableIds.map(playerId =>
         chargeOnePlayer(supabase, playerId, bookingId, year, quarter, matchDateLabel))
     )
   } catch (err) {

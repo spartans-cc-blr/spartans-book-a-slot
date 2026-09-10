@@ -494,6 +494,63 @@ No earlier quarter was backfilled — the request was specifically to catch
 up the quarter in progress, not retroactively invoice every past quarter
 the club has played.
 
+### 12.1 Fee-exempt players — excluded going forward, backfilled charges reversed (added September 2026)
+
+**The gap:** the original design (§12's own "Explicitly Out of Scope" list,
+before this pass) deliberately charged everyone who played a
+role-fulfilling match in the quarter, with "no proration, refund, or
+exemption." That was too wide — a player with a standing `fee_exemptions`
+row (the same table `/api/fees/apply` already excludes from match-fee
+shares, see `security.md` §4/`architecture.md` §6) shouldn't owe the
+quarterly membership fee either. The Q3 2026 backfill (above) predates
+this fix and charged **6** already-exempt players before the gap was
+caught: Chayanveer Sharma, Keshav Renganathan, Kushal Vidya, Loki,
+Manohar B Reddy, and Thimmappa Shankarappa — each had an open-ended
+(`end_date IS NULL`) `fee_exemptions` row whose `start_date` predates the
+match that triggered their charge.
+
+**Code fix — `chargeMembershipFeeIfDue()`:** after computing
+`qualifyingIds` (§12's batted/bowled/fielding-dismissal signal), the
+function now batch-fetches `fee_exemptions` for those players and drops
+anyone whose exemption window (`start_date <= game_date && (end_date ===
+null || end_date >= game_date)`) covers the triggering match's `game_date`
+— same `isExempt` check `/api/fees/apply` already applies to match fees,
+so the two "does this player pay a fee" signals can't drift apart. Checked
+against the match's own `game_date`, not "today" (the sync could run days
+after the match) — consistent with `quarterOf(gameDate)` already deciding
+which quarter the charge belongs to off the same date. An exempt player
+gets **no** `membership_fee_charges` row and no wallet debit at all — not
+a charge-then-waive, just skipped, the same way a practice-tournament
+match is skipped outright earlier in the same function.
+
+**Data fix — the 6 already-charged players were reversed, not deleted.**
+Consistent with this ledger's append-only posture (§3): each of the 6
+`wallet_transactions` debit rows was corrected via the exact same
+mechanism `PATCH /api/wallet/transactions` uses — a `wallet_transaction_edits`
+row was written first (capturing the original `amount: 250`, `reason`,
+`notes`), then the transaction's own `amount` was set to `0` (never
+deleted — the row still marks *that a membership fee cycle happened and
+was waived*, not that it never existed), `reason` gained a `(waived — fee
+exempt)` suffix, and `notes` gained a `Reversed: player has a standing fee
+exemption on file.` line — so the statement row reads as self-explanatory
+even at ₹0, with no need to open the edit history to understand it. Each
+player's `wallet_balance` was credited back ₹250. Run directly against the
+live database via Supabase MCP SQL, mirroring the PATCH route's own
+read-edit-write-then-adjust-balance steps exactly rather than inventing a
+new correction shape — same "one-off fix documented here, not committed as
+a script" convention as the original backfill.
+
+**`membership_fee_charges` rows for these 6 players were left in place,
+untouched.** The row is still accurate — each player's first
+role-fulfilling match of Q3 2026 genuinely did occur on that date — only
+the *fee* tied to it was wrong. Leaving the row also means the
+`UNIQUE(player_id, year, quarter)` guard still correctly prevents a future
+re-sync of the same match from charging them again (moot in practice now
+that they're excluded upstream by the code fix too, but harmless either
+way — see §3's "corrections fix what happened, they don't rewrite whether
+it happened" framing, applied here to a charge-cycle row rather than a
+wallet_transactions row).
+
 ### Security (vibe-security)
 
 | Check | Status |
@@ -503,6 +560,8 @@ the club has played.
 | `membership_fee_charges` RLS enabled, no anon/authenticated policies — service role only | ✅ |
 | Every debit still lands in the same `wallet_transactions` ledger — visible on the player's own `/wallet` statement and `/admin/wallet`'s club-wide feed with no additional code, since it's just another row of that same table | ✅ |
 | A detection failure can never fail the scorecard sync it's attached to (same posture as milestone detection and fee reminders) | ✅ |
+| Fee-exempt players excluded server-side before any charge is made (§12.1) — never relies on a later correction to fix what should never have happened | ✅ |
+| The 6-player reversal (§12.1) went through the same audit-logged correction path (`wallet_transaction_edits`) as any other admin correction — no bare `UPDATE`, no deleted row | ✅ |
 
 ### File Map additions
 
@@ -670,12 +729,14 @@ own statement. No new page or route was added beyond the API endpoint.
   charge is corrected the same way any other ledger mistake is: an admin
   edits or reverses the resulting `wallet_transactions` row via §3's
   correction flow.
-- **No proration, refund, or exemption for the membership fee** — a
-  player who joins mid-quarter, is expelled mid-quarter, or has a standing
-  `fee_exemptions` row is not specially handled; the same fixed ₹250,
-  first-qualifying-match rule applies to everyone who plays a role-
-  fulfilling match in the quarter. Not requested, and would need its own
-  design pass if it ever is.
+- **No proration or refund for the membership fee** — a player who joins
+  or is expelled mid-quarter is not specially handled; the same fixed
+  ₹250, first-qualifying-match rule applies to everyone who plays a
+  role-fulfilling match in the quarter. **A standing `fee_exemptions` row
+  *is* now handled** (§12.1, added September 2026) — an exempt player is
+  excluded from the charge entirely, not charged-then-refunded. Proration/
+  refund for a mid-quarter join or expulsion is still not requested, and
+  would need its own design pass if it ever is.
 - **No configurable amount or quarter boundary** — `MEMBERSHIP_FEE_AMOUNT`
   (₹250) and the calendar-quarter definition are both hardcoded in
   `src/lib/membershipFee.ts`, not admin-editable settings.
