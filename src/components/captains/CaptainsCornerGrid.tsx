@@ -86,11 +86,14 @@ interface Props {
 // ── Constants ─────────────────────────────────────────────────────
 const MAX_SQUAD = 12
 
+// Colours resolve via the --captains-resp-* CSS variables (globals.css) so
+// the same chip reads correctly on both a dark and a white card — dark is the
+// original filled-dark set, light a pastel tint with dark text.
 const RESP: Record<string, { bg: string; text: string; border: string; label: string }> = {
-  Y: { bg: '#14532d', text: '#86efac', border: '#22c55e', label: 'Available' },
-  E: { bg: '#1e3a5f', text: '#93c5fd', border: '#3b82f6', label: 'Either game today — one only' },
-  O: { bg: '#431407', text: '#fdba74', border: '#f97316', label: 'One game this weekend only' },
-  L: { bg: '#2e1a47', text: '#d8b4fe', border: '#a855f7', label: 'On leave' },
+  Y: { bg: 'var(--captains-resp-y-bg)', text: 'var(--captains-resp-y-text)', border: 'var(--captains-resp-y-border)', label: 'Available' },
+  E: { bg: 'var(--captains-resp-e-bg)', text: 'var(--captains-resp-e-text)', border: 'var(--captains-resp-e-border)', label: 'Either game today — one only' },
+  O: { bg: 'var(--captains-resp-o-bg)', text: 'var(--captains-resp-o-text)', border: 'var(--captains-resp-o-border)', label: 'One game this weekend only' },
+  L: { bg: 'var(--captains-resp-l-bg)', text: 'var(--captains-resp-l-text)', border: 'var(--captains-resp-l-border)', label: 'On leave' },
 }
 
 // ── "Form" panel tokens — Light/Dark/System (see ui-theme.md) ─────
@@ -371,10 +374,10 @@ function Chip({ code, count }: { code: string; count?: number }) {
 // ── StatusBadge ───────────────────────────────────────────────────
 function StatusBadge({ status }: { status: 'draft' | 'pending' | 'approved' | 'announced' }) {
   const styles: Record<string, string> = {
-    draft:     'bg-zinc-900 border-zinc-700 text-zinc-500',
-    pending:   'bg-amber-950/40 border-amber-700 text-amber-400',
-    approved:  'bg-emerald-950/40 border-emerald-700 text-emerald-400',
-    announced: 'bg-gold/10 border-gold-dim text-gold',
+    draft:     'bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-500',
+    pending:   'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400',
+    approved:  'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400',
+    announced: 'bg-[var(--captains-badge-bg)] dark:bg-gold/10 border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold',
   }
   const labels: Record<string, string> = {
     draft: 'Draft', pending: 'Pending GC', approved: 'GC Approved', announced: 'Announced',
@@ -399,11 +402,16 @@ function StatusBadge({ status }: { status: 'draft' | 'pending' | 'approved' | 'a
      squadStatus === 'draft'     ? 'rgba(56,189,248,0.07)' :
      undefined
 
+   // Pip colours darken in light mode — the dark-tuned #34d399/#38bdf8
+   // vanish against a white cell.
+   const { resolvedTheme } = useTheme()
+   const green = resolvedTheme === 'dark' ? '#34d399' : '#059669'
+   const blue  = resolvedTheme === 'dark' ? '#38bdf8' : '#0284c7'
    const pip =
-     squadStatus === 'announced' ? { char: '✓', color: '#34d399' } :
-     squadStatus === 'approved'  ? { char: '✓', color: '#34d39970' } :
-     squadStatus === 'pending'   ? { char: '·', color: '#38bdf8' } :
-     squadStatus === 'draft'     ? { char: '·', color: '#38bdf870' } :
+     squadStatus === 'announced' ? { char: '✓', color: green } :
+     squadStatus === 'approved'  ? { char: '✓', color: `${green}70` } :
+     squadStatus === 'pending'   ? { char: '·', color: blue } :
+     squadStatus === 'draft'     ? { char: '·', color: `${blue}70` } :
      null
 
   if (!code) return (
@@ -459,15 +467,15 @@ function PlayerName({
 }) {
   const cls = [
     'font-rajdhani text-sm flex-1 leading-none',
-    isTaken ? 'line-through text-[var(--captains-text-muted)] dark:text-zinc-500' : hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment',
+    isTaken ? 'line-through text-[var(--captains-text-muted)] dark:text-zinc-500' : hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment',
   ].filter(Boolean).join(' ')
 
   const badge = player.is_captain
-    ? <span className="ml-1.5 font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1 py-px rounded-sm">CAP</span>
+    ? <span className="ml-1.5 font-rajdhani text-[9px] font-bold bg-[var(--captains-badge-bg)] dark:bg-gold/10 border border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold px-1 py-px rounded-sm">CAP</span>
     : null
 
 const exemptBadge = player.is_fee_exempt
-   ? <span className="ml-1 inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted"><HeartHandshakeIcon size={12} /></span>
+   ? <span className="ml-1 inline-flex items-center justify-center text-rose-500 dark:text-rose-400" title="Club solidarity — fee exempted"><HeartHandshakeIcon size={12} /></span>
    : null
 
   if (player.cricheroes_url && !isTaken) {
@@ -648,15 +656,15 @@ function SelectablePlayerRow({
 
   // Badges shown when roles are assigned and status is not draft
   const activeBadges = [
-    isMatchCaptain && { label: 'C',  cls: 'bg-gold/20 border-gold-dim text-gold' },
-    isVC           && { label: 'VC', cls: 'bg-gold/10 border-gold-dim text-gold' },
-    isWK           && { label: 'WK', cls: 'bg-sky-950/40 border-sky-700 text-sky-400' },
+    isMatchCaptain && { label: 'C',  cls: 'bg-[var(--captains-badge-bg)] dark:bg-gold/20 border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold' },
+    isVC           && { label: 'VC', cls: 'bg-[var(--captains-badge-bg)] dark:bg-gold/10 border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold' },
+    isWK           && { label: 'WK', cls: 'bg-sky-100 dark:bg-sky-950/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-400' },
   ].filter(Boolean) as { label: string; cls: string }[]
 
   return (
     <div className={[
       'border-b border-[var(--captains-border)] dark:border-zinc-800 last:border-0 transition-colors',
-      isSel ? 'bg-sky-950/30' : '',
+      isSel ? 'bg-[#EAF3FF] dark:bg-sky-950/30' : '',
     ].filter(Boolean).join(' ')}>
 
       {/* Main selectable row */}
@@ -686,14 +694,14 @@ function SelectablePlayerRow({
         {!isPractice && player.recent_form && (
           <button
             onClick={handleFormToggle}
-            className="font-rajdhani text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-[#1E3A5F] text-[#93C5FD] flex-shrink-0">
+            className="font-rajdhani text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-[#DBEAFE] dark:bg-[#1E3A5F] text-[#1E40AF] dark:text-[#93C5FD] flex-shrink-0">
             📊 Form {formOpen ? '▴' : '▾'}
           </button>
         )}
 
         {/* Right-side pill */}
         {isTaken ? (
-          <span className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-red-950/60 border border-red-800/60 text-red-400 whitespace-nowrap">
+          <span className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-red-50 dark:bg-red-950/60 border border-red-300 dark:border-red-800/60 text-red-700 dark:text-red-400 whitespace-nowrap">
             in {takenLabel}
           </span>
         ) : isSel && status !== 'draft' && activeBadges.length > 0 ? (
@@ -733,8 +741,8 @@ function SelectablePlayerRow({
               className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border transition-colors ${
                 role.active
                   ? role.key === 'wk'
-                    ? 'bg-sky-950/60 border-sky-700 text-sky-400'
-                    : 'bg-gold/20 border-gold-dim text-gold'
+                    ? 'bg-sky-100 dark:bg-sky-950/60 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-400'
+                    : 'bg-[var(--captains-badge-bg)] dark:bg-gold/20 border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold'
                   : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 border-[var(--captains-card-border)] dark:border-ink-5 text-[var(--captains-text-muted)] dark:text-zinc-600 hover:text-[var(--captains-text-2)] dark:hover:text-zinc-400 hover:border-[var(--captains-text-muted)] dark:hover:border-zinc-600'
               }`}>
               {role.label}
@@ -764,7 +772,7 @@ function SelectablePlayerRow({
                   isDisabledCombo
                     ? 'opacity-25 cursor-not-allowed bg-[var(--captains-surface-2)] dark:bg-ink-4 border-[var(--captains-card-border)] dark:border-ink-5'
                     : isActive
-                      ? 'bg-emerald-950/60 border-emerald-700'
+                      ? 'bg-emerald-100 dark:bg-emerald-950/60 border-emerald-400 dark:border-emerald-700'
                       : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 border-[var(--captains-card-border)] dark:border-ink-5 hover:border-[var(--captains-text-muted)] dark:hover:border-zinc-600'
                 }`}>
                  <MatchRoleIcon role={mr.key} ballType={ballType} />
@@ -801,7 +809,7 @@ function SelectablePlayerRow({
               <p className="font-rajdhani text-[11px]" style={{ color: ft.loadingText }}>Loading form…</p>
             )}
             {formError && (
-              <p className="font-rajdhani text-[11px] text-red-400">{formError}</p>
+              <p className="font-rajdhani text-[11px] text-red-600 dark:text-red-400">{formError}</p>
             )}
             {formStats && <ContextStatsTable stats={formStats} />}
           </div>
@@ -901,12 +909,17 @@ function AddPlayerPanel({
     p.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  const PROXY_CODES: { code: string; bg: string; text: string; border: string }[] = [
-    { code: 'Y', bg: '#1a4731', text: '#4ade80', border: '#166534' },
-    { code: 'E', bg: '#1e3a5f', text: '#60a5fa', border: '#1d4ed8' },
-    { code: 'O', bg: '#3d2e00', text: '#fbbf24', border: '#d97706' },
-    { code: 'L', bg: '#2e1a47', text: '#c084fc', border: '#7e22ce' },
-  ]
+  // Dark keeps this panel's original, slightly-different-from-RESP shades;
+  // light reuses the RESP pastel set so the buttons match the chips above.
+  const { resolvedTheme } = useTheme()
+  const PROXY_CODES: { code: string; bg: string; text: string; border: string }[] = resolvedTheme === 'dark'
+    ? [
+        { code: 'Y', bg: '#1a4731', text: '#4ade80', border: '#166534' },
+        { code: 'E', bg: '#1e3a5f', text: '#60a5fa', border: '#1d4ed8' },
+        { code: 'O', bg: '#3d2e00', text: '#fbbf24', border: '#d97706' },
+        { code: 'L', bg: '#2e1a47', text: '#c084fc', border: '#7e22ce' },
+      ]
+    : (['Y', 'E', 'O', 'L'] as const).map(code => ({ code, bg: RESP[code].bg, text: RESP[code].text, border: RESP[code].border }))
 
   async function handleCodeSelect(code: string) {
     if (!selectedPlayer) return
@@ -964,7 +977,7 @@ function AddPlayerPanel({
                     key={p.id}
                     onClick={() => setSelectedPlayer(p)}
                     className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-[var(--captains-row-hover)] dark:hover:bg-ink-4 transition-colors text-left">
-                    <span className={`font-rajdhani text-sm font-semibold ${p.wallet_balance < 0 ? 'text-amber-400' : p.status !== 'active' ? 'text-[var(--captains-text-2)] dark:text-zinc-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
+                    <span className={`font-rajdhani text-sm font-semibold ${p.wallet_balance < 0 ? 'text-amber-700 dark:text-amber-400' : p.status !== 'active' ? 'text-[var(--captains-text-2)] dark:text-zinc-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                       {p.name}
                     </span>
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -974,7 +987,7 @@ function AddPlayerPanel({
                         </span>
                       )}
                       {p.wallet_balance < 0 && (
-                        <span className="font-rajdhani text-[9px] font-bold bg-amber-950 border border-amber-800 text-amber-500 px-1 py-px rounded-sm">
+                        <span className="font-rajdhani text-[9px] font-bold bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-500 px-1 py-px rounded-sm">
                           ₹
                         </span>
                       )}
@@ -1018,7 +1031,7 @@ function AddPlayerPanel({
             ))}
           </div>
           {error && (
-            <p className="font-rajdhani text-[10px] text-red-400 mt-2">✕ {error}</p>
+            <p className="font-rajdhani text-[10px] text-red-600 dark:text-red-400 mt-2">✕ {error}</p>
           )}
         </>
       )}
@@ -1468,7 +1481,7 @@ function SlotCard({
             <p className="font-rajdhani text-[10px] text-[var(--captains-text-muted)] dark:text-zinc-500 leading-none mb-0.5">
               {formatSlotDate(booking.game_date)}
             </p>
-            <p className="font-cinzel text-base font-bold text-gold leading-none">
+            <p className="font-cinzel text-base font-bold text-[var(--captains-accent)] dark:text-gold leading-none">
               {matchDisplayTime(booking.match_time)}
             </p>
             <p className="font-rajdhani text-[9px] text-[var(--captains-text-muted)] dark:text-zinc-600 mt-0.5">{booking.format}</p>
@@ -1506,7 +1519,7 @@ function SlotCard({
           {/* Hint when in draft with players selected */}
           {status === 'draft' && selected.size > 0 && (
             <div className="px-3 py-1.5 bg-[var(--captains-surface-2)] dark:bg-ink-4 border-b border-[var(--captains-card-border)] dark:border-ink-5">
-              <p className={`font-rajdhani text-[10px] ${!rolesComplete ? 'text-amber-400' : 'text-[var(--captains-text-2)] dark:text-zinc-400'}`}>
+              <p className={`font-rajdhani text-[10px] ${!rolesComplete ? 'text-amber-700 dark:text-amber-400' : 'text-[var(--captains-text-2)] dark:text-zinc-400'}`}>
                 {!rolesComplete
                   ? `Tap a selected player to assign ${missingRoles.join(', ')} — required before GC submission.`
                   : 'Tap a selected player to change C / VC / WK roles.'}
@@ -1602,7 +1615,7 @@ function SlotCard({
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <span className={`font-rajdhani text-xs font-bold tabular-nums flex-shrink-0 ${atCap ? 'text-emerald-400' : 'text-[var(--captains-text-2)] dark:text-zinc-400'}`}>
+              <span className={`font-rajdhani text-xs font-bold tabular-nums flex-shrink-0 ${atCap ? 'text-emerald-700 dark:text-emerald-400' : 'text-[var(--captains-text-2)] dark:text-zinc-400'}`}>
                 {selected.size}/{MAX_SQUAD}{atCap ? ' ✓' : ''}
               </span>
             </div>
@@ -1630,7 +1643,7 @@ function SlotCard({
               {/* Pending — withdraw button */}
               {status === 'pending' && (
                 <>
-                  <span className="font-rajdhani text-[10px] font-bold text-amber-300 flex items-center gap-1.5">
+                  <span className="font-rajdhani text-[10px] font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" />
                     Awaiting GC
                   </span>
@@ -1647,7 +1660,7 @@ function SlotCard({
               {status === 'draft' && (
                 <div className="flex items-center gap-2">
                   {selected.size > 0 && !rolesComplete && (
-                    <span className="font-rajdhani text-[9px] text-amber-400 whitespace-nowrap">
+                    <span className="font-rajdhani text-[9px] text-amber-700 dark:text-amber-400 whitespace-nowrap">
                       Assign {missingRoles.join(', ')}
                     </span>
                   )}
@@ -1655,7 +1668,7 @@ function SlotCard({
                     onClick={handleSubmit}
                     disabled={selected.size === 0 || !rolesComplete || saving}
                     title={selected.size > 0 && !rolesComplete ? `Assign ${missingRoles.join(', ')} before submitting` : undefined}
-                    className="font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    className="font-rajdhani text-[10px] font-bold tracking-wide px-3 py-1.5 rounded-sm bg-[var(--captains-badge-bg)] dark:bg-gold/10 border border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold hover:bg-[#FDE68A] dark:hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                     {saving ? 'Submitting…' : everAnnounced ? 'Resubmit for GC' : 'Submit for GC review'}
                   </button>
                 </div>
@@ -1665,7 +1678,7 @@ function SlotCard({
               {status === 'approved' && (
                 <>
                   {gcReturnNote && (
-                    <span className="font-rajdhani text-[9px] text-amber-400 truncate max-w-[120px]" title={gcReturnNote}>
+                    <span className="font-rajdhani text-[9px] text-amber-700 dark:text-amber-400 truncate max-w-[120px]" title={gcReturnNote}>
                       GC: {gcReturnNote}
                     </span>
                   )}
@@ -1695,9 +1708,9 @@ function SlotCard({
               {/* Announced */}
               {status === 'announced' && (
                 <>
-                  <span className="font-rajdhani text-[10px] font-bold text-emerald-400">Announced ✓</span>
+                  <span className="font-rajdhani text-[10px] font-bold text-emerald-700 dark:text-emerald-400">Announced ✓</span>
                   <a href={waLink} target="_blank" rel="noopener noreferrer" title="Share via WhatsApp"
-                    className="flex items-center justify-center w-7 h-7 rounded-sm bg-emerald-950/40 border border-emerald-800/60 text-emerald-400 hover:bg-emerald-950/70 transition-colors">
+                    className="flex items-center justify-center w-7 h-7 rounded-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/70 transition-colors">
                     <WAIcon size={13} />
                   </a>
                   <button
@@ -1712,18 +1725,18 @@ function SlotCard({
 
             {/* GC return note — shown when captain is back in draft after GC returned */}
             {status === 'draft' && gcReturnNote && (
-              <div className="mt-2 px-2 py-1.5 rounded-sm bg-amber-950/30 border border-amber-800/50">
-                <p className="font-rajdhani text-[10px] text-amber-400">
+              <div className="mt-2 px-2 py-1.5 rounded-sm bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/50">
+                <p className="font-rajdhani text-[10px] text-amber-700 dark:text-amber-400">
                   <span className="font-bold">GC note:</span> {gcReturnNote}
                 </p>
               </div>
             )}
 
             {saveError && (
-              <p className="font-rajdhani text-[10px] text-red-400 mt-2">{saveError}</p>
+              <p className="font-rajdhani text-[10px] text-red-600 dark:text-red-400 mt-2">{saveError}</p>
             )}
             {exemptWarning && (
-<p className="font-rajdhani text-[10px] text-rose-400 mt-1.5 flex items-center gap-1">
+<p className="font-rajdhani text-[10px] text-rose-500 dark:text-rose-400 mt-1.5 flex items-center gap-1">
      <HeartHandshakeIcon size={11} />
      {exemptInSquad} solidarity players in squad — others share higher match fees
    </p>
@@ -1736,7 +1749,7 @@ function SlotCard({
               <button
                 onClick={() => setAddingFor(v => !v)}
                 className={`font-rajdhani text-[10px] font-bold tracking-wide transition-colors ${
-                  addingFor ? 'text-[var(--captains-text-muted)] dark:text-zinc-500' : 'text-gold hover:text-gold-dim'
+                  addingFor ? 'text-[var(--captains-text-muted)] dark:text-zinc-500' : 'text-[var(--captains-accent)] dark:text-gold hover:text-[var(--captains-accent-dim)] dark:hover:text-gold-dim'
                 }`}>
                 {addingFor ? '✕ Cancel' : '＋ Add player'}
               </button>
@@ -1832,7 +1845,7 @@ function MatrixView({
                   width: '100%',
                   margin: '0 auto',
                 }}>
-                  <span className="font-cinzel text-[10px] font-semibold text-gold">
+                  <span className="font-cinzel text-[10px] font-semibold text-[var(--captains-accent)] dark:text-gold">
                     {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}
                   </span>
                   <span className="font-rajdhani text-[10px] font-bold text-[var(--captains-text-2)] dark:text-zinc-400">
@@ -1865,33 +1878,33 @@ function MatrixView({
                       {/* Desktop name */}
                       {p.cricheroes_url ? (
                         <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                          className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
+                          className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                           {desktopMatrixName(p)}
                         </a>
                       ) : (
-                        <span className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] ${hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
+                        <span className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] ${hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                           {desktopMatrixName(p)}
                         </span>
                       )}
                       {/* Mobile name */}
                       {p.cricheroes_url ? (
                         <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                          className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
+                          className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                           {mobileMatrixName(p)}
                         </a>
                       ) : (
-                        <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] ${hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
+                        <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] ${hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                           {mobileMatrixName(p)}
                         </span>
                       )}
                       {p.is_captain && (
-                        <span className="font-rajdhani text-[8px] font-bold bg-gold/10 border border-gold-dim text-gold px-0.5 rounded-sm flex-shrink-0">C</span>
+                        <span className="font-rajdhani text-[8px] font-bold bg-[var(--captains-badge-bg)] dark:bg-gold/10 border border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold px-0.5 rounded-sm flex-shrink-0">C</span>
                       )}
                       {hasDues && (
-                        <span className="font-rajdhani text-[8px] font-bold bg-amber-950 border border-amber-800 text-amber-500 px-0.5 rounded-sm flex-shrink-0">₹</span>
+                        <span className="font-rajdhani text-[8px] font-bold bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-500 px-0.5 rounded-sm flex-shrink-0">₹</span>
                       )}
                       {p.is_fee_exempt && (
-   <span className="inline-flex items-center justify-center text-rose-400 flex-shrink-0" title="Club solidarity — fee exempted">
+   <span className="inline-flex items-center justify-center text-rose-500 dark:text-rose-400 flex-shrink-0" title="Club solidarity — fee exempted">
      <HeartHandshakeIcon size={11} />
    </span>
  )}
@@ -2031,7 +2044,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
     <div>
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
-          <h2 className="font-cinzel text-base font-semibold text-gold">{weekLabel}</h2>
+          <h2 className="font-cinzel text-base font-semibold text-[var(--captains-accent)] dark:text-gold">{weekLabel}</h2>
           <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-600 mt-0.5">
             {bookings.length} game{bookings.length !== 1 ? 's' : ''} this week
           </p>
@@ -2041,14 +2054,14 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
           <button
             onClick={() => setView('slot')}
             className={`px-3 py-1.5 font-rajdhani text-xs font-bold tracking-wide transition-colors ${
-              view === 'slot' ? 'bg-gold-dim text-gold' : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 text-[var(--captains-text-muted)] dark:text-zinc-500 hover:text-[var(--captains-text)] dark:hover:text-zinc-300'
+              view === 'slot' ? 'bg-[var(--captains-badge-bg)] dark:bg-gold-dim text-[var(--captains-badge-text)] dark:text-gold' : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 text-[var(--captains-text-muted)] dark:text-zinc-500 hover:text-[var(--captains-text)] dark:hover:text-zinc-300'
             }`}>
             Per Slot
           </button>
           <button
             onClick={() => setView('matrix')}
             className={`px-3 py-1.5 font-rajdhani text-xs font-bold tracking-wide transition-colors ${
-              view === 'matrix' ? 'bg-gold-dim text-gold' : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 text-[var(--captains-text-muted)] dark:text-zinc-500 hover:text-[var(--captains-text)] dark:hover:text-zinc-300'
+              view === 'matrix' ? 'bg-[var(--captains-badge-bg)] dark:bg-gold-dim text-[var(--captains-badge-text)] dark:text-gold' : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 text-[var(--captains-text-muted)] dark:text-zinc-500 hover:text-[var(--captains-text)] dark:hover:text-zinc-300'
             }`}>
             Matrix
           </button>
@@ -2059,10 +2072,10 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         {view === 'slot' && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-2.5 pb-2.5 border-b border-[var(--captains-card-border)] dark:border-ink-5">
             {[
-              { dot: 'bg-emerald-900/60 border-emerald-700',   label: 'Available across all slots' },
-              { dot: 'bg-sky-900/40 border-sky-700',           label: 'Selected for this slot' },
+              { dot: 'bg-emerald-100 dark:bg-emerald-900/60 border-emerald-400 dark:border-emerald-700', label: 'Available across all slots' },
+              { dot: 'bg-[#EAF3FF] dark:bg-sky-900/40 border-sky-300 dark:border-sky-700',                label: 'Selected for this slot' },
               { dot: 'bg-[var(--captains-border)] dark:bg-zinc-800 border-[var(--captains-border)] dark:border-zinc-600 opacity-50', label: "Taken — in another slot's squad" },
-              { dot: 'bg-amber-900/40 border-amber-700',       label: 'Has outstanding dues' },
+              { dot: 'bg-amber-50 dark:bg-amber-900/40 border-amber-400 dark:border-amber-700',           label: 'Has outstanding dues' },
             ].map(({ dot, label }) => (
               <div key={label} className="flex items-center gap-1.5">
                 <span className={`w-2.5 h-2.5 rounded-sm border flex-shrink-0 ${dot}`} />

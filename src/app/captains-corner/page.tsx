@@ -251,21 +251,24 @@ export default async function CaptainsCornerPage() {
       {/* Legend */}
       <div className="px-5 md:px-8 lg:px-10 py-2.5 flex gap-5 flex-wrap"
         style={{ background: 'var(--captains-hero-bg)', borderBottom: '1px solid var(--captains-border)' }}>
+        {/* Same --captains-resp-* chip tokens the grid's own RESP set reads,
+            so this legend and the per-row chips can't disagree on a colour
+            (E used to be yellow here while the grid rendered it blue). */}
         {[
-          { code: 'Y', color: '#4ade80', label: 'Available' },
-          { code: 'O', color: '#fb923c', label: 'One game this weekend' },
-          { code: 'E', color: '#fbbf24', label: 'Either game same day' },
+          { code: 'Y', token: 'y', label: 'Available' },
+          { code: 'O', token: 'o', label: 'One game this weekend' },
+          { code: 'E', token: 'e', label: 'Either game same day' },
         ].map(item => (
           <div key={item.code} className="flex items-center gap-1.5">
             <span className="w-5 h-5 rounded flex items-center justify-center font-rajdhani text-xs font-bold"
-              style={{ background: `${item.color}20`, color: item.color, border: `1px solid ${item.color}40` }}>
+              style={{ background: `var(--captains-resp-${item.token}-bg)`, color: `var(--captains-resp-${item.token}-text)`, border: `1px solid var(--captains-resp-${item.token}-border)` }}>
               {item.code}
             </span>
             <span className="font-rajdhani text-xs" style={{ color: 'var(--captains-text-muted)' }}>{item.label}</span>
           </div>
         ))}
         <div className="flex items-center gap-1.5">
-          <span className="w-5 h-5 rounded flex items-center justify-center font-rajdhani text-xs font-bold bg-amber-950 text-amber-400 border border-amber-800">
+          <span className="w-5 h-5 rounded flex items-center justify-center font-rajdhani text-xs font-bold bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800">
             ₹
           </span>
           <span className="font-rajdhani text-xs" style={{ color: 'var(--captains-text-muted)' }}>Has outstanding dues</span>

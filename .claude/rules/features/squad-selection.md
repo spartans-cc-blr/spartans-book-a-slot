@@ -576,6 +576,55 @@ icon, and the `AddPlayerPanel`'s own Y/E/O/L proxy-add button colours
 (`PROXY_CODES`) — none of these read from a `--captains-*` token in either
 theme.
 
+**Revised the same day, after the first real light render — those "leave
+the status chips alone" calls were wrong for this page.** On Home/Fixtures
+the status chips are a handful of small badges; here they *are* most of
+the row. A screenshot of the light theme showed every one of them
+dark-tuned and muddy on a white card: the selected-row `bg-sky-950/30`
+rendered as a grey-blue slab, `text-amber-400` dues names washed out to
+pale yellow, the `text-gold`/`bg-gold/10` CAP/C/VC/Announced badges read
+as faint khaki (`gold` is `#C9A84C` — see `ui-theme.md`'s token
+correction), the Y/O/E chips and 14Y/4O count chips sat as filled-dark
+blocks, and the navy `Form` pill, `WK` badge, and `-400`-shade
+emerald/red/rose/amber text all lost contrast. Dark stays byte-identical
+(every change is a light base class paired with the exact original as
+its `dark:` copy); light now gets:
+
+- **Y/O/E/L chips (`RESP`, `Chip`, `RespCell`, `Legend`, the Matrix
+  footer) read twelve new `--captains-resp-{y,e,o,l}-{bg,text,border}`
+  tokens** (`globals.css`) — dark values are the original literals,
+  light values a pastel tint with dark text of the same hue (`#DCFCE7`/
+  `#15803D`, `#DBEAFE`/`#1D4ED8`, `#FFEDD5`/`#C2410C`, `#F3E8FF`/
+  `#7E22CE`). `RESP` itself stays a plain constant — its values are now
+  `var(--…)` strings, so every consumer flipped with no per-site change.
+  `AddPlayerPanel`'s `PROXY_CODES` keeps its own slightly-different dark
+  literals via `useTheme()` and reuses the `RESP` set in light. The
+  page-shell legend (`page.tsx`) reads the same tokens now — which also
+  fixed a pre-existing inconsistency where that legend drew `E` in yellow
+  while every chip in the grid below drew it blue.
+- **Gold badges** (CAP, C/VC role pills and toggles, `Announced`, the
+  Submit-for-GC button, the Per Slot/Matrix view toggle, the `text-gold`
+  time/heading text) use the `--captains-badge-*`/`--captains-accent*`
+  tokens in light (`#FEF3C7`/`#B45309`/`#D97706`) — the same amber
+  family the rest of the Warm Light app uses for its gold, not the
+  muted khaki Tailwind `gold` token.
+- **Selected row** `#EAF3FF` (a real sky-50 tint), **WK badge**
+  `sky-100/300/700`, **Form pill** `#DBEAFE`/`#1E40AF`, **taken-elsewhere
+  pill** `red-50/300/700`, **active match-role button** `emerald-100/400`,
+  **StatusBadge** draft/pending/approved on `zinc/amber/emerald-50`
+  backgrounds with `-300` borders and `-700` text, the **dues `₹` badges**
+  on `amber-50`, the **GC-note box** on `amber-50`, and the three
+  **legend dots** re-tinted to match the row treatments they describe.
+- **Every `text-{amber,emerald,red,rose}-400` / `text-amber-300`** steps
+  down to its `-700` (rose: `-500`) shade in light, `-400` kept for dark.
+- **`RespCell`'s in-squad pip** (`✓`/`·`) darkens from `#34d399`/`#38bdf8`
+  to `#059669`/`#0284c7` in light via `useTheme()`, since the dark-tuned
+  shades vanish on a white cell.
+
+The "small saturated accent chips don't need theming" rule from the
+other pages still holds where it was applied — it just doesn't extend to
+a page whose rows are almost entirely made of those chips.
+
 **The "Form" panel is its own local theme, not `--captains-*`.** Both the
 navy-gradient card `SelectablePlayerRow` opens (tournament/ground/format
 record) and `ContextStatsTable` inside it were always a deliberately
