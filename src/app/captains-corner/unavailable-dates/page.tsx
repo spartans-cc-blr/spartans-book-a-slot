@@ -173,28 +173,28 @@ export default async function UnavailableDatesPage({
     .filter((d): d is DayInfo => d !== null)
 
   return (
-    <div className="min-h-screen" style={{ background: '#F8F4EE' }}>
+    <div className="min-h-screen" style={{ background: 'var(--unavail-shell-bg)' }}>
       <SiteNav activePage="captains-unavailable" />
 
       {/* Hero — same visual language as /schedule's own hero */}
-      <div style={{ background: '#EEEAE2', borderBottom: '1px solid #D4C9B0', padding: '28px 20px 24px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #D97706 0%, #F59E0B 60%, transparent 100%)' }} />
-        <p style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '11px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#D97706', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ display: 'inline-block', width: '20px', height: '1.5px', background: '#D97706' }} />
+      <div style={{ background: 'var(--unavail-hero-bg)', borderBottom: '1px solid var(--unavail-border)', padding: '28px 20px 24px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, var(--unavail-accent) 0%, #F59E0B 60%, transparent 100%)' }} />
+        <p style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '11px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--unavail-accent)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ display: 'inline-block', width: '20px', height: '1.5px', background: 'var(--unavail-accent)' }} />
           Spartans Cricket Club · Bengaluru
         </p>
-        <p style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '12px', color: '#A8A29E', marginBottom: '4px' }}>
-          <b style={{ color: '#78716C', fontWeight: 600 }}>Captains&rsquo; Corner</b> › Unavailable Dates
+        <p style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '12px', color: 'var(--unavail-text-faint)', marginBottom: '4px' }}>
+          <b style={{ color: 'var(--unavail-text-muted)', fontWeight: 600 }}>Captains&rsquo; Corner</b> › Unavailable Dates
         </p>
-        <h1 style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 'clamp(20px, 5vw, 28px)', fontWeight: 700, color: '#1C1917', letterSpacing: '0.03em', marginBottom: '6px', lineHeight: 1.2 }}>
+        <h1 style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 'clamp(20px, 5vw, 28px)', fontWeight: 700, color: 'var(--unavail-text)', letterSpacing: '0.03em', marginBottom: '6px', lineHeight: 1.2 }}>
           🚫 Unavailable Dates
         </h1>
-        <p style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '14px', color: '#78716C', maxWidth: '520px', lineHeight: 1.5 }}>
+        <p style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '14px', color: 'var(--unavail-text-muted)', maxWidth: '520px', lineHeight: 1.5 }}>
           {isOwnView
             ? <>Mark dates and times you already know you can&rsquo;t lead a game. This keeps the tournament
                 share page from suggesting those slots to organisers — booked and reserved slots are shown
                 too, just so you can see the full day at a glance.</>
-            : <>Read-only — showing <b style={{ color: '#1C1917' }}>{viewingName}</b>&rsquo;s marked-unavailable dates. Only they can add or clear a mark.</>}
+            : <>Read-only — showing <b style={{ color: 'var(--unavail-text)' }}>{viewingName}</b>&rsquo;s marked-unavailable dates. Only they can add or clear a mark.</>}
         </p>
         {user.isAdmin && captainOptions.length > 0 && (
           <CaptainPicker captains={captainOptions} selectedId={viewingPlayerId ?? ''} ownPlayerId={user.playerId ?? null} />
@@ -203,7 +203,7 @@ export default async function UnavailableDatesPage({
 
       <UnavailableDatesPanel days={days} viewingPlayerId={isOwnView ? undefined : (viewingPlayerId ?? undefined)} />
 
-      <footer style={{ textAlign: 'center', color: '#A8A29E', fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '12px', padding: '20px', borderTop: '1px solid #D4C9B0' }}>
+      <footer style={{ textAlign: 'center', color: 'var(--unavail-text-faint)', fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '12px', padding: '20px', borderTop: '1px solid var(--unavail-border)' }}>
         © 2026 Spartans Cricket Club · Bengaluru · Est. 2014
       </footer>
     </div>

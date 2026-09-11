@@ -317,6 +317,60 @@ tournament-level captain assignment and can diverge from it) and renders a
 
 ---
 
+## 6.2 Light/Dark/System theme support (added September 2026)
+
+`/captains-corner/unavailable-dates` (`page.tsx`, `UnavailableDatesPanel.tsx`,
+and `CaptainPicker.tsx`) is now theme-aware, following the app's
+Light/Dark/System toggle — full mechanism in `ui-theme.md`'s "Light/Dark/
+System Theme" section. This page's previous single, always-warm-light look
+(mirroring `/schedule`, per §6's own header comment) is now specifically the
+**light** theme state — unchanged pixel-for-pixel, since the light values in
+the new `--unavail-*` CSS custom property set (`src/app/globals.css`) were
+seeded directly from this page's existing literal colours. A new **dark**
+variant was added alongside it, reusing the same dark-ink palette (`#080808`/
+`#111111`/`#1A1A1A` surfaces, `#C9A84C` gold) every other converted surface in
+this app already uses.
+
+**Own token namespace, not `--captains-*`.** This page has always been
+styled deliberately differently from the rest of Captains' Corner (§1's own
+header comment, and `page.tsx`'s file-level comment), so its tokens are a
+separate `--unavail-*` set rather than sharing the dark-ink-themed
+`--captains-*` tokens `CaptainsCornerGrid.tsx` uses. Both `page.tsx` and
+`CaptainPicker.tsx` already read `var(--unavail-xxx)` directly in inline
+`style` props — no `useTheme()` hook needed, since CSS custom properties
+resolve live off the `data-theme` attribute on `<html>` regardless of
+Server/Client component boundaries. `UnavailableDatesPanel.tsx` (a Client
+Component, but styled entirely via inline `style` rather than Tailwind
+classes) follows the identical pattern: every structural colour — shell/row/
+divider backgrounds, borders, primary/secondary/muted/faint text, the gold
+accent — now reads `var(--unavail-xxx)` instead of a literal hex.
+
+**Five new tokens, added on top of the ones `page.tsx`/`CaptainPicker.tsx`
+already introduced** (`--unavail-divider-bg` for the month-header row,
+`--unavail-toggle-bg-to` for the neutral/unmarked "L" toggle button's
+gradient stop, `--unavail-toggle-shadow-hi`/`--unavail-toggle-shadow-lo` for
+that same button's inset-highlight/drop-shadow — both rgba-valued, so the
+subtle emboss effect doesn't render as a stray bright line across a dark
+button, and `--unavail-danger` for the inline save-error text). Light values
+for all five were set to the page's original literals byte-for-byte; dark
+values reuse the same `#242424`/rgba-on-dark conventions already established
+by `--home-divider`/`--fx-card-divider`/`--captains-row-hover` elsewhere in
+`globals.css`.
+
+**Semantic slot-status colours were deliberately left literal, in both
+themes** — the same four saturated status combos this page's legend and
+`SlotCell` already use (the marked-`L` purple chip, the booked/red link, the
+reserved/amber tile, the blocked/grey link with its directional arrow), plus
+the Sat/Sun day-of-week pills (blue/pink). These are small, self-contained
+badges that already read fine on either a light or dark row background — the
+same call every other themed page in this app has made for its own
+equivalent status chips (e.g. `FixturesCard.tsx`'s format/WK badges, the
+Y/O/E/L availability legend). `ClashArrow.tsx` needed no changes at all — it
+already renders with `stroke="currentColor"`, so it inherits whatever text
+colour the wrapping blocked-slot link already resolves to.
+
+---
+
 ## 7. Removed — Internal Tournament Planner "Suggested Slots" panel
 
 The internal Hub `/tournament-planner` page previously had its own
@@ -362,6 +416,38 @@ the historical note.
 | `/captains-corner/unavailable-dates` hard-redirects non-captains server-side, mirroring `/captains-corner/page.tsx` | ✅ |
 | `GET ?player_id=` cross-player lookup is admin-only, re-checked server-side — never trusts the client to only send it when appropriate | ✅ |
 | Writes always target the caller's own `session.user.playerId` — `player_id` is never accepted from POST/DELETE body or query string, so an admin viewing another captain's calendar can't write under that captain's identity even if the client were compromised | ✅ |
+
+---
+
+## 8.1 Light/Dark/System (added September 2026)
+
+`/captains-corner/unavailable-dates` is being converted to the app's
+Light/Dark/System theme toggle — full mechanism in `ui-theme.md`'s
+"Light/Dark/System Theme" section. Unlike the rest of Captains' Corner,
+this page has always been Warm Light only (§6's own header comment already
+explains why — it's meant to feel like `/schedule`'s calendar surface, not
+Captains' Corner's dark-ink default), so that existing look is now
+specifically the **light** theme state (unchanged), and a new **dark**
+variant sits alongside it — kept as its own `--unavail-*` CSS-variable
+namespace (`--unavail-shell-bg`/`--unavail-hero-bg`/`--unavail-border`/
+`--unavail-text`/`--unavail-text-muted`/`--unavail-text-faint`/
+`--unavail-accent`/`--unavail-accent-dim`/`--unavail-card-bg`/
+`--unavail-row-bg`, in `globals.css`) rather than reusing Squad Selection's
+`--captains-*` set, since the two pages were always deliberately styled
+differently from each other and should stay that way in both themes.
+
+**Landing in two passes.** `src/app/captains-corner/unavailable-dates/page.tsx`
+(hero band, footer) and `CaptainPicker.tsx` (the admin captain-select
+dropdown) are done — both now read `var(--unavail-xxx)` in their inline
+`style` props instead of literal hex. `UnavailableDatesPanel.tsx` itself
+(the day rows, per-slot chips, whole-day mark action) is the larger piece
+and was still converting as of this note. The per-slot status chip colours
+(unscheduled/reserved/booked/blocked, the Sat/Sun pills, the `L`-marked
+purple) are left as literal, unchanged status colours in both themes —
+same "semantic colours stay put" call every other themed surface in this
+app has made. `ClashArrow.tsx` needs no changes at all — it renders with
+`stroke="currentColor"` and has no colour of its own, so it already
+inherits whatever the wrapping element's text colour is.
 
 ---
 

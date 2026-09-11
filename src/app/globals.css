@@ -86,6 +86,51 @@
   --stats-badge-bg: #FEF3C7;
   --stats-badge-text: #B45309;
   --stats-badge-border: #F5D9A8;
+
+  /* Captains' Corner — Squad Selection (/captains-corner). Dark is this
+     page's ORIGINAL look, unchanged; light is new. */
+  --captains-shell-bg: #F8F4EE;
+  --captains-hero-bg: #FFFFFF;
+  --captains-border: #D4C9B0;
+  --captains-text: #1C1917;
+  --captains-text-2: #44403C;
+  --captains-text-muted: #78716C;
+  --captains-text-faint: #A8A29E;
+  --captains-accent: #D97706;
+  --captains-accent-dim: #B45309;
+  --captains-card-bg: #FFFFFF;
+  --captains-card-border: #D4C9B0;
+  --captains-row-hover: rgba(0,0,0,0.03);
+  --captains-badge-bg: #FEF3C7;
+  --captains-badge-text: #B45309;
+  --captains-badge-border: #F5D9A8;
+  /* Sub-surface within a card — section header/footer strips, the
+     "＋ Add player" panel's own background — distinct from --captains-card-bg
+     itself. Added for the CaptainsCornerGrid.tsx Light/Dark/System pass;
+     dark matches ink-4 (#242424) exactly, so every `bg-ink-4 dark:` pairing
+     stays byte-identical to the pre-existing dark look. */
+  --captains-surface-2: #F8F4EE;
+
+  /* Captains' Corner — Unavailable Dates (/captains-corner/unavailable-dates).
+     Light is this page's ORIGINAL look (mirrors /schedule), unchanged;
+     dark is new. Kept as its own namespace from --captains-* above since
+     this page was always deliberately styled differently from the rest of
+     Captains' Corner (see the page's own header comment). */
+  --unavail-shell-bg: #F8F4EE;
+  --unavail-hero-bg: #EEEAE2;
+  --unavail-border: #D4C9B0;
+  --unavail-text: #1C1917;
+  --unavail-text-muted: #78716C;
+  --unavail-text-faint: #A8A29E;
+  --unavail-accent: #D97706;
+  --unavail-accent-dim: #B45309;
+  --unavail-card-bg: #FFFFFF;
+  --unavail-row-bg: #EEEAE2;
+  --unavail-divider-bg: #E2DACE;
+  --unavail-toggle-bg-to: #F1EAD9;
+  --unavail-toggle-shadow-hi: rgba(255,255,255,0.9);
+  --unavail-toggle-shadow-lo: rgba(28,25,23,0.1);
+  --unavail-danger: #DC2626;
 }
 [data-theme="dark"] {
   --home-shell-bg: #111111;
@@ -153,6 +198,39 @@
   --stats-badge-bg: #3d2e00;
   --stats-badge-text: #E8C97A;
   --stats-badge-border: #7A6030;
+
+  --captains-shell-bg: #080808;
+  --captains-hero-bg: #111111;
+  --captains-border: #242424;
+  --captains-text: #F0E8D0;
+  --captains-text-2: #D4CBB0;
+  --captains-text-muted: #a1a1aa;
+  --captains-text-faint: #71717a;
+  --captains-accent: #C9A84C;
+  --captains-accent-dim: #7A6030;
+  --captains-card-bg: #1A1A1A;
+  --captains-card-border: #2E2E2E;
+  --captains-row-hover: rgba(255,255,255,0.04);
+  --captains-badge-bg: #3d2e00;
+  --captains-badge-text: #E8C97A;
+  --captains-badge-border: #7A6030;
+  --captains-surface-2: #242424;
+
+  --unavail-shell-bg: #080808;
+  --unavail-hero-bg: #111111;
+  --unavail-border: #2E2E2E;
+  --unavail-text: #F0E8D0;
+  --unavail-text-muted: #A3987E;
+  --unavail-text-faint: #7A7264;
+  --unavail-accent: #C9A84C;
+  --unavail-accent-dim: #7A6030;
+  --unavail-card-bg: #1A1A1A;
+  --unavail-row-bg: #1A1A1A;
+  --unavail-divider-bg: #242424;
+  --unavail-toggle-bg-to: #242424;
+  --unavail-toggle-shadow-hi: rgba(255,255,255,0.04);
+  --unavail-toggle-shadow-lo: rgba(0,0,0,0.4);
+  --unavail-danger: #FCA5A5;
 }
 
 @layer base {
