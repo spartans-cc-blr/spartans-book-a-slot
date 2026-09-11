@@ -1,8 +1,9 @@
 // GET /api/admin/wallet/export
 // Admin only. Downloadable wallet report for the "⬇ Export" menu on
-// /admin/wallet — a single workbook with a "Summary" sheet (every player's
-// current wallet balance) and a "Detailed" sheet (every transaction, per
-// player, with a running total). See features/wallet-ledger.md §16.
+// /admin/wallet — a single real .xlsx workbook with a "Summary" sheet
+// (every player's current wallet balance, plus a small dashboard header of
+// KPI tiles) and a "Detailed" sheet (every transaction, per player, with a
+// running total). See features/wallet-ledger.md §16.
 //
 // Read-only, no rate limit — same convention as the other admin-only GET
 // panels (e.g. /api/admin/fee-reminders).
@@ -18,15 +19,15 @@ export async function GET() {
   if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const { summary, detailed } = await buildWalletExportData()
-  const workbook = buildWalletExportWorkbook(summary, detailed)
+  const buffer = await buildWalletExportWorkbook(summary, detailed)
 
   const dateStamp = new Date().toISOString().slice(0, 10)
 
-  return new NextResponse('﻿' + workbook, {
+  return new NextResponse(new Uint8Array(buffer), {
     status: 200,
     headers: {
-      'Content-Type': 'application/vnd.ms-excel; charset=utf-8',
-      'Content-Disposition': `attachment; filename="wallet-report-${dateStamp}.xls"`,
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="wallet-report-${dateStamp}.xlsx"`,
     },
   })
 }

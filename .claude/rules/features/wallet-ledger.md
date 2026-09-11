@@ -782,43 +782,95 @@ own statement. No new page or route was added beyond the API endpoint.
 ## 16. Admin Wallet Export — downloadable report (added September 2026)
 
 An "⬇ Export" menu in the top-right corner of `/admin/wallet`'s header,
-next to the page title, with a single item: **"📊 Wallet Report (.xls)"**.
-Downloads one workbook with two named sheets:
+next to the page title, with a single item: **"📊 Wallet Report (.xlsx)"**.
+Downloads one real workbook with two named sheets:
 
-- **Summary** — one row per player: `Player Name`, `Wallet Balance`
-  (their current, live `players.wallet_balance` — the same number shown
-  everywhere else in the app, not a computed-as-of-today figure).
-- **Detailed** — one row per transaction, grouped by player in
-  chronological (oldest-first) order: `Player Name`, `Transaction` (a
-  single descriptive string — date, credit/debit, amount, reason), and
-  `Running Total` (the balance after that transaction). Each player's
-  block is seeded with a `Brought Forward` row using the exact same
-  `opening = wallet_balance − Σ ledger deltas` formula (admin override via
-  `wallet_opening_balance` taking precedence, same as everywhere else —
-  see §5) the `/wallet` statement page already uses for its own Brought
-  Forward line — so the exported running total ties out to a real ledger,
-  not just a bare transaction dump, and the club-wide export can never
-  disagree with what a player sees on their own statement. A player with
-  zero transactions has no rows on the Detailed sheet (nothing to show)
-  but still appears on Summary.
+- **Summary** — a small dashboard header (title, generated timestamp, and
+  three KPI tiles — Total Players, Total Balance, Players Overdue) followed
+  by one row per player: `Player Name`, `Wallet Balance` (their current,
+  live `players.wallet_balance` — the same number shown everywhere else in
+  the app, not a computed-as-of-today figure).
+- **Detailed** — the same dashboard-style title/timestamp header, then one
+  row per transaction, grouped by player in chronological (oldest-first)
+  order: `Player Name`, `Transaction` (a single descriptive string — date,
+  credit/debit, amount, reason), and `Running Total` (the balance after
+  that transaction). Each player's block is seeded with a `Brought Forward`
+  row using the exact same `opening = wallet_balance − Σ ledger deltas`
+  formula (admin override via `wallet_opening_balance` taking precedence,
+  same as everywhere else — see §5) the `/wallet` statement page already
+  uses for its own Brought Forward line — so the exported running total
+  ties out to a real ledger, not just a bare transaction dump, and the
+  club-wide export can never disagree with what a player sees on their own
+  statement. A player with zero transactions has no rows on the Detailed
+  sheet (nothing to show) but still appears on Summary.
 
-### No new npm dependency — the "HTML + SpreadsheetML" workbook trick
+Both sheets are visually themed to match the rest of the Hub — a dark
+header row (`#1A1208`/`#D97706`, the same nav-bar tokens `ui-theme.md`
+defines), alternating light bands per player block on the Detailed sheet,
+green/red text on positive/negative amounts, thin borders, a frozen header
+row (`stickyRowsCount`), and sized columns — rather than a bare unstyled
+data dump.
 
-This repo deliberately keeps its runtime dependency count minimal (see
+### Incident (September 2026) — the first cut's "Detailed" sheet routinely
+### came back empty in real Excel
+
+**Symptom reported:** opening the downloaded file showed the Summary
+sheet's data duplicated onto — or the Detailed sheet rendering as —
+completely empty.
+
+**Root cause.** The first cut avoided adding an xlsx-writing library (see
 `limitations.md`'s cold-start audit — "only 11 runtime dependencies... no
-PDF/image-processing/chart libraries"), so this export does not pull in an
-xlsx-writing library. Instead `buildWalletExportWorkbook()`
-(`src/lib/walletExport.ts`) emits the long-standing HTML-based
-SpreadsheetML workbook format — the same thing Excel itself produces via
-*File → Save As → Web Page* — a plain HTML document whose `<head>` carries
-an `<x:ExcelWorkbook>`/`<x:ExcelWorksheet>` block naming two sheets
-("Summary", "Detailed") and whose `<body>` has one `<table>` per sheet, in
-the same order. Real Excel opens this as a normal multi-sheet workbook
-with no library needed on either end. Served with
-`Content-Type: application/vnd.ms-excel` and a `.xls` filename
-(`wallet-report-<YYYY-MM-DD>.xls`) via `Content-Disposition: attachment`,
-prefixed with a UTF-8 BOM so the `₹` symbol in the Transaction column
-renders correctly.
+PDF/image-processing/chart libraries") by emitting the long-standing
+HTML-based SpreadsheetML workbook format instead — the same thing Excel
+itself produces via *File → Save As → Web Page*: a plain HTML document
+whose `<head>` names two sheets via an `<x:ExcelWorkbook>`/
+`<x:ExcelWorksheet>` block, and whose `<body>` has one `<table>` per sheet.
+This is a real, historically-documented Microsoft format, but it turned out
+to be unreliable across real-world Excel versions — several confirmed
+Excel builds don't split multiple `<table>` elements into separate sheets
+the way the format nominally promises; instead they import the whole HTML
+document as a single sheet (or drop everything past the first table),
+which is exactly the "Detailed has nothing" symptom reported. This is a
+known fragility of the technique, not a bug in this app's HTML generation
+— it just isn't a safe foundation for something admins need to trust.
+
+**Fix — a real .xlsx via `write-excel-file`, not a fragile HTML disguise.**
+`buildWalletExportWorkbook()` (`src/lib/walletExport.ts`) now builds a
+genuine OOXML `.xlsx` workbook using the `write-excel-file` npm package
+(`write-excel-file/node` entry point, `.toBuffer()`). This **is** a new
+runtime dependency, deliberately chosen over the obvious alternative
+(`exceljs`) after checking both against this repo's minimalism posture:
+
+| Package | Unpacked size | Own dependency tree | `npm audit` impact |
+|---|---|---|---|
+| `exceljs` | ~22MB | ~90 packages, several long-deprecated (`glob@7`, `rimraf@2`, `fstream`) | Pulled in fresh vulnerability warnings |
+| `write-excel-file` | ~1.8MB | exactly one — `fflate` (itself dependency-free) | **Zero** new entries in `npm audit` — verified by diffing `npm audit --json` before/after installing; every existing warning traces to `next`/`next-auth`/`vitest`/`eslint-config-next` etc., none to this addition |
+
+Scoped to one admin-only server route — Next.js bundles each API route's
+server function independently, so this dependency is never pulled into any
+page's client bundle or any other route's cold-start path; it doesn't
+change the reasoning in `limitations.md`'s cold-start audit for the rest of
+the app, only adds one line there noting the exception (see that doc).
+
+**Verified directly against the produced file, not just "it typechecks."**
+Before considering this fixed, the exact cell-building logic was run
+standalone (outside Next.js) to produce a real `.xlsx`, which was then
+unzipped and its raw OOXML parts inspected by hand: `xl/workbook.xml`
+confirmed both sheets present, correctly named and ordered (`Summary` then
+`Detailed`); `xl/sharedStrings.xml` confirmed every expected string
+(titles, KPI labels, player names, transaction lines) was actually written;
+and `xl/worksheets/sheet2.xml` (Detailed) was confirmed to carry its own
+correct row count, values, running totals, and frozen-pane/merged-cell
+markup — not empty, not a copy of sheet1. This is the same "read the actual
+bytes, don't trust that code merged" discipline this app's other
+incident write-ups already apply to migrations and crons.
+
+Served with `Content-Type:
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` and a
+`.xlsx` filename (`wallet-report-<YYYY-MM-DD>.xlsx`) via
+`Content-Disposition: attachment` — no UTF-8 BOM needed this time, since a
+real `.xlsx`'s strings live in `xl/sharedStrings.xml` as proper XML text,
+not raw bytes a browser has to sniff the encoding of.
 
 ### Pagination — the same PostgREST row-cap class of bug, pre-empted
 
@@ -852,13 +904,14 @@ using the existing same-origin session cookie).
 | No rate limit — same convention as other admin-only GET panels (low-traffic, single-admin-triggered) | ✅ |
 | Running totals use the same opening-balance formula (and the same admin override) as the player-facing `/wallet` statement — no separate, divergent calculation that could show a different number to an admin than to the player themselves | ✅ |
 | Wallet ledger read paginated past PostgREST's 1000-row default cap | ✅ |
+| New `write-excel-file`/`fflate` dependency confirmed to add zero new `npm audit` findings before adopting it | ✅ |
 
 ### File Map additions
 
 | File | Role |
 |---|---|
-| `src/lib/walletExport.ts` | `buildWalletExportData()` (paginated fetch + per-player running-total calc), `buildWalletExportWorkbook()` (HTML/SpreadsheetML two-sheet workbook builder) |
-| `src/app/api/admin/wallet/export/route.ts` | GET — admin-only, streams the `.xls` download |
+| `src/lib/walletExport.ts` | `buildWalletExportData()` (paginated fetch + per-player running-total calc), `buildWalletExportWorkbook()` (real `.xlsx` builder via `write-excel-file`, styled Summary + Detailed sheets) |
+| `src/app/api/admin/wallet/export/route.ts` | GET — admin-only, streams the `.xlsx` download |
 | `src/components/admin/WalletExportMenu.tsx` | The top-right "⬇ Export" dropdown |
 | `src/app/admin/wallet/page.tsx` | Renders `WalletExportMenu` in the page header, top-right |
 
