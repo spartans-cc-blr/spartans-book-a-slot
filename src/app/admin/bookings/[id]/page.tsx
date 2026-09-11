@@ -6,6 +6,7 @@ import type { Booking, GameFormat, SlotTime, RuleCheckItem } from '@/types'
 import { SLOT_TIMES, SLOT_FORMATS, ORGANISER_SELF_SERVICE_REASON, isInformalFormat } from '@/types'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { StageTypeToggle } from '@/components/admin/StageTypeToggle'
+import { BackButton } from '@/components/ui/BackButton'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 import { buildOrganiserWhatsAppUrl, buildCaptainWhatsAppUrl } from '@/lib/bookingNotify'
 import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
@@ -784,10 +785,8 @@ function BookingDetailPageInner() {
             {booking.format ? ` · ${booking.format}` : ''}
           </p>
         </div>
-        <button onClick={() => router.push('/admin')}
-          className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 border border-ink-5 px-3 py-1.5 rounded transition-colors">
-          ← Back
-        </button>
+        <BackButton fallbackHref="/admin" fallbackLabel="Matches"
+          className="!text-zinc-500 hover:!text-zinc-300 border border-ink-5 px-3 py-1.5 rounded font-normal" />
       </div>
 
       {/* Reservation expiry warning */}

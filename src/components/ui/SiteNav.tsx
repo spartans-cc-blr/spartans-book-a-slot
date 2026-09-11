@@ -6,6 +6,16 @@ import { JerseyIcon } from '@/components/ui/JerseyIcon'
 import { MobileTabBar, type MobileTabBarTheme } from '@/components/ui/MobileTabBar'
 import { GenerateInviteItem } from '@/components/ui/GenerateInviteItem'
 import { ThemeToggleNav } from '@/components/ui/ThemeToggle'
+import { BackButton } from '@/components/ui/BackButton'
+
+// Where a page's mobile "‹ Back" should land when the player arrived cold
+// (no in-app history) — see features/back-navigation.md §2. Omit on
+// bottom-tab destinations; they are where back lands, not somewhere to go
+// back from.
+export interface SiteNavBack {
+  fallbackHref: string
+  label: string
+}
 
 interface SiteNavProps {
   activePage?: string
@@ -17,9 +27,13 @@ interface SiteNavProps {
   // still pass this to keep its tab bar pinned to match, regardless of the
   // visitor's global choice.
   mobileTabBarTheme?: MobileTabBarTheme
+  // Mobile-only back affordance rendered at the far left of the top row.
+  // Desktop keeps each page's own inline text link (the browser has a back
+  // button there). See features/back-navigation.md.
+  back?: SiteNavBack
 }
 
-export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
+export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [gcOpen,       setGcOpen]       = useState(false)
   const [matchesOpen,  setMatchesOpen]  = useState(false)
@@ -62,6 +76,12 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
     <>
     <nav className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 sticky top-0 z-50">
       <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
+        {/* Mobile back — router.back() with in-app history, else the page's parent */}
+        {back && (
+          <div className="md:hidden mr-3 flex-none">
+            <BackButton variant="nav" fallbackHref={back.fallbackHref} fallbackLabel={back.label} />
+          </div>
+        )}
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
           <img src="/Transparent High Resolution.png" alt="Spartans CC" className="w-8 h-8 object-contain" />

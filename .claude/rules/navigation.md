@@ -55,6 +55,7 @@ they can drift apart:
 | `src/components/home/SelectedMatchCard.tsx` | Client component — "You're Selected to Play" card content, replicating `FixturesCard`'s squad-announced fields (icon row, collapsible squad, fee/wallet projection) in the dashboard's Warm Light palette; see §3.1 |
 | `src/components/ui/SiteNav.tsx` | Sticky top nav bar — shared across all pages; full desktop dropdown nav, plus a slim mobile row (avatar/admin/GC shortcuts) that renders `MobileTabBar` below it — see §4.1 |
 | `src/components/ui/MobileTabBar.tsx` | Mobile-only (`md:hidden`) fixed bottom tab bar + "More" bottom sheet — replaced the old hamburger drawer, September 2026 — see §4.1 |
+| `src/components/ui/BackButton.tsx` + `src/components/ui/NavHistoryProvider.tsx` | Shared in-app back affordance and the per-tab history tracker behind it — see §4's "`back` prop" note and `features/back-navigation.md` |
 | `src/components/ui/GenerateInviteItem.tsx` | "Generate Invite Link" action (GC/admin) — extracted out of `SiteNav.tsx` so both it and `MobileTabBar.tsx` can import one copy without a circular import between the two nav components |
 | `src/app/profile/page.tsx` | Player self-service profile edit page |
 | `src/app/api/players/[id]/route.ts` | GET + PATCH for single player — IDOR-protected |
@@ -658,6 +659,21 @@ was added as the last item of **Captains' Corner ▾**, **Council ⚖** and
 since captains, GC and wranglers all manage the opponent master. See
 `features/team-stats.md` §6.
 
+### `back` prop — mobile "‹ Back" (added September 2026)
+
+`SiteNav` accepts `back?: { fallbackHref: string; label: string }`. When
+set, a `md:hidden` `BackButton` (`src/components/ui/BackButton.tsx`)
+renders at the far left of the top row, before the logo lockup:
+`router.back()` when the tab has in-app history (per-tab stack in
+`NavHistoryProvider`, mounted from `providers.tsx`), else a `<Link>` to
+`fallbackHref` labelled "‹ {label}". The rule: **every page that isn't a
+bottom-tab destination passes `back`**; Home, Fixtures, a player's own
+stats page, and the two "More"-sheet roots (Leaderboard, Team Record) do
+not. Desktop keeps each page's own inline text link — the chevron is
+mobile-only because the installed standalone PWA has no browser chrome
+there. Full audit, design and per-page fallbacks in
+`features/back-navigation.md`.
+
 ### Role-conditional Nav Elements
  
 - **Admin button** — crimson pill linking to `/admin`, shown if `isAdmin`
@@ -932,6 +948,7 @@ Displays the player's Google profile photo (from `player.photoUrl ?? player.imag
 | Player-facing "My Tournaments" page | Medium | The Home dashboard's My Tournaments stat tile (§3.1) has no drill-down destination yet — deliberately left non-interactive rather than pointed at the captain/GC/admin-only `/tournament-planner`. Needs its own page listing the tournaments a player has been announced in a squad for (same `squad → bookings.tournament_id` source the tile's count already uses), then the tile's `href` can be wired up the same way "Upcoming Matches" → `/fixtures` was |
 | Seed `players.photo_url` for existing members | Medium | Existing players who signed in before the auth.ts change won't have photos until their next sign-in. Passive approach is fine; no one-off migration needed |
 | CricHeroes hyperlink wherever player names appear | Medium | Agreed pattern: if `cricheroes_url` is set on the player's profile, their name should render as a hyperlink to that URL in squad announcements, availability grids, and Captains Corner |
+| In-app back navigation — `SiteNav` `back` prop + shared `BackButton` | ✅ Done (Sept 2026) | See §4's "`back` prop" note and `features/back-navigation.md`; backlog U-31. Follow-on still open: URL-driven filters on `/matches/history` and `/players/[id]/stats` so back restores them |
 | `/join` route for unmatched Gmail users | Low | `SiteNav` links to `/join` for unmatched users but the page doesn't exist yet — currently dead link |
 | Optimise `getPlayerData` queries | Low | Queries 3 and 4 both hit `bookings` — could be merged into one query with the pending count derived from the same result set |
 | Consider `Promise.all` in `getPlayerData` | Low | Queries 2 and 3 are independent — running them in parallel would reduce TTFB on the home page |
