@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { resolveOpponentIdByName } from '@/lib/opponents'
 import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
 import { ORGANISER_SELF_SERVICE_REASON } from '@/types'
 
@@ -70,6 +71,15 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
     delete safeUpdates.match_fee_override
   }
 
+  // vibe-security: opponent_id is derived server-side from opponent_name
+  // via the alias table (features/team-stats.md §5) — never client-supplied.
+  delete safeUpdates.opponent_id
+
+  if ('stage_type' in safeUpdates && safeUpdates.stage_type != null
+      && safeUpdates.stage_type !== 'league' && safeUpdates.stage_type !== 'knockout') {
+    return NextResponse.json({ error: 'stage_type must be league, knockout or null' }, { status: 400 })
+  }
+
   if (safeUpdates.game_date && !GAME_DATE_REGEX.test(safeUpdates.game_date)) {
     return NextResponse.json({ error: 'game_date must be in YYYY-MM-DD format' }, { status: 400 })
   }
@@ -130,6 +140,13 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
         { status: 400 }
       )
     }
+  }
+
+  // Re-resolve the canonical opponent whenever the typed spelling is part
+  // of this save. An unknown spelling resolves to null (shows as "unlinked"
+  // on Team Record until someone links it on /opponents).
+  if ('opponent_name' in safeUpdates) {
+    safeUpdates.opponent_id = await resolveOpponentIdByName(supabase, safeUpdates.opponent_name)
   }
 
   const { data, error } = await supabase

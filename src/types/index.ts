@@ -90,9 +90,30 @@ export interface Booking {
   organiser_phone?: string | null
   match_id?: string | null
   match_stage?: string | null
+  // Structured league/knockout flag (migration 076) — the machine-readable
+  // counterpart to the free-text match_stage. NULL = unclassified, treated
+  // as league by the Team Record page. See features/team-stats.md §4.
+  stage_type?: StageType | null
   match_time?: string | null
   opponent_name?: string | null
+  // Canonical opponent (migration 077) — resolved from opponent_name via
+  // opponent_aliases, or manually on /opponents. See features/team-stats.md §5.
+  opponent_id?: string | null
   cricheroes_url?: string | null
+}
+
+// ── Opponent master (migration 077) ──────────────────────────────
+
+export type StageType = 'league' | 'knockout'
+
+export interface Opponent {
+  id:                  string
+  name:                string
+  is_marquee:          boolean
+  cricheroes_team_url: string | null
+  notes:               string | null
+  created_at:          string
+  updated_at:          string
 }
 
 // ── Slot model for the availability grid ─────────────────────────

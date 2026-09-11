@@ -642,6 +642,22 @@ Shown when authenticated, opened from the avatar in the top-right. Contains:
 
 This dropdown is desktop-only. On mobile the equivalent content (My Profile, My Wallet, Sign Out) lives in `MobileTabBar`'s "More" sheet instead — see §4.1.
 
+### Stats ▾ dropdown (added September 2026)
+
+The flat "Stats" link (→ `/leaderboard`) became a **Stats ▾** dropdown once
+the club gained a team-level stats page alongside the player one:
+"📊 Yours Statistically" → `/leaderboard` (`activePage === 'leaderboard'`)
+and "🛡️ Team Record" → `/team-stats` (`activePage === 'team-stats'`). Same
+hover-menu markup as Matches ▾ / Captains' Corner ▾, rendered right after
+Captains' Corner ▾ (before the flat `links` array), gated on
+`isLoggedIn && !isExpelled` like the old flat link. The mobile More sheet
+gained a matching "Team Record" row directly under "Leaderboard". In the
+same pass an "⚔️ Opponents" row (→ `/opponents`, `activePage === 'opponents'`)
+was added as the last item of **Captains' Corner ▾**, **Council ⚖** and
+**Wrangler ⚒** — desktop and the three matching mobile sheet sections —
+since captains, GC and wranglers all manage the opponent master. See
+`features/team-stats.md` §6.
+
 ### Role-conditional Nav Elements
  
 - **Admin button** — crimson pill linking to `/admin`, shown if `isAdmin`
@@ -652,10 +668,10 @@ This dropdown is desktop-only. On mobile the equivalent content (My Profile, My 
 | Role | Nav items visible |
 |---|---|
 | Public (not signed in) | Schedule · Sign In |
-| Player | Home (logo) · Matches ▾ · The Dugout · Stats · My Profile |
-| Captain | Home (logo) · Matches ▾ · Captains' Corner ▾ · The Dugout · Stats · Tournaments · My Profile |
-| GC | Home (logo) · Matches ▾ · The Dugout · Stats · Tournaments · My Profile · Council ⚖ |
-| Wrangler | + Wrangler ⚒ dropdown (Squad Backfill, Grounds) |
+| Player | Home (logo) · Matches ▾ · Stats ▾ · The Dugout · My Profile |
+| Captain | Home (logo) · Matches ▾ · Captains' Corner ▾ (Squad Selection, Unavailable Dates, Opponents) · Stats ▾ · The Dugout · Tournaments · My Profile |
+| GC | Home (logo) · Matches ▾ · Stats ▾ · The Dugout · Tournaments · My Profile · Council ⚖ (… Grounds, Opponents) |
+| Wrangler | + Wrangler ⚒ dropdown (Squad Backfill, Grounds, Opponents) |
 | Admin | All of the above · Schedule · Admin ⚙ |
 | Expelled | Home (logo) only — every other link/dropdown is gated on `!isExpelled` |
 
@@ -726,7 +742,7 @@ repurposed as the tab. **More** is always the last slot, a button (not a
 link) that toggles the bottom sheet — it shows the same active-gold
 treatment whenever the sheet is open, or whenever `activePage` is one of
 the values that only live inside the sheet (`isAdminOrGcHighlighted()`:
-`dugout`, `leaderboard`, `profile`, `planner`, `captains`,
+`dugout`, `leaderboard`, `team-stats`, `opponents`, `profile`, `planner`, `captains`,
 `captains-unavailable`, `gc`, `gc-players`, `wrangler`, `schedule` —
 deliberately excludes `matches` and `my-stats`, both covered by their own
 tab's `active` check instead).
@@ -736,10 +752,10 @@ tab's `active` check instead).
 A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `max-h-[70vh]`) with a full-screen scrim behind it. Content branches the same way `SiteNav`'s desktop dropdowns do:
 
 - **Expelled** — just an "Account suspended" notice, no links.
-- **Logged in** — The Dugout (moved here from its own tab slot, September 2026 — see above; `ShieldIcon` at its sheet-row `size={16}`), Leaderboard (the club Honour Board, `/leaderboard` — added back September 2026 once "My Stats" stopped pointing here, see above), My Profile and My Wallet (both hidden together with the rest of the "logged in" content if `playerId` is null, in favour of "Complete Registration" → `/join`; My Wallet added September 2026, `RupeeIcon` — see `features/wallet-ledger.md`), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
-  - **Captains' Corner** (`isCaptain || isAdmin`) — Squad Selection, Unavailable Dates
-  - **Council** (`isGC`) — Squad Review, Feedback, Players, Store Orders, Grounds, `GenerateInviteItem`
-  - **Wrangler** (`isWrangler`) — Squad Backfill, Grounds
+- **Logged in** — The Dugout (moved here from its own tab slot, September 2026 — see above; `ShieldIcon` at its sheet-row `size={16}`), Leaderboard (the club Honour Board, `/leaderboard` — added back September 2026 once "My Stats" stopped pointing here, see above), Team Record (`/team-stats`, September 2026 — see `features/team-stats.md`), My Profile and My Wallet (both hidden together with the rest of the "logged in" content if `playerId` is null, in favour of "Complete Registration" → `/join`; My Wallet added September 2026, `RupeeIcon` — see `features/wallet-ledger.md`), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
+  - **Captains' Corner** (`isCaptain || isAdmin`) — Squad Selection, Unavailable Dates, Opponents
+  - **Council** (`isGC`) — Squad Review, Feedback, Players, Store Orders, Grounds, Opponents, `GenerateInviteItem`
+  - **Wrangler** (`isWrangler`) — Squad Backfill, Grounds, Opponents
   - **Admin** (`isAdmin`) — Schedule, Admin Panel (crimson row)
   - Club Site (muted, external) and Sign Out always last.
 - **Logged out** — Club Site + Sign In only.

@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import type { Booking, GameFormat, SlotTime, RuleCheckItem } from '@/types'
 import { SLOT_TIMES, SLOT_FORMATS, ORGANISER_SELF_SERVICE_REASON, isInformalFormat } from '@/types'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
+import { StageTypeToggle } from '@/components/admin/StageTypeToggle'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 import { buildOrganiserWhatsAppUrl, buildCaptainWhatsAppUrl } from '@/lib/bookingNotify'
 import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
@@ -215,6 +216,7 @@ function BookingDetailPageInner() {
   const [captainOptions, setCaptainOptions] = useState<CaptainOption[]>([])
 
   const [matchStage,        setMatchStage]        = useState('')
+  const [stageType,         setStageType]         = useState<'' | 'league' | 'knockout'>('')
   const [gameDate,          setGameDate]           = useState('')
   const [matchFeeOverride,  setMatchFeeOverride]   = useState<string>('')
 
@@ -288,6 +290,7 @@ function BookingDetailPageInner() {
         setCaptainId(b.captain_id ?? '')
         setGameDate(b.game_date ?? '')
         setMatchStage(b.match_stage ?? '')
+        setStageType((b.stage_type as 'league' | 'knockout' | null) ?? '')
         setMatchFeeOverride((b as any).match_fee_override != null ? String((b as any).match_fee_override) : '')
         // Pre-fill any previously-logged override reason (booking_rule_overrides).
         // The rule-check effect below prunes any entry that isn't actually
@@ -649,6 +652,7 @@ function BookingDetailPageInner() {
         slot_time:       slotTime,
         match_id:        tournamentId ? (matchId || null) : null,
         match_stage:     matchStage || null,
+        stage_type:      stageType || null,
         match_time:      matchTime || null,
         opponent_name:   tournamentId ? (opponentName || null) : null,
         cricheroes_url:  tournamentId ? (cricheroes || null) : null,
@@ -962,6 +966,7 @@ function BookingDetailPageInner() {
                   <input type="text" value={matchStage} onChange={e => setMatchStage(e.target.value)} disabled={feesMode}
                     placeholder="e.g. Quarter Final, Semi Final, Final, Knockout" className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
+                <StageTypeToggle value={stageType} onChange={setStageType} disabled={feesMode} />
                 <div>
                   <label className="form-label">CricHeroes URL</label>
                   <input type="text" value={cricheroes} onChange={e => setCricheroes(e.target.value)} disabled={feesMode}

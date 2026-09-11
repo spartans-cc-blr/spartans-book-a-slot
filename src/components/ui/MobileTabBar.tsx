@@ -100,6 +100,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
               <>
                 <SheetLink t={t} href="/dugout" icon={<ShieldIcon size={16} />} label="The Dugout" active={activePage === 'dugout'} onNavigate={() => setMoreOpen(false)} />
                 <SheetLink t={t} href="/leaderboard" icon={<TrophyIcon />} label="Leaderboard" active={activePage === 'leaderboard'} onNavigate={() => setMoreOpen(false)} />
+                <SheetLink t={t} href="/team-stats" icon={<ShieldIcon size={16} />} label="Team Record" active={activePage === 'team-stats'} onNavigate={() => setMoreOpen(false)} />
                 {playerId ? (
                   <>
                     <SheetLink t={t} href="/profile" icon={<PersonIcon />} label="My Profile" active={activePage === 'profile'} onNavigate={() => setMoreOpen(false)} />
@@ -117,6 +118,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
                     <SectionLabel t={t}>Captains&rsquo; Corner</SectionLabel>
                     <SheetLink t={t} href="/captains-corner" icon={<ClipboardIcon />} label="Squad Selection" active={activePage === 'captains'} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/captains-corner/unavailable-dates" icon={<CalendarXIcon />} label="Unavailable Dates" active={activePage === 'captains-unavailable'} onNavigate={() => setMoreOpen(false)} />
+                    <SheetLink t={t} href="/opponents" icon={<SwordsIcon />} label="Opponents" active={activePage === 'opponents'} onNavigate={() => setMoreOpen(false)} />
                   </>
                 )}
 
@@ -128,6 +130,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
                     <SheetLink t={t} href="/gc-players" icon={<PersonIcon />} label="Players" active={activePage === 'gc-players'} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/dugout/store-orders" icon={<JerseyIcon colour="gold" size={16} />} label="Store Orders" active={false} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/wrangler/grounds" icon={<PinIcon />} label="Grounds" active={activePage === 'wrangler'} onNavigate={() => setMoreOpen(false)} />
+                    <SheetLink t={t} href="/opponents" icon={<SwordsIcon />} label="Opponents" active={activePage === 'opponents'} onNavigate={() => setMoreOpen(false)} />
                     <GenerateInviteItem mobile onClose={() => setMoreOpen(false)} />
                   </>
                 )}
@@ -137,6 +140,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
                     <SectionLabel t={t}>Wrangler</SectionLabel>
                     <SheetLink t={t} href="/wrangler/backfill-squad" icon={<WrenchIcon />} label="Squad Backfill" active={false} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/wrangler/grounds" icon={<PinIcon />} label="Grounds" active={activePage === 'wrangler'} onNavigate={() => setMoreOpen(false)} />
+                    <SheetLink t={t} href="/opponents" icon={<SwordsIcon />} label="Opponents" active={activePage === 'opponents'} onNavigate={() => setMoreOpen(false)} />
                   </>
                 )}
 
@@ -236,7 +240,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
 // live in the sheet only (Dugout lost its tab slot to My Stats; Leaderboard
 // never had one — see navigation.md §4.1), so both are listed here.
 function isAdminOrGcHighlighted(activePage?: string) {
-  return ['dugout', 'leaderboard', 'profile', 'wallet', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
+  return ['dugout', 'leaderboard', 'team-stats', 'opponents', 'profile', 'wallet', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
 }
 
 function Tab({ t, href, icon, label, active }: { t: Tokens; href: string; icon: React.ReactNode; label: string; active?: boolean }) {
@@ -386,6 +390,14 @@ function ShieldCheckIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" /><polyline points="9 12 11 14 15 9.5" />
+    </svg>
+  )
+}
+function SwordsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 17.5 3 6V3h3l11.5 11.5" /><path d="M13 19l6-6" /><path d="M16 16l4 4" /><path d="M19 21l2-2" />
+      <path d="M9.5 6.5 21 18v3h-3L6.5 9.5" /><path d="M5 14l-2 2" /><path d="M3 21l2-2" />
     </svg>
   )
 }

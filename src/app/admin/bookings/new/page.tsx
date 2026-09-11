@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Tournament, SlotTime, GameFormat, ValidationResult, RuleCheckItem } from '@/types'
+import { StageTypeToggle } from '@/components/admin/StageTypeToggle'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
 
@@ -82,6 +83,7 @@ export default function NewBookingPage() {
   const [submitError, setSubmitError] = useState('')
 
   const [matchStage, setMatchStage] = useState('')
+  const [stageType,  setStageType]  = useState<'' | 'league' | 'knockout'>('')
 
   function refreshGrounds() {
     fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? []))
@@ -262,6 +264,7 @@ export default function NewBookingPage() {
           opponent_name:  opponentName || null,
           match_id:       matchId || null,
           match_stage:    matchStage || null,
+          stage_type:     stageType || null,
           cricheroes_url: cricHeroesUrl || null,
           match_time:     matchTime || null,
           overrides: Object.entries(overrides).map(([rule, reason]) => ({ rule, reason })),
@@ -557,6 +560,7 @@ export default function NewBookingPage() {
                     <input type="text" value={matchStage} onChange={e => setMatchStage(e.target.value)}
                       placeholder="e.g. Quarter Final, Semi Final, Final, Knockout" className="form-input" />
                   </div>
+                  <StageTypeToggle value={stageType} onChange={setStageType} />
                   <div>
                     <label className="form-label">Match Start Time</label>
                     <input type="time" value={matchTime}

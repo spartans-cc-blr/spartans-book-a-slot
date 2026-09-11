@@ -64,6 +64,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/wallet` | Server → `WalletStatementClient` (client) | `wallet_transactions` (own rows, paginated), `players.wallet_balance`/`wallet_opening_balance*`; see `features/wallet-ledger.md` |
 | `/matches/history` | Server → `MatchHistoryClient` (client) | `bookings` (past confirmed), `scorecard_uploads`, `match_stats_cache`, `squad`; upload/sync/verify/flag actions gated per-booking to captain/VC/wrangler/admin, but the verified status itself is visible to every viewer — see `features/post-match-scorecard.md` §14 |
 | `/leaderboard` | Server → `LeaderboardMilestones`/`LeaderboardMonthly`/`LeaderboardTable` (client) | Analytics DB (`batting_stats`/`bowling_stats`/`fielding_stats`/`team_list`) via `src/lib/playerStats.ts`, joined to Hub `players`; year/month/tournament/ground/format filters — see `features/leaderboard.md` |
+| `/team-stats` | Server → `TeamFilterBar`/`TeamSplitTable` (client) | Team Record — `match_stats_cache` ⋈ `bookings` (⋈ `tournaments`/`grounds`/`opponents`), match captain from `squad`, toss from the analytics DB's `match_stats`; W/L split by tournament/ground/opponent/format/league-knockout/innings/toss/captain/year/month/slot, records, form — see `features/team-stats.md` |
  
 ### Captain Routes (`isCaptain` or `isAdmin`)
  
@@ -73,6 +74,12 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/captains-corner/unavailable-dates` | Server → `UnavailableDatesPanel` (client) | `bookings` (16-week horizon, any non-`cancelled` status), run through `computeSlotStatus()` (`src/lib/validation.ts`) to compute genuinely open dates/slots — same engine `/api/availability` uses, so slot-overlap rules (a T20 at 10:30 blocking the whole day, etc.) are honoured; `player_future_availability` (own rows, `L` only) via `/api/player/future-availability`; reachable from the "Captains' Corner ▾" nav dropdown — see `features/player-future-availability.md` §6 |
 | `/tournament-planner` | Server → `TournamentPlannerClient` (client) | `bookings`, `captains`, `tournaments` (with `total_league_games`, `cricheroes_points_table_url`) |
  
+### Captain / GC / Wrangler shared routes
+
+| Route | Component | Data source |
+|---|---|---|
+| `/opponents` | Server → `OpponentsClient` (client) | Opponent master list (`opponents`, `opponent_aliases`) + reconciliation queue of unlinked `bookings.opponent_name` spellings; gate `isCaptain \|\| isGC \|\| isWrangler \|\| isAdmin`, reachable from all three dropdowns — see `features/team-stats.md` §5 |
+
 ### GC Routes (`isGC` or `isAdmin`)
  
 | Route | Component | Data source |
@@ -139,6 +146,14 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/api/availability/weekend` | GET | Captain or Admin | Powers Captains Corner grid |
 | `/api/squad/[booking_id]` | GET | Captain / GC / Admin / Family session | Returns squad with `phone` field conditionally included server-side by tier |
  
+### Opponent master APIs (captain / GC / wrangler / admin writes)
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/opponents` | GET | Any signed-in, non-expelled member | Master list with aliases + match counts, plus the unlinked-spellings queue with fuzzy suggestions |
+| `/api/opponents` | POST, PATCH | Captain / GC / wrangler / admin | Create / edit an opponent (name, marquee, CricHeroes team URL, notes); Zod-validated, `captainWrite` rate limit — see `features/team-stats.md` §5 |
+| `/api/opponents/link` | POST | Captain / GC / wrangler / admin | Link a raw `opponent_name` spelling to an opponent — writes `opponent_aliases`, back-fills `bookings.opponent_id` |
+
 ### GC APIs
  
 | Endpoint | Method | Auth | Purpose |
@@ -234,7 +249,9 @@ Primary scheduling record.
 | `match_id` | text | CricHeroes match reference |
 | `cricheroes_url` | text | Direct CricHeroes match link |
 | `match_time` | text | Actual start time (may differ from slot). Admin booking form defaults this to the chosen `slot_time` once a slot is picked, unless already saved or manually overridden — see §8.1 |
-| `match_stage` | text | Group / Knockout etc. |
+| `match_stage` | text | Free-text narrative stage ("Tournament Opener", "Semi Final") — never parsed as a signal |
+| `stage_type` | text | `league` · `knockout` · NULL (unclassified, treated as league) — structured flag for Team Record's League/Knockout split, set from the admin form; migration 076 — see `features/team-stats.md` §4 |
+| `opponent_id` | uuid FK | → `opponents.id`, nullable; derived server-side from `opponent_name` via `opponent_aliases` on create/edit, or linked on `/opponents`; migration 077 |
 | `reserved_until` | timestamptz | 48 hr expiry for `soft_block` |
 | `organiser_name` | text | External organiser (reservations) |
 | `organiser_phone` | text | WhatsApp for expiry warnings |
@@ -255,6 +272,11 @@ Primary scheduling record.
 `id, name, organiser_name, organiser_contact, active, total_league_games, vc_captain_id, cricheroes_points_table_url, organiser_self_service, is_practice, intended_formats, tentative_start_date, created_at`
 > `total_league_games` — used by Tournament Planner for bandwidth and pace signals. `vc_captain_id` — links the vice-captain for this tournament (FK → `captains.id`); used in share card and bandwidth view. `cricheroes_points_table_url` — optional URL to the CricHeroes points table for this tournament; when set, the tournament name renders as a hyperlink on fixture cards (`FixturesCard.tsx`) and the Tournament Planner page (`TournamentPlannerClient.tsx`), helping captains and players track standings. `organiser_self_service` — boolean, default `false` (migration `053_tournament_organiser_self_service.sql`); per-tournament opt-in for the public organiser reserve/decline flow on the share page — see `features/organiser-self-service.md`. `is_practice` — boolean, default `false` (migration `054_tournament_is_practice.sql`); set `true` only on the "Practice games" umbrella tournament so its matches are excluded from leaderboard/player-stats aggregates by default — see `features/leaderboard.md` §10. `intended_formats` — nullable `text[]` (migration `069_tournament_intended_formats.sql`, `CHECK (intended_formats IS NULL OR intended_formats <@ ARRAY['T20','T30'])`); admin-declared format(s) for a tournament with zero confirmed bookings yet, set from `/admin/tournaments`. Used only as the slot-distribution/suggestion fallback (`resolveActiveFormats()`, `src/lib/slotTargets.ts`) in place of the previous unconditional "assume both T20 and T30" — see `features/tournament-planner.md` §3.1. Ignored the moment a real booking exists; never affects R1–R8 booking validation itself. `tentative_start_date` — nullable `date` (migration `070_tournament_tentative_start_date.sql`); admin-declared expected start date, set from `/admin/tournaments`. Feeds only `computeSuggestionWindow()` (`src/lib/suggestedSlots.ts`) — anchors and sizes the suggestion horizon (`total_league_games / 2` months, at "2 games a month") for a tournament with zero bookings yet — see `features/tournament-planner.md` §3.2. A past-or-today value is treated as unset; never affects R1–R8 validation itself.
  
+#### `opponents` / `opponent_aliases`
+`opponents`: `id, name (unique on lower(btrim)), is_marquee, cricheroes_team_url, notes, created_by, created_at, updated_at`.
+`opponent_aliases`: `id, opponent_id FK, alias (unique on lower(btrim)), created_by, created_at`.
+Canonical opponent identity behind Team Record's head-to-head and marquee list; every raw `bookings.opponent_name` spelling maps to one opponent via an alias. Managed on `/opponents` by captains/GC/wranglers. RLS: `opponents` public SELECT (names already public on fixture cards), `opponent_aliases` service role only. Migration `077_opponents_master.sql` — see `features/team-stats.md` §5.
+
 #### `grounds`
 `id, name, maps_url, hospital_url` — joined into fixture cards and squad announcement text. Managed at `/wrangler/grounds` (not `/admin/*`) — create is `isGC || isAdmin`, edit is `isWrangler || isAdmin`; see `features/wrangler-grounds-menu.md`.
  
@@ -746,6 +768,8 @@ Next.js API Routes (server-side)
 | `captains` | ✅ | ✅ | Service role only |
 | `tournaments` | ✅ | ✅ | Service role only |
 | `grounds` | ✅ | ✅ | Service role only |
+| `opponents` | ✅ | ✅ | Service role only — see `features/team-stats.md` §5 |
+| `opponent_aliases` | ❌ Locked | ❌ Locked | Service role only |
 | `players` | ❌ Locked | ❌ Locked | Service role only |
 | `availability` | ❌ Locked | ❌ Locked | Service role only |
 | `fee_exemptions` | ❌ Locked | ❌ Locked | Service role only |
@@ -881,6 +905,11 @@ Next.js API Routes (server-side)
 | `src/app/admin/player-reconciliation/page.tsx` | Admin reconciliation UI + "Run Reconciliation Pass" client loop |
 | `analytics-db/migrations/001_player_identity_resolution.sql` | Analytics DB (separate project) — `player_id` columns + alias/override/ignore tables |
 | `src/app/leaderboard/page.tsx` | `/leaderboard` ("Yours Statistically") — any signed-in, non-expelled member; year/month/tournament/ground/format filters; see `features/leaderboard.md` |
+| `src/lib/teamStats.ts` + `src/lib/teamStatsCore.ts` | Team Record data layer — `getTeamMatches()` (server-only fetch) and the pure, client-safe aggregators (`applyFilters`/`summarize`/`splitBy`/`computeRecords`/…); see `features/team-stats.md` §2 |
+| `src/lib/opponents.ts` | `normaliseOpponentName()` / `resolveOpponentIdByName()` / `linkSpellingToOpponent()` — opponent master resolution, used by both booking routes and `/api/opponents*` |
+| `src/app/team-stats/page.tsx` + `src/components/team/*` | `/team-stats` — Team Record page, filter bar, expandable split table |
+| `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` + `src/app/api/opponents/**` | `/opponents` — opponent master + reconciliation queue and its API |
+| `src/components/admin/StageTypeToggle.tsx` | League/Knockout toggle on both admin booking forms → `bookings.stage_type` |
 | `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()`, `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()` — shared analytics-DB query layer, also used by Captains' Corner recent-form |
 | `src/lib/leaderboardMilestones.ts` | Plain (non-`'use client'`) module — `minGamesThreshold()`, `minDismissalsThreshold()`, `bestBy()`/`bestByAll()`, `totalDismissals()`; deliberately kept free of React/JSX so server-only callers like `leaderboardGlossary.ts` can import it safely — see `features/leaderboard.md` |
 | `src/lib/leaderboardGlossary.ts` | Builds the "What do these numbers mean?" entries at the bottom of `/leaderboard`, quoting the real thresholds currently in effect |
