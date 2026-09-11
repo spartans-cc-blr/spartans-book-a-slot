@@ -316,7 +316,9 @@ Approved by club coordinator over the default warm-light theme for this page.
 | Muted | slate-500 | Jersey, metadata |
 | Faint | slate-400 | Last played date, result count |
 
-Nav bar stays dark (`bg-ink-2`). Only page content uses slate-teal.
+Nav bar is the shared site-wide `SiteNav` (Warm Light as of September 2026,
+see `navigation.md` §4) — unaffected by this page's own Slate & Teal
+palette. Only page content below it uses slate-teal.
 
 ---
 

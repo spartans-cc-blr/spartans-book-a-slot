@@ -437,7 +437,62 @@ A full-width panel at the bottom with a Google sign-in button (using inline Goog
 ---
  
 ## 4. SiteNav — `src/components/ui/SiteNav.tsx`
- 
+
+### Warm Light nav, site-wide (changed September 2026)
+
+`SiteNav` was previously an intentional dark exception — every page-level
+Warm Light adoption in this app (the Home dashboard §3.1, `/fixtures` and
+`/matches/history` §4.1's mobile-only `theme` prop, `/gc-players`' Slate &
+Teal) explicitly left the top nav dark on top of it, and both
+`ui-theme.md`'s checklist and this doc used to say so outright ("nav bar
+stays dark... do not lighten it"). Per a direct request for the nav to
+match the rest of the light palette everywhere rather than only on the
+pages that had already gone light, the nav itself is now Warm Light —
+unconditionally, on every page, not behind a per-page opt-in prop the way
+`MobileTabBarTheme` works for the bottom tab bar (§4.1).
+
+`bg-ink-2` (the dark surface, `#292524`) was replaced with `bg-white`
+throughout — the main bar, every dropdown panel (Matches/Captains'
+Corner/Council/Wrangler/Profile), and their hover/active states. Text
+colours that assumed a dark backdrop were swapped for the same tokens the
+rest of the app's Warm Light surfaces already use:
+`text-parchment`→`#1C1917`, `text-zinc-400`→`#44403C`,
+`text-zinc-500`/`text-zinc-600`→`#78716C`, `text-red-400`→`#B91C1C`
+(crimson-dark), and the GC badge's dark-mode `bg-sky-900/40
+border-sky-700 text-sky-400` → a light-mode `bg-sky-50 border-sky-300
+text-sky-700`. An active/selected dropdown row's highlight changed from
+`bg-ink-3` to `#FEF3C7` (the same `--color-gold-light` tinted-background
+token `ui-theme.md` already defines for this exact purpose). `border-ink-5`
+(`#D4C9B0`) needed **no** change at all, despite the name — it was already
+the Warm Light palette's own border token (`ui-theme.md`'s
+`--color-border`), just reused as a *light* border-on-dark-surface accent
+in the old dark nav; it reads correctly as a border on the new white
+surface too, with zero edits. `text-gold`/`border-gold-dim`/`bg-gold/10`
+(the CAPTAIN badge, the sign-in button, avatar borders) were likewise
+untouched — `#D97706`/`#B45309` are already the palette's accent colours
+for light surfaces specifically, so every gold-branded element that worked
+on the dark nav works identically on the new light one.
+
+`GenerateInviteItem.tsx`'s desktop (non-`mobile`) render branch — used
+only inside `SiteNav`'s Council ⚖ dropdown — got the same treatment
+(`text-zinc-400`→`#44403C`, the Copy/WhatsApp pill borders/colours
+lightened to `emerald-700`/`emerald-300`/`sky`-style light equivalents,
+error text →`#B91C1C`). Its `mobile` branch (rendered inside
+`MobileTabBar`'s "More" sheet instead — a separate component with its own
+independent light/dark `theme` prop, §4.1) was **not** touched — that
+branch's colours are already a pre-existing, separate gap from this pass
+(it's hardcoded dark regardless of `MobileTabBar`'s own theme prop), out of
+scope for a change specifically about the top nav.
+
+**Deliberately still just the nav bar, not a wider reskin.** Every page's
+own body content — the dark hero bands on `/profile`, `/captains-corner`,
+`/leaderboard`, the ink-dark default page background used everywhere
+except the pages that have their own Warm Light rebuild — is unchanged.
+A light nav sitting directly above a dark page body (the mirror image of
+the dark nav that used to sit above the Home dashboard's light Warm Light
+island) is an accepted seam, not a bug — reskinning every page body was
+explicitly out of scope for this change.
+
 ### Link Structure
  
 ```ts
@@ -606,8 +661,10 @@ per-icon colour prop threading needed. Only `/fixtures` and
 `/matches/history` pass `'light'` today (see `features/player-availability.md`
 §10.1 and `features/post-match-scorecard.md` §16 for why those two pages
 went Warm Light in the first place) — the desktop nav and the slim mobile
-top row in `SiteNav` itself are unaffected either way, always dark,
-regardless of `mobileTabBarTheme`.
+top row in `SiteNav` itself are unaffected by this prop either way (it only
+ever governs `MobileTabBar`), but both are now Warm Light unconditionally
+on every page regardless, since the top nav's own theme changed
+site-wide — see §4's "Warm Light nav, site-wide" note.
 
 ### One admin page had to drop its own `<SiteNav>`
 
