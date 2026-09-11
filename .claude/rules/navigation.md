@@ -75,9 +75,12 @@ switched palette.
 
 ### `getPlayerData(playerId)` — Server Function
 
-Called only when `isPlayer = true`. Eight independent queries fetched via
+Called only when `isPlayer = true`. Nine independent queries fetched via
 one `Promise.all` (unchanged from the pre-existing parallelization pass —
-see §7's architectural-decisions table):
+see §7's architectural-decisions table), plus one further query that
+genuinely depends on query 9's result and so runs as a follow-up after the
+`Promise.all` resolves rather than inside it — see the "You're Selected to
+Play" note below:
 
 | # | Query | Feeds |
 |---|---|---|
@@ -87,8 +90,9 @@ see §7's architectural-decisions table):
 | 4 | `squad` rows for this player, joined to `bookings(game_date, status)` | Matches Played stat tile (this year's count + all-time last-played date) |
 | 5 | `players.wallet_balance, dues_override` | Wallet Balance stat tile |
 | 6 | `squad` rows for this player, joined to `bookings(tournament_id)` | My Tournaments stat tile (distinct tournament count) |
-| 7 | `getNudgeForPlayer()` | Availability nudge banner |
-| 8 | `getWeekendGapForPlayer()` | First-open-of-day greeting dialog |
+| 7 | `squad` rows for this player with `status='announced'`, joined to `bookings(...tournament, ground)` | "You're Selected to Play" card (added September 2026 — see below) |
+| 8 | `getNudgeForPlayer()` | Availability nudge banner |
+| 9 | `getWeekendGapForPlayer()` | First-open-of-day greeting dialog |
 
 **Query 3 change (single → preview array):** the pre-rebuild version fetched
 exactly one row via `.single()`. The rebuild widens this to `.limit(3)` and
@@ -183,11 +187,54 @@ but the tile is honest that the balance itself is negative), else
 `walletBalance`/`duesOverride` in `getPlayerData()`'s return shape to
 match.
 
+**"You're Selected to Play" (added September 2026)** — a card per upcoming
+confirmed booking this player has an *announced* squad row for (query 7
+above), rendered **ahead of** the Upcoming Fixtures card (see the Dashboard
+Sections table below), between it and the availability nudge banner.
+Deliberately additive, not a
+replacement: a booking that has an announced squad this player is in still
+also appears in the ordinary Upcoming Fixtures preview list underneath —
+this section is a highlight layered on top, not a dedupe/filter of that
+list.
+
+Query 7 only resolves *which* upcoming bookings qualify (one row per
+squad-membership, via the same "join broadly via `booking:bookings!inner(...)`,
+filter/sort in code" pattern queries 4 and 6 already use, rather than
+fighting PostgREST's embedded-resource filter syntax). Once `Promise.all`
+resolves, a second, genuinely-dependent query fetches the *full* squad
+(every announced player, not just this one) for those specific booking
+IDs — this is the one query in `getPlayerData()` that can't be parallelized
+with the rest, since it needs query 7's booking-id list first.
+
+Each card is `SelectedMatchCard` (`src/app/page.tsx`) — deliberately **not**
+a reuse of `FixturesCard.tsx` itself, which is tightly coupled to
+`FixturesWeekendGroup`'s shared live-availability state and carries fields
+(fee-per-player, wallet-after-this-match projection, Y/O/E/L buttons) that
+don't apply here — the squad is already announced by the time this card
+renders, so there's nothing left for the viewer to mark. Instead it's a
+self-contained, read-only card mirroring `FixturesCard`'s squad-announced
+*content* (date/slot/format, tournament name linking to
+`cricheroes_points_table_url` when set, opponent + ground linking to
+`maps_url`, a CricHeroes match link, and the full squad list sorted
+alphabetically with C/VC/WK badges — same fields, same sort, same
+name-linking fallback chain `FixturesCard`'s own squad grid uses:
+`/players/[id]/stats` if the row resolves to a Hub player, else
+`cricheroes_url`, else plain text) — but **re-themed to the dashboard's own
+Warm Light palette** (`#FFFFFF` card, `#D4C9B0`/`#F5D9A8` borders, `#D97706`
+gold accents) rather than `FixturesCard`'s hardcoded dark gradient
+(`player-availability.md` §10.1 already documents why `FixturesCard`/
+`FixturesAvailability` stay dark even on an otherwise-Warm-Light page
+shell — this card is a different, dashboard-native component, not that
+same component reskinned in place). The viewer's own row in the squad list
+is tinted gold (`#B45309`) rather than the default slate, so they can spot
+themselves in the list at a glance.
+
 ### Dashboard Sections
 
 | Section | Content |
 |---|---|
 | Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle, a static "🛡️ Spartans CC Bengaluru" badge pill |
+| You're Selected to Play | Zero or more `SelectedMatchCard`s (see above) — one per upcoming booking with an announced squad this player is in; rendered above Upcoming Fixtures, entirely absent when there are none |
 | Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald, no tag if ≥ 0 (see below), amber "Exempted" if negative but dues-waived, else crimson "Overdue"; **clickable → `/wallet`**, added September 2026 — see `features/wallet-ledger.md`) |
 | Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
 | Upcoming Fixtures | Header + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `upcomingPreview`, or a dashed empty-state box ("No Upcoming Matches Scheduled") when there are none |
