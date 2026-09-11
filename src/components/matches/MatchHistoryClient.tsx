@@ -522,6 +522,7 @@ export function MatchHistoryClient({
             hasMore={!!nextCursor}
             loadingMore={loadingMore}
             onLoadMore={loadMore}
+            theme="light"
           />
         </div>
       )}

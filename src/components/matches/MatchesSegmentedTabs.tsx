@@ -10,15 +10,25 @@ import Link from 'next/link'
 // than to link between. A plain server component — no client state, just
 // two <Link>s with an `active` prop passed in from whichever page renders
 // it, styled to match the DateChipSlider/filter-bar segmented look.
-export function MatchesSegmentedTabs({ active }: { active: 'upcoming' | 'past' }) {
+//
+// `theme` (default `'auto'`) follows the same convention `DateChipSlider`
+// added for Light/Dark/System — 'auto' reads the `--fx-*` CSS variables so
+// it matches the visitor's own theme choice on /fixtures; `/matches/history`
+// passes `theme="light"` to pin the original Warm Light look, since that
+// page's own body content hasn't been made theme-aware yet (see ui-theme.md).
+const LIGHT = { trackBg: '#F8F4EE', trackBorder: '#D4C9B0', accent: '#D97706', accentText: '#fff', inactiveText: '#78716C' }
+const AUTO  = { trackBg: 'var(--fx-card-header-bg)', trackBorder: 'var(--fx-border)', accent: 'var(--fx-accent)', accentText: '#fff', inactiveText: 'var(--fx-card-text-muted)' }
+
+export function MatchesSegmentedTabs({ active, theme = 'auto' }: { active: 'upcoming' | 'past'; theme?: 'auto' | 'light' }) {
+  const t = theme === 'light' ? LIGHT : AUTO
   return (
-    <div className="flex rounded-full p-1 gap-1 max-w-xs" style={{ background: '#F8F4EE', border: '1px solid #D4C9B0' }}>
+    <div className="flex rounded-full p-1 gap-1 max-w-xs" style={{ background: t.trackBg, border: `1px solid ${t.trackBorder}` }}>
       <Link
         href="/fixtures"
         className="flex-1 text-center font-rajdhani text-sm font-bold py-2 rounded-full transition-colors"
         style={active === 'upcoming'
-          ? { background: '#D97706', color: '#fff' }
-          : { color: '#78716C' }}
+          ? { background: t.accent, color: t.accentText }
+          : { color: t.inactiveText }}
       >
         Upcoming
       </Link>
@@ -26,8 +36,8 @@ export function MatchesSegmentedTabs({ active }: { active: 'upcoming' | 'past' }
         href="/matches/history"
         className="flex-1 text-center font-rajdhani text-sm font-bold py-2 rounded-full transition-colors"
         style={active === 'past'
-          ? { background: '#D97706', color: '#fff' }
-          : { color: '#78716C' }}
+          ? { background: t.accent, color: t.accentText }
+          : { color: t.inactiveText }}
       >
         Past Matches
       </Link>
