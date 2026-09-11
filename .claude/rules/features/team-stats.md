@@ -146,6 +146,16 @@ Sections, top to bottom:
    format, bat-1st/chased, result + margin — each linking to
    `/matches/history/[bookingId]`. Marquee rows carry a pill; an opponent
    row grouped only by raw spelling carries an "unlinked" hint.
+   **A "Total" footer row** (added the same day, on request) closes every
+   split with the aggregate P/W/L/T-NR/Win %/form/last-played across the
+   rows above it — computed from the *distinct* matches behind those rows
+   (`summarize()` over a `bookingId`-deduped set), not by summing the rows,
+   since the Toss split deliberately puts a toss-winning match in two
+   buckets. Hidden when the split has a single row (it would just repeat
+   it). This total can differ from the headline strip on purpose: the
+   Innings and Toss splits drop matches with no toss data, so their total
+   is "of the matches we have toss data for", while the headline counts
+   every filtered match.
 4. **Records** — up to eight cards (highest/lowest total, highest
    successful chase, lowest total defended, biggest win by runs / by
    wickets, highest/lowest total conceded), each linking to its match.
