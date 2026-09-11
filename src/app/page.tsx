@@ -239,7 +239,7 @@ function ChevronGlyph({ color = '#A8A29E' }: { color?: string }) {
 // with no drill-down destination yet (e.g. "My Tournaments" — see
 // navigation.md's Home page section for why that one stays static for now).
 function StatTile({ icon, value, label, tag, tone, href, sublabel }: {
-  icon: React.ReactNode; value: string | number; label: string; tag: string
+  icon: React.ReactNode; value: string | number; label: string; tag?: string
   tone: 'gold' | 'amber' | 'emerald' | 'crimson'
   href?: string
   sublabel?: string
@@ -257,10 +257,12 @@ function StatTile({ icon, value, label, tag, tone, href, sublabel }: {
         <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: toneMap.bg }}>
           {icon}
         </span>
-        <span className="font-rajdhani text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full"
-          style={{ background: toneMap.tagBg, color: toneMap.tagText }}>
-          {tag}
-        </span>
+        {tag && (
+          <span className="font-rajdhani text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full"
+            style={{ background: toneMap.tagBg, color: toneMap.tagText }}>
+            {tag}
+          </span>
+        )}
       </div>
       <p className="font-cinzel text-2xl font-bold" style={{ color: '#1C1917' }}>{value}</p>
       <p className="font-rajdhani text-xs mt-1" style={{ color: '#78716C' }}>{label}</p>
@@ -440,7 +442,7 @@ export default async function HomePage() {
                 label="Wallet Balance"
                 tag={
                   playerData.walletBalance >= 0
-                    ? 'Positive'
+                    ? undefined
                     : playerData.duesOverride
                     ? 'Exempted'
                     : 'Overdue'

@@ -170,11 +170,17 @@ player with waived dues both rendered identically as "₹0 · Clear", with no
 way to see their real balance. Per a product decision, the tile now always
 renders `formatSignedRupees(wallet_balance)` (e.g. `-₹500`) — the actual
 number, never zeroed or absoluted-away — with the tag/tone reflecting
-context rather than clearance: `Positive`/emerald when `wallet_balance >= 0`,
-`Exempted`/amber when negative but `dues_override` is set (still not
-blocked from booking, but the tile is honest that the balance itself is
-negative), else `Overdue`/crimson. `duesAmount`/`duesCleared` were renamed
-to `walletBalance`/`duesOverride` in `getPlayerData()`'s return shape to
+context rather than clearance: no tag at all (just the emerald-tinted
+icon) when `wallet_balance >= 0` — there are no dues to call out, so a
+"Positive" pill was redundant with the already-positive number sitting
+right below it and was dropped (fixed September 2026; `StatTile`'s `tag`
+prop is now optional, and the pill itself only renders when `tag` is
+truthy — no other tile passes an empty tag today, but the prop stayed
+generic rather than adding a wallet-tile-specific flag) — `Exempted`/amber
+when negative but `dues_override` is set (still not blocked from booking,
+but the tile is honest that the balance itself is negative), else
+`Overdue`/crimson. `duesAmount`/`duesCleared` were renamed to
+`walletBalance`/`duesOverride` in `getPlayerData()`'s return shape to
 match.
 
 ### Dashboard Sections
@@ -182,7 +188,7 @@ match.
 | Section | Content |
 |---|---|
 | Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle, a static "🛡️ Spartans CC Bengaluru" badge pill |
-| Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald "Positive" if ≥ 0, amber "Exempted" if negative but dues-waived, else crimson "Overdue"; **clickable → `/wallet`**, added September 2026 — see `features/wallet-ledger.md`) |
+| Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald, no tag if ≥ 0 (see below), amber "Exempted" if negative but dues-waived, else crimson "Overdue"; **clickable → `/wallet`**, added September 2026 — see `features/wallet-ledger.md`) |
 | Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
 | Upcoming Fixtures | Header + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `upcomingPreview`, or a dashed empty-state box ("No Upcoming Matches Scheduled") when there are none |
 | Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |
