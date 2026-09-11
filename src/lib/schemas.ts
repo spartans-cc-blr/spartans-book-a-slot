@@ -387,3 +387,31 @@ export const walletTransferSchema = z.object({
   data => data.sponsor_player_id !== data.beneficiary_player_id,
   { message: 'Sponsor and beneficiary must be different players', path: ['beneficiary_player_id'] }
 )
+
+// ── OPPONENT MASTER (/api/opponents — captain / GC / wrangler / admin) ──────
+// See features/team-stats.md §5.
+
+const opponentNameSchema = z.string().trim().min(2, 'Name is too short').max(80, 'Name is too long')
+
+export const opponentCreateSchema = z.object({
+  name:                opponentNameSchema,
+  is_marquee:          z.boolean().optional(),
+  cricheroes_team_url: cricheroesUrlSchema.nullable().optional(),
+  notes:               z.string().trim().max(500).nullable().optional(),
+  // Optional raw spelling (from the unlinked queue) to link straight away —
+  // written to opponent_aliases and applied to every matching booking.
+  link_name:           z.string().trim().min(1).max(120).optional(),
+}).strict()
+
+export const opponentUpdateSchema = z.object({
+  id:                  z.string().uuid(),
+  name:                opponentNameSchema.optional(),
+  is_marquee:          z.boolean().optional(),
+  cricheroes_team_url: cricheroesUrlSchema.nullable().optional(),
+  notes:               z.string().trim().max(500).nullable().optional(),
+}).strict()
+
+export const opponentLinkSchema = z.object({
+  opponent_id: z.string().uuid(),
+  name:        z.string().trim().min(1).max(120),
+}).strict()

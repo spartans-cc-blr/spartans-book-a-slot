@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { resolveOpponentIdByName } from '@/lib/opponents'
 import { validateBooking } from '@/lib/validation'
 import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
 import type { CreateBookingRequest } from '@/types'
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
   const {
     game_date, slot_time, format, tournament_id,
     notes, opponent_name, match_id, cricheroes_url,
-    match_time, match_stage, match_fee_override,
+    match_time, match_stage, match_fee_override, stage_type,
     // Both validated below and defaulted from the tournament when the key
     // is omitted entirely — see the resolution after the tournament fetch.
     captain_id, ground_id,
@@ -65,6 +66,10 @@ export async function POST(req: NextRequest) {
 
   if (!game_date || !slot_time || !format || !tournament_id) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  if (stage_type != null && stage_type !== 'league' && stage_type !== 'knockout') {
+    return NextResponse.json({ error: 'stage_type must be league, knockout or null' }, { status: 400 })
   }
 
   if (!GAME_DATE_REGEX.test(game_date)) {
@@ -163,7 +168,11 @@ export async function POST(req: NextRequest) {
       cricheroes_url:     cricheroes_url ?? null,
       match_time:         match_time ?? null,
       match_stage:        match_stage ?? null,
+      stage_type:         stage_type ?? null,
       match_fee_override: match_fee_override ?? null,
+      // Canonical opponent, resolved server-side from the typed spelling via
+      // opponent_aliases — never taken from the client (features/team-stats.md §5)
+      opponent_id:        await resolveOpponentIdByName(supabase, opponent_name),
     })
     .select(`
       *,

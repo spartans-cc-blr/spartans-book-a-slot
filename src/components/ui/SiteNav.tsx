@@ -25,6 +25,7 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
   const [matchesOpen,  setMatchesOpen]  = useState(false)
   const [captainsOpen, setCaptainsOpen] = useState(false)
   const [wranglerOpen, setWranglerOpen] = useState(false)
+  const [statsOpen,    setStatsOpen]    = useState(false)
   const { data: session, status }     = useSession()
 
   const player     = session?.user as any
@@ -44,9 +45,8 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
     ...(isLoggedIn && !isExpelled
       ? [{ href: '/dugout', label: 'The Dugout', key: 'dugout' }]
       : []),
-    ...(isLoggedIn && !isExpelled
-      ? [{ href: '/leaderboard', label: 'Stats', key: 'leaderboard' }]
-      : []),
+    // Stats — its own dropdown now (Yours Statistically + Team Record),
+    // rendered separately below alongside Matches / Captains' Corner.
     // Captains' Corner — its own dropdown now (Squad Selection + Unavailable
     // Dates), rendered separately below, not a flat link here.
     // Tournament Planner — captains, GC, admin
@@ -129,6 +129,44 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
                       ${activePage === 'captains-unavailable' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                     🚫 Unavailable Dates
                   </Link>
+                  <Link href="/opponents"
+                    onClick={() => setCaptainsOpen(false)}
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-t border-[#D4C9B0] dark:border-ink-5
+                      ${activePage === 'opponents' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
+                    ⚔️ Opponents
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+
+
+          {/* Stats submenu — desktop: player stats + team record */}
+          {isLoggedIn && !isExpelled && (
+            <div className="relative ml-1"
+              onMouseEnter={() => setStatsOpen(true)}
+              onMouseLeave={() => setStatsOpen(false)}>
+              <button
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                  ${activePage === 'leaderboard' || activePage === 'team-stats'
+                    ? 'text-gold border-crimson'
+                    : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
+                Stats <span className="text-[8px] mt-0.5">▾</span>
+              </button>
+              {statsOpen && (
+                <div className="absolute top-14 left-0 w-52 bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-b shadow-xl z-50">
+                  <Link href="/leaderboard"
+                    onClick={() => setStatsOpen(false)}
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-[#D4C9B0] dark:border-ink-5
+                      ${activePage === 'leaderboard' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
+                    📊 Yours Statistically
+                  </Link>
+                  <Link href="/team-stats"
+                    onClick={() => setStatsOpen(false)}
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
+                      ${activePage === 'team-stats' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
+                    🛡️ Team Record
+                  </Link>
                 </div>
               )}
             </div>
@@ -182,6 +220,11 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     📍 Grounds
                   </Link>
+                  <Link href="/opponents"
+                    onClick={() => setGcOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
+                    ⚔️ Opponents
+                  </Link>
                   <GenerateInviteItem />
                 </div>
               )}
@@ -209,8 +252,13 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
                   </Link>
                   <Link href="/wrangler/grounds"
                     onClick={() => setWranglerOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors">
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     📍 Grounds
+                  </Link>
+                  <Link href="/opponents"
+                    onClick={() => setWranglerOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors">
+                    ⚔️ Opponents
                   </Link>
                 </div>
               )}
