@@ -737,7 +737,7 @@ export default async function HomePage() {
 
       </div>
 
-      <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
+      <footer className="py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
         © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
         <span className="mx-2 text-ink-5">·</span>
         <a href="https://spartanscricketclub.vercel.app" className="text-zinc-700 hover:text-zinc-500 transition-colors">
