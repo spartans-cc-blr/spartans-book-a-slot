@@ -10,6 +10,7 @@ import { BattingPositionLeaders } from '@/components/leaderboard/BattingPosition
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
 import { LeaderboardGlossary } from '@/components/leaderboard/LeaderboardGlossary'
+import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
 import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
 import { getMonthSyncStatus } from '@/lib/monthlyRecognition'
@@ -173,6 +174,7 @@ export default async function LeaderboardPage({
           Performance
         </p>
         <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-[var(--stats-text)] dark:text-parchment tracking-wide">Yours Statistically</h1>
+        <StatsSegmentedTabs active="players" />
 
         {user?.playerId && (
           <div className="flex flex-wrap items-center gap-4 mt-3">

@@ -13,19 +13,19 @@ import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { TeamFilterBar, type TeamFilterState } from '@/components/team/TeamFilterBar'
+import { TeamFilterShell, SplitByRow } from '@/components/team/TeamFilterPanel'
 import { TeamSplitTable, FormPills, MatchList } from '@/components/team/TeamSplitTable'
+import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import {
   getTeamMatches, applyFilters, summarize, recentForm, currentStreak, splitBy, computeRecords,
-  filterOptions, sortNewestFirst, SPLIT_LABEL,
+  filterOptions, sortNewestFirst,
   type FormatFilter, type InningsFilter, type StageFilter, type SplitDimension,
 } from '@/lib/teamStats'
+import { SPLIT_DIMENSIONS, toTeamFilters, type TeamFilterState } from '@/lib/teamStatsFilters'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Team Record — Spartans CC' }
 export const revalidate = 0
-
-const DIMENSIONS: SplitDimension[] = ['tournament', 'ground', 'opponent', 'format', 'stage', 'innings', 'toss', 'captain', 'year', 'month', 'slot']
 
 function pickEnum<T extends string>(v: string | undefined, allowed: readonly T[], fallback: T): T {
   return (allowed as readonly string[]).includes(v ?? '') ? (v as T) : fallback
@@ -57,19 +57,10 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
     innings:    pickEnum<InningsFilter>(searchParams?.innings, ['all', 'defending', 'chasing'], 'all'),
     stage:      pickEnum<StageFilter>(searchParams?.stage, ['all', 'league', 'knockout'], 'all'),
     practice:   searchParams?.practice === '1',
-    by:         pickEnum<SplitDimension>(searchParams?.by, DIMENSIONS, 'tournament'),
+    by:         pickEnum<SplitDimension>(searchParams?.by, SPLIT_DIMENSIONS, 'tournament'),
   }
 
-  const matches = applyFilters(all, {
-    year: state.year === 'all' ? null : Number(state.year),
-    format: state.format,
-    tournamentId: state.tournament === 'all' ? null : state.tournament,
-    groundId: state.ground === 'all' ? null : state.ground,
-    opponentKey: state.opponent === 'all' ? null : state.opponent,
-    innings: state.innings,
-    stage: state.stage,
-    includePractice: state.practice,
-  })
+  const matches = applyFilters(all, toTeamFilters(state))
 
   const summary = summarize(matches)
   const form = recentForm(matches, 5)
@@ -93,20 +84,11 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
           Performance
         </p>
         <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-[var(--stats-text)] dark:text-parchment tracking-wide">Team Record</h1>
-        <div className="flex flex-wrap items-center gap-4 mt-3">
-          <Link href="/leaderboard" className="font-rajdhani text-sm font-semibold text-[var(--stats-accent)] dark:text-gold hover:text-[var(--stats-accent-dim)] dark:hover:text-gold-light transition-colors">
-            Player stats — Yours Statistically →
-          </Link>
-          {canManageOpponents && (
-            <Link href="/opponents" className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment hover:text-[var(--stats-accent)] dark:hover:text-gold transition-colors">
-              ⚔️ Manage opponents{unlinkedCount > 0 ? ` (${unlinkedCount} unlinked)` : ''}
-            </Link>
-          )}
-        </div>
+        <StatsSegmentedTabs active="team" />
       </div>
 
       <div className="px-5 md:px-8 lg:px-10 py-6">
-        <TeamFilterBar {...state} years={options.years} tournaments={options.tournaments} grounds={options.grounds} opponents={options.opponents} />
+        <TeamFilterShell state={state} options={options} matches={all}>
 
         {/* Headline strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
@@ -146,14 +128,16 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
 
         {/* The split */}
         <section className="mb-6">
-          <SectionHeading title={`By ${SPLIT_LABEL[state.by].toLowerCase()}`} />
+          <SplitByRow state={state} />
+          <TeamSplitTable rows={rows} showOpponentInMatches={state.by !== 'opponent'} />
           {state.by === 'opponent' && unlinkedCount > 0 && (
-            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mb-2">
-              Opponents marked <span className="font-bold uppercase tracking-widest text-[10px]">unlinked</span> are grouped by the exact spelling on the booking — link them on{' '}
-              {canManageOpponents ? <Link href="/opponents" className="text-[var(--stats-accent)] dark:text-gold underline decoration-dotted">Manage opponents</Link> : 'Manage opponents (captains, GC, wranglers)'} so different spellings of the same club count together.
+            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mt-2">
+              {unlinkedCount} {unlinkedCount === 1 ? 'spelling is' : 'spellings are'} not yet linked to an opponent — rows marked <span className="font-bold uppercase tracking-widest text-[10px]">unlinked</span> group by the exact spelling on the booking.{' '}
+              {canManageOpponents
+                ? <Link href="/opponents" className="font-semibold text-[var(--stats-accent)] dark:text-gold hover:underline">⚔️ Manage opponents →</Link>
+                : 'Captains, GC and wranglers can link them on Manage opponents.'}
             </p>
           )}
-          <TeamSplitTable rows={rows} showOpponentInMatches={state.by !== 'opponent'} />
         </section>
 
         {/* Records */}
@@ -185,8 +169,9 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
         )}
 
         <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 text-center mt-8 px-4">
-          Covers every confirmed Hub booking whose CricHeroes scorecard has synced. Win % excludes no-results. Defending/chasing and toss splits come from the scorecard&rsquo;s toss line; League/Knockout from the booking&rsquo;s stage flag (unclassified games count as league). Practice games are excluded unless &ldquo;Include practice&rdquo; is ticked.
+          Covers every confirmed Hub booking whose CricHeroes scorecard has synced. Win % excludes no-results. Defending/chasing and toss splits come from the scorecard&rsquo;s toss line; League/Knockout from the booking&rsquo;s stage flag (unclassified games count as league). Practice games are excluded unless the &ldquo;Practice games&rdquo; filter is added.
         </p>
+        </TeamFilterShell>
       </div>
 
       <footer className="border-t border-[var(--stats-divider)] dark:border-ink-4 py-5 text-center font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 mt-8">
