@@ -10,10 +10,11 @@ interface SiteNavProps {
   activePage?: string
   // Theme for the mobile bottom tab bar only (MobileTabBar's own light/dark
   // toggle, unrelated to the desktop nav/slim mobile top row above, which
-  // are always Warm Light now — see navigation.md §4). Defaults to 'dark'
-  // (unchanged look); pages that opted into the Warm Light treatment
-  // (currently /fixtures and /matches/history — see navigation.md §4.1)
-  // pass 'light' so the tab bar matches their own Warm Light page shell.
+  // are always Warm Light now — see navigation.md §4). Defaults to 'light'
+  // (changed September 2026 — the tab bar is now Warm Light everywhere,
+  // irrespective of the page's own body theme; see navigation.md §4.1).
+  // Left in place as an explicit 'dark' opt-out for any page that still
+  // wants the original ink/gold look, though nothing currently passes it.
   mobileTabBarTheme?: MobileTabBarTheme
 }
 

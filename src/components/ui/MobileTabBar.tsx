@@ -19,10 +19,13 @@ interface MobileTabBarProps {
   theme?: MobileTabBarTheme
 }
 
-// Colour tokens per theme. 'dark' matches the app's existing ink/gold
-// palette (unchanged look). 'light' is the Warm Light palette introduced
-// with the DateChipSlider — parchment surfaces, saturated #D97706 gold —
-// opted into per-page via SiteNav's `theme` prop (see navigation.md §4.1).
+// Colour tokens per theme. 'light' — the Warm Light palette introduced
+// with the DateChipSlider (parchment surfaces, saturated #D97706 gold) —
+// is now the default (September 2026), rendered regardless of page, so
+// the bottom tab bar looks the same everywhere. 'dark' matches the app's
+// original ink/gold palette and stays available as an explicit opt-out
+// via SiteNav's `mobileTabBarTheme` prop (see navigation.md §4.1) for any
+// page that still wants it, though nothing currently does.
 function tokens(theme: MobileTabBarTheme) {
   return theme === 'light' ? {
     navBg: '#FFFFFF', navBorder: '#D4C9B0',
@@ -56,7 +59,7 @@ function useReserveBottomSpace() {
 }
 
 export function MobileTabBar(props: MobileTabBarProps) {
-  const { activePage, isLoggedIn, isExpelled, isAdmin, isGC, isCaptain, isWrangler, playerId, theme = 'dark' } = props
+  const { activePage, isLoggedIn, isExpelled, isAdmin, isGC, isCaptain, isWrangler, playerId, theme = 'light' } = props
   const [moreOpen, setMoreOpen] = useState(false)
   useReserveBottomSpace()
   const t = tokens(theme)
