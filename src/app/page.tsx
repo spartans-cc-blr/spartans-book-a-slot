@@ -435,7 +435,7 @@ export default async function HomePage() {
   const firstName  = player?.playerName?.split(' ')[0] ?? 'Spartan'
 
   return (
-    <div className="min-h-screen bg-ink grain">
+    <div className="min-h-screen bg-parchment grain">
       <SiteNav activePage="home" />
 
       {/* ── EXPELLED STATE ── */}
@@ -467,7 +467,7 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* ── PLAYER DASHBOARD — Warm Light, self-contained (nav above stays dark) ── */}
+      {/* ── PLAYER DASHBOARD — Warm Light, self-contained ── */}
       {isPlayer && playerData && (
         <div style={{ background: '#F0F4F5' }} className="px-5 md:px-8 lg:px-10 py-6">
           <div className="max-w-4xl mx-auto">
@@ -737,10 +737,10 @@ export default async function HomePage() {
 
       </div>
 
-      <footer className="py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
+      <footer className="py-5 text-center font-rajdhani text-xs text-[#78716C] mt-8">
         © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
         <span className="mx-2 text-ink-5">·</span>
-        <a href="https://spartanscricketclub.vercel.app" className="text-zinc-700 hover:text-zinc-500 transition-colors">
+        <a href="https://spartanscricketclub.vercel.app" className="text-[#78716C] hover:text-[#44403C] transition-colors">
           Club Site
         </a>
       </footer>
