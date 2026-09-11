@@ -517,6 +517,133 @@ WK is a `Set<string>` in client state. Captain and VC are `string | null` — se
 - `/captains-corner` page re-validates `isCaptain || isAdmin` on every load
 ---
  
+## 9.1 Light/Dark/System (added September 2026)
+
+`/captains-corner` is being converted to the app's Light/Dark/System theme
+toggle — full mechanism in `ui-theme.md`'s "Light/Dark/System Theme"
+section. This page's look has always been dark-ink only, with no light
+story at all; that existing look is now specifically the **dark** theme
+state (unchanged), and a new **light** variant sits alongside it.
+
+**Landing in two passes.** The page shell (`src/app/captains-corner/page.tsx`
+— hero band, Y/O/E legend, dues-badge row, footer) is done: every literal
+hex/Tailwind dark class there now reads a `--captains-*` CSS variable
+(`--captains-shell-bg`/`--captains-hero-bg`/`--captains-border`/
+`--captains-text`/`--captains-text-muted`/`--captains-text-faint`/
+`--captains-accent`/`--captains-accent-dim`, defined in `globals.css`
+under both `[data-theme="light"]` and `[data-theme="dark"]`) instead of a
+fixed `bg-ink`/`bg-ink-2`/`text-parchment`/`text-zinc-*` set. The Y/O/E
+legend chip colours and the dues `₹` badge are left as literal, unchanged
+status colours in both themes — small saturated accent chips, same
+"semantic colours stay put" call every other themed page in this app has
+made.
+
+`CaptainsCornerGrid.tsx` itself (Per-Slot/Matrix views, `SlotCard`,
+`AddPlayerPanel`, role badges, status pills) — the much larger piece — is
+now also converted. It reuses the same `--captains-*` token set the page
+shell already established, plus one new sub-surface token,
+`--captains-surface-2` (light `#F8F4EE`, dark `#242424` — matches `ink-4`'s
+literal dark value exactly), for the section header/footer strips and the
+"＋ Add player" panel's own background, which have no exact match among the
+page-shell's original token set.
+
+**Conversion pattern.** Every structural Tailwind class this component used
+(`bg-ink-3`/`bg-ink-4`/`bg-ink-5`/`bg-ink`, `border-ink-4`/`border-ink-5`,
+`text-parchment`, `text-zinc-300`–`text-zinc-800`, `border-zinc-500`–
+`border-zinc-800`, `bg-zinc-800`, including their `hover:`/`placeholder:`
+variants) now carries a `dark:`-prefixed copy of the exact original class
+alongside a new light base class reading the matching `--captains-*`
+token — e.g. `bg-ink-3` → `bg-[var(--captains-card-bg)] dark:bg-ink-3`,
+`text-zinc-500` → `text-[var(--captains-text-muted)] dark:text-zinc-500`.
+Dark mode is therefore byte-identical to the component's pre-existing,
+always-dark look; light is new. `text-gold`/`border-gold-dim`/`bg-gold/…`
+accents were left unconverted throughout, matching the same call
+`SiteNav.tsx`'s own Warm Light pass made for these tokens (`ui-theme.md`'s
+Tailwind Token Mapping correction) — not the reported symptom, and they
+read fine on either background.
+
+**Status/semantic colours were deliberately left untouched, in both
+themes** — same "small saturated accent chips don't need theming" call as
+the page shell's own Y/O/E legend: the `RESP` (Y/O/E/L) response-code
+colours and `Chip`, the `StatusBadge` draft/pending/approved/announced set
+(including the grayscale `draft` entry, which stays literal specifically
+because it's one state in that same four-state set, not a stray structural
+gray), the amber dues `₹` badge and amber wallet-balance text, the "via
+CAP"-style CAP/C/VC/WK role badges, the emerald "Announced ✓"/Approve/WA
+button family, the red "taken elsewhere" pill and error text, the sky
+"selected for this slot" row/checkbox tint, the rose fee-exemption heart
+icon, and the `AddPlayerPanel`'s own Y/E/O/L proxy-add button colours
+(`PROXY_CODES`) — none of these read from a `--captains-*` token in either
+theme.
+
+**Revised the same day, after the first real light render — those "leave
+the status chips alone" calls were wrong for this page.** On Home/Fixtures
+the status chips are a handful of small badges; here they *are* most of
+the row. A screenshot of the light theme showed every one of them
+dark-tuned and muddy on a white card: the selected-row `bg-sky-950/30`
+rendered as a grey-blue slab, `text-amber-400` dues names washed out to
+pale yellow, the `text-gold`/`bg-gold/10` CAP/C/VC/Announced badges read
+as faint khaki (`gold` is `#C9A84C` — see `ui-theme.md`'s token
+correction), the Y/O/E chips and 14Y/4O count chips sat as filled-dark
+blocks, and the navy `Form` pill, `WK` badge, and `-400`-shade
+emerald/red/rose/amber text all lost contrast. Dark stays byte-identical
+(every change is a light base class paired with the exact original as
+its `dark:` copy); light now gets:
+
+- **Y/O/E/L chips (`RESP`, `Chip`, `RespCell`, `Legend`, the Matrix
+  footer) read twelve new `--captains-resp-{y,e,o,l}-{bg,text,border}`
+  tokens** (`globals.css`) — dark values are the original literals,
+  light values a pastel tint with dark text of the same hue (`#DCFCE7`/
+  `#15803D`, `#DBEAFE`/`#1D4ED8`, `#FFEDD5`/`#C2410C`, `#F3E8FF`/
+  `#7E22CE`). `RESP` itself stays a plain constant — its values are now
+  `var(--…)` strings, so every consumer flipped with no per-site change.
+  `AddPlayerPanel`'s `PROXY_CODES` keeps its own slightly-different dark
+  literals via `useTheme()` and reuses the `RESP` set in light. The
+  page-shell legend (`page.tsx`) reads the same tokens now — which also
+  fixed a pre-existing inconsistency where that legend drew `E` in yellow
+  while every chip in the grid below drew it blue.
+- **Gold badges** (CAP, C/VC role pills and toggles, `Announced`, the
+  Submit-for-GC button, the Per Slot/Matrix view toggle, the `text-gold`
+  time/heading text) use the `--captains-badge-*`/`--captains-accent*`
+  tokens in light (`#FEF3C7`/`#B45309`/`#D97706`) — the same amber
+  family the rest of the Warm Light app uses for its gold, not the
+  muted khaki Tailwind `gold` token.
+- **Selected row** `#EAF3FF` (a real sky-50 tint), **WK badge**
+  `sky-100/300/700`, **Form pill** `#DBEAFE`/`#1E40AF`, **taken-elsewhere
+  pill** `red-50/300/700`, **active match-role button** `emerald-100/400`,
+  **StatusBadge** draft/pending/approved on `zinc/amber/emerald-50`
+  backgrounds with `-300` borders and `-700` text, the **dues `₹` badges**
+  on `amber-50`, the **GC-note box** on `amber-50`, and the three
+  **legend dots** re-tinted to match the row treatments they describe.
+- **Every `text-{amber,emerald,red,rose}-400` / `text-amber-300`** steps
+  down to its `-700` (rose: `-500`) shade in light, `-400` kept for dark.
+- **`RespCell`'s in-squad pip** (`✓`/`·`) darkens from `#34d399`/`#38bdf8`
+  to `#059669`/`#0284c7` in light via `useTheme()`, since the dark-tuned
+  shades vanish on a white cell.
+
+The "small saturated accent chips don't need theming" rule from the
+other pages still holds where it was applied — it just doesn't extend to
+a page whose rows are almost entirely made of those chips.
+
+**The "Form" panel is its own local theme, not `--captains-*`.** Both the
+navy-gradient card `SelectablePlayerRow` opens (tournament/ground/format
+record) and `ContextStatsTable` inside it were always a deliberately
+separate styling family from the rest of this page — mirroring
+`FixturesCard`'s own card look rather than the ink-token surfaces
+everywhere else here (see that panel's own header comment). Since
+`FixturesCard` itself has since gone theme-aware the same way
+(`player-availability.md` §10.3), this panel now follows suit: a local
+`FORM_LIGHT`/`FORM_DARK` token object plus a `useTheme()` lookup — the same
+pattern `SelectedMatchCard.tsx` established for an identical problem —
+rather than the page's CSS-variable route, since the container background
+itself (a gradient, not a flat colour) needed to flip along with its text,
+and mixing that with a still-hardcoded-dark container would have put light
+text on a still-dark card. `FORM_DARK` reproduces the panel's original,
+always-dark colours byte-for-byte; `FORM_LIGHT` is new, built from the same
+Warm Light "match info" palette `FixturesCard`/`SelectedMatchCard` use.
+
+---
+
 ## 10. Pending Tasks
  
 | Task | Status | Notes |

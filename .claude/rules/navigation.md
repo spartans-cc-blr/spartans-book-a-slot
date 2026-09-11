@@ -421,7 +421,14 @@ root wrapper to `bg-parchment` (`#F8F4EE`, the same default page
 background `ui-theme.md` already specifies for every other page's
 `<main>` — and, unlike `gold`/`crimson`/`ink`, the one Tailwind colour
 token that genuinely does match its documented value) instead of
-`bg-ink`. The footer's own text (`text-zinc-600`/`text-zinc-700` —
+`bg-ink`. **Further updated (Light/Dark/System, September 2026 — see
+`ui-theme.md`):** the root wrapper now carries a `dark:bg-ink` counterpart
+(`bg-parchment dark:bg-ink`) rather than being permanently `bg-parchment`
+— the whole dashboard (welcome banner, stat tiles, "You're Selected to
+Play"/`SelectedMatchCard`, Upcoming Fixtures, Quick Actions) is
+theme-aware via a `--home-*` CSS-variable set in `globals.css`, so this
+fix's own reasoning (a black band showing through on an otherwise-light
+page) now applies symmetrically in reverse for a visitor who picks Dark. The footer's own text (`text-zinc-600`/`text-zinc-700` —
 legible-enough on the old dark bg, but essentially invisible on a light
 one) was updated to `#78716C`/hover `#44403C`, matching the Warm Light
 "muted"/"secondary text" tokens used everywhere else in this file. The
@@ -494,6 +501,35 @@ A full-width panel at the bottom with a Google sign-in button (using inline Goog
 ---
  
 ## 4. SiteNav — `src/components/ui/SiteNav.tsx`
+
+### Light/Dark/System (added September 2026, same month as the Warm Light nav change below)
+
+`SiteNav` and `MobileTabBar` are now the app's first genuinely theme-aware
+surfaces — a real Light/Dark/System toggle (mirroring a phone's own
+appearance setting), not a fixed palette. Full mechanism (storage,
+no-FOUC script, the `useTheme()` hook, the two conversion patterns used
+across the app) is documented centrally in `ui-theme.md`'s "Light/Dark/System
+Theme" section — this doc only covers what changed in these two files
+specifically. In short: every colour value described in §4/§4.1 below as
+"Warm Light, site-wide/unconditional" is now the **light** state of a real
+toggle, not a fixed look — `SiteNav.tsx` carries a `dark:`-prefixed
+counterpart on each of its Tailwind classes (reusing the exact
+pre-September-2026 dark nav values), and `MobileTabBar`'s `theme` prop,
+previously defaulted to a hardcoded `'light'`, now defaults to the
+signed-in visitor's own `resolvedTheme` from `useTheme()` when no explicit
+override is passed. `ThemeToggleNav`/`ThemeToggleSheet`
+(`src/components/ui/ThemeToggle.tsx`) are the actual switcher controls,
+rendered in `SiteNav`'s profile dropdown and `MobileTabBar`'s "More" sheet
+respectively (all three sheet branches — logged-in, logged-out, and
+expelled — so even a suspended account can flip the theme).
+
+`Home` (`src/app/page.tsx`) no longer passes `mobileTabBarTheme="light"` to
+`<SiteNav>` — its dashboard content became theme-aware in the same pass
+(see `ui-theme.md`), so the bottom tab bar should follow the visitor's
+choice rather than being pinned light. `/fixtures` similarly dropped its
+own hardcoded prop. `/matches/history` still passes `mobileTabBarTheme="light"`
+explicitly and is unaffected — its own body content hasn't been converted
+to Light/Dark/System yet, so its tab bar stays pinned to match.
 
 ### Warm Light nav, site-wide (changed September 2026)
 
@@ -712,29 +748,53 @@ A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `ma
 
 Since the tab bar is `fixed`, page content needs bottom padding so the bar doesn't cover it. `MobileTabBar` toggles a `document.body.classList.add('has-mobile-tabbar')` in a `useEffect` (removed on unmount), and `src/app/globals.css` reserves `padding-bottom: 4.5rem` on `body.has-mobile-tabbar` under a `max-width: 767px` media query. This means the padding only ever applies on pages that actually mount `MobileTabBar` (i.e. render `SiteNav`) — the `/admin/*` subtree (which uses `AdminLayout`/`AdminSidebar` instead, see `admin_console.md`) is unaffected.
 
-### Warm Light variant — `theme` prop (added September 2026)
+### Warm Light variant — `theme` prop, now the default everywhere (added September 2026, defaulted site-wide a few days later)
 
-`MobileTabBar` accepts an optional `theme?: 'dark' | 'light'` prop (default
-`'dark'`, unchanged look). `SiteNav` forwards it through its own
-`mobileTabBarTheme` prop — `<SiteNav activePage="fixtures"
-mobileTabBarTheme="light" />` — never inferred from `activePage` or
-anything else, so a page opts in explicitly. Both the fixed tab bar and
-the "More" sheet read every colour from a small `tokens(theme)` lookup
-(`src/components/ui/MobileTabBar.tsx`) rather than hardcoded Tailwind
-classes — `'light'` swaps in the same Warm Light palette as
-`DateChipSlider` (`#FFFFFF`/`#F8F4EE` surfaces, `#D97706` gold, `#D4C9B0`
-borders), `'dark'` keeps the original ink/gold tokens byte-for-byte. Every
-icon in the file was changed from a hardcoded `stroke="#C9A84C"` to
-`stroke="currentColor"` so a single `color` set on each row's wrapping
-`<span>`/`<Link>` (from the token lookup) tints the icon too — no
-per-icon colour prop threading needed. Only `/fixtures` and
-`/matches/history` pass `'light'` today (see `features/player-availability.md`
-§10.1 and `features/post-match-scorecard.md` §16 for why those two pages
-went Warm Light in the first place) — the desktop nav and the slim mobile
-top row in `SiteNav` itself are unaffected by this prop either way (it only
-ever governs `MobileTabBar`), but both are now Warm Light unconditionally
-on every page regardless, since the top nav's own theme changed
-site-wide — see §4's "Warm Light nav, site-wide" note.
+`MobileTabBar` accepts an optional `theme?: 'dark' | 'light'` prop.
+Originally defaulted to `'dark'` (unchanged look), with `SiteNav` forwarding
+it through its own `mobileTabBarTheme` prop — `<SiteNav activePage="fixtures"
+mobileTabBarTheme="light" />` — so only `/fixtures` and `/matches/history`
+(see `features/player-availability.md` §10.1 and
+`features/post-match-scorecard.md` §16 for why those two pages went Warm
+Light in the first place) opted in explicitly.
+
+**Default flipped to `'light'` (fixed September 2026)** — per a direct
+request for the bottom tab bar to render Warm Light "irrespective of the
+page we are navigating," rather than adding `mobileTabBarTheme="light"`
+one page at a time. `MobileTabBar`'s own default changed from `theme =
+'dark'` to `theme = 'light'` (one-line change, `src/components/ui/MobileTabBar.tsx`),
+so every page that renders `<SiteNav>` without the prop now gets the light
+tab bar automatically — no per-page prop needed, and the ~20-odd pages
+that never passed this prop at all needed zero changes. `'dark'` stays a
+real, working option (nothing was deleted) for any page that might want
+to explicitly opt back out via `mobileTabBarTheme="dark"`, though nothing
+currently does. The three pages that already passed `mobileTabBarTheme="light"`
+explicitly (Home, `/fixtures`, `/matches/history`) were left with that
+explicit prop rather than cleaned up to rely on the new default — harmless
+redundancy, and it documents original intent at each call site.
+
+**This is a shared-chrome change, not a page-body reskin** — same
+"deliberately still just the nav bar" posture §4's Warm Light nav note
+already established for the top bar. A page whose own body content is
+still dark-ink now sits between a light top nav and a light bottom tab
+bar, both persistent chrome, with its own dark body in between — an
+accepted seam, not a bug. See `ui-theme.md`'s Rollout Policy section for
+the broader rule this follows: Warm Light is the default for new work,
+existing page bodies aren't migrated without asking first.
+
+Both the fixed tab bar and the "More" sheet read every colour from a small
+`tokens(theme)` lookup (`src/components/ui/MobileTabBar.tsx`) rather than
+hardcoded Tailwind classes — `'light'` swaps in the same Warm Light
+palette as `DateChipSlider` (`#FFFFFF`/`#F8F4EE` surfaces, `#D97706` gold,
+`#D4C9B0` borders), `'dark'` keeps the original ink/gold tokens
+byte-for-byte. Every icon in the file was changed from a hardcoded
+`stroke="#C9A84C"` to `stroke="currentColor"` so a single `color` set on
+each row's wrapping `<span>`/`<Link>` (from the token lookup) tints the
+icon too — no per-icon colour prop threading needed. The desktop nav and
+the slim mobile top row in `SiteNav` itself are unaffected by this prop
+either way (it only ever governs `MobileTabBar`) — both are already Warm
+Light unconditionally on every page regardless, since the top nav's own
+theme changed site-wide first — see §4's "Warm Light nav, site-wide" note.
 
 ### One admin page had to drop its own `<SiteNav>`
 

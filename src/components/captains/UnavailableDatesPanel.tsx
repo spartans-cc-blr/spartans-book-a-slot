@@ -163,7 +163,7 @@ export function UnavailableDatesPanel({ days, viewingPlayerId }: Props) {
 
   if (days.length === 0) {
     return (
-      <p style={{ fontFamily: FONT_UI, fontSize: '14px', color: '#78716C', padding: '48px 20px', textAlign: 'center' }}>
+      <p style={{ fontFamily: FONT_UI, fontSize: '14px', color: 'var(--unavail-text-muted)', padding: '48px 20px', textAlign: 'center' }}>
         Every upcoming weekend is already fully scheduled — check back later.
       </p>
     )
@@ -171,8 +171,8 @@ export function UnavailableDatesPanel({ days, viewingPlayerId }: Props) {
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', padding: '12px 16px', borderBottom: '1px solid #D4C9B0', background: '#F8F4EE' }}>
-        <LegendItem swatchBg="transparent" swatchBorder="#D4C9B0" label={readOnly ? 'Not marked' : 'Tap to mark unavailable'} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', padding: '12px 16px', borderBottom: '1px solid var(--unavail-border)', background: 'var(--unavail-shell-bg)' }}>
+        <LegendItem swatchBg="transparent" swatchBorder="var(--unavail-border)" label={readOnly ? 'Not marked' : 'Tap to mark unavailable'} />
         <LegendItem swatchBg="#F3E8FF" swatchBorder="#C084FC" label={readOnly ? 'Marked unavailable' : 'Marked — tap to clear'} />
         <LegendLink color="#B91C1C" underline="#FCA5A5" sample="View match" label="Booked" />
         <LegendItem swatchBg="#FEF3C7" swatchBorder="#FCD34D" label="Reserved" />
@@ -180,11 +180,11 @@ export function UnavailableDatesPanel({ days, viewingPlayerId }: Props) {
       </div>
 
       {error && (
-        <p style={{ fontFamily: FONT_UI, fontSize: '12.5px', color: '#DC2626', padding: '10px 16px 0' }}>{error}</p>
+        <p style={{ fontFamily: FONT_UI, fontSize: '12.5px', color: 'var(--unavail-danger)', padding: '10px 16px 0' }}>{error}</p>
       )}
 
       {!loaded ? (
-        <p style={{ fontFamily: FONT_UI, fontSize: '13px', color: '#A8A29E', padding: '32px 20px', textAlign: 'center' }}>
+        <p style={{ fontFamily: FONT_UI, fontSize: '13px', color: 'var(--unavail-text-faint)', padding: '32px 20px', textAlign: 'center' }}>
           Loading…
         </p>
       ) : (
@@ -196,12 +196,12 @@ export function UnavailableDatesPanel({ days, viewingPlayerId }: Props) {
           <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: '300px', tableLayout: 'fixed' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 5 }}>
               <tr>
-                <th style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px 6px', textAlign: 'left', width: '24%' }}>
-                  <span style={{ fontFamily: FONT_UI, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#A8A29E' }}>Date</span>
+                <th style={{ background: 'var(--unavail-row-bg)', borderBottom: '2px solid var(--unavail-border)', borderRight: '1px solid var(--unavail-border)', padding: '6px 6px', textAlign: 'left', width: '24%' }}>
+                  <span style={{ fontFamily: FONT_UI, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--unavail-text-faint)' }}>Date</span>
                 </th>
                 {SLOT_TIMES.map(slot => (
-                  <th key={slot} style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px 2px', textAlign: 'center', width: '19%' }}>
-                    <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '11px', fontWeight: 700, color: '#B45309', whiteSpace: 'nowrap' }}>{slot}</span>
+                  <th key={slot} style={{ background: 'var(--unavail-row-bg)', borderBottom: '2px solid var(--unavail-border)', borderRight: '1px solid var(--unavail-border)', padding: '6px 2px', textAlign: 'center', width: '19%' }}>
+                    <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '11px', fontWeight: 700, color: 'var(--unavail-accent-dim)', whiteSpace: 'nowrap' }}>{slot}</span>
                   </th>
                 ))}
               </tr>
@@ -209,7 +209,7 @@ export function UnavailableDatesPanel({ days, viewingPlayerId }: Props) {
             <tbody>
               {days.map((day, idx) => {
                 const isSat     = day.dow === 'Sat'
-                const rowBg     = isSat ? '#F8F4EE' : '#EEEAE2'
+                const rowBg     = isSat ? 'var(--unavail-shell-bg)' : 'var(--unavail-row-bg)'
                 const prevMonth = days[idx - 1]?.month ?? null
                 const showMonth = day.month !== prevMonth
 
@@ -221,13 +221,13 @@ export function UnavailableDatesPanel({ days, viewingPlayerId }: Props) {
                   <FragmentRow key={day.date}>
                     {showMonth && (
                       <tr>
-                        <td colSpan={5} style={{ background: '#E2DACE', borderBottom: '1px solid #D4C9B0', borderTop: idx === 0 ? 'none' : '2px solid #D4C9B0', padding: '5px 8px', fontFamily: FONT_UI, fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#D97706' }}>
+                        <td colSpan={5} style={{ background: 'var(--unavail-divider-bg)', borderBottom: '1px solid var(--unavail-border)', borderTop: idx === 0 ? 'none' : '2px solid var(--unavail-border)', padding: '5px 8px', fontFamily: FONT_UI, fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--unavail-accent)' }}>
                           {day.month}
                         </td>
                       </tr>
                     )}
                     <tr style={{ background: rowBg }}>
-                      <td style={{ borderBottom: '1px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '6px', verticalAlign: 'middle' }}>
+                      <td style={{ borderBottom: '1px solid var(--unavail-border)', borderRight: '1px solid var(--unavail-border)', padding: '6px', verticalAlign: 'middle' }}>
                         <span style={{
                           display: 'inline-block', fontFamily: FONT_UI,
                           fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.05em',
@@ -238,7 +238,7 @@ export function UnavailableDatesPanel({ days, viewingPlayerId }: Props) {
                         }}>
                           {day.dow.toUpperCase()}
                         </span>
-                        <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '12px', fontWeight: 700, color: '#1C1917', whiteSpace: 'nowrap' }}>
+                        <span style={{ display: 'block', fontFamily: FONT_DISP, fontSize: '12px', fontWeight: 700, color: 'var(--unavail-text)', whiteSpace: 'nowrap' }}>
                           {day.label.replace(/^\w+\s/, '')}
                         </span>
                         {!readOnly && unscheduledSlots.length > 1 && (
@@ -251,8 +251,8 @@ export function UnavailableDatesPanel({ days, viewingPlayerId }: Props) {
                               padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap',
                               background: allMarkedToday ? '#F3E8FF' : 'transparent',
                               borderWidth: '1px', borderStyle: 'solid',
-                              borderColor: allMarkedToday ? '#C084FC' : '#D4C9B0',
-                              color: allMarkedToday ? '#7E22CE' : '#A8A29E',
+                              borderColor: allMarkedToday ? '#C084FC' : 'var(--unavail-border)',
+                              color: allMarkedToday ? '#7E22CE' : 'var(--unavail-text-faint)',
                               opacity: savingKey === wholeKey ? 0.5 : 1,
                             }}
                           >
@@ -291,7 +291,7 @@ function FragmentRow({ children }: { children: React.ReactNode }) {
 
 function LegendItem({ swatchBg, swatchBorder, label }: { swatchBg: string; swatchBorder: string; label: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: FONT_UI, fontSize: '11px', color: '#78716C', whiteSpace: 'nowrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: FONT_UI, fontSize: '11px', color: 'var(--unavail-text-muted)', whiteSpace: 'nowrap' }}>
       <span style={{ width: '10px', height: '10px', borderRadius: '3px', border: `1px solid ${swatchBorder}`, background: swatchBg, flexShrink: 0 }} />
       {label}
     </div>
@@ -303,7 +303,7 @@ function LegendItem({ swatchBg, swatchBorder, label }: { swatchBg: string; swatc
 // so the legend matches what the table cells really look like.
 function LegendLink({ color, underline, sample, label }: { color: string; underline: string; sample: string; label: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: FONT_UI, fontSize: '11px', color: '#78716C', whiteSpace: 'nowrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: FONT_UI, fontSize: '11px', color: 'var(--unavail-text-muted)', whiteSpace: 'nowrap' }}>
       <span style={{ fontWeight: 700, color, textDecoration: 'underline', textDecorationColor: underline, textUnderlineOffset: '2px', fontSize: '10px' }}>
         {sample}
       </span>
@@ -313,7 +313,7 @@ function LegendLink({ color, underline, sample, label }: { color: string; underl
 }
 
 const cellStyle: React.CSSProperties = {
-  borderBottom: '1px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '3px', verticalAlign: 'middle',
+  borderBottom: '1px solid var(--unavail-border)', borderRight: '1px solid var(--unavail-border)', padding: '3px', verticalAlign: 'middle',
 }
 
 function SlotCell({
@@ -350,9 +350,9 @@ function SlotCell({
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 2px rgba(126,34,206,0.25)',
                 }
               : {
-                  background: 'linear-gradient(180deg, #FFFFFF 0%, #F1EAD9 100%)',
-                  borderColor: '#D4C9B0', color: '#A8A29E',
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(28,25,23,0.1)',
+                  background: 'linear-gradient(180deg, var(--unavail-card-bg) 0%, var(--unavail-toggle-bg-to) 100%)',
+                  borderColor: 'var(--unavail-border)', color: 'var(--unavail-text-faint)',
+                  boxShadow: 'inset 0 1px 0 var(--unavail-toggle-shadow-hi), 0 1px 2px var(--unavail-toggle-shadow-lo)',
                 }),
           }}
         >

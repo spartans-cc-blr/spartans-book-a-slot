@@ -628,6 +628,65 @@ and wasn't part of this change.
 
 ---
 
+## 10.1 Light/Dark/System (added September 2026)
+
+`/leaderboard` is now fully converted to the app's Light/Dark/System theme
+toggle — full mechanism documented in `ui-theme.md`'s "Light/Dark/System
+Theme" section. The page's previous, only-ever-dark look is now
+specifically the **dark** theme state, unchanged pixel-for-pixel (every
+existing colour value described earlier in this doc — `bg-ink-3`,
+`text-parchment`, `text-gold`, `border-ink-5`, the `zinc-*` scale, the
+milestone card's literal navy gradient — stays correct as the dark
+description). A new **light** variant sits alongside it, built from the
+shared `--stats-*` CSS variables (`src/app/globals.css`) — the same tokens
+`/players/[id]/stats` uses (`player-stats-batting-position.md` §8), so the
+two stats surfaces stay visually consistent.
+
+**All nine files are converted:** `src/app/leaderboard/page.tsx`,
+`LeaderboardFilters.tsx`, `LeaderboardMilestones.tsx`,
+`LeaderboardMonthly.tsx`, `LeaderboardTable.tsx`,
+`LeaderboardGlossary.tsx`, `InningsRow.tsx`, `PlayerAvatar.tsx`, and
+`BattingPositionLeaders.tsx`.
+
+Two implementation patterns, matching whichever this file already used for
+a given element:
+
+- **Plain Tailwind classes** (the large majority of this feature) get a
+  `dark:`-prefixed pair — the existing class becomes the `dark:` variant
+  verbatim (so dark mode is byte-identical to before), and a new base
+  class pulls the light colour from a `--stats-*` var via an arbitrary
+  value, e.g. `text-[var(--stats-text)] dark:text-parchment`. Since the
+  `dark:` variant's selector is always more specific than the bare
+  arbitrary-value class, this is safe even where the base class also
+  responds to the CSS variable's own dark value (it does, but is always
+  overridden).
+- **Inline `style` on the milestone highlight cards** (the same
+  dark-gradient "match card" treatment shared by `LeaderboardMilestones.tsx`
+  and `LeaderboardMonthly.tsx`, mirroring `FixturesCard.tsx`'s own card
+  styling) uses a plain `useTheme()` lookup instead of a CSS var, since
+  none of the `--stats-*` tokens carry a matching gradient value — same
+  approach `SelectedMatchCard.tsx` already established for an identical
+  "re-theme a FixturesCard-style dark gradient card" problem. Light: a
+  white/parchment gradient (`#FFFFFF → #F8F4EE`) with a `#D97706`-family
+  gold top accent bar; dark: the original literal navy gradient
+  (`#1C2333 → #111827`) with the original `#C9A84C`-family gold bar,
+  unchanged.
+
+**One deliberate gap — `BattingPositionLeaders.tsx`'s "Top 3" modal.**
+The bar chart itself (outside the modal) is fully theme-aware. The content
+*inside* the `Dialog` it opens is **not** — `Dialog.tsx`
+(`src/components/ui/Dialog.tsx`) is shared across many unrelated features
+(the milestone/birthday broadcast modals, etc.) and is not itself
+theme-aware yet (hardcoded `bg-ink-2` shell), so it was left out of this
+pass's scope. Following `--stats-*` inside the modal's content while its
+own shell stays forced-dark would have rendered near-black text on a
+near-black background for a Light-theme visitor — so the modal's rank/
+name/stat-line text intentionally keeps its original dark-only colours,
+matching the shell it's actually rendered inside. Revisit once `Dialog.tsx`
+itself gets a light variant.
+
+---
+
 ## 11. Explicitly Out of Scope
 
 - No write path anywhere in this feature — pure read/display.

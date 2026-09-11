@@ -1,11 +1,27 @@
 'use client'
 
-// Shared date-chip picker — Warm Light palette (parchment bg, saturated gold
-// accent), matching the reference mockup rather than the app's existing dark
-// ink theme. Self-contained "light island" the same way GC Players / Kit
-// Room already run their own light content on an otherwise dark app — see
-// architecture.md's theme notes. Purely presentational + controlled: caller
-// owns `selected` and does the actual filtering.
+// Shared date-chip picker. Originally a permanent Warm Light "light island"
+// (parchment bg, saturated gold accent) regardless of the app's dark-ink
+// default — see architecture.md's theme notes for that history. Now
+// Light/Dark/System-aware by default (`theme="auto"`, the default — reads
+// the `--fx-*` CSS variables from globals.css, which flip with the
+// visitor's own theme choice, same convention as the rest of /fixtures —
+// see ui-theme.md). `theme="light"` pins the original literal Warm Light
+// colours regardless of the visitor's choice, for a caller whose own page
+// body hasn't been made theme-aware yet (e.g. /matches/history — see
+// MatchHistoryClient.tsx's own call site). Purely presentational +
+// controlled: caller owns `selected` and does the actual filtering.
+
+const LIGHT = {
+  trackBg: '#EEEAE2', trackBorder: '#D4C9B0',
+  accent: '#D97706', accentText: '#fff',
+  chipText: '#1C1917', mutedText: '#78716C', mutedTextOnDark: 'rgba(255,255,255,0.85)',
+}
+const AUTO = {
+  trackBg: 'var(--fx-card-header-bg)', trackBorder: 'var(--fx-border)',
+  accent: 'var(--fx-accent)', accentText: '#fff',
+  chipText: 'var(--fx-card-text)', mutedText: 'var(--fx-card-text-muted)', mutedTextOnDark: 'rgba(255,255,255,0.85)',
+}
 
 export interface DateChipGroup {
   // A representative ISO date from this group (its earliest date) — used
@@ -43,10 +59,14 @@ interface DateChipSliderProps {
   hasMore?:     boolean
   loadingMore?: boolean
   onLoadMore?:  () => void
+  // See the file header comment — 'auto' (default) follows the visitor's
+  // Light/Dark/System choice; 'light' pins the original Warm Light look.
+  theme?: 'auto' | 'light'
 }
 
-export function DateChipSlider({ groups, selected, onSelect, hasMore, loadingMore, onLoadMore }: DateChipSliderProps) {
+export function DateChipSlider({ groups, selected, onSelect, hasMore, loadingMore, onLoadMore, theme = 'auto' }: DateChipSliderProps) {
   if (groups.length === 0 && !hasMore) return null
+  const t = theme === 'light' ? LIGHT : AUTO
 
   return (
     <div
@@ -57,8 +77,8 @@ export function DateChipSlider({ groups, selected, onSelect, hasMore, loadingMor
         onClick={() => onSelect(null)}
         className="flex-shrink-0 font-rajdhani text-sm font-bold px-4 py-2.5 rounded-xl transition-colors"
         style={selected === null
-          ? { background: '#D97706', color: '#fff' }
-          : { background: '#EEEAE2', border: '1px solid #D4C9B0', color: '#44403C' }}
+          ? { background: t.accent, color: t.accentText }
+          : { background: t.trackBg, border: `1px solid ${t.trackBorder}`, color: t.mutedText }}
       >
         All
       </button>
@@ -66,9 +86,9 @@ export function DateChipSlider({ groups, selected, onSelect, hasMore, loadingMor
       {groups.map(group => {
         const active = selected === group.key
         const activeStyle = active
-          ? { background: '#D97706', color: '#fff' }
-          : { background: '#EEEAE2', border: '1px solid #D4C9B0', color: '#1C1917' }
-        const mutedColor = active ? 'rgba(255,255,255,0.85)' : '#78716C'
+          ? { background: t.accent, color: t.accentText }
+          : { background: t.trackBg, border: `1px solid ${t.trackBorder}`, color: t.chipText }
+        const mutedColor = active ? t.mutedTextOnDark : t.mutedText
 
         if (group.dates.length === 1) {
           const { dow, day, month } = chipParts(group.dates[0])
@@ -112,7 +132,7 @@ export function DateChipSlider({ groups, selected, onSelect, hasMore, loadingMor
           aria-label="Load older matches"
           title="Load older matches"
           className="flex-shrink-0 w-[58px] flex flex-col items-center justify-center rounded-xl py-1.5 transition-colors disabled:opacity-50"
-          style={{ background: '#EEEAE2', border: '1px dashed #D4C9B0', color: '#78716C' }}
+          style={{ background: t.trackBg, border: `1px dashed ${t.trackBorder}`, color: t.mutedText }}
         >
           <span className="font-rajdhani text-lg font-extrabold leading-tight">{loadingMore ? '…' : '+'}</span>
           <span className="font-rajdhani text-[9px] font-bold leading-tight text-center">{loadingMore ? 'Loading' : 'Older'}</span>

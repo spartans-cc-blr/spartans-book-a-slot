@@ -12,6 +12,8 @@ export default async function MatchCardPage({ params }: { params: { id: string }
   const user     = session?.user as any
   const isPlayer  = !!user?.playerId
   const isCaptain = !!user?.isCaptain || !!user?.isAdmin
+  const isGC      = !!user?.isGC
+  const isAdmin   = !!user?.isAdmin
 
   // Fetch the single booking
   const { data: booking, error } = await supabase
@@ -122,6 +124,8 @@ export default async function MatchCardPage({ params }: { params: { id: string }
         <FixturesWeekendGroup
           isPlayer={isPlayer}
           isCaptain={isCaptain}
+          isGC={isGC}
+          isAdmin={isAdmin}
           bookings={[entry]}
           initialWeekendResponses={
             initialResponse ? { [booking.id]: initialResponse } : {}

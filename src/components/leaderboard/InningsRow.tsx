@@ -22,7 +22,7 @@ export function formatShortDate(dateStr: string | null): string {
 // gets the same same-tab/back-button behaviour without invalid markup.
 export function ClickableRow({ bookingId, children }: { bookingId: string | null; children: React.ReactNode }) {
   const router = useRouter()
-  const base = 'flex items-center gap-3 px-4 py-2.5 border-b border-ink-4 last:border-b-0'
+  const base = 'flex items-center gap-3 px-4 py-2.5 border-b border-[var(--stats-divider)] dark:border-ink-4 last:border-b-0'
   if (!bookingId) return <div className={base}>{children}</div>
   return (
     <div
@@ -30,7 +30,7 @@ export function ClickableRow({ bookingId, children }: { bookingId: string | null
       tabIndex={0}
       onClick={() => router.push(`/matches/history/${bookingId}`)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push(`/matches/history/${bookingId}`) }}
-      className={`${base} cursor-pointer hover:bg-ink-4 transition-colors`}>
+      className={`${base} cursor-pointer hover:bg-[var(--stats-row-hover)] dark:hover:bg-ink-4 transition-colors`}>
       {children}
     </div>
   )
@@ -44,12 +44,12 @@ function RowIdentity({ photoUrl, playerId, playerName, cricheroesUrl, format, to
     <>
       <PlayerAvatar photoUrl={photoUrl} name={playerName} />
       <div className="min-w-0 flex-1">
-        <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
+        <p className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment truncate">
           <PlayerNameLink name={playerName} playerId={playerId} cricHeroesUrl={cricheroesUrl} />
         </p>
-        <p className="font-rajdhani text-xs text-zinc-500 truncate">
+        <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 truncate">
           {format && (
-            <span className="inline-block text-[9px] font-bold bg-ink-4 border border-ink-5 text-zinc-400 rounded px-1 py-0.5 mr-1.5 align-middle">
+            <span className="inline-block text-[9px] font-bold bg-[var(--stats-row-bg)] dark:bg-ink-4 border border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-2)] dark:text-zinc-400 rounded px-1 py-0.5 mr-1.5 align-middle">
               {format}
             </span>
           )}
@@ -65,10 +65,10 @@ export function BattingInningsRow({ innings }: { innings: MonthlyInnings }) {
     <ClickableRow bookingId={innings.bookingId}>
       <RowIdentity {...innings} />
       <div className="text-right flex-shrink-0">
-        <p className="font-cinzel text-sm text-gold whitespace-nowrap">
+        <p className="font-cinzel text-sm text-[var(--stats-accent)] dark:text-gold whitespace-nowrap">
           {innings.runs}{innings.notOut ? '*' : ''} ({innings.balls})
         </p>
-        <p className="font-rajdhani text-[10px] text-zinc-600 whitespace-nowrap">{formatShortDate(innings.gameDate)}</p>
+        <p className="font-rajdhani text-[10px] text-[var(--stats-text-faint)] dark:text-zinc-600 whitespace-nowrap">{formatShortDate(innings.gameDate)}</p>
       </div>
     </ClickableRow>
   )
@@ -79,10 +79,10 @@ export function BowlingInningsRow({ innings }: { innings: MonthlyBowlingInnings 
     <ClickableRow bookingId={innings.bookingId}>
       <RowIdentity {...innings} />
       <div className="text-right flex-shrink-0">
-        <p className="font-cinzel text-sm text-gold whitespace-nowrap">
+        <p className="font-cinzel text-sm text-[var(--stats-accent)] dark:text-gold whitespace-nowrap">
           {innings.wickets}/{innings.runsConceded} ({innings.overs} ov)
         </p>
-        <p className="font-rajdhani text-[10px] text-zinc-600 whitespace-nowrap">{formatShortDate(innings.gameDate)}</p>
+        <p className="font-rajdhani text-[10px] text-[var(--stats-text-faint)] dark:text-zinc-600 whitespace-nowrap">{formatShortDate(innings.gameDate)}</p>
       </div>
     </ClickableRow>
   )

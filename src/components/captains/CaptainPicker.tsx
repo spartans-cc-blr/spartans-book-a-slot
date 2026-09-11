@@ -32,15 +32,15 @@ export function CaptainPicker({ captains, selectedId, ownPlayerId }: Props) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-      <label style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#A8A29E' }}>
+      <label style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--unavail-text-faint)' }}>
         Viewing
       </label>
       <select
         value={selectedId}
         onChange={handleChange}
         style={{
-          fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '13px', fontWeight: 700, color: '#1C1917',
-          background: '#FFFFFF', border: '1px solid #D4C9B0', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer',
+          fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: '13px', fontWeight: 700, color: 'var(--unavail-text)',
+          background: 'var(--unavail-card-bg)', border: '1px solid var(--unavail-border)', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer',
         }}
       >
         {captains.map(c => (

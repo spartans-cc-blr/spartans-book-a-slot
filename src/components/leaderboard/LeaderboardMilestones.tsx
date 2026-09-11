@@ -45,6 +45,7 @@ import { PlayerNameLink } from '@/lib/playerLink'
 import { PlayerAvatar } from './PlayerAvatar'
 import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
 import { BallIcon } from '@/components/matches/BallIcon'
+import { useTheme } from '@/components/ui/ThemeProvider'
 import { MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE_OVERALL, minGamesThreshold, minDismissalsThreshold, bestByAll, totalDismissals } from '@/lib/leaderboardMilestones'
 import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
@@ -65,18 +66,18 @@ function CollapsibleInningsPanel({ icon, label, count, children }: { icon: React
   if (count === 0) return null
 
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded-lg overflow-hidden">
+    <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded-lg overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-ink-4 transition-colors">
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-[var(--stats-row-bg)] dark:hover:bg-ink-4 transition-colors">
         <span className="inline-flex items-center leading-none">{icon}</span>
-        <span className="font-rajdhani text-xs font-bold tracking-wide text-parchment flex-1">{label}</span>
-        <span className="font-cinzel text-[10px] text-gold bg-gold/10 border border-gold-dim rounded-full px-2 py-0.5">{count}</span>
-        <span className={`text-zinc-500 text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+        <span className="font-rajdhani text-xs font-bold tracking-wide text-[var(--stats-text)] dark:text-parchment flex-1">{label}</span>
+        <span className="font-cinzel text-[10px] text-[var(--stats-accent)] dark:text-gold bg-[var(--stats-badge-bg)] dark:bg-gold/10 border border-[var(--stats-accent-dim)] dark:border-gold-dim rounded-full px-2 py-0.5">{count}</span>
+        <span className={`text-[var(--stats-text-muted)] dark:text-zinc-500 text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
       </button>
-      {open && <div className="border-t border-ink-5">{children}</div>}
+      {open && <div className="border-t border-[var(--stats-card-border)] dark:border-ink-5">{children}</div>}
     </div>
   )
 }
@@ -87,14 +88,14 @@ function CollapsibleInningsPanel({ icon, label, count, children }: { icon: React
 // behind a tap isn't warranted, same reasoning as the Monthly tab).
 function ScopedInningsPanel({ icon, label, count, children }: { icon: React.ReactNode; label: string; count: number; children: React.ReactNode }) {
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-ink-5">
+    <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded-lg overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--stats-card-border)] dark:border-ink-5">
         <span className="inline-flex items-center leading-none">{icon}</span>
-        <span className="font-rajdhani text-xs font-bold tracking-wide text-parchment flex-1">{label}</span>
-        <span className="font-cinzel text-[10px] text-gold bg-gold/10 border border-gold-dim rounded-full px-2 py-0.5">{count}</span>
+        <span className="font-rajdhani text-xs font-bold tracking-wide text-[var(--stats-text)] dark:text-parchment flex-1">{label}</span>
+        <span className="font-cinzel text-[10px] text-[var(--stats-accent)] dark:text-gold bg-[var(--stats-badge-bg)] dark:bg-gold/10 border border-[var(--stats-accent-dim)] dark:border-gold-dim rounded-full px-2 py-0.5">{count}</span>
       </div>
       {count === 0
-        ? <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">No {label.toLowerCase()} for this filter yet.</p>
+        ? <p className="font-rajdhani text-sm text-[var(--stats-text-faint)] dark:text-zinc-600 text-center py-6">No {label.toLowerCase()} for this filter yet.</p>
         : children}
     </div>
   )
@@ -110,6 +111,19 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
   centuries?: MonthlyInnings[] | null
   fiveWicketHauls?: MonthlyBowlingInnings[] | null
 }) {
+  // Light/Dark for the milestone card's hardcoded gradient background —
+  // see ui-theme.md "Light/Dark/System". Dark is this card's original
+  // literal navy gradient, unchanged; light is a new white/parchment
+  // equivalent, matching FixturesCard's own Warm Light re-theme approach
+  // (SelectedMatchCard.tsx). Plain useTheme() lookup rather than the
+  // --stats-* CSS vars, since none of them carry a matching gradient value.
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+  const cardBg = isDark ? 'linear-gradient(135deg, #1C2333 0%, #111827 100%)' : 'linear-gradient(135deg, #FFFFFF 0%, #F8F4EE 100%)'
+  const cardBorder = isDark ? '#2D3748' : '#D4C9B0'
+  const cardShadow = isDark ? '0 4px 20px rgba(0,0,0,0.4)' : '0 4px 20px rgba(28,25,23,0.08)'
+  const accentBarGradient = isDark ? 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' : 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)'
+
   // Scoped (Tournament/Ground filter) always wins over the year-band
   // treatment — see the header comment. Monthly-style always-open lists
   // for all four categories, no "most" card for any of them.
@@ -119,7 +133,7 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
 
   if (rows.length === 0 && !showInningsBands) {
     return (
-      <p className="font-rajdhani text-sm text-zinc-500 py-8 text-center">No stats for this filter yet.</p>
+      <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500 py-8 text-center">No stats for this filter yet.</p>
     )
   }
 
@@ -187,7 +201,7 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
 
   if (milestones.length === 0 && !showInningsBands) {
     return (
-      <p className="font-rajdhani text-sm text-zinc-500 py-8 text-center">No stats for this filter yet.</p>
+      <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500 py-8 text-center">No stats for this filter yet.</p>
     )
   }
 
@@ -197,29 +211,29 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {milestones.map(m => (
             <div key={m.key} style={{
-              background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
-              border: '1px solid #2D3748',
+              background: cardBg,
+              border: `1px solid ${cardBorder}`,
               borderRadius: '12px',
               padding: '12px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              boxShadow: cardShadow,
               position: 'relative',
               overflow: 'hidden',
             }}>
               {/* Gold top accent bar — matches FixturesCard.tsx */}
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: accentBarGradient }} />
 
               <div className="flex items-center justify-between mb-2">
-                <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">{m.label}</p>
+                <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] dark:text-zinc-500">{m.label}</p>
                 <span className="text-sm leading-none">{m.icon}</span>
               </div>
 
               <div className="flex items-center gap-2">
                 <PlayerAvatar photoUrl={m.row.photoUrl} name={m.row.playerName} />
                 <div className="min-w-0">
-                  <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
+                  <p className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment truncate">
                     <PlayerNameLink name={m.row.playerName} playerId={m.row.playerId} cricHeroesUrl={m.row.cricheroesUrl} />
                   </p>
-                  <p className="font-cinzel text-xs text-gold mt-0.5">{m.valueText}</p>
+                  <p className="font-cinzel text-xs text-[var(--stats-accent)] dark:text-gold mt-0.5">{m.valueText}</p>
                 </div>
               </div>
             </div>

@@ -6,9 +6,34 @@
 
 import { signIn } from 'next-auth/react'
 import { FixtureShareButton } from './FixturesCard'
+import { useTheme } from '@/components/ui/ThemeProvider'
 
 type AvailKey  = 'Y' | 'O' | 'E' | 'L'
 type AvailCode = AvailKey | null
+
+// Light/Dark tokens — see ui-theme.md and FixturesCard.tsx's own note. DARK
+// preserves this panel's original always-dark palette byte-for-byte (this
+// row used to render dark regardless of page theme — see
+// player-availability.md's theme-awareness note, that decision is reversed
+// here). The Y/O/E/L response-button colours themselves (BUTTONS below) are
+// left untouched in both themes — they're semantic response codes, matched
+// to the same legend colours used on /fixtures itself, not chrome.
+const LIGHT = {
+  panelBg: '#FFFFFF', panelBorder: '#D4C9B0', panelBorderTop: '#E7E0D3',
+  notPlayerText: '#78716C', signInColor: '#B45309',
+  labelText: '#78716C',
+  idleBg: '#F0EAD8', idleBorder: '#D4C9B0', idleText: '#78716C',
+  blockedText: '#A8A29E',
+  frozenText: '#78716C',
+}
+const DARK = {
+  panelBg: '#111827', panelBorder: '#2D3748', panelBorderTop: '#1F2937',
+  notPlayerText: '#6B7280', signInColor: '#C9A84C',
+  labelText: '#4B5563',
+  idleBg: '#1F2937', idleBorder: '#374151', idleText: '#6B7280',
+  blockedText: '#9CA3AF',
+  frozenText: '#6B7280',
+}
 
 const BUTTONS: {
   code:             AvailKey
@@ -45,6 +70,11 @@ interface Props {
   hasDues?: boolean          // wallet_balance < 0 AND no dues_override
   slotLocked?: boolean       // bookings.availability_locked === true
   squadAnnounced?: boolean
+  // Captains, GC, and admins bypass the freeze on the server (see
+  // checkFreeze() in /api/player-availability) — these mirror that so the
+  // UI doesn't disable buttons the API would happily accept.
+  isGC?: boolean
+  isAdmin?: boolean
 }
 
 // ── Validation ────────────────────────────────────────────────────
@@ -105,6 +135,7 @@ export function FixturesAvailability({
   bookingId,
   slotDate,
   isPlayer,
+  isCaptain,
   response,
   saving,
   error,
@@ -114,24 +145,33 @@ export function FixturesAvailability({
   hasDues,
   slotLocked,
   squadAnnounced,
+  isGC,
+  isAdmin,
 }: Props) {
+  const { resolvedTheme } = useTheme()
+  const t = resolvedTheme === 'dark' ? DARK : LIGHT
+
+  // Mirrors the server-side bypass in checkFreeze() — captains, GC, and
+  // admins manage the pool directly and are never blocked by the freeze
+  // when updating their own response. Wallet dues still apply to everyone.
+  const bypassesFreeze = isCaptain || isGC || isAdmin
 
   // ── Not a player — sign-in prompt ────────────────────────────
   if (!isPlayer) {
     return (
       <div style={{
         marginTop: '-6px', padding: '10px 16px',
-        background: '#111827', border: '1px solid #2D3748',
+        background: t.panelBg, border: `1px solid ${t.panelBorder}`,
         borderTop: 'none', borderRadius: '0 0 12px 12px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
       }}>
-        <span style={{ fontSize: '11px', color: '#6B7280', fontFamily: "'DM Sans', sans-serif" }}>
+        <span style={{ fontSize: '11px', color: t.notPlayerText, fontFamily: "'DM Sans', sans-serif" }}>
           Sign in to submit your availability
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           <button onClick={() => signIn('google')} style={{
-            fontSize: '11px', fontWeight: 700, color: '#C9A84C',
-            border: '1px solid #C9A84C', borderRadius: '6px',
+            fontSize: '11px', fontWeight: 700, color: t.signInColor,
+            border: `1px solid ${t.signInColor}`, borderRadius: '6px',
             padding: '4px 10px', background: 'transparent', cursor: 'pointer',
             fontFamily: "'DM Sans', sans-serif",
           }}>
@@ -146,8 +186,8 @@ export function FixturesAvailability({
   // ── Upstream guards (apply to ALL buttons) ────────────────────
  
    const upstreamBlock =
-    hasDues    ? 'Your account has outstanding dues — please clear your balance to update availability' :
-    slotLocked ? 'Availability locked — Squad selection in progress' :
+    hasDues                        ? 'Your account has outstanding dues — please clear your balance to update availability' :
+    slotLocked && !bypassesFreeze  ? 'Availability locked — Squad selection in progress' :
     null
  
    const blockedReasons: Partial<Record<AvailKey, string>> = {}
@@ -162,12 +202,12 @@ export function FixturesAvailability({
   return (
     <div style={{
       marginTop: '-6px', padding: '10px 16px 12px',
-      background: '#111827', border: '1px solid #2D3748',
-      borderTop: '1px solid #1F2937', borderRadius: '0 0 12px 12px',
+      background: t.panelBg, border: `1px solid ${t.panelBorder}`,
+      borderTop: `1px solid ${t.panelBorderTop}`, borderRadius: '0 0 12px 12px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <span style={{
-          fontSize: '10px', color: '#4B5563',
+          fontSize: '10px', color: t.labelText,
           fontFamily: "'DM Sans', sans-serif", flexShrink: 0, minWidth: '56px',
         }}>
           {saving ? 'Saving…' : 'Available?'}
@@ -191,10 +231,10 @@ export function FixturesAvailability({
                   outline: 'none', transition: 'all 0.15s',
                   border: isActive
                     ? `1px solid ${btn.activeBorder}`
-                    : '1px solid #374151',
-                  background: isActive ? btn.activeBackground : '#1F2937',
+                    : `1px solid ${t.idleBorder}`,
+                  background: isActive ? btn.activeBackground : t.idleBg,
                   // Active: bright colour. Blocked: visible mid-grey + strikethrough. Idle: softer grey.
-                  color: isActive ? btn.activeColor : isBlocked ? '#9CA3AF' : '#6B7280',
+                  color: isActive ? btn.activeColor : isBlocked ? t.blockedText : t.idleText,
                   cursor: saving ? 'wait' : isBlocked ? 'not-allowed' : 'pointer',
                   opacity: saving ? 0.5 : 1,
                   boxShadow: isActive ? `0 0 0 1px ${btn.activeBorder}40` : 'none',
@@ -221,8 +261,8 @@ export function FixturesAvailability({
       </div>
 
       {/* Frozen slot notice */}
-{slotLocked && !squadAnnounced && (
-    <p style={{ fontSize: '10px', color: '#6B7280', marginTop: '6px',
+{slotLocked && !squadAnnounced && !bypassesFreeze && (
+    <p style={{ fontSize: '10px', color: t.frozenText, marginTop: '6px',
       fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4 }}>
       🔒 Availability locked — Squad selection in progress
       {response === 'L' ? ' (you can still withdraw your L)' : ''}

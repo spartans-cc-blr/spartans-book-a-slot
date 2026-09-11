@@ -6,8 +6,16 @@
 import { useState } from 'react'
 import { FixturesCard, FixtureShareButton } from '@/components/fixtures/FixturesCard'
 import { FixturesAvailability } from '@/components/fixtures/FixturesAvailability'
+import { useTheme } from '@/components/ui/ThemeProvider'
 
 type AvailKey = 'Y' | 'O' | 'E' | 'L'
+
+// Light/Dark tokens for the "outstanding dues" banner rendered in place of
+// FixturesAvailability — see FixturesCard.tsx's own note. DARK preserves the
+// original always-dark values byte-for-byte; LIGHT reuses the same amber
+// warning combo the "not registered" banner on /fixtures already uses.
+const DUES_LIGHT = { bg: '#FEF3C7', border: '#F5D9A8', text: '#92400E' }
+const DUES_DARK  = { bg: '#111827', border: '#2D3748', text: '#92400e' }
 
 interface SquadPlayer {
   id: string
@@ -33,6 +41,8 @@ interface BookingEntry {
 interface Props {
   isPlayer:                boolean
   isCaptain:               boolean
+  isGC?:                   boolean
+  isAdmin?:                boolean
   bookings:                BookingEntry[]
   initialWeekendResponses: Record<string, string>
 }
@@ -40,9 +50,14 @@ interface Props {
 export function FixturesWeekendGroup({
   isPlayer,
   isCaptain,
+  isGC,
+  isAdmin,
   bookings,
   initialWeekendResponses,
 }: Props) {
+  const { resolvedTheme } = useTheme()
+  const duesTokens = resolvedTheme === 'dark' ? DUES_DARK : DUES_LIGHT
+
   // Single shared responses map — all cards in this weekend read/write here
   const [weekendResponses, setWeekendResponses] = useState<Record<string, string>>(
     initialWeekendResponses
@@ -130,11 +145,11 @@ export function FixturesWeekendGroup({
                     {b.hasDues ? (
             <div style={{
               marginTop: '-6px', padding: '10px 16px',
-             background: '#111827', border: '1px solid #2D3748',
+             background: duesTokens.bg, border: `1px solid ${duesTokens.border}`,
               borderTop: 'none', borderRadius: '0 0 12px 12px',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
             }}>
-              <p style={{ fontSize: '11px', color: '#92400e', fontFamily: "'DM Sans', sans-serif" }}>
+              <p style={{ fontSize: '11px', color: duesTokens.text, fontFamily: "'DM Sans', sans-serif" }}>
                 ⚠ Outstanding dues — contact admin to update availability
               </p>
               <FixtureShareButton bookingId={b.id} />
@@ -145,6 +160,8 @@ export function FixturesWeekendGroup({
             slotDate={b.game_date}
             isPlayer={isPlayer}
             isCaptain={isCaptain}
+            isGC={isGC}
+            isAdmin={isAdmin}
             response={(weekendResponses[b.id] ?? null) as AvailKey | null}
             saving={savingMap[b.id] ?? false}
             error={errorMap[b.id]  ?? null}

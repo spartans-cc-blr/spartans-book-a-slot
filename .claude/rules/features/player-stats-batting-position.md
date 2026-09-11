@@ -176,4 +176,59 @@ already-fetched, already-authorized array.
 
 ---
 
+## 8. Light/Dark/System (added September 2026)
+
+`/players/[id]/stats` (`PlayerStatsClient.tsx` and its server wrapper
+`src/app/players/[id]/stats/page.tsx`, including this feature's own
+`BattingPositionChart`) is now theme-aware, following the app's new
+Light/Dark/System toggle — full mechanism documented in `ui-theme.md`'s
+"Light/Dark/System Theme" section.
+
+**Correction to the note this section originally carried:** this page's
+existing look (white cards, near-black text, muted-gold accents on a
+parchment shell) was already a Warm Light design when this pass started —
+not the dark-ink look the earlier version of this note assumed. That
+existing look is now the **light** theme, essentially unchanged (its
+literal Tailwind classes — `bg-white`, `text-ink`, `border-parchment-3`,
+`text-stone-500`, `text-gold`/`text-gold-dim` — were swapped for the
+matching `--stats-*` light-token values, which read as the same colours).
+A new **dark** variant was added on top, using the pre-built `--stats-*`
+dark tokens in `globals.css` (`--stats-shell-bg`, `--stats-card-bg`,
+`--stats-text*`, `--stats-accent*`, `--stats-badge-*`, `--stats-row-*`,
+`--stats-divider`) — the same dark-ink palette the rest of the app's
+classic theme already uses (`#080808`/`#111111` surfaces, `#C9A84C` gold),
+so a dark-theme visitor sees a properly dark page instead of the light one
+regardless of preference.
+
+**Pattern used:** structural chrome (page/card/row backgrounds, borders,
+dividers, body/muted/faint text, the gold accent and its "badge" pill
+triad) reads its colour via `var(--stats-*)` inside a Tailwind arbitrary
+value (e.g. `text-[var(--stats-text)]`, `bg-[var(--stats-card-bg)]`) —
+since these CSS custom properties are already redefined per
+`[data-theme="light"|"dark"]` in `globals.css`, no `dark:` class pairs or
+`useTheme()` calls are needed for these; the browser repaints them the
+instant `<html data-theme>` changes. One-off *semantic/data* colours that
+don't have a `--stats-*` counterpart — the win/loss/tie result letters,
+the three MVP category colours, and the "big innings"/"bar selected"
+highlight blue — instead use plain literal Tailwind `dark:` pairs (e.g.
+`text-red-700 dark:text-red-400`), each darker `-600`/`-700` light shade
+paired with a lighter `-400` shade for dark-background contrast, matching
+the same shade-stepping already used for `--home-tile-emerald-text`/
+`--home-tile-crimson-text` in `src/app/page.tsx`. The chart's own
+unselected-bar fill (`bg-gold/50`) and the Position-pill's hover tint
+(`hover:bg-gold/20`) were deliberately left untouched in both themes —
+translucent-gold accents that read fine over either a light or dark card
+background, the same allowance `ui-theme.md`'s dataviz guidance gives a
+semantic accent that isn't structural chrome.
+
+No new `--stats-*` tokens were needed — the triad already pre-built for
+this page (`--stats-badge-bg`/`--stats-badge-border`/`--stats-badge-text`)
+turned out to double as the right choice for every "readable gold text"
+role (headings, selected-filter labels, non-highlighted stat values), not
+just literal pill badges — its dark value (`#E8C97A`) is legible against
+the dark card background where the more muted `--stats-accent-dim`
+(`#7A6030` in dark) would not have been.
+
+---
+
 *Maintained by: Spartans CC BLR*

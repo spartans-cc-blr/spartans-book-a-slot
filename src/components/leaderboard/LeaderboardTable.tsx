@@ -131,18 +131,18 @@ export function LeaderboardTable({ rows, category, tournamentFiltered }: {
   }
 
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+    <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-ink-5 bg-ink-4">
-              <th className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">#</th>
-              <th className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">Player</th>
+            <tr className="border-b border-[var(--stats-card-border)] dark:border-ink-5 bg-[var(--stats-row-bg)] dark:bg-ink-4">
+              <th className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[var(--stats-text-faint)] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">#</th>
+              <th className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[var(--stats-text-faint)] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">Player</th>
               {columns.map(col => (
                 <th key={col.key}
                   onClick={() => handleSort(col.key)}
                   className={`font-rajdhani text-[10px] font-bold tracking-[2px] uppercase px-4 py-2.5 text-left whitespace-nowrap cursor-pointer select-none transition-colors
-                    ${sortKey === col.key ? 'text-gold' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                    ${sortKey === col.key ? 'text-[var(--stats-accent)] dark:text-gold' : 'text-[var(--stats-text-faint)] dark:text-zinc-600 hover:text-[var(--stats-text-2)] dark:hover:text-zinc-400'}`}>
                   {col.label}{sortKey === col.key ? (sortDesc ? ' ↓' : ' ↑') : ''}
                 </th>
               ))}
@@ -150,17 +150,17 @@ export function LeaderboardTable({ rows, category, tournamentFiltered }: {
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={2 + columns.length} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No stats for this filter yet.</td></tr>
+              <tr><td colSpan={2 + columns.length} className="px-4 py-8 text-center font-rajdhani text-[var(--stats-text-faint)] dark:text-zinc-600 text-sm">No stats for this filter yet.</td></tr>
             )}
             {sorted.map((row, i) => (
-              <tr key={row.playerId} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
-                <td className="px-4 py-3 font-cinzel text-sm text-zinc-500">{i + 1}</td>
-                <td className="px-4 py-3 font-rajdhani text-sm text-parchment">
+              <tr key={row.playerId} className="border-b border-[var(--stats-divider)] dark:border-ink-4 hover:bg-[var(--stats-row-hover)] dark:hover:bg-ink-4 transition-colors">
+                <td className="px-4 py-3 font-cinzel text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">{i + 1}</td>
+                <td className="px-4 py-3 font-rajdhani text-sm text-[var(--stats-text)] dark:text-parchment">
                   <PlayerNameLink name={row.playerName} playerId={row.playerId} cricHeroesUrl={row.cricheroesUrl} />
                 </td>
                 {columns.map(col => (
                   <td key={col.key}
-                    className={`px-4 py-3 font-rajdhani text-sm ${sortKey === col.key ? 'text-gold font-bold' : 'text-zinc-400'}`}>
+                    className={`px-4 py-3 font-rajdhani text-sm ${sortKey === col.key ? 'text-[var(--stats-accent)] dark:text-gold font-bold' : 'text-[var(--stats-text-2)] dark:text-zinc-400'}`}>
                     {formatStatValue(statValue(row, col.key), col.key)}
                   </td>
                 ))}
@@ -170,8 +170,8 @@ export function LeaderboardTable({ rows, category, tournamentFiltered }: {
         </table>
       </div>
       {excludedRows.length > 0 && (
-        <p className="px-4 py-2.5 border-t border-ink-5 font-rajdhani text-xs text-zinc-500 flex flex-wrap items-baseline gap-x-1">
-          <span className="text-zinc-600">{category === 'batting' ? 'Did not bat:' : 'Did not bowl:'}</span>
+        <p className="px-4 py-2.5 border-t border-[var(--stats-card-border)] dark:border-ink-5 font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 flex flex-wrap items-baseline gap-x-1">
+          <span className="text-[var(--stats-text-faint)] dark:text-zinc-600">{category === 'batting' ? 'Did not bat:' : 'Did not bowl:'}</span>
           {excludedRows.map((row, i) => (
             <span key={row.playerId}>
               <PlayerNameLink name={row.playerName} playerId={row.playerId} cricHeroesUrl={row.cricheroesUrl} />

@@ -330,22 +330,76 @@ Captains (and GC / Admin) bypass the freeze entirely. Any post-lock availability
 
 ### API implementation — `src/app/api/player-availability/route.ts`
 
-A shared `checkFreeze()` helper runs a single parallel round-trip before any write:
+A shared `checkFreeze()` helper checks the booking's own lock flag before any write:
 
 ```typescript
 async function checkFreeze(supabase, booking_id): Promise<string | null> {
-  const [{ data: booking }, { data: squad }] = await Promise.all([
-    supabase.from('bookings').select('availability_locked').eq('id', booking_id).single(),
-    supabase.from('squad').select('status').eq('booking_id', booking_id)
-      .in('status', ['pending_approval', 'approved', 'announced']).limit(1).maybeSingle(),
-  ])
+  const { data: booking } = await supabase
+    .from('bookings').select('availability_locked').eq('id', booking_id).single()
   if (booking?.availability_locked) return LOCK_MSG
-  if (squad?.status)                return LOCK_MSG
   return null
 }
 ```
 
-Called in both POST and DELETE handlers. Skipped when `session.isCaptain || session.isGC || session.isAdmin`.
+> Corrected September 2026 — this section previously showed a two-query
+> `Promise.all()` version that also checked live `squad.status` directly.
+> The shipped route has never done that; it only ever reads
+> `bookings.availability_locked` (which §10.1 and the Thursday cron are
+> what actually keep in sync with squad state). Updated to match the real
+> code, found while tracing why a captain/GC/admin's own re-mark was
+> blocked in the UI — see the fix note below.
+
+Called in both POST and DELETE handlers. Skipped entirely when
+`session.isCaptain || session.isGC || session.isAdmin` — this is the
+*server-side* bypass; see below for a client-side bug where the UI didn't
+mirror it.
+
+### UI didn't mirror the server's captain/GC/admin bypass (fixed September 2026)
+
+**Reported symptom:** a captain (also GC) could clear their own `O`
+response on an already-locked, squad-announced booking (`DELETE` isn't
+blocked for them), but then couldn't tap any button to mark a new
+response — every Y/O/E/L button rendered disabled, as if they were a
+regular player hitting the freeze.
+
+**Root cause:** `FixturesAvailability.tsx`'s `upstreamBlock` — the
+client-side gate that disables every response button — only ever checked
+`hasDues` and `slotLocked`:
+
+```typescript
+const upstreamBlock =
+  hasDues    ? '...' :
+  slotLocked ? 'Availability locked — Squad selection in progress' :
+  null
+```
+
+It never looked at role at all, even though the component already
+received an `isCaptain` prop (declared, destructured, and then never used
+in this logic) and `checkFreeze()` on the server has always skipped the
+lock entirely for `isCaptain || isGC || isAdmin` (see above). So once
+`bookings.availability_locked` was `true` — which it reliably is by the
+time a squad is announced, via the Thursday cron and/or §10.1's
+squad-draft-save trigger — every button was disabled for *every* viewer,
+privileged or not, even though a POST from a captain/GC/admin would have
+been accepted by the API without any freeze check at all.
+
+**Fix:** `FixturesAvailability.tsx` now accepts `isGC`/`isAdmin` props
+alongside the existing `isCaptain`, computes
+`bypassesFreeze = isCaptain || isGC || isAdmin`, and only applies the
+`slotLocked` block when `!bypassesFreeze` — mirroring the server exactly.
+The dues guard (`hasDues`) is untouched and still applies to everyone,
+since the API's own wallet-dues guard is never skipped by role either.
+The "🔒 Availability locked" notice under the buttons is likewise
+suppressed for a privileged viewer, since it would otherwise contradict
+buttons that are actually still tappable. `isGC`/`isAdmin` are threaded
+down from both server pages that render this component
+(`src/app/fixtures/page.tsx` and `src/app/fixtures/[id]/page.tsx`, the
+standalone share page) through `FixturesWeekendGroup`
+(`src/components/fixtures/FixturesWeekend.tsx`), the same way `isCaptain`
+already was. `getBlockReason()`'s own Y/O/E cross-game validation is
+unaffected by any of this — that still applies equally to every viewer,
+privileged or not, since only the freeze/dues guards were ever meant to
+have a role-based bypass.
 
 ### §10.1 — Squad-draft-save implementation — `src/app/api/squad/route.ts`
 
@@ -504,6 +558,46 @@ tab bar matches. Scope is deliberately just this page and
 `/matches/history` (§16 there) — not a site-wide reskin; see
 `navigation.md` §4.1's "Warm Light variant" note for the full reasoning.
 
+**Light/Dark/System (added September 2026) — supersedes the "stays as they
+are" decision above.** The Hub gained a real OS-style Light/Dark/System
+toggle (full mechanism in `ui-theme.md`'s "Light/Dark/System Theme"
+section). `/fixtures`' page shell (hero, not-registered/expelled banners,
+the Y/E/O/L legend, footer) and `FixturesDateFilterBar.tsx` now read their
+colours from a `--fx-*` CSS-variable set in `globals.css` instead of the
+literal hex values this section describes — the light values are byte-
+identical to what's documented above, and a new dark counterpart was added
+alongside them, so the shell now genuinely follows the visitor's choice
+rather than being fixed Warm Light. `<SiteNav activePage="fixtures" />` no
+longer passes `mobileTabBarTheme="light"`, so the bottom tab bar follows
+the toggle too instead of being pinned light. **`FixturesCard`/
+`FixturesAvailability`'s "stays dark, deliberately" decision is being
+reversed in this same pass** — both are being converted to read from the
+same `--fx-card-*`/`--fx-badge-*` tokens, with their current dark gradient
+preserved exactly as the `dark` state and a new light variant designed
+alongside it (modelled on `SelectedMatchCard.tsx`, a close analog already
+built in Warm Light). See that component's own file for the final result.
+(Conversion of `FixturesCard.tsx`, `FixturesAvailability.tsx`, and
+`FixturesWeekend.tsx` is still landing incrementally as of this note.)
+
+**Fixed same week — two shared components rendered above the fixture list
+had been missed by the pass above.** `DateChipSlider.tsx` (the date-chip
+picker, wrapped by `FixturesDateFilterBar.tsx`) and
+`MatchesSegmentedTabs.tsx` (the "Upcoming / Past Matches" pill atop both
+this page and `/matches/history`) were both still hardcoded to their
+original literal Warm Light hex values — reported live as the two controls
+staying bright cream/orange while the rest of the page had correctly gone
+dark. Both now default to a `theme="auto"` prop that reads the same
+`--fx-*` CSS variables the rest of the page uses (`--fx-card-header-bg`/
+`--fx-border`/`--fx-accent`/`--fx-card-text`/`--fx-card-text-muted`), so
+they follow the visitor's Light/Dark/System choice with no page-level
+change needed on `/fixtures`. Since `/matches/history`'s own body content
+is still Warm-Light-only (not converted in this pass), both components
+also accept an explicit `theme="light"` override to pin the original look
+there — `MatchHistoryClient.tsx`'s `<DateChipSlider>` call and
+`/app/matches/history/page.tsx`'s `<MatchesSegmentedTabs>` call both pass
+it, so that page's appearance is unchanged. Same override-prop convention
+`MobileTabBar`'s `mobileTabBarTheme` prop already established.
+
 ---
 
 ## 10.2 "Matches" — Fixtures + Match History merged into one bottom tab (added September 2026)
@@ -543,18 +637,81 @@ new, since nothing else was asked for.
 
 ---
 
+## 10.3 Light/Dark/System theme support (added September 2026)
+
+The page shell (`src/app/fixtures/page.tsx`) was already Warm Light-only
+(§10.1's "Page shell widened to Warm Light too" note); it's now genuinely
+theme-aware instead — every inline colour that used to be a literal hex now
+reads one of the `--fx-*` CSS custom properties (`ui-theme.md`'s Light/Dark/
+System tokens, `src/app/globals.css`), which flip automatically with the
+visitor's Light/Dark/System choice via the `data-theme` attribute on
+`<html>`. The page's own current look is unchanged for a Light-preference
+visitor — the `[data-theme="light"]` block was seeded from this page's
+existing colours — and a Dark-preference visitor now gets the app's
+original dark-ink look instead of a jarring light island. Two small new
+tokens, `--fx-danger-bg`/`--fx-danger-border`/`--fx-danger-text`, were added
+to both light and dark blocks for the Expelled banner, which had no
+existing danger/crimson token to reuse. `<SiteNav activePage="fixtures" />`
+no longer passes `mobileTabBarTheme="light"` — the bottom tab bar now
+follows the visitor's own theme choice too, the same way it already does on
+the Home dashboard.
+
+**`FixturesCard.tsx` and `FixturesAvailability.tsx` reverse their earlier
+"deliberately stays dark by design" decision.** Both of these were
+previously hardcoded to a permanently-dark palette via inline `style`,
+regardless of what theme the page around them used — `squad-selection.md`
+and the earlier revisions of this section documented that as intentional,
+on the reasoning that a squad-announced card's content ported cleanly from
+the legacy spreadsheet look and didn't need re-theming. That decision is
+reversed here at the product level: both components now read a local
+`LIGHT`/`DARK` token object selected via `useTheme()`
+(`src/components/ui/ThemeProvider.tsx`), the same client-side pattern
+`SelectedMatchCard.tsx` (the Home dashboard's near-identical squad-announced
+card, §3.1 of `navigation.md`) already established. `FixturesCard.tsx`
+gained an explicit `'use client'` directive to go with it — it already used
+`useState` and was only ever reachable through a `'use client'` ancestor
+(`FixturesWeekendGroup`), so this is a formality, not a behaviour change.
+
+The **dark** token values in both components are the componentsʼ original,
+always-dark colours, copied byte-for-byte — nothing about the dark
+appearance changed. The **light** values are new, built from the same Warm
+Light palette `SelectedMatchCard.tsx` uses for the equivalent content (card
+background/border, heading/body/muted/faint text, the gold-tinted
+match-stage and C/VC badge pills, the fee/wallet-projection text). A
+handful of small, self-contained status chips are left as plain literals in
+both themes rather than threaded through the token objects — the format
+pill, the WK badge, the "IN PROGRESS" pill, the ground/maps green link, and
+the Y/O/E/L response-button colours in `FixturesAvailability.tsx` (which
+must keep matching the fixed legend colours on the page shell above them
+regardless of theme) — since they already read fine on either card
+background, the same call `SelectedMatchCard.tsx` made for its own format
+and WK chips. `FixtureShareButton` (exported from `FixturesCard.tsx`,
+reused by `FixturesAvailability.tsx` and `FixturesWeekend.tsx`'s dues
+banner) also picks its icon colour from `useTheme()` now, darkening on
+hover in light mode instead of lightening.
+
+`FixturesWeekend.tsx`'s own "⚠ Outstanding dues" banner (rendered in place
+of `FixturesAvailability` when the signed-in player owes money) is themed
+the same way — dark preserved exactly, light reusing the same amber warning
+combo (`#FEF3C7`/`#F5D9A8`/`#92400E`) the page shell's "not registered"
+banner already uses. `FixturesDateFilterBar.tsx`'s own wrapper panel now
+reads `--fx-shell-bg`/`--fx-border` instead of literal hex; `DateChipSlider`
+itself (out of scope here — shared with Match History) was not touched.
+
+---
+
 ## 11. File Map
 
 | File | Role |
 |---|---|
-| `src/app/fixtures/page.tsx` | Server component — fetches bookings, availability, squads; groups by `validationGroupKey`; renders `FixturesWeekendGroup` per group, each wrapped in a `data-dates` div for §10.1's date-chip filter |
-| `src/components/fixtures/FixturesDateFilterBar.tsx` | Date-chip quick filter (§10.1) — wraps the weekend-group list, toggles visibility via a CSS attribute-substring rule; never touches `FixturesWeekendGroup`'s own state |
+| `src/app/fixtures/page.tsx` | Server component — fetches bookings, availability, squads; groups by `validationGroupKey`; renders `FixturesWeekendGroup` per group, each wrapped in a `data-dates` div for §10.1's date-chip filter; theme-aware via `--fx-*` CSS vars (§10.3) |
+| `src/components/fixtures/FixturesDateFilterBar.tsx` | Date-chip quick filter (§10.1) — wraps the weekend-group list, toggles visibility via a CSS attribute-substring rule; never touches `FixturesWeekendGroup`'s own state; wrapper panel theme-aware via `--fx-*` CSS vars (§10.3) |
 | `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component, also used by `/matches/history` (`features/post-match-scorecard.md` §16) |
 | `src/components/matches/MatchesSegmentedTabs.tsx` | Shared "Upcoming / Past Matches" pill control (§10.2) — plain server component, rendered on both `/fixtures` and `/matches/history` |
 | `src/app/fixtures/[id]/page.tsx` | Single match share page — same squad fetch pattern as fixtures page |
-| `src/components/fixtures/FixturesWeekend.tsx` | `FixturesWeekendGroup` — shared state owner; handles API calls; renders card + availability pairs |
-| `src/components/fixtures/FixturesAvailability.tsx` | Controlled availability button row; runs `getBlockReason()` validation on every render |
-| `src/components/fixtures/FixturesCard.tsx` | Match card display; squad section uses `is_match_captain`, `is_vc`, `is_wk` from squad row |
+| `src/components/fixtures/FixturesWeekend.tsx` | `FixturesWeekendGroup` — shared state owner; handles API calls; renders card + availability pairs; own "outstanding dues" banner theme-aware via `useTheme()` (§10.3) |
+| `src/components/fixtures/FixturesAvailability.tsx` | Controlled availability button row; runs `getBlockReason()` validation on every render; theme-aware via `useTheme()` — no longer permanently dark (§10.3) |
+| `src/components/fixtures/FixturesCard.tsx` | Match card display; squad section uses `is_match_captain`, `is_vc`, `is_wk` from squad row; theme-aware via `useTheme()` — no longer permanently dark (§10.3) |
 | `src/app/api/player-availability/route.ts` | Self-update API — GET, POST, DELETE; explicit SELECT(`id, response`) → INSERT/UPDATE; auto-reactivation; audit log |
 | `src/app/api/captain-availability/route.ts` | Captain proxy API — POST (set availability on behalf of player); GET (audit log fetch) |
 | `src/app/captains-corner/page.tsx` | Captain-only server page — fetches all data; renders `CaptainsCornerGrid` per week |

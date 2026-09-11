@@ -135,6 +135,8 @@ export default async function FixturesPage() {
 
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'
   const isCaptain = isPlayer && !!player?.isCaptain
+  const isGC      = isPlayer && !!player?.isGC
+  const isAdmin   = isPlayer && !!player?.isAdmin
 
   // Helper — live exemption check (same logic as admin fee-apply route)
   function isCurrentlyExempt(exemptions: { start_date: string; end_date: string | null }[]): boolean {
@@ -254,23 +256,23 @@ export default async function FixturesPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#F8F4EE' }}>
-      <SiteNav activePage="fixtures" mobileTabBarTheme="light" />
+    <div className="min-h-screen" style={{ background: 'var(--fx-shell-bg)' }}>
+      <SiteNav activePage="fixtures" />
       {isPlayer && <PushSubscribePrompt />}
 
       {/* Hero */}
       <div className="border-b px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden"
-        style={{ background: '#FFFFFF', borderColor: '#D4C9B0' }}>
+        style={{ background: 'var(--fx-hero-bg)', borderColor: 'var(--fx-border)' }}>
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(217,119,6,0.1) 0%, transparent 70%)' }} />
-        <p className="text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2" style={{ color: '#B45309' }}>
-          <span className="w-4 h-px inline-block" style={{ background: '#D97706' }} />
+        <p className="text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2" style={{ color: 'var(--fx-accent-dim)' }}>
+          <span className="w-4 h-px inline-block" style={{ background: 'var(--fx-accent)' }} />
           Spartans Cricket Club · Bengaluru
         </p>
-        <h1 className="font-cinzel text-2xl md:text-3xl font-bold mb-2 tracking-wide" style={{ color: '#1C1917' }}>
+        <h1 className="font-cinzel text-2xl md:text-3xl font-bold mb-2 tracking-wide" style={{ color: 'var(--fx-text)' }}>
           Matches
         </h1>
-        <p className="text-sm md:text-base max-w-xl leading-relaxed font-rajdhani mb-4" style={{ color: '#57534E' }}>
+        <p className="text-sm md:text-base max-w-xl leading-relaxed font-rajdhani mb-4" style={{ color: 'var(--fx-text-2)' }}>
           Confirmed matches for Spartans CC. Mark your availability below each card.
         </p>
         <MatchesSegmentedTabs active="upcoming" />
@@ -278,18 +280,18 @@ export default async function FixturesPage() {
 
       {/* Not registered */}
       {session && !player?.playerId && player?.playerStatus !== 'expelled' && (
-        <div className="px-5 md:px-8 lg:px-10 py-3 border-b" style={{ background: '#FEF3C7', borderColor: '#F5D9A8' }}>
-          <p className="font-rajdhani text-sm" style={{ color: '#92400E' }}>
+        <div className="px-5 md:px-8 lg:px-10 py-3 border-b" style={{ background: 'var(--fx-badge-bg)', borderColor: 'var(--fx-badge-border)' }}>
+          <p className="font-rajdhani text-sm" style={{ color: 'var(--fx-badge-text)' }}>
             You're signed in but not yet registered as a Spartans player.{' '}
-            <a href="/join" className="underline" style={{ color: '#B45309' }}>Complete your registration →</a>
+            <a href="/join" className="underline" style={{ color: 'var(--fx-badge-text)' }}>Complete your registration →</a>
           </p>
         </div>
       )}
 
       {/* Expelled */}
       {player?.playerStatus === 'expelled' && (
-        <div className="px-5 md:px-8 lg:px-10 py-3 border-b" style={{ background: '#FEE2E2', borderColor: '#FCA5A5' }}>
-          <p className="font-rajdhani text-sm" style={{ color: '#991B1B' }}>
+        <div className="px-5 md:px-8 lg:px-10 py-3 border-b" style={{ background: 'var(--fx-danger-bg)', borderColor: 'var(--fx-danger-border)' }}>
+          <p className="font-rajdhani text-sm" style={{ color: 'var(--fx-danger-text)' }}>
             Your account has been suspended. Contact the club admin for more information.
           </p>
         </div>
@@ -297,7 +299,7 @@ export default async function FixturesPage() {
 
       {/* Legend */}
       {isPlayer && (
-        <div className="px-5 md:px-8 lg:px-10 py-2 border-b flex gap-4 flex-wrap" style={{ background: '#FFFFFF', borderColor: '#D4C9B0' }}>
+        <div className="px-5 md:px-8 lg:px-10 py-2 border-b flex gap-4 flex-wrap" style={{ background: 'var(--fx-hero-bg)', borderColor: 'var(--fx-border)' }}>
           {[
             { code: 'Y', color: '#16a34a', label: 'Available' },
             { code: 'E', color: '#2563eb', label: 'Either game same day' },
@@ -306,7 +308,7 @@ export default async function FixturesPage() {
           ].map(item => (
             <div key={item.code} className="flex items-center gap-1.5">
               <span className="font-rajdhani text-xs font-bold" style={{ color: item.color }}>{item.code}</span>
-              <span className="font-rajdhani text-xs" style={{ color: '#78716C' }}>{item.label}</span>
+              <span className="font-rajdhani text-xs" style={{ color: 'var(--fx-text-muted)' }}>{item.label}</span>
             </div>
           ))}
         </div>
@@ -314,7 +316,7 @@ export default async function FixturesPage() {
 
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
         {weekendOrder.length === 0 ? (
-          <p className="font-rajdhani text-sm" style={{ color: '#78716C' }}>No upcoming fixtures confirmed yet. Check back soon.</p>
+          <p className="font-rajdhani text-sm" style={{ color: 'var(--fx-text-muted)' }}>No upcoming fixtures confirmed yet. Check back soon.</p>
         ) : (
           <>
             <FixturesDateFilterBar
@@ -328,6 +330,8 @@ export default async function FixturesPage() {
                 <FixturesWeekendGroup
                   isPlayer={isPlayer}
                   isCaptain={isCaptain}
+                  isGC={isGC}
+                  isAdmin={isAdmin}
                   bookings={weekendMap[wk]}
                   initialWeekendResponses={
                     Object.fromEntries(
@@ -343,8 +347,8 @@ export default async function FixturesPage() {
         )}
       </div>
 
-      <footer className="border-t py-5 text-center font-rajdhani text-xs mt-8" style={{ borderColor: '#D4C9B0', color: '#A8A29E' }}>
-        © 2026 <span style={{ color: '#B45309' }}>Spartans Cricket Club</span> · Bengaluru · Est. 2014
+      <footer className="border-t py-5 text-center font-rajdhani text-xs mt-8" style={{ borderColor: 'var(--fx-border)', color: 'var(--fx-text-faint)' }}>
+        © 2026 <span style={{ color: 'var(--fx-accent-dim)' }}>Spartans Cricket Club</span> · Bengaluru · Est. 2014
       </footer>
     </div>
   )

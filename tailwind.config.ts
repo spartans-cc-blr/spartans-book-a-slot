@@ -1,6 +1,11 @@
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
+  // Light/Dark/System theming (see ui-theme.md "Light/Dark/System"):
+  // ThemeProvider sets data-theme="dark"|"light" on <html>. Only components
+  // that opt in with an explicit `dark:` class respond — every page/component
+  // that hasn't been touched keeps rendering exactly as it always has.
+  darkMode: ['selector', '[data-theme="dark"]'],
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',

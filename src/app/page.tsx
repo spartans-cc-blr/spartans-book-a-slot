@@ -357,10 +357,10 @@ function StatTile({ icon, value, label, tag, tone, href, sublabel }: {
   sublabel?: string
 }) {
   const toneMap = {
-    gold:    { bg: '#FEF3C7', tagBg: '#FEF3C7', tagText: '#B45309' },
-    amber:   { bg: '#FEF3C7', tagBg: '#FEF3C7', tagText: '#B45309' },
-    emerald: { bg: '#D1FAE5', tagBg: '#D1FAE5', tagText: '#059669' },
-    crimson: { bg: '#FEE2E2', tagBg: '#FEE2E2', tagText: '#DC2626' },
+    gold:    { bg: 'var(--home-tile-tint-bg)', tagBg: 'var(--home-tile-gold-tag-bg)', tagText: 'var(--home-tile-gold-tag-text)' },
+    amber:   { bg: 'var(--home-tile-tint-bg)', tagBg: 'var(--home-tile-gold-tag-bg)', tagText: 'var(--home-tile-gold-tag-text)' },
+    emerald: { bg: 'var(--home-tile-emerald-bg)', tagBg: 'var(--home-tile-emerald-bg)', tagText: 'var(--home-tile-emerald-text)' },
+    crimson: { bg: 'var(--home-tile-crimson-bg)', tagBg: 'var(--home-tile-crimson-bg)', tagText: 'var(--home-tile-crimson-text)' },
   }[tone]
 
   const content = (
@@ -376,10 +376,10 @@ function StatTile({ icon, value, label, tag, tone, href, sublabel }: {
           </span>
         )}
       </div>
-      <p className="font-cinzel text-2xl font-bold" style={{ color: '#1C1917' }}>{value}</p>
-      <p className="font-rajdhani text-xs mt-1" style={{ color: '#78716C' }}>{label}</p>
+      <p className="font-cinzel text-2xl font-bold" style={{ color: 'var(--home-text)' }}>{value}</p>
+      <p className="font-rajdhani text-xs mt-1" style={{ color: 'var(--home-text-muted)' }}>{label}</p>
       {sublabel && (
-        <p className="font-rajdhani text-[10px] mt-0.5" style={{ color: '#A8A29E' }}>{sublabel}</p>
+        <p className="font-rajdhani text-[10px] mt-0.5" style={{ color: 'var(--home-text-faint)' }}>{sublabel}</p>
       )}
     </>
   )
@@ -387,15 +387,15 @@ function StatTile({ icon, value, label, tag, tone, href, sublabel }: {
   if (href) {
     return (
       <Link href={href}
-        className="rounded-xl p-4 block transition-colors hover:bg-black/[0.02] active:bg-black/[0.04]"
-        style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
+        className="rounded-xl p-4 block transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03] active:bg-black/[0.04] dark:active:bg-white/[0.05]"
+        style={{ background: 'var(--home-card-bg)', border: '1px solid var(--home-card-border)' }}>
         {content}
       </Link>
     )
   }
 
   return (
-    <div className="rounded-xl p-4" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
+    <div className="rounded-xl p-4" style={{ background: 'var(--home-card-bg)', border: '1px solid var(--home-card-border)' }}>
       {content}
     </div>
   )
@@ -406,15 +406,15 @@ function QuickActionRow({ href, icon, title, subtitle }: {
 }) {
   return (
     <Link href={href}
-      className="flex items-center gap-3 py-3 px-3 -mx-1 rounded-lg transition-colors hover:bg-black/[0.03]">
-      <span className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#FEF3C7' }}>
+      className="flex items-center gap-3 py-3 px-3 -mx-1 rounded-lg transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+      <span className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--home-tile-tint-bg)' }}>
         {icon}
       </span>
       <div className="flex-1 min-w-0">
-        <p className="font-rajdhani text-sm font-bold" style={{ color: '#1C1917' }}>{title}</p>
-        <p className="font-rajdhani text-xs" style={{ color: '#78716C' }}>{subtitle}</p>
+        <p className="font-rajdhani text-sm font-bold" style={{ color: 'var(--home-text)' }}>{title}</p>
+        <p className="font-rajdhani text-xs" style={{ color: 'var(--home-text-muted)' }}>{subtitle}</p>
       </div>
-      <ChevronGlyph />
+      <ChevronGlyph color="var(--home-text-faint)" />
     </Link>
   )
 }
@@ -435,8 +435,8 @@ export default async function HomePage() {
   const firstName  = player?.playerName?.split(' ')[0] ?? 'Spartan'
 
   return (
-    <div className="min-h-screen bg-parchment grain">
-      <SiteNav activePage="home" mobileTabBarTheme="light" />
+    <div className="min-h-screen bg-parchment dark:bg-ink grain">
+      <SiteNav activePage="home" />
 
       {/* ── EXPELLED STATE ── */}
       {isExpelled && (
@@ -469,7 +469,7 @@ export default async function HomePage() {
 
       {/* ── PLAYER DASHBOARD — Warm Light, self-contained ── */}
       {isPlayer && playerData && (
-        <div style={{ background: '#F0F4F5' }} className="px-5 md:px-8 lg:px-10 py-6">
+        <div style={{ background: 'var(--home-shell-bg)' }} className="px-5 md:px-8 lg:px-10 py-6">
           <div className="max-w-4xl mx-auto">
             <WeekendAvailabilityGreeting
               playerId={player.playerId}
@@ -479,18 +479,18 @@ export default async function HomePage() {
 
             {/* Welcome banner */}
             <div className="rounded-2xl p-6 mb-5 flex flex-wrap items-start justify-between gap-4"
-              style={{ background: 'linear-gradient(135deg, #FEF3C7 0%, #FFF7ED 100%)' }}>
+              style={{ background: 'var(--home-welcome-grad)' }}>
               <div>
                 <img
                   src={player?.photoUrl ?? player?.image ?? '/default-avatar.png'}
                   alt=""
                   className="w-10 h-10 rounded-full object-cover border-2 mb-3"
-                  style={{ borderColor: '#D97706' }}
+                  style={{ borderColor: 'var(--home-accent)' }}
                 />
-                <p className="font-cinzel text-2xl font-bold leading-snug" style={{ color: '#1C1917' }}>
+                <p className="font-cinzel text-2xl font-bold leading-snug" style={{ color: 'var(--home-text)' }}>
                   Welcome back, {firstName}! 👋
                 </p>
-                <p className="font-rajdhani text-sm mt-1 max-w-md" style={{ color: '#57534E' }}>
+                <p className="font-rajdhani text-sm mt-1 max-w-md" style={{ color: 'var(--home-text-2)' }}>
                   Here's your real-time overview for matches &amp; availability.
                 </p>
               </div>
@@ -499,7 +499,7 @@ export default async function HomePage() {
             {/* Stat tiles — 2x2 */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               <StatTile
-                icon={<CalendarGlyph color="#B45309" />}
+                icon={<CalendarGlyph color="var(--home-icon-tint)" />}
                 value={playerData.upcomingCount}
                 label="Upcoming Matches"
                 tag="Upcoming"
@@ -507,14 +507,14 @@ export default async function HomePage() {
                 href="/fixtures"
               />
               <StatTile
-                icon={<TrophyGlyph color="#B45309" />}
+                icon={<TrophyGlyph color="var(--home-icon-tint)" />}
                 value={playerData.tournamentCount}
                 label="My Tournaments"
                 tag="Tournaments"
                 tone="gold"
               />
               <StatTile
-                icon={<CheckGlyph color="#B45309" />}
+                icon={<CheckGlyph color="var(--home-icon-tint)" />}
                 value={playerData.matchesPlayedThisYear}
                 label="Matches Played"
                 sublabel={playerData.lastPlayedOn ? formatLastPlayed(playerData.lastPlayedOn) : 'No matches yet'}
@@ -548,19 +548,19 @@ export default async function HomePage() {
             {playerData.nudge && (
               <Link href={`/fixtures/${playerData.nudge.booking.id}`}
                 className="mb-5 flex items-center justify-between gap-4 rounded-xl p-4 transition-colors group"
-                style={{ background: '#FEF3C7', border: '1px solid #F5D9A8' }}>
+                style={{ background: 'var(--home-nudge-bg)', border: '1px solid var(--home-nudge-border)' }}>
                 <div className="flex items-start gap-3 min-w-0">
                   <span className="text-xl flex-shrink-0">{playerData.nudge.title.split(' ')[0]}</span>
                   <div className="min-w-0">
-                    <p className="font-cinzel text-xs font-semibold truncate" style={{ color: '#92400E' }}>
+                    <p className="font-cinzel text-xs font-semibold truncate" style={{ color: 'var(--home-nudge-title)' }}>
                       {playerData.nudge.title.replace(/^\S+\s/, '')}
                     </p>
-                    <p className="font-rajdhani text-xs mt-0.5" style={{ color: '#B45309' }}>
+                    <p className="font-rajdhani text-xs mt-0.5" style={{ color: 'var(--home-nudge-body)' }}>
                       {playerData.nudge.body}
                     </p>
                   </div>
                 </div>
-                <span className="font-rajdhani text-xs font-bold flex-shrink-0" style={{ color: '#B45309' }}>
+                <span className="font-rajdhani text-xs font-bold flex-shrink-0" style={{ color: 'var(--home-nudge-body)' }}>
                   Mark now →
                 </span>
               </Link>
@@ -573,7 +573,7 @@ export default async function HomePage() {
                 shown twice. */}
             {playerData.selectedToPlay.length > 0 && (
               <div className="mb-5">
-                <h2 className="font-cinzel text-lg font-bold flex items-center gap-2 mb-3" style={{ color: '#1C1917' }}>
+                <h2 className="font-cinzel text-lg font-bold flex items-center gap-2 mb-3" style={{ color: 'var(--home-text)' }}>
                   <span className="w-1 h-5 rounded-full inline-block" style={{ background: '#059669' }} />
                   You're Selected to Play
                 </h2>
@@ -586,24 +586,24 @@ export default async function HomePage() {
             {/* Upcoming Fixtures — relabelled "Upcoming Other Fixtures" once
                 the section above exists, since this list no longer includes
                 those bookings. */}
-            <div className="rounded-xl p-5 mb-5" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
+            <div className="rounded-xl p-5 mb-5" style={{ background: 'var(--home-card-bg)', border: '1px solid var(--home-card-border)'}}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-cinzel text-lg font-bold flex items-center gap-2" style={{ color: '#1C1917' }}>
-                  <span className="w-1 h-5 rounded-full inline-block" style={{ background: '#D97706' }} />
+                <h2 className="font-cinzel text-lg font-bold flex items-center gap-2" style={{ color: 'var(--home-text)' }}>
+                  <span className="w-1 h-5 rounded-full inline-block" style={{ background: 'var(--home-accent)'}} />
                   {playerData.selectedToPlay.length > 0 ? 'Upcoming Other Fixtures' : 'Upcoming Fixtures'}
                 </h2>
-                <Link href="/fixtures" className="font-rajdhani text-sm font-bold" style={{ color: '#D97706' }}>
+                <Link href="/fixtures" className="font-rajdhani text-sm font-bold" style={{ color: 'var(--home-accent)' }}>
                   View All →
                 </Link>
               </div>
 
               {playerData.upcomingPreview.length === 0 ? (
-                <div className="rounded-xl py-10 flex flex-col items-center text-center border-2 border-dashed" style={{ borderColor: '#D4C9B0' }}>
-                  <CalendarGlyph color="#A8A29E" />
-                  <p className="font-cinzel text-base font-bold mt-3" style={{ color: '#1C1917' }}>
+                <div className="rounded-xl py-10 flex flex-col items-center text-center border-2 border-dashed" style={{ borderColor: 'var(--home-card-border)' }}>
+                  <CalendarGlyph color="var(--home-text-faint)" />
+                  <p className="font-cinzel text-base font-bold mt-3" style={{ color: 'var(--home-text)' }}>
                     {playerData.selectedToPlay.length > 0 ? 'No Other Matches Scheduled' : 'No Upcoming Matches Scheduled'}
                   </p>
-                  <p className="font-rajdhani text-sm mt-1 max-w-xs" style={{ color: '#78716C' }}>
+                  <p className="font-rajdhani text-sm mt-1 max-w-xs" style={{ color: 'var(--home-text-muted)' }}>
                     Check fixtures for your next match once it's confirmed.
                   </p>
                 </div>
@@ -613,13 +613,13 @@ export default async function HomePage() {
                     const resp = playerData.previewResponses[fx.id] ?? null
                     return (
                       <Link key={fx.id} href="/fixtures"
-                        className="flex items-center justify-between gap-3 rounded-lg p-3 transition-colors hover:bg-black/[0.03]"
-                        style={{ background: '#F8F4EE' }}>
+                        className="flex items-center justify-between gap-3 rounded-lg p-3 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                        style={{ background: 'var(--home-row-bg)' }}>
                         <div className="min-w-0">
-                          <p className="font-rajdhani text-sm font-bold truncate" style={{ color: '#1C1917' }}>
+                          <p className="font-rajdhani text-sm font-bold truncate" style={{ color: 'var(--home-text)' }}>
                             vs {fx.opponent_name ?? 'TBD'}
                           </p>
-                          <p className="font-rajdhani text-xs mt-0.5" style={{ color: '#78716C' }}>
+                          <p className="font-rajdhani text-xs mt-0.5" style={{ color: 'var(--home-text-muted)' }}>
                             {fx.tournament?.name ?? fx.format} · {formatDate(fx.game_date)} · {slotLabel(fx.slot_time)}
                           </p>
                         </div>
@@ -629,7 +629,7 @@ export default async function HomePage() {
                             {resp}
                           </span>
                         ) : (
-                          <span className="font-rajdhani text-[10px] font-bold flex-shrink-0" style={{ color: '#D97706' }}>
+                          <span className="font-rajdhani text-[10px] font-bold flex-shrink-0" style={{ color: 'var(--home-accent)' }}>
                             Not marked
                           </span>
                         )}
@@ -641,20 +641,20 @@ export default async function HomePage() {
             </div>
 
             {/* Quick Actions */}
-            <div className="rounded-xl p-5" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
-              <h2 className="font-cinzel text-lg font-bold flex items-center gap-2 mb-2" style={{ color: '#1C1917' }}>
-                <span className="w-1 h-5 rounded-full inline-block" style={{ background: '#D97706' }} />
+            <div className="rounded-xl p-5" style={{ background: 'var(--home-card-bg)', border: '1px solid var(--home-card-border)'}}>
+              <h2 className="font-cinzel text-lg font-bold flex items-center gap-2 mb-2" style={{ color: 'var(--home-text)' }}>
+                <span className="w-1 h-5 rounded-full inline-block" style={{ background: 'var(--home-accent)'}} />
                 Quick Actions
               </h2>
-              <div className="divide-y" style={{ borderColor: '#E7E0D3' }}>
-                <QuickActionRow href="/fixtures" icon={<CalendarGlyph color="#B45309" />} title="Set Availability" subtitle="Update weekend match availability" />
+              <div className="divide-y" style={{ borderColor: 'var(--home-divider)' }}>
+                <QuickActionRow href="/fixtures" icon={<CalendarGlyph color="var(--home-icon-tint)" />} title="Set Availability" subtitle="Update weekend match availability" />
                 {isCaptain && (
-                  <QuickActionRow href="/captains-corner" icon={<ClipboardGlyph color="#B45309" />} title="Squad Selection" subtitle="Pick the squad & view availability grid" />
+                  <QuickActionRow href="/captains-corner" icon={<ClipboardGlyph color="var(--home-icon-tint)" />} title="Squad Selection" subtitle="Pick the squad & view availability grid" />
                 )}
                 {isGC && (
-                  <QuickActionRow href="/gc-review" icon={<ScalesGlyph color="#B45309" />} title="Squad Review" subtitle="Approve or return submitted squads" />
+                  <QuickActionRow href="/gc-review" icon={<ScalesGlyph color="var(--home-icon-tint)" />} title="Squad Review" subtitle="Approve or return submitted squads" />
                 )}
-                <QuickActionRow href="/profile" icon={<PersonGlyph color="#B45309" />} title="My Profile" subtitle="Update your details & photo" />
+                <QuickActionRow href="/profile" icon={<PersonGlyph color="var(--home-icon-tint)" />} title="My Profile" subtitle="Update your details & photo" />
               </div>
             </div>
           </div>
@@ -737,10 +737,10 @@ export default async function HomePage() {
 
       </div>
 
-      <footer className="py-5 text-center font-rajdhani text-xs text-[#78716C] mt-8">
+      <footer className="py-5 text-center font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-8">
         © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
-        <span className="mx-2 text-ink-5">·</span>
-        <a href="https://spartanscricketclub.vercel.app" className="text-[#78716C] hover:text-[#44403C] transition-colors">
+        <span className="mx-2 text-ink-5 dark:text-zinc-700">·</span>
+        <a href="https://spartanscricketclub.vercel.app" className="text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 transition-colors">
           Club Site
         </a>
       </footer>
