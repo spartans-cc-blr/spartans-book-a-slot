@@ -110,6 +110,22 @@
      dark matches ink-4 (#242424) exactly, so every `bg-ink-4 dark:` pairing
      stays byte-identical to the pre-existing dark look. */
   --captains-surface-2: #F8F4EE;
+  /* Y/O/E/L response-code chips (RESP in CaptainsCornerGrid.tsx, and the
+     page-shell legend). Dark keeps the original filled-dark chips; light
+     uses the pastel-tint-plus-dark-text version of the same four hues so
+     the chips read on a white card instead of sitting on it as dark slabs. */
+  --captains-resp-y-bg: #DCFCE7;
+  --captains-resp-y-text: #15803D;
+  --captains-resp-y-border: #4ADE80;
+  --captains-resp-e-bg: #DBEAFE;
+  --captains-resp-e-text: #1D4ED8;
+  --captains-resp-e-border: #60A5FA;
+  --captains-resp-o-bg: #FFEDD5;
+  --captains-resp-o-text: #C2410C;
+  --captains-resp-o-border: #FB923C;
+  --captains-resp-l-bg: #F3E8FF;
+  --captains-resp-l-text: #7E22CE;
+  --captains-resp-l-border: #C084FC;
 
   /* Captains' Corner — Unavailable Dates (/captains-corner/unavailable-dates).
      Light is this page's ORIGINAL look (mirrors /schedule), unchanged;
@@ -215,6 +231,18 @@
   --captains-badge-text: #E8C97A;
   --captains-badge-border: #7A6030;
   --captains-surface-2: #242424;
+  --captains-resp-y-bg: #14532d;
+  --captains-resp-y-text: #86efac;
+  --captains-resp-y-border: #22c55e;
+  --captains-resp-e-bg: #1e3a5f;
+  --captains-resp-e-text: #93c5fd;
+  --captains-resp-e-border: #3b82f6;
+  --captains-resp-o-bg: #431407;
+  --captains-resp-o-text: #fdba74;
+  --captains-resp-o-border: #f97316;
+  --captains-resp-l-bg: #2e1a47;
+  --captains-resp-l-text: #d8b4fe;
+  --captains-resp-l-border: #a855f7;
 
   --unavail-shell-bg: #080808;
   --unavail-hero-bg: #111111;
