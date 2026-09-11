@@ -318,6 +318,16 @@ Y/O/E/L response buttons themselves were never part of this card to
 begin with (`FixturesAvailability` is a separate sibling component
 `FixturesCard` never renders).
 
+**"✓ Selected" pill removed (fixed September 2026)** — the card's
+date/slot/format row originally carried its own small green "✓ Selected"
+pill next to the format pill, left over from when this card was first
+scaffolded as a standalone replica of `FixturesCard`'s header row. Once
+it's rendered inside a section already titled "You're Selected to Play",
+the pill was pure repetition — every card under that heading is
+definitionally one the viewer is selected for, so the word was saying the
+same thing twice on the same card. Removed; only the format pill (T20/T30)
+remains in that row.
+
 To let `SelectedMatchCard` reuse `FixturesCard`'s icon/format helpers
 without duplicating ~150 lines of SVG and formatting code, nine
 previously-private functions in `src/components/fixtures/FixturesCard.tsx`
@@ -341,12 +351,20 @@ the default slate, so they can spot themselves in the list at a glance.
 
 | Section | Content |
 |---|---|
-| Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle, a static "🛡️ Spartans CC Bengaluru" badge pill |
+| Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle. The static "🛡️ Spartans CC Bengaluru" badge pill that used to sit alongside it was removed (added nothing every other visitor to this same-club Hub didn't already know) — see the "Welcome banner trimmed" note below |
 | You're Selected to Play | Zero or more `SelectedMatchCard`s (see above) — one per upcoming booking with an announced squad this player is in; rendered above Upcoming Fixtures, entirely absent when there are none. Each replicates `FixturesCard`'s squad-announced content (icon row, collapsible squad, fee/wallet projection) minus the underfilled-slot nudge, re-themed Warm Light |
 | Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald, no tag if ≥ 0 (see below), amber "Exempted" if negative but dues-waived, else crimson "Overdue"; **clickable → `/wallet`**, added September 2026 — see `features/wallet-ledger.md`) |
 | Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
 | Upcoming Fixtures / Upcoming Other Fixtures | Header ("Upcoming Other Fixtures" once the section above is non-empty — see above) + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `otherUpcoming` — bookings already shown in "You're Selected to Play" are excluded — or a dashed empty-state box ("No Other Matches Scheduled" / "No Upcoming Matches Scheduled") when there are none |
 | Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |
+
+**Welcome banner trimmed (fixed September 2026)** — the banner originally
+paired the avatar/greeting block with a static "🛡️ Spartans CC Bengaluru"
+badge pill on the opposite end of the row. Every visitor who reaches this
+dashboard is already a signed-in Spartans CC Bengaluru member — the badge
+told them nothing they didn't already know just by being logged in, so it
+was removed rather than kept as decoration. The banner is now just the
+avatar, greeting, and subtitle.
 
 **Stat tiles are drill-down targets, not just numbers (added September 2026).**
 The club coordinator flagged that "18 Upcoming Matches" / "9 My Tournaments"
