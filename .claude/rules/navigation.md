@@ -18,6 +18,33 @@ The home page (`/`) replaced a simple redirect to `/schedule` that was organiser
 **Option 2 — Split-audience home page** was selected over:
 - Option 1 (smart redirect based on session) — too invisible, players without a session still saw the organiser view
 - Option 3 (fixtures as the root) — broke the organiser-facing URL that was already being shared externally
+
+### Two different "default landing page" mechanisms — kept in sync (fixed September 2026)
+
+There are two independent things that decide what a player sees first, and
+they can drift apart:
+
+1. **A normal signed-in browser session** — there is no server-side
+   redirect away from `/` for a logged-in player. `middleware.ts`'s
+   `matcher` only guards `/gc/:path*`, `/gc-review`, `/gc-players`, and
+   `/admin/:path*`; `/lib/auth.ts` has no custom `callbacks.redirect`. The
+   Home page's own "Sign in with Google" button links straight to
+   `/api/auth/signin` with no `callbackUrl` query param, so NextAuth's
+   default post-sign-in redirect (back to the site's base URL) already
+   lands the player on `/` — this page, with the personalised dashboard
+   (§3.1), has been the real default here since it shipped.
+2. **The installed PWA** ("Add to Home Screen" — the install path
+   `features/push-notifications.md` walks iPhone players through so web
+   push works) — this is governed entirely separately, by `start_url` in
+   `src/app/manifest.ts`. That value had never been updated when this
+   split-audience Home page replaced the old `/schedule` redirect — it was
+   still `/fixtures`, so tapping the installed app's icon skipped Home
+   entirely and opened Fixtures directly, regardless of what `/` itself
+   would have shown. **Fixed** — `start_url` is now `'/'`, so the PWA's own
+   default matches the browser one. A player who already installed the app
+   before this fix needs to reinstall it (remove and re-"Add to Home
+   Screen") to pick up the new `start_url` — a PWA manifest is normally
+   cached and isn't re-read on every app launch.
 ---
  
 ## 2. File Map
@@ -31,6 +58,7 @@ The home page (`/`) replaced a simple redirect to `/schedule` that was organiser
 | `src/app/profile/page.tsx` | Player self-service profile edit page |
 | `src/app/api/players/[id]/route.ts` | GET + PATCH for single player — IDOR-protected |
 | `src/lib/auth.ts` | JWT callback — enriches session with player context, saves Google photo on first sign-in |
+| `src/app/manifest.ts` | PWA manifest — `start_url` is the installed app's own "default landing page," independent of a browser session's; kept in sync with `/` (§1) |
  
 ---
  
@@ -75,9 +103,12 @@ switched palette.
 
 ### `getPlayerData(playerId)` — Server Function
 
-Called only when `isPlayer = true`. Eight independent queries fetched via
+Called only when `isPlayer = true`. Nine independent queries fetched via
 one `Promise.all` (unchanged from the pre-existing parallelization pass —
-see §7's architectural-decisions table):
+see §7's architectural-decisions table), plus one further query that
+genuinely depends on query 9's result and so runs as a follow-up after the
+`Promise.all` resolves rather than inside it — see the "You're Selected to
+Play" note below:
 
 | # | Query | Feeds |
 |---|---|---|
@@ -87,8 +118,9 @@ see §7's architectural-decisions table):
 | 4 | `squad` rows for this player, joined to `bookings(game_date, status)` | Matches Played stat tile (this year's count + all-time last-played date) |
 | 5 | `players.wallet_balance, dues_override` | Wallet Balance stat tile |
 | 6 | `squad` rows for this player, joined to `bookings(tournament_id)` | My Tournaments stat tile (distinct tournament count) |
-| 7 | `getNudgeForPlayer()` | Availability nudge banner |
-| 8 | `getWeekendGapForPlayer()` | First-open-of-day greeting dialog |
+| 7 | `squad` rows for this player with `status='announced'`, joined to `bookings(...tournament, ground)` | "You're Selected to Play" card (added September 2026 — see below) |
+| 8 | `getNudgeForPlayer()` | Availability nudge banner |
+| 9 | `getWeekendGapForPlayer()` | First-open-of-day greeting dialog |
 
 **Query 3 change (single → preview array):** the pre-rebuild version fetched
 exactly one row via `.single()`. The rebuild widens this to `.limit(3)` and
@@ -170,19 +202,68 @@ player with waived dues both rendered identically as "₹0 · Clear", with no
 way to see their real balance. Per a product decision, the tile now always
 renders `formatSignedRupees(wallet_balance)` (e.g. `-₹500`) — the actual
 number, never zeroed or absoluted-away — with the tag/tone reflecting
-context rather than clearance: `Positive`/emerald when `wallet_balance >= 0`,
-`Exempted`/amber when negative but `dues_override` is set (still not
-blocked from booking, but the tile is honest that the balance itself is
-negative), else `Overdue`/crimson. `duesAmount`/`duesCleared` were renamed
-to `walletBalance`/`duesOverride` in `getPlayerData()`'s return shape to
+context rather than clearance: no tag at all (just the emerald-tinted
+icon) when `wallet_balance >= 0` — there are no dues to call out, so a
+"Positive" pill was redundant with the already-positive number sitting
+right below it and was dropped (fixed September 2026; `StatTile`'s `tag`
+prop is now optional, and the pill itself only renders when `tag` is
+truthy — no other tile passes an empty tag today, but the prop stayed
+generic rather than adding a wallet-tile-specific flag) — `Exempted`/amber
+when negative but `dues_override` is set (still not blocked from booking,
+but the tile is honest that the balance itself is negative), else
+`Overdue`/crimson. `duesAmount`/`duesCleared` were renamed to
+`walletBalance`/`duesOverride` in `getPlayerData()`'s return shape to
 match.
+
+**"You're Selected to Play" (added September 2026)** — a card per upcoming
+confirmed booking this player has an *announced* squad row for (query 7
+above), rendered **ahead of** the Upcoming Fixtures card (see the Dashboard
+Sections table below), between it and the availability nudge banner.
+Deliberately additive, not a
+replacement: a booking that has an announced squad this player is in still
+also appears in the ordinary Upcoming Fixtures preview list underneath —
+this section is a highlight layered on top, not a dedupe/filter of that
+list.
+
+Query 7 only resolves *which* upcoming bookings qualify (one row per
+squad-membership, via the same "join broadly via `booking:bookings!inner(...)`,
+filter/sort in code" pattern queries 4 and 6 already use, rather than
+fighting PostgREST's embedded-resource filter syntax). Once `Promise.all`
+resolves, a second, genuinely-dependent query fetches the *full* squad
+(every announced player, not just this one) for those specific booking
+IDs — this is the one query in `getPlayerData()` that can't be parallelized
+with the rest, since it needs query 7's booking-id list first.
+
+Each card is `SelectedMatchCard` (`src/app/page.tsx`) — deliberately **not**
+a reuse of `FixturesCard.tsx` itself, which is tightly coupled to
+`FixturesWeekendGroup`'s shared live-availability state and carries fields
+(fee-per-player, wallet-after-this-match projection, Y/O/E/L buttons) that
+don't apply here — the squad is already announced by the time this card
+renders, so there's nothing left for the viewer to mark. Instead it's a
+self-contained, read-only card mirroring `FixturesCard`'s squad-announced
+*content* (date/slot/format, tournament name linking to
+`cricheroes_points_table_url` when set, opponent + ground linking to
+`maps_url`, a CricHeroes match link, and the full squad list sorted
+alphabetically with C/VC/WK badges — same fields, same sort, same
+name-linking fallback chain `FixturesCard`'s own squad grid uses:
+`/players/[id]/stats` if the row resolves to a Hub player, else
+`cricheroes_url`, else plain text) — but **re-themed to the dashboard's own
+Warm Light palette** (`#FFFFFF` card, `#D4C9B0`/`#F5D9A8` borders, `#D97706`
+gold accents) rather than `FixturesCard`'s hardcoded dark gradient
+(`player-availability.md` §10.1 already documents why `FixturesCard`/
+`FixturesAvailability` stay dark even on an otherwise-Warm-Light page
+shell — this card is a different, dashboard-native component, not that
+same component reskinned in place). The viewer's own row in the squad list
+is tinted gold (`#B45309`) rather than the default slate, so they can spot
+themselves in the list at a glance.
 
 ### Dashboard Sections
 
 | Section | Content |
 |---|---|
 | Welcome banner | Avatar, "Welcome back, `{firstName}`! 👋", subtitle, a static "🛡️ Spartans CC Bengaluru" badge pill |
-| Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald "Positive" if ≥ 0, amber "Exempted" if negative but dues-waived, else crimson "Overdue"; **clickable → `/wallet`**, added September 2026 — see `features/wallet-ledger.md`) |
+| You're Selected to Play | Zero or more `SelectedMatchCard`s (see above) — one per upcoming booking with an announced squad this player is in; rendered above Upcoming Fixtures, entirely absent when there are none |
+| Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald, no tag if ≥ 0 (see below), amber "Exempted" if negative but dues-waived, else crimson "Overdue"; **clickable → `/wallet`**, added September 2026 — see `features/wallet-ledger.md`) |
 | Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
 | Upcoming Fixtures | Header + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `upcomingPreview`, or a dashed empty-state box ("No Upcoming Matches Scheduled") when there are none |
 | Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |
