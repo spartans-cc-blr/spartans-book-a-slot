@@ -24,6 +24,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { WalletStatementClient } from '@/components/wallet/WalletStatementClient'
+import { WalletExportMenu } from '@/components/admin/WalletExportMenu'
 
 type PlayerOption = { id: string; name: string; wallet_balance: number }
 
@@ -101,7 +102,10 @@ export default function AdminWalletPage() {
 
   return (
     <div>
-      <h1 className="font-cinzel text-xl font-bold text-gold mb-1">Wallet</h1>
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <h1 className="font-cinzel text-xl font-bold text-gold">Wallet</h1>
+        <WalletExportMenu />
+      </div>
       <p className="font-rajdhani text-zinc-500 text-sm mb-6">
         Player payments, match fee debits, and corrections — all in one place.
       </p>

@@ -183,6 +183,7 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/wallet/opening-balance` | PATCH | Admin | Sets or clears (`amount: null`) a player's "Brought Forward" statement override |
 | `/api/wallet/transfers` | POST | Admin | Player-to-player sponsorship — debits `sponsor_player_id`, credits `beneficiary_player_id` by the same amount, linked via `wallet_transfers`; see `features/wallet-ledger.md` §14 |
 | `/api/admin/fee-reminders` | GET | Admin | Every currently fee-pending booking (scorecard synced, fee configured, squad announced, not yet applied/externally-reconciled) — feeds the admin-only fee reminder modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
+| `/api/admin/wallet/export` | GET | Admin | Downloadable wallet report (`.xls`, no new npm dependency) for `/admin/wallet`'s top-right "⬇ Export" menu — a Summary sheet (player + balance) and a Detailed sheet (player, transaction, running total); see `features/wallet-ledger.md` §16 |
  
 ### Family Auth APIs *(Planned — U-24)*
  
@@ -849,6 +850,7 @@ Next.js API Routes (server-side)
 | `src/app/api/wallet/opening-balance/route.ts` | PATCH — admin override of a player's Brought Forward line |
 | `src/app/api/wallet/transfers/route.ts` | POST — admin-recorded player-to-player sponsorship transfer; see `features/wallet-ledger.md` §14 |
 | `src/app/wallet/page.tsx` + `src/components/wallet/WalletStatementClient.tsx` | `/wallet` — player's own bank-statement view; the client component is reused in `admin` mode by `/admin/wallet`, including its "🎁 Sponsor" player-to-player transfer action — see `features/wallet-ledger.md` §14 |
+| `src/lib/walletExport.ts` + `src/app/api/admin/wallet/export/route.ts` + `src/components/admin/WalletExportMenu.tsx` | `/admin/wallet`'s top-right "⬇ Export" menu — downloadable `.xls` (Summary + Detailed sheets), no new npm dependency — see `features/wallet-ledger.md` §16 |
 | `src/app/admin/wallet/page.tsx` | Admin wallet hub — pending fee applications, player search + drill-down, club-wide feed |
 | `src/components/admin/FeeReminderModal.tsx` + `src/components/ui/GlobalFeeReminderModal.tsx` | Admin-only "fees pending" reminder modal, mounted once in the root layout |
 | public/sw.js | Service worker — PWA caching + push notification display + notificationclick handler |

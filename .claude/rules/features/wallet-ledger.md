@@ -779,4 +779,89 @@ own statement. No new page or route was added beyond the API endpoint.
 
 ---
 
+## 16. Admin Wallet Export — downloadable report (added September 2026)
+
+An "⬇ Export" menu in the top-right corner of `/admin/wallet`'s header,
+next to the page title, with a single item: **"📊 Wallet Report (.xls)"**.
+Downloads one workbook with two named sheets:
+
+- **Summary** — one row per player: `Player Name`, `Wallet Balance`
+  (their current, live `players.wallet_balance` — the same number shown
+  everywhere else in the app, not a computed-as-of-today figure).
+- **Detailed** — one row per transaction, grouped by player in
+  chronological (oldest-first) order: `Player Name`, `Transaction` (a
+  single descriptive string — date, credit/debit, amount, reason), and
+  `Running Total` (the balance after that transaction). Each player's
+  block is seeded with a `Brought Forward` row using the exact same
+  `opening = wallet_balance − Σ ledger deltas` formula (admin override via
+  `wallet_opening_balance` taking precedence, same as everywhere else —
+  see §5) the `/wallet` statement page already uses for its own Brought
+  Forward line — so the exported running total ties out to a real ledger,
+  not just a bare transaction dump, and the club-wide export can never
+  disagree with what a player sees on their own statement. A player with
+  zero transactions has no rows on the Detailed sheet (nothing to show)
+  but still appears on Summary.
+
+### No new npm dependency — the "HTML + SpreadsheetML" workbook trick
+
+This repo deliberately keeps its runtime dependency count minimal (see
+`limitations.md`'s cold-start audit — "only 11 runtime dependencies... no
+PDF/image-processing/chart libraries"), so this export does not pull in an
+xlsx-writing library. Instead `buildWalletExportWorkbook()`
+(`src/lib/walletExport.ts`) emits the long-standing HTML-based
+SpreadsheetML workbook format — the same thing Excel itself produces via
+*File → Save As → Web Page* — a plain HTML document whose `<head>` carries
+an `<x:ExcelWorkbook>`/`<x:ExcelWorksheet>` block naming two sheets
+("Summary", "Detailed") and whose `<body>` has one `<table>` per sheet, in
+the same order. Real Excel opens this as a normal multi-sheet workbook
+with no library needed on either end. Served with
+`Content-Type: application/vnd.ms-excel` and a `.xls` filename
+(`wallet-report-<YYYY-MM-DD>.xls`) via `Content-Disposition: attachment`,
+prefixed with a UTF-8 BOM so the `₹` symbol in the Transaction column
+renders correctly.
+
+### Pagination — the same PostgREST row-cap class of bug, pre-empted
+
+`fetchAllTransactions()` (`src/lib/walletExport.ts`) pages through
+`wallet_transactions` via `.range()` in batches of 1000 rather than one
+unpaginated `.select()`, since PostgREST silently caps an unpaginated
+response at 1000 rows — exactly the class of bug that once undercounted
+`/leaderboard`'s Honor Board (`features/leaderboard.md` §8.1). The
+club-wide wallet ledger can plausibly cross that threshold across a full
+season, so this export pages explicitly rather than risk a silently
+truncated report.
+
+### Where it lives — admin-only, `/admin/wallet` specifically
+
+Not on the player-facing `/wallet` page — every row on both sheets is
+keyed by `Player Name`, which only makes sense as a club-wide, admin-only
+view (the same audience as the rest of `/admin/wallet`). `GET
+/api/admin/wallet/export` is a thin wrapper: `buildWalletExportData()` +
+`buildWalletExportWorkbook()` from `src/lib/walletExport.ts`, gated on
+`user?.isAdmin` server-side — the menu itself is a plain `<a href>` to
+that route (no fetch+blob dance needed, since the response already sets
+`Content-Disposition: attachment` and the browser handles the download
+using the existing same-origin session cookie).
+
+### Security (vibe-security)
+
+| Check | Status |
+|---|---|
+| `GET /api/admin/wallet/export` requires `isAdmin`, server-side | ✅ |
+| No new write path — this feature is entirely read-derived, same posture as every other read-only admin panel (e.g. `/api/admin/fee-reminders`) | ✅ |
+| No rate limit — same convention as other admin-only GET panels (low-traffic, single-admin-triggered) | ✅ |
+| Running totals use the same opening-balance formula (and the same admin override) as the player-facing `/wallet` statement — no separate, divergent calculation that could show a different number to an admin than to the player themselves | ✅ |
+| Wallet ledger read paginated past PostgREST's 1000-row default cap | ✅ |
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/lib/walletExport.ts` | `buildWalletExportData()` (paginated fetch + per-player running-total calc), `buildWalletExportWorkbook()` (HTML/SpreadsheetML two-sheet workbook builder) |
+| `src/app/api/admin/wallet/export/route.ts` | GET — admin-only, streams the `.xls` download |
+| `src/components/admin/WalletExportMenu.tsx` | The top-right "⬇ Export" dropdown |
+| `src/app/admin/wallet/page.tsx` | Renders `WalletExportMenu` in the page header, top-right |
+
+---
+
 *Maintained by: Spartans CC BLR*
