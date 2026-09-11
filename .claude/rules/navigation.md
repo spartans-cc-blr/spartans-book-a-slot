@@ -97,10 +97,14 @@ Actions list). The dashboard is a **self-contained Warm Light "island"**
 (`background: '#F0F4F5'`, white/parchment cards, `#D97706` gold accent) —
 the same "light content on an otherwise dark app" pattern already
 established by `/gc-players` (Slate & Teal) and the admin Kit Room page, not
-a site-wide reskin. The dark hero band above it (`SPARTANS HUB` title) and
-everything below it (Quick Links divider, split-audience cards, footer) are
-unchanged, still dark-ink themed — only the dashboard section itself
-switched palette.
+a site-wide reskin. `SiteNav` above it and everything below it (split-audience
+cards, footer) are unchanged, still dark-ink themed — only the dashboard
+section itself switched palette. (The page also had a dark hero band —
+"SPARTANS CRICKET CLUB · BENGALURU · EST. 2014" / "Spartans Hub" title /
+subtitle — directly under the nav; removed September 2026, see the note
+below the Dashboard Sections table, since `SiteNav`'s own logo lockup and
+the footer's "© 2026 Spartans Cricket Club · Bengaluru · Est. 2014" line
+already said the same thing.)
 
 ### `getPlayerData(playerId)` — Server Function
 
@@ -365,6 +369,26 @@ dashboard is already a signed-in Spartans CC Bengaluru member — the badge
 told them nothing they didn't already know just by being logged in, so it
 was removed rather than kept as decoration. The banner is now just the
 avatar, greeting, and subtitle.
+
+**Page-level hero band removed entirely (fixed September 2026)** — a
+different, page-wide element from the welcome banner above: a dark
+`bg-ink-2` band directly under `SiteNav`, present for *every* visitor
+state (logged-out, player, expelled, unmatched — not just the player
+dashboard), reading "— SPARTANS CRICKET CLUB · BENGALURU · EST. 2014" /
+"Spartans Hub" / "Club operations platform — fixtures, availability,
+scheduling and more." Removed outright rather than trimmed, since it was
+pure repetition of identity chrome that already exists twice elsewhere on
+the same page: `SiteNav`'s own logo lockup (the Spartans CC mark + "SPARTANS
+CC" wordmark, always visible in the nav bar above it) and the page footer's
+"© 2026 Spartans Cricket Club · Bengaluru · Est. 2014" line. With both of
+those already present, the hero band added a third copy of the same
+club-identity statement with no new information — same "cut, don't
+decorate" reasoning as the welcome banner badge and the "✓ Selected" pill
+right above this note. Every render branch that used to sit directly below
+the hero (Expelled notice, Unmatched-Gmail callout, the player dashboard,
+the split-audience cards, the sign-in prompt) is unaffected in content —
+only the spacing/order shifted up, since each of those blocks already
+carries its own top-level padding independent of the hero.
 
 **Stat tiles are drill-down targets, not just numbers (added September 2026).**
 The club coordinator flagged that "18 Upcoming Matches" / "9 My Tournaments"
