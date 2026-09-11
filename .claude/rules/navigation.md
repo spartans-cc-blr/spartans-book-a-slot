@@ -18,6 +18,33 @@ The home page (`/`) replaced a simple redirect to `/schedule` that was organiser
 **Option 2 — Split-audience home page** was selected over:
 - Option 1 (smart redirect based on session) — too invisible, players without a session still saw the organiser view
 - Option 3 (fixtures as the root) — broke the organiser-facing URL that was already being shared externally
+
+### Two different "default landing page" mechanisms — kept in sync (fixed September 2026)
+
+There are two independent things that decide what a player sees first, and
+they can drift apart:
+
+1. **A normal signed-in browser session** — there is no server-side
+   redirect away from `/` for a logged-in player. `middleware.ts`'s
+   `matcher` only guards `/gc/:path*`, `/gc-review`, `/gc-players`, and
+   `/admin/:path*`; `/lib/auth.ts` has no custom `callbacks.redirect`. The
+   Home page's own "Sign in with Google" button links straight to
+   `/api/auth/signin` with no `callbackUrl` query param, so NextAuth's
+   default post-sign-in redirect (back to the site's base URL) already
+   lands the player on `/` — this page, with the personalised dashboard
+   (§3.1), has been the real default here since it shipped.
+2. **The installed PWA** ("Add to Home Screen" — the install path
+   `features/push-notifications.md` walks iPhone players through so web
+   push works) — this is governed entirely separately, by `start_url` in
+   `src/app/manifest.ts`. That value had never been updated when this
+   split-audience Home page replaced the old `/schedule` redirect — it was
+   still `/fixtures`, so tapping the installed app's icon skipped Home
+   entirely and opened Fixtures directly, regardless of what `/` itself
+   would have shown. **Fixed** — `start_url` is now `'/'`, so the PWA's own
+   default matches the browser one. A player who already installed the app
+   before this fix needs to reinstall it (remove and re-"Add to Home
+   Screen") to pick up the new `start_url` — a PWA manifest is normally
+   cached and isn't re-read on every app launch.
 ---
  
 ## 2. File Map
@@ -31,6 +58,7 @@ The home page (`/`) replaced a simple redirect to `/schedule` that was organiser
 | `src/app/profile/page.tsx` | Player self-service profile edit page |
 | `src/app/api/players/[id]/route.ts` | GET + PATCH for single player — IDOR-protected |
 | `src/lib/auth.ts` | JWT callback — enriches session with player context, saves Google photo on first sign-in |
+| `src/app/manifest.ts` | PWA manifest — `start_url` is the installed app's own "default landing page," independent of a browser session's; kept in sync with `/` (§1) |
  
 ---
  

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Spartans Hub',
     short_name: 'Spartans',
     description: 'Spartans CC BLR — Fixtures, Availability & Squad Hub',
-    start_url: '/fixtures',
+    start_url: '/',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#0D0F14',
