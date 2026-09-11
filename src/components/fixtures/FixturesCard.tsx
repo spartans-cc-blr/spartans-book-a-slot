@@ -87,14 +87,14 @@ function PinkBall({ size = 20 }: { size?: number }) {
   );
 }
 
-function stageIcon(stage: string): string {
+export function stageIcon(stage: string): string {
   const s = stage.toLowerCase()
   if (s.includes('final') || s.includes('quarter')) return '🏆'
   return '🎖️'
 }
 
 // ── CricHeroes Icon ───────────────────────────────────────────────
-function CricHeroesIcon({ size = 20 }: { size?: number }) {
+export function CricHeroesIcon({ size = 20 }: { size?: number }) {
   return (
     <img
       src="/cricheroes-logo.jpg"
@@ -107,7 +107,7 @@ function CricHeroesIcon({ size = 20 }: { size?: number }) {
 }
 
 // ── Map Pin Icon ──────────────────────────────────────────────────
-function MapPinIcon({ size = 18 }: { size?: number }) {
+export function MapPinIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
@@ -118,7 +118,7 @@ function MapPinIcon({ size = 18 }: { size?: number }) {
 }
 
 // ── Hospital Icon ─────────────────────────────────────────────────
-function HospitalIcon({ size = 18 }: { size?: number }) {
+export function HospitalIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="3" y="3" width="18" height="18" rx="3" fill="#EF4444" stroke="#B91C1C" strokeWidth="0.5"/>
@@ -129,28 +129,28 @@ function HospitalIcon({ size = 18 }: { size?: number }) {
 }
 
 // ── Ball Component Selector ───────────────────────────────────────
-function BallIcon({ type, size = 20 }: { type: 'red' | 'white' | 'pink'; size?: number }) {
+export function BallIcon({ type, size = 20 }: { type: 'red' | 'white' | 'pink'; size?: number }) {
   if (type === "white") return <WhiteBall size={size} />;
   if (type === "pink")  return <PinkBall  size={size} />;
   return                        <RedBall   size={size} />;
 }
 
 // ── Jersey logic ──────────────────────────────────────────────────
-function jerseyColour(ballType: 'red' | 'white' | 'pink'): 'gold' | 'white' {
+export function jerseyColour(ballType: 'red' | 'white' | 'pink'): 'gold' | 'white' {
   return ballType === "white" ? "gold" : "white";
 }
 
-function jerseyLabel(ballType: 'red' | 'white' | 'pink'): string {
+export function jerseyLabel(ballType: 'red' | 'white' | 'pink'): string {
   return ballType === "white" ? "Colour jersey" : "White jersey";
 }
 
 // ── Slot label ────────────────────────────────────────────────────
-function slotLabel(slot: string): string {
+export function slotLabel(slot: string): string {
   const map: Record<string, string> = { "07:30": "7:15 AM", "10:30": "10:15 AM", "12:30": "12:15 PM", "14:30": "2:15 PM" };
   return map[slot] || slot;
 }
 
-function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 }
