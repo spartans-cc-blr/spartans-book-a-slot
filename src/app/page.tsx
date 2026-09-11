@@ -438,28 +438,6 @@ export default async function HomePage() {
     <div className="min-h-screen bg-ink grain">
       <SiteNav activePage="home" />
 
-      {/* ── HERO ── */}
-      <div className="relative overflow-hidden bg-ink-2 border-b border-ink-4">
-        {/* Background glow */}
-        <div className="absolute -top-16 -right-16 w-80 h-80 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
-        <div className="absolute -bottom-8 -left-8 w-60 h-60 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(192,19,44,0.06) 0%, transparent 70%)' }} />
-
-        <div className="px-5 md:px-8 lg:px-10 py-10 md:py-14 relative z-10">
-          <p className="text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-3 flex items-center gap-2">
-            <span className="w-4 h-px bg-gold inline-block" />
-            Spartans Cricket Club · Bengaluru · Est. 2014
-          </p>
-          <h1 className="font-cinzel text-3xl md:text-4xl font-bold text-parchment mb-3 tracking-wide leading-tight">
-            Spartans Hub
-          </h1>
-          <p className="text-muted text-sm md:text-base max-w-lg leading-relaxed font-rajdhani">
-            Club operations platform — fixtures, availability, scheduling and more.
-          </p>
-        </div>
-      </div>
-
       {/* ── EXPELLED STATE ── */}
       {isExpelled && (
         <div className="px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
@@ -489,7 +467,7 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* ── PLAYER DASHBOARD — Warm Light, self-contained (nav + hero above stay dark) ── */}
+      {/* ── PLAYER DASHBOARD — Warm Light, self-contained (nav above stays dark) ── */}
       {isPlayer && playerData && (
         <div style={{ background: '#F0F4F5' }} className="px-5 md:px-8 lg:px-10 py-6">
           <div className="max-w-4xl mx-auto">
