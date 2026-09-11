@@ -516,10 +516,6 @@ export default async function HomePage() {
                   Here's your real-time overview for matches &amp; availability.
                 </p>
               </div>
-              <span className="font-rajdhani text-xs font-bold px-4 py-2 rounded-full flex items-center gap-2 flex-shrink-0"
-                style={{ background: '#FFFFFF', color: '#B45309', border: '1px solid #F5D9A8' }}>
-                🛡️ Spartans CC Bengaluru
-              </span>
             </div>
 
             {/* Stat tiles — 2x2 */}

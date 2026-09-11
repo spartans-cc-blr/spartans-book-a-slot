@@ -82,10 +82,6 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
         </span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
-            style={{ background: '#D1FAE5', color: '#059669' }}>
-            ✓ Selected
-          </span>
-          <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
             style={{ background: '#DBEAFE', color: '#1D4ED8' }}>
             {match.format}
           </span>
