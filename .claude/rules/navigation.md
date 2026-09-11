@@ -406,29 +406,57 @@ one more follow-up in the same series)** — the border removals above
 stopped the hero and footer from drawing their own extra divider/band, but
 `page.tsx`'s outermost wrapper (`<div className="min-h-screen bg-ink
 grain">`, wrapping the whole page — nav, dashboard, footer, everything)
-was still `bg-ink`, the same dark near-black (`#1C1917`) the old dark-ink
-theme used everywhere. Once the nav went Warm Light too (see §4's "Warm
-Light nav, site-wide" note) and the dashboard already was, that root `bg-
-ink` had nothing left it was actually needed for on this page except
-filling in the gaps *around* the light dashboard box — the empty wrapper
-div between the dashboard and the footer (both its own conditional
-children, the split-audience cards and sign-in prompt, are hidden once
-`isPlayer`), and the footer's own vertical padding — which is exactly the
-"still a black band at the bottom" a signed-in player kept seeing. Fixed
-by switching the root wrapper to `bg-parchment` (`#F8F4EE`, the same
-default page background `ui-theme.md` already specifies for every other
-page's `<main>`) instead of `bg-ink`. The footer's own text
-(`text-zinc-600`/`text-zinc-700` — legible-enough on the old dark bg, but
-essentially invisible on a light one) was updated to `#78716C`/hover
-`#44403C`, matching the Warm Light "muted"/"secondary text" tokens used
-everywhere else in this file. The Expelled/Unmatched banners and the
-logged-out split-audience/sign-in cards (`bg-ink-3`/`bg-red-950`/
-`bg-amber-950`, all self-contained dark cards with their own background
-and already-correct light-on-dark text) needed **no** changes — they carry
-their own background regardless of what the root wrapper behind them is,
-so they still render as intentional dark accent cards sitting on the new
-light page, the same way they always looked like dark cards sitting on
-the old dark page.
+was still `bg-ink`, near-black (`#080808` as actually shipped — see the
+Tailwind-token correction below §4's "Warm Light nav" note; `ui-theme.md`
+had documented this as `#1C1917`, a different dark shade, which was also
+wrong). Once the nav went Warm Light too (see §4's "Warm Light nav,
+site-wide" note) and the dashboard already was, that root `bg-ink` had
+nothing left it was actually needed for on this page except filling in
+the gaps *around* the light dashboard box — the empty wrapper div between
+the dashboard and the footer (both its own conditional children, the
+split-audience cards and sign-in prompt, are hidden once `isPlayer`), and
+the footer's own vertical padding — which is exactly the "still a black
+band at the bottom" a signed-in player kept seeing. Fixed by switching the
+root wrapper to `bg-parchment` (`#F8F4EE`, the same default page
+background `ui-theme.md` already specifies for every other page's
+`<main>` — and, unlike `gold`/`crimson`/`ink`, the one Tailwind colour
+token that genuinely does match its documented value) instead of
+`bg-ink`. The footer's own text (`text-zinc-600`/`text-zinc-700` —
+legible-enough on the old dark bg, but essentially invisible on a light
+one) was updated to `#78716C`/hover `#44403C`, matching the Warm Light
+"muted"/"secondary text" tokens used everywhere else in this file. The
+Expelled/Unmatched banners and the logged-out split-audience/sign-in
+cards (`bg-ink-3`/`bg-red-950`/`bg-amber-950`, all self-contained dark
+cards with their own background and already-correct light-on-dark text)
+needed **no** changes — they carry their own background regardless of
+what the root wrapper behind them is, so they still render as intentional
+dark accent cards sitting on the new light page, the same way they always
+looked like dark cards sitting on the old dark page.
+
+**A second dark element remained after that fix — the mobile bottom tab
+bar (fixed September 2026, same "still a black band" report, reproduced
+via a real screenshot this time).** The root-background fix above
+addressed everything in *normal document flow*, but `MobileTabBar` — the
+fixed "Home · Matches · My Stats · More" bar `SiteNav` renders as a
+sibling right after `</nav>` (§4.1) — is a **separate** component with its
+own independent light/dark `theme` prop, defaulting to `'dark'` unless a
+page explicitly opts in. Home's `<SiteNav activePage="home" />` call had
+never passed `mobileTabBarTheme="light"`, so on mobile the tab bar kept
+rendering its dark tokens (`navBg: '#111111'`) directly underneath the now-
+light page content — visually indistinguishable, in a screenshot, from
+"the black band is still there," even though the root-background fix
+above was already correctly live. Fixed by adding
+`mobileTabBarTheme="light"` to Home's `<SiteNav>` call, the same prop
+`/fixtures` and `/matches/history` already pass for the identical reason
+(§4.1's Warm Light variant note) — the tab bar now reads the same
+`'light'` token set (`#FFFFFF`/`#F8F4EE` surfaces, `#D97706` gold,
+`#D4C9B0` borders) those two pages already use. The one still-known gap
+this doesn't close: `GenerateInviteItem.tsx`'s `mobile` branch, rendered
+inside the "More" sheet, stays hardcoded dark regardless of this prop
+(§4's "Deliberately still just the nav bar" note already flags this as
+pre-existing, GC/admin-only, out of scope) — now slightly more visible
+on Home for a GC/admin viewer who opens the sheet, but not the reported
+symptom.
 
 **Stat tiles are drill-down targets, not just numbers (added September 2026).**
 The club coordinator flagged that "18 Upcoming Matches" / "9 My Tournaments"
@@ -480,27 +508,40 @@ pages that had already gone light, the nav itself is now Warm Light —
 unconditionally, on every page, not behind a per-page opt-in prop the way
 `MobileTabBarTheme` works for the bottom tab bar (§4.1).
 
-`bg-ink-2` (the dark surface, `#292524`) was replaced with `bg-white`
-throughout — the main bar, every dropdown panel (Matches/Captains'
-Corner/Council/Wrangler/Profile), and their hover/active states. Text
-colours that assumed a dark backdrop were swapped for the same tokens the
-rest of the app's Warm Light surfaces already use:
-`text-parchment`→`#1C1917`, `text-zinc-400`→`#44403C`,
-`text-zinc-500`/`text-zinc-600`→`#78716C`, `text-red-400`→`#B91C1C`
-(crimson-dark), and the GC badge's dark-mode `bg-sky-900/40
-border-sky-700 text-sky-400` → a light-mode `bg-sky-50 border-sky-300
-text-sky-700`. An active/selected dropdown row's highlight changed from
-`bg-ink-3` to `#FEF3C7` (the same `--color-gold-light` tinted-background
-token `ui-theme.md` already defines for this exact purpose). `border-ink-5`
-(`#D4C9B0`) needed **no** change at all, despite the name — it was already
-the Warm Light palette's own border token (`ui-theme.md`'s
-`--color-border`), just reused as a *light* border-on-dark-surface accent
-in the old dark nav; it reads correctly as a border on the new white
-surface too, with zero edits. `text-gold`/`border-gold-dim`/`bg-gold/10`
-(the CAPTAIN badge, the sign-in button, avatar borders) were likewise
-untouched — `#D97706`/`#B45309` are already the palette's accent colours
-for light surfaces specifically, so every gold-branded element that worked
-on the dark nav works identically on the new light one.
+`bg-ink-2` (the dark surface) was replaced with `bg-white` throughout —
+the main bar, every dropdown panel (Matches/Captains' Corner/Council/
+Wrangler/Profile), and their hover/active states. Text colours that
+assumed a dark backdrop were swapped for the same tokens the rest of the
+app's Warm Light surfaces already use: `text-parchment`→`#1C1917`,
+`text-zinc-400`→`#44403C`, `text-zinc-500`/`text-zinc-600`→`#78716C`,
+`text-red-400`→`#B91C1C` (crimson-dark), and the GC badge's dark-mode
+`bg-sky-900/40 border-sky-700 text-sky-400` → a light-mode `bg-sky-50
+border-sky-300 text-sky-700`. An active/selected dropdown row's highlight
+changed from `bg-ink-3` to `#FEF3C7` (the same `--color-gold-light`
+tinted-background token `ui-theme.md` defines for this exact purpose).
+`text-gold`/`border-gold-dim`/`bg-gold/10` (the CAPTAIN badge, the sign-in
+button, avatar borders) were left untouched, on the assumption they were
+already the palette's light-surface accent colours (`#D97706`/`#B45309`)
+— **this assumption turned out to be wrong for the bare Tailwind token**,
+see the correction below.
+
+**Correction (fixed September 2026, a few messages later) —
+`border-ink-5` actually needed a real fix, not "zero edits."** The claim
+above (in the original version of this section) that `border-ink-5`
+already resolved to the light `#D4C9B0` tan was wrong — it was taken from
+`ui-theme.md`'s "Tailwind Token Mapping" section, which turned out to
+describe the *planned* Option 1 palette, not what `tailwind.config.ts`
+actually ships. The real `ink.5` is `#2E2E2E`, a dark gray — so every
+`border-ink-5` in the new white nav was rendering a dark border, not the
+intended light one. Every occurrence in `SiteNav.tsx` was switched to the
+literal `border-[#D4C9B0]` arbitrary-value class instead of the token.
+`text-gold`/`border-gold-dim` were left alone even after this was found —
+the real shipped values (`#C9A84C`/`#7A6030`, a more muted khaki-gold) are
+a different shade from the documented `#D97706`/`#B45309`, but still read
+as "gold" and weren't part of the reported symptom (a dark border/
+background, not an off-shade accent colour) — see `ui-theme.md`'s
+Tailwind Token Mapping section for the full correction and the
+still-open gap between the two palettes.
 
 `GenerateInviteItem.tsx`'s desktop (non-`mobile`) render branch — used
 only inside `SiteNav`'s Council ⚖ dropdown — got the same treatment

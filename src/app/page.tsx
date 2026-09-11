@@ -436,7 +436,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-parchment grain">
-      <SiteNav activePage="home" />
+      <SiteNav activePage="home" mobileTabBarTheme="light" />
 
       {/* ── EXPELLED STATE ── */}
       {isExpelled && (
