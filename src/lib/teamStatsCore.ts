@@ -1,6 +1,6 @@
 // Pure, client-safe half of the team-stats layer — types, filters and
 // aggregators only. NO server imports: this file is imported by the
-// 'use client' components under src/components/team/ (TeamFilterBar,
+// 'use client' components under src/components/team/ (TeamFilterPanel,
 // TeamSplitTable), and anything reachable from a client component ends up
 // in the browser bundle. The fetch (getTeamMatches) lives in teamStats.ts,
 // which imports server-only modules (service-role Supabase, the analytics

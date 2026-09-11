@@ -64,7 +64,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/wallet` | Server → `WalletStatementClient` (client) | `wallet_transactions` (own rows, paginated), `players.wallet_balance`/`wallet_opening_balance*`; see `features/wallet-ledger.md` |
 | `/matches/history` | Server → `MatchHistoryClient` (client) | `bookings` (past confirmed), `scorecard_uploads`, `match_stats_cache`, `squad`; upload/sync/verify/flag actions gated per-booking to captain/VC/wrangler/admin, but the verified status itself is visible to every viewer — see `features/post-match-scorecard.md` §14 |
 | `/leaderboard` | Server → `LeaderboardMilestones`/`LeaderboardMonthly`/`LeaderboardTable` (client) | Analytics DB (`batting_stats`/`bowling_stats`/`fielding_stats`/`team_list`) via `src/lib/playerStats.ts`, joined to Hub `players`; year/month/tournament/ground/format filters — see `features/leaderboard.md` |
-| `/team-stats` | Server → `TeamFilterBar`/`TeamSplitTable` (client) | Team Record — `match_stats_cache` ⋈ `bookings` (⋈ `tournaments`/`grounds`/`opponents`), match captain from `squad`, toss from the analytics DB's `match_stats`; W/L split by tournament/ground/opponent/format/league-knockout/innings/toss/captain/year/month/slot, records, form — see `features/team-stats.md` |
+| `/team-stats` | Server → `TeamFilterShell`/`TeamSplitTable` (client) | Team Record — `match_stats_cache` ⋈ `bookings` (⋈ `tournaments`/`grounds`/`opponents`), match captain from `squad`, toss from the analytics DB's `match_stats`; W/L split by tournament/ground/opponent/format/league-knockout/innings/toss/captain/year/month/slot, records, form — see `features/team-stats.md` |
  
 ### Captain Routes (`isCaptain` or `isAdmin`)
  
@@ -907,7 +907,8 @@ Next.js API Routes (server-side)
 | `src/app/leaderboard/page.tsx` | `/leaderboard` ("Yours Statistically") — any signed-in, non-expelled member; year/month/tournament/ground/format filters; see `features/leaderboard.md` |
 | `src/lib/teamStats.ts` + `src/lib/teamStatsCore.ts` | Team Record data layer — `getTeamMatches()` (server-only fetch) and the pure, client-safe aggregators (`applyFilters`/`summarize`/`splitBy`/`computeRecords`/…); see `features/team-stats.md` §2 |
 | `src/lib/opponents.ts` | `normaliseOpponentName()` / `resolveOpponentIdByName()` / `linkSpellingToOpponent()` — opponent master resolution, used by both booking routes and `/api/opponents*` |
-| `src/app/team-stats/page.tsx` + `src/components/team/*` | `/team-stats` — Team Record page, filter bar, expandable split table |
+| `src/app/team-stats/page.tsx` + `src/components/team/*` + `src/lib/teamStatsFilters.ts` | `/team-stats` — Team Record page; filter panel (chip summary row, desktop aside / mobile bottom sheet, staged apply), scrolling split row, expandable split table — see `features/team-stats.md` §3.1 |
+| `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher rendered under both `/leaderboard`'s and `/team-stats`'s hero |
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` + `src/app/api/opponents/**` | `/opponents` — opponent master + reconciliation queue and its API |
 | `src/components/admin/StageTypeToggle.tsx` | League/Knockout toggle on both admin booking forms → `bookings.stage_type` |
 | `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()`, `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()` — shared analytics-DB query layer, also used by Captains' Corner recent-form |

@@ -54,7 +54,8 @@ Split in two on purpose, after a `next build` failure:
 | `teamStatsCore.ts` | `TeamMatch` type, `normaliseResult()`, `applyFilters()`, `summarize()`, `recentForm()`, `currentStreak()`, `splitBy()`, `computeRecords()`, `winMargin()`, `filterOptions()`, `opponentKey()`, `SPLIT_LABEL` — **pure functions, no server imports** | Anywhere, including `'use client'` components |
 | `teamStats.ts` | `getTeamMatches()` — the one fetch; `export *` of the core | Server Components / routes only |
 
-The first cut had everything in one file. `TeamFilterBar.tsx` and
+The first cut had everything in one file. `TeamFilterBar.tsx` (since
+replaced by `TeamFilterPanel.tsx`, §3.1) and
 `TeamSplitTable.tsx` (both `'use client'`) imported a constant and two
 formatters from it, which pulled `createAnalyticsClient` →
 `playerIdentityResolution.ts` → `matchStatsSync.ts` → `webpush.ts` into the
@@ -129,7 +130,58 @@ follows Light/Dark/System like `/leaderboard`, `ui-theme.md`).
 `stage` (`league`/`knockout`), `practice=1`, `by` (the split dimension).
 Invalid/absent values fall back to "no restriction"; a `tournament`/
 `ground`/`opponent` id not present in the data falls back to "all" rather
-than rendering a `<select>` with no matching option.
+than rendering a `<select>` with no matching option. The URL shape lives
+in one pure module, `src/lib/teamStatsFilters.ts` (`TeamFilterState`,
+`buildTeamStatsHref()`, `toTeamFilters()`, `clearFilter()`, …), imported by
+both the Server Component and the client panel below so the two can never
+disagree on what a link means. Unit-tested in `teamStatsFilters.test.ts`.
+
+### 3.1 Filter panel — `TeamFilterPanel.tsx` (reworked September 2026)
+
+The first cut rendered every filter inline above the numbers: seven
+`<select>`s, a checkbox and eleven "Split by" pills, stacked. On a phone
+that was the entire first screen — the record itself (Played 103 · Won 55)
+only appeared below the fold, and every select change was its own server
+round-trip. Reported with a screenshot the same day it shipped; replaced by
+`TeamFilterShell`, which wraps the whole results column:
+
+- **Summary row** (all widths) — a "Filters · N" button plus one removable
+  chip per active filter ("2026 ✕", "Thunder 5 ✕", "Practice included ✕")
+  and a "Clear all". Removing a chip navigates immediately. With nothing
+  applied it reads "All matches — no filters applied", so the current view
+  is always legible without opening anything.
+- **Desktop (`md+`)** — the panel is a persistent left aside (`sticky`,
+  272px) beside the results; "‹ Hide" collapses it and the summary row's
+  Filters button brings it back.
+- **Mobile** — the same panel as a bottom sheet (scrim, drag handle,
+  Escape/scrim-tap to close, body scroll locked while open — the idiom
+  `MobileTabBar`'s "More" sheet already established, and within thumb
+  reach). It was deliberately *not* a left-edge drawer: that competes with
+  the iOS edge-swipe gesture and with the app's own "‹ Back" affordance in
+  the top-left (`features/back-navigation.md`).
+- **Progressive "+ Add filter"** inside the panel — the panel only shows
+  the filters that are set; "+ Add filter" lists the rest (Season,
+  Tournament, Ground, Opponent, Format, Defending / Chasing, League /
+  Knockout, Practice games), and picking one adds its row with a select.
+  Adding "Practice games" just means *include them* (there's no value to
+  pick), so it toggles straight on.
+- **Staged, applied once.** Edits go into a local draft; the footer button
+  reads **"Show N matches"** and pushes one URL (`buildTeamStatsHref`) when
+  tapped, so a five-filter change is one navigation instead of five. The
+  live N is `applyFilters()` over the unfiltered match list the page hands
+  down — cheap, because that function lives in the client-safe
+  `teamStatsCore.ts` (§2). When the draft equals the URL the button is
+  inert and reads "Showing N matches"; a "Reset" link discards a dirty
+  draft, and closing the sheet discards it too. The draft resyncs whenever
+  the applied href changes (apply, chip removal, browser back).
+- **Split by** stays *outside* the panel — it's the primary interaction on
+  this page — as `SplitByRow`: one horizontally scrolling row of link pills
+  directly above the split table, with the active pill scrolled into view
+  on mount. Plain `<Link>`s (`scroll={false}`), since switching dimension
+  is a cheap re-render of already-fetched data.
+
+Net effect: the first screen is hero → segmented tabs → one chip row →
+Played/Won/Lost/Win % → form, and the panel is one tap away.
 
 Sections, top to bottom:
 
@@ -139,13 +191,16 @@ Sections, top to bottom:
    selected (hidden while the Opponent split itself is showing, to avoid
    listing them twice). Shows a "mark your rivals on Manage opponents"
    nudge to a manager if none are starred yet.
-3. **Split by …** — `TeamSplitTable` for the chosen dimension. One table
+3. **Split by …** — `SplitByRow` (§3.1) then `TeamSplitTable` for the chosen dimension. One table
    shape for every dimension: label · P · W · L · T/NR · Win % · form ·
    last played. **Every row expands** (`▸`) to the matches behind it —
    date, opponent (or tournament, on the Opponent split), both scores,
    format, bat-1st/chased, result + margin — each linking to
    `/matches/history/[bookingId]`. Marquee rows carry a pill; an opponent
-   row grouped only by raw spelling carries an "unlinked" hint.
+   row grouped only by raw spelling carries an "unlinked" hint; on the
+   Opponent split a one-line note under the table gives the unlinked count
+   and, for a manager, the "⚔️ Manage opponents →" link (see the hero note
+   below for why it lives here now).
    **A "Total" footer row** (added the same day, on request) closes every
    split with the aggregate P/W/L/T-NR/Win %/form/last-played across the
    rows above it — computed from the *distinct* matches behind those rows
@@ -161,13 +216,30 @@ Sections, top to bottom:
    wickets, highest/lowest total conceded), each linking to its match.
 5. **Recent matches** — last five, linking to Match History.
 
-The hero links across to `/leaderboard` and, for a manager, to
-`/opponents` with a live count of unlinked spellings in the current view.
+**Hero (changed September 2026).** The first cut's hero carried two text
+links — "Player stats — Yours Statistically →" and, for a manager,
+"⚔️ Manage opponents (N unlinked)". Both were flagged as not belonging
+there: the hero is the page's identity, not a link bin. Now:
 
-Components: `src/components/team/TeamFilterBar.tsx` (client — pushes
-searchParams), `src/components/team/TeamSplitTable.tsx` (client — the
-expandable table, plus the shared `FormPills` and `MatchList` used by the
-headline strip and Recent matches).
+- The cross-link to player stats is `StatsSegmentedTabs`
+  (`src/components/stats/StatsSegmentedTabs.tsx`) — a two-pill
+  "Yours Statistically | Team Record" control rendered under the `<h1>` on
+  **both** stats pages, the same shape `MatchesSegmentedTabs` gives
+  Upcoming / Past Matches. Two real routes, `active` passed in by each
+  page; reads the `--stats-*` tokens (active pill white-on-accent in light,
+  ink-on-gold in dark). The Stats ▾ dropdown and the More sheet still cover
+  navigation, so nothing was lost by dropping the sentence.
+- "Manage opponents" moved to where the data it fixes is visible: the note
+  under the Opponent split's table (above), and the marquee section's
+  empty-state nudge. It's also in the Captains' Corner / Council /
+  Wrangler menus (§6) for direct access.
+
+Components: `src/components/team/TeamFilterPanel.tsx` (client —
+`TeamFilterShell` + `SplitByRow`, §3.1), `src/components/team/TeamSplitTable.tsx`
+(client — the expandable table, plus the shared `FormPills` and `MatchList`
+used by the headline strip and Recent matches),
+`src/components/stats/StatsSegmentedTabs.tsx` (server — the two-pill stats
+switcher, shared with `/leaderboard`).
 
 ---
 
@@ -322,10 +394,12 @@ show an "unlinked" hint).
 | `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2) |
 | `src/lib/teamStats.ts` | `getTeamMatches()` fetch; re-exports the core (§2) |
 | `src/lib/teamStats.test.ts` | Vitest coverage of the aggregators |
+| `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers (`TeamFilterState`, `buildTeamStatsHref`, `toTeamFilters`, chip labels) shared by the page and the panel (§3) |
 | `src/lib/opponents.ts` | `normaliseOpponentName()`, `resolveOpponentIdByName()`, `linkSpellingToOpponent()`, `AliasConflictError` (§5) |
 | `src/lib/schemas.ts` | `opponentCreateSchema`, `opponentUpdateSchema`, `opponentLinkSchema` |
 | `src/app/team-stats/page.tsx` | The Team Record page (§3) |
-| `src/components/team/TeamFilterBar.tsx` | URL-driven filter bar + "Split by" pills |
+| `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `SplitByRow` — scrolling split-dimension pills (§3.1) |
+| `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher under both stats heroes (§3) |
 | `src/components/team/TeamSplitTable.tsx` | Expandable split table, `FormPills`, `MatchList` |
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` | Opponent master + reconciliation queue (§5) |
 | `src/app/api/opponents/route.ts` | GET / POST / PATCH |

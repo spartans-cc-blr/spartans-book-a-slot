@@ -23,6 +23,15 @@ session that fixed a real production bug and added two new cards — see
 untouched by that session (Detailed tables, the filter bar's own internals)
 are kept deliberately brief.
 
+**Hero — stats switcher (added September 2026).** Under the "Yours
+Statistically" `<h1>` the hero now renders `StatsSegmentedTabs`
+(`src/components/stats/StatsSegmentedTabs.tsx`), a two-pill
+"Yours Statistically | Team Record" control shared with `/team-stats` —
+the same shape `MatchesSegmentedTabs` gives Upcoming / Past Matches, so
+the player and team stats pages read as one area. The existing "My stats
+on Hub →" / CricHeroes links below it are unchanged. See
+`features/team-stats.md` §3.
+
 ---
 
 ## 2. Nav Structure — `LeaderboardFilters.tsx`
