@@ -576,6 +576,8 @@ same `--fx-card-*`/`--fx-badge-*` tokens, with their current dark gradient
 preserved exactly as the `dark` state and a new light variant designed
 alongside it (modelled on `SelectedMatchCard.tsx`, a close analog already
 built in Warm Light). See that component's own file for the final result.
+(Conversion of `FixturesCard.tsx` itself is still landing incrementally as
+of this note — `FixturesAvailability.tsx`'s own pass hasn't started yet.)
 
 ---
 

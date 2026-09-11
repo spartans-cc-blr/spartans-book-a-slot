@@ -13,8 +13,65 @@
 //   ground: { name, maps_url, hospital_url } // nullable
 // }
 
+'use client'
+
 import { useState } from "react";
 import { JerseyIcon } from '@/components/ui/JerseyIcon'
+import { useTheme } from '@/components/ui/ThemeProvider'
+
+// Light/Dark tokens — see ui-theme.md "Light/Dark/System" and
+// player-availability.md's theme-awareness note. DARK preserves this card's
+// original always-dark palette byte-for-byte — until now this card was
+// deliberately hardcoded dark regardless of page theme (see
+// player-availability.md/squad-selection.md's earlier "stays dark by
+// design" reasoning); that decision has been reversed, and this is the new
+// dark half of the toggle, not a fresh design. LIGHT is new, built from the
+// same Warm Light tokens SelectedMatchCard.tsx already established for a
+// near-identical layout. A handful of small, self-contained status chips —
+// the format pill, the WK badge, the "IN PROGRESS" pill, the ground/maps
+// green link, and the "Slot underfilled" warning — are left as plain
+// literals below (no ternary), since they already read fine on either card
+// background, same call SelectedMatchCard made for its own format/WK chips.
+const LIGHT = {
+  cardBg: 'linear-gradient(160deg, #FFFFFF 0%, #F8F4EE 100%)',
+  cardBorder: '#D4C9B0',
+  accentGradient: 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)',
+  dateText: '#B45309',
+  headingText: '#1C1917',
+  accentUnderline: '#D97706',
+  subtitleText: '#78716C',
+  opponentText: '#44403C',
+  groundText: '#78716C',
+  divider: '#E7E0D3',
+  faintText: '#A8A29E',
+  stageBg: '#FEF3C7', stageText: '#B45309', stageBorder: '#F5D9A8',
+  squadHeading: '#059669',
+  chevron: '#A8A29E',
+  feeText: '#78716C', feeBorder: '#E7E0D3', feeAmount: '#B45309',
+  walletPositive: '#059669', walletNegative: '#D97706',
+  squadText: '#44403C', squadUnderline: '#D4C9B0',
+  cBadgeBg: '#FEF3C7', cBadgeText: '#B45309', cBadgeBorder: '#F5D9A8',
+}
+const DARK = {
+  cardBg: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
+  cardBorder: '#2D3748',
+  accentGradient: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)',
+  dateText: '#C9A84C',
+  headingText: '#F5F5F5',
+  accentUnderline: '#C9A84C',
+  subtitleText: '#9CA3AF',
+  opponentText: '#D1D5DB',
+  groundText: '#6B7280',
+  divider: '#2D3748',
+  faintText: '#6B7280',
+  stageBg: '#2d1f00', stageText: '#f59e0b', stageBorder: '#d97706',
+  squadHeading: '#4ade80',
+  chevron: '#6B7280',
+  feeText: '#9CA3AF', feeBorder: '#1F2937', feeAmount: '#F5D78E',
+  walletPositive: '#4ADE80', walletNegative: '#F59E0B',
+  squadText: '#D1D5DB', squadUnderline: '#C9A84C55',
+  cBadgeBg: '#2d2400', cBadgeText: '#C9A84C', cBadgeBorder: '#C9A84C',
+}
 
 // ── Cricket Ball SVG Components ──────────────────────────────────
 
@@ -172,6 +229,12 @@ function ShareIcon({ size = 13 }: { size?: number }) {
 // ── Shareable-match link — reused by FixturesAvailability so the icon
 // can render on the response row instead of the tournament-name row.
 export function FixtureShareButton({ bookingId, size = 13 }: { bookingId: string; size?: number }) {
+  const { resolvedTheme } = useTheme()
+  // Dark preserves this button's original always-dark colours byte-for-byte;
+  // light darkens on hover instead of lightening (the inverse direction
+  // reads as "more visible" on each respective background).
+  const base  = resolvedTheme === 'dark' ? '#4B5563' : '#A8A29E'
+  const hover = resolvedTheme === 'dark' ? '#9CA3AF' : '#57534E'
   return (
     <a
       href={`/fixtures/${bookingId}`}
@@ -187,10 +250,10 @@ export function FixtureShareButton({ bookingId, size = 13 }: { bookingId: string
       }}
       style={{
         display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-        color: '#4B5563', textDecoration: 'none',
+        color: base, textDecoration: 'none',
       }}
-      onMouseEnter={e => (e.currentTarget.style.color = '#9CA3AF')}
-      onMouseLeave={e => (e.currentTarget.style.color = '#4B5563')}
+      onMouseEnter={e => (e.currentTarget.style.color = hover)}
+      onMouseLeave={e => (e.currentTarget.style.color = base)}
     >
       <ShareIcon size={size} />
     </a>
@@ -241,6 +304,8 @@ type BookingProp = {
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
   const [squadOpen, setSquadOpen] = useState(false)
+  const { resolvedTheme } = useTheme()
+  const t = resolvedTheme === 'dark' ? DARK : LIGHT
   const squad = booking.squad ?? []
   const squadAnnounced = squad.length > 0
   const {
@@ -270,8 +335,8 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
 
   return (
     <div style={{
-      background: "linear-gradient(135deg, #1C2333 0%, #111827 100%)",
-      border: "1px solid #2D3748",
+      background: t.cardBg,
+      border: `1px solid ${t.cardBorder}`,
       borderRadius: "12px",
       padding: "14px 16px",
       display: "flex",
@@ -284,11 +349,11 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       overflow: "hidden",
     }}>
       {/* Gold top accent bar */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)" }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: t.accentGradient }} />
 
       {/* Date + Slot + Format row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: "12px", fontWeight: 600, color: "#C9A84C", letterSpacing: "0.05em" }}>
+        <span style={{ fontSize: "12px", fontWeight: 600, color: t.dateText, letterSpacing: "0.05em" }}>
           {formatDate(game_date)} · {booking.match_time
             ? booking.match_time.slice(0, 5).replace(/^0/, '') + ' ' + (parseInt(booking.match_time) < 12 ? 'AM' : 'PM')
             : slotLabel(slot_time)}
@@ -314,26 +379,26 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
 
       {/* Tournament + Opponent + Ground */}
       <div>
-        <div style={{ fontSize: "15px", fontWeight: 700, color: "#F9FAFB", lineHeight: 1.3, marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
+        <div style={{ fontSize: "15px", fontWeight: 700, color: t.headingText, lineHeight: 1.3, marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
           {tournament?.cricheroes_points_table_url ? (
             <a
               href={tournament.cricheroes_points_table_url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontWeight: 700, color: '#F5F5F5', textDecoration: 'underline', textDecorationColor: '#C9A84C', textUnderlineOffset: '3px' }}
+              style={{ fontWeight: 700, color: t.headingText, textDecoration: 'underline', textDecorationColor: t.accentUnderline, textUnderlineOffset: '3px' }}
             >
               {tournament.name}
             </a>
           ) : (
-            <span style={{ fontWeight: 700, color: '#F5F5F5' }}>{tournament?.name}</span>
+            <span style={{ fontWeight: 700, color: t.headingText }}>{tournament?.name}</span>
           )}
         </div>
-        <div style={{ fontSize: "12px", color: "#9CA3AF" }}>
-          vs <span style={{ color: "#D1D5DB", fontWeight: 500 }}>{opponent_name || "TBD"}</span>
+        <div style={{ fontSize: "12px", color: t.subtitleText }}>
+          vs <span style={{ color: t.opponentText, fontWeight: 500 }}>{opponent_name || "TBD"}</span>
         </div>
         {(ground?.name || match_stage) && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", gap: "8px" }}>
-            <div style={{ fontSize: "11px", color: "#6B7280" }}>
+            <div style={{ fontSize: "11px", color: t.groundText }}>
               {ground?.name && (
                 <>
                   {'@ '}
@@ -350,10 +415,10 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             </div>
             {match_stage && (
               <span style={{
-                background: '#2d1f00', color: '#f59e0b',
+                background: t.stageBg, color: t.stageText,
                 fontSize: '10px', fontWeight: 700,
                 padding: '2px 8px', borderRadius: '999px',
-                letterSpacing: '0.06em', border: '1px solid #d97706',
+                letterSpacing: '0.06em', border: `1px solid ${t.stageBorder}`,
                 flexShrink: 0,
               }}>
                 {stageIcon(match_stage)} {match_stage}
@@ -364,7 +429,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       </div>
 
       {/* Divider */}
-      <div style={{ height: "1px", background: "#2D3748" }} />
+      <div style={{ height: "1px", background: t.divider }} />
 
       {/* Icons row */}
       <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
@@ -372,13 +437,13 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
         {/* Ball */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
           <BallIcon type={ballType} size={22} />
-          <span style={{ fontSize: "9px", color: "#6B7280", textTransform: "capitalize" }}>{ballType} ball</span>
+          <span style={{ fontSize: "9px", color: t.faintText, textTransform: "capitalize" }}>{ballType} ball</span>
         </div>
 
         {/* Jersey */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
           <JerseyIcon colour={jColour} size={22} />
-          <span style={{ fontSize: "9px", color: "#6B7280" }}>{jLabel}</span>
+          <span style={{ fontSize: "9px", color: t.faintText }}>{jLabel}</span>
         </div>
 
         {/* Spacer */}
@@ -390,7 +455,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             title="Open in CricHeroes"
             style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", textDecoration: "none" }}>
             <CricHeroesIcon size={22} />
-            <span style={{ fontSize: "9px", color: "#6B7280" }}>CricHeroes</span>
+            <span style={{ fontSize: "9px", color: t.faintText }}>CricHeroes</span>
           </a>
         )}
 
@@ -400,7 +465,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             title="Open ground in Google Maps"
             style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", textDecoration: "none" }}>
             <MapPinIcon size={22} />
-            <span style={{ fontSize: "9px", color: "#6B7280" }}>Ground</span>
+            <span style={{ fontSize: "9px", color: t.faintText }}>Ground</span>
           </a>
         )}
 
@@ -410,7 +475,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             title="Nearest hospital"
             style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", textDecoration: "none" }}>
             <HospitalIcon size={22} />
-            <span style={{ fontSize: "9px", color: "#6B7280" }}>Hospital</span>
+            <span style={{ fontSize: "9px", color: t.faintText }}>Hospital</span>
           </a>
         )}
       </div>
@@ -418,7 +483,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
       {/* Announced Squad */}
       {squadAnnounced && (
         <div>
-          <div style={{ height: "1px", background: "#2D3748" }} />
+          <div style={{ height: "1px", background: t.divider }} />
           <button
             onClick={() => setSquadOpen(v => !v)}
             style={{
@@ -426,24 +491,24 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
               alignItems: 'center', background: 'none', border: 'none',
               cursor: 'pointer', padding: '6px 0',
             }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#4ade80' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: t.squadHeading }}>
               ✅ SQUAD ANNOUNCED · {squad.length} players
             </span>
-            <span style={{ fontSize: '14px', color: '#6B7280' }}>{squadOpen ? '▲' : '▼'}</span>
+            <span style={{ fontSize: '14px', color: t.chevron }}>{squadOpen ? '▲' : '▼'}</span>
           </button>
 
           {/* Match fee row — shown to all when squad announced and fee is configured */}
           {squadAnnounced && feePerPlayer != null && (
             <div style={{
               fontSize: '11px',
-              color: '#9CA3AF',
+              color: t.feeText,
               fontFamily: "'Rajdhani', sans-serif",
               paddingTop: '6px',
-              borderTop: '1px solid #1F2937',
+              borderTop: `1px solid ${t.feeBorder}`,
             }}>
-              💰 Match fee: <span style={{ color: '#F5D78E', fontWeight: 600 }}>₹{feePerPlayer}</span> per player
+              💰 Match fee: <span style={{ color: t.feeAmount, fontWeight: 600 }}>₹{feePerPlayer}</span> per player
               {isLoggedInPlayerInSquad && isLoggedInPlayerExempt && (
-                <span style={{ color: '#6B7280', marginLeft: '6px' }}>· You are exempt</span>
+                <span style={{ color: t.faintText, marginLeft: '6px' }}>· You are exempt</span>
               )}
             </div>
           )}
@@ -457,17 +522,17 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
             <div style={{
               fontSize: '11px',
               fontFamily: "'Rajdhani', sans-serif",
-              color: '#9CA3AF',
+              color: t.feeText,
               marginTop: '4px',
             }}>
               Your wallet after this match:{' '}
               <span style={{
                 fontWeight: 700,
-                color: (loggedInWalletBalance - feePerPlayer) < 0 ? '#F59E0B' : '#4ADE80',
+                color: (loggedInWalletBalance - feePerPlayer) < 0 ? t.walletNegative : t.walletPositive,
               }}>
                 ₹{loggedInWalletBalance - feePerPlayer}
               </span>
-              <span style={{ color: '#6B7280', marginLeft: '4px' }}>
+              <span style={{ color: t.faintText, marginLeft: '4px' }}>
                 (currently ₹{loggedInWalletBalance} · −₹{feePerPlayer})
               </span>
             </div>
@@ -483,14 +548,14 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
                 .map((p) => (
                   <div key={p.id} style={{
                     display: 'flex', alignItems: 'center', gap: '6px',
-                    fontSize: '11px', color: '#D1D5DB', padding: '3px 0',
+                    fontSize: '11px', color: t.squadText, padding: '3px 0',
                   }}>
                     <span style={{ flex: 1 }}>
                       {p.id ? (
                         <a
                           href={`/players/${p.id}/stats`}
                           onClick={e => e.stopPropagation()}
-                          style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: '#C9A84C55' }}
+                          style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: t.squadUnderline }}
                         >
                           {p.name}
                         </a>
@@ -500,7 +565,7 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
-                          style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: '#C9A84C55' }}
+                          style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: t.squadUnderline }}
                         >
                           {p.name}
                         </a>
@@ -508,16 +573,16 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
                       {p.is_match_captain && (
                         <span style={{
                           marginLeft: '4px', fontSize: '9px', fontWeight: 700,
-                          color: '#C9A84C', background: '#2d2400',
-                          border: '1px solid #C9A84C', borderRadius: '3px',
+                          color: t.cBadgeText, background: t.cBadgeBg,
+                          border: `1px solid ${t.cBadgeBorder}`, borderRadius: '3px',
                           padding: '0 3px',
                         }}>C</span>
                       )}
                       {p.is_vc && (
                         <span style={{
                           marginLeft: '3px', fontSize: '9px', fontWeight: 700,
-                          color: '#C9A84C', background: '#2d2400',
-                          border: '1px solid #C9A84C40', borderRadius: '3px',
+                          color: t.cBadgeText, background: t.cBadgeBg,
+                          border: `1px solid ${t.cBadgeBorder}40`, borderRadius: '3px',
                           padding: '0 3px', opacity: 0.8,
                         }}>VC</span>
                       )}

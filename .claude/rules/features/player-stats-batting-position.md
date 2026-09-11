@@ -176,4 +176,18 @@ already-fetched, already-authorized array.
 
 ---
 
+## 8. Light/Dark/System (added September 2026)
+
+`/players/[id]/stats` (`PlayerStatsClient.tsx`, including this feature's
+own `BattingPositionChart`) is being converted to the app's new
+Light/Dark/System theme toggle — full mechanism documented in
+`ui-theme.md`'s "Light/Dark/System Theme" section. The page's previous,
+only-ever-dark look becomes the `dark` state unchanged; a new light
+variant is being added via `--stats-*` CSS variables / Tailwind `dark:`
+class pairs, same convention `src/app/page.tsx` and `SiteNav.tsx` already
+established. This conversion is still landing incrementally as of this
+note — see the file itself for current state.
+
+---
+
 *Maintained by: Spartans CC BLR*
