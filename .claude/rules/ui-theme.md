@@ -32,6 +32,61 @@ below a still-dark page is an accepted seam, not a bug (see `navigation.md`
 
 ---
 
+## Light/Dark/System Theme (added September 2026)
+
+Alongside the Warm Light rollout above, the Hub gained a real OS-style
+appearance toggle — **Light / Dark / System** — mirroring a phone's own
+theme setting. This is a genuinely new mechanism, not a reskin: before this,
+the whole app was hardcoded to one theme (the dark "ink" palette), with a
+handful of pages hand-built as permanently-light Warm Light islands (no
+toggle, no OS awareness, no dark counterpart). "System" now means "follow
+the visitor's OS `prefers-color-scheme`, live" — flip the phone's own
+appearance setting and, if the visitor picked System, the Hub follows
+without reopening the app.
+
+### Storage — device-only, not account-synced
+
+The preference (`light` / `dark` / `system`) is stored in `localStorage`
+(`hub-theme` key) only — no `players` column, no API route, no migration.
+This was a deliberate choice: it matches how most phone apps' own theme
+setting works (per-device, not account-wide), needs no sign-in to work at
+all (a logged-out visitor on `/schedule` gets it too), and avoids a real
+schema/API change for what's fundamentally a display preference, not data.
+Switching devices or browsers resets it to `system`.
+
+### Mechanism
+
+| Piece | File | Role |
+|---|---|---|
+| `ThemeProvider` / `useTheme()` | `src/components/ui/ThemeProvider.tsx` | Client-side context — reads/writes `localStorage`, resolves `system` via `window.matchMedia('(prefers-color-scheme: dark)')` (live — listens for OS-level changes while `system` is selected), and keeps a `data-theme="light"\|"dark"` attribute on `<html>` in sync. Exposes `{ preference, resolvedTheme, setPreference }`. |
+| No-FOUC script | `src/app/layout.tsx` (`themeInitScript`, exported from `ThemeProvider.tsx`) | A synchronous inline `<script>` in `<head>`, before `<body>` paints — reads the stored preference (or OS default) and stamps `data-theme` immediately, so the first frame is already correct instead of flashing the wrong theme. `<html>` carries `suppressHydrationWarning` since this one attribute is set by the script before React hydrates. |
+| Tailwind `dark:` variant | `tailwind.config.ts` | `darkMode: ['selector', '[data-theme="dark"]']` — any `dark:`-prefixed Tailwind class now responds to the `data-theme` attribute via pure CSS, live, with **no React re-render needed** — this works even inside a Server Component, since it's the browser's CSS engine reacting to an attribute change, not a hook. |
+| CSS custom properties | `src/app/globals.css` | For anywhere colour is set via an inline `style={{...}}` prop rather than a Tailwind class (common on Server Components, which can't call `useTheme()`) — a `var(--xxx)` reference resolves live off `[data-theme="light"]`/`[data-theme="dark"]` blocks in this file, the CSS equivalent of the Tailwind `dark:` mechanism above. Scoped per-surface (`--home-*`, `--fx-*`, `--stats-*` — see the per-page sections below) rather than one global palette, matching this doc's existing "Warm Light island" precedent of bespoke-but-consistent per-page palettes. |
+| `ThemeToggleNav` / `ThemeToggleSheet` | `src/components/ui/ThemeToggle.tsx` | The actual Light/Dark/System control — two presentational variants sharing `useTheme()`: `ThemeToggleNav` (Tailwind `dark:`-aware, styled to match `SiteNav`'s dropdown rows) and `ThemeToggleSheet` (styled from `MobileTabBar`'s own inline colour-token dictionary, so it matches whichever of that component's two token sets — light/dark — is currently active). |
+
+### Where the toggle lives
+
+Reachable from every page, next to Sign Out — not a separate settings page:
+- **Desktop/mobile-top nav** — `SiteNav`'s profile dropdown, `ThemeToggleNav` rendered just above the Sign out button.
+- **Mobile bottom tab bar** — `MobileTabBar`'s "More" sheet, `ThemeToggleSheet` rendered in the logged-in, logged-out, *and* expelled branches (so even a suspended account can still flip the theme).
+
+### Two conversion patterns — pick per component
+
+1. **Pure Tailwind `dark:` classes** — for any component already styled with Tailwind utility classes (not inline `style`). Add a light *base* class (no prefix) alongside a `dark:`-prefixed copy of whatever the class already was. Used throughout `SiteNav.tsx` and `GenerateInviteItem.tsx` (e.g. `bg-white dark:bg-ink-2`, `text-[#44403C] dark:text-zinc-400`, `border-[#D4C9B0] dark:border-ink-5`) — see those files for the exact mapping used to un-reverse the September-2026 "Warm Light nav, site-wide" change (§4 below) back into a real toggle.
+2. **CSS variables / client-side token objects** — for anywhere colour is set via inline `style` (common on Server Components, and on client components that already computed hex literals inline rather than via classes). Two sub-flavours, both valid:
+   - A **Server Component** (can't call `useTheme()`) reads `var(--xxx)` from the per-surface CSS variable set in `globals.css` — see `src/app/page.tsx`'s `StatTile`/`QuickActionRow` functions and the `isPlayer` dashboard JSX, using `--home-*`.
+   - A **Client Component** that already computes inline styles can instead call `useTheme()` directly and pick between two local plain-object literals (`LIGHT`/`DARK`, same key shape) — see `src/components/home/SelectedMatchCard.tsx`. Slightly more verbose than the CSS-variable route but keeps all the colour values colocated in one file rather than round-tripping through `globals.css`.
+
+Either pattern is fine — match whichever the surrounding code already leans toward. Semantic/status colours (a win/loss badge, the Y/O/E/L response chip colours, a role badge like WK's blue) are deliberately **not** threaded through either mechanism — they're small, self-contained, already-saturated accent chips that read fine on both a white and a dark card, so they stay literal and unchanged in both themes. Only structural chrome (page/card background, borders, primary/secondary/muted/faint text, dividers, the gold accent) needs to actually flip.
+
+### Rollout scope (as of this pass)
+
+Theme-aware today: **Home** (`/`, `src/app/page.tsx` + `SelectedMatchCard.tsx`), **Fixtures** (`/fixtures` shell, `FixturesCard`, `FixturesAvailability`), **Player Stats** (`/players/[id]/stats`), **Leaderboard** (`/leaderboard`), and the two pieces of shared chrome that wrap every page — **`SiteNav`** and **`MobileTabBar`** (both now genuinely dual-themed rather than hardcoded light — see §4/§4.1 corrections below).
+
+Everything else keeps rendering exactly as it always has, in the single dark-ink look, **regardless of the visitor's Light/Dark/System choice** — this is intentional, not a bug: the Rollout Policy above (no proactive page-by-page migration) still applies to the *content* of untouched pages, only the shared nav/tab-bar chrome above them now follows the toggle everywhere. A dark-ink page body sitting under a now-theme-following nav/tab bar is the same "accepted seam" this doc already documented for the Warm Light rollout, just with the seam now able to appear or disappear depending on the visitor's own choice rather than being fixed per page.
+
+---
+
 ## Design Principles
 
 1. **Daylight-first** — primary users are on mobile outdoors. Every colour decision
@@ -82,13 +137,23 @@ below a still-dark page is an accepted seam, not a bug (see `navigation.md`
 | `--color-warning-bg` | `#FEF3C7` | Warning tinted surface (amber-50) |
 | `--color-neutral` | `#78716C` | Unbooked, inactive (stone-500) |
 
-### Navigation Bar (Warm Light, site-wide — changed September 2026)
+### Navigation Bar (Warm Light, site-wide — changed September 2026; now Light/Dark/System-aware)
 Previously an intentional dark exception, kept dark regardless of what
 theme the page content below it used (see `navigation.md` §4's changelog
 note). Reversed per a direct request for the top nav to match the rest of
 the Warm Light palette everywhere, not just on the pages that had already
 adopted it — `SiteNav.tsx` now renders on `bg-white` (`#FFFFFF`) with a
 `border-[#D4C9B0]` bottom border on every page, dropdown panels included.
+
+**Further updated (see "Light/Dark/System Theme" above):** `bg-white`/
+`border-[#D4C9B0]` and every other colour value in this section is now
+specifically the **light** state — `SiteNav.tsx` carries a `dark:`-prefixed
+counterpart on every one of these classes (`bg-white dark:bg-ink-2`, etc.),
+reusing the exact pre-September-2026 dark nav values this section describes
+being reversed away from. The nav is Warm Light *by default* (matches the
+device's `prefers-color-scheme` unless the visitor picks otherwise) rather
+than unconditionally light — "site-wide" now means "site-wide, theme-aware"
+rather than "site-wide, fixed light."
 
 **The border is a literal arbitrary-value class, not `border-ink-5`
 (corrected September 2026, same pass as the "still a black band" fix

@@ -60,7 +60,9 @@ const SELECT_TRUNCATE = 'truncate min-w-0'
 
 function pillClass(active: boolean): string {
   return `font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors whitespace-nowrap
-    ${active ? 'bg-gold/20 border-gold-dim text-gold' : 'border-ink-5 text-zinc-500 hover:text-zinc-300'}`
+    ${active
+      ? 'bg-[var(--stats-badge-bg)] dark:bg-gold/20 border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold'
+      : 'border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-muted)] dark:text-zinc-500 hover:text-[var(--stats-text-2)] dark:hover:text-zinc-300'}`
 }
 
 function shiftMonth(m: string, delta: number): string {
@@ -215,13 +217,13 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
   const formatCheckboxes = (
     <div className="flex items-center gap-2 flex-shrink-0">
       <label className={`flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-widest uppercase cursor-pointer select-none
-        ${formats.has('T20') ? 'text-gold' : 'text-zinc-500'}`}>
-        <input type="checkbox" checked={formats.has('T20')} onChange={() => toggleFormat('T20')} className="accent-gold" />
+        ${formats.has('T20') ? 'text-[var(--stats-accent)] dark:text-gold' : 'text-[var(--stats-text-muted)] dark:text-zinc-500'}`}>
+        <input type="checkbox" checked={formats.has('T20')} onChange={() => toggleFormat('T20')} className="accent-[var(--stats-accent)] dark:accent-gold" />
         T20
       </label>
       <label className={`flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-widest uppercase cursor-pointer select-none
-        ${formats.has('T30') ? 'text-gold' : 'text-zinc-500'}`}>
-        <input type="checkbox" checked={formats.has('T30')} onChange={() => toggleFormat('T30')} className="accent-gold" />
+        ${formats.has('T30') ? 'text-[var(--stats-accent)] dark:text-gold' : 'text-[var(--stats-text-muted)] dark:text-zinc-500'}`}>
+        <input type="checkbox" checked={formats.has('T30')} onChange={() => toggleFormat('T30')} className="accent-[var(--stats-accent)] dark:accent-gold" />
         T30
       </label>
     </div>
@@ -232,13 +234,13 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
   const inningsCheckboxes = category === 'mvp' ? (
     <div className="flex items-center gap-2 flex-shrink-0">
       <label className={`flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-widest uppercase cursor-pointer select-none
-        ${innings.has('defending') ? 'text-gold' : 'text-zinc-500'}`}>
-        <input type="checkbox" checked={innings.has('defending')} onChange={() => toggleInnings('defending')} className="accent-gold" />
+        ${innings.has('defending') ? 'text-[var(--stats-accent)] dark:text-gold' : 'text-[var(--stats-text-muted)] dark:text-zinc-500'}`}>
+        <input type="checkbox" checked={innings.has('defending')} onChange={() => toggleInnings('defending')} className="accent-[var(--stats-accent)] dark:accent-gold" />
         Defending
       </label>
       <label className={`flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-widest uppercase cursor-pointer select-none
-        ${innings.has('chasing') ? 'text-gold' : 'text-zinc-500'}`}>
-        <input type="checkbox" checked={innings.has('chasing')} onChange={() => toggleInnings('chasing')} className="accent-gold" />
+        ${innings.has('chasing') ? 'text-[var(--stats-accent)] dark:text-gold' : 'text-[var(--stats-text-muted)] dark:text-zinc-500'}`}>
+        <input type="checkbox" checked={innings.has('chasing')} onChange={() => toggleInnings('chasing')} className="accent-[var(--stats-accent)] dark:accent-gold" />
         Chasing
       </label>
     </div>
@@ -256,7 +258,7 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
             onChange={e => navigate({ year: e.target.value })}
             disabled={tournamentId !== 'all'}
             title={tournamentId !== 'all' ? 'A tournament is already selected — every one of its games is shown, regardless of year' : undefined}
-            className="form-input w-auto font-rajdhani text-xs py-1.5 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+            className="form-input w-auto font-rajdhani text-xs py-1.5 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--stats-card-bg)] dark:bg-zinc-900 border-[var(--stats-card-border)] dark:border-zinc-700 text-[var(--stats-text)] dark:text-zinc-100">
             <option value="all">All time</option>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
@@ -296,14 +298,14 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
           <select
             value={tournamentId}
             onChange={e => navigate({ tournament: e.target.value, ...(e.target.value !== 'all' ? { year: 'all' } : {}) })}
-            className={`form-input font-rajdhani text-xs py-1.5 ${SELECT_TRUNCATE}`}>
+            className={`form-input font-rajdhani text-xs py-1.5 ${SELECT_TRUNCATE} bg-[var(--stats-card-bg)] dark:bg-zinc-900 border-[var(--stats-card-border)] dark:border-zinc-700 text-[var(--stats-text)] dark:text-zinc-100`}>
             <option value="all">All tournaments</option>
             {tournaments.map(t => <option key={t.id} value={t.id} title={t.name}>{t.name}</option>)}
           </select>
           <select
             value={groundId}
             onChange={e => navigate({ ground: e.target.value })}
-            className={`form-input font-rajdhani text-xs py-1.5 ${SELECT_TRUNCATE}`}>
+            className={`form-input font-rajdhani text-xs py-1.5 ${SELECT_TRUNCATE} bg-[var(--stats-card-bg)] dark:bg-zinc-900 border-[var(--stats-card-border)] dark:border-zinc-700 text-[var(--stats-text)] dark:text-zinc-100`}>
             <option value="all">All grounds</option>
             {grounds.map(g => <option key={g.id} value={g.id} title={g.name}>{g.name}</option>)}
           </select>
@@ -318,25 +320,25 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
       {isMonthly && (
         <div>
           <div className="flex items-stretch gap-2">
-            <div className="w-[90%] flex items-center gap-2 bg-ink-4 border border-ink-5 rounded-full px-2 py-1.5">
+            <div className="w-[90%] flex items-center gap-2 bg-[var(--stats-row-bg)] dark:bg-ink-4 border border-[var(--stats-card-border)] dark:border-ink-5 rounded-full px-2 py-1.5">
               <button
                 onClick={goOlder}
                 disabled={!canGoOlder}
                 aria-label="Older month"
-                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
+                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold rounded-full text-sm disabled:opacity-30 disabled:border-[var(--stats-card-border)] dark:disabled:border-ink-5 disabled:text-[var(--stats-text-faint)] dark:disabled:text-zinc-600 hover:bg-[var(--stats-accent-dim)] dark:hover:bg-gold-dim transition-colors">
                 ‹
               </button>
               <button
                 onClick={() => setMonthPickerOpen(v => !v)}
-                className="flex-1 flex items-center justify-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide text-gold py-1">
+                className="flex-1 flex items-center justify-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide text-[var(--stats-accent)] dark:text-gold py-1">
                 {monthChipLabel(month)}
-                <span className="text-zinc-500 text-[10px]">{monthPickerOpen ? '▲' : '▾'}</span>
+                <span className="text-[var(--stats-text-muted)] dark:text-zinc-500 text-[10px]">{monthPickerOpen ? '▲' : '▾'}</span>
               </button>
               <button
                 onClick={goNewer}
                 disabled={!canGoNewer}
                 aria-label="Newer month"
-                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-gold-dim text-gold rounded-full text-sm disabled:opacity-30 disabled:border-ink-5 disabled:text-zinc-600 hover:bg-gold-dim transition-colors">
+                className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold rounded-full text-sm disabled:opacity-30 disabled:border-[var(--stats-card-border)] dark:disabled:border-ink-5 disabled:text-[var(--stats-text-faint)] dark:disabled:text-zinc-600 hover:bg-[var(--stats-accent-dim)] dark:hover:bg-gold-dim transition-colors">
                 ›
               </button>
             </div>
@@ -348,13 +350,13 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
           </div>
 
           {monthPickerOpen && (
-            <div className="mt-2 bg-ink-4 border border-ink-5 rounded-lg p-3 space-y-3">
+            <div className="mt-2 bg-[var(--stats-row-bg)] dark:bg-ink-4 border border-[var(--stats-card-border)] dark:border-ink-5 rounded-lg p-3 space-y-3">
               {monthGroups.length === 0 && (
-                <p className="font-rajdhani text-xs text-zinc-600">No months with stats yet.</p>
+                <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600">No months with stats yet.</p>
               )}
               {monthGroups.map(group => (
                 <div key={group.year} className="space-y-1.5">
-                  <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-600">
+                  <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-faint)] dark:text-zinc-600">
                     {group.year}
                   </span>
                   <div className="flex flex-wrap gap-2">
@@ -364,8 +366,8 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
                         onClick={() => selectMonth(m)}
                         className={`font-rajdhani text-xs font-bold tracking-wide px-3 py-1.5 rounded-full border transition-colors ${
                           month === m
-                            ? 'bg-gold/20 border-gold-dim text-gold'
-                            : 'bg-ink-3 border-ink-5 text-zinc-500 hover:text-zinc-300'
+                            ? 'bg-[var(--stats-badge-bg)] dark:bg-gold/20 border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold'
+                            : 'bg-[var(--stats-card-bg)] dark:bg-ink-3 border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-muted)] dark:text-zinc-500 hover:text-[var(--stats-text-2)] dark:hover:text-zinc-300'
                         }`}>
                         {monthOnlyLabel(m)}
                       </button>

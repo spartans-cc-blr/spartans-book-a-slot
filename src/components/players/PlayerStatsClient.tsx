@@ -175,24 +175,24 @@ export function PlayerStatsClient({
 
   return (
     <>
-      <div className="bg-white border-b border-parchment-3 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
+      <div className="bg-[var(--stats-card-bg)] border-b border-[var(--stats-card-border)] px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(217,119,6,0.08) 0%, transparent 70%)' }} />
         <div className="flex items-center gap-4">
           <img
             src={player.photo_url ?? '/default-avatar.png'}
             alt={player.name}
-            className="w-16 h-16 rounded-full object-cover border-2 border-gold-dim flex-shrink-0"
+            className="w-16 h-16 rounded-full object-cover border-2 border-[var(--stats-accent-dim)] flex-shrink-0"
           />
           <div>
-            <p className="text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-1 flex items-center gap-2">
-              <span className="w-4 h-px bg-gold inline-block" />
+            <p className="text-[var(--stats-accent)] text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-1 flex items-center gap-2">
+              <span className="w-4 h-px bg-[var(--stats-accent)] inline-block" />
               Player Stats
             </p>
-            <h1 className="font-cinzel text-xl md:text-2xl font-bold text-ink tracking-wide">{player.name}</h1>
+            <h1 className="font-cinzel text-xl md:text-2xl font-bold text-[var(--stats-text)] tracking-wide">{player.name}</h1>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {(player.jersey_name || player.jersey_number != null) && (
-                <span className="font-rajdhani text-xs text-stone-500">
+                <span className="font-rajdhani text-xs text-[var(--stats-text-muted)]">
                   {player.jersey_number != null && `#${player.jersey_number}`}
                   {player.jersey_number != null && player.jersey_name && ' · '}
                   {player.jersey_name}
@@ -200,7 +200,7 @@ export function PlayerStatsClient({
               )}
               {player.cricheroes_url && (
                 <a href={player.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                  className="font-rajdhani text-xs text-stone-500 hover:text-gold-dim underline decoration-dotted underline-offset-2 transition-colors">
+                  className="font-rajdhani text-xs text-[var(--stats-text-muted)] hover:text-[var(--stats-badge-text)] underline decoration-dotted underline-offset-2 transition-colors">
                   View on CricHeroes ↗
                 </a>
               )}
@@ -214,57 +214,57 @@ export function PlayerStatsClient({
         <div className="flex flex-col gap-2 mb-5">
           <div className="flex gap-2 items-center flex-shrink-0">
             <select value={year} onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5 flex-shrink-0">
+              className="font-rajdhani text-sm bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] text-[var(--stats-text)] rounded px-3 py-1.5 flex-shrink-0">
               <option value="all">All Years</option>
               {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
-              ${formats.has('T20') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              ${formats.has('T20') ? 'text-[var(--stats-badge-text)]' : 'text-[var(--stats-text-muted)]'}`}>
               <input type="checkbox" checked={formats.has('T20')} onChange={() => toggleFormat('T20')} className="accent-gold" />
               T20
             </label>
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
-              ${formats.has('T30') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              ${formats.has('T30') ? 'text-[var(--stats-badge-text)]' : 'text-[var(--stats-text-muted)]'}`}>
               <input type="checkbox" checked={formats.has('T30')} onChange={() => toggleFormat('T30')} className="accent-gold" />
               T30
             </label>
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
-              ${asCaptain ? 'text-gold-dim' : 'text-stone-500'}`}>
+              ${asCaptain ? 'text-[var(--stats-badge-text)]' : 'text-[var(--stats-text-muted)]'}`}>
               <input type="checkbox" checked={asCaptain} onChange={() => setAsCaptain(v => !v)} className="accent-gold" />
               As Captain
             </label>
           </div>
           <div className="flex gap-2 items-center flex-shrink-0">
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
-              ${innings.has('defending') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              ${innings.has('defending') ? 'text-[var(--stats-badge-text)]' : 'text-[var(--stats-text-muted)]'}`}>
               <input type="checkbox" checked={innings.has('defending')} onChange={() => toggleInnings('defending')} className="accent-gold" />
               Defending
             </label>
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
-              ${innings.has('chasing') ? 'text-gold-dim' : 'text-stone-500'}`}>
+              ${innings.has('chasing') ? 'text-[var(--stats-badge-text)]' : 'text-[var(--stats-text-muted)]'}`}>
               <input type="checkbox" checked={innings.has('chasing')} onChange={() => toggleInnings('chasing')} className="accent-gold" />
               Chasing
             </label>
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
-              ${includePractice ? 'text-gold-dim' : 'text-stone-500'}`}>
+              ${includePractice ? 'text-[var(--stats-badge-text)]' : 'text-[var(--stats-text-muted)]'}`}>
               <input type="checkbox" checked={includePractice} onChange={() => setIncludePractice(v => !v)} className="accent-gold" />
               Include Practice Games
             </label>
           </div>
           <select value={groundId} onChange={e => setGroundId(e.target.value)}
-            className="font-rajdhani text-sm bg-white border border-parchment-3 text-ink rounded px-3 py-1.5 w-full">
+            className="font-rajdhani text-sm bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] text-[var(--stats-text)] rounded px-3 py-1.5 w-full">
             <option value="all">All Grounds</option>
             {grounds.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
         </div>
 
         {/* Summary */}
-        <div className="bg-white border border-parchment-3 rounded-2xl p-5 mb-5">
-          <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-4">
+        <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5 mb-5">
+          <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold mb-4">
             {isFiltered ? 'Filtered' : 'Career'} Summary
           </h2>
           {scoped.matches === 0 ? (
-            <p className="font-rajdhani text-sm text-stone-500">No matches for this filter.</p>
+            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No matches for this filter.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <Stat label="Matches" value={String(scoped.matches)}
@@ -280,30 +280,30 @@ export function PlayerStatsClient({
             </div>
           )}
           {scoped.matches > 0 && (
-            <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-parchment-3">
-              <MvpStat label="Batting MVP" value={scoped.battingMvp} color="text-emerald-600" />
-              <MvpStat label="Bowling MVP" value={scoped.bowlingMvp} color="text-blue-600" />
-              <MvpStat label="Fielding MVP" value={scoped.fieldingMvp} color="text-purple-600" />
+            <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-[var(--stats-card-border)]">
+              <MvpStat label="Batting MVP" value={scoped.battingMvp} color="text-emerald-600 dark:text-emerald-400" />
+              <MvpStat label="Bowling MVP" value={scoped.bowlingMvp} color="text-blue-600 dark:text-blue-400" />
+              <MvpStat label="Fielding MVP" value={scoped.fieldingMvp} color="text-purple-600 dark:text-purple-400" />
             </div>
           )}
         </div>
 
         {/* Runs by batting position */}
         {positionData.length > 0 && (
-          <div className="bg-white border border-parchment-3 rounded-2xl p-5 mb-5">
-            <h2 className="font-cinzel text-sm text-gold-dim font-semibold mb-1">Runs by Batting Position</h2>
-            <p className="font-rajdhani text-xs text-stone-500 mb-4">Tap a position to filter the innings history below.</p>
+          <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5 mb-5">
+            <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold mb-1">Runs by Batting Position</h2>
+            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">Tap a position to filter the innings history below.</p>
             <BattingPositionChart data={positionData} selected={selectedPosition} onSelect={togglePosition} />
           </div>
         )}
 
         {/* Match by match */}
-        <div className="bg-white border border-parchment-3 rounded-2xl p-5">
+        <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <h2 className="font-cinzel text-sm text-gold-dim font-semibold">Innings History</h2>
+            <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold">Innings History</h2>
             {selectedPosition != null && (
               <button onClick={() => setSelectedPosition(null)}
-                className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded-full bg-gold/10 border border-gold-dim text-gold-dim hover:bg-gold/20 transition-colors">
+                className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--stats-badge-bg)] border border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] hover:bg-gold/20 transition-colors">
                 Position {selectedPosition} ✕
               </button>
             )}
@@ -312,25 +312,27 @@ export function PlayerStatsClient({
             {STAT_TABS.map(t => (
               <button key={t} onClick={() => setStatTab(t)}
                 className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors capitalize
-                  ${statTab === t ? 'bg-gold/10 border-gold-dim text-gold-dim' : 'border-parchment-3 text-stone-500 hover:text-stone-700'}`}>
+                  ${statTab === t
+                    ? 'bg-[var(--stats-badge-bg)] border-[var(--stats-badge-border)] text-[var(--stats-badge-text)]'
+                    : 'border-[var(--stats-card-border)] text-[var(--stats-text-muted)] hover:text-[var(--stats-text-2)]'}`}>
                 {t}
               </button>
             ))}
           </div>
           {statTab === 'batting' && selectedPosition != null && (
-            <p className="font-rajdhani text-xs text-stone-500 mb-4">
+            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">
               {tabMatches.length} of {scoped.battingInnings} innings batted at Position {selectedPosition}
             </p>
           )}
           {statTab === 'bowling' && (
-            <p className="font-rajdhani text-xs text-stone-500 mb-4">
+            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">
               {tabMatches.length} innings bowled
             </p>
           )}
           {loading ? (
-            <p className="font-rajdhani text-sm text-stone-500">Loading…</p>
+            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">Loading…</p>
           ) : tabMatches.length === 0 ? (
-            <p className="font-rajdhani text-sm text-stone-500">No {statTab} innings for this filter.</p>
+            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No {statTab} innings for this filter.</p>
           ) : (
             <MatchHistoryTable matches={tabMatches} statTab={statTab} />
           )}
@@ -343,9 +345,9 @@ export function PlayerStatsClient({
 function Stat({ label, value, caption }: { label: string; value: string; caption?: string }) {
   return (
     <div>
-      <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 mb-0.5">{label}</p>
-      <p className="font-cinzel text-lg font-bold text-ink">{value}</p>
-      {caption && <p className="font-rajdhani text-[10px] text-stone-400 mt-0.5">{caption}</p>}
+      <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mb-0.5">{label}</p>
+      <p className="font-cinzel text-lg font-bold text-[var(--stats-text)]">{value}</p>
+      {caption && <p className="font-rajdhani text-[10px] text-[var(--stats-text-faint)] mt-0.5">{caption}</p>}
     </div>
   )
 }
@@ -353,7 +355,7 @@ function Stat({ label, value, caption }: { label: string; value: string; caption
 function MvpStat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="text-center">
-      <p className="font-rajdhani text-[9px] font-bold tracking-widest uppercase text-stone-500 mb-0.5">{label}</p>
+      <p className="font-rajdhani text-[9px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mb-0.5">{label}</p>
       <p className={`font-cinzel text-base font-bold ${color}`}>{value.toFixed(2)}</p>
     </div>
   )
@@ -389,16 +391,16 @@ function BattingPositionChart({
             onClick={() => onSelect(position)}
             className="flex-1 min-w-0 h-full flex flex-col items-center justify-end gap-1 group"
           >
-            <span className={`font-rajdhani text-[10px] font-bold whitespace-nowrap ${isSelected ? 'text-blue-700' : 'text-stone-600'}`}>
+            <span className={`font-rajdhani text-[10px] font-bold whitespace-nowrap ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-[var(--stats-text-2)]'}`}>
               {runs}
             </span>
             <div
               style={{ height: `${pct}%` }}
               className={`w-full rounded-t transition-colors ${
-                isSelected ? 'bg-blue-700' : 'bg-gold/50 group-hover:bg-gold/70'
+                isSelected ? 'bg-blue-700 dark:bg-blue-400' : 'bg-gold/50 group-hover:bg-gold/70'
               }`}
             />
-            <span className={`font-rajdhani text-[10px] font-bold uppercase whitespace-nowrap ${isSelected ? 'text-blue-700' : 'text-stone-500'}`}>
+            <span className={`font-rajdhani text-[10px] font-bold uppercase whitespace-nowrap ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-[var(--stats-text-muted)]'}`}>
               {position}
             </span>
           </button>
@@ -416,17 +418,17 @@ function BattingPositionChart({
 function MatchHistoryTable({ matches, statTab }: { matches: PlayerMatchHistoryRow[]; statTab: StatTab }) {
   const columnLabel = statTab === 'batting' ? 'Runs' : statTab === 'bowling' ? 'Bowling' : 'Fielding'
   return (
-    <div className="bg-white border border-parchment-3 rounded-2xl overflow-hidden overflow-x-auto">
+    <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl overflow-hidden overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="bg-parchment-2 border-b border-parchment-3">
-            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-1.5 py-2 whitespace-nowrap">Date</th>
-            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-2 py-2">Match</th>
-            <th scope="col" className="text-center font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-2 py-2">{columnLabel}</th>
-            <th scope="col" className="text-center font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 px-1.5 py-2 whitespace-nowrap">R</th>
+          <tr className="bg-[var(--stats-row-bg)] border-b border-[var(--stats-card-border)]">
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] px-1.5 py-2 whitespace-nowrap">Date</th>
+            <th scope="col" className="text-left font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] px-2 py-2">Match</th>
+            <th scope="col" className="text-center font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] px-2 py-2">{columnLabel}</th>
+            <th scope="col" className="text-center font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] px-1.5 py-2 whitespace-nowrap">R</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-parchment-3">
+        <tbody className="divide-y divide-[var(--stats-card-border)]">
           {matches.map(m => <MatchHistoryRow key={m.matchId} match={m} statTab={statTab} />)}
         </tbody>
       </table>
@@ -448,29 +450,29 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
         onClick: goToMatch,
         onKeyDown: (e: React.KeyboardEvent<HTMLTableRowElement>) => { if (e.key === 'Enter' || e.key === ' ') goToMatch() },
       } : {})}
-      className={clickable ? 'cursor-pointer hover:bg-parchment-2 transition-colors' : ''}>
+      className={clickable ? 'cursor-pointer hover:bg-[var(--stats-row-hover)] transition-colors' : ''}>
       <th scope="row" className="text-center font-normal align-middle px-1.5 py-2.5 whitespace-nowrap">
         {d ? (
           <div className="flex flex-col items-center gap-0.5">
             <div className="flex items-center gap-1">
               <span
-                className="font-rajdhani text-[10px] font-bold tracking-wide text-stone-400 uppercase whitespace-nowrap"
+                className="font-rajdhani text-[10px] font-bold tracking-wide text-[var(--stats-text-faint)] uppercase whitespace-nowrap"
                 style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
               >
                 {d.toLocaleDateString('en-IN', { month: 'short' })}-{String(d.getFullYear()).slice(-2)}
               </span>
-              <span className="font-cinzel text-sm font-bold text-ink">{String(d.getDate()).padStart(2, '0')}</span>
+              <span className="font-cinzel text-sm font-bold text-[var(--stats-text)]">{String(d.getDate()).padStart(2, '0')}</span>
             </div>
           </div>
         ) : (
-          <span className="font-rajdhani text-xs text-stone-400">—</span>
+          <span className="font-rajdhani text-xs text-[var(--stats-text-faint)]">—</span>
         )}
       </th>
       <td className="align-middle px-2 py-2.5">
-        <span className="block font-rajdhani text-sm text-ink">
+        <span className="block font-rajdhani text-sm text-[var(--stats-text)]">
           {match.tournamentName ?? '—'}
         </span>
-        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
+        <span className="block font-rajdhani text-xs text-[var(--stats-text-muted)] mt-0.5">{match.opponentName ? `vs ${match.opponentName}` : '—'}</span>
       </td>
       <td className="text-center align-middle px-2 py-2.5">
         {statTab === 'batting' && match.batting && <BattingCell batting={match.batting} />}
@@ -478,7 +480,7 @@ function MatchHistoryRow({ match, statTab }: { match: PlayerMatchHistoryRow; sta
         {statTab === 'fielding' && match.fielding && <FieldingCell fielding={match.fielding} />}
       </td>
       <td className="text-center align-middle px-1.5 py-2.5">
-        {match.matchResult ? <ResultCell result={match.matchResult} /> : <span className="font-rajdhani text-xs text-stone-400">—</span>}
+        {match.matchResult ? <ResultCell result={match.matchResult} /> : <span className="font-rajdhani text-xs text-[var(--stats-text-faint)]">—</span>}
       </td>
     </tr>
   )
@@ -489,10 +491,10 @@ function ResultCell({ result }: { result: string }) {
   if (r.includes('won'))
     return <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">W</span>
   if (r.includes('lost'))
-    return <span className="text-red-700 text-[10px] font-bold">L</span>
+    return <span className="text-red-700 dark:text-red-400 text-[10px] font-bold">L</span>
   if (r.includes('tie'))
-    return <span className="text-amber-700 text-[10px] font-bold">T</span>
-  return <span className="text-stone-400 text-[10px] font-bold">{result.charAt(0).toUpperCase()}</span>
+    return <span className="text-amber-700 dark:text-amber-400 text-[10px] font-bold">T</span>
+  return <span className="text-[var(--stats-text-faint)] text-[10px] font-bold">{result.charAt(0).toUpperCase()}</span>
 }
 
 // Raw dismissal_method values from the analytics DB use snake_case
@@ -510,11 +512,11 @@ function BattingCell({ batting }: { batting: NonNullable<PlayerMatchHistoryRow['
   const highlight = batting.runs >= 30
   return (
     <>
-      <span className={`block font-rajdhani text-sm font-semibold ${highlight ? 'text-blue-700' : 'text-gold-dim'}`}>
+      <span className={`block font-rajdhani text-sm font-semibold ${highlight ? 'text-blue-700 dark:text-blue-400' : 'text-[var(--stats-badge-text)]'}`}>
         {batting.runs}{batting.notOut ? '*' : ''} ({batting.balls})
       </span>
       {!batting.notOut && (
-        <span className="block font-rajdhani text-xs text-stone-500 mt-0.5">{batting.howOut ? formatDismissal(batting.howOut) : '—'}</span>
+        <span className="block font-rajdhani text-xs text-[var(--stats-text-muted)] mt-0.5">{batting.howOut ? formatDismissal(batting.howOut) : '—'}</span>
       )}
     </>
   )
@@ -524,8 +526,8 @@ function BowlingCell({ bowling }: { bowling: NonNullable<PlayerMatchHistoryRow['
   const highlight = bowling.wickets >= 3
   return (
     <>
-      <span className="block font-rajdhani text-[10px] font-bold tracking-wide uppercase text-stone-400">O-D-R-W</span>
-      <span className={`block font-rajdhani text-sm font-semibold mt-0.5 ${highlight ? 'text-blue-700' : 'text-gold-dim'}`}>
+      <span className="block font-rajdhani text-[10px] font-bold tracking-wide uppercase text-[var(--stats-text-faint)]">O-D-R-W</span>
+      <span className={`block font-rajdhani text-sm font-semibold mt-0.5 ${highlight ? 'text-blue-700 dark:text-blue-400' : 'text-[var(--stats-badge-text)]'}`}>
         {bowling.overs}-{bowling.dots}-{bowling.runsConceded}-{bowling.wickets}
       </span>
     </>
@@ -541,10 +543,10 @@ function FieldingCell({ fielding }: { fielding: NonNullable<PlayerMatchHistoryRo
   const total = fielding.catches + fielding.stumpings + fielding.runOuts
   const highlight = total >= 3
   return parts.length > 0 ? (
-    <span className={`font-rajdhani text-sm font-semibold ${highlight ? 'text-blue-700' : 'text-gold-dim'}`}>
+    <span className={`font-rajdhani text-sm font-semibold ${highlight ? 'text-blue-700 dark:text-blue-400' : 'text-[var(--stats-badge-text)]'}`}>
       {parts.map(p => <span key={p} className="block">{p}</span>)}
     </span>
   ) : (
-    <span className="font-rajdhani text-xs text-stone-400">—</span>
+    <span className="font-rajdhani text-xs text-[var(--stats-text-faint)]">—</span>
   )
 }

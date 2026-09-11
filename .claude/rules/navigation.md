@@ -421,7 +421,14 @@ root wrapper to `bg-parchment` (`#F8F4EE`, the same default page
 background `ui-theme.md` already specifies for every other page's
 `<main>` — and, unlike `gold`/`crimson`/`ink`, the one Tailwind colour
 token that genuinely does match its documented value) instead of
-`bg-ink`. The footer's own text (`text-zinc-600`/`text-zinc-700` —
+`bg-ink`. **Further updated (Light/Dark/System, September 2026 — see
+`ui-theme.md`):** the root wrapper now carries a `dark:bg-ink` counterpart
+(`bg-parchment dark:bg-ink`) rather than being permanently `bg-parchment`
+— the whole dashboard (welcome banner, stat tiles, "You're Selected to
+Play"/`SelectedMatchCard`, Upcoming Fixtures, Quick Actions) is
+theme-aware via a `--home-*` CSS-variable set in `globals.css`, so this
+fix's own reasoning (a black band showing through on an otherwise-light
+page) now applies symmetrically in reverse for a visitor who picks Dark. The footer's own text (`text-zinc-600`/`text-zinc-700` —
 legible-enough on the old dark bg, but essentially invisible on a light
 one) was updated to `#78716C`/hover `#44403C`, matching the Warm Light
 "muted"/"secondary text" tokens used everywhere else in this file. The
@@ -494,6 +501,35 @@ A full-width panel at the bottom with a Google sign-in button (using inline Goog
 ---
  
 ## 4. SiteNav — `src/components/ui/SiteNav.tsx`
+
+### Light/Dark/System (added September 2026, same month as the Warm Light nav change below)
+
+`SiteNav` and `MobileTabBar` are now the app's first genuinely theme-aware
+surfaces — a real Light/Dark/System toggle (mirroring a phone's own
+appearance setting), not a fixed palette. Full mechanism (storage,
+no-FOUC script, the `useTheme()` hook, the two conversion patterns used
+across the app) is documented centrally in `ui-theme.md`'s "Light/Dark/System
+Theme" section — this doc only covers what changed in these two files
+specifically. In short: every colour value described in §4/§4.1 below as
+"Warm Light, site-wide/unconditional" is now the **light** state of a real
+toggle, not a fixed look — `SiteNav.tsx` carries a `dark:`-prefixed
+counterpart on each of its Tailwind classes (reusing the exact
+pre-September-2026 dark nav values), and `MobileTabBar`'s `theme` prop,
+previously defaulted to a hardcoded `'light'`, now defaults to the
+signed-in visitor's own `resolvedTheme` from `useTheme()` when no explicit
+override is passed. `ThemeToggleNav`/`ThemeToggleSheet`
+(`src/components/ui/ThemeToggle.tsx`) are the actual switcher controls,
+rendered in `SiteNav`'s profile dropdown and `MobileTabBar`'s "More" sheet
+respectively (all three sheet branches — logged-in, logged-out, and
+expelled — so even a suspended account can flip the theme).
+
+`Home` (`src/app/page.tsx`) no longer passes `mobileTabBarTheme="light"` to
+`<SiteNav>` — its dashboard content became theme-aware in the same pass
+(see `ui-theme.md`), so the bottom tab bar should follow the visitor's
+choice rather than being pinned light. `/fixtures` similarly dropped its
+own hardcoded prop. `/matches/history` still passes `mobileTabBarTheme="light"`
+explicitly and is unaffected — its own body content hasn't been converted
+to Light/Dark/System yet, so its tab bar stays pinned to match.
 
 ### Warm Light nav, site-wide (changed September 2026)
 

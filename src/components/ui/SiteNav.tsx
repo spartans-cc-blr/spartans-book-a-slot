@@ -5,16 +5,17 @@ import { useSession, signIn, signOut } from 'next-auth/react'
 import { JerseyIcon } from '@/components/ui/JerseyIcon'
 import { MobileTabBar, type MobileTabBarTheme } from '@/components/ui/MobileTabBar'
 import { GenerateInviteItem } from '@/components/ui/GenerateInviteItem'
+import { ThemeToggleNav } from '@/components/ui/ThemeToggle'
 
 interface SiteNavProps {
   activePage?: string
-  // Theme for the mobile bottom tab bar only (MobileTabBar's own light/dark
-  // toggle, unrelated to the desktop nav/slim mobile top row above, which
-  // are always Warm Light now — see navigation.md §4). Defaults to 'light'
-  // (changed September 2026 — the tab bar is now Warm Light everywhere,
-  // irrespective of the page's own body theme; see navigation.md §4.1).
-  // Left in place as an explicit 'dark' opt-out for any page that still
-  // wants the original ink/gold look, though nothing currently passes it.
+  // Explicit per-page override for the mobile bottom tab bar's theme.
+  // Normally omitted — both the nav bar above and the tab bar below follow
+  // the signed-in visitor's own Light/Dark/System preference (see
+  // ui-theme.md and useTheme()). A page whose own body content hasn't been
+  // made theme-aware yet (e.g. /matches/history, still Warm-Light-only) can
+  // still pass this to keep its tab bar pinned to match, regardless of the
+  // visitor's global choice.
   mobileTabBarTheme?: MobileTabBarTheme
 }
 
@@ -59,7 +60,7 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
 
   return (
     <>
-    <nav className="bg-white border-b border-[#D4C9B0] sticky top-0 z-50">
+    <nav className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 sticky top-0 z-50">
       <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
@@ -80,21 +81,21 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
                   ${activePage === 'fixtures' || activePage === 'matches'
                     ? 'text-gold border-crimson'
-                    : 'text-[#78716C] border-transparent hover:text-gold'}`}>
+                    : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
                 Matches <span className="text-[8px] mt-0.5">▾</span>
               </button>
               {matchesOpen && (
-                <div className="absolute top-14 left-0 w-44 bg-white border border-[#D4C9B0] rounded-b shadow-xl z-50">
+                <div className="absolute top-14 left-0 w-44 bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-b shadow-xl z-50">
                   <Link href="/fixtures"
                     onClick={() => setMatchesOpen(false)}
-                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-[#D4C9B0]
-                      ${activePage === 'fixtures' ? 'text-gold bg-[#FEF3C7]' : 'text-[#44403C] hover:text-gold hover:bg-[#F8F4EE]'}`}>
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-[#D4C9B0] dark:border-ink-5
+                      ${activePage === 'fixtures' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                     🏏 Upcoming
                   </Link>
                   <Link href="/matches/history"
                     onClick={() => setMatchesOpen(false)}
                     className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
-                      ${activePage === 'matches' ? 'text-gold bg-[#FEF3C7]' : 'text-[#44403C] hover:text-gold hover:bg-[#F8F4EE]'}`}>
+                      ${activePage === 'matches' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                     📜 Past Matches
                   </Link>
                 </div>
@@ -111,21 +112,21 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
                   ${activePage === 'captains' || activePage === 'captains-unavailable'
                     ? 'text-gold border-crimson'
-                    : 'text-[#78716C] border-transparent hover:text-gold'}`}>
+                    : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
                 Captains' Corner <span className="text-[8px] mt-0.5">▾</span>
               </button>
               {captainsOpen && (
-                <div className="absolute top-14 left-0 w-52 bg-white border border-[#D4C9B0] rounded-b shadow-xl z-50">
+                <div className="absolute top-14 left-0 w-52 bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-b shadow-xl z-50">
                   <Link href="/captains-corner"
                     onClick={() => setCaptainsOpen(false)}
-                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-[#D4C9B0]
-                      ${activePage === 'captains' ? 'text-gold bg-[#FEF3C7]' : 'text-[#44403C] hover:text-gold hover:bg-[#F8F4EE]'}`}>
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-[#D4C9B0] dark:border-ink-5
+                      ${activePage === 'captains' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                     🏏 Squad Selection
                   </Link>
                   <Link href="/captains-corner/unavailable-dates"
                     onClick={() => setCaptainsOpen(false)}
                     className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
-                      ${activePage === 'captains-unavailable' ? 'text-gold bg-[#FEF3C7]' : 'text-[#44403C] hover:text-gold hover:bg-[#F8F4EE]'}`}>
+                      ${activePage === 'captains-unavailable' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                     🚫 Unavailable Dates
                   </Link>
                 </div>
@@ -136,7 +137,7 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
           {links.map(item => (
             <Link key={item.label} href={item.href}
               className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center border-b-2 transition-all
-                ${activePage === item.key ? 'text-gold border-crimson' : 'text-[#78716C] border-transparent hover:text-gold'}`}>
+                ${activePage === item.key ? 'text-gold border-crimson' : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
               {item.label}
             </Link>
           ))}
@@ -150,35 +151,35 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
                   ${activePage === 'gc' || activePage === 'invite'
                     ? 'text-gold border-gold'
-                    : 'text-[#78716C] border-transparent hover:text-gold'}`}>
+                    : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
                 Council ⚖ <span className="text-[8px] mt-0.5">▾</span>
               </button>
               {gcOpen && (
-                <div className="absolute top-14 left-0 w-52 bg-white border border-[#D4C9B0] rounded-b shadow-xl z-50">
+                <div className="absolute top-14 left-0 w-52 bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-b shadow-xl z-50">
                   <Link href="/gc-review"
                     onClick={() => setGcOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors border-b border-[#D4C9B0]">
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     ⚖ Squad Review
                   </Link>
                   <Link href="/gc/feedback"
                     onClick={() => setGcOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors border-b border-[#D4C9B0]">
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     📋 Feedback
                   </Link>
                   <Link href="/gc-players"
                     onClick={() => setGcOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors border-b border-[#D4C9B0]">
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     👤 Players
                   </Link>
                   <Link href="/dugout/store-orders"
                     onClick={() => setGcOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors border-b border-[#D4C9B0]">
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     <JerseyIcon colour="gold" size={16} />
                     Store Orders
                   </Link>
                   <Link href="/wrangler/grounds"
                     onClick={() => setGcOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors border-b border-[#D4C9B0]">
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     📍 Grounds
                   </Link>
                   <GenerateInviteItem />
@@ -196,19 +197,19 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
                   ${activePage === 'wrangler'
                     ? 'text-gold border-gold'
-                    : 'text-[#78716C] border-transparent hover:text-gold'}`}>
+                    : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
                 Wrangler ⚒ <span className="text-[8px] mt-0.5">▾</span>
               </button>
               {wranglerOpen && (
-                <div className="absolute top-14 left-0 w-52 bg-white border border-[#D4C9B0] rounded-b shadow-xl z-50">
+                <div className="absolute top-14 left-0 w-52 bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-b shadow-xl z-50">
                   <Link href="/wrangler/backfill-squad"
                     onClick={() => setWranglerOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors border-b border-[#D4C9B0]">
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     🧩 Squad Backfill
                   </Link>
                   <Link href="/wrangler/grounds"
                     onClick={() => setWranglerOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors">
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors">
                     📍 Grounds
                   </Link>
                 </div>
@@ -238,7 +239,7 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
                   alt={player?.playerName ?? player?.name ?? ''}
                   className="w-7 h-7 rounded-full object-cover border border-gold-dim"
                 />
-                <span className="font-rajdhani text-xs text-[#44403C] max-w-[100px] truncate">
+                <span className="font-rajdhani text-xs text-[#44403C] dark:text-zinc-400 max-w-[100px] truncate">
                   {player?.playerName ?? player?.name?.split(' ')[0]}
                 </span>
               </button>
@@ -246,48 +247,49 @@ export function SiteNav({ activePage, mobileTabBarTheme }: SiteNavProps) {
 
             {/* Profile dropdown */}
             {profileOpen && isLoggedIn && (
-              <div className="absolute right-0 top-10 w-48 bg-white border border-[#D4C9B0] rounded shadow-xl z-50">
-                <div className="px-4 py-3 border-b border-[#D4C9B0]">
-                  <p className="font-rajdhani text-xs font-bold text-[#1C1917] truncate">
+              <div className="absolute right-0 top-10 w-48 bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded shadow-xl z-50">
+                <div className="px-4 py-3 border-b border-[#D4C9B0] dark:border-ink-5">
+                  <p className="font-rajdhani text-xs font-bold text-[#1C1917] dark:text-parchment truncate">
                     {player?.playerName ?? player?.name}
                   </p>
-                  <p className="font-rajdhani text-[10px] text-[#78716C] truncate">{player?.email}</p>
+                  <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-500 truncate">{player?.email}</p>
                   {player?.isCaptain && (
                     <span className="font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1.5 py-0.5 rounded mt-1 inline-block">
                       CAPTAIN
                     </span>
                   )}
                   {player?.isGC && !player?.isAdmin && (
-                    <span className="font-rajdhani text-[9px] font-bold bg-sky-50 border border-sky-300 text-sky-700 px-1.5 py-0.5 rounded mt-1 inline-block ml-1">
+                    <span className="font-rajdhani text-[9px] font-bold bg-sky-50 dark:bg-sky-900/40 border border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-400 px-1.5 py-0.5 rounded mt-1 inline-block ml-1">
                       GC
                     </span>
                   )}
                 </div>
                 {player?.playerId && !isExpelled && (
                   <Link href="/profile" onClick={() => setProfileOpen(false)}
-                    className="block px-4 py-2.5 font-rajdhani text-xs text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors">
+                    className="block px-4 py-2.5 font-rajdhani text-xs text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors">
                     My Profile
                   </Link>
                 )}
                 {player?.playerId && !isExpelled && (
                   <Link href="/wallet" onClick={() => setProfileOpen(false)}
-                    className="block px-4 py-2.5 font-rajdhani text-xs text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors">
+                    className="block px-4 py-2.5 font-rajdhani text-xs text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors">
                     💰 My Wallet
                   </Link>
                 )}
                 {isExpelled && (
-                  <div className="px-4 py-2.5 font-rajdhani text-xs text-[#B91C1C]">
+                  <div className="px-4 py-2.5 font-rajdhani text-xs text-[#B91C1C] dark:text-red-400">
                     Account suspended
                   </div>
                 )}
                 {!player?.playerId && !isExpelled && (
                   <Link href="/join" onClick={() => setProfileOpen(false)}
-                    className="block px-4 py-2.5 font-rajdhani text-xs text-[#44403C] hover:text-gold hover:bg-[#F8F4EE] transition-colors">
+                    className="block px-4 py-2.5 font-rajdhani text-xs text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors">
                     Complete Registration
                   </Link>
                 )}
+                <ThemeToggleNav />
                 <button onClick={() => { signOut(); setProfileOpen(false) }}
-                  className="w-full text-left px-4 py-2.5 font-rajdhani text-xs text-[#78716C] hover:text-[#44403C] hover:bg-[#F8F4EE] transition-colors border-t border-[#D4C9B0]">
+                  className="w-full text-left px-4 py-2.5 font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-t border-[#D4C9B0] dark:border-ink-5">
                   Sign out
                 </button>
               </div>

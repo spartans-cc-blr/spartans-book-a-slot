@@ -6,6 +6,7 @@ import { ChunkErrorBoundary } from '@/components/ui/ChunkErrorBoundary'
 import { GlobalMilestoneModal } from '@/components/ui/GlobalMilestoneModal'
 import { GlobalBirthdayModal } from '@/components/ui/GlobalBirthdayModal'
 import { GlobalFeeReminderModal } from '@/components/ui/GlobalFeeReminderModal'
+import { ThemeProvider, themeInitScript } from '@/components/ui/ThemeProvider'
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -38,15 +39,28 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${cinzel.variable} ${rajdhani.variable}`}>
+    // suppressHydrationWarning: the inline script below sets data-theme on
+    // this element before React hydrates, which would otherwise trip a
+    // server/client mismatch warning for this one attribute — same pattern
+    // every hand-rolled (and next-themes-based) light/dark toggle uses.
+    <html lang="en" className={`${cinzel.variable} ${rajdhani.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Must run before <body> paints — reads the stored Light/Dark/System
+            preference (or the OS's prefers-color-scheme when 'system') and
+            stamps data-theme synchronously, so the first frame is already
+            correct instead of flashing dark-then-light or vice versa. */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="bg-ink text-parchment font-rajdhani antialiased">
         <Providers>
-          <ChunkErrorBoundary>
-            <GlobalBirthdayModal />
-            <GlobalMilestoneModal />
-            <GlobalFeeReminderModal />
-            {children}
-          </ChunkErrorBoundary>
+          <ThemeProvider>
+            <ChunkErrorBoundary>
+              <GlobalBirthdayModal />
+              <GlobalMilestoneModal />
+              <GlobalFeeReminderModal />
+              {children}
+            </ChunkErrorBoundary>
+          </ThemeProvider>
         </Providers>
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {

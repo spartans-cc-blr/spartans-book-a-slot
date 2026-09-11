@@ -42,6 +42,7 @@ import { PlayerAvatar } from './PlayerAvatar'
 import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
 import { BallIcon } from '@/components/matches/BallIcon'
 import { WicketIcon } from './WicketIcon'
+import { useTheme } from '@/components/ui/ThemeProvider'
 import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
 
 interface Milestone {
@@ -53,14 +54,14 @@ interface Milestone {
 
 function InningsPanel({ icon, label, count, children }: { icon: React.ReactNode; label: string; count: number; children: React.ReactNode }) {
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-ink-5">
+    <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded-lg overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--stats-card-border)] dark:border-ink-5">
         <span className="inline-flex items-center leading-none">{icon}</span>
-        <span className="font-rajdhani text-xs font-bold tracking-wide text-parchment flex-1">{label}</span>
-        <span className="font-cinzel text-[10px] text-gold bg-gold/10 border border-gold-dim rounded-full px-2 py-0.5">{count}</span>
+        <span className="font-rajdhani text-xs font-bold tracking-wide text-[var(--stats-text)] dark:text-parchment flex-1">{label}</span>
+        <span className="font-cinzel text-[10px] text-[var(--stats-accent)] dark:text-gold bg-[var(--stats-badge-bg)] dark:bg-gold/10 border border-[var(--stats-accent-dim)] dark:border-gold-dim rounded-full px-2 py-0.5">{count}</span>
       </div>
       {count === 0
-        ? <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">No {label.toLowerCase()} this month yet.</p>
+        ? <p className="font-rajdhani text-sm text-[var(--stats-text-faint)] dark:text-zinc-600 text-center py-6">No {label.toLowerCase()} this month yet.</p>
         : children}
     </div>
   )
@@ -74,6 +75,15 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
   threeWicketHauls: MonthlyBowlingInnings[]
   monthLabel: string
 }) {
+  // Same light/dark card treatment as LeaderboardMilestones.tsx's identical
+  // milestone card — see that file's comment for the full reasoning.
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+  const cardBg = isDark ? 'linear-gradient(135deg, #1C2333 0%, #111827 100%)' : 'linear-gradient(135deg, #FFFFFF 0%, #F8F4EE 100%)'
+  const cardBorder = isDark ? '#2D3748' : '#D4C9B0'
+  const cardShadow = isDark ? '0 4px 20px rgba(0,0,0,.4)' : '0 4px 20px rgba(28,25,23,0.08)'
+  const accentBarGradient = isDark ? 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' : 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)'
+
   const qualifies = (r: LeaderboardRow) => r.stats.matches >= 1
 
   const topMVP     = bestBy(rows, r => r.stats.mvpPoints, qualifies)
@@ -98,7 +108,7 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
   const noInnings = centuries.length === 0 && halfCenturies.length === 0 && fiveWicketHauls.length === 0 && threeWicketHauls.length === 0
   if (rows.length === 0 && noInnings) {
     return (
-      <p className="font-rajdhani text-sm text-zinc-500 py-8 text-center">No stats for {monthLabel} yet.</p>
+      <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500 py-8 text-center">No stats for {monthLabel} yet.</p>
     )
   }
 
@@ -108,28 +118,28 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {milestones.map(m => (
             <div key={m.label} style={{
-              background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
-              border: '1px solid #2D3748',
+              background: cardBg,
+              border: `1px solid ${cardBorder}`,
               borderRadius: '12px',
               padding: '12px',
-              boxShadow: '0 4px 20px rgba(0,0,0,.4)',
+              boxShadow: cardShadow,
               position: 'relative',
               overflow: 'hidden',
             }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: accentBarGradient }} />
 
               <div className="flex items-center justify-between mb-2">
-                <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">{m.label}</p>
+                <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] dark:text-zinc-500">{m.label}</p>
                 <span className="text-sm leading-none">{m.icon}</span>
               </div>
 
               <div className="flex items-center gap-2">
                 <PlayerAvatar photoUrl={m.row!.photoUrl} name={m.row!.playerName} />
                 <div className="min-w-0">
-                  <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
+                  <p className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment truncate">
                     <PlayerNameLink name={m.row!.playerName} playerId={m.row!.playerId} cricHeroesUrl={m.row!.cricheroesUrl} />
                   </p>
-                  <p className="font-cinzel text-xs text-gold mt-0.5">{m.valueText}</p>
+                  <p className="font-cinzel text-xs text-[var(--stats-accent)] dark:text-gold mt-0.5">{m.valueText}</p>
                 </div>
               </div>
             </div>

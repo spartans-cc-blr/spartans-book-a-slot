@@ -16,13 +16,13 @@ export function PlayerAvatar({ photoUrl, name }: { photoUrl: string | null; name
       <img
         src={photoUrl}
         alt={name}
-        className="w-8 h-8 rounded-full object-cover border border-gold-dim flex-shrink-0"
+        className="w-8 h-8 rounded-full object-cover border border-[var(--stats-accent-dim)] dark:border-gold-dim flex-shrink-0"
       />
     )
   }
   return (
-    <div className="w-8 h-8 rounded-full border border-gold-dim bg-ink-4 flex items-center justify-center flex-shrink-0">
-      <span className="font-rajdhani text-xs font-bold text-gold">{initials(name)}</span>
+    <div className="w-8 h-8 rounded-full border border-[var(--stats-accent-dim)] dark:border-gold-dim bg-[var(--stats-row-bg)] dark:bg-ink-4 flex items-center justify-center flex-shrink-0">
+      <span className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] dark:text-gold">{initials(name)}</span>
     </div>
   )
 }
