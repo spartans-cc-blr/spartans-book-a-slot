@@ -33,7 +33,7 @@ export default async function MatchHistoryPage() {
           <p className="font-rajdhani text-sm mb-4" style={{ color: '#78716C' }}>
             Squad history for completed matches.
           </p>
-          <MatchesSegmentedTabs active="past" />
+          <MatchesSegmentedTabs active="past" theme="light" />
         </div>
         <MatchHistoryClient
           canEditRoles={canEditRoles}

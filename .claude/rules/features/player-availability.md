@@ -579,6 +579,25 @@ built in Warm Light). See that component's own file for the final result.
 (Conversion of `FixturesCard.tsx`, `FixturesAvailability.tsx`, and
 `FixturesWeekend.tsx` is still landing incrementally as of this note.)
 
+**Fixed same week — two shared components rendered above the fixture list
+had been missed by the pass above.** `DateChipSlider.tsx` (the date-chip
+picker, wrapped by `FixturesDateFilterBar.tsx`) and
+`MatchesSegmentedTabs.tsx` (the "Upcoming / Past Matches" pill atop both
+this page and `/matches/history`) were both still hardcoded to their
+original literal Warm Light hex values — reported live as the two controls
+staying bright cream/orange while the rest of the page had correctly gone
+dark. Both now default to a `theme="auto"` prop that reads the same
+`--fx-*` CSS variables the rest of the page uses (`--fx-card-header-bg`/
+`--fx-border`/`--fx-accent`/`--fx-card-text`/`--fx-card-text-muted`), so
+they follow the visitor's Light/Dark/System choice with no page-level
+change needed on `/fixtures`. Since `/matches/history`'s own body content
+is still Warm-Light-only (not converted in this pass), both components
+also accept an explicit `theme="light"` override to pin the original look
+there — `MatchHistoryClient.tsx`'s `<DateChipSlider>` call and
+`/app/matches/history/page.tsx`'s `<MatchesSegmentedTabs>` call both pass
+it, so that page's appearance is unchanged. Same override-prop convention
+`MobileTabBar`'s `mobileTabBarTheme` prop already established.
+
 ---
 
 ## 10.2 "Matches" — Fixtures + Match History merged into one bottom tab (added September 2026)
