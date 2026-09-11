@@ -640,8 +640,9 @@ tokens `/players/[id]/stats` uses — see `player-stats-batting-position.md`
 §8), so the two stats surfaces stay visually consistent. `page.tsx`,
 `LeaderboardFilters.tsx`, and `LeaderboardMilestones.tsx` are converted as
 of this note; `LeaderboardMonthly.tsx`, `LeaderboardTable.tsx`,
-`LeaderboardGlossary.tsx`, `InningsRow.tsx`, `PlayerAvatar.tsx`, and
-`BattingPositionLeaders.tsx` are still landing incrementally.
+`LeaderboardGlossary.tsx`, `InningsRow.tsx`, and `PlayerAvatar.tsx` are
+also converted; `BattingPositionLeaders.tsx` is the last file in this
+pass, still landing as of this note.
 
 ---
 

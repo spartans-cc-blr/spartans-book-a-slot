@@ -28,9 +28,9 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
   const active = leaders.find(l => l.position === openPosition) ?? null
 
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4">
-      <h3 className="font-cinzel text-sm text-gold font-semibold mb-1">Runs by Batting Position</h3>
-      <p className="font-rajdhani text-xs text-zinc-500 mb-4">
+    <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded p-4 mb-4">
+      <h3 className="font-cinzel text-sm text-[var(--stats-accent)] dark:text-gold font-semibold mb-1">Runs by Batting Position</h3>
+      <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mb-4">
         Leading run-scorer at each position, for the current filter. Tap a bar for the top 3.
       </p>
       <div className="space-y-2">
@@ -46,11 +46,11 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setOpenPosition(l.position) }}
               className="flex items-center gap-2 cursor-pointer group"
             >
-              <span className="font-cinzel text-xs text-zinc-500 w-7 flex-shrink-0 text-right">{l.position}</span>
-              <div className="flex-1 relative h-7 bg-ink-4 group-hover:bg-ink-5 rounded overflow-hidden transition-colors">
+              <span className="font-cinzel text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 w-7 flex-shrink-0 text-right">{l.position}</span>
+              <div className="flex-1 relative h-7 bg-[var(--stats-row-bg)] dark:bg-ink-4 group-hover:bg-[var(--stats-divider)] dark:group-hover:bg-ink-5 rounded overflow-hidden transition-colors">
                 <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
                 <div className="absolute inset-0 flex items-center justify-between gap-2 px-2.5">
-                  <span className="font-rajdhani text-xs font-semibold text-parchment truncate">
+                  <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text)] dark:text-parchment truncate">
                     {l.players.map((p, i) => (
                       <span key={p.playerId}>
                         {i > 0 && ', '}
@@ -58,7 +58,7 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
                       </span>
                     ))}
                   </span>
-                  <span className="font-rajdhani text-xs font-bold text-gold flex-shrink-0">{l.runs}</span>
+                  <span className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] dark:text-gold flex-shrink-0">{l.runs}</span>
                 </div>
               </div>
             </div>
@@ -66,6 +66,11 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
         })}
       </div>
 
+      {/* Dialog.tsx itself is not yet theme-aware (hardcoded dark shell,
+          out of scope here — it's shared across many unrelated features).
+          The content below deliberately stays on its original dark-ink
+          colours rather than following --stats-*, so it doesn't render
+          dark-on-dark once a visitor is in Light mode. */}
       <Dialog
         open={active != null}
         onClose={() => setOpenPosition(null)}
