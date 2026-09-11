@@ -56,12 +56,18 @@
 | `--color-warning-bg` | `#FEF3C7` | Warning tinted surface (amber-50) |
 | `--color-neutral` | `#78716C` | Unbooked, inactive (stone-500) |
 
-### Navigation Bar (intentionally dark — stays dark across all themes)
+### Navigation Bar (Warm Light, site-wide — changed September 2026)
+Previously an intentional dark exception, kept dark regardless of what
+theme the page content below it used (see `navigation.md` §4's changelog
+note). Reversed per a direct request for the top nav to match the rest of
+the Warm Light palette everywhere, not just on the pages that had already
+adopted it — `SiteNav.tsx` now renders on `#FFFFFF` with a `#D4C9B0`
+(`border-ink-5`) bottom border on every page, dropdown panels included.
 | Token | Value | Usage |
 |---|---|---|
-| `--color-nav-bg` | `#1A1208` | Nav background |
-| `--color-nav-border` | `#D97706` | Nav bottom border |
-| `--color-nav-text` | `#D97706` | Nav role label, icons |
+| `--color-nav-bg` | `#FFFFFF` | Nav background |
+| `--color-nav-border` | `#D4C9B0` | Nav bottom border, dropdown panel borders |
+| `--color-nav-text` | `#D97706` | Active nav label, icons (same gold accent as the rest of the palette) |
 
 ---
 
@@ -232,7 +238,7 @@ Before submitting any code change, verify:
 - [ ] Stat numbers are `text-lg` minimum
 - [ ] `*-400` colour shades replaced with `*-600`/`*-700` for text on light bg
 - [ ] Page `<main>` uses `bg-parchment`
-- [ ] Nav bar stays dark (`bg-[#1A1208]`) — do not lighten it
+- [ ] Nav bar (`SiteNav.tsx`) stays Warm Light (`bg-white`/`border-ink-5`) — do not re-darken it (changed September 2026, see `navigation.md` §4)
 
 ---
 
