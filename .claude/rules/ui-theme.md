@@ -1,8 +1,34 @@
 # Spartans Hub — UI Theme & Design System
 
 **Applies to:** All pages and components in `hub.spartanscricketclub.in`
-**Last updated: May 2026**
-**Status: Option 1 (Warm Light) — approved, pending implementation**
+**Last updated: September 2026**
+**Status: Option 1 (Warm Light) — approved as the default for all new work (see Rollout Policy below)**
+
+---
+
+## Rollout Policy (added September 2026)
+
+**Warm Light (Option 1, this document's palette) is the approved theme for
+all *new* pages and components going forward.** Anything built from here
+on should use this palette directly — no need to ask before a new page
+goes Warm Light; it's the default, not an opt-in.
+
+**Existing pages are explicitly NOT to be migrated proactively.** The
+dark-ink theme still in use across most of the app (`/captains-corner`,
+`/profile`, `/leaderboard`, `/admin/**`, and everything else that hasn't
+had its own Warm Light rebuild) stays as-is until a session is already
+touching that specific page for some other reason — and even then, only
+migrate its theme after asking the user to confirm first. Don't fold a
+theme migration into an unrelated change as a drive-by improvement.
+
+**Two pieces of shared chrome are the exception, already migrated
+site-wide** — not page bodies, but persistent UI that wraps every page
+regardless of that page's own theme: the top nav bar (`SiteNav.tsx`) and
+the mobile bottom tab bar (`MobileTabBar.tsx`, defaults to `'light'` as of
+September 2026). Both are documented in `navigation.md` §4/§4.1. Neither
+migration touched any page body — a light nav/tab bar sitting above or
+below a still-dark page is an accepted seam, not a bug (see `navigation.md`
+§4's "Deliberately still just the nav bar, not a wider reskin" note).
 
 ---
 
