@@ -228,27 +228,29 @@ export default async function CaptainsCornerPage() {
   const weekendEntries = Object.entries(weekendMap)
 
   return (
-    <div className="min-h-screen bg-ink grain">
+    <div className="min-h-screen grain" style={{ background: 'var(--captains-shell-bg)' }}>
       <SiteNav activePage="captains" />
 
       {/* Hero */}
-      <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden">
+      <div className="px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden"
+        style={{ background: 'var(--captains-hero-bg)', borderBottom: '1px solid var(--captains-border)' }}>
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)' }} />
-        <p className="text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
-          <span className="w-4 h-px bg-gold inline-block" />
+        <p className="text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2" style={{ color: 'var(--captains-accent)' }}>
+          <span className="w-4 h-px inline-block" style={{ background: 'var(--captains-accent)' }} />
           Captains Corner
         </p>
-        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-parchment mb-2 tracking-wide">
+        <h1 className="font-cinzel text-2xl md:text-3xl font-bold mb-2 tracking-wide" style={{ color: 'var(--captains-text)' }}>
           Player Availability
         </h1>
-        <p className="text-muted text-sm max-w-xl leading-relaxed font-rajdhani">
+        <p className="text-sm max-w-xl leading-relaxed font-rajdhani" style={{ color: 'var(--captains-text-muted)' }}>
           Showing Y / O / E responses. N and L are hidden. Amber names have outstanding dues.
         </p>
       </div>
 
       {/* Legend */}
-      <div className="px-5 md:px-8 lg:px-10 py-2.5 bg-ink-2 border-b border-ink-4 flex gap-5 flex-wrap">
+      <div className="px-5 md:px-8 lg:px-10 py-2.5 flex gap-5 flex-wrap"
+        style={{ background: 'var(--captains-hero-bg)', borderBottom: '1px solid var(--captains-border)' }}>
         {[
           { code: 'Y', color: '#4ade80', label: 'Available' },
           { code: 'O', color: '#fb923c', label: 'One game this weekend' },
@@ -259,20 +261,20 @@ export default async function CaptainsCornerPage() {
               style={{ background: `${item.color}20`, color: item.color, border: `1px solid ${item.color}40` }}>
               {item.code}
             </span>
-            <span className="font-rajdhani text-xs text-zinc-500">{item.label}</span>
+            <span className="font-rajdhani text-xs" style={{ color: 'var(--captains-text-muted)' }}>{item.label}</span>
           </div>
         ))}
         <div className="flex items-center gap-1.5">
           <span className="w-5 h-5 rounded flex items-center justify-center font-rajdhani text-xs font-bold bg-amber-950 text-amber-400 border border-amber-800">
             ₹
           </span>
-          <span className="font-rajdhani text-xs text-zinc-500">Has outstanding dues</span>
+          <span className="font-rajdhani text-xs" style={{ color: 'var(--captains-text-muted)' }}>Has outstanding dues</span>
         </div>
       </div>
 
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-full overflow-x-auto">
         {weekendEntries.length === 0 ? (
-          <p className="font-rajdhani text-zinc-500 text-sm">No upcoming fixtures found.</p>
+          <p className="font-rajdhani text-sm" style={{ color: 'var(--captains-text-muted)' }}>No upcoming fixtures found.</p>
         ) : (
           <div className="flex flex-col gap-10">
             {weekendEntries.map(([wk, weekend]) => (
@@ -289,8 +291,8 @@ export default async function CaptainsCornerPage() {
         )}
       </div>
 
-      <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
-        © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
+      <footer className="py-5 text-center font-rajdhani text-xs mt-8" style={{ borderTop: '1px solid var(--captains-border)', color: 'var(--captains-text-faint)' }}>
+        © 2026 <span style={{ color: 'var(--captains-accent-dim)' }}>Spartans Cricket Club</span> · Bengaluru · Est. 2014
       </footer>
     </div>
   )

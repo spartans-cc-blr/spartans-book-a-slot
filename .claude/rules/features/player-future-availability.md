@@ -365,6 +365,38 @@ the historical note.
 
 ---
 
+## 8.1 Light/Dark/System (added September 2026)
+
+`/captains-corner/unavailable-dates` is being converted to the app's
+Light/Dark/System theme toggle — full mechanism in `ui-theme.md`'s
+"Light/Dark/System Theme" section. Unlike the rest of Captains' Corner,
+this page has always been Warm Light only (§6's own header comment already
+explains why — it's meant to feel like `/schedule`'s calendar surface, not
+Captains' Corner's dark-ink default), so that existing look is now
+specifically the **light** theme state (unchanged), and a new **dark**
+variant sits alongside it — kept as its own `--unavail-*` CSS-variable
+namespace (`--unavail-shell-bg`/`--unavail-hero-bg`/`--unavail-border`/
+`--unavail-text`/`--unavail-text-muted`/`--unavail-text-faint`/
+`--unavail-accent`/`--unavail-accent-dim`/`--unavail-card-bg`/
+`--unavail-row-bg`, in `globals.css`) rather than reusing Squad Selection's
+`--captains-*` set, since the two pages were always deliberately styled
+differently from each other and should stay that way in both themes.
+
+**Landing in two passes.** `src/app/captains-corner/unavailable-dates/page.tsx`
+(hero band, footer) and `CaptainPicker.tsx` (the admin captain-select
+dropdown) are done — both now read `var(--unavail-xxx)` in their inline
+`style` props instead of literal hex. `UnavailableDatesPanel.tsx` itself
+(the day rows, per-slot chips, whole-day mark action) is the larger piece
+and was still converting as of this note. The per-slot status chip colours
+(unscheduled/reserved/booked/blocked, the Sat/Sun pills, the `L`-marked
+purple) are left as literal, unchanged status colours in both themes —
+same "semantic colours stay put" call every other themed surface in this
+app has made. `ClashArrow.tsx` needs no changes at all — it renders with
+`stroke="currentColor"` and has no colour of its own, so it already
+inherits whatever the wrapping element's text colour is.
+
+---
+
 ## 9. File Map
 
 | File | Role |

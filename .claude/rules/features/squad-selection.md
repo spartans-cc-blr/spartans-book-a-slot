@@ -517,6 +517,35 @@ WK is a `Set<string>` in client state. Captain and VC are `string | null` — se
 - `/captains-corner` page re-validates `isCaptain || isAdmin` on every load
 ---
  
+## 9.1 Light/Dark/System (added September 2026)
+
+`/captains-corner` is being converted to the app's Light/Dark/System theme
+toggle — full mechanism in `ui-theme.md`'s "Light/Dark/System Theme"
+section. This page's look has always been dark-ink only, with no light
+story at all; that existing look is now specifically the **dark** theme
+state (unchanged), and a new **light** variant sits alongside it.
+
+**Landing in two passes.** The page shell (`src/app/captains-corner/page.tsx`
+— hero band, Y/O/E legend, dues-badge row, footer) is done: every literal
+hex/Tailwind dark class there now reads a `--captains-*` CSS variable
+(`--captains-shell-bg`/`--captains-hero-bg`/`--captains-border`/
+`--captains-text`/`--captains-text-muted`/`--captains-text-faint`/
+`--captains-accent`/`--captains-accent-dim`, defined in `globals.css`
+under both `[data-theme="light"]` and `[data-theme="dark"]`) instead of a
+fixed `bg-ink`/`bg-ink-2`/`text-parchment`/`text-zinc-*` set. The Y/O/E
+legend chip colours and the dues `₹` badge are left as literal, unchanged
+status colours in both themes — small saturated accent chips, same
+"semantic colours stay put" call every other themed page in this app has
+made.
+
+`CaptainsCornerGrid.tsx` itself (Per-Slot/Matrix views, `SlotCard`,
+`AddPlayerPanel`, role badges, status pills) is the much larger piece and
+was still converting as of this note — see that file directly for the
+final result once landed. It reuses the same `--captains-*` token set the
+page shell already established, so the two stay visually consistent.
+
+---
+
 ## 10. Pending Tasks
  
 | Task | Status | Notes |
