@@ -390,6 +390,17 @@ the split-audience cards, the sign-in prompt) is unaffected in content —
 only the spacing/order shifted up, since each of those blocks already
 carries its own top-level padding independent of the hero.
 
+**Footer divider removed too (fixed September 2026, same pass)** — a
+follow-up to the hero-band removal above: the footer's `border-t
+border-ink-4` drew a horizontal divider line above the copyright text,
+which — sitting on the page's dark `bg-ink` background with its own
+`py-5`/`mt-8` spacing — visually read as a second, smaller version of the
+same "distinct dark band" the hero band was. The footer text itself
+(`© 2026 Spartans Cricket Club · Bengaluru · Est. 2014 · Club Site`) is
+unchanged and still renders exactly as before; only the `border-t
+border-ink-4` class was dropped, so the copyright line now sits directly
+on the page background with no divider drawing a line above it.
+
 **Stat tiles are drill-down targets, not just numbers (added September 2026).**
 The club coordinator flagged that "18 Upcoming Matches" / "9 My Tournaments"
 had no way to actually see what those 18/9 were. `StatTile` gained an
