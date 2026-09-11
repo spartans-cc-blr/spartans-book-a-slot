@@ -401,6 +401,35 @@ unchanged and still renders exactly as before; only the `border-t
 border-ink-4` class was dropped, so the copyright line now sits directly
 on the page background with no divider drawing a line above it.
 
+**Root page background switched to Warm Light too (fixed September 2026,
+one more follow-up in the same series)** — the border removals above
+stopped the hero and footer from drawing their own extra divider/band, but
+`page.tsx`'s outermost wrapper (`<div className="min-h-screen bg-ink
+grain">`, wrapping the whole page — nav, dashboard, footer, everything)
+was still `bg-ink`, the same dark near-black (`#1C1917`) the old dark-ink
+theme used everywhere. Once the nav went Warm Light too (see §4's "Warm
+Light nav, site-wide" note) and the dashboard already was, that root `bg-
+ink` had nothing left it was actually needed for on this page except
+filling in the gaps *around* the light dashboard box — the empty wrapper
+div between the dashboard and the footer (both its own conditional
+children, the split-audience cards and sign-in prompt, are hidden once
+`isPlayer`), and the footer's own vertical padding — which is exactly the
+"still a black band at the bottom" a signed-in player kept seeing. Fixed
+by switching the root wrapper to `bg-parchment` (`#F8F4EE`, the same
+default page background `ui-theme.md` already specifies for every other
+page's `<main>`) instead of `bg-ink`. The footer's own text
+(`text-zinc-600`/`text-zinc-700` — legible-enough on the old dark bg, but
+essentially invisible on a light one) was updated to `#78716C`/hover
+`#44403C`, matching the Warm Light "muted"/"secondary text" tokens used
+everywhere else in this file. The Expelled/Unmatched banners and the
+logged-out split-audience/sign-in cards (`bg-ink-3`/`bg-red-950`/
+`bg-amber-950`, all self-contained dark cards with their own background
+and already-correct light-on-dark text) needed **no** changes — they carry
+their own background regardless of what the root wrapper behind them is,
+so they still render as intentional dark accent cards sitting on the new
+light page, the same way they always looked like dark cards sitting on
+the old dark page.
+
 **Stat tiles are drill-down targets, not just numbers (added September 2026).**
 The club coordinator flagged that "18 Upcoming Matches" / "9 My Tournaments"
 had no way to actually see what those 18/9 were. `StatTile` gained an
