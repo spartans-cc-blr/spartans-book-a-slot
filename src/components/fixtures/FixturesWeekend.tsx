@@ -33,6 +33,8 @@ interface BookingEntry {
 interface Props {
   isPlayer:                boolean
   isCaptain:               boolean
+  isGC?:                   boolean
+  isAdmin?:                boolean
   bookings:                BookingEntry[]
   initialWeekendResponses: Record<string, string>
 }
@@ -40,6 +42,8 @@ interface Props {
 export function FixturesWeekendGroup({
   isPlayer,
   isCaptain,
+  isGC,
+  isAdmin,
   bookings,
   initialWeekendResponses,
 }: Props) {
@@ -145,6 +149,8 @@ export function FixturesWeekendGroup({
             slotDate={b.game_date}
             isPlayer={isPlayer}
             isCaptain={isCaptain}
+            isGC={isGC}
+            isAdmin={isAdmin}
             response={(weekendResponses[b.id] ?? null) as AvailKey | null}
             saving={savingMap[b.id] ?? false}
             error={errorMap[b.id]  ?? null}

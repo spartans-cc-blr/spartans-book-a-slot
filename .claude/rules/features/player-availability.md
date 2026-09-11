@@ -330,22 +330,76 @@ Captains (and GC / Admin) bypass the freeze entirely. Any post-lock availability
 
 ### API implementation — `src/app/api/player-availability/route.ts`
 
-A shared `checkFreeze()` helper runs a single parallel round-trip before any write:
+A shared `checkFreeze()` helper checks the booking's own lock flag before any write:
 
 ```typescript
 async function checkFreeze(supabase, booking_id): Promise<string | null> {
-  const [{ data: booking }, { data: squad }] = await Promise.all([
-    supabase.from('bookings').select('availability_locked').eq('id', booking_id).single(),
-    supabase.from('squad').select('status').eq('booking_id', booking_id)
-      .in('status', ['pending_approval', 'approved', 'announced']).limit(1).maybeSingle(),
-  ])
+  const { data: booking } = await supabase
+    .from('bookings').select('availability_locked').eq('id', booking_id).single()
   if (booking?.availability_locked) return LOCK_MSG
-  if (squad?.status)                return LOCK_MSG
   return null
 }
 ```
 
-Called in both POST and DELETE handlers. Skipped when `session.isCaptain || session.isGC || session.isAdmin`.
+> Corrected September 2026 — this section previously showed a two-query
+> `Promise.all()` version that also checked live `squad.status` directly.
+> The shipped route has never done that; it only ever reads
+> `bookings.availability_locked` (which §10.1 and the Thursday cron are
+> what actually keep in sync with squad state). Updated to match the real
+> code, found while tracing why a captain/GC/admin's own re-mark was
+> blocked in the UI — see the fix note below.
+
+Called in both POST and DELETE handlers. Skipped entirely when
+`session.isCaptain || session.isGC || session.isAdmin` — this is the
+*server-side* bypass; see below for a client-side bug where the UI didn't
+mirror it.
+
+### UI didn't mirror the server's captain/GC/admin bypass (fixed September 2026)
+
+**Reported symptom:** a captain (also GC) could clear their own `O`
+response on an already-locked, squad-announced booking (`DELETE` isn't
+blocked for them), but then couldn't tap any button to mark a new
+response — every Y/O/E/L button rendered disabled, as if they were a
+regular player hitting the freeze.
+
+**Root cause:** `FixturesAvailability.tsx`'s `upstreamBlock` — the
+client-side gate that disables every response button — only ever checked
+`hasDues` and `slotLocked`:
+
+```typescript
+const upstreamBlock =
+  hasDues    ? '...' :
+  slotLocked ? 'Availability locked — Squad selection in progress' :
+  null
+```
+
+It never looked at role at all, even though the component already
+received an `isCaptain` prop (declared, destructured, and then never used
+in this logic) and `checkFreeze()` on the server has always skipped the
+lock entirely for `isCaptain || isGC || isAdmin` (see above). So once
+`bookings.availability_locked` was `true` — which it reliably is by the
+time a squad is announced, via the Thursday cron and/or §10.1's
+squad-draft-save trigger — every button was disabled for *every* viewer,
+privileged or not, even though a POST from a captain/GC/admin would have
+been accepted by the API without any freeze check at all.
+
+**Fix:** `FixturesAvailability.tsx` now accepts `isGC`/`isAdmin` props
+alongside the existing `isCaptain`, computes
+`bypassesFreeze = isCaptain || isGC || isAdmin`, and only applies the
+`slotLocked` block when `!bypassesFreeze` — mirroring the server exactly.
+The dues guard (`hasDues`) is untouched and still applies to everyone,
+since the API's own wallet-dues guard is never skipped by role either.
+The "🔒 Availability locked" notice under the buttons is likewise
+suppressed for a privileged viewer, since it would otherwise contradict
+buttons that are actually still tappable. `isGC`/`isAdmin` are threaded
+down from both server pages that render this component
+(`src/app/fixtures/page.tsx` and `src/app/fixtures/[id]/page.tsx`, the
+standalone share page) through `FixturesWeekendGroup`
+(`src/components/fixtures/FixturesWeekend.tsx`), the same way `isCaptain`
+already was. `getBlockReason()`'s own Y/O/E cross-game validation is
+unaffected by any of this — that still applies equally to every viewer,
+privileged or not, since only the freeze/dues guards were ever meant to
+have a role-based bypass.
 
 ### §10.1 — Squad-draft-save implementation — `src/app/api/squad/route.ts`
 
