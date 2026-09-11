@@ -436,6 +436,16 @@ ALTER TABLE squad ADD COLUMN match_role text CHECK (match_role IN ('bat','bowl',
 
 **Not started** — no schema, no UI. Worth picking up once the fee-reminder feature has been used for a bit and there's a clear sense of how often admins actually need this shortcut. Confirmed still unbuilt as of the September 2026 player payment ledger work (`features/wallet-ledger.md` §4) — that feature covers player→club wallet transactions only; this club→organiser direction remains a distinct, separate gap.
 ---
+
+### U-31 · In-app back navigation (PWA has no browser chrome)
+**Status:** 📝 Documented, not built — see `features/back-navigation.md` for the full audit and plan.
+
+**Gap:** the Hub runs as a `display: 'standalone'` PWA, so the installed app has no back button (and iOS offers no reliable back gesture). Every drill-down — a match tapped on Team Record, a stat tile on Home, a player name anywhere — is a one-way trip unless the page draws its own exit. Six pages have a hardcoded "← parent" link (never `router.back()`, so it ignores where the player actually came from); `/players/[id]/stats`, `/opponents`, `/wallet` and others have none at all.
+
+**Fix (planned):** one shared `BackButton` — `router.back()` when in-app history exists (tracked via a `sessionStorage` nav-depth counter in `providers.tsx`), else a per-page `fallbackHref` (the existing parent destinations) — rendered by `SiteNav` at the left of the mobile top row on every non-tab page. Follow-on: make `/matches/history` and `/players/[id]/stats` filters URL-driven so "back" restores them (Team Record and the leaderboard already are).
+
+**Priority:** 🟡 Medium — a real, reported UX gap for every installed-PWA user; small, self-contained, no schema or API change.
+---
  ### U-28 · The Dugout — Kit Room (Jersey Orders)
 **Status:** ❌ Not built — spec finalised June 2026
 
