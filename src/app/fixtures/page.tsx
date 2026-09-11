@@ -135,6 +135,8 @@ export default async function FixturesPage() {
 
   const isPlayer  = !!player?.playerId && player?.playerStatus !== 'expelled'
   const isCaptain = isPlayer && !!player?.isCaptain
+  const isGC      = isPlayer && !!player?.isGC
+  const isAdmin   = isPlayer && !!player?.isAdmin
 
   // Helper — live exemption check (same logic as admin fee-apply route)
   function isCurrentlyExempt(exemptions: { start_date: string; end_date: string | null }[]): boolean {
@@ -328,6 +330,8 @@ export default async function FixturesPage() {
                 <FixturesWeekendGroup
                   isPlayer={isPlayer}
                   isCaptain={isCaptain}
+                  isGC={isGC}
+                  isAdmin={isAdmin}
                   bookings={weekendMap[wk]}
                   initialWeekendResponses={
                     Object.fromEntries(

@@ -45,6 +45,11 @@ interface Props {
   hasDues?: boolean          // wallet_balance < 0 AND no dues_override
   slotLocked?: boolean       // bookings.availability_locked === true
   squadAnnounced?: boolean
+  // Captains, GC, and admins bypass the freeze on the server (see
+  // checkFreeze() in /api/player-availability) — these mirror that so the
+  // UI doesn't disable buttons the API would happily accept.
+  isGC?: boolean
+  isAdmin?: boolean
 }
 
 // ── Validation ────────────────────────────────────────────────────
@@ -105,6 +110,7 @@ export function FixturesAvailability({
   bookingId,
   slotDate,
   isPlayer,
+  isCaptain,
   response,
   saving,
   error,
@@ -114,7 +120,13 @@ export function FixturesAvailability({
   hasDues,
   slotLocked,
   squadAnnounced,
+  isGC,
+  isAdmin,
 }: Props) {
+  // Mirrors the server-side bypass in checkFreeze() — captains, GC, and
+  // admins manage the pool directly and are never blocked by the freeze
+  // when updating their own response. Wallet dues still apply to everyone.
+  const bypassesFreeze = isCaptain || isGC || isAdmin
 
   // ── Not a player — sign-in prompt ────────────────────────────
   if (!isPlayer) {
@@ -146,8 +158,8 @@ export function FixturesAvailability({
   // ── Upstream guards (apply to ALL buttons) ────────────────────
  
    const upstreamBlock =
-    hasDues    ? 'Your account has outstanding dues — please clear your balance to update availability' :
-    slotLocked ? 'Availability locked — Squad selection in progress' :
+    hasDues                        ? 'Your account has outstanding dues — please clear your balance to update availability' :
+    slotLocked && !bypassesFreeze  ? 'Availability locked — Squad selection in progress' :
     null
  
    const blockedReasons: Partial<Record<AvailKey, string>> = {}
@@ -221,7 +233,7 @@ export function FixturesAvailability({
       </div>
 
       {/* Frozen slot notice */}
-{slotLocked && !squadAnnounced && (
+{slotLocked && !squadAnnounced && !bypassesFreeze && (
     <p style={{ fontSize: '10px', color: '#6B7280', marginTop: '6px',
       fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4 }}>
       🔒 Availability locked — Squad selection in progress
