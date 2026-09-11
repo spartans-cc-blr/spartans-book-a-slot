@@ -10,6 +10,7 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import Link from 'next/link'
 import { getNudgeForPlayer, getWeekendGapForPlayer } from '@/lib/availabilityNudge'
 import { WeekendAvailabilityGreeting } from '@/components/ui/WeekendAvailabilityGreeting'
+import { SelectedMatchCard } from '@/components/home/SelectedMatchCard'
 
 export const revalidate = 60
 
@@ -48,6 +49,9 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
 
     // Next few confirmed fixtures — feeds both the "Next Match" callout
     // (first row) and the Upcoming Fixtures preview list on the dashboard.
+    // Fetches more than the 3 actually shown (see `otherUpcoming` below) so
+    // there's still a full 3 left over once bookings already covered by the
+    // "You're Selected to Play" section are filtered out.
     supabase
       .from('bookings')
       .select(`
@@ -58,7 +62,7 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       .gte('game_date', today)
       .order('game_date', { ascending: true })
       .order('slot_time', { ascending: true })
-      .limit(3),
+      .limit(8),
 
     // Every squad row this player has ever been announced in, joined to
     // its booking's game_date/status — feeds the Matches Played stat tile
@@ -96,9 +100,10 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       .from('squad')
       .select(`
         booking:bookings!inner(
-          id, game_date, slot_time, format, opponent_name, cricheroes_url, status,
-          tournament:tournaments(name, cricheroes_points_table_url, ground:grounds(name, maps_url)),
-          ground:grounds(name, maps_url)
+          id, game_date, slot_time, match_time, format, opponent_name, cricheroes_url, match_stage, status,
+          match_fee_override,
+          tournament:tournaments(name, ball_type, match_fee, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url)),
+          ground:grounds(name, maps_url, hospital_url)
         )
       `)
       .eq('player_id', playerId)
@@ -119,14 +124,6 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
   const nextFixtureResponse = nextFixture
     ? avail?.find(a => a.booking_id === nextFixture.id)?.response ?? null
     : null
-
-  // Player's availability for every fixture in the preview list (not just
-  // the first) — feeds the badge on each row of the Upcoming Fixtures card.
-  const previewResponses: Record<string, string> = {}
-  for (const fx of upcomingPreview ?? []) {
-    const r = avail?.find(a => a.booking_id === fx.id)?.response
-    if (r) previewResponses[fx.id] = r
-  }
 
   const walletBalance = playerRow?.wallet_balance ?? 0
   const duesOverride = !!playerRow?.dues_override
@@ -150,23 +147,46 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
 
   // Upcoming bookings this player has an *announced* squad row for — feeds
   // the "You're Selected to Play" card, shown ahead of the Upcoming
-  // Fixtures preview. These bookings are deliberately still included in
-  // upcomingPreview too (not deduped away) — this section highlights them,
-  // it doesn't replace their normal listing.
+  // Fixtures preview. Unlike the first cut of this feature, these bookings
+  // are now excluded from the plain Upcoming Fixtures list below — the
+  // selected-to-play section is where they live now, not both places.
   const selectedUpcomingBookings = (mySelectedSquadRows ?? [])
     .map(r => (r as any).booking)
     .filter((b: any) => b?.status === 'confirmed' && b.game_date >= today)
     .sort((a: any, b: any) =>
       a.game_date === b.game_date ? a.slot_time.localeCompare(b.slot_time) : a.game_date.localeCompare(b.game_date)
     )
+  const selectedBookingIds = new Set(selectedUpcomingBookings.map((b: any) => b.id))
+
+  // The plain Upcoming Fixtures preview — whatever's left of the fetched
+  // candidate pool once bookings already surfaced above are filtered out,
+  // capped back down to the usual 3-row preview.
+  const otherUpcoming = (upcomingPreview ?? [])
+    .filter((b: any) => !selectedBookingIds.has(b.id))
+    .slice(0, 3)
+
+  // Player's availability for every fixture actually shown in the Upcoming
+  // Fixtures preview — feeds the badge on each row.
+  const previewResponses: Record<string, string> = {}
+  for (const fx of otherUpcoming) {
+    const r = avail?.find(a => a.booking_id === fx.id)?.response
+    if (r) previewResponses[fx.id] = r
+  }
+
+  // Live exemption check — same logic /fixtures itself uses (src/app/fixtures/page.tsx).
+  function isCurrentlyExempt(exemptions: { start_date: string; end_date: string | null }[]): boolean {
+    return (exemptions ?? []).some(
+      e => e.start_date <= today && (e.end_date === null || e.end_date >= today)
+    )
+  }
 
   let selectedToPlay: any[] = []
   if (selectedUpcomingBookings.length > 0) {
-    const selectedBookingIds = selectedUpcomingBookings.map((b: any) => b.id)
+    const selectedIds = selectedUpcomingBookings.map((b: any) => b.id)
     const { data: fullSquadRows } = await supabase
       .from('squad')
-      .select('booking_id, is_captain, is_vc, is_wk, players(id, name, cricheroes_url)')
-      .in('booking_id', selectedBookingIds)
+      .select('booking_id, is_captain, is_vc, is_wk, players(id, name, cricheroes_url, fee_exemptions(start_date, end_date))')
+      .in('booking_id', selectedIds)
       .eq('status', 'announced')
 
     const squadByBooking: Record<string, any[]> = {}
@@ -177,18 +197,51 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       squadByBooking[row.booking_id].push({
         id: p.id, name: p.name, cricheroes_url: p.cricheroes_url,
         is_match_captain: row.is_captain, is_vc: row.is_vc, is_wk: row.is_wk,
+        fee_exemptions: p.fee_exemptions ?? [],
       })
     }
 
-    selectedToPlay = selectedUpcomingBookings.map((b: any) => ({
-      ...b,
-      squad: (squadByBooking[b.id] ?? []).sort((a: any, c: any) => a.name.localeCompare(c.name)),
-    }))
+    // Running balance for the wallet-after-this-match projection — same
+    // "chain across matches chronologically" approach /fixtures itself
+    // uses. selectedUpcomingBookings is already game_date/slot_time
+    // ascending, so this naturally deducts each match's fee before the
+    // next card's projection is computed.
+    let runningWalletBalance: number | null = walletBalance
+
+    selectedToPlay = selectedUpcomingBookings.map((b: any) => {
+      const squadRows = squadByBooking[b.id] ?? []
+      const baseFee: number | null = b.match_fee_override ?? b.tournament?.match_fee ?? null
+      const nonExemptCount = squadRows.filter((p: any) => !isCurrentlyExempt(p.fee_exemptions)).length
+      const feePerPlayer = baseFee && squadRows.length > 0
+        ? (nonExemptCount > 0 ? Math.ceil(baseFee / nonExemptCount) : null)
+        : null
+
+      const myRow = squadRows.find((p: any) => p.id === playerId)
+      const isExempt = myRow ? isCurrentlyExempt(myRow.fee_exemptions) : false
+
+      const loggedInWalletBalance = runningWalletBalance
+      if (!isExempt && feePerPlayer !== null && runningWalletBalance !== null) {
+        runningWalletBalance = runningWalletBalance - feePerPlayer
+      }
+
+      return {
+        ...b,
+        squad: squadRows
+          .map((p: any) => ({
+            id: p.id, name: p.name, cricheroes_url: p.cricheroes_url,
+            is_match_captain: p.is_match_captain, is_vc: p.is_vc, is_wk: p.is_wk,
+          }))
+          .sort((x: any, y: any) => x.name.localeCompare(y.name)),
+        feePerPlayer,
+        isLoggedInPlayerExempt: isExempt,
+        loggedInWalletBalance,
+      }
+    })
   }
 
   return {
     upcomingCount: upcomingCount ?? 0,
-    upcomingPreview: upcomingPreview ?? [],
+    upcomingPreview: otherUpcoming,
     nextFixture, nextFixtureResponse, previewResponses, nudge, weekendGap,
     walletBalance, duesOverride, tournamentCount,
     matchesPlayedThisYear, lastPlayedOn,
@@ -363,104 +416,6 @@ function QuickActionRow({ href, icon, title, subtitle }: {
       </div>
       <ChevronGlyph />
     </Link>
-  )
-}
-
-// "You're Selected to Play" card — the same match-card information a
-// squad-announced FixturesCard shows (date/slot/format, tournament +
-// opponent + ground, CricHeroes link, squad list with C/VC/WK badges),
-// but re-themed to this dashboard's Warm Light palette rather than
-// FixturesCard's own hardcoded dark gradient (see navigation.md §3.1 for
-// why the two coexist in this app). Read-only — no availability buttons,
-// no fee/wallet projection; the squad is already announced by the time
-// this renders, so there's nothing left to mark here.
-function SelectedMatchCard({ match, viewerPlayerId }: { match: any; viewerPlayerId: string }) {
-  const ground = match.ground ?? match.tournament?.ground
-  return (
-    <div className="rounded-xl p-5 mb-3 relative overflow-hidden" style={{ background: '#FFFFFF', border: '1px solid #F5D9A8' }}>
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)' }} />
-      <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-        <span className="font-rajdhani text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full" style={{ background: '#D1FAE5', color: '#059669' }}>
-          ✓ You're Selected to Play
-        </span>
-        <span className="font-rajdhani text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full" style={{ background: '#FEF3C7', color: '#B45309' }}>
-          {match.format}
-        </span>
-      </div>
-
-      <p className="font-rajdhani text-xs font-semibold mb-1" style={{ color: '#B45309' }}>
-        {formatDate(match.game_date)} · {slotLabel(match.slot_time)}
-      </p>
-
-      <p className="font-cinzel text-base font-bold leading-snug" style={{ color: '#1C1917' }}>
-        {match.tournament?.cricheroes_points_table_url ? (
-          <a href={match.tournament.cricheroes_points_table_url} target="_blank" rel="noopener noreferrer"
-            style={{ color: '#1C1917', textDecoration: 'underline', textDecorationColor: '#D97706', textUnderlineOffset: '3px' }}>
-            {match.tournament?.name}
-          </a>
-        ) : (
-          match.tournament?.name ?? 'Match'
-        )}
-      </p>
-
-      <p className="font-rajdhani text-sm mt-0.5" style={{ color: '#57534E' }}>
-        vs {match.opponent_name ?? 'TBD'}
-        {ground?.name && (
-          <>
-            {' · '}
-            {ground.maps_url ? (
-              <a href={ground.maps_url} target="_blank" rel="noopener noreferrer" style={{ color: '#B45309' }}>
-                {ground.name}
-              </a>
-            ) : (
-              ground.name
-            )}
-          </>
-        )}
-      </p>
-
-      {match.cricheroes_url && (
-        <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer"
-          className="font-rajdhani text-xs font-bold inline-block mt-2" style={{ color: '#D97706' }}>
-          View on CricHeroes ↗
-        </a>
-      )}
-
-      {match.squad.length > 0 && (
-        <div className="mt-3 pt-3" style={{ borderTop: '1px solid #E7E0D3' }}>
-          <p className="font-rajdhani text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#A8A29E' }}>
-            Squad · {match.squad.length} players
-          </p>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-            {match.squad.map((p: any) => (
-              <div key={p.id} className="font-rajdhani text-xs" style={{ color: p.id === viewerPlayerId ? '#B45309' : '#44403C' }}>
-                {p.id ? (
-                  <a href={`/players/${p.id}/stats`} style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: '#D4C9B0' }}>
-                    {p.name}
-                  </a>
-                ) : p.cricheroes_url ? (
-                  <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                    style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: '#D4C9B0' }}>
-                    {p.name}
-                  </a>
-                ) : (
-                  p.name
-                )}
-                {p.is_match_captain && (
-                  <span className="ml-1 font-bold px-1 rounded" style={{ fontSize: '9px', color: '#B45309', background: '#FEF3C7', border: '1px solid #F5D9A8' }}>C</span>
-                )}
-                {p.is_vc && (
-                  <span className="ml-1 font-bold px-1 rounded" style={{ fontSize: '9px', color: '#B45309', background: '#FEF3C7', border: '1px solid #F5D9A8', opacity: 0.8 }}>VC</span>
-                )}
-                {p.is_wk && (
-                  <span className="ml-1 font-bold px-1 rounded" style={{ fontSize: '9px', color: '#1D4ED8', background: '#DBEAFE', border: '1px solid #93C5FD' }}>WK</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -639,7 +594,9 @@ export default async function HomePage() {
 
             {/* You're Selected to Play — one card per upcoming booking with an
                 announced squad this player is in. Shown ahead of Upcoming
-                Fixtures below; those bookings are still listed there too. */}
+                Fixtures below; those bookings are excluded from that plain
+                list (see otherUpcoming in getPlayerData) so they aren't
+                shown twice. */}
             {playerData.selectedToPlay.length > 0 && (
               <div className="mb-5">
                 <h2 className="font-cinzel text-lg font-bold flex items-center gap-2 mb-3" style={{ color: '#1C1917' }}>
@@ -652,12 +609,14 @@ export default async function HomePage() {
               </div>
             )}
 
-            {/* Upcoming Fixtures */}
+            {/* Upcoming Fixtures — relabelled "Upcoming Other Fixtures" once
+                the section above exists, since this list no longer includes
+                those bookings. */}
             <div className="rounded-xl p-5 mb-5" style={{ background: '#FFFFFF', border: '1px solid #D4C9B0' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-cinzel text-lg font-bold flex items-center gap-2" style={{ color: '#1C1917' }}>
                   <span className="w-1 h-5 rounded-full inline-block" style={{ background: '#D97706' }} />
-                  Upcoming Fixtures
+                  {playerData.selectedToPlay.length > 0 ? 'Upcoming Other Fixtures' : 'Upcoming Fixtures'}
                 </h2>
                 <Link href="/fixtures" className="font-rajdhani text-sm font-bold" style={{ color: '#D97706' }}>
                   View All →
@@ -668,7 +627,7 @@ export default async function HomePage() {
                 <div className="rounded-xl py-10 flex flex-col items-center text-center border-2 border-dashed" style={{ borderColor: '#D4C9B0' }}>
                   <CalendarGlyph color="#A8A29E" />
                   <p className="font-cinzel text-base font-bold mt-3" style={{ color: '#1C1917' }}>
-                    No Upcoming Matches Scheduled
+                    {playerData.selectedToPlay.length > 0 ? 'No Other Matches Scheduled' : 'No Upcoming Matches Scheduled'}
                   </p>
                   <p className="font-rajdhani text-sm mt-1 max-w-xs" style={{ color: '#78716C' }}>
                     Check fixtures for your next match once it's confirmed.
