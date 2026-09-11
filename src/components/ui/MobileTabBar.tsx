@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { signIn, signOut } from 'next-auth/react'
 import { JerseyIcon } from '@/components/ui/JerseyIcon'
 import { GenerateInviteItem } from '@/components/ui/GenerateInviteItem'
+import { useTheme } from '@/components/ui/ThemeProvider'
+import { ThemeToggleSheet } from '@/components/ui/ThemeToggle'
 
 export type MobileTabBarTheme = 'dark' | 'light'
 
@@ -19,13 +21,15 @@ interface MobileTabBarProps {
   theme?: MobileTabBarTheme
 }
 
-// Colour tokens per theme. 'light' — the Warm Light palette introduced
-// with the DateChipSlider (parchment surfaces, saturated #D97706 gold) —
-// is now the default (September 2026), rendered regardless of page, so
-// the bottom tab bar looks the same everywhere. 'dark' matches the app's
-// original ink/gold palette and stays available as an explicit opt-out
-// via SiteNav's `mobileTabBarTheme` prop (see navigation.md §4.1) for any
-// page that still wants it, though nothing currently does.
+// Colour tokens per theme. 'light' is the Warm Light palette introduced
+// with the DateChipSlider (parchment surfaces, saturated #D97706 gold);
+// 'dark' is the app's original ink/gold palette. As of the Light/Dark/System
+// rollout (see ui-theme.md), whichever one renders is normally driven by the
+// signed-in visitor's own theme preference (`useTheme()`'s `resolvedTheme`,
+// below) rather than fixed per page — SiteNav's `mobileTabBarTheme` prop
+// still exists as an explicit per-page override for a page that hasn't
+// adopted the toggle for its own body content yet (e.g. /matches/history,
+// which stays pinned 'light' regardless of the visitor's global choice).
 function tokens(theme: MobileTabBarTheme) {
   return theme === 'light' ? {
     navBg: '#FFFFFF', navBorder: '#D4C9B0',
@@ -59,9 +63,11 @@ function useReserveBottomSpace() {
 }
 
 export function MobileTabBar(props: MobileTabBarProps) {
-  const { activePage, isLoggedIn, isExpelled, isAdmin, isGC, isCaptain, isWrangler, playerId, theme = 'light' } = props
+  const { activePage, isLoggedIn, isExpelled, isAdmin, isGC, isCaptain, isWrangler, playerId, theme: themeOverride } = props
   const [moreOpen, setMoreOpen] = useState(false)
   useReserveBottomSpace()
+  const { resolvedTheme } = useTheme()
+  const theme = themeOverride ?? resolvedTheme
   const t = tokens(theme)
 
   return (
@@ -83,10 +89,13 @@ export function MobileTabBar(props: MobileTabBarProps) {
           <div className="overflow-y-auto px-5 pb-6 pt-2">
 
             {isExpelled ? (
-              <div className="py-3" style={{ borderBottom: `1px solid ${t.divider}` }}>
-                <p className="font-rajdhani text-sm font-semibold" style={{ color: t.dangerText }}>Account suspended</p>
-                <p className="font-rajdhani text-xs mt-1" style={{ color: t.muted }}>Contact the coordinator if you think this is a mistake.</p>
-              </div>
+              <>
+                <div className="py-3" style={{ borderBottom: `1px solid ${t.divider}` }}>
+                  <p className="font-rajdhani text-sm font-semibold" style={{ color: t.dangerText }}>Account suspended</p>
+                  <p className="font-rajdhani text-xs mt-1" style={{ color: t.muted }}>Contact the coordinator if you think this is a mistake.</p>
+                </div>
+                <ThemeToggleSheet t={t} />
+              </>
             ) : isLoggedIn ? (
               <>
                 <SheetLink t={t} href="/dugout" icon={<ShieldIcon size={16} />} label="The Dugout" active={activePage === 'dugout'} onNavigate={() => setMoreOpen(false)} />
@@ -146,6 +155,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
                   </>
                 )}
 
+                <ThemeToggleSheet t={t} />
                 <SheetLink t={t} href="https://spartanscricketclub.vercel.app" icon={<ExternalLinkIcon />} label="Club Site" active={false} onNavigate={() => setMoreOpen(false)} muted />
 
                 <button
@@ -160,6 +170,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
               </>
             ) : (
               <>
+                <ThemeToggleSheet t={t} />
                 <SheetLink t={t} href="https://spartanscricketclub.vercel.app" icon={<ExternalLinkIcon />} label="Club Site" active={false} onNavigate={() => setMoreOpen(false)} muted />
                 <button
                   onClick={() => { setMoreOpen(false); signIn('google') }}

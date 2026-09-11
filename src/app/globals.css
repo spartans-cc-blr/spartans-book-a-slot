@@ -7,6 +7,154 @@
   --font-rajdhani: 'Rajdhani', sans-serif;
 }
 
+/* ============================================================
+   Light/Dark/System theme tokens — see ui-theme.md.
+   Scoped per-surface: only the components that opt in by reading
+   one of these var() values are affected. Every page/component
+   that doesn't reference them keeps rendering exactly as it always
+   has, regardless of data-theme. Needed (rather than Tailwind's
+   `dark:` class variant alone) anywhere colour is set via an inline
+   `style` prop from a Server Component, which can't call useTheme().
+   ============================================================ */
+:root,
+[data-theme="light"] {
+  /* Home dashboard (src/app/page.tsx, SelectedMatchCard.tsx) */
+  --home-shell-bg: #F0F4F5;
+  --home-card-bg: #FFFFFF;
+  --home-card-border: #D4C9B0;
+  --home-text: #1C1917;
+  --home-text-2: #57534E;
+  --home-text-muted: #78716C;
+  --home-text-faint: #A8A29E;
+  --home-divider: #E7E0D3;
+  --home-row-bg: #F8F4EE;
+  --home-welcome-grad: linear-gradient(135deg, #FEF3C7 0%, #FFF7ED 100%);
+  --home-nudge-bg: #FEF3C7;
+  --home-nudge-border: #F5D9A8;
+  --home-nudge-title: #92400E;
+  --home-nudge-body: #B45309;
+  --home-accent: #D97706;
+  --home-icon-tint: #B45309;
+  --home-tile-tint-bg: #FEF3C7;
+  --home-tile-gold-tag-bg: #FEF3C7;
+  --home-tile-gold-tag-text: #B45309;
+  --home-tile-emerald-bg: #D1FAE5;
+  --home-tile-emerald-text: #059669;
+  --home-tile-crimson-bg: #FEE2E2;
+  --home-tile-crimson-text: #DC2626;
+
+  /* Fixtures shell + FixturesCard/FixturesAvailability */
+  --fx-shell-bg: #F8F4EE;
+  --fx-hero-bg: #FFFFFF;
+  --fx-border: #D4C9B0;
+  --fx-text: #1C1917;
+  --fx-text-2: #44403C;
+  --fx-text-muted: #78716C;
+  --fx-text-faint: #A8A29E;
+  --fx-card-bg: linear-gradient(160deg, #FFFFFF 0%, #F8F4EE 100%);
+  --fx-card-border: #D4C9B0;
+  --fx-card-header-bg: #F0EAD8;
+  --fx-card-text: #1C1917;
+  --fx-card-text-2: #44403C;
+  --fx-card-text-muted: #78716C;
+  --fx-card-text-faint: #A8A29E;
+  --fx-card-divider: #E7E0D3;
+  --fx-row-bg: #F8F4EE;
+  --fx-row-hover: rgba(0,0,0,0.03);
+  --fx-badge-bg: #FEF3C7;
+  --fx-badge-text: #B45309;
+  --fx-badge-border: #F5D9A8;
+  --fx-accent: #D97706;
+  --fx-accent-dim: #B45309;
+  --fx-danger-bg: #FEE2E2;
+  --fx-danger-border: #FCA5A5;
+  --fx-danger-text: #991B1B;
+
+  /* Player Stats + Leaderboard */
+  --stats-shell-bg: #F8F4EE;
+  --stats-card-bg: #FFFFFF;
+  --stats-card-border: #D4C9B0;
+  --stats-text: #1C1917;
+  --stats-text-2: #44403C;
+  --stats-text-muted: #78716C;
+  --stats-text-faint: #A8A29E;
+  --stats-divider: #E7E0D3;
+  --stats-accent: #D97706;
+  --stats-accent-dim: #B45309;
+  --stats-row-bg: #F8F4EE;
+  --stats-row-hover: rgba(0,0,0,0.03);
+  --stats-badge-bg: #FEF3C7;
+  --stats-badge-text: #B45309;
+  --stats-badge-border: #F5D9A8;
+}
+[data-theme="dark"] {
+  --home-shell-bg: #111111;
+  --home-card-bg: #1A1A1A;
+  --home-card-border: #2E2E2E;
+  --home-text: #F0E8D0;
+  --home-text-2: #D4CBB0;
+  --home-text-muted: #A3987E;
+  --home-text-faint: #7A7264;
+  --home-divider: #242424;
+  --home-row-bg: #111111;
+  --home-welcome-grad: linear-gradient(135deg, #241a06 0%, #1A1A1A 100%);
+  --home-nudge-bg: #241a06;
+  --home-nudge-border: #7A6030;
+  --home-nudge-title: #E8C97A;
+  --home-nudge-body: #C9A84C;
+  --home-accent: #C9A84C;
+  --home-icon-tint: #C9A84C;
+  --home-tile-tint-bg: #3d2e00;
+  --home-tile-gold-tag-bg: #3d2e00;
+  --home-tile-gold-tag-text: #E8C97A;
+  --home-tile-emerald-bg: #1a4731;
+  --home-tile-emerald-text: #4ade80;
+  --home-tile-crimson-bg: #3f1414;
+  --home-tile-crimson-text: #f87171;
+
+  --fx-shell-bg: #080808;
+  --fx-hero-bg: #111111;
+  --fx-border: #2E2E2E;
+  --fx-text: #F0E8D0;
+  --fx-text-2: #D4CBB0;
+  --fx-text-muted: #A3987E;
+  --fx-text-faint: #7A7264;
+  --fx-card-bg: linear-gradient(160deg, #1A1A1A 0%, #111111 100%);
+  --fx-card-border: #2E2E2E;
+  --fx-card-header-bg: #1A1A1A;
+  --fx-card-text: #F0E8D0;
+  --fx-card-text-2: #D4CBB0;
+  --fx-card-text-muted: #A3987E;
+  --fx-card-text-faint: #7A7264;
+  --fx-card-divider: #242424;
+  --fx-row-bg: #1A1A1A;
+  --fx-row-hover: rgba(255,255,255,0.04);
+  --fx-badge-bg: #3d2e00;
+  --fx-badge-text: #E8C97A;
+  --fx-badge-border: #7A6030;
+  --fx-accent: #C9A84C;
+  --fx-accent-dim: #7A6030;
+  --fx-danger-bg: #3f1414;
+  --fx-danger-border: #7F1D1D;
+  --fx-danger-text: #FCA5A5;
+
+  --stats-shell-bg: #080808;
+  --stats-card-bg: #111111;
+  --stats-card-border: #2E2E2E;
+  --stats-text: #F0E8D0;
+  --stats-text-2: #D4CBB0;
+  --stats-text-muted: #A3987E;
+  --stats-text-faint: #7A7264;
+  --stats-divider: #242424;
+  --stats-accent: #C9A84C;
+  --stats-accent-dim: #7A6030;
+  --stats-row-bg: #1A1A1A;
+  --stats-row-hover: rgba(255,255,255,0.04);
+  --stats-badge-bg: #3d2e00;
+  --stats-badge-text: #E8C97A;
+  --stats-badge-border: #7A6030;
+}
+
 @layer base {
   body {
     background-color: #080808;

@@ -24,6 +24,35 @@ import {
   BallIcon, CricHeroesIcon, MapPinIcon, HospitalIcon,
   jerseyColour, jerseyLabel, stageIcon, slotLabel, formatDate,
 } from '@/components/fixtures/FixturesCard'
+import { useTheme } from '@/components/ui/ThemeProvider'
+
+// Light/Dark tokens — see ui-theme.md "Light/Dark/System". Light is this
+// card's original Warm Light palette, unchanged; dark reuses the app's
+// original ink tokens. A plain client-side lookup (not the CSS-variable
+// approach page.tsx uses) since this is already a 'use client' component
+// and can read useTheme() directly.
+const LIGHT = {
+  cardBg: '#FFFFFF', cardBorder: '#F5D9A8',
+  dateText: '#B45309', accentGradient: 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)',
+  headingText: '#1C1917', accent: '#D97706',
+  subtitleText: '#57534E', opponentText: '#44403C',
+  groundText: '#78716C', divider: '#E7E0D3', faintText: '#A8A29E',
+  stageBg: '#FEF3C7', stageText: '#B45309', stageBorder: '#F5D9A8',
+  feeText: '#78716C', feeBorder: '#F1EBDD', feeAmount: '#B45309',
+  squadOwn: '#B45309', squadOther: '#44403C', squadUnderline: '#D4C9B0',
+  cBadgeBg: '#FEF3C7', cBadgeText: '#B45309', cBadgeBorder: '#F5D9A8',
+}
+const DARK = {
+  cardBg: 'linear-gradient(160deg, #1A1A1A 0%, #111111 100%)', cardBorder: '#7A6030',
+  dateText: '#E8C97A', accentGradient: 'linear-gradient(90deg, #C9A84C, #E8C97A, #C9A84C)',
+  headingText: '#F0E8D0', accent: '#C9A84C',
+  subtitleText: '#D4CBB0', opponentText: '#D4CBB0',
+  groundText: '#A3987E', divider: '#242424', faintText: '#7A7264',
+  stageBg: '#3d2e00', stageText: '#E8C97A', stageBorder: '#7A6030',
+  feeText: '#A3987E', feeBorder: '#242424', feeAmount: '#E8C97A',
+  squadOwn: '#E8C97A', squadOther: '#D4CBB0', squadUnderline: '#2E2E2E',
+  cBadgeBg: '#3d2e00', cBadgeText: '#E8C97A', cBadgeBorder: '#7A6030',
+}
 
 type SquadPlayer = {
   id: string
@@ -60,6 +89,8 @@ export type SelectedMatch = {
 
 export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMatch; viewerPlayerId: string }) {
   const [squadOpen, setSquadOpen] = useState(false)
+  const { resolvedTheme } = useTheme()
+  const t = resolvedTheme === 'dark' ? DARK : LIGHT
   const ground = match.ground ?? match.tournament?.ground ?? null
   const ballType = (match.tournament?.ball_type || 'red') as 'red' | 'white' | 'pink'
   const jColour = jerseyColour(ballType)
@@ -69,13 +100,12 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
 
   return (
     <div className="rounded-xl p-4 mb-3 relative overflow-hidden flex flex-col gap-2.5"
-      style={{ background: '#FFFFFF', border: '1px solid #F5D9A8' }}>
-      <div className="absolute top-0 left-0 right-0 h-[3px]"
-        style={{ background: 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)' }} />
+      style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}` }}>
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: t.accentGradient }} />
 
       {/* Date + slot + format row */}
       <div className="flex items-center justify-between gap-2">
-        <span className="font-rajdhani text-xs font-semibold" style={{ color: '#B45309' }}>
+        <span className="font-rajdhani text-xs font-semibold" style={{ color: t.dateText }}>
           {formatDate(match.game_date)} · {match.match_time
             ? match.match_time.slice(0, 5).replace(/^0/, '') + ' ' + (parseInt(match.match_time, 10) < 12 ? 'AM' : 'PM')
             : slotLabel(match.slot_time)}
@@ -90,22 +120,22 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
 
       {/* Tournament + opponent + ground + match_stage */}
       <div>
-        <p className="font-cinzel text-base font-bold leading-snug" style={{ color: '#1C1917' }}>
+        <p className="font-cinzel text-base font-bold leading-snug" style={{ color: t.headingText }}>
           {match.tournament?.cricheroes_points_table_url ? (
             <a href={match.tournament.cricheroes_points_table_url} target="_blank" rel="noopener noreferrer"
-              style={{ color: '#1C1917', textDecoration: 'underline', textDecorationColor: '#D97706', textUnderlineOffset: '3px' }}>
+              style={{ color: t.headingText, textDecoration: 'underline', textDecorationColor: t.accent, textUnderlineOffset: '3px' }}>
               {match.tournament?.name}
             </a>
           ) : (
             match.tournament?.name ?? 'Match'
           )}
         </p>
-        <p className="font-rajdhani text-sm mt-0.5" style={{ color: '#57534E' }}>
-          vs <span style={{ color: '#44403C', fontWeight: 500 }}>{match.opponent_name ?? 'TBD'}</span>
+        <p className="font-rajdhani text-sm mt-0.5" style={{ color: t.subtitleText }}>
+          vs <span style={{ color: t.opponentText, fontWeight: 500 }}>{match.opponent_name ?? 'TBD'}</span>
         </p>
         {(ground?.name || match.match_stage) && (
           <div className="flex items-center justify-between mt-1 gap-2">
-            <p className="font-rajdhani text-xs" style={{ color: '#78716C' }}>
+            <p className="font-rajdhani text-xs" style={{ color: t.groundText }}>
               {ground?.name && (
                 <>
                   {'@ '}
@@ -119,7 +149,7 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
             </p>
             {match.match_stage && (
               <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide flex-shrink-0"
-                style={{ background: '#FEF3C7', color: '#B45309', border: '1px solid #F5D9A8' }}>
+                style={{ background: t.stageBg, color: t.stageText, border: `1px solid ${t.stageBorder}` }}>
                 {stageIcon(match.match_stage)} {match.match_stage}
               </span>
             )}
@@ -127,45 +157,45 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
         )}
       </div>
 
-      <div className="h-px" style={{ background: '#E7E0D3' }} />
+      <div className="h-px" style={{ background: t.divider }} />
 
       {/* Icon row — ball, jersey, CricHeroes, ground, hospital */}
       <div className="flex items-center gap-3.5">
         <div className="flex flex-col items-center gap-0.5">
           <BallIcon type={ballType} size={20} />
-          <span className="font-rajdhani text-[9px] capitalize" style={{ color: '#A8A29E' }}>{ballType} ball</span>
+          <span className="font-rajdhani text-[9px] capitalize" style={{ color: t.faintText }}>{ballType} ball</span>
         </div>
         <div className="flex flex-col items-center gap-0.5">
           <JerseyIcon colour={jColour} size={20} />
-          <span className="font-rajdhani text-[9px]" style={{ color: '#A8A29E' }}>{jLabel}</span>
+          <span className="font-rajdhani text-[9px]" style={{ color: t.faintText }}>{jLabel}</span>
         </div>
         <div className="flex-1" />
         {match.cricheroes_url && (
           <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
             className="flex flex-col items-center gap-0.5" style={{ textDecoration: 'none' }}>
             <CricHeroesIcon size={20} />
-            <span className="font-rajdhani text-[9px]" style={{ color: '#A8A29E' }}>CricHeroes</span>
+            <span className="font-rajdhani text-[9px]" style={{ color: t.faintText }}>CricHeroes</span>
           </a>
         )}
         {hasGround && (
           <a href={ground!.maps_url!} target="_blank" rel="noopener noreferrer" title="Open ground in Google Maps"
             className="flex flex-col items-center gap-0.5" style={{ textDecoration: 'none' }}>
             <MapPinIcon size={18} />
-            <span className="font-rajdhani text-[9px]" style={{ color: '#A8A29E' }}>Ground</span>
+            <span className="font-rajdhani text-[9px]" style={{ color: t.faintText }}>Ground</span>
           </a>
         )}
         {hasHosp && (
           <a href={ground!.hospital_url!} target="_blank" rel="noopener noreferrer" title="Nearest hospital"
             className="flex flex-col items-center gap-0.5" style={{ textDecoration: 'none' }}>
             <HospitalIcon size={18} />
-            <span className="font-rajdhani text-[9px]" style={{ color: '#A8A29E' }}>Hospital</span>
+            <span className="font-rajdhani text-[9px]" style={{ color: t.faintText }}>Hospital</span>
           </a>
         )}
       </div>
 
       {/* Announced squad — collapsible, same as FixturesCard */}
       <div>
-        <div className="h-px mb-1.5" style={{ background: '#E7E0D3' }} />
+        <div className="h-px mb-1.5" style={{ background: t.divider }} />
         <button
           onClick={() => setSquadOpen(v => !v)}
           className="w-full flex items-center justify-between py-1"
@@ -174,28 +204,28 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
           <span className="font-rajdhani text-[11px] font-bold uppercase tracking-wide" style={{ color: '#059669' }}>
             ✅ Squad Announced · {match.squad.length} players
           </span>
-          <span className="text-sm" style={{ color: '#A8A29E' }}>{squadOpen ? '▲' : '▼'}</span>
+          <span className="text-sm" style={{ color: t.faintText }}>{squadOpen ? '▲' : '▼'}</span>
         </button>
 
         {match.feePerPlayer != null && (
-          <div className="font-rajdhani text-xs pt-1.5 mt-0.5" style={{ color: '#78716C', borderTop: '1px solid #F1EBDD' }}>
-            💰 Match fee: <span style={{ color: '#B45309', fontWeight: 700 }}>₹{match.feePerPlayer}</span> per player
+          <div className="font-rajdhani text-xs pt-1.5 mt-0.5" style={{ color: t.feeText, borderTop: `1px solid ${t.feeBorder}` }}>
+            💰 Match fee: <span style={{ color: t.feeAmount, fontWeight: 700 }}>₹{match.feePerPlayer}</span> per player
             {match.isLoggedInPlayerExempt && (
-              <span style={{ color: '#A8A29E', marginLeft: '6px' }}>· You are exempt</span>
+              <span style={{ color: t.faintText, marginLeft: '6px' }}>· You are exempt</span>
             )}
           </div>
         )}
 
         {match.feePerPlayer != null && !match.isLoggedInPlayerExempt && match.loggedInWalletBalance != null && (
-          <div className="font-rajdhani text-xs mt-1" style={{ color: '#78716C' }}>
+          <div className="font-rajdhani text-xs mt-1" style={{ color: t.feeText }}>
             Your wallet after this match:{' '}
             <span style={{
               fontWeight: 700,
-              color: (match.loggedInWalletBalance - match.feePerPlayer) < 0 ? '#D97706' : '#059669',
+              color: (match.loggedInWalletBalance - match.feePerPlayer) < 0 ? t.accent : '#059669',
             }}>
               ₹{match.loggedInWalletBalance - match.feePerPlayer}
             </span>
-            <span style={{ color: '#A8A29E', marginLeft: '4px' }}>
+            <span style={{ color: t.faintText, marginLeft: '4px' }}>
               (currently ₹{match.loggedInWalletBalance} · −₹{match.feePerPlayer})
             </span>
           </div>
@@ -204,24 +234,24 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
         {squadOpen && (
           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 pb-1 pt-2">
             {match.squad.map(p => (
-              <div key={p.id} className="font-rajdhani text-xs" style={{ color: p.id === viewerPlayerId ? '#B45309' : '#44403C' }}>
+              <div key={p.id} className="font-rajdhani text-xs" style={{ color: p.id === viewerPlayerId ? t.squadOwn : t.squadOther }}>
                 {p.id ? (
-                  <a href={`/players/${p.id}/stats`} style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: '#D4C9B0' }}>
+                  <a href={`/players/${p.id}/stats`} style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: t.squadUnderline }}>
                     {p.name}
                   </a>
                 ) : p.cricheroes_url ? (
                   <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                    style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: '#D4C9B0' }}>
+                    style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: t.squadUnderline }}>
                     {p.name}
                   </a>
                 ) : (
                   p.name
                 )}
                 {p.is_match_captain && (
-                  <span className="ml-1 font-bold px-1 rounded" style={{ fontSize: '9px', color: '#B45309', background: '#FEF3C7', border: '1px solid #F5D9A8' }}>C</span>
+                  <span className="ml-1 font-bold px-1 rounded" style={{ fontSize: '9px', color: t.cBadgeText, background: t.cBadgeBg, border: `1px solid ${t.cBadgeBorder}` }}>C</span>
                 )}
                 {p.is_vc && (
-                  <span className="ml-1 font-bold px-1 rounded" style={{ fontSize: '9px', color: '#B45309', background: '#FEF3C7', border: '1px solid #F5D9A8', opacity: 0.8 }}>VC</span>
+                  <span className="ml-1 font-bold px-1 rounded" style={{ fontSize: '9px', color: t.cBadgeText, background: t.cBadgeBg, border: `1px solid ${t.cBadgeBorder}`, opacity: 0.8 }}>VC</span>
                 )}
                 {p.is_wk && (
                   <span className="ml-1 font-bold px-1 rounded" style={{ fontSize: '9px', color: '#1D4ED8', background: '#DBEAFE', border: '1px solid #93C5FD' }}>WK</span>
