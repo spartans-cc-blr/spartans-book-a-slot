@@ -35,9 +35,9 @@ export function WalletExportMenu() {
             onClick={() => setOpen(false)}
             className="block px-4 py-3 font-rajdhani text-sm text-zinc-300 hover:bg-ink-4 hover:text-gold transition-colors"
           >
-            📊 Wallet Report (.xls)
+            📊 Wallet Report (.xlsx)
             <span className="block font-rajdhani text-xs text-zinc-500 mt-0.5">
-              Summary sheet (player + balance) · Detailed sheet (player, transaction, running total)
+              Summary sheet (player + balance, with KPI tiles) · Detailed sheet (player, transaction, running total)
             </span>
           </a>
         </div>

@@ -1,21 +1,25 @@
 // Admin wallet Excel export — src/app/api/admin/wallet/export/route.ts is the
 // only caller. See features/wallet-ledger.md §16.
 //
-// Produces a single downloadable workbook with two named sheets:
-//   - "Summary"  — one row per player: name + current wallet balance.
+// Produces a real, single downloadable .xlsx workbook with two named sheets:
+//   - "Summary"  — a small dashboard header (title, generated date, KPI
+//     tiles) followed by one row per player: name + current wallet balance.
 //   - "Detailed" — one row per transaction, grouped by player, in
 //     chronological (oldest-first) order, with a running total that starts
 //     from that player's own opening balance (the same "Brought Forward"
 //     figure the /wallet statement page computes — see §5 of the feature
 //     doc) so the numbers tie out to a real ledger, not just a bare list.
 //
-// No xlsx library dependency — this repo deliberately keeps its runtime
-// dependency count minimal (see limitations.md's cold-start audit). Instead
-// this emits the long-standing "HTML + SpreadsheetML" workbook format
-// (the same thing Excel itself produces via File > Save As > Web Page),
-// which real Excel opens as a normal multi-sheet workbook with no library
-// needed on either side.
+// Built via `write-excel-file` — a genuine OOXML (.xlsx) writer, not a raw
+// HTML/SpreadsheetML "trick" (see this file's git history for the first cut,
+// which used that trick and turned out unreliable in real Excel — the
+// "Detailed" sheet routinely came back empty). `write-excel-file` has
+// exactly one dependency (`fflate`, itself dependency-free) and adds zero
+// new vulnerabilities to this repo's `npm audit` output — confirmed before
+// adopting it — so it's a safe fit for this app's otherwise minimal runtime
+// dependency footprint (see limitations.md's cold-start audit).
 
+import writeExcelFile from 'write-excel-file/node'
 import { createServiceClient } from '@/lib/supabase'
 
 export type WalletSummaryRow = { name: string; wallet_balance: number }
@@ -114,47 +118,135 @@ function round2(n: number) {
   return Math.round(n * 100) / 100
 }
 
-function escapeHtml(s: string) {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+// ── Workbook styling tokens — mirrors ui-theme.md's palette so the export
+// reads as part of the same app, not a generic spreadsheet dump. ──────────
+const HEADER_BG = '#1A1208'   // --color-nav-bg
+const HEADER_TEXT = '#D97706' // --color-gold
+const TITLE_TEXT = '#1C1917'  // --color-text
+const MUTED_TEXT = '#78716C'  // --color-text-muted
+const POSITIVE = '#059669'    // --color-success
+const NEGATIVE = '#DC2626'    // --color-crimson
+const BAND_BG = '#F8F4EE'     // --color-bg
+const BORDER = '#D4C9B0'      // --color-border
+const MONEY_FORMAT = '"₹"#,##0.00;-"₹"#,##0.00'
+
+function titleRow(text: string, columns: number) {
+  return [
+    { value: text, fontWeight: 'bold', fontSize: 14, textColor: TITLE_TEXT, columnSpan: columns },
+    ...Array(columns - 1).fill(null),
+  ]
 }
 
-export function buildWalletExportWorkbook(summary: WalletSummaryRow[], detailed: WalletDetailRow[]): string {
-  const summaryRows = summary
-    .map(r => `<tr><td>${escapeHtml(r.name)}</td><td>${r.wallet_balance}</td></tr>`)
-    .join('')
+function subtitleRow(text: string, columns: number) {
+  return [
+    { value: text, fontStyle: 'italic', fontSize: 10, textColor: MUTED_TEXT, columnSpan: columns },
+    ...Array(columns - 1).fill(null),
+  ]
+}
 
-  const detailedRows = detailed
-    .map(r => `<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.transaction)}</td><td>${r.running_total}</td></tr>`)
-    .join('')
+function blankRow(columns: number) {
+  return Array(columns).fill(null)
+}
 
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-<meta charset="UTF-8">
-<!--[if gte mso 9]><xml>
-<x:ExcelWorkbook><x:ExcelWorksheets>
-<x:ExcelWorksheet><x:Name>Summary</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>
-<x:ExcelWorksheet><x:Name>Detailed</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>
-</x:ExcelWorksheets></x:ExcelWorkbook>
-</xml><![endif]-->
-<style>
-table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 12px; margin-bottom: 24px; }
-th, td { border: 1px solid #B0AFAF; padding: 4px 10px; }
-th { background: #1A1208; color: #D97706; font-weight: bold; text-align: left; }
-</style>
-</head>
-<body>
-<table>
-<tr><th>Player Name</th><th>Wallet Balance</th></tr>
-${summaryRows}
-</table>
-<table>
-<tr><th>Player Name</th><th>Transaction</th><th>Running Total</th></tr>
-${detailedRows}
-</table>
-</body>
-</html>`
+function headerCell(text: string) {
+  return {
+    value: text,
+    fontWeight: 'bold',
+    textColor: HEADER_TEXT,
+    backgroundColor: HEADER_BG,
+    borderColor: BORDER,
+    borderStyle: 'thin' as const,
+  }
+}
+
+function labelCell(text: string) {
+  return { value: text, fontWeight: 'bold', textColor: MUTED_TEXT }
+}
+
+function textCell(text: string, band: boolean, extra: Record<string, unknown> = {}) {
+  return {
+    value: text,
+    borderColor: BORDER,
+    borderStyle: 'thin' as const,
+    ...(band ? { backgroundColor: BAND_BG } : {}),
+    ...extra,
+  }
+}
+
+function moneyCell(amount: number, band: boolean, extra: Record<string, unknown> = {}) {
+  return {
+    value: amount,
+    type: Number,
+    format: MONEY_FORMAT,
+    align: 'right' as const,
+    textColor: amount < 0 ? NEGATIVE : POSITIVE,
+    borderColor: BORDER,
+    borderStyle: 'thin' as const,
+    ...(band ? { backgroundColor: BAND_BG } : {}),
+    ...extra,
+  }
+}
+
+export async function buildWalletExportWorkbook(
+  summary: WalletSummaryRow[],
+  detailed: WalletDetailRow[]
+): Promise<Buffer> {
+  const generatedAt = new Date().toLocaleString('en-IN', {
+    dateStyle: 'medium', timeStyle: 'short',
+  })
+
+  // ── Summary sheet — dashboard header + KPI tiles + player table ────────
+  const totalPlayers = summary.length
+  const totalBalance = round2(summary.reduce((sum, p) => sum + p.wallet_balance, 0))
+  const overdueCount = summary.filter(p => p.wallet_balance < 0).length
+
+  const summaryData = [
+    titleRow('Spartans Hub — Wallet Report', 2),
+    subtitleRow(`Generated ${generatedAt}`, 2),
+    blankRow(2),
+    [labelCell('Total Players'), { value: totalPlayers, type: Number }],
+    [labelCell('Total Balance'), moneyCell(totalBalance, false)],
+    [labelCell('Players Overdue'), { value: overdueCount, type: Number, textColor: overdueCount > 0 ? NEGATIVE : POSITIVE, fontWeight: 'bold' }],
+    blankRow(2),
+    [headerCell('Player Name'), headerCell('Wallet Balance')],
+    ...summary.map(p => [textCell(p.name, false), moneyCell(p.wallet_balance, false)]),
+  ]
+
+  // ── Detailed sheet — one banded block per player ────────────────────────
+  let band = false
+  let lastName: string | null = null
+  const detailedRows = detailed.map(r => {
+    if (r.name !== lastName) { band = !band; lastName = r.name }
+    const isBroughtForward = r.transaction === 'Brought Forward'
+    return [
+      textCell(r.name, band, isBroughtForward ? { fontWeight: 'bold' } : {}),
+      textCell(r.transaction, band, isBroughtForward ? { fontStyle: 'italic' } : {}),
+      moneyCell(r.running_total, band, isBroughtForward ? { fontWeight: 'bold' } : {}),
+    ]
+  })
+
+  const detailedData = [
+    titleRow('Spartans Hub — Wallet Ledger (Detailed)', 3),
+    subtitleRow(`Generated ${generatedAt}`, 3),
+    blankRow(3),
+    [headerCell('Player Name'), headerCell('Transaction'), headerCell('Running Total')],
+    ...detailedRows,
+  ]
+
+  const buffer = await writeExcelFile([
+    {
+      sheet: 'Summary',
+      data: summaryData,
+      columns: [{ width: 26 }, { width: 20 }],
+      stickyRowsCount: 8,
+    },
+    {
+      sheet: 'Detailed',
+      data: detailedData,
+      columns: [{ width: 24 }, { width: 68 }, { width: 18 }],
+      stickyRowsCount: 4,
+    },
+  ]).toBuffer()
+
+  return buffer as Buffer
 }

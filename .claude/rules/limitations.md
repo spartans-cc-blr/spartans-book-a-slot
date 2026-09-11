@@ -147,6 +147,17 @@ enough idle gap still cold-starts, and any unpinged route is unaffected)
 and isn't a substitute for the actual fix, a Vercel plan with better
 warm-retention (e.g. Pro's Fluid Compute).
 
+**One exception to the "11 runtime dependencies" count, added deliberately
+(September 2026):** `write-excel-file` (+ its own sole dependency,
+`fflate`) was added to build a real `.xlsx` for `/admin/wallet`'s export
+menu, after a dependency-free HTML/SpreadsheetML trick turned out
+unreliable in real Excel — see `features/wallet-ledger.md` §16's incident
+write-up. Confirmed to add zero new `npm audit` findings before adopting
+it, and scoped to a single admin-only API route — Next.js bundles each API
+route's server function independently, so this doesn't touch any page's
+client bundle or any other route's cold-start path, and doesn't change the
+audit conclusion above for the rest of the app.
+
 ---
 
 ## Supabase Free Tier — Storage Cap
