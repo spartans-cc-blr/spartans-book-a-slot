@@ -61,20 +61,91 @@ Previously an intentional dark exception, kept dark regardless of what
 theme the page content below it used (see `navigation.md` §4's changelog
 note). Reversed per a direct request for the top nav to match the rest of
 the Warm Light palette everywhere, not just on the pages that had already
-adopted it — `SiteNav.tsx` now renders on `#FFFFFF` with a `#D4C9B0`
-(`border-ink-5`) bottom border on every page, dropdown panels included.
+adopted it — `SiteNav.tsx` now renders on `bg-white` (`#FFFFFF`) with a
+`border-[#D4C9B0]` bottom border on every page, dropdown panels included.
+
+**The border is a literal arbitrary-value class, not `border-ink-5`
+(corrected September 2026, same pass as the "still a black band" fix
+below)** — the first cut of this change kept `border-ink-5`, on the
+mistaken belief (this doc's own "Tailwind Token Mapping" section said so)
+that `ink-5` already resolved to this same light `#D4C9B0` tan. It
+doesn't — see the ⚠️ correction note under Tailwind Token Mapping below;
+`ink-5` actually ships as `#2E2E2E`, a dark gray. Every `border-ink-5` in
+`SiteNav.tsx` was switched to the literal `border-[#D4C9B0]` to get the
+colour this section always intended.
 | Token | Value | Usage |
 |---|---|---|
 | `--color-nav-bg` | `#FFFFFF` | Nav background |
-| `--color-nav-border` | `#D4C9B0` | Nav bottom border, dropdown panel borders |
-| `--color-nav-text` | `#D97706` | Active nav label, icons (same gold accent as the rest of the palette) |
+| `--color-nav-border` | `#D4C9B0` | Nav bottom border, dropdown panel borders (literal hex — not the `ink-5` token, see above) |
+| `--color-nav-text` | `#D97706` | Active nav label, icons — this is the *intended* value; the bare `text-gold` class actually renders `#C9A84C` (see the Tailwind Token Mapping correction below), a close but not identical muted gold |
 
 ---
 
 ## Tailwind Token Mapping
 
+> ⚠️ **Correction (September 2026) — this section describes the *planned*
+> Option 1 palette, not what `tailwind.config.ts` actually ships.** This
+> was discovered live while chasing a "still a black band at the bottom"
+> report: `ink-5`, documented below as the light `#D4C9B0` border token,
+> was assumed unchanged when `SiteNav.tsx` went Warm Light (PR #234) —
+> its real value is `#2E2E2E`, a dark gray, since the real `ink` scale was
+> never migrated off the original dark-ink palette. Every `border-ink-5`
+> in `SiteNav.tsx` has since been corrected to the literal `border-[#D4C9B0]`
+> (§4's changelog note has the fix). The real, currently-shipped tokens are:
+>
+> ```ts
+> // tailwind.config.ts — colors block, as actually shipped
+> colors: {
+>   gold: {
+>     DEFAULT: '#C9A84C',   // muted khaki-gold, NOT #D97706
+>     light: '#E8C97A',
+>     dim: '#7A6030',        // NOT #B45309
+>     glow: 'rgba(201,168,76,0.15)',
+>   },
+>   crimson: {
+>     DEFAULT: '#C0132C',   // deep maroon-red, NOT #DC2626
+>     dark: '#8B0000',
+>   },
+>   ink: {
+>     DEFAULT: '#080808',   // near-black — matches globals.css's `body` bg
+>     2: '#111111',
+>     3: '#1A1A1A',
+>     4: '#242424',
+>     5: '#2E2E2E',          // dark gray border, NOT light tan
+>   },
+>   parchment: {
+>     DEFAULT: '#F8F4EE',   // this one *does* match the table below
+>     2: '#EEEAE2',
+>     3: '#E2DACE',
+>   },
+> }
+> ```
+>
+> Every Home dashboard/`FixturesCard`/`SelectedMatchCard` colour cited
+> elsewhere in this file as a hex literal (`#D97706`, `#B45309`, `#DC2626`,
+> `#D4C9B0`, …) is a plain inline `style={{ color: '...' }}` or a Tailwind
+> arbitrary-value class (`bg-[#...]`) — those are unaffected by this gap,
+> since they never went through the `gold`/`crimson`/`ink` token names at
+> all. Only code using the bare Tailwind utility classes (`text-gold`,
+> `border-ink-5`, `bg-ink-2`, etc.) is actually rendering the *shipped*
+> palette below, not the aspirational one in the rest of this doc. Not
+> re-audited further as part of this fix — the gold/crimson shift (muted
+> khaki vs. punchy amber, deep maroon vs. bright red) doesn't read as
+> "broken" the way a dark-gray border or a near-black background did, so
+> it wasn't in scope for the reported bug. Worth a dedicated pass if the
+> two palettes are ever meant to fully converge — either update
+> `tailwind.config.ts` to match this table, or update this table to match
+> the config.
+
+The table below (and the rest of this document) still describes the
+**intended** Option 1 values — useful as the target design, just not a
+reliable source for what a bare `text-gold`/`border-ink-5`/`bg-ink-2`
+class actually renders today. Prefer literal hex (inline `style` or
+`bg-[#...]`) over the `gold`/`crimson`/`ink` Tailwind tokens when the exact
+Warm Light value matters, until the two are reconciled.
+
 ```ts
-// tailwind.config.ts — colors block
+// tailwind.config.ts — colors block (as intended, still not shipped for gold/crimson/ink)
 colors: {
   gold: {
     DEFAULT: '#D97706',
@@ -94,7 +165,7 @@ colors: {
     5: '#D4C9B0',   // borders
   },
   parchment: {
-    DEFAULT: '#F8F4EE',   // page bg
+    DEFAULT: '#F8F4EE',   // page bg — this one is actually shipped
     2: '#EEEAE2',          // card bg
     3: '#E2DACE',          // deep surface
   },
