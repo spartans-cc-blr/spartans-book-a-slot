@@ -9,7 +9,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import type { SplitRow, TeamMatch, FormLetter } from '@/lib/teamStatsCore'
-import { scoreString, winMargin } from '@/lib/teamStatsCore'
+import { scoreString, winMargin, summarize, recentForm } from '@/lib/teamStatsCore'
 
 export function FormPills({ form, size = 'sm' }: { form: FormLetter[]; size?: 'sm' | 'lg' }) {
   if (form.length === 0) return <span className="text-[var(--stats-text-faint)] dark:text-zinc-600">—</span>
@@ -82,16 +82,28 @@ export function MatchList({ matches, showOpponent = true }: { matches: TeamMatch
   )
 }
 
-export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText = 'No matches for this filter.' }: {
+export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText = 'No matches for this filter.', showTotal = true }: {
   rows: SplitRow[]
   showOpponentInMatches?: boolean
   emptyText?: string
+  // Aggregate footer row across everything listed above it. Computed from
+  // the *distinct* matches behind the rows, not by summing the rows — the
+  // Toss split puts a toss-winning match in two buckets, and that must
+  // not count twice in the total.
+  showTotal?: boolean
 }) {
   const [open, setOpen] = useState<string | null>(null)
 
   if (rows.length === 0) {
     return <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500 py-6 text-center">{emptyText}</p>
   }
+
+  const distinct = new Map<string, TeamMatch>()
+  for (const r of rows) for (const m of r.matches) distinct.set(m.bookingId, m)
+  const allMatches = Array.from(distinct.values())
+  const total = summarize(allMatches)
+  const totalForm = recentForm(allMatches, 5)
+  const lastPlayed = allMatches.reduce<string | null>((acc, m) => (acc === null || m.gameDate > acc ? m.gameDate : acc), null)
 
   return (
     <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded-lg overflow-hidden">
@@ -117,6 +129,24 @@ export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText =
               )
             })}
           </tbody>
+          {showTotal && rows.length > 1 && (
+            <tfoot>
+              <tr className="border-t-2 border-[var(--stats-card-border)] dark:border-ink-5 bg-[var(--stats-row-bg)] dark:bg-ink-4/60">
+                <td className="px-3 py-2.5">
+                  <span className="font-rajdhani text-xs font-bold tracking-[3px] uppercase text-[var(--stats-text-muted)] dark:text-zinc-500">
+                    Total <span className="font-normal tracking-normal normal-case">· {rows.length} {rows.length === 1 ? 'group' : 'groups'}</span>
+                  </span>
+                </td>
+                <td className="px-2 py-2.5 text-right font-rajdhani text-sm font-bold text-[var(--stats-text)] dark:text-parchment tabular-nums">{total.played}</td>
+                <td className="px-2 py-2.5 text-right font-rajdhani text-sm font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">{total.won}</td>
+                <td className="px-2 py-2.5 text-right font-rajdhani text-sm font-bold text-red-700 dark:text-red-400 tabular-nums">{total.lost}</td>
+                <td className="px-2 py-2.5 text-right font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500 tabular-nums hidden sm:table-cell">{total.tied + total.nr || '–'}</td>
+                <td className="px-2 py-2.5 text-right font-rajdhani text-base font-bold text-[var(--stats-accent)] dark:text-gold tabular-nums">{total.winPct === null ? '–' : `${total.winPct}%`}</td>
+                <td className="px-3 py-2.5 hidden md:table-cell"><FormPills form={totalForm} /></td>
+                <td className="px-3 py-2.5 text-right font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 hidden md:table-cell">{lastPlayed ? fmtDate(lastPlayed) : '–'}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
