@@ -25,7 +25,7 @@ export function FixturesDateFilterBar({ groups }: { groups: DateChipGroup[] }) {
       {selected && (
         <style>{`[data-dates]:not([data-dates*="${selected}"]) { display: none; }`}</style>
       )}
-      <div className="rounded-xl p-3 mb-4" style={{ background: '#F8F4EE', border: '1px solid #D4C9B0' }}>
+      <div className="rounded-xl p-3 mb-4" style={{ background: 'var(--fx-shell-bg)', border: '1px solid var(--fx-border)' }}>
         <DateChipSlider groups={groups} selected={selected} onSelect={setSelected} />
       </div>
     </>

@@ -558,6 +558,25 @@ tab bar matches. Scope is deliberately just this page and
 `/matches/history` (§16 there) — not a site-wide reskin; see
 `navigation.md` §4.1's "Warm Light variant" note for the full reasoning.
 
+**Light/Dark/System (added September 2026) — supersedes the "stays as they
+are" decision above.** The Hub gained a real OS-style Light/Dark/System
+toggle (full mechanism in `ui-theme.md`'s "Light/Dark/System Theme"
+section). `/fixtures`' page shell (hero, not-registered/expelled banners,
+the Y/E/O/L legend, footer) and `FixturesDateFilterBar.tsx` now read their
+colours from a `--fx-*` CSS-variable set in `globals.css` instead of the
+literal hex values this section describes — the light values are byte-
+identical to what's documented above, and a new dark counterpart was added
+alongside them, so the shell now genuinely follows the visitor's choice
+rather than being fixed Warm Light. `<SiteNav activePage="fixtures" />` no
+longer passes `mobileTabBarTheme="light"`, so the bottom tab bar follows
+the toggle too instead of being pinned light. **`FixturesCard`/
+`FixturesAvailability`'s "stays dark, deliberately" decision is being
+reversed in this same pass** — both are being converted to read from the
+same `--fx-card-*`/`--fx-badge-*` tokens, with their current dark gradient
+preserved exactly as the `dark` state and a new light variant designed
+alongside it (modelled on `SelectedMatchCard.tsx`, a close analog already
+built in Warm Light). See that component's own file for the final result.
+
 ---
 
 ## 10.2 "Matches" — Fixtures + Match History merged into one bottom tab (added September 2026)
