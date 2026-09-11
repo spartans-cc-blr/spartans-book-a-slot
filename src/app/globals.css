@@ -104,6 +104,12 @@
   --captains-badge-bg: #FEF3C7;
   --captains-badge-text: #B45309;
   --captains-badge-border: #F5D9A8;
+  /* Sub-surface within a card — section header/footer strips, the
+     "＋ Add player" panel's own background — distinct from --captains-card-bg
+     itself. Added for the CaptainsCornerGrid.tsx Light/Dark/System pass;
+     dark matches ink-4 (#242424) exactly, so every `bg-ink-4 dark:` pairing
+     stays byte-identical to the pre-existing dark look. */
+  --captains-surface-2: #F8F4EE;
 
   /* Captains' Corner — Unavailable Dates (/captains-corner/unavailable-dates).
      Light is this page's ORIGINAL look (mirrors /schedule), unchanged;
@@ -208,6 +214,7 @@
   --captains-badge-bg: #3d2e00;
   --captains-badge-text: #E8C97A;
   --captains-badge-border: #7A6030;
+  --captains-surface-2: #242424;
 
   --unavail-shell-bg: #080808;
   --unavail-hero-bg: #111111;

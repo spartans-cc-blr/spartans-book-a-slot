@@ -539,10 +539,59 @@ status colours in both themes — small saturated accent chips, same
 made.
 
 `CaptainsCornerGrid.tsx` itself (Per-Slot/Matrix views, `SlotCard`,
-`AddPlayerPanel`, role badges, status pills) is the much larger piece and
-was still converting as of this note — see that file directly for the
-final result once landed. It reuses the same `--captains-*` token set the
-page shell already established, so the two stay visually consistent.
+`AddPlayerPanel`, role badges, status pills) — the much larger piece — is
+now also converted. It reuses the same `--captains-*` token set the page
+shell already established, plus one new sub-surface token,
+`--captains-surface-2` (light `#F8F4EE`, dark `#242424` — matches `ink-4`'s
+literal dark value exactly), for the section header/footer strips and the
+"＋ Add player" panel's own background, which have no exact match among the
+page-shell's original token set.
+
+**Conversion pattern.** Every structural Tailwind class this component used
+(`bg-ink-3`/`bg-ink-4`/`bg-ink-5`/`bg-ink`, `border-ink-4`/`border-ink-5`,
+`text-parchment`, `text-zinc-300`–`text-zinc-800`, `border-zinc-500`–
+`border-zinc-800`, `bg-zinc-800`, including their `hover:`/`placeholder:`
+variants) now carries a `dark:`-prefixed copy of the exact original class
+alongside a new light base class reading the matching `--captains-*`
+token — e.g. `bg-ink-3` → `bg-[var(--captains-card-bg)] dark:bg-ink-3`,
+`text-zinc-500` → `text-[var(--captains-text-muted)] dark:text-zinc-500`.
+Dark mode is therefore byte-identical to the component's pre-existing,
+always-dark look; light is new. `text-gold`/`border-gold-dim`/`bg-gold/…`
+accents were left unconverted throughout, matching the same call
+`SiteNav.tsx`'s own Warm Light pass made for these tokens (`ui-theme.md`'s
+Tailwind Token Mapping correction) — not the reported symptom, and they
+read fine on either background.
+
+**Status/semantic colours were deliberately left untouched, in both
+themes** — same "small saturated accent chips don't need theming" call as
+the page shell's own Y/O/E legend: the `RESP` (Y/O/E/L) response-code
+colours and `Chip`, the `StatusBadge` draft/pending/approved/announced set
+(including the grayscale `draft` entry, which stays literal specifically
+because it's one state in that same four-state set, not a stray structural
+gray), the amber dues `₹` badge and amber wallet-balance text, the "via
+CAP"-style CAP/C/VC/WK role badges, the emerald "Announced ✓"/Approve/WA
+button family, the red "taken elsewhere" pill and error text, the sky
+"selected for this slot" row/checkbox tint, the rose fee-exemption heart
+icon, and the `AddPlayerPanel`'s own Y/E/O/L proxy-add button colours
+(`PROXY_CODES`) — none of these read from a `--captains-*` token in either
+theme.
+
+**The "Form" panel is its own local theme, not `--captains-*`.** Both the
+navy-gradient card `SelectablePlayerRow` opens (tournament/ground/format
+record) and `ContextStatsTable` inside it were always a deliberately
+separate styling family from the rest of this page — mirroring
+`FixturesCard`'s own card look rather than the ink-token surfaces
+everywhere else here (see that panel's own header comment). Since
+`FixturesCard` itself has since gone theme-aware the same way
+(`player-availability.md` §10.3), this panel now follows suit: a local
+`FORM_LIGHT`/`FORM_DARK` token object plus a `useTheme()` lookup — the same
+pattern `SelectedMatchCard.tsx` established for an identical problem —
+rather than the page's CSS-variable route, since the container background
+itself (a gradient, not a flat colour) needed to flip along with its text,
+and mixing that with a still-hardcoded-dark container would have put light
+text on a still-dark card. `FORM_DARK` reproduces the panel's original,
+always-dark colours byte-for-byte; `FORM_LIGHT` is new, built from the same
+Warm Light "match info" palette `FixturesCard`/`SelectedMatchCard` use.
 
 ---
 

@@ -16,6 +16,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { BookingContextStats, PlayerStatsTotals } from '@/types'
 import { matchDisplayTime } from '@/lib/matchStatus'
+import { useTheme } from '@/components/ui/ThemeProvider'
 
 interface Booking {
   id: string
@@ -90,6 +91,42 @@ const RESP: Record<string, { bg: string; text: string; border: string; label: st
   E: { bg: '#1e3a5f', text: '#93c5fd', border: '#3b82f6', label: 'Either game today — one only' },
   O: { bg: '#431407', text: '#fdba74', border: '#f97316', label: 'One game this weekend only' },
   L: { bg: '#2e1a47', text: '#d8b4fe', border: '#a855f7', label: 'On leave' },
+}
+
+// ── "Form" panel tokens — Light/Dark/System (see ui-theme.md) ─────
+// This panel deliberately mirrors FixturesCard's own navy-gradient "match
+// info" card family rather than the --captains-* ink tokens used everywhere
+// else on this page (see the panel's own header comment below) — so it gets
+// its own local LIGHT/DARK object + useTheme() lookup, the same pattern
+// SelectedMatchCard.tsx uses for an identical "re-theme a FixturesCard-style
+// dark gradient card" problem. DARK reproduces the panel's original,
+// always-dark colours byte-for-byte; LIGHT is new, built from the same Warm
+// Light "match info" palette FixturesCard/SelectedMatchCard use.
+const FORM_DARK = {
+  cardBg: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
+  cardBorder: '#2D3748',
+  accentBar: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)',
+  loadingText: '#71717a',
+  emptyText: '#71717a',
+  headerText: '#6B7280',
+  rowLabelText: '#9CA3AF',
+  rowDivider: 'rgba(45,55,72,0.6)',
+  cellDash: '#6B7280',
+  cellValue: '#F9FAFB',
+  disclaimerText: '#52525b',
+}
+const FORM_LIGHT = {
+  cardBg: 'linear-gradient(160deg, #FFFFFF 0%, #F8F4EE 100%)',
+  cardBorder: '#D4C9B0',
+  accentBar: 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)',
+  loadingText: '#78716C',
+  emptyText: '#78716C',
+  headerText: '#78716C',
+  rowLabelText: '#44403C',
+  rowDivider: 'rgba(212,201,176,0.6)',
+  cellDash: '#A8A29E',
+  cellValue: '#1C1917',
+  disclaimerText: '#78716C',
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -373,7 +410,7 @@ function StatusBadge({ status }: { status: 'draft' | 'pending' | 'approved' | 'a
     <td className="py-0 text-center" style={{ width: 48, minWidth: 48, background: cellBg }}>
      {pip
        ? <span className="font-rajdhani text-[11px]" style={{ color: pip.color }}>{pip.char}</span>
-       : <span className="font-rajdhani text-[11px] text-zinc-800">—</span>
+       : <span className="font-rajdhani text-[11px] text-[var(--captains-text-faint)] dark:text-zinc-800">—</span>
      }
     </td>
   )
@@ -422,7 +459,7 @@ function PlayerName({
 }) {
   const cls = [
     'font-rajdhani text-sm flex-1 leading-none',
-    isTaken ? 'line-through text-zinc-500' : hasDues ? 'text-amber-400' : 'text-parchment',
+    isTaken ? 'line-through text-[var(--captains-text-muted)] dark:text-zinc-500' : hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment',
   ].filter(Boolean).join(' ')
 
   const badge = player.is_captain
@@ -579,6 +616,8 @@ function SelectablePlayerRow({
   const [formStats,   setFormStats]   = useState<BookingContextStats | null>(null)
   const [formLoading, setFormLoading] = useState(false)
   const [formError,   setFormError]   = useState<string | null>(null)
+  const { resolvedTheme } = useTheme()
+  const ft = resolvedTheme === 'dark' ? FORM_DARK : FORM_LIGHT
 
   async function handleFormToggle(e: React.MouseEvent) {
     e.stopPropagation()
@@ -616,7 +655,7 @@ function SelectablePlayerRow({
 
   return (
     <div className={[
-      'border-b border-zinc-800 last:border-0 transition-colors',
+      'border-b border-[var(--captains-border)] dark:border-zinc-800 last:border-0 transition-colors',
       isSel ? 'bg-sky-950/30' : '',
     ].filter(Boolean).join(' ')}>
 
@@ -625,15 +664,15 @@ function SelectablePlayerRow({
         onClick={() => !isDisabled && onToggle(player.id)}
         className={[
           'flex items-center gap-2 px-3 py-2.5 transition-colors',
-          !isDisabled ? 'cursor-pointer hover:bg-ink-5/60' : 'cursor-default',
+          !isDisabled ? 'cursor-pointer hover:bg-[var(--captains-row-hover)] dark:hover:bg-ink-5/60' : 'cursor-default',
         ].filter(Boolean).join(' ')}>
 
         {/* Checkbox */}
         <span className={[
           'w-3.5 h-3.5 rounded-sm border flex items-center justify-center flex-shrink-0 transition-all',
           isSel              ? 'bg-sky-500 border-sky-400'   : '',
-          isTaken            ? 'bg-zinc-800 border-zinc-700' : '',
-          !isSel && !isTaken ? 'border-zinc-500'             : '',
+          isTaken            ? 'bg-[var(--captains-border)] dark:bg-zinc-800 border-[var(--captains-border)] dark:border-zinc-700' : '',
+          !isSel && !isTaken ? 'border-[var(--captains-text-faint)] dark:border-zinc-500'             : '',
         ].filter(Boolean).join(' ')}>
           {isSel && <span className="text-[8px] text-white font-bold leading-none">✓</span>}
         </span>
@@ -679,7 +718,7 @@ function SelectablePlayerRow({
         <div
           className="flex items-center gap-1.5 px-3 pb-2 pt-0 flex-wrap"
           onClick={e => e.stopPropagation()}>
-          <span className="font-rajdhani text-[9px] text-zinc-700 mr-0.5">Role:</span>
+          <span className="font-rajdhani text-[9px] text-[var(--captains-text-faint)] dark:text-zinc-700 mr-0.5">Role:</span>
 
           {/* C / VC / WK — unchanged */}
           {([
@@ -696,14 +735,14 @@ function SelectablePlayerRow({
                   ? role.key === 'wk'
                     ? 'bg-sky-950/60 border-sky-700 text-sky-400'
                     : 'bg-gold/20 border-gold-dim text-gold'
-                  : 'bg-ink-4 border-ink-5 text-zinc-600 hover:text-zinc-400 hover:border-zinc-600'
+                  : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 border-[var(--captains-card-border)] dark:border-ink-5 text-[var(--captains-text-muted)] dark:text-zinc-600 hover:text-[var(--captains-text-2)] dark:hover:text-zinc-400 hover:border-[var(--captains-text-muted)] dark:hover:border-zinc-600'
               }`}>
               {role.label}
             </button>
           ))}
 
           {/* Separator */}
-          <span className="font-rajdhani text-[9px] text-zinc-700 select-none">·</span>
+          <span className="font-rajdhani text-[9px] text-[var(--captains-text-faint)] dark:text-zinc-700 select-none">·</span>
 
           {/* Match role badges — BAT / BOWL / BAT-AR / BOWL-AR */}
           {([
@@ -723,10 +762,10 @@ function SelectablePlayerRow({
                 onClick={() => onMatchRoleToggle(player.id, isActive ? null : mr.key)}
                 className={`inline-flex items-center gap-px px-1.5 py-0.5 rounded-sm border transition-colors ${
                   isDisabledCombo
-                    ? 'opacity-25 cursor-not-allowed bg-ink-4 border-ink-5'
+                    ? 'opacity-25 cursor-not-allowed bg-[var(--captains-surface-2)] dark:bg-ink-4 border-[var(--captains-card-border)] dark:border-ink-5'
                     : isActive
                       ? 'bg-emerald-950/60 border-emerald-700'
-                      : 'bg-ink-4 border-ink-5 hover:border-zinc-600'
+                      : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 border-[var(--captains-card-border)] dark:border-ink-5 hover:border-[var(--captains-text-muted)] dark:hover:border-zinc-600'
                 }`}>
                  <MatchRoleIcon role={mr.key} ballType={ballType} />
               </button>
@@ -734,7 +773,7 @@ function SelectablePlayerRow({
           })}
 
           {(isMatchCaptain || isVC || isWK) && (
-            <span className="font-rajdhani text-[9px] text-zinc-600 ml-0.5">
+            <span className="font-rajdhani text-[9px] text-[var(--captains-text-muted)] dark:text-zinc-600 ml-0.5">
               {[isMatchCaptain && 'Captain', isVC && 'VC', isWK && 'WK'].filter(Boolean).join(' · ')}
             </span>
           )}
@@ -751,15 +790,15 @@ function SelectablePlayerRow({
           <div
             className="rounded-lg border relative overflow-hidden px-3 py-2.5"
             style={{
-              background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
-              borderColor: '#2D3748',
+              background: ft.cardBg,
+              borderColor: ft.cardBorder,
             }}>
             <div
               className="absolute top-0 left-0 right-0 h-[2px]"
-              style={{ background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }}
+              style={{ background: ft.accentBar }}
             />
             {formLoading && (
-              <p className="font-rajdhani text-[11px] text-zinc-500">Loading form…</p>
+              <p className="font-rajdhani text-[11px]" style={{ color: ft.loadingText }}>Loading form…</p>
             )}
             {formError && (
               <p className="font-rajdhani text-[11px] text-red-400">{formError}</p>
@@ -778,6 +817,8 @@ function statCell(v: number | null | undefined): { text: string; dash: boolean }
 }
 
 function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
+  const { resolvedTheme } = useTheme()
+  const ft = resolvedTheme === 'dark' ? FORM_DARK : FORM_LIGHT
   // Format row is a last-3-months "recent form" read (min 6 games — see
   // MIN_GAMES_FOR_FORMAT_ROW in src/lib/playerStats.ts), not an all-time
   // record like Tourn/Ground — hence its own label and empty-state text.
@@ -788,7 +829,7 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
   ]
   const anyData = rows.some(r => r.totals)
   if (!anyData) {
-    return <p className="font-rajdhani text-[11px] text-zinc-500 italic">No reconciled matches yet in any scope.</p>
+    return <p className="font-rajdhani text-[11px] italic" style={{ color: ft.emptyText }}>No reconciled matches yet in any scope.</p>
   }
   return (
     <>
@@ -798,7 +839,7 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
             <th></th>
             {['M', 'R', 'Avg', 'SR', 'Wk', 'Econ', 'BSR', 'Dis'].map(h => (
               <th key={h} className="font-rajdhani text-[8.5px] font-bold uppercase tracking-wide text-right pb-1"
-                style={{ color: '#6B7280' }}>
+                style={{ color: ft.headerText }}>
                 {h}
               </th>
             ))}
@@ -806,12 +847,12 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
         </thead>
         <tbody>
           {rows.map(row => (
-            <tr key={row.label} style={{ borderTop: '1px solid rgba(45,55,72,0.6)' }}>
-              <td className="font-rajdhani text-[11px] font-semibold py-1 whitespace-nowrap text-right" style={{ color: '#9CA3AF' }}>
+            <tr key={row.label} style={{ borderTop: `1px solid ${ft.rowDivider}` }}>
+              <td className="font-rajdhani text-[11px] font-semibold py-1 whitespace-nowrap text-right" style={{ color: ft.rowLabelText }}>
                 {row.icon} {row.label}
               </td>
               {row.totals == null ? (
-                <td colSpan={8} className="text-[10.5px] italic py-1" style={{ color: '#6B7280' }}>{row.emptyText}</td>
+                <td colSpan={8} className="text-[10.5px] italic py-1" style={{ color: ft.headerText }}>{row.emptyText}</td>
               ) : (
                 [
                   row.totals.matches, row.totals.runs, statCell(row.totals.battingAverage).text,
@@ -820,7 +861,7 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
                   row.totals.catches + row.totals.runOuts + row.totals.stumpings,
                 ].map((v, i) => (
                   <td key={i} className="font-cinzel text-[11.5px] font-bold text-right py-1"
-                    style={{ color: v === '—' ? '#4B5563' : '#F9FAFB' }}>
+                    style={{ color: v === '—' ? ft.cellDash : ft.cellValue }}>
                     {v}
                   </td>
                 ))
@@ -831,7 +872,7 @@ function ContextStatsTable({ stats }: { stats: BookingContextStats }) {
       </table>
       {/* Disclaimer for the "Last 3 Months" row's gating — see
           MIN_GAMES_FOR_FORMAT_ROW in src/lib/playerStats.ts. */}
-      <p className="font-rajdhani text-[9px] text-zinc-600 italic pt-1.5">
+      <p className="font-rajdhani text-[9px] italic pt-1.5" style={{ color: ft.disclaimerText }}>
         Last 3 Months requires a minimum of 6 games played in that format.
       </p>
     </>
@@ -896,17 +937,17 @@ function AddPlayerPanel({
   }
 
   return (
-    <div className="border-t border-ink-5 bg-ink px-3 py-3">
+    <div className="border-t border-[var(--captains-card-border)] dark:border-ink-5 bg-[var(--captains-surface-2)] dark:bg-ink px-3 py-3">
       {!selectedPlayer ? (
         <>
           <div className="flex items-center justify-between mb-2">
-            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">
+            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[var(--captains-text-muted)] dark:text-zinc-600">
               Add player
             </span>
-            <button onClick={onCancel} className="font-rajdhani text-[11px] text-zinc-600 hover:text-zinc-400">✕</button>
+            <button onClick={onCancel} className="font-rajdhani text-[11px] text-[var(--captains-text-muted)] dark:text-zinc-600 hover:text-[var(--captains-text-2)] dark:hover:text-zinc-400">✕</button>
           </div>
           {unrespondedPlayers.length === 0 ? (
-            <p className="font-rajdhani text-xs text-zinc-600">All players have responded.</p>
+            <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-600">All players have responded.</p>
           ) : (
             <>
               <input
@@ -915,20 +956,20 @@ function AddPlayerPanel({
                 placeholder="Search player…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full font-rajdhani text-xs bg-ink-3 border border-ink-5 rounded px-2.5 py-1.5 text-zinc-300 placeholder:text-zinc-700 outline-none mb-2"
+                className="w-full font-rajdhani text-xs bg-[var(--captains-card-bg)] dark:bg-ink-3 border border-[var(--captains-card-border)] dark:border-ink-5 rounded px-2.5 py-1.5 text-[var(--captains-text)] dark:text-zinc-300 placeholder:text-[var(--captains-text-faint)] dark:placeholder:text-zinc-700 outline-none mb-2"
               />
               <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto">
                 {filtered.map(p => (
                   <button
                     key={p.id}
                     onClick={() => setSelectedPlayer(p)}
-                    className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-ink-4 transition-colors text-left">
-                    <span className={`font-rajdhani text-sm font-semibold ${p.wallet_balance < 0 ? 'text-amber-400' : p.status !== 'active' ? 'text-zinc-400' : 'text-parchment'}`}>
+                    className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-[var(--captains-row-hover)] dark:hover:bg-ink-4 transition-colors text-left">
+                    <span className={`font-rajdhani text-sm font-semibold ${p.wallet_balance < 0 ? 'text-amber-400' : p.status !== 'active' ? 'text-[var(--captains-text-2)] dark:text-zinc-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                       {p.name}
                     </span>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {p.status !== 'active' && (
-                        <span className="font-rajdhani text-[9px] font-bold bg-zinc-800 border border-zinc-700 text-zinc-500 px-1 py-px rounded-sm">
+                        <span className="font-rajdhani text-[9px] font-bold bg-[var(--captains-border)] dark:bg-zinc-800 border border-[var(--captains-border)] dark:border-zinc-700 text-[var(--captains-text-muted)] dark:text-zinc-500 px-1 py-px rounded-sm">
                           inactive
                         </span>
                       )}
@@ -941,7 +982,7 @@ function AddPlayerPanel({
                   </button>
                 ))}
                 {filtered.length === 0 && (
-                  <p className="font-rajdhani text-xs text-zinc-600 px-2">No match</p>
+                  <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-600 px-2">No match</p>
                 )}
               </div>
             </>
@@ -951,16 +992,16 @@ function AddPlayerPanel({
         <>
           <div className="flex items-center justify-between mb-2">
             <div>
-              <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">
+              <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[var(--captains-text-muted)] dark:text-zinc-600">
                 Add player ·{' '}
               </span>
-              <span className="font-rajdhani text-sm font-semibold text-parchment">
+              <span className="font-rajdhani text-sm font-semibold text-[var(--captains-text)] dark:text-parchment">
                 {selectedPlayer.name}
               </span>
             </div>
             <button
               onClick={() => { setSelectedPlayer(null); setSearch('') }}
-              className="font-rajdhani text-[11px] text-zinc-500 hover:text-zinc-300">
+              className="font-rajdhani text-[11px] text-[var(--captains-text-muted)] dark:text-zinc-500 hover:text-[var(--captains-text)] dark:hover:text-zinc-300">
               ← back
             </button>
           </div>
@@ -1417,28 +1458,28 @@ function SlotCard({
   }
 
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+    <div className="bg-[var(--captains-card-bg)] dark:bg-ink-3 border border-[var(--captains-card-border)] dark:border-ink-5 rounded overflow-hidden">
       {/* Header */}
       <button
-        className="w-full text-left px-4 py-3.5 hover:bg-ink-4 transition-colors"
+        className="w-full text-left px-4 py-3.5 hover:bg-[var(--captains-row-hover)] dark:hover:bg-ink-4 transition-colors"
         onClick={() => setOpen(v => !v)}>
         <div className="flex items-start gap-2">
           <div className="flex-shrink-0 text-center w-14">
-            <p className="font-rajdhani text-[10px] text-zinc-500 leading-none mb-0.5">
+            <p className="font-rajdhani text-[10px] text-[var(--captains-text-muted)] dark:text-zinc-500 leading-none mb-0.5">
               {formatSlotDate(booking.game_date)}
             </p>
             <p className="font-cinzel text-base font-bold text-gold leading-none">
               {matchDisplayTime(booking.match_time)}
             </p>
-            <p className="font-rajdhani text-[9px] text-zinc-600 mt-0.5">{booking.format}</p>
+            <p className="font-rajdhani text-[9px] text-[var(--captains-text-muted)] dark:text-zinc-600 mt-0.5">{booking.format}</p>
           </div>
 
           <div className="flex-1 min-w-0">
-            <p className="font-cinzel text-sm font-semibold text-parchment truncate leading-none">
+            <p className="font-cinzel text-sm font-semibold text-[var(--captains-text)] dark:text-parchment truncate leading-none">
               {booking.tournament?.name ?? 'Match'}
             </p>
             {booking.opponent_name && (
-              <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
+              <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-500 mt-0.5">
                 vs {booking.opponent_name}
               </p>
             )}
@@ -1447,13 +1488,13 @@ function SlotCard({
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <StatusBadge status={status} />
             {counts.total === 0 ? (
-              <span className="font-rajdhani text-[10px] text-zinc-700">No responses</span>
+              <span className="font-rajdhani text-[10px] text-[var(--captains-text-faint)] dark:text-zinc-700">No responses</span>
             ) : (
               (['Y', 'O', 'E'] as const).map(code =>
                 counts[code] > 0 ? <Chip key={code} code={code} count={counts[code]} /> : null
               )
             )}
-            <span className={`text-zinc-600 text-lg transition-transform duration-200 ml-1 ${open ? 'rotate-180' : ''}`}>
+            <span className={`text-[var(--captains-text-muted)] dark:text-zinc-600 text-lg transition-transform duration-200 ml-1 ${open ? 'rotate-180' : ''}`}>
               ⌄
             </span>
           </div>
@@ -1464,8 +1505,8 @@ function SlotCard({
         <div>
           {/* Hint when in draft with players selected */}
           {status === 'draft' && selected.size > 0 && (
-            <div className="px-3 py-1.5 bg-ink-4 border-b border-ink-5">
-              <p className={`font-rajdhani text-[10px] ${!rolesComplete ? 'text-amber-400' : 'text-zinc-400'}`}>
+            <div className="px-3 py-1.5 bg-[var(--captains-surface-2)] dark:bg-ink-4 border-b border-[var(--captains-card-border)] dark:border-ink-5">
+              <p className={`font-rajdhani text-[10px] ${!rolesComplete ? 'text-amber-400' : 'text-[var(--captains-text-2)] dark:text-zinc-400'}`}>
                 {!rolesComplete
                   ? `Tap a selected player to assign ${missingRoles.join(', ')} — required before GC submission.`
                   : 'Tap a selected player to change C / VC / WK roles.'}
@@ -1476,8 +1517,8 @@ function SlotCard({
           {/* Available across all slots */}
           {priorityPlayers.length > 0 && (
             <>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-ink-4 border-y border-ink-5">
-                <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-400 flex-1">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--captains-surface-2)] dark:bg-ink-4 border-y border-[var(--captains-card-border)] dark:border-ink-5">
+                <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[var(--captains-text-2)] dark:text-zinc-400 flex-1">
                   Available across all slots
                 </span>
               </div>
@@ -1504,29 +1545,29 @@ function SlotCard({
           )}
 
           {/* Available */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-ink-4 border-y border-ink-5">
-            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-400 flex-1">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--captains-surface-2)] dark:bg-ink-4 border-y border-[var(--captains-card-border)] dark:border-ink-5">
+            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[var(--captains-text-2)] dark:text-zinc-400 flex-1">
               Available
             </span>
             {status === 'draft' && eligible.length > 0 && (
               <button
                 onClick={handleSelectAll}
                 disabled={atCap && !allEligibleSelected}
-                className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-ink-5 text-zinc-600 hover:text-zinc-300 hover:border-zinc-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-[var(--captains-card-border)] dark:border-ink-5 text-[var(--captains-text-muted)] dark:text-zinc-600 hover:text-[var(--captains-text)] dark:hover:text-zinc-300 hover:border-[var(--captains-text-muted)] dark:hover:border-zinc-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                 {atCap && !allEligibleSelected ? 'Full' : allEligibleSelected ? 'Deselect all' : 'Select all'}
               </button>
             )}
-            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-700">
+            <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[var(--captains-text-faint)] dark:text-zinc-700">
               {counts.total} responded
             </span>
           </div>
 
           {eligible.length === 0 ? (
-            <p className="px-4 py-5 font-rajdhani text-sm text-zinc-600 text-center">
+            <p className="px-4 py-5 font-rajdhani text-sm text-[var(--captains-text-muted)] dark:text-zinc-600 text-center">
               No responses yet.
             </p>
           ) : normalPlayers.length === 0 && priorityPlayers.length > 0 ? (
-            <p className="px-4 py-3 font-rajdhani text-xs text-zinc-700 text-center">
+            <p className="px-4 py-3 font-rajdhani text-xs text-[var(--captains-text-faint)] dark:text-zinc-700 text-center">
               All available players are in the priority section above.
             </p>
           ) : (
@@ -1552,16 +1593,16 @@ function SlotCard({
           )}
 
           {/* Footer */}
-          <div className="px-3 py-2.5 bg-ink-4 border-t border-ink-5">
+          <div className="px-3 py-2.5 bg-[var(--captains-surface-2)] dark:bg-ink-4 border-t border-[var(--captains-card-border)] dark:border-ink-5">
             {/* Row 1 — progress */}
             <div className="flex items-center gap-2 mb-2.5">
-              <div className="flex-1 h-1.5 bg-ink-5 rounded-full overflow-hidden">
+              <div className="flex-1 h-1.5 bg-[var(--captains-border)] dark:bg-ink-5 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-300 ${atCap ? 'bg-emerald-500' : 'bg-sky-600'}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <span className={`font-rajdhani text-xs font-bold tabular-nums flex-shrink-0 ${atCap ? 'text-emerald-400' : 'text-zinc-400'}`}>
+              <span className={`font-rajdhani text-xs font-bold tabular-nums flex-shrink-0 ${atCap ? 'text-emerald-400' : 'text-[var(--captains-text-2)] dark:text-zinc-400'}`}>
                 {selected.size}/{MAX_SQUAD}{atCap ? ' ✓' : ''}
               </span>
             </div>
@@ -1572,7 +1613,7 @@ function SlotCard({
               {selected.size > 0 && (
                 <button
                   onClick={() => copy(booking.id, buildSquadCopyText(players, selected, roles, matchRoles))}
-                  className="flex items-center gap-1 font-rajdhani text-[10px] font-bold px-2 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 transition-colors flex-shrink-0">
+                  className="flex items-center gap-1 font-rajdhani text-[10px] font-bold px-2 py-1.5 rounded-sm border border-[var(--captains-border)] dark:border-zinc-700 text-[var(--captains-text-2)] dark:text-zinc-400 hover:text-[var(--captains-text)] dark:hover:text-zinc-100 hover:border-[var(--captains-text-muted)] dark:hover:border-zinc-500 transition-colors flex-shrink-0">
                   {copied === booking.id ? '✓ Copied' : (
                     <>
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1596,7 +1637,7 @@ function SlotCard({
                   <button
                     onClick={handleWithdraw}
                     disabled={saving}
-                    className="font-rajdhani text-[10px] font-bold px-2 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-40">
+                    className="font-rajdhani text-[10px] font-bold px-2 py-1.5 rounded-sm border border-[var(--captains-border)] dark:border-zinc-700 text-[var(--captains-text-2)] dark:text-zinc-400 hover:text-[var(--captains-text)] dark:hover:text-zinc-200 hover:border-[var(--captains-text-muted)] dark:hover:border-zinc-500 transition-colors disabled:opacity-40">
                     {saving ? '…' : 'Withdraw'}
                   </button>
                 </>
@@ -1637,7 +1678,7 @@ function SlotCard({
                         onChange={e => setIncludeRolesInAnnouncement(e.target.checked)}
                         className="w-3 h-3 accent-emerald-500"
                       />
-                      <span className="font-rajdhani text-[9px] text-zinc-500 select-none">
+                      <span className="font-rajdhani text-[9px] text-[var(--captains-text-muted)] dark:text-zinc-500 select-none">
                         Include roles
                       </span>
                     </label>
@@ -1662,7 +1703,7 @@ function SlotCard({
                   <button
                     onClick={handleReopen}
                     disabled={saving}
-                    className="font-rajdhani text-[9px] font-bold px-2 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-40">
+                    className="font-rajdhani text-[9px] font-bold px-2 py-1.5 rounded-sm border border-[var(--captains-border)] dark:border-zinc-700 text-[var(--captains-text-2)] dark:text-zinc-400 hover:text-[var(--captains-text)] dark:hover:text-zinc-200 hover:border-[var(--captains-text-muted)] dark:hover:border-zinc-500 transition-colors disabled:opacity-40">
                     {saving ? '…' : 'Edit'}
                   </button>
                 </>
@@ -1691,11 +1732,11 @@ function SlotCard({
 
           {/* Add player button */}
           {(status === 'draft' || (status === 'announced')) && unrespondedPlayers.length > 0 && (
-            <div className="px-3 py-2 border-t border-ink-5 flex justify-end">
+            <div className="px-3 py-2 border-t border-[var(--captains-card-border)] dark:border-ink-5 flex justify-end">
               <button
                 onClick={() => setAddingFor(v => !v)}
                 className={`font-rajdhani text-[10px] font-bold tracking-wide transition-colors ${
-                  addingFor ? 'text-zinc-500' : 'text-gold hover:text-gold-dim'
+                  addingFor ? 'text-[var(--captains-text-muted)] dark:text-zinc-500' : 'text-gold hover:text-gold-dim'
                 }`}>
                 {addingFor ? '✕ Cancel' : '＋ Add player'}
               </button>
@@ -1754,12 +1795,12 @@ function MatrixView({
     <div className="overflow-x-auto">
       <table className="w-full border-collapse" style={{ minWidth: Math.max(240, bookings.length * 48 + 112) }}>
         <thead>
-          <tr className="bg-ink-4 border-b border-ink-5">
-            <th className="px-2 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 w-28 sm:w-44 sticky left-0 bg-ink-4 z-10 align-bottom">
+          <tr className="bg-[var(--captains-surface-2)] dark:bg-ink-4 border-b border-[var(--captains-card-border)] dark:border-ink-5">
+            <th className="px-2 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[var(--captains-text-muted)] dark:text-zinc-600 w-28 sm:w-44 sticky left-0 bg-[var(--captains-surface-2)] dark:bg-ink-4 z-10 align-bottom">
               Player
             </th>
             {/* Squad games count column */}
-            <th className="bg-ink-4 z-10 align-bottom text-center" style={{ width: 28, minWidth: 28, padding: '0 4px' }}>
+            <th className="bg-[var(--captains-surface-2)] dark:bg-ink-4 z-10 align-bottom text-center" style={{ width: 28, minWidth: 28, padding: '0 4px' }}>
               <div style={{
                 writingMode: 'vertical-rl',
                 transform: 'rotate(180deg)',
@@ -1772,11 +1813,11 @@ function MatrixView({
                 width: '100%',
                 margin: '0 auto',
               }}>
-                <span className="font-rajdhani text-[10px] text-zinc-600"># of games</span>
+                <span className="font-rajdhani text-[10px] text-[var(--captains-text-muted)] dark:text-zinc-600"># of games</span>
               </div>
             </th>
             {bookings.map(b => (
-              <th key={b.id} className="bg-ink-4 z-10 align-bottom text-center" style={{ width: 48, minWidth: 48, padding: 0 }}>
+              <th key={b.id} className="bg-[var(--captains-surface-2)] dark:bg-ink-4 z-10 align-bottom text-center" style={{ width: 48, minWidth: 48, padding: 0 }}>
                 <div style={{
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
@@ -1794,10 +1835,10 @@ function MatrixView({
                   <span className="font-cinzel text-[10px] font-semibold text-gold">
                     {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}
                   </span>
-                  <span className="font-rajdhani text-[10px] font-bold text-zinc-400">
+                  <span className="font-rajdhani text-[10px] font-bold text-[var(--captains-text-2)] dark:text-zinc-400">
                     {matchDisplayTime(b.match_time, true)} · {b.format}
                   </span>
-                  <span className="font-rajdhani text-[10px] text-zinc-600">
+                  <span className="font-rajdhani text-[10px] text-[var(--captains-text-muted)] dark:text-zinc-600">
                     {shortTourney(b.tournament?.name)}
                   </span>
                 </div>
@@ -1809,7 +1850,7 @@ function MatrixView({
         <tbody>
           {activePlayers.length === 0 ? (
             <tr>
-              <td colSpan={bookings.length + 2} className="px-4 py-8 text-center font-rajdhani text-sm text-zinc-600">
+              <td colSpan={bookings.length + 2} className="px-4 py-8 text-center font-rajdhani text-sm text-[var(--captains-text-muted)] dark:text-zinc-600">
                 No availability responses yet.
               </td>
             </tr>
@@ -1818,28 +1859,28 @@ function MatrixView({
               const hasDues = p.wallet_balance < 0
 
               return (
-                <tr key={p.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
-                  <td className="px-2 py-1.5 sticky left-0 bg-ink-3 z-10" style={{ minWidth: 112 }}>
+                <tr key={p.id} className="border-b border-[var(--captains-border)] dark:border-ink-4 hover:bg-[var(--captains-row-hover)] dark:hover:bg-ink-4 transition-colors">
+                  <td className="px-2 py-1.5 sticky left-0 bg-[var(--captains-card-bg)] dark:bg-ink-3 z-10" style={{ minWidth: 112 }}>
                     <div className="flex items-center gap-1.5">
                       {/* Desktop name */}
                       {p.cricheroes_url ? (
                         <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                          className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                           {desktopMatrixName(p)}
                         </a>
                       ) : (
-                        <span className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                        <span className={`font-rajdhani text-xs hidden sm:inline truncate max-w-[140px] ${hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                           {desktopMatrixName(p)}
                         </span>
                       )}
                       {/* Mobile name */}
                       {p.cricheroes_url ? (
                         <a href={p.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                          className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                          className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] hover:underline underline-offset-2 ${hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                           {mobileMatrixName(p)}
                         </a>
                       ) : (
-                        <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+                        <span className={`font-rajdhani text-xs sm:hidden truncate max-w-[80px] ${hasDues ? 'text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment'}`}>
                           {mobileMatrixName(p)}
                         </span>
                       )}
@@ -1868,7 +1909,7 @@ function MatrixView({
                           {n}
                         </span>
                       ) : (
-                        <span className="font-rajdhani text-[11px] text-zinc-800">—</span>
+                        <span className="font-rajdhani text-[11px] text-[var(--captains-text-faint)] dark:text-zinc-800">—</span>
                       )
                     })()}
                   </td>
@@ -1889,8 +1930,8 @@ function MatrixView({
 
         {activePlayers.length > 0 && (
           <tfoot>
-            <tr className="bg-ink-4 border-t border-ink-5">
-              <td className="px-2 py-2 font-rajdhani text-[9px] font-bold tracking-[2px] uppercase text-zinc-600 sticky left-0 bg-ink-4">
+            <tr className="bg-[var(--captains-surface-2)] dark:bg-ink-4 border-t border-[var(--captains-card-border)] dark:border-ink-5">
+              <td className="px-2 py-2 font-rajdhani text-[9px] font-bold tracking-[2px] uppercase text-[var(--captains-text-muted)] dark:text-zinc-600 sticky left-0 bg-[var(--captains-surface-2)] dark:bg-ink-4">
                 Available
               </td>
               <td />
@@ -1902,7 +1943,7 @@ function MatrixView({
                       .map((code, idx, arr) => (
                         <span key={code}>
                           <span style={{ color: RESP[code].text }}>{counts[b.id][code]}{code}</span>
-                          {idx < arr.length - 1 && <span className="text-zinc-700">, </span>}
+                          {idx < arr.length - 1 && <span className="text-[var(--captains-text-faint)] dark:text-zinc-700">, </span>}
                         </span>
                       ))
                     }
@@ -1928,7 +1969,7 @@ function Legend() {
             style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
             {code}
           </span>
-          <span className="font-rajdhani text-[11px] text-zinc-400">{cfg.label}</span>
+          <span className="font-rajdhani text-[11px] text-[var(--captains-text-2)] dark:text-zinc-400">{cfg.label}</span>
         </div>
       ))}
     </div>
@@ -1991,48 +2032,48 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
           <h2 className="font-cinzel text-base font-semibold text-gold">{weekLabel}</h2>
-          <p className="font-rajdhani text-xs text-zinc-600 mt-0.5">
+          <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-600 mt-0.5">
             {bookings.length} game{bookings.length !== 1 ? 's' : ''} this week
           </p>
         </div>
 
-        <div className="flex border border-ink-5 rounded overflow-hidden flex-shrink-0">
+        <div className="flex border border-[var(--captains-card-border)] dark:border-ink-5 rounded overflow-hidden flex-shrink-0">
           <button
             onClick={() => setView('slot')}
             className={`px-3 py-1.5 font-rajdhani text-xs font-bold tracking-wide transition-colors ${
-              view === 'slot' ? 'bg-gold-dim text-gold' : 'bg-ink-4 text-zinc-500 hover:text-zinc-300'
+              view === 'slot' ? 'bg-gold-dim text-gold' : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 text-[var(--captains-text-muted)] dark:text-zinc-500 hover:text-[var(--captains-text)] dark:hover:text-zinc-300'
             }`}>
             Per Slot
           </button>
           <button
             onClick={() => setView('matrix')}
             className={`px-3 py-1.5 font-rajdhani text-xs font-bold tracking-wide transition-colors ${
-              view === 'matrix' ? 'bg-gold-dim text-gold' : 'bg-ink-4 text-zinc-500 hover:text-zinc-300'
+              view === 'matrix' ? 'bg-gold-dim text-gold' : 'bg-[var(--captains-surface-2)] dark:bg-ink-4 text-[var(--captains-text-muted)] dark:text-zinc-500 hover:text-[var(--captains-text)] dark:hover:text-zinc-300'
             }`}>
             Matrix
           </button>
         </div>
       </div>
 
-      <div className="mb-4 bg-ink-3 border border-ink-5 rounded px-3 py-2.5">
+      <div className="mb-4 bg-[var(--captains-card-bg)] dark:bg-ink-3 border border-[var(--captains-card-border)] dark:border-ink-5 rounded px-3 py-2.5">
         {view === 'slot' && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-2.5 pb-2.5 border-b border-ink-5">
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-2.5 pb-2.5 border-b border-[var(--captains-card-border)] dark:border-ink-5">
             {[
               { dot: 'bg-emerald-900/60 border-emerald-700',   label: 'Available across all slots' },
               { dot: 'bg-sky-900/40 border-sky-700',           label: 'Selected for this slot' },
-              { dot: 'bg-zinc-800 border-zinc-600 opacity-50', label: "Taken — in another slot's squad" },
+              { dot: 'bg-[var(--captains-border)] dark:bg-zinc-800 border-[var(--captains-border)] dark:border-zinc-600 opacity-50', label: "Taken — in another slot's squad" },
               { dot: 'bg-amber-900/40 border-amber-700',       label: 'Has outstanding dues' },
             ].map(({ dot, label }) => (
               <div key={label} className="flex items-center gap-1.5">
                 <span className={`w-2.5 h-2.5 rounded-sm border flex-shrink-0 ${dot}`} />
-                <span className="font-rajdhani text-[10px] text-zinc-600">{label}</span>
+                <span className="font-rajdhani text-[10px] text-[var(--captains-text-muted)] dark:text-zinc-600">{label}</span>
               </div>
             ))}
           </div>
         )}
         <Legend />
         {view === 'matrix' && (
-          <div className="font-rajdhani text-[10px] text-zinc-700 mt-2 flex flex-wrap gap-x-4 gap-y-1">
+          <div className="font-rajdhani text-[10px] text-[var(--captains-text-faint)] dark:text-zinc-700 mt-2 flex flex-wrap gap-x-4 gap-y-1">
             <span>Amber names = O or E across slots.</span>
             <span className="flex items-center gap-1">
               <span style={{ color: '#34d399' }}>✓</span> In announced squad
@@ -2067,10 +2108,10 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
       )}
 
       {view === 'matrix' && (
-        <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+        <div className="bg-[var(--captains-card-bg)] dark:bg-ink-3 border border-[var(--captains-card-border)] dark:border-ink-5 rounded overflow-hidden">
           {weekendBookings.length > 0
             ? <MatrixView bookings={weekendBookings} players={players} availMap={availMap} liveSquadMap={liveSquadMap} statusMap={statusMap} />
-            : <p className="px-4 py-6 font-rajdhani text-sm text-zinc-600 text-center">No weekend games this week.</p>
+            : <p className="px-4 py-6 font-rajdhani text-sm text-[var(--captains-text-muted)] dark:text-zinc-600 text-center">No weekend games this week.</p>
           }
         </div>
       )}
