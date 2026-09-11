@@ -618,18 +618,81 @@ new, since nothing else was asked for.
 
 ---
 
+## 10.3 Light/Dark/System theme support (added September 2026)
+
+The page shell (`src/app/fixtures/page.tsx`) was already Warm Light-only
+(§10.1's "Page shell widened to Warm Light too" note); it's now genuinely
+theme-aware instead — every inline colour that used to be a literal hex now
+reads one of the `--fx-*` CSS custom properties (`ui-theme.md`'s Light/Dark/
+System tokens, `src/app/globals.css`), which flip automatically with the
+visitor's Light/Dark/System choice via the `data-theme` attribute on
+`<html>`. The page's own current look is unchanged for a Light-preference
+visitor — the `[data-theme="light"]` block was seeded from this page's
+existing colours — and a Dark-preference visitor now gets the app's
+original dark-ink look instead of a jarring light island. Two small new
+tokens, `--fx-danger-bg`/`--fx-danger-border`/`--fx-danger-text`, were added
+to both light and dark blocks for the Expelled banner, which had no
+existing danger/crimson token to reuse. `<SiteNav activePage="fixtures" />`
+no longer passes `mobileTabBarTheme="light"` — the bottom tab bar now
+follows the visitor's own theme choice too, the same way it already does on
+the Home dashboard.
+
+**`FixturesCard.tsx` and `FixturesAvailability.tsx` reverse their earlier
+"deliberately stays dark by design" decision.** Both of these were
+previously hardcoded to a permanently-dark palette via inline `style`,
+regardless of what theme the page around them used — `squad-selection.md`
+and the earlier revisions of this section documented that as intentional,
+on the reasoning that a squad-announced card's content ported cleanly from
+the legacy spreadsheet look and didn't need re-theming. That decision is
+reversed here at the product level: both components now read a local
+`LIGHT`/`DARK` token object selected via `useTheme()`
+(`src/components/ui/ThemeProvider.tsx`), the same client-side pattern
+`SelectedMatchCard.tsx` (the Home dashboard's near-identical squad-announced
+card, §3.1 of `navigation.md`) already established. `FixturesCard.tsx`
+gained an explicit `'use client'` directive to go with it — it already used
+`useState` and was only ever reachable through a `'use client'` ancestor
+(`FixturesWeekendGroup`), so this is a formality, not a behaviour change.
+
+The **dark** token values in both components are the componentsʼ original,
+always-dark colours, copied byte-for-byte — nothing about the dark
+appearance changed. The **light** values are new, built from the same Warm
+Light palette `SelectedMatchCard.tsx` uses for the equivalent content (card
+background/border, heading/body/muted/faint text, the gold-tinted
+match-stage and C/VC badge pills, the fee/wallet-projection text). A
+handful of small, self-contained status chips are left as plain literals in
+both themes rather than threaded through the token objects — the format
+pill, the WK badge, the "IN PROGRESS" pill, the ground/maps green link, and
+the Y/O/E/L response-button colours in `FixturesAvailability.tsx` (which
+must keep matching the fixed legend colours on the page shell above them
+regardless of theme) — since they already read fine on either card
+background, the same call `SelectedMatchCard.tsx` made for its own format
+and WK chips. `FixtureShareButton` (exported from `FixturesCard.tsx`,
+reused by `FixturesAvailability.tsx` and `FixturesWeekend.tsx`'s dues
+banner) also picks its icon colour from `useTheme()` now, darkening on
+hover in light mode instead of lightening.
+
+`FixturesWeekend.tsx`'s own "⚠ Outstanding dues" banner (rendered in place
+of `FixturesAvailability` when the signed-in player owes money) is themed
+the same way — dark preserved exactly, light reusing the same amber warning
+combo (`#FEF3C7`/`#F5D9A8`/`#92400E`) the page shell's "not registered"
+banner already uses. `FixturesDateFilterBar.tsx`'s own wrapper panel now
+reads `--fx-shell-bg`/`--fx-border` instead of literal hex; `DateChipSlider`
+itself (out of scope here — shared with Match History) was not touched.
+
+---
+
 ## 11. File Map
 
 | File | Role |
 |---|---|
-| `src/app/fixtures/page.tsx` | Server component — fetches bookings, availability, squads; groups by `validationGroupKey`; renders `FixturesWeekendGroup` per group, each wrapped in a `data-dates` div for §10.1's date-chip filter |
-| `src/components/fixtures/FixturesDateFilterBar.tsx` | Date-chip quick filter (§10.1) — wraps the weekend-group list, toggles visibility via a CSS attribute-substring rule; never touches `FixturesWeekendGroup`'s own state |
+| `src/app/fixtures/page.tsx` | Server component — fetches bookings, availability, squads; groups by `validationGroupKey`; renders `FixturesWeekendGroup` per group, each wrapped in a `data-dates` div for §10.1's date-chip filter; theme-aware via `--fx-*` CSS vars (§10.3) |
+| `src/components/fixtures/FixturesDateFilterBar.tsx` | Date-chip quick filter (§10.1) — wraps the weekend-group list, toggles visibility via a CSS attribute-substring rule; never touches `FixturesWeekendGroup`'s own state; wrapper panel theme-aware via `--fx-*` CSS vars (§10.3) |
 | `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component, also used by `/matches/history` (`features/post-match-scorecard.md` §16) |
 | `src/components/matches/MatchesSegmentedTabs.tsx` | Shared "Upcoming / Past Matches" pill control (§10.2) — plain server component, rendered on both `/fixtures` and `/matches/history` |
 | `src/app/fixtures/[id]/page.tsx` | Single match share page — same squad fetch pattern as fixtures page |
-| `src/components/fixtures/FixturesWeekend.tsx` | `FixturesWeekendGroup` — shared state owner; handles API calls; renders card + availability pairs |
-| `src/components/fixtures/FixturesAvailability.tsx` | Controlled availability button row; runs `getBlockReason()` validation on every render |
-| `src/components/fixtures/FixturesCard.tsx` | Match card display; squad section uses `is_match_captain`, `is_vc`, `is_wk` from squad row |
+| `src/components/fixtures/FixturesWeekend.tsx` | `FixturesWeekendGroup` — shared state owner; handles API calls; renders card + availability pairs; own "outstanding dues" banner theme-aware via `useTheme()` (§10.3) |
+| `src/components/fixtures/FixturesAvailability.tsx` | Controlled availability button row; runs `getBlockReason()` validation on every render; theme-aware via `useTheme()` — no longer permanently dark (§10.3) |
+| `src/components/fixtures/FixturesCard.tsx` | Match card display; squad section uses `is_match_captain`, `is_vc`, `is_wk` from squad row; theme-aware via `useTheme()` — no longer permanently dark (§10.3) |
 | `src/app/api/player-availability/route.ts` | Self-update API — GET, POST, DELETE; explicit SELECT(`id, response`) → INSERT/UPDATE; auto-reactivation; audit log |
 | `src/app/api/captain-availability/route.ts` | Captain proxy API — POST (set availability on behalf of player); GET (audit log fetch) |
 | `src/app/captains-corner/page.tsx` | Captain-only server page — fetches all data; renders `CaptainsCornerGrid` per week |

@@ -44,7 +44,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
   const isOwnStats = !!user?.playerId && user.playerId === params.id
 
   return (
-    <div className="min-h-screen bg-parchment">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--stats-shell-bg)' }}>
       <SiteNav activePage={isOwnStats ? 'my-stats' : undefined} />
       <PlayerStatsClient
         player={player}
@@ -52,8 +52,9 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
         initialCareer={career}
         initialMatches={matches}
       />
-      <footer className="border-t border-parchment-3 py-5 text-center font-rajdhani text-xs text-stone-500 mt-8">
-        © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
+      <footer className="border-t py-5 text-center font-rajdhani text-xs mt-8"
+        style={{ borderColor: 'var(--stats-card-border)', color: 'var(--stats-text-muted)' }}>
+        © 2026 <span style={{ color: 'var(--stats-badge-text)' }}>Spartans Cricket Club</span> · Bengaluru · Est. 2014
       </footer>
     </div>
   )
