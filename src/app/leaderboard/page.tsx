@@ -162,32 +162,32 @@ export default async function LeaderboardPage({
     : buildDetailedGlossary(category)
 
   return (
-    <div className="min-h-screen bg-ink grain">
+    <div className="min-h-screen bg-[var(--stats-shell-bg)] dark:bg-ink grain">
       <SiteNav activePage="leaderboard" />
 
-      <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
+      <div className="bg-[var(--stats-card-bg)] dark:bg-ink-2 border-b border-[var(--stats-divider)] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)' }} />
-        <p className="text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
-          <span className="w-4 h-px bg-gold inline-block" />
+        <p className="text-[var(--stats-accent)] dark:text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
+          <span className="w-4 h-px bg-[var(--stats-accent)] dark:bg-gold inline-block" />
           Performance
         </p>
-        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-parchment tracking-wide">Yours Statistically</h1>
+        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-[var(--stats-text)] dark:text-parchment tracking-wide">Yours Statistically</h1>
 
         {user?.playerId && (
           <div className="flex flex-wrap items-center gap-4 mt-3">
             <a href={`/players/${user.playerId}/stats`}
-              className="font-rajdhani text-sm font-semibold text-gold hover:text-gold-light transition-colors">
+              className="font-rajdhani text-sm font-semibold text-[var(--stats-accent)] dark:text-gold hover:text-[var(--stats-accent-dim)] dark:hover:text-gold-light transition-colors">
               My stats on Hub →
             </a>
             {myCricheroesUrl ? (
               <a href={myCricheroesUrl} target="_blank" rel="noopener noreferrer"
-                className="font-rajdhani text-sm font-semibold text-parchment hover:text-gold transition-colors flex items-center gap-1.5">
+                className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment hover:text-[var(--stats-accent)] dark:hover:text-gold transition-colors flex items-center gap-1.5">
                 <CricHeroesIcon size={16} /> My stats on CricHeroes
               </a>
             ) : (
               <a href="/profile"
-                className="font-rajdhani text-xs text-amber-400 hover:text-amber-300 bg-amber-950/30 border border-amber-800/50 rounded px-2.5 py-1 flex items-center gap-1.5 transition-colors">
+                className="font-rajdhani text-xs text-[var(--stats-accent-dim)] dark:text-amber-400 hover:text-[#92400E] dark:hover:text-amber-300 bg-[var(--stats-badge-bg)] dark:bg-amber-950/30 border border-[var(--stats-badge-border)] dark:border-amber-800/50 rounded px-2.5 py-1 flex items-center gap-1.5 transition-colors">
                 <CricHeroesIcon size={14} /> Add your CricHeroes profile to see your stats there
               </a>
             )}
@@ -238,15 +238,15 @@ export default async function LeaderboardPage({
           </>
         )}
 
-        <p className="font-rajdhani text-xs text-zinc-500 text-center mt-8 px-4">
+        <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 text-center mt-8 px-4">
           Stats are synced from CricHeroes, a third-party platform, on a best-effort basis. Small discrepancies may appear from time to time — we're actively working to catch these up. Practice games are excluded from every ranking and aggregate above — only real tournament fixtures count towards these numbers — though a century or 5-wicket haul from a practice game is still recognised in the Centuries/5-Wicket Hauls lists.
         </p>
 
         <LeaderboardGlossary title={glossaryTitle} entries={glossaryEntries} />
       </div>
 
-      <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
-        © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
+      <footer className="border-t border-[var(--stats-divider)] dark:border-ink-4 py-5 text-center font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 mt-8">
+        © 2026 <span className="text-[var(--stats-accent-dim)] dark:text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
       </footer>
     </div>
   )

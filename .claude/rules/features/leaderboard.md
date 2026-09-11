@@ -628,6 +628,23 @@ and wasn't part of this change.
 
 ---
 
+## 10.1 Light/Dark/System (added September 2026)
+
+`/leaderboard` is being converted to the app's new Light/Dark/System theme
+toggle — full mechanism documented in `ui-theme.md`'s "Light/Dark/System
+Theme" section. The page's previous, only-ever-dark look becomes the
+`dark` state unchanged (every existing colour value in this doc stays
+correct as the dark description); a new light variant is being added via
+shared `--stats-*` CSS variables / Tailwind `dark:` class pairs (the same
+tokens `/players/[id]/stats` uses — see `player-stats-batting-position.md`
+§8), so the two stats surfaces stay visually consistent. `page.tsx`,
+`LeaderboardFilters.tsx`, and `LeaderboardMilestones.tsx` are converted as
+of this note; `LeaderboardMonthly.tsx`, `LeaderboardTable.tsx`,
+`LeaderboardGlossary.tsx`, `InningsRow.tsx`, `PlayerAvatar.tsx`, and
+`BattingPositionLeaders.tsx` are still landing incrementally.
+
+---
+
 ## 11. Explicitly Out of Scope
 
 - No write path anywhere in this feature — pure read/display.
