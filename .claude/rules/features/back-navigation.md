@@ -1,6 +1,6 @@
 # In-App Back Navigation — Gap & Implementation Plan
 
-**Spartans Hub · Status: 📝 Documented, not yet built · September 2026**
+**Spartans Hub · Status: ✅ Built (steps 1–6) · Follow-on §3 pending · September 2026**
 
 ---
 
@@ -21,9 +21,10 @@ split opens `/matches/history/[bookingId]`, whose only exit is a
 hardcoded "← Past Matches" link — which is not where the player came
 from. The same shape exists Hub-wide.
 
-### Audit (11 Sep 2026)
+### Audit (11 Sep 2026 — the state *before* this shipped)
 
-Every back affordance in `src/` today, and what it actually does:
+Every back affordance in `src/` at the time, and what it actually did.
+All of these were replaced by `BackButton` the same day (§4):
 
 | Page | Affordance | Destination | Problem |
 |---|---|---|---|
@@ -45,7 +46,7 @@ the player arrived from that parent.
 
 **One shared component, two behaviours, one rule.**
 
-### `BackButton` — `src/components/ui/BackButton.tsx` (to build)
+### `BackButton` — `src/components/ui/BackButton.tsx`
 
 ```tsx
 <BackButton fallbackHref="/matches/history" fallbackLabel="Past Matches" />
@@ -66,39 +67,72 @@ the player arrived from that parent.
 
 ### Knowing whether in-app history exists
 
-Next's App Router has no API for "did this session navigate here". Add a
-tiny tracker to `src/app/providers.tsx` (client, already wraps every
-page): on every `usePathname()` change, increment a `sessionStorage`
-counter (`hub-nav-depth`). `canGoBack = depth > 1`. `sessionStorage` is
-per-tab and cleared when the tab (or the standalone PWA) closes, which is
-exactly the lifetime of the browser history it mirrors. `document.referrer`
-is *not* a substitute — it's empty in standalone mode and after client-side
-navigations.
+Next's App Router has no API for "did this session navigate here", and
+`window.history.length` counts entries from before the app was opened, so
+the Hub keeps its own per-tab stack. `NavHistoryProvider`
+(`src/components/ui/NavHistoryProvider.tsx`, mounted once in
+`src/app/providers.tsx` inside `SessionProvider`) feeds every
+pathname+search change through the pure reducer `recordNavigation()`
+(`src/lib/navHistory.ts`) and persists the result to `sessionStorage`
+(`hub-nav-history`). The reducer classifies each URL change against the
+stack's neighbours — equals the previous entry → *back* (pointer−1),
+equals the next entry → *forward* (pointer+1), otherwise → *push*
+(truncate forward entries, append). `canGoBack = pointer > 0`, exposed
+via `useCanGoBack()`. Unit-tested in `src/lib/navHistory.test.ts`.
+
+**Why a counter wasn't enough** (the first draft of this doc proposed
+one): a plain depth counter can't tell a back navigation from a push, so
+it would keep growing as the player went *back*, and `canGoBack` would
+stay true on the entry page — exactly the case where `router.back()`
+leaves the app. The stack heuristic can still misclassify a forward
+navigation to the same URL as the previous entry as "back", but that
+fails safe (pointer too *low* → fallback link one step early), never the
+other way.
+
+`sessionStorage` is per-tab and cleared when the tab (or the standalone
+PWA) closes — the lifetime of the browser history it mirrors.
+`document.referrer` is *not* a substitute: empty in standalone mode and
+after client-side navigations. `useSearchParams()` needs a Suspense
+boundary during static rendering, so the tracker is an inner component
+wrapped in `<Suspense fallback={null}>`.
 
 ### Where it renders — the rule
 
 **Any page that isn't a bottom-tab destination shows a back affordance on
 mobile.** Concretely:
 
-- `SiteNav` gains an optional `back?: { fallbackHref: string; label: string }`
-  prop. When set, the slim mobile top row (`md:hidden`) renders
-  `BackButton` at the far left, before the logo lockup — the standard
-  mobile "‹" position. Desktop keeps a normal per-page text link where one
-  exists today (desktop always has a browser back button; the chevron would
-  be noise).
-- Pages that already have a hardcoded back link swap it for `BackButton`
-  with the same destination as `fallbackHref` — six files, no new
-  destinations to decide.
-- `/players/[id]/stats`, `/opponents`, `/wallet`,
-  `/captains-corner/unavailable-dates` gain one (currently none).
-- `/admin/**` is out of scope — it renders `AdminLayout`/`AdminSidebar`,
-  not `SiteNav`, and is desktop-first; its existing `router.push('/admin')`
-  button can adopt `BackButton` with `/admin` as the fallback in the same
-  pass, but nothing else there changes.
+- `SiteNav` has an optional `back?: SiteNavBack` prop
+  (`{ fallbackHref, label }`). When set, a `md:hidden` `BackButton
+  variant="nav"` ("‹ Back" / "‹ {label}") renders at the far left of the
+  top row, before the logo lockup — the standard mobile position. Desktop
+  keeps each page's own inline text link (`className="hidden md:inline-flex"`
+  on the page-body `BackButton`, so the two never show together); the
+  browser has a back button there and a chevron would be noise.
+- The six pages that had a hardcoded back link now render `BackButton`
+  with that same destination as `fallbackHref`:
+  `/matches/history/[bookingId]` (→ Past Matches), `/fixtures/[id]` (→ All
+  fixtures; this page has no `SiteNav`, so its inline `BackButton` shows on
+  every width), `/dugout/gear/[id]` (→ Gear Exchange), `/profile` (→ Home,
+  all three `SiteNav` render branches), `/admin/bookings/[id]` (→ `/admin`,
+  labelled "Matches").
+- Pages that had none: `/players/[id]/stats` (→ Leaderboard — but **only
+  when viewing someone else's stats**; a player's own page is the "My
+  Stats" bottom tab, so no back there), `/opponents` (→ Team Record),
+  `/wallet` (→ Home), `/captains-corner/unavailable-dates` (→ Squad
+  Selection).
+- `/admin/**` otherwise unchanged — it renders `AdminLayout`/`AdminSidebar`,
+  not `SiteNav`, and is desktop-first.
 - Bottom-tab destinations (`/`, `/fixtures`, own `/players/[id]/stats`)
   and the two pages the tab bar's "More" sheet treats as roots
   (`/leaderboard`, `/team-stats`) show **no** back — they are where back
   lands, not somewhere to go back *from*.
+
+### `fixtures/[id]` and body-level `BackButton`s keep their old colours
+
+`BackButton`'s default text colour is `text-gold`; a page whose old link
+used a different colour passes `!text-…` overrides via `className` so
+nothing visibly changed except the behaviour (e.g. `/fixtures/[id]`'s muted
+grey, `/profile`'s bordered zinc button, Gear Exchange's amber).
 
 ### Standalone-only, or always?
 
@@ -134,20 +168,26 @@ the most common drill-down target.
 
 ## 4. Implementation checklist
 
-| # | Step | Files |
-|---|---|---|
-| 1 | Nav-depth tracker (`sessionStorage`, `usePathname()`) + `useCanGoBack()` hook | `src/app/providers.tsx` (or a new `src/components/ui/NavHistoryProvider.tsx` mounted there) |
-| 2 | `BackButton` — `router.back()` vs `<Link fallbackHref>`, label switches accordingly | `src/components/ui/BackButton.tsx` |
-| 3 | `SiteNav` `back` prop → renders `BackButton` at the left of the `md:hidden` top row | `src/components/ui/SiteNav.tsx` |
-| 4 | Swap the six hardcoded back links for `BackButton` (same fallbacks) | `matches/history/[bookingId]`, `fixtures/[id]`, `dugout/gear/[id]`, `profile`, `admin/bookings/[id]` |
-| 5 | Add `back` to pages with none today | `players/[id]/stats`, `opponents`, `wallet`, `captains-corner/unavailable-dates` |
-| 6 | Doc pass — `navigation.md` §4 (SiteNav prop, the rule), this file → "Built" | `.claude/rules/**` |
-| 7 | Follow-on: URL-driven filters on `/matches/history`, then `/players/[id]/stats` (§3) | `MatchHistoryClient.tsx`, `PlayerStatsClient.tsx` |
+| # | Step | Files | Status |
+|---|---|---|---|
+| 1 | Nav-history stack (`sessionStorage`, pathname+search) + `useCanGoBack()` hook | `src/lib/navHistory.ts` (pure reducer + tests), `src/components/ui/NavHistoryProvider.tsx`, mounted in `src/app/providers.tsx` | ✅ 11 Sep 2026 |
+| 2 | `BackButton` — `router.back()` vs `<Link fallbackHref>`, label switches accordingly | `src/components/ui/BackButton.tsx` | ✅ |
+| 3 | `SiteNav` `back` prop → renders `BackButton variant="nav"` at the left of the `md:hidden` top row | `src/components/ui/SiteNav.tsx` | ✅ |
+| 4 | Swap the six hardcoded back links for `BackButton` (same fallbacks) | `matches/history/[bookingId]`, `fixtures/[id]`, `dugout/gear/[id]`, `profile`, `admin/bookings/[id]` | ✅ |
+| 5 | Add `back` to pages with none | `players/[id]/stats` (others' pages only), `opponents`, `wallet`, `captains-corner/unavailable-dates` | ✅ |
+| 6 | Doc pass — `navigation.md` §4 (SiteNav prop, the rule), this file | `.claude/rules/**` | ✅ |
+| 7 | Follow-on: URL-driven filters on `/matches/history`, then `/players/[id]/stats` (§3) | `MatchHistoryClient.tsx`, `PlayerStatsClient.tsx` | ⏳ Pending |
 
-**Verification, when built:** install the PWA on an iPhone, open Team
-Record → tap a match → "‹ Back" returns to Team Record with the same split
-and filters; open the same match URL fresh from a WhatsApp message →
-"‹ Past Matches" goes to the list. Both without any browser chrome.
+**Verified at build time:** `tsc`, vitest (5 new reducer tests covering
+push / back / forward / truncate / repeat), and a full `next build`
+(the `useSearchParams()` Suspense requirement is what the build checks).
+**Still to verify on a real device** (no env in the build container):
+install the PWA on an iPhone, open Team Record → tap a match → "‹ Back"
+returns to Team Record with the same split and filters; open the same
+match URL fresh from a WhatsApp message → "‹ Past Matches" goes to the
+list. Both without any browser chrome. Note the first server render has
+no history yet, so a hydrating page briefly shows the fallback label
+before flipping to "Back" — a one-frame flicker, accepted.
 
 **Security:** none — purely client-side navigation; `router.back()` and
 `<Link>` both stay within the same origin, and the fallback hrefs are
@@ -156,11 +196,23 @@ hardcoded per page, never read from the URL (so a crafted
 
 ---
 
-## 5. Tracking
+## 5. File map
 
-Backlog item **U-31** in `pending-backlog.md`. Also referenced from
-`features/team-stats.md` §9 (where the gap was reported) and
-`navigation.md` §8.
+| File | Role |
+|---|---|
+| `src/lib/navHistory.ts` | `recordNavigation()` / `canGoBack()` — pure per-tab history-stack reducer |
+| `src/lib/navHistory.test.ts` | Vitest coverage of the reducer |
+| `src/components/ui/NavHistoryProvider.tsx` | Tracks pathname+search changes, persists to `sessionStorage`, exposes `useCanGoBack()` |
+| `src/app/providers.tsx` | Mounts `NavHistoryProvider` inside `SessionProvider` |
+| `src/components/ui/BackButton.tsx` | The shared control — `router.back()` or fallback `<Link>`; `inline` and `nav` variants |
+| `src/components/ui/SiteNav.tsx` | `back?: SiteNavBack` prop → mobile top-row `BackButton` |
+| The pages listed in §4 steps 4–5 | Each passes its fallback to `SiteNav` and/or renders an inline `BackButton` |
+
+## 6. Tracking
+
+Backlog item **U-31** in `pending-backlog.md` (steps 1–6 ✅, step 7
+pending). Also referenced from `features/team-stats.md` §9 (where the gap
+was reported) and `navigation.md` §8.
 
 ---
 

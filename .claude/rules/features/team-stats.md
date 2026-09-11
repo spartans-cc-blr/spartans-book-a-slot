@@ -347,7 +347,7 @@ show an "unlinked" hint).
 | Unlink / delete an alias | Not built — a mis-link is fixed by renaming/relinking. Add a DELETE on `/api/opponents/link` if it comes up. |
 | Toss columns on `match_stats_cache` | Not needed today (§2); revisit only if the extra analytics-DB read shows up in latency. |
 | Per-opponent detail page | The Opponent split + `?opponent=` filter cover H2H today; a dedicated `/opponents/[id]` page with the full match list, records vs them and top performers vs them would be the natural next step. |
-| No way back from a tapped match (installed PWA) | Reported here first: tapping a match opens `/matches/history/[bookingId]`, whose only exit is a hardcoded "← Past Matches" link — wrong when you came from Team Record, and the standalone PWA has no browser back button. Hub-wide gap, documented with a plan in `features/back-navigation.md` (backlog U-31). Team Record itself is already URL-driven, so once `BackButton` lands, back returns to the exact split and filters. |
+| No way back from a tapped match (installed PWA) | ✅ Fixed 11 Sep 2026 — reported here first, fixed Hub-wide: `/matches/history/[bookingId]` (and every other drill-down) now renders the shared `BackButton`, which `router.back()`s to wherever the player came from — Team Record with the exact split and filters, since this page is URL-driven — and falls back to "‹ Past Matches" for a cold open. See `features/back-navigation.md` (backlog U-31). |
 
 ---
 

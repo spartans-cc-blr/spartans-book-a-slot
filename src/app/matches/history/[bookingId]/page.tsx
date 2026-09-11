@@ -1,10 +1,10 @@
 import { getServerSession } from 'next-auth'
 import { redirect, notFound } from 'next/navigation'
-import Link from 'next/link'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { isPastMatch } from '@/lib/matchStatus'
 import { SiteNav } from '@/components/ui/SiteNav'
+import { BackButton } from '@/components/ui/BackButton'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { computeTopPerformers, summarizeTopPerformance } from '@/lib/matchTopPerformers'
 import { MatchVerifyBlock } from '@/components/matches/MatchVerifyBlock'
@@ -154,11 +154,10 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
   return (
     <>
-      <SiteNav activePage="matches" />
+      <SiteNav activePage="matches" back={{ fallbackHref: '/matches/history', label: 'Past Matches' }} />
       <main className="min-h-screen bg-ink-1 px-4 md:px-8 py-8 max-w-2xl mx-auto">
-        <Link href="/matches/history" className="font-rajdhani text-xs font-bold text-gold hover:text-gold-light transition-colors">
-          ← Past Matches
-        </Link>
+        {/* Desktop only — mobile gets the same control in SiteNav's top row */}
+        <BackButton fallbackHref="/matches/history" fallbackLabel="Past Matches" className="hidden md:inline-flex" />
 
         <div className="mt-4 relative overflow-hidden rounded-xl border border-[#2D3748] p-5"
           style={{ background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>

@@ -174,7 +174,7 @@ export default async function UnavailableDatesPage({
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--unavail-shell-bg)' }}>
-      <SiteNav activePage="captains-unavailable" />
+      <SiteNav activePage="captains-unavailable" back={{ fallbackHref: '/captains-corner', label: 'Squad Selection' }} />
 
       {/* Hero — same visual language as /schedule's own hero */}
       <div style={{ background: 'var(--unavail-hero-bg)', borderBottom: '1px solid var(--unavail-border)', padding: '28px 20px 24px', position: 'relative', overflow: 'hidden' }}>

@@ -9,6 +9,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SiteNav } from '@/components/ui/SiteNav'
+import { BackButton } from '@/components/ui/BackButton'
 import { DobInput } from '@/components/ui/DobInput'
 import type { PlayerStatsTotals } from '@/types'
 import { hasLocalPushSubscription, subscribeToPush as subscribeToPushBrowser, unsubscribeFromPush as unsubscribeFromPushBrowser } from '@/lib/pushSubscription'
@@ -260,7 +261,7 @@ export default function ProfilePage() {
   if (sessionStatus === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-ink grain">
-        <SiteNav activePage="profile" />
+        <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
         <div className="px-5 py-8 space-y-3 animate-pulse max-w-2xl mx-auto mt-8">
           {[0, 1, 2].map(i => <div key={i} className="h-16 bg-ink-3 rounded border border-ink-5" />)}
         </div>
@@ -271,7 +272,7 @@ export default function ProfilePage() {
   if (!player?.playerId || player?.playerStatus === 'expelled') {
     return (
       <div className="min-h-screen bg-ink grain">
-        <SiteNav activePage="profile" />
+        <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
         <div className="px-5 py-12 text-center font-rajdhani text-zinc-500">
           {player?.playerStatus === 'expelled' ? 'Account suspended.' : 'Profile not available.'}
         </div>
@@ -283,7 +284,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-ink grain">
-      <SiteNav activePage="profile" />
+      <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
       {/* ── Dashboard Stats ── */}
               {dashboard && (
                 <section aria-labelledby="dashboard-heading" className="bg-ink-1 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-5">
@@ -690,10 +691,8 @@ export default function ProfilePage() {
 
         {/* ── SAVE ── */}
         <div className="flex gap-3 justify-between items-center">
-          <button onClick={() => router.push('/')}
-            className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 border border-ink-5 px-4 py-2.5 rounded transition-colors">
-            ← Back
-          </button>
+          <BackButton fallbackHref="/" fallbackLabel="Home"
+            className="!text-zinc-500 hover:!text-zinc-300 border border-ink-5 px-4 py-2.5 rounded font-normal" />
           <button
             onClick={handleSave}
             disabled={saving || uploadingPhoto}

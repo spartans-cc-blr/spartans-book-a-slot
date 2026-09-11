@@ -45,7 +45,10 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--stats-shell-bg)' }}>
-      <SiteNav activePage={isOwnStats ? 'my-stats' : undefined} />
+      {/* Own stats is a bottom-tab destination — no back there; another
+          player's page is always a drill-down, so it gets one. */}
+      <SiteNav activePage={isOwnStats ? 'my-stats' : undefined}
+        back={isOwnStats ? undefined : { fallbackHref: '/leaderboard', label: 'Leaderboard' }} />
       <PlayerStatsClient
         player={player}
         grounds={grounds ?? []}

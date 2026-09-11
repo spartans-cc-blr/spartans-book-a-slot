@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
+import { BackButton } from '@/components/ui/BackButton'
 
 export const revalidate = 60
 
@@ -111,12 +112,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     }}>
       {/* Header */}
       <div style={{ width: '100%', maxWidth: '480px', marginBottom: '16px' }}>
-        <a href="/fixtures" style={{
-          fontSize: '12px', color: '#6B7280', textDecoration: 'none',
-          display: 'inline-flex', alignItems: 'center', gap: '4px',
-        }}>
-          ← All fixtures
-        </a>
+        <BackButton fallbackHref="/fixtures" fallbackLabel="All fixtures" className="!text-[#9CA3AF] hover:!text-white" />
       </div>
 
       {/* Card + availability — reuses the exact same components */}

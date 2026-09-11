@@ -438,11 +438,11 @@ ALTER TABLE squad ADD COLUMN match_role text CHECK (match_role IN ('bat','bowl',
 ---
 
 ### U-31 · In-app back navigation (PWA has no browser chrome)
-**Status:** 📝 Documented, not built — see `features/back-navigation.md` for the full audit and plan.
+**Status:** ✅ Built 11 Sep 2026 (shared `BackButton` + `SiteNav` `back` prop, every drill-down page wired) — see `features/back-navigation.md`. ⏳ Follow-on still open: URL-driven filters on `/matches/history` and `/players/[id]/stats` so "back" restores them (that doc §3).
 
 **Gap:** the Hub runs as a `display: 'standalone'` PWA, so the installed app has no back button (and iOS offers no reliable back gesture). Every drill-down — a match tapped on Team Record, a stat tile on Home, a player name anywhere — is a one-way trip unless the page draws its own exit. Six pages have a hardcoded "← parent" link (never `router.back()`, so it ignores where the player actually came from); `/players/[id]/stats`, `/opponents`, `/wallet` and others have none at all.
 
-**Fix (planned):** one shared `BackButton` — `router.back()` when in-app history exists (tracked via a `sessionStorage` nav-depth counter in `providers.tsx`), else a per-page `fallbackHref` (the existing parent destinations) — rendered by `SiteNav` at the left of the mobile top row on every non-tab page. Follow-on: make `/matches/history` and `/players/[id]/stats` filters URL-driven so "back" restores them (Team Record and the leaderboard already are).
+**Fix (shipped):** one shared `BackButton` — `router.back()` when in-app history exists (tracked via a per-tab `sessionStorage` history stack — `src/lib/navHistory.ts`, `NavHistoryProvider` in `providers.tsx`), else a per-page `fallbackHref` (the existing parent destinations) — rendered by `SiteNav` at the left of the mobile top row on every non-tab page. Follow-on: make `/matches/history` and `/players/[id]/stats` filters URL-driven so "back" restores them (Team Record and the leaderboard already are).
 
 **Priority:** 🟡 Medium — a real, reported UX gap for every installed-PWA user; small, self-contained, no schema or API change.
 ---

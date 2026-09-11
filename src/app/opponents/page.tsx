@@ -26,7 +26,7 @@ export default async function OpponentsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--stats-shell-bg)] dark:bg-ink grain">
-      <SiteNav activePage="opponents" />
+      <SiteNav activePage="opponents" back={{ fallbackHref: '/team-stats', label: 'Team Record' }} />
       <div className="bg-[var(--stats-card-bg)] dark:bg-ink-2 border-b border-[var(--stats-divider)] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-7">
         <p className="text-[var(--stats-accent)] dark:text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
           <span className="w-4 h-px bg-[var(--stats-accent)] dark:bg-gold inline-block" />

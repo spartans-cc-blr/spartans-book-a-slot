@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
+import { BackButton } from '@/components/ui/BackButton'
 import { GearDetailShare } from '@/components/dugout/GearDetailShare'
 
 export const revalidate = 0
@@ -99,15 +100,11 @@ export default async function GearDetailPage({
 
   return (
     <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
-      <SiteNav activePage="dugout" />
+      <SiteNav activePage="dugout" back={{ fallbackHref: '/dugout/gear', label: 'Gear Exchange' }} />
       <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
         <div className="max-w-2xl mx-auto">
-          <Link
-            href="/dugout/gear"
-            className="font-rajdhani text-sm text-amber-700 hover:underline underline-offset-2 inline-flex items-center gap-1 mb-6"
-          >
-            ← Back to Gear Exchange
-          </Link>
+          <BackButton fallbackHref="/dugout/gear" fallbackLabel="Back to Gear Exchange"
+            className="hidden md:inline-flex !text-amber-700 hover:!text-amber-800 text-sm mb-6" />
 
           {notFound || !listing ? (
             <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-6 text-center">
