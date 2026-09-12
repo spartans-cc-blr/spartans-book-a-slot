@@ -406,6 +406,36 @@ Client component for the GC review page. Manages:
 ### `src/app/gc-review/page.tsx`
  
 Accessible to `isGC` or `isAdmin`. GC members see it via the "GC Review" nav link in `SiteNav`. Admins reach it via the admin sidebar. Squads fetched with status filter `['pending_approval', 'approved', 'announced']` — draft squads are invisible to the GC.
+
+**Restricted to the next two rolling weekends only (changed September
+2026), same scoping as `/captains-corner`.** Previously this page fetched
+only bookings whose `game_date` fell inside *today's own calendar
+Monday–Sunday week* (`startOfISOWeek(today)` through `+7 days`, `.lt()`
+exclusive). A booking dated exactly the following Monday — the first day
+of the *next* ISO week — was silently excluded by that boundary and had no
+way to appear here until the calendar day itself arrived, by which point
+it was match day and too late for advance review. Since a captain can
+draft and submit a squad for a weekday fixture well ahead of its own
+weekend (no time-gate applies to non-weekend bookings — see
+`features/player-availability.md` §4), this left GC with genuinely
+nothing to review for such a match until it had effectively already
+started.
+
+Fixed by adopting `/captains-corner`'s exact scoping instead of a
+calendar-week window: fetch confirmed, unexpired bookings from yesterday
+onward (capped at 20), then restrict to the **first two distinct
+`weekKey()` values** encountered — the same ISO-week bucketing helper
+(private, duplicated in this file rather than shared, matching
+`/captains-corner`'s own private copy) that groups a midweek fixture with
+the Sat/Sun weekend that follows it in the same ISO week. The page now
+renders one `GCReviewClient` block per weekend group (each with its own
+`weekLabel`, and `avail`/`squads`/`draftSquadMap` filtered down to just
+that group's booking IDs) instead of a single flat list — so a squad
+submitted for a weekday fixture becomes reviewable the moment it exists,
+regardless of which day of the week the match itself falls on, and two
+weekends' worth of approvals can be visible side by side when both are
+within the rolling window. `captainMap` is unaffected — it's a flat
+`bookingId → captain` map shared unchanged across every block.
  
 ### `src/lib/announcement.ts`
  

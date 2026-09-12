@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { AdminSidebar } from '@/components/admin/AdminSidebar'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { GCReviewClient } from '@/components/admin/GCReviewClient'
-import { startOfISOWeek, addDays, format, parseISO } from 'date-fns'
+import { getISOWeek, getISOWeekYear, parseISO, startOfISOWeek, addDays, format } from 'date-fns'
 import type { Metadata } from 'next'
 import { InviteLinkButton } from '@/components/ui/InviteLinkButton'
 
@@ -15,6 +15,32 @@ export const metadata: Metadata = {
 
 export const revalidate = 0
 
+// Same ISO-week bucketing convention as /captains-corner — a midweek game
+// (e.g. a Monday fixture) shares a weekKey with the Sat/Sun that follows it
+// in the same ISO week, rather than the weekend that just finished.
+function weekKey(dateStr: string): string {
+  const d = parseISO(dateStr)
+  return `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, '0')}`
+}
+
+function weekLabel(dateStr: string): string {
+  const d = parseISO(dateStr)
+  const saturday = addDays(startOfISOWeek(d), 5)
+  const sunday   = addDays(saturday, 1)
+  return `${format(saturday, 'd MMM')} – ${format(sunday, 'd MMM yyyy')}`
+}
+
+function getMatchEndTime(gameDate: string, slotTime: string, matchFormat: string): Date {
+  const end = new Date(`${gameDate}T${slotTime}:00+05:30`)
+  const durationHours = matchFormat === 'T30' ? 5.5 : 3.5
+  end.setTime(end.getTime() + durationHours * 60 * 60 * 1000)
+  return end
+}
+
+function isMatchExpired(gameDate: string, slotTime: string, matchFormat: string): boolean {
+  return new Date() >= getMatchEndTime(gameDate, slotTime, matchFormat)
+}
+
 export default async function GCReviewPage() {
   const session = await getServerSession(authOptions)
   const user    = session?.user as any
@@ -23,25 +49,42 @@ export default async function GCReviewPage() {
   if (!user?.isAdmin && !user?.isGC) redirect('/fixtures')
 
   const supabase  = createServiceClient()
-  const today     = new Date()
-  const monday    = startOfISOWeek(today)
-  const saturday  = addDays(monday, 5)
-  const sunday    = addDays(monday, 6)
-  const weekStart = format(monday, 'yyyy-MM-dd')
-  const weekEnd   = format(addDays(monday, 7), 'yyyy-MM-dd')
-  const weekLabel = `${format(monday, 'd MMM')} – ${format(sunday, 'd MMM yyyy')}`
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  // ── Fetch this weekend's confirmed bookings ────────────────
+  // ── Fetch upcoming confirmed bookings ──────────────────────
+  // Previously this queried a fixed "today's calendar Mon–Sun" window,
+  // which meant a booking dated exactly the following Monday (the start of
+  // the *next* ISO week) was invisible here until match day itself — see
+  // features/squad-selection.md for the incident this fixes.
   const { data: bookings } = await supabase
     .from('bookings')
-		.select('id, game_date, slot_time, match_time, format, opponent_name, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))')
-		.eq('status', 'confirmed')
-    .gte('game_date', weekStart)
-    .lt('game_date', weekEnd)
+    .select('id, game_date, slot_time, match_time, format, opponent_name, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url))')
+    .eq('status', 'confirmed')
+    .gte('game_date', yesterday)
     .order('game_date', { ascending: true })
     .order('slot_time', { ascending: true })
+    .limit(20) // cap to a reasonable window, mirrors /captains-corner
 
-  const bookingIds = (bookings ?? []).map(b => b.id)
+  const activeBookings = (bookings ?? []).filter(b =>
+    !isMatchExpired(b.game_date, b.slot_time, b.format ?? 'T20')
+  )
+
+  // ── Restrict to the next two rolling weekends only ─────────────
+  // Mirrors /captains-corner's own scoping exactly (same rationale, same
+  // weekKey() grouping) so the two pages can never disagree on which
+  // weekend a given booking belongs to. A squad can be drafted and
+  // submitted for a weekday game well ahead of its own weekend — GC needs
+  // to be able to see and act on it before match day, not just on it.
+  const seenWeekKeys: string[] = []
+  for (const b of activeBookings) {
+    const wk = weekKey(b.game_date)
+    if (!seenWeekKeys.includes(wk)) seenWeekKeys.push(wk)
+    if (seenWeekKeys.length >= 2) break
+  }
+  const allowedWeekKeys = new Set(seenWeekKeys)
+  const scopedBookings  = activeBookings.filter(b => allowedWeekKeys.has(weekKey(b.game_date)))
+
+  const bookingIds = scopedBookings.map(b => b.id)
 
   // The four queries below all depend only on `bookingIds` (already
   // resolved above), never on each other — issued together instead of
@@ -100,13 +143,25 @@ export default async function GCReviewPage() {
     const playerRow = Array.isArray(c.players) ? c.players[0] ?? null : c.players
     captainMap[row.id] = { name: c.name, whatsapp: playerRow?.whatsapp ?? null }
   }
- 
+
   // Build draftSquadMap: bookingId → player_id[]
   const draftSquadMap: Record<string, string[]> = {}
   for (const row of draftSquads ?? []) {
     if (!draftSquadMap[row.booking_id]) draftSquadMap[row.booking_id] = []
     draftSquadMap[row.booking_id].push(row.player_id)
   }
+
+  // ── Group into per-weekend blocks, chronological order ─────────
+  // A weekKey group always corresponds to one weekLabel (its own Sat/Sun),
+  // even when it only contains a midweek fixture that hasn't reached its
+  // own weekend yet.
+  const weekendMap: Record<string, { label: string; bookings: typeof scopedBookings }> = {}
+  for (const b of scopedBookings) {
+    const wk = weekKey(b.game_date)
+    if (!weekendMap[wk]) weekendMap[wk] = { label: weekLabel(b.game_date), bookings: [] }
+    weekendMap[wk].bookings.push(b)
+  }
+  const weekendOrder = Object.keys(weekendMap).sort()
 
   return (
     <div className="min-h-screen bg-ink flex flex-col">
@@ -117,18 +172,33 @@ export default async function GCReviewPage() {
           <div className="mb-6">
             <h1 className="font-cinzel text-xl font-bold text-gold">GC Review</h1>
             <p className="font-rajdhani text-sm text-zinc-500 mt-1">
-              {weekLabel} · Review squad fairness and approve or return each slot before captains announce.
+              Review squad fairness and approve or return each slot before captains announce.
             </p>
           </div>
           <InviteLinkButton />
-          <GCReviewClient
-            weekLabel={weekLabel}
-            bookings={(bookings ?? []) as any}
-            avail={(avail ?? []) as any}
-            squads={(squads ?? []) as any}
-            draftSquadMap={draftSquadMap}
-            captainMap={captainMap}
-          />
+          {weekendOrder.length === 0 ? (
+            <p className="font-rajdhani text-zinc-500 text-sm mt-4">No confirmed upcoming fixtures found.</p>
+          ) : (
+            <div className="flex flex-col gap-10 mt-4">
+              {weekendOrder.map(wk => {
+                const group       = weekendMap[wk]
+                const idsInGroup  = new Set(group.bookings.map(b => b.id))
+                return (
+                  <GCReviewClient
+                    key={wk}
+                    weekLabel={group.label}
+                    bookings={group.bookings as any}
+                    avail={(avail ?? []).filter((a: any) => idsInGroup.has(a.booking_id)) as any}
+                    squads={(squads ?? []).filter((s: any) => idsInGroup.has(s.booking_id)) as any}
+                    draftSquadMap={Object.fromEntries(
+                      Object.entries(draftSquadMap).filter(([bookingId]) => idsInGroup.has(bookingId))
+                    )}
+                    captainMap={captainMap}
+                  />
+                )
+              })}
+            </div>
+          )}
         </main>
       </div>
     </div>
