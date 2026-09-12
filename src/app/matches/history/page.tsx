@@ -26,14 +26,14 @@ export default async function MatchHistoryPage() {
 
   return (
     <>
-      <SiteNav activePage="matches" mobileTabBarTheme="light" />
-      <main className="min-h-screen px-4 md:px-8 py-8 max-w-4xl mx-auto" style={{ background: '#F8F4EE' }}>
+      <SiteNav activePage="matches" />
+      <main className="min-h-screen px-4 md:px-8 py-8 max-w-4xl mx-auto" style={{ background: 'var(--fx-shell-bg)' }}>
         <div className="mb-6">
-          <h1 className="font-cinzel text-xl font-bold mb-1" style={{ color: '#B45309' }}>Matches</h1>
-          <p className="font-rajdhani text-sm mb-4" style={{ color: '#78716C' }}>
+          <h1 className="font-cinzel text-xl font-bold mb-1" style={{ color: 'var(--fx-accent-dim)' }}>Matches</h1>
+          <p className="font-rajdhani text-sm mb-4" style={{ color: 'var(--fx-text-muted)' }}>
             Squad history for completed matches.
           </p>
-          <MatchesSegmentedTabs active="past" theme="light" />
+          <MatchesSegmentedTabs active="past" />
         </div>
         <MatchHistoryClient
           canEditRoles={canEditRoles}
