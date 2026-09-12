@@ -1560,6 +1560,22 @@ card sitting on the new light page shell with no changes needed. `SiteNav`
 on this page now passes `mobileTabBarTheme="light"` so the bottom tab bar
 matches. Scope is this page and `/fixtures` only, not a site-wide reskin.
 
+**Superseded a week later — the same page shell converted from fixed
+Warm Light to genuinely Light/Dark/System-aware (September 2026), after a
+live report that the "Past Matches" tab wasn't following the toggle.**
+The `mobileTabBarTheme="light"` pin above was removed, and every literal
+hex colour in `page.tsx` and `MatchHistoryClient.tsx`'s filter chrome was
+swapped for the matching `--fx-*` CSS variable (see
+`player-availability.md` §10.1's own note on this, added in the same
+pass, for the full list of what changed and the two new
+`--fx-success-*` tokens it needed). `MatchesSegmentedTabs`'s and
+`DateChipSlider`'s `theme="light"` overrides on this page's call sites
+were removed too, so both now default to `theme="auto"` the same as on
+`/fixtures`. `MatchHistoryCard` and the standalone
+`/matches/history/[bookingId]` page are unaffected by this pass and stay
+permanently dark, exactly as this note originally described — only the
+page shell around them changed.
+
 ## 16.1 Deep-link support — `?month=all` (added September 2026)
 
 Every filter on this page is local `useState`, not driven by the URL — with

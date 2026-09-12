@@ -69,6 +69,11 @@
   --fx-danger-bg: #FEE2E2;
   --fx-danger-border: #FCA5A5;
   --fx-danger-text: #991B1B;
+  /* "Won" result-filter pill on /matches/history — the only fx- surface
+     that needed a success colour; light is this filter's original value. */
+  --fx-success-bg: #D1FAE5;
+  --fx-success-border: #6EE7B7;
+  --fx-success-text: #047857;
 
   /* Player Stats + Leaderboard */
   --stats-shell-bg: #F8F4EE;
@@ -198,6 +203,9 @@
   --fx-danger-bg: #3f1414;
   --fx-danger-border: #7F1D1D;
   --fx-danger-text: #FCA5A5;
+  --fx-success-bg: #1a4731;
+  --fx-success-border: #166534;
+  --fx-success-text: #4ade80;
 
   --stats-shell-bg: #080808;
   --stats-card-bg: #111111;

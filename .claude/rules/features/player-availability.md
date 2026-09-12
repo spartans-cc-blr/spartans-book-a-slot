@@ -590,13 +590,45 @@ dark. Both now default to a `theme="auto"` prop that reads the same
 `--fx-*` CSS variables the rest of the page uses (`--fx-card-header-bg`/
 `--fx-border`/`--fx-accent`/`--fx-card-text`/`--fx-card-text-muted`), so
 they follow the visitor's Light/Dark/System choice with no page-level
-change needed on `/fixtures`. Since `/matches/history`'s own body content
-is still Warm-Light-only (not converted in this pass), both components
-also accept an explicit `theme="light"` override to pin the original look
-there — `MatchHistoryClient.tsx`'s `<DateChipSlider>` call and
-`/app/matches/history/page.tsx`'s `<MatchesSegmentedTabs>` call both pass
-it, so that page's appearance is unchanged. Same override-prop convention
-`MobileTabBar`'s `mobileTabBarTheme` prop already established.
+change needed on `/fixtures`. At the time, `/matches/history`'s own body
+content was still Warm-Light-only (not converted in that pass), so both
+components also accepted an explicit `theme="light"` override to pin the
+original look there — `MatchHistoryClient.tsx`'s `<DateChipSlider>` call
+and `/app/matches/history/page.tsx`'s `<MatchesSegmentedTabs>` call both
+passed it. Same override-prop convention `MobileTabBar`'s
+`mobileTabBarTheme` prop already established.
+
+**`/matches/history`'s own body converted a week later (September
+2026) — after a live report that the "Past Matches" tab visibly wasn't
+following the toggle.** Both `theme="light"` overrides above were removed
+— `MatchesSegmentedTabs`'s and `DateChipSlider`'s own `theme="auto"`
+default now takes over, same as `/fixtures`. `MatchHistoryClient.tsx`'s
+filter chrome (the Won/Lost/other result pills, the month
+stepper/picker, the role-filter pills, the three `<select>`s, "Clear
+filters", the date-chip slider's wrapper card, the flagged/all-matches
+section headings, and "Load Older Matches") now reads the same `--fx-*`
+tokens `/fixtures` already uses — the literal hex values on this page had
+always been byte-identical to `--fx-shell-bg`/`--fx-hero-bg`/
+`--fx-border`/`--fx-text*`/`--fx-accent*`/`--fx-badge-*`, so light mode is
+unchanged and a dark counterpart now exists for the first time.
+`page.tsx`'s heading/subtitle and background switched the same way, and
+`<SiteNav activePage="matches" />` no longer passes
+`mobileTabBarTheme="light"`, so the bottom tab bar follows the toggle
+here too. Two new tokens were added for the result pills that had no
+`--fx-*` equivalent yet: `--fx-success-bg`/`--fx-success-border`/
+`--fx-success-text` (the "Won" pill; light is the filter's original
+value, dark mirrors `--home-tile-emerald-*`'s green) — "Lost" reuses
+`--fx-danger-*`, the neutral result reuses `--fx-badge-*`.
+
+**`MatchHistoryCard` — the actual per-match dark gradient result
+card — and the standalone `/matches/history/[bookingId]` page were
+deliberately left untouched in this pass**, same "convert what was
+reported, don't proactively migrate the rest" posture `ui-theme.md`'s
+Rollout Policy calls for. Both still render their original hardcoded
+dark styling regardless of theme (the card already renders correctly as
+an intentional dark accent sitting on the now-theme-aware page shell,
+same as `FixturesCard` did before its own later conversion — see
+`post-match-scorecard.md` §16 for the corrected file map note).
 
 ---
 
