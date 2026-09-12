@@ -44,6 +44,7 @@ async function fetchAllTransactions(supabase: ReturnType<typeof createServiceCli
     const { data, error } = await supabase
       .from('wallet_transactions')
       .select('player_id, type, amount, reason, created_at')
+      .is('deleted_at', null)
       .order('player_id', { ascending: true })
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })

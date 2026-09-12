@@ -41,13 +41,24 @@
 //   and re-propagates the whole squad's shares together — see
 //   features/post-match-scorecard.md §6.1. reason/notes/created_at on a
 //   fee-split row stay editable here, same as any other transaction.
+//
+// DELETE — admin-only removal of a mistaken row, requiring a reason. Soft
+//   delete only (migration 076): the row is stamped deleted_at/deleted_by/
+//   delete_reason and its balance effect reversed, but never physically
+//   removed — a hard DELETE would also cascade away its own
+//   wallet_transaction_edits audit trail via that table's ON DELETE
+//   CASCADE. Every read below filters .is('deleted_at', null) so a
+//   deleted row disappears from every statement/feed without ever
+//   actually being gone. Same booking_id refusal as PATCH's amount/type
+//   block — a fee-split share is removable only via a squad-wide
+//   recalculation, not a one-row delete.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
-import { walletTransactionSchema, walletTransactionEditSchema } from '@/lib/schemas'
+import { walletTransactionSchema, walletTransactionEditSchema, walletTransactionDeleteSchema } from '@/lib/schemas'
 import { sendPushToPlayer } from '@/lib/webpush'
 
 const PAGE_SIZE = 20
@@ -154,6 +165,7 @@ export async function GET(req: NextRequest) {
     let query = supabase
       .from('wallet_transactions')
       .select('id, player_id, type, amount, reason, notes, created_by, created_at, booking_id, edited_at, edited_by, players(name)')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(PAGE_SIZE + 1)
@@ -200,6 +212,7 @@ export async function GET(req: NextRequest) {
     .from('wallet_transactions')
     .select('id, type, amount, reason, notes, created_by, created_at, booking_id, edited_at, edited_by')
     .eq('player_id', targetPlayerId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(PAGE_SIZE + 1)
@@ -231,6 +244,7 @@ export async function GET(req: NextRequest) {
       .from('wallet_transactions')
       .select('type, amount')
       .eq('player_id', targetPlayerId)
+      .is('deleted_at', null)
     const ledgerSum = (allTx ?? []).reduce(
       (sum, t) => sum + (t.type === 'credit' ? Number(t.amount) : -Number(t.amount)), 0
     )
@@ -271,11 +285,14 @@ export async function PATCH(req: NextRequest) {
 
   const { data: existing, error: fetchErr } = await supabase
     .from('wallet_transactions')
-    .select('id, player_id, booking_id, type, amount, reason, notes, created_at')
+    .select('id, player_id, booking_id, type, amount, reason, notes, created_at, deleted_at')
     .eq('id', id)
     .single()
   if (fetchErr || !existing) {
     return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+  }
+  if (existing.deleted_at) {
+    return NextResponse.json({ error: 'This transaction has been deleted and can no longer be edited' }, { status: 400 })
   }
 
   // A row carrying booking_id is a match-fee entry — the original per-share
@@ -377,4 +394,101 @@ export async function PATCH(req: NextRequest) {
   }
 
   return NextResponse.json({ transaction: updatedTx, player: updatedPlayer })
+}
+
+export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const user = session?.user as any
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
+
+  const limited = await rateLimit(req, RATE_LIMITS.adminWrite, user.playerId)
+  if (limited) return limited
+
+  const body = await req.json().catch(() => null)
+  const parsed = walletTransactionDeleteSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Invalid request' },
+      { status: 400 }
+    )
+  }
+  const { id, delete_reason } = parsed.data
+
+  const supabase = createServiceClient()
+
+  const { data: existing, error: fetchErr } = await supabase
+    .from('wallet_transactions')
+    .select('id, player_id, booking_id, type, amount, deleted_at')
+    .eq('id', id)
+    .single()
+  if (fetchErr || !existing) {
+    return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+  }
+  if (existing.deleted_at) {
+    return NextResponse.json({ error: 'This transaction has already been deleted' }, { status: 400 })
+  }
+
+  // Same reasoning as PATCH's amount/type block above — a row carrying
+  // booking_id is one player's share of a squad-wide match-fee split.
+  // Removing it here would silently change what that player owes for the
+  // match with nothing recomputed for the rest of the squad. "Correct
+  // Match Fee" on the booking page is the only path that can touch a
+  // fee-split row, by recalculating and re-propagating the whole split.
+  if (existing.booking_id) {
+    return NextResponse.json(
+      {
+        error: "This is a match fee entry — one player's share of a squad-wide split. "
+          + 'Use "Correct Match Fee" on the booking page instead of deleting it here.',
+      },
+      { status: 400 }
+    )
+  }
+
+  // Reverses the row's own balance effect — mathematically identical to a
+  // PATCH correction that zeroes the amount (diff = 0 - oldDelta), just
+  // expressed as a deletion instead of a visible ₹0 row.
+  const oldDelta = existing.type === 'credit' ? Number(existing.amount) : -Number(existing.amount)
+
+  const { data: playerRow, error: playerErr } = await supabase
+    .from('players')
+    .select('id, wallet_balance')
+    .eq('id', existing.player_id)
+    .single()
+  if (playerErr || !playerRow) {
+    return NextResponse.json({ error: 'Player not found' }, { status: 404 })
+  }
+  const newBalance = Number(playerRow.wallet_balance ?? 0) - oldDelta
+
+  // Soft-delete stamped first — the row (and everything it said) survives;
+  // only the balance-effect reversal below is a second write. If that
+  // second write fails, the transaction is still visibly flagged deleted
+  // and inspectable, not silently half-gone.
+  const { data: deletedTx, error: delErr } = await supabase
+    .from('wallet_transactions')
+    .update({ deleted_at: new Date().toISOString(), deleted_by: user.email ?? null, delete_reason })
+    .eq('id', id)
+    .select()
+    .single()
+  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+
+  const { data: updatedPlayer, error: balErr } = await supabase
+    .from('players')
+    .update({ wallet_balance: newBalance })
+    .eq('id', existing.player_id)
+    .select()
+    .single()
+  if (balErr) {
+    return NextResponse.json(
+      { error: `Transaction deleted but balance sync failed: ${balErr.message}`, transaction: deletedTx },
+      { status: 500 }
+    )
+  }
+
+  await sendPushToPlayer(existing.player_id, {
+    title: '💰 Wallet Entry Removed',
+    body: `A transaction was removed from your wallet — new balance: ₹${newBalance}`,
+    url: '/wallet',
+  })
+
+  return NextResponse.json({ transaction: deletedTx, player: updatedPlayer })
 }

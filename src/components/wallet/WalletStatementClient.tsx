@@ -74,6 +74,11 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteReason, setDeleteReason] = useState('')
+  const [deleteSaving, setDeleteSaving] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
   const [showAdd, setShowAdd] = useState(false)
   const [addForm, setAddForm] = useState({ type: 'credit' as 'credit' | 'debit', amount: '', reason: '' })
   const [addSaving, setAddSaving] = useState(false)
@@ -158,8 +163,13 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
 
   async function saveEdit(id: string) {
     const amount = parseFloat(editForm.amount)
-    if (!amount || amount <= 0 || !editForm.reason.trim() || !editForm.edit_reason.trim()) {
-      setEditError('Amount, reason, and a reason for the edit are all required.')
+    // 0 is a legitimate corrected amount (reversing a mistaken charge down
+    // to nothing while keeping the row visible with an explanation — see
+    // features/wallet-ledger.md §3.1) — `!amount` alone would wrongly
+    // reject it, since 0 is falsy in JS. Only actually-invalid input
+    // (blank, negative, non-numeric) is rejected here.
+    if (isNaN(amount) || amount < 0 || !editForm.reason.trim() || !editForm.edit_reason.trim()) {
+      setEditError('A valid amount (0 or more), a reason, and a reason for the edit are all required.')
       return
     }
     setEditSaving(true)
@@ -174,7 +184,16 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
           amount,
           reason: editForm.reason.trim(),
           notes: editForm.notes.trim() || null,
-          created_at: new Date(editForm.created_at + 'T12:00:00').toISOString(),
+          // Anchored at local midnight, not noon — a noon anchor meant
+          // "today" could construct a timestamp still ahead of the actual
+          // current instant (e.g. any time before noon IST), tripping the
+          // server's "not in the future" check and forcing an admin to
+          // pick an earlier date just to get today's own correction to
+          // save. Midnight-of-today is always <= now, so this can't
+          // happen — same convention every other date-string-to-Date
+          // conversion in this app already uses (e.g. CaptainsCornerGrid,
+          // dateChipGroups).
+          created_at: new Date(editForm.created_at + 'T00:00:00').toISOString(),
           edit_reason: editForm.edit_reason.trim(),
         }),
       })
@@ -188,6 +207,33 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
       setEditingId(null)
     } finally {
       setEditSaving(false)
+    }
+  }
+
+  async function deleteTransaction(id: string) {
+    if (!deleteReason.trim()) {
+      setDeleteError('A reason is required to delete this transaction.')
+      return
+    }
+    setDeleteSaving(true)
+    setDeleteError('')
+    try {
+      const res = await fetch('/api/wallet/transactions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, delete_reason: deleteReason.trim() }),
+      })
+      const d = await res.json()
+      if (!res.ok) {
+        setDeleteError(d.error ?? 'Failed to delete transaction.')
+        return
+      }
+      setTransactions(prev => prev.filter(t => t.id !== id))
+      if (d.player) setCurrentBalance(d.player.wallet_balance)
+      setDeletingId(null)
+      setDeleteReason('')
+    } finally {
+      setDeleteSaving(false)
     }
   }
 
@@ -499,10 +545,33 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                   <p className="font-rajdhani text-xs text-zinc-500">Bal {formatSigned(t.balanceAfter)}</p>
                 </div>
                 {admin && (
-                  <button onClick={() => editingId === t.id ? setEditingId(null) : startEdit(t)}
+                  <button onClick={() => {
+                      if (editingId === t.id) { setEditingId(null); return }
+                      setDeletingId(null)
+                      startEdit(t)
+                    }}
                     className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors w-8 text-right flex-shrink-0">
                     {editingId === t.id ? '✕' : 'Edit'}
                   </button>
+                )}
+                {admin && (
+                  t.booking_id ? (
+                    <span title={'A match-fee entry can’t be deleted here — use "Correct Match Fee" on the booking page.'}
+                      className="font-rajdhani text-xs text-zinc-700 w-12 text-right flex-shrink-0 cursor-not-allowed">
+                      Delete
+                    </span>
+                  ) : (
+                    <button onClick={() => {
+                        if (deletingId === t.id) { setDeletingId(null); setDeleteReason(''); setDeleteError(''); return }
+                        setEditingId(null)
+                        setDeletingId(t.id)
+                        setDeleteReason('')
+                        setDeleteError('')
+                      }}
+                      className="font-rajdhani text-xs text-red-400 hover:text-red-300 transition-colors w-12 text-right flex-shrink-0">
+                      {deletingId === t.id ? '✕' : 'Delete'}
+                    </button>
+                  )
                 )}
               </div>
             </div>
@@ -567,6 +636,25 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                 <button onClick={() => saveEdit(t.id)} disabled={editSaving}
                   className="mt-3 font-rajdhani text-xs font-bold bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-1.5 rounded transition-colors">
                   {editSaving ? 'Saving...' : '✓ Save Correction'}
+                </button>
+              </div>
+            )}
+
+            {admin && deletingId === t.id && (
+              <div className="bg-ink-4 mx-4 mb-3 p-3 rounded border border-red-900/50">
+                <p className="font-rajdhani text-xs text-zinc-400 mb-2">
+                  This removes the entry from {playerName ?? 'this player'}'s statement and reverses its
+                  {' '}₹{Number(t.amount).toLocaleString('en-IN')} effect on their balance. The row itself
+                  is never actually erased (it stays inspectable directly if ever needed) — it just
+                  disappears from every statement and feed. This can't be undone from here.
+                </p>
+                <label className="form-label">Why are you deleting this? *</label>
+                <input type="text" value={deleteReason} placeholder="e.g. Duplicate entry — same top-up recorded twice"
+                  onChange={e => setDeleteReason(e.target.value)} className="form-input" />
+                {deleteError && <p className="font-rajdhani text-xs text-red-400 mt-2">{deleteError}</p>}
+                <button onClick={() => deleteTransaction(t.id)} disabled={deleteSaving}
+                  className="mt-3 font-rajdhani text-xs font-bold bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-1.5 rounded transition-colors">
+                  {deleteSaving ? 'Deleting...' : '🗑 Delete Entry'}
                 </button>
               </div>
             )}

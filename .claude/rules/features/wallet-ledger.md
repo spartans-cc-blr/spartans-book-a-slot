@@ -104,6 +104,93 @@ actually changes the player's current balance (`diff !== 0`) — a
 cosmetic-only edit (fixing a typo in the reason, correcting the date)
 doesn't ping the player, since nothing about their balance changed.
 
+### 3.1 Deleting an entry entirely (added September 2026)
+
+Reported gap: correcting an entry's amount down to a typed number is the
+right tool for a *wrong* charge, but not for one that should never have
+existed at all (a duplicate top-up, an entry created by mistake) — an
+admin needed to remove it from the statement outright, with a reason on
+record.
+
+**Soft delete, not a real `DELETE`.** Migration `076_wallet_transaction_soft_delete.sql`
+adds `deleted_at`/`deleted_by`/`delete_reason` to `wallet_transactions`.
+`DELETE /api/wallet/transactions` (admin-only, `{ id, delete_reason }`,
+`delete_reason` required — same Zod-validated shape as an edit's
+`edit_reason`) stamps those three columns and reverses the row's balance
+effect (`players.wallet_balance -= oldDelta`, the same math a correction
+that zeroed the amount would produce) — but the row is **never physically
+removed**. A real `DELETE` would also cascade away that row's own
+`wallet_transaction_edits` history via that table's `ON DELETE CASCADE`,
+destroying the very audit trail this feature exists to keep. Every read
+this route does against `wallet_transactions` — the self/`?player_id=`
+statement, the admin `scope=all` club-wide feed, and the opening-balance
+ledger sum — filters `.is('deleted_at', null)`, so a deleted row simply
+disappears from every surface without ever being gone from the database.
+
+**Same `booking_id` refusal as the correction flow.** A match-fee entry
+(any row with `booking_id` set) can't be deleted here for the identical
+reason `amount`/`type` can't be edited on one (§ above) — it's one
+player's share of a squad-wide split, and removing it would silently
+change what that player owes with nothing recomputed for the rest of the
+squad. `WalletStatementClient.tsx` shows a disabled "Delete" label with an
+explanatory tooltip on such rows instead of a working button, pointing at
+"Correct Match Fee" on the booking page — same "UI mirrors the API"
+posture as everywhere else.
+
+**`membership_fee_charges`/`wallet_transfers` link rows are left as-is.**
+Deleting a quarterly-membership-fee debit doesn't reset its
+`membership_fee_charges` row (§12) — that row's `UNIQUE(player_id, year,
+quarter)` guard is what stops a future re-sync from ever charging the
+same quarter twice, and losing that protection just because the visible
+ledger row was removed would be worse than the gap this closes. Same for
+a sponsorship transfer's `wallet_transfers` link (§14) — the linked
+transaction still physically exists (soft delete only), so the link
+itself is never broken.
+
+**UI** — a "Delete" action sits next to "Edit" on every non-fee-split row
+(admin mode only). Tapping it opens an inline confirm panel (mutually
+exclusive with the Edit panel — opening one closes the other) explaining
+what will happen and requiring a reason before "🗑 Delete Entry" is
+enabled. A push notification (`💰 Wallet Entry Removed`) fires the same
+way every other balance-changing action in this app does.
+
+### 3.2 Two correction-form bugs fixed (September 2026)
+
+Both reported the same session, both in `WalletStatementClient.tsx`'s
+"Edit" (correction) form:
+
+- **Setting the amount to `0` silently failed to save.** `saveEdit()`'s
+  client-side guard was `if (!amount || amount <= 0 || ...)` — `!amount`
+  alone is `true` for `0` in JavaScript (`0` is falsy), so the form
+  refused to submit *before* even reaching the server. The server schema
+  (`walletTransactionEditSchema.amount`) also independently rejected `0`
+  via `.positive()`. This directly blocked the very correction pattern
+  §12.1 itself documents as the intended way to reverse a mistaken charge
+  down to nothing while keeping the row visible — a doc-blessed capability
+  the validation had never actually allowed through the UI. Fixed on both
+  sides: the client check is now `isNaN(amount) || amount < 0`, and the
+  schema uses `.min(0, ...)` instead of `.positive()` — `0` is a valid
+  corrected amount now, still rejecting negative/non-numeric input. The
+  create schema (`walletTransactionSchema`, for brand-new entries) is
+  untouched and still requires a positive amount — a fresh ₹0 entry
+  wouldn't mean anything.
+- **Picking today's date and saving before local noon failed with "not in
+  the future."** `saveEdit()` built the correction's `created_at` as
+  `new Date(editForm.created_at + 'T12:00:00').toISOString()` — noon,
+  local time. The server's `pastIsoDatetimeSchema` rejects anything more
+  than a minute ahead of `Date.now()`. Noon-local-today, converted to UTC,
+  is *later* than the actual current UTC instant whenever it's currently
+  before noon in the browser's own timezone — so an admin correcting a
+  transaction any time before noon IST and leaving the date on "today"
+  (its natural default) got rejected as a future date, and had to
+  backdate to yesterday just to get the save through. Fixed by anchoring
+  at local midnight (`T00:00:00`) instead of noon — midnight-of-today is
+  always `<= now()`, for any timezone, at any time of day — matching the
+  `T00:00:00` convention every other date-string-to-`Date` conversion in
+  this app already uses (`CaptainsCornerGrid.tsx`, `dateChipGroups.ts`,
+  `announcement.ts`, etc.) rather than introducing a second, inconsistent
+  anchor.
+
 ---
 
 ## 4. Fees stay on the booking page — this hub only surfaces *which* ones need it
@@ -379,9 +466,10 @@ one (contrast with the `055_wallet_transactions.sql` reconstruction note).
 | `/api/wallet/transactions` | GET | Own (any signed-in player with a `playerId`), or admin via `?player_id=`, or admin-only `?scope=all` | Cursor-paginated statement — own by default, matching the `/api/player/future-availability` convention; `scope=all` is the club-wide ledger feed for the admin hub |
 | `/api/wallet/transactions` | POST | Admin | Unchanged S-1 behaviour + optional `created_at` for backdating a historic entry |
 | `/api/wallet/transactions` | PATCH | Admin | New — corrects an existing row; writes to `wallet_transaction_edits` first, adjusts `players.wallet_balance` by the delta the correction introduces if `amount`/`type` changed. Refuses a genuine `amount`/`type` change on any row carrying `booking_id` — that's a match-fee split share, correctable only via `PATCH /api/fees/apply` (§3) |
+| `/api/wallet/transactions` | DELETE | Admin | New (§3.1) — soft-deletes a row (`deleted_at`/`deleted_by`/`delete_reason`, never a real `DELETE`), reverses its balance effect. Requires `delete_reason`; refuses any row carrying `booking_id`, same as PATCH's amount/type block |
 | `/api/wallet/opening-balance` | PATCH | Admin | New — sets or clears (`amount: null`) a player's Brought Forward override |
 
-All four re-derive `isAdmin`/own-`playerId` server-side on every call —
+All five re-derive `isAdmin`/own-`playerId` server-side on every call —
 none of them trust a client-supplied role or player scope.
 
 ---
@@ -397,6 +485,8 @@ none of them trust a client-supplied role or player scope.
 | `PATCH /api/wallet/transactions` refuses a genuine `amount`/`type` change on any row carrying `booking_id` — checked against the resulting value, not just field presence | ✅ |
 | Every correction requires a non-empty `edit_reason`, logged to `wallet_transaction_edits` before the row itself is touched | ✅ |
 | `wallet_transaction_edits` RLS enabled, no anon/authenticated policies — service role only | ✅ |
+| `DELETE /api/wallet/transactions` is a soft delete, never a real `DELETE` — the row and its full pre-deletion state stay in the database; only reads filter it out (§3.1) | ✅ |
+| `DELETE /api/wallet/transactions` requires a non-empty `delete_reason` and refuses any row carrying `booking_id` — same guard as PATCH's amount/type block | ✅ |
 | `wallet_opening_balance*` columns never feed `players.wallet_balance` — purely a display anchor, no way to use them to alter the live balance | ✅ |
 | `admin` prop on `WalletStatementClient` is UI-only — every mutating route re-checks `isAdmin` regardless of what the client renders | ✅ |
 | Push payloads (top-up/debit/correction) carry only the amount, reason, and new balance already visible to that player — no other player's data | ✅ |
@@ -408,8 +498,9 @@ none of them trust a client-supplied role or player scope.
 | File | Role |
 |---|---|
 | `supabase/migrations/072_wallet_statement_corrections.sql` | `wallet_transaction_edits` table + `wallet_transactions.edited_at`/`edited_by` + `players.wallet_opening_balance*` |
-| `src/lib/schemas.ts` | `walletTransactionSchema` (now with optional `created_at`), `walletTransactionEditSchema`, `walletOpeningBalanceSchema` |
-| `src/app/api/wallet/transactions/route.ts` | GET (self/admin/`scope=all`, paginated, Brought Forward calc), POST (unchanged S-1 + backdating), PATCH (new — corrections) |
+| `supabase/migrations/076_wallet_transaction_soft_delete.sql` | `wallet_transactions.deleted_at`/`deleted_by`/`delete_reason` (§3.1) |
+| `src/lib/schemas.ts` | `walletTransactionSchema` (now with optional `created_at`), `walletTransactionEditSchema` (amount now `.min(0)`, §3.2), `walletTransactionDeleteSchema` (§3.1), `walletOpeningBalanceSchema` |
+| `src/app/api/wallet/transactions/route.ts` | GET (self/admin/`scope=all`, paginated, Brought Forward calc, all filtered `deleted_at IS NULL`), POST (unchanged S-1 + backdating), PATCH (corrections), DELETE (new — soft delete, §3.1) |
 | `src/app/api/wallet/opening-balance/route.ts` | PATCH — admin override of the Brought Forward line |
 | `src/app/wallet/page.tsx` | Player's own statement page |
 | `src/components/wallet/WalletStatementClient.tsx` | Shared bank-statement component — self view and admin drill-down |
@@ -803,6 +894,14 @@ Downloads one real workbook with two named sheets:
   club-wide export can never disagree with what a player sees on their own
   statement. A player with zero transactions has no rows on the Detailed
   sheet (nothing to show) but still appears on Summary.
+
+**`fetchAllTransactions()` filters `deleted_at IS NULL` (added alongside
+§3.1's soft-delete capability)** — a soft-deleted row's balance effect is
+already reversed out of `players.wallet_balance` at delete time, so
+including it in this file's own running-total sum would double it back in
+and break the "ties out to a real ledger" guarantee this section exists
+to make. Same filter every other read of `wallet_transactions` in this
+feature applies.
 
 Both sheets are visually themed to match the rest of the Hub — a dark
 header row (`#1A1208`/`#D97706`, the same nav-bar tokens `ui-theme.md`
