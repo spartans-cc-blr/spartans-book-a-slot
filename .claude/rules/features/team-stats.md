@@ -105,7 +105,10 @@ matches that produced it (§3).
 - **Unclassified `stage_type` counts as league** (§4).
 - **Toss split** puts a toss-winning match in two buckets — the outcome
   (won/lost the toss) and the decision (chose to bat/field) — since those
-  are two different questions.
+  are two different questions. The toss *filter* is won/lost only (§3.2).
+- **Every dimension is both filterable and splittable** (§3.2), and
+  `splitByNested()` composes two of them; a match that a dimension can't
+  group (no toss data) drops out of both its filter and its split.
 - **Margin of victory**: runs when we batted first, wickets (10 −
   `team_wickets`) when we chased; `null` without toss data.
 - **Opponent grouping key** is `opponents.id` once reconciled, else the
@@ -125,12 +128,14 @@ follows Light/Dark/System like `/leaderboard`, `ui-theme.md`).
 
 **Every filter is a `searchParams` key**, same URL-driven convention as
 `LeaderboardFilters.tsx`, so any view is a shareable link:
-`year`, `format` (`T20`/`T30`/`other`), `tournament`, `ground`,
-`opponent` (an `opponentKey()`), `innings` (`defending`/`chasing`),
-`stage` (`league`/`knockout`), `practice=1`, `by` (the split dimension).
-Invalid/absent values fall back to "no restriction"; a `tournament`/
-`ground`/`opponent` id not present in the data falls back to "all" rather
-than rendering a `<select>` with no matching option. The URL shape lives
+`year`, `month` (`YYYY-MM`), `format` (`T20`/`T30`/`other`), `tournament`,
+`ground`, `opponent` (an `opponentKey()`), `captain` (a `captainKey()`),
+`slot` (`HH:MM`), `innings` (`defending`/`chasing`), `toss` (`won`/`lost`),
+`stage` (`league`/`knockout`), `practice=1`, `by` (the split dimension) and
+`then` (the second-level split, §3.2). Invalid/absent values fall back to
+"no restriction"; a `tournament`/`ground`/`opponent`/`captain`/`month`/
+`slot` value not present in the data falls back to "all" rather than
+rendering a `<select>` with no matching option. The URL shape lives
 in one pure module, `src/lib/teamStatsFilters.ts` (`TeamFilterState`,
 `buildTeamStatsHref()`, `toTeamFilters()`, `clearFilter()`, …), imported by
 both the Server Component and the client panel below so the two can never
@@ -183,6 +188,71 @@ round-trip. Reported with a screenshot the same day it shipped; replaced by
 Net effect: the first screen is hero → segmented tabs → one chip row →
 Played/Won/Lost/Win % → form, and the panel is one tap away.
 
+### 3.2 Two dimensions at once (added September 2026)
+
+The first cut split the dimensions across two controls: eight were
+filters, eleven were splits, and only some were both. That made a
+genuinely common question unanswerable — "which captain performs how,
+based on the toss" needs captain *and* toss together, and toss existed
+only as a split. Closed two ways, deliberately both, since they suit
+different shapes of question:
+
+**Every dimension is now filterable.** Toss (won / lost), Captain, Month
+and Slot time joined the filter set, so the filter and split lists are
+finally symmetric — narrow on one dimension, split by the other, and flip
+the chip to see the other side. Notes on the four:
+
+- **Toss** offers only won/lost, not the decision. "Chose to bat" is
+  already the Defending/Chasing filter, and offering both would be two
+  controls for one question. The *split* still shows all four buckets.
+- A match with **no toss data** satisfies neither side of a toss filter
+  and drops out entirely — the same treatment the toss and innings
+  *splits* already give it (`groupsFor()` returns no group for it).
+- **Captain** keys on the squad row's player id via `captainKey()`, with a
+  single `unknown` bucket for a booking whose captain was never recorded.
+  That's surfaced rather than hidden: it's a real data gap a wrangler can
+  fix, and it sorts last in the option list rather than alphabetically
+  among real names.
+- **Month** values are `YYYY-MM` and labelled "Sep 2026", so a month and a
+  season filter set together read consistently. They AND like every other
+  pair, so an inconsistent pair gives zero matches and the chips show why.
+
+**And a second-level split, "then by"** (`?then=`) — a second pill row
+under Split by, offering every dimension except the primary one plus
+"None". `splitByNested()` (`teamStatsCore.ts`) runs `splitBy()` again over
+each row's own matches; a `then` that is absent or equal to `by` returns a
+plain single-level split, so a caller can pass whatever the URL says
+without checking first. Expanding a primary row then shows one sub-row per
+second-dimension group, each with its own P/W/L/T-NR/Win %/form/last, and
+each expanding again to the matches behind it — so no summary is ever more
+than two taps from its matches, the same rule the top level follows.
+
+Sub-rows render as real `<tr>`s in the same table rather than a nested
+table, so every column stays aligned with the parent. Two behaviours worth
+knowing:
+
+- **A "Not recorded" sub-row appears when the second dimension leaves
+  matches ungrouped** (`withUncovered()` in `TeamSplitTable.tsx`). Toss and
+  Defending/Chasing give a match with no toss data no group at all, and
+  once a "then by" is chosen the parent row no longer lists its matches
+  directly — without this they would be unreachable.
+- **Toss sub-rows can sum to more than their parent's P**, because the toss
+  dimension deliberately puts a toss-winning match in both a "Won the toss"
+  and a "Won toss & chose to …" bucket, exactly as it does at the top
+  level. The Total footer is unaffected: it still counts distinct matches
+  across the *primary* rows only.
+
+**Capped at two levels on purpose.** Three-deep nesting stops being
+readable in one table, and the filters cover any further narrowing.
+
+**A pivot matrix was considered and not built** — captains as rows, toss
+outcomes as columns. It only reads well when the second dimension has a
+handful of values (toss does; opponent or tournament does not, giving a
+wide, mostly-empty grid needing horizontal scroll on a phone), and the
+nested split answers the same question in the table shape that already
+works at every width. Worth revisiting for the low-cardinality pairs if
+the nested split proves awkward in use.
+
 Sections, top to bottom:
 
 1. **Headline strip** — Played / Won / Lost / Win % tiles, then last-5
@@ -191,9 +261,11 @@ Sections, top to bottom:
    selected (hidden while the Opponent split itself is showing, to avoid
    listing them twice). Shows a "mark your rivals on Manage opponents"
    nudge to a manager if none are starred yet.
-3. **Split by …** — `SplitByRow` (§3.1) then `TeamSplitTable` for the chosen dimension. One table
+3. **Split by …** — `SplitByRow` (§3.1, now two pill rows: Split by and
+   Then by, §3.2) then `TeamSplitTable` for the chosen dimension. One table
    shape for every dimension: label · P · W · L · T/NR · Win % · form ·
-   last played. **Every row expands** (`▸`) to the matches behind it —
+   last played. **Every row expands** (`▸`) to the matches behind it, or to
+   the second-dimension sub-rows when a "then by" is chosen (§3.2) —
    date, opponent (or tournament, on the Opponent split), both scores,
    format, bat-1st/chased, result + margin — each linking to
    `/matches/history/[bookingId]`. Marquee rows carry a pill; an opponent
@@ -391,16 +463,16 @@ show an "unlinked" hint).
 |---|---|
 | `supabase/migrations/076_bookings_stage_type.sql` | `bookings.stage_type` + one-off knockout backfill (§4) |
 | `supabase/migrations/077_opponents_master.sql` | `opponents`, `opponent_aliases`, `bookings.opponent_id`, RLS (§5) |
-| `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2) |
+| `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `applyFilters()` covers every dimension and `splitByNested()` composes two of them (§3.2) |
 | `src/lib/teamStats.ts` | `getTeamMatches()` fetch; re-exports the core (§2) |
 | `src/lib/teamStats.test.ts` | Vitest coverage of the aggregators |
 | `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers (`TeamFilterState`, `buildTeamStatsHref`, `toTeamFilters`, chip labels) shared by the page and the panel (§3) |
 | `src/lib/opponents.ts` | `normaliseOpponentName()`, `resolveOpponentIdByName()`, `linkSpellingToOpponent()`, `AliasConflictError` (§5) |
 | `src/lib/schemas.ts` | `opponentCreateSchema`, `opponentUpdateSchema`, `opponentLinkSchema` |
 | `src/app/team-stats/page.tsx` | The Team Record page (§3) |
-| `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `SplitByRow` — scrolling split-dimension pills (§3.1) |
+| `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `SplitByRow` — the Split by / Then by scrolling pill rows (§3.1, §3.2) |
 | `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher under both stats heroes (§3) |
-| `src/components/team/TeamSplitTable.tsx` | Expandable split table, `FormPills`, `MatchList` |
+| `src/components/team/TeamSplitTable.tsx` | Expandable split table (including the second-level sub-rows and their "Not recorded" fallback, §3.2), `FormPills`, `MatchList` |
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` | Opponent master + reconciliation queue (§5) |
 | `src/app/api/opponents/route.ts` | GET / POST / PATCH |
 | `src/app/api/opponents/link/route.ts` | POST — link a spelling |
@@ -420,6 +492,7 @@ show an "unlinked" hint).
 | Pre-Hub matches (~170 in the analytics DB) | Out of scope by decision (§1). Including them needs bookings backfilled with format/ground/opponent first — `/admin/booking-backfill` is the existing tool for that. |
 | Unlink / delete an alias | Not built — a mis-link is fixed by renaming/relinking. Add a DELETE on `/api/opponents/link` if it comes up. |
 | Toss columns on `match_stats_cache` | Not needed today (§2); revisit only if the extra analytics-DB read shows up in latency. |
+| Pivot matrix for low-cardinality pairs | Considered and not built (§3.2) — the nested "then by" split covers the same two-dimension questions in a table shape that already works at phone width. Revisit for pairs like captain × toss if the nested split proves awkward in real use. |
 | Per-opponent detail page | The Opponent split + `?opponent=` filter cover H2H today; a dedicated `/opponents/[id]` page with the full match list, records vs them and top performers vs them would be the natural next step. |
 | No way back from a tapped match (installed PWA) | ✅ Fixed 11 Sep 2026 — reported here first, fixed Hub-wide: `/matches/history/[bookingId]` (and every other drill-down) now renders the shared `BackButton`, which `router.back()`s to wherever the player came from — Team Record with the exact split and filters, since this page is URL-driven — and falls back to "‹ Past Matches" for a cold open. See `features/back-navigation.md` (backlog U-31). |
 

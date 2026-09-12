@@ -25,7 +25,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { applyFilters, SPLIT_LABEL, type TeamMatch } from '@/lib/teamStatsCore'
+import { applyFilters, SPLIT_LABEL, type SplitDimension, type TeamMatch } from '@/lib/teamStatsCore'
 import {
   FILTER_KEYS, FILTER_LABEL, SPLIT_DIMENSIONS,
   activeFilterKeys, buildTeamStatsHref, clearAllFilters, clearFilter, filterValueLabel, isFilterSet, toTeamFilters,
@@ -229,6 +229,35 @@ function FilterControl({ k, draft, setDraft, options }: { k: FilterKey; draft: T
           {options.opponents.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
         </select>
       )
+    case 'month':
+      return (
+        <select value={draft.month} onChange={e => setDraft({ ...draft, month: e.target.value })} className={SELECT}>
+          <option value="all">All months</option>
+          {options.months.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+      )
+    case 'captain':
+      return (
+        <select value={draft.captain} onChange={e => setDraft({ ...draft, captain: e.target.value })} className={SELECT}>
+          <option value="all">All captains</option>
+          {options.captains.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+      )
+    case 'slot':
+      return (
+        <select value={draft.slot} onChange={e => setDraft({ ...draft, slot: e.target.value })} className={SELECT}>
+          <option value="all">All slot times</option>
+          {options.slots.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+      )
+    case 'toss':
+      return (
+        <select value={draft.toss} onChange={e => setDraft({ ...draft, toss: e.target.value as TeamFilterState['toss'] })} className={SELECT}>
+          <option value="all">Won + lost the toss</option>
+          <option value="won">Won the toss</option>
+          <option value="lost">Lost the toss</option>
+        </select>
+      )
     case 'format':
       return (
         <select value={draft.format} onChange={e => setDraft({ ...draft, format: e.target.value as TeamFilterState['format'] })} className={SELECT}>
@@ -294,6 +323,31 @@ function FilterSheet({ children, onClose }: { children: ReactNode; onClose: () =
 // ── Split-by row ──────────────────────────────────────────────────────────
 
 export function SplitByRow({ state }: { state: TeamFilterState }) {
+  // "Then by" is the second-level breakdown shown inside each row when it
+  // is expanded (§3.2) — the other way to answer a two-dimension question,
+  // alongside filtering one dimension and splitting the other. It offers
+  // every dimension except the primary one: splitting a group by the thing
+  // that defined it would just yield one sub-row per group.
+  const thenOptions = SPLIT_DIMENSIONS.filter(d => d !== state.by)
+  return (
+    <div className="flex flex-col gap-1.5 mb-2">
+      <PillRow label="Split by" active={state.by}
+        options={SPLIT_DIMENSIONS} hrefFor={d => buildTeamStatsHref({ ...state, by: d, then: state.then === d ? null : state.then })} />
+      <PillRow label="Then by" active={state.then} includeNone
+        options={thenOptions} hrefFor={d => buildTeamStatsHref({ ...state, then: d })}
+        noneHref={buildTeamStatsHref({ ...state, then: null })} />
+    </div>
+  )
+}
+
+function PillRow({ label, active, options, hrefFor, includeNone, noneHref }: {
+  label: string
+  active: SplitDimension | null
+  options: SplitDimension[]
+  hrefFor: (d: SplitDimension) => string
+  includeNone?: boolean
+  noneHref?: string
+}) {
   const ref = useRef<HTMLDivElement>(null)
   // Keep the active pill in view — the row scrolls horizontally on a phone
   // and the selected dimension may otherwise sit off-screen to the right.
@@ -303,27 +357,30 @@ export function SplitByRow({ state }: { state: TeamFilterState }) {
     if (!row || !el) return
     const target = el.offsetLeft - (row.clientWidth - el.offsetWidth) / 2
     row.scrollTo({ left: Math.max(0, target), behavior: 'auto' })
-  }, [state.by])
+  }, [active])
 
   return (
-    <div className="flex items-center gap-3 mb-2">
-      <span className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-[var(--stats-text-faint)] dark:text-zinc-600 flex-none">Split by</span>
+    <div className="flex items-center gap-3">
+      <span className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-[var(--stats-text-faint)] dark:text-zinc-600 flex-none w-[4.5rem]">{label}</span>
       <div ref={ref} className="flex gap-2 overflow-x-auto -my-1 py-1 min-w-0" style={{ scrollbarWidth: 'none' }}>
-        {SPLIT_DIMENSIONS.map(d => {
-          const on = state.by === d
-          return (
-            <Link key={d} href={buildTeamStatsHref({ ...state, by: d })} data-active={on} scroll={false}
-              className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors whitespace-nowrap flex-none
-                ${on
-                  ? 'bg-[var(--stats-badge-bg)] dark:bg-gold/20 border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold'
-                  : 'border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-muted)] dark:text-zinc-500 hover:text-[var(--stats-text-2)] dark:hover:text-zinc-300'}`}>
-              {SPLIT_LABEL[d]}
-            </Link>
-          )
-        })}
+        {includeNone && (
+          <Link href={noneHref!} data-active={active === null} scroll={false} className={splitPill(active === null)}>None</Link>
+        )}
+        {options.map(d => (
+          <Link key={d} href={hrefFor(d)} data-active={active === d} scroll={false} className={splitPill(active === d)}>
+            {SPLIT_LABEL[d]}
+          </Link>
+        ))}
       </div>
     </div>
   )
+}
+
+function splitPill(on: boolean): string {
+  return `font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors whitespace-nowrap flex-none
+    ${on
+      ? 'bg-[var(--stats-badge-bg)] dark:bg-gold/20 border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold'
+      : 'border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-muted)] dark:text-zinc-500 hover:text-[var(--stats-text-2)] dark:hover:text-zinc-300'}`
 }
 
 // ── Bits ──────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  summarize, recentForm, currentStreak, splitBy, computeRecords, winMargin,
-  applyFilters, opponentKey, normaliseResult, type TeamMatch,
+  summarize, recentForm, currentStreak, splitBy, splitByNested, computeRecords, winMargin,
+  applyFilters, opponentKey, captainKey, filterOptions, normaliseResult, type TeamMatch,
 } from './teamStatsCore'
 
 function m(over: Partial<TeamMatch> & { gameDate: string }): TeamMatch {
@@ -94,6 +94,86 @@ describe('splitBy', () => {
   it('drops matches with no toss data from the innings split', () => {
     const rows = splitBy(sample, 'innings')
     expect(rows.reduce((n, r) => n + r.played, 0)).toBe(4)
+  })
+})
+
+describe('applyFilters — toss / captain / month / slot', () => {
+  it('filters by toss outcome, dropping matches with no toss data', () => {
+    expect(applyFilters(sample, { toss: 'won' }).map(x => x.gameDate)).toEqual(['2026-01-04', '2026-02-01'])
+    expect(applyFilters(sample, { toss: 'lost' }).map(x => x.gameDate)).toEqual(['2026-01-11'])
+    // The 8 Feb no-toss match is in neither, and the 15 Feb one is
+    // practice (excluded by default) — so neither side ever sees it.
+    expect(applyFilters(sample, { toss: 'won' }).some(x => x.gameDate === '2026-02-08')).toBe(false)
+  })
+
+  it('filters by captain, month and slot time', () => {
+    const withOther = [...sample, m({ gameDate: '2026-03-01', slotTime: '14:30', captainId: 'p2', captainName: 'Keshav' })]
+    expect(applyFilters(withOther, { captainKey: 'p2' }).map(x => x.gameDate)).toEqual(['2026-03-01'])
+    expect(applyFilters(withOther, { month: '2026-01' }).map(x => x.gameDate)).toEqual(['2026-01-04', '2026-01-11'])
+    expect(applyFilters(withOther, { slotTime: '14:30' }).map(x => x.gameDate)).toEqual(['2026-03-01'])
+    expect(applyFilters(withOther, { slotTime: '07:30' })).toHaveLength(4)
+  })
+
+  it('buckets a booking with no recorded captain under "unknown"', () => {
+    const noCaptain = m({ gameDate: '2026-04-01', captainId: null, captainName: null })
+    expect(captainKey(noCaptain)).toBe('unknown')
+    expect(applyFilters([...sample, noCaptain], { captainKey: 'unknown' })).toHaveLength(1)
+  })
+
+  it('combines a filter with a split — the two-dimension case', () => {
+    // "How does each captain do after winning the toss": filter one, split
+    // the other. See features/team-stats.md §3.2.
+    const rows = splitBy(applyFilters(sample, { toss: 'won' }), 'captain')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ label: 'Muthu', played: 2, won: 2, winPct: 100 })
+  })
+})
+
+describe('filterOptions', () => {
+  it('lists captains, months and slots alongside the existing lists', () => {
+    const o = filterOptions([...sample, m({ gameDate: '2026-03-01', slotTime: '14:30', captainId: 'p2', captainName: 'Keshav' })])
+    expect(o.captains.map(c => c.name)).toEqual(['Keshav', 'Muthu'])
+    expect(o.months.map(x => x.id)).toEqual(['2026-03', '2026-02', '2026-01'])   // newest first
+    expect(o.slots.map(x => x.id)).toEqual(['07:30', '14:30'])                    // chronological
+  })
+
+  it('sorts "Captain not recorded" last, not alphabetically', () => {
+    const o = filterOptions([m({ gameDate: '2026-05-01', captainId: null, captainName: null }), ...sample])
+    expect(o.captains[o.captains.length - 1].id).toBe('unknown')
+  })
+})
+
+describe('splitByNested', () => {
+  it('returns a plain split when there is no second dimension', () => {
+    expect(splitByNested(sample, 'captain')[0].sub).toBeUndefined()
+    expect(splitByNested(sample, 'captain', null)[0].sub).toBeUndefined()
+  })
+
+  it('ignores a second dimension equal to the first', () => {
+    expect(splitByNested(sample, 'captain', 'captain')[0].sub).toBeUndefined()
+  })
+
+  it('breaks each group down by the second dimension', () => {
+    const rows = splitByNested(sample, 'captain', 'toss')
+    expect(rows).toHaveLength(1)
+    const sub = rows[0].sub!
+    // splitByNested groups whatever it is given — practice exclusion is
+    // applyFilters' job upstream, so all five sample matches are in play.
+    expect(sub.find(r => r.key === 'toss-won')).toMatchObject({ played: 3, won: 3 })
+    expect(sub.find(r => r.key === 'toss-lost')).toMatchObject({ played: 1, lost: 1 })
+    // Sub-rows only ever cover the parent's own matches.
+    for (const r of sub) for (const match of r.matches) {
+      expect(rows[0].matches.map(x => x.bookingId)).toContain(match.bookingId)
+    }
+  })
+
+  it('leaves a match with no group for the second dimension out of every sub-row', () => {
+    // The 8 Feb match has no toss data, so it belongs to no toss bucket —
+    // the table adds a "Not recorded" sub-row for exactly this case.
+    const rows = splitByNested(sample, 'captain', 'toss')
+    const covered = new Set(rows[0].sub!.flatMap(r => r.matches.map(x => x.bookingId)))
+    const uncovered = rows[0].matches.filter(x => !covered.has(x.bookingId))
+    expect(uncovered.map(x => x.gameDate)).toEqual(['2026-02-08'])
   })
 })
 
