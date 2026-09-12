@@ -82,7 +82,7 @@ export function MatchList({ matches, showOpponent = true }: { matches: TeamMatch
   )
 }
 
-export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText = 'No matches for this filter.', showTotal = true }: {
+export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText = 'No matches for this filter.', showTotal = true, hideMarqueeBadge = false }: {
   rows: SplitRow[]
   showOpponentInMatches?: boolean
   emptyText?: string
@@ -91,6 +91,12 @@ export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText =
   // Toss split puts a toss-winning match in two buckets, and that must
   // not count twice in the total.
   showTotal?: boolean
+  // The Marquee opponents highlight table (page.tsx, opponent split only)
+  // is entirely marquee rows by construction, so the "Marquee" pill on
+  // every row would just repeat the section's own heading. The full
+  // opponent table below it still shows the pill, to distinguish marquee
+  // from non-marquee rows there.
+  hideMarqueeBadge?: boolean
 }) {
   const [open, setOpen] = useState<string | null>(null)
 
@@ -125,7 +131,7 @@ export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText =
             {rows.map(r => {
               const isOpen = open === r.key
               return (
-                <RowGroup key={r.key} row={r} isOpen={isOpen} onToggle={() => setOpen(isOpen ? null : r.key)} showOpponent={showOpponentInMatches} />
+                <RowGroup key={r.key} row={r} isOpen={isOpen} onToggle={() => setOpen(isOpen ? null : r.key)} showOpponent={showOpponentInMatches} hideMarqueeBadge={hideMarqueeBadge} />
               )
             })}
           </tbody>
@@ -153,7 +159,7 @@ export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText =
   )
 }
 
-function RowGroup({ row: r, isOpen, onToggle, showOpponent }: { row: SplitRow; isOpen: boolean; onToggle: () => void; showOpponent: boolean }) {
+function RowGroup({ row: r, isOpen, onToggle, showOpponent, hideMarqueeBadge = false }: { row: SplitRow; isOpen: boolean; onToggle: () => void; showOpponent: boolean; hideMarqueeBadge?: boolean }) {
   // Second-level breakdown ("then by", §3.2). Sub-rows expand to their own
   // matches, so no summary is ever more than two taps from the matches
   // behind it — the same rule the top level follows.
@@ -168,7 +174,7 @@ function RowGroup({ row: r, isOpen, onToggle, showOpponent }: { row: SplitRow; i
           <span className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment flex items-center gap-2">
             <span className="text-[10px] text-[var(--stats-text-faint)] dark:text-zinc-600">{isOpen ? '▾' : '▸'}</span>
             <span className="truncate">{r.label}</span>
-            {r.meta?.isMarquee && (
+            {r.meta?.isMarquee && !hideMarqueeBadge && (
               <span className="text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded border bg-[var(--stats-badge-bg)] dark:bg-gold/15 border-[var(--stats-badge-border)] dark:border-gold-dim text-[var(--stats-badge-text)] dark:text-gold">
                 Marquee
               </span>

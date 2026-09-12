@@ -78,7 +78,9 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
   const streak = currentStreak(matches)
   const rows = splitByNested(matches, state.by, state.then)
   const records = computeRecords(matches)
-  const marquee = state.by === 'opponent' ? [] : splitBy(matches, 'opponent').filter(r => r.meta?.isMarquee)
+  // Only needed once Opponent is the chosen split — see the section below
+  // for why this no longer pins itself above every other split.
+  const marquee = state.by === 'opponent' ? splitBy(matches, 'opponent').filter(r => r.meta?.isMarquee) : []
   const anyMarqueeDefined = all.some(m => m.isMarquee)
   const unlinkedCount = new Set(matches.filter(m => !m.opponentId).map(m => m.opponentName.toLowerCase())).size
   const recent = sortNewestFirst(matches).slice(0, 5)
@@ -123,33 +125,15 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
           <span className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 ml-auto">Most recent first</span>
         </div>
 
-        {/* Marquee head-to-head — pinned above whichever split is selected */}
-        {state.by !== 'opponent' && (marquee.length > 0 || (canManageOpponents && !anyMarqueeDefined)) && (
+        {/* Recent matches */}
+        {recent.length > 0 && (
           <section className="mb-6">
-            <SectionHeading title="Marquee opponents — head to head" link={{ href: '/team-stats?by=opponent', label: 'All opponents →' }} />
-            {marquee.length > 0 ? (
-              <TeamSplitTable rows={marquee} />
-            ) : (
-              <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">
-                No marquee opponents yet — mark the rivals you care about on <Link href="/opponents" className="text-[var(--stats-accent)] dark:text-gold underline decoration-dotted">Manage opponents</Link> and they&rsquo;ll be pinned here.
-              </p>
-            )}
+            <SectionHeading title="Recent matches" link={{ href: '/matches/history?month=all', label: 'Match history →' }} />
+            <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded-lg overflow-hidden">
+              <MatchList matches={recent} />
+            </div>
           </section>
         )}
-
-        {/* The split */}
-        <section className="mb-6">
-          <SplitByRow state={state} />
-          <TeamSplitTable rows={rows} showOpponentInMatches={state.by !== 'opponent'} />
-          {state.by === 'opponent' && unlinkedCount > 0 && (
-            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mt-2">
-              {unlinkedCount} {unlinkedCount === 1 ? 'spelling is' : 'spellings are'} not yet linked to an opponent — rows marked <span className="font-bold uppercase tracking-widest text-[10px]">unlinked</span> group by the exact spelling on the booking.{' '}
-              {canManageOpponents
-                ? <Link href="/opponents" className="font-semibold text-[var(--stats-accent)] dark:text-gold hover:underline">⚔️ Manage opponents →</Link>
-                : 'Captains, GC and wranglers can link them on Manage opponents.'}
-            </p>
-          )}
-        </section>
 
         {/* Records */}
         {records.length > 0 && (
@@ -169,15 +153,33 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
           </section>
         )}
 
-        {/* Recent matches */}
-        {recent.length > 0 && (
-          <section className="mb-6">
-            <SectionHeading title="Recent matches" link={{ href: '/matches/history?month=all', label: 'Match history →' }} />
-            <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded-lg overflow-hidden">
-              <MatchList matches={recent} />
+        {/* Split by / Then by, the marquee highlight (opponent split only), then the table */}
+        <section className="mb-6">
+          <SplitByRow state={state} />
+
+          {state.by === 'opponent' && (marquee.length > 0 || (canManageOpponents && !anyMarqueeDefined)) && (
+            <div className="mb-4">
+              <SectionHeading title="Marquee opponents" />
+              {marquee.length > 0 ? (
+                <TeamSplitTable rows={marquee} hideMarqueeBadge showTotal={false} />
+              ) : (
+                <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">
+                  No marquee opponents yet — mark the rivals you care about on <Link href="/opponents" className="text-[var(--stats-accent)] dark:text-gold underline decoration-dotted">Manage opponents</Link> and they&rsquo;ll show here.
+                </p>
+              )}
             </div>
-          </section>
-        )}
+          )}
+
+          <TeamSplitTable rows={rows} showOpponentInMatches={state.by !== 'opponent'} />
+          {state.by === 'opponent' && unlinkedCount > 0 && (
+            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mt-2">
+              {unlinkedCount} {unlinkedCount === 1 ? 'spelling is' : 'spellings are'} not yet linked to an opponent — rows marked <span className="font-bold uppercase tracking-widest text-[10px]">unlinked</span> group by the exact spelling on the booking.{' '}
+              {canManageOpponents
+                ? <Link href="/opponents" className="font-semibold text-[var(--stats-accent)] dark:text-gold hover:underline">⚔️ Manage opponents →</Link>
+                : 'Captains, GC and wranglers can link them on Manage opponents.'}
+            </p>
+          )}
+        </section>
 
         <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 text-center mt-8 px-4">
           Covers every confirmed Hub booking whose CricHeroes scorecard has synced. Win % excludes no-results. Defending/chasing and toss splits come from the scorecard&rsquo;s toss line; League/Knockout from the booking&rsquo;s stage flag (unclassified games count as league). Practice games are excluded unless the &ldquo;Practice games&rdquo; filter is added.
