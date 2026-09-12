@@ -254,6 +254,49 @@ Upcoming Matches Scheduled") — since the plain list no longer includes
 every upcoming match once some of them have been promoted above it, the
 heading says so rather than reading as a duplicate "Upcoming Fixtures".
 
+**Upcoming Fixtures now renders the real `FixturesCard`, not a compact
+text row (added September 2026).** Before this, each row in this list was
+a bare `<Link>` — opponent name, a tournament/format/date/slot line, and a
+small Y/O/E/L badge — a lighter-weight rendering than "You're Selected to
+Play"'s `SelectedMatchCard` directly above it. Per a direct request for
+this section to use "the same … fixtures card" already seen on the
+Matches tab, it now renders `FixturesCard` (`src/components/fixtures/FixturesCard.tsx`)
+— the exact component `/fixtures` itself uses, not a re-implementation
+like `SelectedMatchCard` (§3.1 above) is. Since `FixturesCard` reversed
+its own "stays dark by design" decision the same month
+(`player-availability.md` §10.3), it already follows the visitor's own
+Light/Dark/System choice with zero extra work here — "the dark theme
+fixtures card" from the request is just this component's dark state, one
+half of a toggle it already has.
+
+`getPlayerData()`'s query 3 (the `upcomingPreview` fetch) was widened from
+`id, game_date, slot_time, format, opponent_name,
+tournament:tournaments(name, ball_type)` to the same field set query 7
+("You're Selected to Play", see above) already fetches —
+`match_time`/`match_stage`/`cricheroes_url` on the booking, and
+`cricheroes_points_table_url`/`ground` on the tournament plus the
+booking's own `ground` override — so `FixturesCard` has everything it
+needs for its icon row, ground/tournament links, and match-stage badge.
+Deliberately **not** widened to also fetch `squad` — these are exactly
+the bookings this player has no announced-squad row for (that's what
+`otherUpcoming`'s exclusion means), so a second, per-booking squad fetch
+mirroring query 7's follow-up would add a round trip for a section that's
+correctly squad-less for this viewer in the common case; `FixturesCard`
+already treats an absent `squad` prop as "no squad section" (`booking.squad
+?? []`), same as it does for a genuinely un-announced match on `/fixtures`
+itself.
+
+The player's own availability response (`previewResponses[fx.id]`, the
+same lookup the old compact row used) now renders as a small pill —
+`Your status: Y` / `Not marked` — right-aligned directly above each card,
+rather than overlaid on it: `FixturesCard` already places its own format
+pill (and, for a same-day match, an "● IN PROGRESS" pill) in the card's
+own top-right corner, so a second badge layered on top of the card itself
+risked colliding with those rather than sitting cleanly beside them.
+`formatDate()`/`slotLabel()` (the two local helpers the old row used to
+build its date/slot line) were removed from `page.tsx` — `FixturesCard`
+formats these itself — since nothing else in the file called them.
+
 Query 7 only resolves *which* upcoming bookings qualify (one row per
 squad-membership, via the same "join broadly via `booking:bookings!inner(...)`,
 filter/sort in code" pattern queries 4 and 6 already use, rather than
@@ -360,7 +403,7 @@ the default slate, so they can spot themselves in the list at a glance.
 | You're Selected to Play | Zero or more `SelectedMatchCard`s (see above) — one per upcoming booking with an announced squad this player is in; rendered above Upcoming Fixtures, entirely absent when there are none. Each replicates `FixturesCard`'s squad-announced content (icon row, collapsible squad, fee/wallet projection) minus the underfilled-slot nudge, re-themed Warm Light |
 | Stat tiles (2×2) | Upcoming Matches (gold, **clickable → `/fixtures`**) · My Tournaments (gold, static — no player-facing tournament list page exists yet, see below) · Matches Played (gold, **clickable → `/matches/history?month=all`**, this year's count + "Last played" sublabel) · Wallet Balance (signed amount — emerald, no tag if ≥ 0 (see below), amber "Exempted" if negative but dues-waived, else crimson "Overdue"; **clickable → `/wallet`**, added September 2026 — see `features/wallet-ledger.md`) |
 | Availability nudge | Unchanged from pre-rebuild — same `getNudgeForPlayer()` read-only rendering of the Sun–Wed cron logic, restyled to the new palette |
-| Upcoming Fixtures / Upcoming Other Fixtures | Header ("Upcoming Other Fixtures" once the section above is non-empty — see above) + "View All →" to `/fixtures`; up to 3 compact rows (opponent, tournament/format, date, slot, availability badge) from `otherUpcoming` — bookings already shown in "You're Selected to Play" are excluded — or a dashed empty-state box ("No Other Matches Scheduled" / "No Upcoming Matches Scheduled") when there are none |
+| Upcoming Fixtures / Upcoming Other Fixtures | Header ("Upcoming Other Fixtures" once the section above is non-empty — see above) + "View All →" to `/fixtures`; up to 3 real `FixturesCard`s (added September 2026 — see below), each preceded by a small "Your status: Y" / "Not marked" line, from `otherUpcoming` — bookings already shown in "You're Selected to Play" are excluded — or a dashed empty-state box ("No Other Matches Scheduled" / "No Upcoming Matches Scheduled") when there are none |
 | Quick Actions | Row-per-action list, icon + title + subtitle + chevron: "Set Availability" (always, → `/fixtures`) · "Squad Selection" (`isCaptain`, → `/captains-corner`) · "Squad Review" (`isGC`, → `/gc-review`) · "My Profile" (always, → `/profile`) — replaces the old separate gold/crimson bordered shortcut panels |
 
 **Welcome banner trimmed (fixed September 2026)** — the banner originally
