@@ -349,7 +349,11 @@ export const walletTransactionSchema = z.object({
 export const walletTransactionEditSchema = z.object({
   id: z.string().uuid('id must be a valid UUID'),
   type: z.enum(['credit', 'debit']).optional(),
-  amount: z.number().positive('amount must be greater than 0').max(100000, 'amount is too large').optional(),
+  // 0 is allowed here (unlike the create schema's .positive()) — a
+  // correction's whole point can be reversing a mistaken charge down to
+  // ₹0 while keeping the row visible with an explanation, rather than
+  // removing it outright (see walletTransactionDeleteSchema for that).
+  amount: z.number().min(0, 'amount cannot be negative').max(100000, 'amount is too large').optional(),
   reason: z.string().min(3, 'Reason must be at least 3 characters').max(200, 'Reason max 200 characters').trim().optional(),
   notes: z.string().max(500, 'Notes max 500 characters').trim().nullable().optional(),
   created_at: pastIsoDatetimeSchema.optional(),
@@ -361,6 +365,14 @@ export const walletTransactionEditSchema = z.object({
     || data.notes !== undefined || data.created_at !== undefined,
   'At least one field must change'
 )
+
+// DELETE /api/wallet/transactions — admin-only removal of a mistaken row.
+// Soft-delete only (see migration 076) — never a raw DELETE — so a reason
+// is required, same as every other wallet correction.
+export const walletTransactionDeleteSchema = z.object({
+  id: z.string().uuid('id must be a valid UUID'),
+  delete_reason: z.string().min(3, 'A reason is required to delete a transaction').max(300, 'Reason max 300 characters').trim(),
+})
 
 // PATCH /api/wallet/opening-balance — admin override of a player's
 // "Brought Forward" statement line. amount: null explicitly clears the
