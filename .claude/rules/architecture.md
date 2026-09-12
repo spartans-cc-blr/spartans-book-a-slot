@@ -84,7 +84,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
  
 | Route | Component | Data source |
 |---|---|---|
-| `/gc-review` | Server → `GCReviewClient` (client) | `bookings`, `availability`, `squad` (pending/approved/announced) |
+| `/gc-review` | Server → one `GCReviewClient` (client) per rolling weekend | `bookings` (next two rolling weekends, same scoping as `/captains-corner`), `availability`, `squad` (pending/approved/announced) |
  
 ### Wrangler Routes (`isWrangler` or `isAdmin`; `/wrangler/grounds` also allows `isGC`)
  
@@ -839,7 +839,7 @@ Next.js API Routes (server-side)
 | `src/middleware.ts` | Route protection; redirects unauthenticated/unauthorised requests |
 | `src/app/fixtures/page.tsx` | Main fixtures server component; fetches bookings, availability, squad; includes `cricheroes_points_table_url` in tournament select |
 | `src/app/captains-corner/page.tsx` | Captain-only server page; feeds `CaptainsCornerGrid` |
-| `src/app/gc-review/page.tsx` | GC-only server page; feeds `GCReviewClient` |
+| `src/app/gc-review/page.tsx` | GC-only server page; scoped to the next two rolling weekends (same `weekKey()` grouping as `/captains-corner`, not a fixed calendar week — see `features/squad-selection.md`); renders one `GCReviewClient` block per weekend |
 | `src/app/admin/` | All admin pages (dashboard, new/edit booking, players, captains, tournaments) |
 | `src/components/fixtures/FixturesCard.tsx` | Match card display; squad panel; CricHeroes match link; tournament name links to CricHeroes points table if `cricheroes_points_table_url` set |
 | `src/components/fixtures/FixturesWeekend.tsx` | Shared weekend state; handles availability API calls |
