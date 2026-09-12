@@ -6,10 +6,10 @@
 // "Every possible thing that can be sliced and diced" is the whole point —
 // no summary here is ever more than one tap from the matches that produced it.
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import Link from 'next/link'
 import type { SplitRow, TeamMatch, FormLetter } from '@/lib/teamStatsCore'
-import { scoreString, winMargin, summarize, recentForm } from '@/lib/teamStatsCore'
+import { scoreString, winMargin, summarize, recentForm, sortNewestFirst } from '@/lib/teamStatsCore'
 
 export function FormPills({ form, size = 'sm' }: { form: FormLetter[]; size?: 'sm' | 'lg' }) {
   if (form.length === 0) return <span className="text-[var(--stats-text-faint)] dark:text-zinc-600">—</span>
@@ -154,6 +154,12 @@ export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText =
 }
 
 function RowGroup({ row: r, isOpen, onToggle, showOpponent }: { row: SplitRow; isOpen: boolean; onToggle: () => void; showOpponent: boolean }) {
+  // Second-level breakdown ("then by", §3.2). Sub-rows expand to their own
+  // matches, so no summary is ever more than two taps from the matches
+  // behind it — the same rule the top level follows.
+  const [openSub, setOpenSub] = useState<string | null>(null)
+  const subs = withUncovered(r)
+
   return (
     <>
       <tr onClick={onToggle}
@@ -180,7 +186,7 @@ function RowGroup({ row: r, isOpen, onToggle, showOpponent }: { row: SplitRow; i
         <td className="px-3 py-2.5 hidden md:table-cell"><FormPills form={r.form} /></td>
         <td className="px-3 py-2.5 text-right font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 hidden md:table-cell">{r.lastPlayed ? fmtDate(r.lastPlayed) : '–'}</td>
       </tr>
-      {isOpen && (
+      {isOpen && subs.length === 0 && (
         <tr className="border-b border-[var(--stats-divider)] dark:border-ink-4">
           <td colSpan={8} className="p-0 bg-[var(--stats-row-bg)] dark:bg-ink-2">
             <div className="md:hidden px-3 pt-2"><FormPills form={r.form} /></div>
@@ -188,6 +194,58 @@ function RowGroup({ row: r, isOpen, onToggle, showOpponent }: { row: SplitRow; i
           </td>
         </tr>
       )}
+      {isOpen && subs.map(sr => {
+        const subKey = `${r.key}::${sr.key}`
+        const subOpen = openSub === subKey
+        return (
+          <Fragment key={subKey}>
+            <tr onClick={() => setOpenSub(subOpen ? null : subKey)}
+              className={`cursor-pointer border-b border-[var(--stats-divider)] dark:border-ink-4 bg-[var(--stats-row-bg)] dark:bg-ink-2 hover:bg-[var(--stats-row-hover)] transition-colors`}>
+              <td className="py-2 pr-3 pl-7">
+                <span className="font-rajdhani text-[13px] text-[var(--stats-text-2)] dark:text-zinc-300 flex items-center gap-2 border-l-2 border-[var(--stats-card-border)] dark:border-ink-5 pl-3">
+                  <span className="text-[9px] text-[var(--stats-text-faint)] dark:text-zinc-600">{subOpen ? '▾' : '▸'}</span>
+                  <span className="truncate">{sr.label}</span>
+                </span>
+              </td>
+              <td className="px-2 py-2 text-right font-rajdhani text-[13px] text-[var(--stats-text-2)] dark:text-zinc-400 tabular-nums">{sr.played}</td>
+              <td className="px-2 py-2 text-right font-rajdhani text-[13px] text-emerald-700 dark:text-emerald-400 tabular-nums">{sr.won}</td>
+              <td className="px-2 py-2 text-right font-rajdhani text-[13px] text-red-700 dark:text-red-400 tabular-nums">{sr.lost}</td>
+              <td className="px-2 py-2 text-right font-rajdhani text-[13px] text-[var(--stats-text-muted)] dark:text-zinc-500 tabular-nums hidden sm:table-cell">{sr.tied + sr.nr || '–'}</td>
+              <td className="px-2 py-2 text-right font-rajdhani text-[13px] font-bold text-[var(--stats-accent)] dark:text-gold tabular-nums">{sr.winPct === null ? '–' : `${sr.winPct}%`}</td>
+              <td className="px-3 py-2 hidden md:table-cell"><FormPills form={sr.form} /></td>
+              <td className="px-3 py-2 text-right font-rajdhani text-[11px] text-[var(--stats-text-muted)] dark:text-zinc-500 hidden md:table-cell">{sr.lastPlayed ? fmtDate(sr.lastPlayed) : '–'}</td>
+            </tr>
+            {subOpen && (
+              <tr className="border-b border-[var(--stats-divider)] dark:border-ink-4">
+                <td colSpan={8} className="p-0 bg-[var(--stats-card-bg)] dark:bg-ink-3">
+                  <MatchList matches={sr.matches} showOpponent={showOpponent} />
+                </td>
+              </tr>
+            )}
+          </Fragment>
+        )
+      })}
     </>
   )
+}
+
+// A sub-split can leave matches in no group at all — the Toss and
+// Defending/Chasing dimensions give a match with no toss data nothing to
+// belong to. Those matches would otherwise become unreachable once a
+// "then by" is chosen (the parent row no longer lists them directly), so
+// they get a trailing "Not recorded" sub-row of their own.
+function withUncovered(r: SplitRow): SplitRow[] {
+  if (!r.sub || r.sub.length === 0) return []
+  const covered = new Set<string>()
+  for (const sr of r.sub) for (const m of sr.matches) covered.add(m.bookingId)
+  const rest = r.matches.filter(m => !covered.has(m.bookingId))
+  if (rest.length === 0) return r.sub
+  const sorted = sortNewestFirst(rest)
+  return [...r.sub, {
+    key: '__uncovered', label: 'Not recorded',
+    ...summarize(sorted),
+    form: recentForm(sorted, 5),
+    lastPlayed: sorted[0]?.gameDate ?? null,
+    matches: sorted,
+  }]
 }

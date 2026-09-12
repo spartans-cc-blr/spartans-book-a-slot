@@ -17,9 +17,9 @@ import { TeamFilterShell, SplitByRow } from '@/components/team/TeamFilterPanel'
 import { TeamSplitTable, FormPills, MatchList } from '@/components/team/TeamSplitTable'
 import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import {
-  getTeamMatches, applyFilters, summarize, recentForm, currentStreak, splitBy, computeRecords,
+  getTeamMatches, applyFilters, summarize, recentForm, currentStreak, splitBy, splitByNested, computeRecords,
   filterOptions, sortNewestFirst,
-  type FormatFilter, type InningsFilter, type StageFilter, type SplitDimension,
+  type FormatFilter, type InningsFilter, type StageFilter, type TossFilter, type SplitDimension,
 } from '@/lib/teamStats'
 import { SPLIT_DIMENSIONS, toTeamFilters, type TeamFilterState } from '@/lib/teamStatsFilters'
 import type { Metadata } from 'next'
@@ -31,7 +31,9 @@ function pickEnum<T extends string>(v: string | undefined, allowed: readonly T[]
   return (allowed as readonly string[]).includes(v ?? '') ? (v as T) : fallback
 }
 
-type SearchParams = Partial<Record<'year' | 'format' | 'tournament' | 'ground' | 'opponent' | 'innings' | 'stage' | 'practice' | 'by', string>>
+type SearchParams = Partial<Record<
+  'year' | 'month' | 'format' | 'tournament' | 'ground' | 'opponent' | 'captain' | 'slot'
+  | 'innings' | 'toss' | 'stage' | 'practice' | 'by' | 'then', string>>
 
 export default async function TeamStatsPage({ searchParams }: { searchParams?: SearchParams }) {
   const session = await getServerSession(authOptions)
@@ -48,16 +50,25 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
   const options = filterOptions(all)
 
   const yearParam = searchParams?.year && /^\d{4}$/.test(searchParams.year) && options.years.includes(searchParams.year) ? searchParams.year : 'all'
+  const by = pickEnum<SplitDimension>(searchParams?.by, SPLIT_DIMENSIONS, 'tournament')
+  // A `then` equal to `by` is a no-op (splitByNested ignores it) — treated
+  // as "none" here so it never round-trips back into the URL either.
+  const thenParam = SPLIT_DIMENSIONS.includes(searchParams?.then as SplitDimension) ? searchParams!.then as SplitDimension : null
   const state: TeamFilterState = {
     year:       yearParam,
+    month:      options.months.some(m => m.id === searchParams?.month) ? searchParams!.month! : 'all',
     format:     pickEnum<FormatFilter>(searchParams?.format, ['all', 'T20', 'T30', 'other'], 'all'),
     tournament: options.tournaments.some(t => t.id === searchParams?.tournament) ? searchParams!.tournament! : 'all',
     ground:     options.grounds.some(g => g.id === searchParams?.ground) ? searchParams!.ground! : 'all',
     opponent:   options.opponents.some(o => o.id === searchParams?.opponent) ? searchParams!.opponent! : 'all',
+    captain:    options.captains.some(c => c.id === searchParams?.captain) ? searchParams!.captain! : 'all',
+    slot:       options.slots.some(o => o.id === searchParams?.slot) ? searchParams!.slot! : 'all',
     innings:    pickEnum<InningsFilter>(searchParams?.innings, ['all', 'defending', 'chasing'], 'all'),
+    toss:       pickEnum<TossFilter>(searchParams?.toss, ['all', 'won', 'lost'], 'all'),
     stage:      pickEnum<StageFilter>(searchParams?.stage, ['all', 'league', 'knockout'], 'all'),
     practice:   searchParams?.practice === '1',
-    by:         pickEnum<SplitDimension>(searchParams?.by, SPLIT_DIMENSIONS, 'tournament'),
+    by,
+    then:       thenParam === by ? null : thenParam,
   }
 
   const matches = applyFilters(all, toTeamFilters(state))
@@ -65,7 +76,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
   const summary = summarize(matches)
   const form = recentForm(matches, 5)
   const streak = currentStreak(matches)
-  const rows = splitBy(matches, state.by)
+  const rows = splitByNested(matches, state.by, state.then)
   const records = computeRecords(matches)
   const marquee = state.by === 'opponent' ? [] : splitBy(matches, 'opponent').filter(r => r.meta?.isMarquee)
   const anyMarqueeDefined = all.some(m => m.isMarquee)
