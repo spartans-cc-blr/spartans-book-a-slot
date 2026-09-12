@@ -114,6 +114,17 @@ matches that produced it (§3).
 - **Opponent grouping key** is `opponents.id` once reconciled, else the
   normalised raw spelling — so two bookings typed identically still group
   together before anyone links them (`opponentKey()`).
+- **Split rows default to Win % descending** (changed September 2026, was
+  Played descending) — a group with nothing decided yet (`winPct === null`)
+  sorts last, never first, since `null` has no rank to offer. This is the
+  default *comparator* inside `splitBy()`, so it applies to every
+  categorical dimension (tournament, ground, opponent, format, captain,
+  innings, stage) uniformly — three dimensions keep their own fixed order
+  regardless: `year`/`month` (newest first, still a timeline) and `slot`
+  (chronological by time-of-day), plus `toss`, which follows a fixed
+  logical sequence (won → lost → the two toss-winner decisions) rather
+  than a ranking. Marquee opponents still pin ahead of everything else on
+  the Opponent split, same as before.
 
 Unit tests: `src/lib/teamStats.test.ts` (vitest) cover every aggregator
 above against a hand-built fixture, including the toss double-bucketing,
