@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { getNudgeForPlayer, getWeekendGapForPlayer } from '@/lib/availabilityNudge'
 import { WeekendAvailabilityGreeting } from '@/components/ui/WeekendAvailabilityGreeting'
 import { SelectedMatchCard } from '@/components/home/SelectedMatchCard'
+import { FixturesCard } from '@/components/fixtures/FixturesCard'
 
 export const revalidate = 60
 
@@ -51,12 +52,18 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     // (first row) and the Upcoming Fixtures preview list on the dashboard.
     // Fetches more than the 3 actually shown (see `otherUpcoming` below) so
     // there's still a full 3 left over once bookings already covered by the
-    // "You're Selected to Play" section are filtered out.
+    // "You're Selected to Play" section are filtered out. Widened to the
+    // same field set "You're Selected to Play" (query 7 below) already
+    // fetches, so the preview list can render the real FixturesCard —
+    // ground/tournament links, match stage badge, icon row — instead of a
+    // bare text row. See navigation.md §3.1 "Upcoming Fixtures now renders
+    // the real FixturesCard".
     supabase
       .from('bookings')
       .select(`
-        id, game_date, slot_time, format, opponent_name,
-        tournament:tournaments(name, ball_type)
+        id, game_date, slot_time, format, opponent_name, match_time, match_stage, cricheroes_url,
+        tournament:tournaments(name, ball_type, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url)),
+        ground:grounds(name, maps_url, hospital_url)
       `)
       .eq('status', 'confirmed')
       .gte('game_date', today)
@@ -247,18 +254,6 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     matchesPlayedThisYear, lastPlayedOn,
     selectedToPlay,
   }
-}
-
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
-}
-
-function slotLabel(slot: string) {
-  const map: Record<string, string> = {
-    '07:30': '7:15 AM', '10:30': '10:15 AM', '12:30': '12:15 PM', '14:30': '2:15 PM',
-  }
-  return map[slot] || slot
 }
 
 function formatRupees(n: number) {
@@ -608,32 +603,25 @@ export default async function HomePage() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {playerData.upcomingPreview.map((fx: any) => {
                     const resp = playerData.previewResponses[fx.id] ?? null
                     return (
-                      <Link key={fx.id} href="/fixtures"
-                        className="flex items-center justify-between gap-3 rounded-lg p-3 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-                        style={{ background: 'var(--home-row-bg)' }}>
-                        <div className="min-w-0">
-                          <p className="font-rajdhani text-sm font-bold truncate" style={{ color: 'var(--home-text)' }}>
-                            vs {fx.opponent_name ?? 'TBD'}
-                          </p>
-                          <p className="font-rajdhani text-xs mt-0.5" style={{ color: 'var(--home-text-muted)' }}>
-                            {fx.tournament?.name ?? fx.format} · {formatDate(fx.game_date)} · {slotLabel(fx.slot_time)}
-                          </p>
+                      <div key={fx.id}>
+                        <div className="flex items-center justify-end mb-1">
+                          {resp ? (
+                            <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full"
+                              style={{ background: AVAIL_CONFIG[resp]?.bg, color: AVAIL_CONFIG[resp]?.color, border: `1px solid ${AVAIL_CONFIG[resp]?.border}` }}>
+                              Your status: {resp}
+                            </span>
+                          ) : (
+                            <span className="font-rajdhani text-[10px] font-bold" style={{ color: 'var(--home-accent)' }}>
+                              Not marked
+                            </span>
+                          )}
                         </div>
-                        {resp ? (
-                          <span className="font-rajdhani text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0"
-                            style={{ background: AVAIL_CONFIG[resp]?.bg, color: AVAIL_CONFIG[resp]?.color }}>
-                            {resp}
-                          </span>
-                        ) : (
-                          <span className="font-rajdhani text-[10px] font-bold flex-shrink-0" style={{ color: 'var(--home-accent)' }}>
-                            Not marked
-                          </span>
-                        )}
-                      </Link>
+                        <FixturesCard booking={fx} />
+                      </div>
                     )
                   })}
                 </div>
