@@ -253,26 +253,33 @@ nested split answers the same question in the table shape that already
 works at every width. Worth revisiting for the low-cardinality pairs if
 the nested split proves awkward in use.
 
-Sections, top to bottom:
+### 3.3 Section order (reordered September 2026)
+
+Sections, top to bottom — reordered on request so the most-often-checked
+numbers (form, recent results, records) come before the slice-and-dice
+controls, and the marquee highlight moved to where it's actually relevant:
 
 1. **Headline strip** — Played / Won / Lost / Win % tiles, then last-5
    form pills and the current streak.
-2. **Marquee opponents — head to head** — pinned above whichever split is
-   selected (hidden while the Opponent split itself is showing, to avoid
-   listing them twice). Shows a "mark your rivals on Manage opponents"
-   nudge to a manager if none are starred yet.
-3. **Split by …** — `SplitByRow` (§3.1, now two pill rows: Split by and
-   Then by, §3.2) then `TeamSplitTable` for the chosen dimension. One table
-   shape for every dimension: label · P · W · L · T/NR · Win % · form ·
-   last played. **Every row expands** (`▸`) to the matches behind it, or to
-   the second-dimension sub-rows when a "then by" is chosen (§3.2) —
-   date, opponent (or tournament, on the Opponent split), both scores,
-   format, bat-1st/chased, result + margin — each linking to
-   `/matches/history/[bookingId]`. Marquee rows carry a pill; an opponent
-   row grouped only by raw spelling carries an "unlinked" hint; on the
-   Opponent split a one-line note under the table gives the unlinked count
-   and, for a manager, the "⚔️ Manage opponents →" link (see the hero note
-   below for why it lives here now).
+2. **Recent matches** — last five, linking to Match History. Moved up
+   (was last) to sit directly under Current form, since both answer the
+   same "what's happened lately" question.
+3. **Records** — up to eight cards (highest/lowest total, highest
+   successful chase, lowest total defended, biggest win by runs / by
+   wickets, highest/lowest total conceded), each linking to its match.
+   Moved up from below the split table.
+4. **Split by / Then by, then the table** — `SplitByRow` (§3.1/§3.2), the
+   Marquee highlight when applicable (below), then `TeamSplitTable` for
+   the chosen dimension. One table shape for every dimension: label · P ·
+   W · L · T/NR · Win % · form · last played. **Every row expands** (`▸`)
+   to the matches behind it, or to the second-dimension sub-rows when a
+   "then by" is chosen (§3.2) — date, opponent (or tournament, on the
+   Opponent split), both scores, format, bat-1st/chased, result + margin —
+   each linking to `/matches/history/[bookingId]`. An opponent row grouped
+   only by raw spelling carries an "unlinked" hint; on the Opponent split a
+   one-line note under the table gives the unlinked count and, for a
+   manager, the "⚔️ Manage opponents →" link (see the hero note below for
+   why it lives here now).
    **A "Total" footer row** (added the same day, on request) closes every
    split with the aggregate P/W/L/T-NR/Win %/form/last-played across the
    rows above it — computed from the *distinct* matches behind those rows
@@ -283,10 +290,42 @@ Sections, top to bottom:
    Innings and Toss splits drop matches with no toss data, so their total
    is "of the matches we have toss data for", while the headline counts
    every filtered match.
-4. **Records** — up to eight cards (highest/lowest total, highest
-   successful chase, lowest total defended, biggest win by runs / by
-   wickets, highest/lowest total conceded), each linking to its match.
-5. **Recent matches** — last five, linking to Match History.
+
+**Marquee opponents — now Opponent-split-only, not pinned everywhere
+(changed September 2026).** The original design pinned a marquee
+head-to-head preview above *whichever* split was currently selected,
+hiding only when the Opponent split itself was already showing (to avoid
+listing the same rivals twice). Per a direct request, this inverted: the
+marquee table now renders **only when Opponent is the chosen split**, and
+sits directly above the full opponent table rather than above an unrelated
+split like Captain or Format — a marquee preview above a Captain table
+answered a question the viewer wasn't asking.
+
+- `marquee` is now computed only when `state.by === 'opponent'`
+  (`splitBy(matches, 'opponent').filter(r => r.meta?.isMarquee)`), instead
+  of whenever `by !== 'opponent'`.
+- Rendered inside the same `<section>` as `SplitByRow`/`TeamSplitTable`,
+  between the pills and the full table — a small "Marquee opponents"
+  heading, `TeamSplitTable` scoped to just the marquee rows
+  (`hideMarqueeBadge showTotal={false}`, see below), or the "mark your
+  rivals" nudge to a manager when none are starred yet.
+- **This does duplicate marquee rows** between the small highlight table
+  and the full opponent table below it — `splitBy()` already pins marquee
+  rows to the top of the Opponent split (§2). That's intentional, the same
+  "highlight snippet above the full detail" convention the Honour Board
+  uses for its own tied cards vs. detailed tables — not something to
+  de-duplicate away.
+- **The "Marquee" badge is suppressed inside the highlight table**
+  (`TeamSplitTable`'s new `hideMarqueeBadge` prop, threaded to `RowGroup`) —
+  every row in that table is definitionally marquee, so the pill would
+  just repeat the section heading. The full opponent table below still
+  shows the badge, since it's the one place marquee and non-marquee rows
+  sit side by side. `showTotal={false}` on the highlight table too — a
+  "Total" footer duplicating a subset of the real table right below it
+  added nothing.
+- The old `/team-stats?by=opponent` deep link in the section heading was
+  dropped along with the "All opponents →" label — redundant now that the
+  section only ever renders while already on the Opponent split.
 
 **Hero (changed September 2026).** The first cut's hero carried two text
 links — "Player stats — Yours Statistically →" and, for a manager,
@@ -472,7 +511,7 @@ show an "unlinked" hint).
 | `src/app/team-stats/page.tsx` | The Team Record page (§3) |
 | `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `SplitByRow` — the Split by / Then by scrolling pill rows (§3.1, §3.2) |
 | `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher under both stats heroes (§3) |
-| `src/components/team/TeamSplitTable.tsx` | Expandable split table (including the second-level sub-rows and their "Not recorded" fallback, §3.2), `FormPills`, `MatchList` |
+| `src/components/team/TeamSplitTable.tsx` | Expandable split table (including the second-level sub-rows and their "Not recorded" fallback, §3.2, and `hideMarqueeBadge`/`showTotal` for the Marquee highlight table, §3.3), `FormPills`, `MatchList` |
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` | Opponent master + reconciliation queue (§5) |
 | `src/app/api/opponents/route.ts` | GET / POST / PATCH |
 | `src/app/api/opponents/link/route.ts` | POST — link a spelling |
