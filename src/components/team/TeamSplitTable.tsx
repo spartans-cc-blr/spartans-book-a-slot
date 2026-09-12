@@ -98,7 +98,22 @@ export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText =
   // from non-marquee rows there.
   hideMarqueeBadge?: boolean
 }) {
-  const [open, setOpen] = useState<string | null>(null)
+  // Every row toggles independently and stays expanded until tapped again —
+  // unlike a single-row accordion, this lets a viewer open two (or more)
+  // rows at once to compare them side by side. Unbounded rather than capped
+  // at the "last two" fallback floated alongside this request: at this
+  // app's data scale (a club's own split rows, never more than a few dozen)
+  // there's no real rendering cost to letting every row stay open, so the
+  // simpler unbounded set was chosen over tracking an eviction order.
+  const [open, setOpen] = useState<Set<string>>(() => new Set())
+  function toggleOpen(key: string) {
+    setOpen(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   if (rows.length === 0) {
     return <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500 py-6 text-center">{emptyText}</p>
@@ -129,9 +144,9 @@ export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText =
           </thead>
           <tbody>
             {rows.map(r => {
-              const isOpen = open === r.key
+              const isOpen = open.has(r.key)
               return (
-                <RowGroup key={r.key} row={r} isOpen={isOpen} onToggle={() => setOpen(isOpen ? null : r.key)} showOpponent={showOpponentInMatches} hideMarqueeBadge={hideMarqueeBadge} />
+                <RowGroup key={r.key} row={r} isOpen={isOpen} onToggle={() => toggleOpen(r.key)} showOpponent={showOpponentInMatches} hideMarqueeBadge={hideMarqueeBadge} />
               )
             })}
           </tbody>
@@ -162,8 +177,9 @@ export function TeamSplitTable({ rows, showOpponentInMatches = true, emptyText =
 function RowGroup({ row: r, isOpen, onToggle, showOpponent, hideMarqueeBadge = false }: { row: SplitRow; isOpen: boolean; onToggle: () => void; showOpponent: boolean; hideMarqueeBadge?: boolean }) {
   // Second-level breakdown ("then by", §3.2). Sub-rows expand to their own
   // matches, so no summary is ever more than two taps from the matches
-  // behind it — the same rule the top level follows.
-  const [openSub, setOpenSub] = useState<string | null>(null)
+  // behind it — the same rule the top level follows. Same independent,
+  // stays-open-until-tapped-again behaviour as the top-level rows above.
+  const [openSub, setOpenSub] = useState<Set<string>>(() => new Set())
   const subs = withUncovered(r)
 
   return (
@@ -202,10 +218,15 @@ function RowGroup({ row: r, isOpen, onToggle, showOpponent, hideMarqueeBadge = f
       )}
       {isOpen && subs.map(sr => {
         const subKey = `${r.key}::${sr.key}`
-        const subOpen = openSub === subKey
+        const subOpen = openSub.has(subKey)
         return (
           <Fragment key={subKey}>
-            <tr onClick={() => setOpenSub(subOpen ? null : subKey)}
+            <tr onClick={() => setOpenSub(prev => {
+              const next = new Set(prev)
+              if (next.has(subKey)) next.delete(subKey)
+              else next.add(subKey)
+              return next
+            })}
               className={`cursor-pointer border-b border-[var(--stats-divider)] dark:border-ink-4 bg-[var(--stats-row-bg)] dark:bg-ink-2 hover:bg-[var(--stats-row-hover)] transition-colors`}>
               <td className="py-2 pr-3 pl-7">
                 <span className="font-rajdhani text-[13px] text-[var(--stats-text-2)] dark:text-zinc-300 flex items-center gap-2 border-l-2 border-[var(--stats-card-border)] dark:border-ink-5 pl-3">
