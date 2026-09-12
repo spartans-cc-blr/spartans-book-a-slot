@@ -95,6 +95,25 @@ describe('splitBy', () => {
     const rows = splitBy(sample, 'innings')
     expect(rows.reduce((n, r) => n + r.played, 0)).toBe(4)
   })
+
+  it('sorts categorical splits by win % descending by default', () => {
+    // Two captains: p1 (Muthu) 2W-1L across the non-practice sample, p2
+    // (Keshav) a single loss added on top — higher win % first, even
+    // though p1 has more games played.
+    const withLosingCaptain = [...sample, m({ gameDate: '2026-03-01', result: 'lost', captainId: 'p2', captainName: 'Keshav' })]
+    const rows = splitBy(withLosingCaptain, 'captain')
+    expect(rows.map(r => r.label)).toEqual(['Muthu', 'Keshav'])
+    expect(rows[0].winPct).toBeGreaterThan(rows[1].winPct!)
+  })
+
+  it('sorts a group with no decided result last, not first', () => {
+    // An nr-only group has winPct === null — it must never outrank a real
+    // number just because null happens to compare oddly.
+    const undecidedOnly = m({ gameDate: '2026-04-01', result: 'nr', teamTotal: null, oppTotal: null, format: 'T30', tossWon: null, tossDecision: null, battedFirst: null })
+    const rows = splitBy([...sample.filter(x => x.gameDate !== '2026-02-15'), undecidedOnly], 'format')
+    expect(rows[rows.length - 1].key).toBe('T30')
+    expect(rows[rows.length - 1].winPct).toBeNull()
+  })
 })
 
 describe('applyFilters — toss / captain / month / slot', () => {

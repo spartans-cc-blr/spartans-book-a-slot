@@ -298,9 +298,12 @@ export function splitBy(matches: TeamMatch[], dim: SplitDimension): SplitRow[] {
       matches: sorted,
     })
   }
-  // Chronological dimensions read newest-first; everything else by volume,
-  // then alphabetically for a stable tie-break. Marquee opponents pin to
-  // the top of the opponent split regardless.
+  // Chronological/fixed-sequence dimensions keep their own natural order
+  // (a season reads newest-first, a toss outcome reads
+  // won-then-lost-then-the-two-decisions); everything else ranks by Win %
+  // descending — the number this whole page exists to answer — with
+  // Played descending, then alphabetical, as tie-breaks. Marquee opponents
+  // still pin to the top of the Opponent split ahead of any of that.
   rows.sort((a, b) => {
     if (dim === 'opponent') {
       const am = a.meta?.isMarquee ? 1 : 0, bm = b.meta?.isMarquee ? 1 : 0
@@ -309,7 +312,10 @@ export function splitBy(matches: TeamMatch[], dim: SplitDimension): SplitRow[] {
     if (dim === 'year' || dim === 'month') return b.key.localeCompare(a.key)
     if (dim === 'slot') return a.key.localeCompare(b.key)
     if (dim === 'toss') return TOSS_ORDER.indexOf(a.key) - TOSS_ORDER.indexOf(b.key)
-    if (dim === 'innings' || dim === 'stage') return a.key.localeCompare(b.key)
+    // A group with nothing decided yet (winPct === null) has no rank to
+    // offer — sorts last, not first, so it never outranks a real number.
+    const aw = a.winPct ?? -1, bw = b.winPct ?? -1
+    if (aw !== bw) return bw - aw
     return (b.played - a.played) || a.label.localeCompare(b.label)
   })
   return rows
