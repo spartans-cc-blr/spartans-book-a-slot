@@ -363,6 +363,35 @@ used by the headline strip and Recent matches),
 `src/components/stats/StatsSegmentedTabs.tsx` (server — the two-pill stats
 switcher, shared with `/leaderboard`).
 
+### 3.4 Multiple rows stay expanded at once (changed September 2026)
+
+`TeamSplitTable`'s top-level rows were a single-row accordion — tapping a
+new row silently collapsed whichever one was already open, so comparing
+two rows (say, two tournaments' form) meant tapping back and forth and
+holding one row's numbers in your head. Per a direct request ("helps to
+compare one row with other"), row expansion is now fully independent: each
+row toggles open/closed on its own tap and stays open until tapped again,
+with no cap on how many can be open simultaneously — the "cap at the last
+two" fallback floated alongside the request wasn't needed, since a club's
+own split (never more than a few dozen rows) has no real rendering cost to
+letting all of them stay open at once, and an unbounded `Set<string>` of
+open keys is simpler to get right than tracking an eviction order.
+
+`open` (the top-level expand state in `TeamSplitTable`) changed from
+`useState<string | null>` to `useState<Set<string>>`, with a small
+`toggleOpen(key)` helper that adds/removes a key from the set. `isOpen` for
+a row is now `open.has(r.key)` instead of `open === r.key`. The same
+treatment was applied to `openSub` inside `RowGroup` — the second-level
+"then by" sub-rows (§3.2) — for consistency, since the same "compare one
+against another" rationale applies there too (e.g. comparing two toss
+outcomes within one captain's row); it was already scoped per parent-row
+instance (so sibling top-level rows never shared sub-row state), only the
+single-open-within-one-row-group behaviour changed.
+
+Purely a client-side state change — no new prop, no data-layer change, no
+effect on `applyFilters()`/`splitBy()`/`splitByNested()` or what's rendered
+inside an open row.
+
 ---
 
 ## 4. Knockout flag — `bookings.stage_type` (migration 076)
@@ -522,7 +551,7 @@ show an "unlinked" hint).
 | `src/app/team-stats/page.tsx` | The Team Record page (§3) |
 | `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `SplitByRow` — the Split by / Then by scrolling pill rows (§3.1, §3.2) |
 | `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher under both stats heroes (§3) |
-| `src/components/team/TeamSplitTable.tsx` | Expandable split table (including the second-level sub-rows and their "Not recorded" fallback, §3.2, and `hideMarqueeBadge`/`showTotal` for the Marquee highlight table, §3.3), `FormPills`, `MatchList` |
+| `src/components/team/TeamSplitTable.tsx` | Expandable split table — every row independently toggleable and stays open until tapped closed again (§3.4); includes the second-level sub-rows and their "Not recorded" fallback (§3.2), and `hideMarqueeBadge`/`showTotal` for the Marquee highlight table (§3.3); `FormPills`, `MatchList` |
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` | Opponent master + reconciliation queue (§5) |
 | `src/app/api/opponents/route.ts` | GET / POST / PATCH |
 | `src/app/api/opponents/link/route.ts` | POST — link a spelling |
