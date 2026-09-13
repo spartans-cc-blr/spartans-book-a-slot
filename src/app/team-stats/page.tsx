@@ -18,7 +18,7 @@ import { TeamSplitTable, FormPills, MatchList } from '@/components/team/TeamSpli
 import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import {
   getTeamMatches, applyFilters, summarize, recentForm, currentStreak, splitBy, splitByNested, computeRecords,
-  filterOptions, sortNewestFirst,
+  filterOptions, sortNewestFirst, splitTournamentRowsByStatus,
   type FormatFilter, type InningsFilter, type StageFilter, type TossFilter, type SplitDimension,
 } from '@/lib/teamStats'
 import { toTeamFilters, currentTeamStatsYear, visibleSplitDimensions, type TeamFilterState } from '@/lib/teamStatsFilters'
@@ -94,6 +94,10 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
   const form = recentForm(matches, 5)
   const streak = currentStreak(matches)
   const rows = splitByNested(matches, state.by, state.then)
+  // Tournament split only — one running-tournaments table, then a separate
+  // finished-tournaments one below it, instead of mixing both under a
+  // single Win %-sorted list. See §3.7 in the feature doc.
+  const tournamentSplit = state.by === 'tournament' ? splitTournamentRowsByStatus(rows) : null
   const records = computeRecords(matches)
   // Only needed once Opponent is the chosen split — see the section below
   // for why this no longer pins itself above every other split.
@@ -187,7 +191,28 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
             </div>
           )}
 
-          <TeamSplitTable rows={rows} showOpponentInMatches={state.by !== 'opponent'} />
+          {tournamentSplit ? (
+            rows.length === 0 ? (
+              <TeamSplitTable rows={[]} />
+            ) : (
+              <>
+                {tournamentSplit.ongoing.length > 0 && (
+                  <div className="mb-4">
+                    <SectionHeading title="Ongoing" />
+                    <TeamSplitTable rows={tournamentSplit.ongoing} />
+                  </div>
+                )}
+                {tournamentSplit.completed.length > 0 && (
+                  <div>
+                    <SectionHeading title="Completed" />
+                    <TeamSplitTable rows={tournamentSplit.completed} />
+                  </div>
+                )}
+              </>
+            )
+          ) : (
+            <TeamSplitTable rows={rows} showOpponentInMatches={state.by !== 'opponent'} />
+          )}
           {state.by === 'opponent' && unlinkedCount > 0 && (
             <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mt-2">
               {unlinkedCount} {unlinkedCount === 1 ? 'spelling is' : 'spellings are'} not yet linked to an opponent — rows marked <span className="font-bold uppercase tracking-widest text-[10px]">unlinked</span> group by the exact spelling on the booking.{' '}

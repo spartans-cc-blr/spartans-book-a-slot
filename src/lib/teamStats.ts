@@ -55,7 +55,7 @@ export async function getTeamMatches(): Promise<TeamMatch[]> {
     .select(`
       id, game_date, slot_time, format, match_id, opponent_name, opponent_id,
       tournament_id, ground_id, venue, match_stage, stage_type,
-      tournament:tournaments!bookings_tournament_id_fkey(id, name, is_practice),
+      tournament:tournaments!bookings_tournament_id_fkey(id, name, is_practice, total_league_games),
       ground:grounds!bookings_ground_id_fkey(id, name),
       opponent:opponents!bookings_opponent_id_fkey(id, name, is_marquee)
     `)
@@ -146,6 +146,7 @@ export async function getTeamMatches(): Promise<TeamMatch[]> {
       isMarquee:      !!opponent?.is_marquee,
       tournamentId:   tournament?.id ?? b.tournament_id ?? null,
       tournamentName: tournament?.name ?? null,
+      tournamentTotalLeagueGames: num(tournament?.total_league_games),
       isPractice:     !!tournament?.is_practice,
       groundId:       ground?.id ?? b.ground_id ?? null,
       // Legacy rows from before migration 066 only have free-text venue

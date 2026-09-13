@@ -36,6 +36,10 @@ export interface TeamMatch {
   isMarquee:      boolean
   tournamentId:   string | null
   tournamentName: string | null
+  // tournaments.total_league_games — feeds the Ongoing/Completed split on
+  // the Tournament dimension (see splitTournamentRowsByStatus() below).
+  // null when the admin hasn't set a target for this tournament.
+  tournamentTotalLeagueGames: number | null
   isPractice:     boolean
   groundId:       string | null
   groundName:     string | null
@@ -338,6 +342,30 @@ export function splitByNested(matches: TeamMatch[], dim: SplitDimension, then?: 
   const rows = splitBy(matches, dim)
   if (!then || then === dim) return rows
   return rows.map(r => ({ ...r, sub: splitBy(r.matches, then) }))
+}
+
+// Ongoing vs Completed partition for the Tournament split only (added
+// September 2026, see features/team-stats.md §3.7). Every match behind a
+// Team Record row has already been played (getTeamMatches() only ever
+// includes synced scorecards), so "completed" here means the *tournament*
+// has nothing left to play, not that any individual match is unresolved.
+//
+// Proxy: a tournament counts as Completed once this row's `played` count
+// (every synced match for that tournament, league or knockout) has
+// reached its admin-set `total_league_games` target. A tournament with no
+// target set (null) can never be proven complete this way, so it's always
+// Ongoing — the same "can't confirm complete, so don't claim it" posture
+// Tournament Planner takes for its own isCompleted check. Every row in a
+// group shares one tournamentId, so any match in it carries the same
+// target — reading it off the first is enough.
+export function splitTournamentRowsByStatus(rows: SplitRow[]): { ongoing: SplitRow[]; completed: SplitRow[] } {
+  const ongoing: SplitRow[] = []
+  const completed: SplitRow[] = []
+  for (const r of rows) {
+    const target = r.matches[0]?.tournamentTotalLeagueGames ?? null
+    ;(target !== null && r.played >= target ? completed : ongoing).push(r)
+  }
+  return { ongoing, completed }
 }
 
 // ── Records ────────────────────────────────────────────────────────────────

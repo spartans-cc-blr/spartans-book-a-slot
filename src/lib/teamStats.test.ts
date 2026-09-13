@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   summarize, recentForm, currentStreak, splitBy, splitByNested, computeRecords, winMargin,
-  applyFilters, opponentKey, captainKey, filterOptions, normaliseResult, type TeamMatch,
+  applyFilters, opponentKey, captainKey, filterOptions, normaliseResult, splitTournamentRowsByStatus,
+  type TeamMatch,
 } from './teamStatsCore'
 
 function m(over: Partial<TeamMatch> & { gameDate: string }): TeamMatch {
@@ -11,7 +12,7 @@ function m(over: Partial<TeamMatch> & { gameDate: string }): TeamMatch {
     slotTime: '07:30', format: 'T20', result: 'won',
     teamTotal: 150, teamWickets: 5, teamOvers: 20, oppTotal: 120, oppWickets: 10, oppOvers: 18.4,
     opponentName: 'Rising Phoenix CC', opponentId: null, opponentLabel: 'Rising Phoenix CC', isMarquee: false,
-    tournamentId: 't1', tournamentName: 'Trumphate', isPractice: false,
+    tournamentId: 't1', tournamentName: 'Trumphate', tournamentTotalLeagueGames: null, isPractice: false,
     groundId: 'g1', groundName: 'Mario Turner', stageType: null, matchStage: null,
     tossWon: true, tossDecision: 'bat', battedFirst: true,
     captainId: 'p1', captainName: 'Muthu',
@@ -193,6 +194,33 @@ describe('splitByNested', () => {
     const covered = new Set(rows[0].sub!.flatMap(r => r.matches.map(x => x.bookingId)))
     const uncovered = rows[0].matches.filter(x => !covered.has(x.bookingId))
     expect(uncovered.map(x => x.gameDate)).toEqual(['2026-02-08'])
+  })
+})
+
+describe('splitTournamentRowsByStatus', () => {
+  const tournaments: TeamMatch[] = [
+    // t1: target hit exactly (2 of 2 league games played) — Completed.
+    m({ gameDate: '2026-01-04', tournamentId: 't1', tournamentName: 'Thunder 5', tournamentTotalLeagueGames: 2 }),
+    m({ gameDate: '2026-01-11', tournamentId: 't1', tournamentName: 'Thunder 5', tournamentTotalLeagueGames: 2 }),
+    // t2: target set but not yet reached (1 of 3) — Ongoing.
+    m({ gameDate: '2026-02-01', tournamentId: 't2', tournamentName: 'Mario Sixers', tournamentTotalLeagueGames: 3 }),
+    // t3: no target set at all — can never be proven Completed, so Ongoing
+    // even though only one match has been played.
+    m({ gameDate: '2026-02-08', tournamentId: 't3', tournamentName: 'Weekday Bash', tournamentTotalLeagueGames: null }),
+  ]
+
+  it('buckets a tournament as Completed once played reaches its total_league_games target', () => {
+    const rows = splitBy(tournaments, 'tournament')
+    const { ongoing, completed } = splitTournamentRowsByStatus(rows)
+    expect(completed.map(r => r.label)).toEqual(['Thunder 5'])
+    expect(ongoing.map(r => r.label).sort()).toEqual(['Mario Sixers', 'Weekday Bash'])
+  })
+
+  it('never marks a tournament Completed with no total_league_games target set', () => {
+    const rows = splitBy(tournaments, 'tournament')
+    const { ongoing, completed } = splitTournamentRowsByStatus(rows)
+    expect(completed.some(r => r.label === 'Weekday Bash')).toBe(false)
+    expect(ongoing.some(r => r.label === 'Weekday Bash')).toBe(true)
   })
 })
 
