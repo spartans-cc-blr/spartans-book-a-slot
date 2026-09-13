@@ -392,6 +392,126 @@ Purely a client-side state change — no new prop, no data-layer change, no
 effect on `applyFilters()`/`splitBy()`/`splitByNested()` or what's rendered
 inside an open row.
 
+### 3.5 Pre-filtered to the current season by default (changed September 2026)
+
+A bare `/team-stats` used to mean "all time" — the record and every split
+covered the club's full synced history. Per a direct request, the page now
+opens scoped to the **current calendar year** instead, matching what a
+viewer most often wants ("how are we doing this season"), with "All time"
+one tap away rather than the other way round.
+
+**Year is now the one filter whose default isn't the fixed `'all'`
+sentinel every other dimension uses** — it's "whichever year it is today",
+a moving target rather than a constant. `currentTeamStatsYear()`
+(`teamStatsFilters.ts`, `String(new Date().getFullYear())`) is the single
+place that's resolved, called from both ends of the URL⇄state round trip
+so they can never disagree on what "the default" currently means:
+
+- **`page.tsx`** resolves `state.year` from `searchParams.year` exactly as
+  before for a valid, in-range year or an explicit `year=all` — the only
+  change is the *fallback* for an absent or invalid/out-of-range value,
+  which used to be `'all'` and is now `currentTeamStatsYear()`.
+- **`buildTeamStatsHref()`** used to omit `year` from the URL whenever it
+  equalled the `'all'` sentinel (the old default). It now omits `year`
+  whenever it equals `currentTeamStatsYear()` instead — and, symmetrically,
+  **spells `all` out explicitly** (`?year=all`) rather than omitting it.
+  Omitting it would have made "All time" indistinguishable from "no year
+  specified" the moment someone reloaded or shared that link — a bare
+  `/team-stats` would just resolve back to the current year again,
+  silently discarding the "All time" choice. Every other filter's `'all'`
+  is still a genuine no-restriction sentinel that's always safe to omit;
+  year is the one exception, because its *unspecified* state now means
+  something other than "no restriction."
+
+**`isFilterSet()`/`activeFilterKeys()` are unchanged** — they still just
+check `state.year !== 'all'`, so the resolved current-year default reads
+as a genuinely active filter: a "2026 ✕" chip shows in the summary row
+from the moment the page loads, same as any other applied filter. This is
+deliberate, not a gap — a silent default would leave a viewer wondering
+why last year's biggest win doesn't show up in Records; the chip makes the
+scoping visible, and removing it (or picking "All time" from the Season
+select) is how you get back to the full history. `'all'` itself still
+means "no restriction" for chip/count purposes, exactly as before — it's
+only the URL encoding of the *unspecified* case that changed meaning.
+
+**"Clear all" still goes to true all-time, not back to the current-year
+default** — `clearAllFilters()` resets to `DEFAULT_TEAM_FILTER_STATE`
+(`year: 'all'`) untouched, so clearing every filter at once is a genuine
+"show me everything" action, distinct from just removing the Season chip
+by itself (which does the same thing for that one filter). Both land on
+the same place here since year is the only filter that starts non-default,
+but the distinction matters if a future filter is ever given a non-`'all'`
+default too.
+
+No change to the year `<select>` itself (`TeamFilterPanel.tsx`) — its "All
+time" option already existed and already set `state.year = 'all'`; only
+what a *bare* URL/absent value resolves to changed.
+
+### 3.6 Captain dimension restricted to captains, GC and admin (added September 2026)
+
+The Captain filter, split, and "then by" option let anyone compare
+captains' win rates against each other head-to-head — exactly the kind of
+comparison that can stir up drama in the player community if it's open to
+every plain player. Per a direct request, it's now hidden from and
+rejected for anyone who isn't a captain, GC member, or admin. Nothing else
+about the page changed — every other dimension (tournament, ground,
+opponent, format, stage, innings, toss, year, month, slot) is unaffected
+and still open to any signed-in, non-expelled member.
+
+**`canUseCaptainDimension`** (`src/app/team-stats/page.tsx`) —
+`!!user?.isCaptain || !!user?.isGC || !!user?.isAdmin`, computed from the
+server session the same way `canManageOpponents` already is on this page
+(that one also includes `isWrangler`; this one deliberately doesn't — a
+wrangler backfills squads and grounds, not team leadership, so there's no
+reason to widen this gate to match). This is the **one** place that
+decides the gate; everything downstream — the client filter panel, the
+split-by pills — only ever mirrors what it resolves to, never decides
+independently.
+
+**Two pure helpers in `teamStatsFilters.ts`** replace the raw `FILTER_KEYS`/
+`SPLIT_DIMENSIONS` constants everywhere a viewer-facing list of dimensions
+is built:
+
+```ts
+export function visibleFilterKeys(canUseCaptainDimension: boolean): FilterKey[] {
+  return canUseCaptainDimension ? FILTER_KEYS : FILTER_KEYS.filter(k => k !== 'captain')
+}
+export function visibleSplitDimensions(canUseCaptainDimension: boolean): SplitDimension[] {
+  return canUseCaptainDimension ? SPLIT_DIMENSIONS : SPLIT_DIMENSIONS.filter(d => d !== 'captain')
+}
+```
+
+**Server-side re-validation, not just a hidden UI control** — the same
+"UI mirrors the API, never replaces it" posture this app applies
+everywhere else (`wrangler-grounds-menu.md` §4, `fee-reminders.md` §6).
+`page.tsx` runs `by`/`then` against `visibleSplitDimensions(canUseCaptainDimension)`
+instead of the raw `SPLIT_DIMENSIONS` list, so a non-privileged viewer
+hand-typing `?by=captain` or `?then=captain` falls back to the ordinary
+invalid-value behaviour (silently ignored, same as any other unrecognised
+value) rather than actually switching the split. The `captain` filter
+itself gets an extra `canUseCaptainDimension &&` guard alongside its
+existing "does this id exist in `options.captains`" check, so `?captain=<id>`
+is ignored the same way for a non-privileged viewer. There is no API route
+to bypass this through — `/team-stats` has no separate data endpoint, so
+`page.tsx`'s own `searchParams` handling is the entire surface.
+
+**Threaded down as a plain boolean prop, not re-derived client-side** —
+`TeamFilterShell`/`FilterPanelBody` and `SplitByRow` (`TeamFilterPanel.tsx`)
+all take a new `canUseCaptainDimension: boolean` prop from `page.tsx` and
+call the two helpers above instead of importing the raw constants. A
+non-privileged viewer therefore never sees "Captain" in the "+ Add filter"
+list, the Season/Tournament/etc.-style filter panel, or either "Split by"/
+"Then by" pill row — the option simply isn't in the array the UI iterates
+over, not styled-disabled or hidden-but-present in the DOM.
+
+**Not treated as a data-sensitivity concern** — a match's captain is
+already visible to any signed-in player elsewhere in the app (the C badge
+on an announced squad, `FixturesCard`'s squad panel, Captains' Corner), so
+`filterOptions()`'s `captains` list is still computed and returned to
+every viewer regardless of role; only the *comparison feature* built on
+top of it is gated. This is a product/governance decision about which
+aggregate views to expose, not a fix for a data leak.
+
 ---
 
 ## 4. Knockout flag — `bookings.stage_type` (migration 076)
@@ -533,6 +653,7 @@ show an "unlinked" hint).
 | Alias conflicts refuse (409) rather than silently re-pointing existing bookings | ✅ |
 | Toss read from the analytics DB server-side only (`ANALYTICS_SUPABASE_KEY`), never from the client | ✅ |
 | Client-safe module split (`teamStatsCore.ts`) — no server-only import reachable from a `'use client'` file; verified by `next build` | ✅ |
+| Captain filter/split/then-by gated to captain/GC/admin server-side (`canUseCaptainDimension` in `page.tsx`) — a non-privileged `?by=captain`/`?then=captain`/`?captain=<id>` is ignored, not just hidden from the UI (§3.6) | ✅ |
 
 ---
 
@@ -545,11 +666,11 @@ show an "unlinked" hint).
 | `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `applyFilters()` covers every dimension and `splitByNested()` composes two of them (§3.2) |
 | `src/lib/teamStats.ts` | `getTeamMatches()` fetch; re-exports the core (§2) |
 | `src/lib/teamStats.test.ts` | Vitest coverage of the aggregators |
-| `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers (`TeamFilterState`, `buildTeamStatsHref`, `toTeamFilters`, chip labels) shared by the page and the panel (§3) |
+| `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers (`TeamFilterState`, `buildTeamStatsHref`, `toTeamFilters`, chip labels) shared by the page and the panel (§3); `visibleFilterKeys()`/`visibleSplitDimensions()` gate the Captain dimension (§3.6) |
 | `src/lib/opponents.ts` | `normaliseOpponentName()`, `resolveOpponentIdByName()`, `linkSpellingToOpponent()`, `AliasConflictError` (§5) |
 | `src/lib/schemas.ts` | `opponentCreateSchema`, `opponentUpdateSchema`, `opponentLinkSchema` |
-| `src/app/team-stats/page.tsx` | The Team Record page (§3) |
-| `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `SplitByRow` — the Split by / Then by scrolling pill rows (§3.1, §3.2) |
+| `src/app/team-stats/page.tsx` | The Team Record page (§3); computes `canUseCaptainDimension` and re-validates `by`/`then`/`captain` against it server-side (§3.6) |
+| `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `SplitByRow` — the Split by / Then by scrolling pill rows (§3.1, §3.2); both take a `canUseCaptainDimension` prop that decides whether Captain is offered at all (§3.6) |
 | `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher under both stats heroes (§3) |
 | `src/components/team/TeamSplitTable.tsx` | Expandable split table — every row independently toggleable and stays open until tapped closed again (§3.4); includes the second-level sub-rows and their "Not recorded" fallback (§3.2), and `hideMarqueeBadge`/`showTotal` for the Marquee highlight table (§3.3); `FormPills`, `MatchList` |
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` | Opponent master + reconciliation queue (§5) |

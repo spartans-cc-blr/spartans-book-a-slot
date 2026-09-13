@@ -58,10 +58,41 @@ export const FILTER_LABEL: Record<FilterKey, string> = {
 
 export const SPLIT_DIMENSIONS: SplitDimension[] = ['tournament', 'ground', 'opponent', 'format', 'stage', 'innings', 'toss', 'captain', 'year', 'month', 'slot']
 
+// The Captain dimension (filter, split, and "then by") is restricted to
+// captains, GC and admin — see features/team-stats.md §3.6. Comparing
+// captains' win rates against each other is exactly the kind of thing that
+// can stir up drama in the player community if it's open to everyone, so
+// this isn't offered as a filter/split option at all for a plain player.
+// `visibleFilterKeys()`/`visibleSplitDimensions()` are the single place
+// that decides this — both the Server Component (page.tsx, which also
+// re-validates any `captain`/`by=captain`/`then=captain` URL param against
+// the same gate, since a hidden option is not the same as a blocked one)
+// and the client filter panel call these instead of the raw
+// FILTER_KEYS/SPLIT_DIMENSIONS constants, so the two can never disagree on
+// who gets to see it.
+export function visibleFilterKeys(canUseCaptainDimension: boolean): FilterKey[] {
+  return canUseCaptainDimension ? FILTER_KEYS : FILTER_KEYS.filter(k => k !== 'captain')
+}
+
+export function visibleSplitDimensions(canUseCaptainDimension: boolean): SplitDimension[] {
+  return canUseCaptainDimension ? SPLIT_DIMENSIONS : SPLIT_DIMENSIONS.filter(d => d !== 'captain')
+}
+
 export const DEFAULT_TEAM_FILTER_STATE: TeamFilterState = {
   year: 'all', month: 'all', format: 'all', tournament: 'all', ground: 'all',
   opponent: 'all', captain: 'all', slot: 'all', innings: 'all', toss: 'all',
   stage: 'all', practice: false, by: 'tournament', then: null,
+}
+
+// The page's own default season — resolved fresh on every call (not a
+// module-level constant) since it's a genuine "today" concept, not a
+// build-time one. Both the Server Component (§3, resolving a bare or
+// invalid `?year=` to this) and buildTeamStatsHref (deciding whether a
+// state's year is the implicit default or needs to be spelled out in the
+// URL) call this same function, so they can never disagree on what "the
+// default season" currently means.
+export function currentTeamStatsYear(): string {
+  return String(new Date().getFullYear())
 }
 
 export interface TeamFilterOptions {
@@ -111,9 +142,17 @@ export function toTeamFilters(state: TeamFilterState): TeamFilters {
 // Canonical href for a state — defaults are omitted so the bare
 // /team-stats URL is always the default view. A `then` equal to `by` is a
 // no-op split (splitByNested ignores it), so it's never encoded.
+//
+// Year is the one filter whose "default" isn't a fixed sentinel — the page
+// pre-filters to the current season (§3), so the bare URL's implicit year
+// is whatever currentTeamStatsYear() returns *today*, not the 'all'
+// sentinel. 'all' (an explicit "All time" request) is therefore spelled
+// out in the URL rather than omitted, so it round-trips correctly instead
+// of being reinterpreted as "no year specified" (→ current year) on the
+// next load.
 export function buildTeamStatsHref(state: TeamFilterState): string {
   const params = new URLSearchParams()
-  if (state.year !== 'all')       params.set('year', state.year)
+  if (state.year !== currentTeamStatsYear()) params.set('year', state.year)
   if (state.month !== 'all')      params.set('month', state.month)
   if (state.tournament !== 'all') params.set('tournament', state.tournament)
   if (state.ground !== 'all')     params.set('ground', state.ground)

@@ -21,7 +21,7 @@ import {
   filterOptions, sortNewestFirst,
   type FormatFilter, type InningsFilter, type StageFilter, type TossFilter, type SplitDimension,
 } from '@/lib/teamStats'
-import { SPLIT_DIMENSIONS, toTeamFilters, type TeamFilterState } from '@/lib/teamStatsFilters'
+import { toTeamFilters, currentTeamStatsYear, visibleSplitDimensions, type TeamFilterState } from '@/lib/teamStatsFilters'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Team Record — Spartans CC' }
@@ -45,15 +45,29 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
   if (user?.playerStatus === 'expelled') redirect('/')
 
   const canManageOpponents = !!user?.isCaptain || !!user?.isGC || !!user?.isWrangler || !!user?.isAdmin
+  // Comparing captains' win rates against each other is exactly the kind
+  // of thing that can stir up drama in the player community if it's open
+  // to everyone — restricted to captains, GC and admin. See §3.6 in the
+  // feature doc. This is the one server-side gate that decides it; the
+  // filter/split UI just mirrors whatever it resolves to.
+  const canUseCaptainDimension = !!user?.isCaptain || !!user?.isGC || !!user?.isAdmin
+  const splitDimensions = visibleSplitDimensions(canUseCaptainDimension)
 
   const all = await getTeamMatches()
   const options = filterOptions(all)
 
-  const yearParam = searchParams?.year && /^\d{4}$/.test(searchParams.year) && options.years.includes(searchParams.year) ? searchParams.year : 'all'
-  const by = pickEnum<SplitDimension>(searchParams?.by, SPLIT_DIMENSIONS, 'tournament')
+  // Pre-filters to the current season by default — a bare or invalid/
+  // out-of-range `?year=` resolves to this year, not "all time". `?year=all`
+  // is the explicit opt-out (round-trips via buildTeamStatsHref, which
+  // spells 'all' out in the URL for exactly this reason).
+  const yearParam =
+    searchParams?.year === 'all' ? 'all'
+    : searchParams?.year && /^\d{4}$/.test(searchParams.year) && options.years.includes(searchParams.year) ? searchParams.year
+    : currentTeamStatsYear()
+  const by = pickEnum<SplitDimension>(searchParams?.by, splitDimensions, 'tournament')
   // A `then` equal to `by` is a no-op (splitByNested ignores it) — treated
   // as "none" here so it never round-trips back into the URL either.
-  const thenParam = SPLIT_DIMENSIONS.includes(searchParams?.then as SplitDimension) ? searchParams!.then as SplitDimension : null
+  const thenParam = splitDimensions.includes(searchParams?.then as SplitDimension) ? searchParams!.then as SplitDimension : null
   const state: TeamFilterState = {
     year:       yearParam,
     month:      options.months.some(m => m.id === searchParams?.month) ? searchParams!.month! : 'all',
@@ -61,7 +75,10 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
     tournament: options.tournaments.some(t => t.id === searchParams?.tournament) ? searchParams!.tournament! : 'all',
     ground:     options.grounds.some(g => g.id === searchParams?.ground) ? searchParams!.ground! : 'all',
     opponent:   options.opponents.some(o => o.id === searchParams?.opponent) ? searchParams!.opponent! : 'all',
-    captain:    options.captains.some(c => c.id === searchParams?.captain) ? searchParams!.captain! : 'all',
+    // Re-validated against the same server-side gate as `by`/`then` above —
+    // a non-privileged viewer's `?captain=` is ignored, not just hidden
+    // from the select.
+    captain:    canUseCaptainDimension && options.captains.some(c => c.id === searchParams?.captain) ? searchParams!.captain! : 'all',
     slot:       options.slots.some(o => o.id === searchParams?.slot) ? searchParams!.slot! : 'all',
     innings:    pickEnum<InningsFilter>(searchParams?.innings, ['all', 'defending', 'chasing'], 'all'),
     toss:       pickEnum<TossFilter>(searchParams?.toss, ['all', 'won', 'lost'], 'all'),
@@ -101,7 +118,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
       </div>
 
       <div className="px-5 md:px-8 lg:px-10 py-6">
-        <TeamFilterShell state={state} options={options} matches={all}>
+        <TeamFilterShell state={state} options={options} matches={all} canUseCaptainDimension={canUseCaptainDimension}>
 
         {/* Headline strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
@@ -155,7 +172,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
 
         {/* Split by / Then by, the marquee highlight (opponent split only), then the table */}
         <section className="mb-6">
-          <SplitByRow state={state} />
+          <SplitByRow state={state} canUseCaptainDimension={canUseCaptainDimension} />
 
           {state.by === 'opponent' && (marquee.length > 0 || (canManageOpponents && !anyMarqueeDefined)) && (
             <div className="mb-4">

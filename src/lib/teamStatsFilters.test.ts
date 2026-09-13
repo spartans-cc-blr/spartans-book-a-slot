@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  DEFAULT_TEAM_FILTER_STATE, activeFilterKeys, buildTeamStatsHref, clearAllFilters, clearFilter,
-  filterValueLabel, isFilterSet, toTeamFilters, type TeamFilterState,
+  DEFAULT_TEAM_FILTER_STATE, FILTER_KEYS, SPLIT_DIMENSIONS, activeFilterKeys, buildTeamStatsHref, clearAllFilters, clearFilter,
+  currentTeamStatsYear, filterValueLabel, isFilterSet, toTeamFilters, visibleFilterKeys, visibleSplitDimensions,
+  type TeamFilterState,
 } from './teamStatsFilters'
 
 const options = {
@@ -15,27 +16,45 @@ const options = {
 }
 
 describe('teamStatsFilters', () => {
-  it('default state maps to the bare /team-stats href', () => {
-    expect(buildTeamStatsHref(DEFAULT_TEAM_FILTER_STATE)).toBe('/team-stats')
+  // The page pre-filters to the current season by default (see
+  // features/team-stats.md §3) — the bare-href sentinel for year is
+  // therefore "whatever year it is today", not the 'all' sentinel every
+  // other filter uses. 'all' (an explicit "All time" request) has to be
+  // spelled out in the URL instead, or it would round-trip back into
+  // "no year specified" → current year on the next load.
+  it('the current-year state (the page default) maps to the bare /team-stats href', () => {
+    const s: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, year: currentTeamStatsYear() }
+    expect(buildTeamStatsHref(s)).toBe('/team-stats')
+    expect(activeFilterKeys(s)).toEqual(['year'])
+  })
+
+  it('"all time" is spelled out explicitly, not omitted', () => {
+    expect(buildTeamStatsHref(DEFAULT_TEAM_FILTER_STATE)).toBe('/team-stats?year=all')
+    // 'all' is still the "no restriction" sentinel for chip/count purposes —
+    // it just isn't the same thing as an unspecified URL year anymore.
     expect(activeFilterKeys(DEFAULT_TEAM_FILTER_STATE)).toEqual([])
   })
 
   it('encodes only non-default params, split dimension included', () => {
-    const s: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, year: '2026', format: 'T20', practice: true, by: 'ground' }
-    expect(buildTeamStatsHref(s)).toBe('/team-stats?year=2026&format=T20&practice=1&by=ground')
+    // A non-current year (not just any year — see the two tests above for
+    // why the current year specifically is the one that gets omitted).
+    const s: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, year: '2025', format: 'T20', practice: true, by: 'ground' }
+    expect(buildTeamStatsHref(s)).toBe('/team-stats?year=2025&format=T20&practice=1&by=ground')
     expect(activeFilterKeys(s)).toEqual(['year', 'format', 'practice'])
   })
 
   it('encodes the new toss / captain / month / slot filters', () => {
-    const s: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, toss: 'won', captain: 'p1', month: '2026-09', slot: '07:30' }
+    // year pinned to the current-season default so only the filters under
+    // test show up in the href — see the two tests above.
+    const s: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, year: currentTeamStatsYear(), toss: 'won', captain: 'p1', month: '2026-09', slot: '07:30' }
     expect(buildTeamStatsHref(s)).toBe('/team-stats?month=2026-09&captain=p1&slot=07%3A30&toss=won')
-    expect(activeFilterKeys(s)).toEqual(['month', 'captain', 'slot', 'toss'])
+    expect(activeFilterKeys(s)).toEqual(['year', 'month', 'captain', 'slot', 'toss'])
   })
 
   it('encodes a second-level split, and never one equal to the first', () => {
-    const nested: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, by: 'captain', then: 'toss' }
+    const nested: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, year: currentTeamStatsYear(), by: 'captain', then: 'toss' }
     expect(buildTeamStatsHref(nested)).toBe('/team-stats?by=captain&then=toss')
-    const sameBoth: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, by: 'captain', then: 'captain' }
+    const sameBoth: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, year: currentTeamStatsYear(), by: 'captain', then: 'captain' }
     expect(buildTeamStatsHref(sameBoth)).toBe('/team-stats?by=captain')
   })
 
@@ -79,5 +98,24 @@ describe('teamStatsFilters', () => {
     expect(filterValueLabel(s, 'slot', options)).toBe('7:30 AM')
     expect(filterValueLabel(s, 'toss', options)).toBe('Won the toss')
     expect(filterValueLabel({ ...s, toss: 'lost' }, 'toss', options)).toBe('Lost the toss')
+  })
+
+  // Captain filter/split/then-by is restricted to captains, GC and admin —
+  // see features/team-stats.md §3.6. A plain player must never see it as a
+  // filter or split option.
+  describe('visibleFilterKeys / visibleSplitDimensions — Captain dimension gating', () => {
+    it('omits captain for a non-privileged viewer, keeps every other key/dimension', () => {
+      expect(visibleFilterKeys(false)).toEqual(FILTER_KEYS.filter(k => k !== 'captain'))
+      expect(visibleFilterKeys(false)).not.toContain('captain')
+      expect(visibleSplitDimensions(false)).toEqual(SPLIT_DIMENSIONS.filter(d => d !== 'captain'))
+      expect(visibleSplitDimensions(false)).not.toContain('captain')
+    })
+
+    it('includes captain for a captain/GC/admin viewer', () => {
+      expect(visibleFilterKeys(true)).toEqual(FILTER_KEYS)
+      expect(visibleFilterKeys(true)).toContain('captain')
+      expect(visibleSplitDimensions(true)).toEqual(SPLIT_DIMENSIONS)
+      expect(visibleSplitDimensions(true)).toContain('captain')
+    })
   })
 })
