@@ -717,7 +717,7 @@ deep-link (`?month=all`) that overrides it.
 | `src/app/api/admin/matches/[id]/post-match/route.ts` | Admin Post-Match panel feed (GET) + stuck-upload reset (DELETE) |
 | `src/lib/matchFeeSplit.ts` | `computeMatchFeeSplit()` — shared per-player fee/units/exemption computation, used by both `POST` (initial apply) and `PATCH` (correction, §6.1) `/api/fees/apply` |
 | `supabase/migrations/075_match_fee_corrections.sql` | `match_fee_corrections` — one immutable audit row per match-fee correction event (§6.1) |
-| `src/app/api/admin/scorecard-backfill/route.ts` | One-time backfill: GET lists eligible bookings, POST processes one |
+| `src/app/api/admin/scorecard-backfill/route.ts` | One-time backfill: GET lists eligible bookings (via the shared `isPastMatch()`, so a same-day-but-ended match is included — see Section 13's 2026-09-13 incident), POST processes one |
 | `src/app/admin/scorecard-backfill/page.tsx` | Admin UI driving the client-side backfill loop |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron |
 | `src/app/api/matches/history/route.ts` | Paginated match list — `can_upload`, `can_verify`, `top_performers`, `roles_complete`, `scorecard_status`, `ground` join. `top_performers` is built from `computeMatchMVP()` (single match MVP); `can_verify` still uses `computeTopPerformers()` (tie-inclusive) — see Section 15 |
@@ -787,6 +787,7 @@ MICROSERVICE_SECRET  = <same value as Hub's MICROSERVICE_SECRET>
 | CricHeroes match URL backfill for pre-existing bookings | ⏳ See `pending-backlog.md` E-3 — separate, ongoing coordinator task |
 | `match_stats_cache` carrying stale `player_id: null` for names reconciled in the analytics DB *after* that booking last synced — 63 of ~65 bookings affected | ✅ Bulk-patched 2026-08-01 — see Section 15's second incident write-up. No automated re-sync-on-reconcile hook exists yet, so this class of drift can recur for any newly-confirmed alias/override until one is built |
 | A match played *today* 404'd when clicked through from the profile stats page (and, less visibly, from `/matches/history`'s own inline expand) | ✅ Fixed 2026-08-23 — see the incident write-up below |
+| `/admin/scorecard-backfill` silently excluded every match played *today*, synced or not, with no visibility into a same-day match stuck at `pending_parse` | ✅ Fixed 2026-09-13 — a fourth call site missed by the 2026-08-23 pass; see the incident write-up below |
 
 **Incident (2026-08-23) — the standalone match page and its squad-detail API
 used a stricter "past match" test than the list route, 404-ing on any match
@@ -819,6 +820,35 @@ then apply `isPastMatch()` in code once `slot_time`/`format` are in hand —
 same two-step shape the list route already used. `GET /api/matches/history`
 itself was only touched to import the now-shared `isPastMatch()` instead of
 defining its own; its behaviour is unchanged.
+
+**Incident (2026-09-13) — `/admin/scorecard-backfill` carried the identical
+bug, missed by the 2026-08-23 pass above because nobody had reason to look
+at it that day.** Reported when today's own Mario Turner Flash 5 match
+(already fully `synced`, so not itself broken) prompted the question of why
+the admin backfill page's list "shows all other games until yesterday" —
+i.e. it never shows *any* booking from today, regardless of whether that
+match still needs attention. `GET /api/admin/scorecard-backfill` used a
+bare `.lt('game_date', today)` Supabase filter, same as the three sites
+fixed on 2026-08-23 — excluding every same-day booking outright, even one
+genuinely stuck at `pending_parse` with a real `error_message` an admin
+would want to see and re-run. Since this route deliberately does **not**
+filter by `scorecard_uploads.status` (see its own header comment — a
+`synced`/`fees_applied` match from a prior day is meant to show up here too,
+for re-running after a parsing-pipeline fix), the bug wasn't about sync
+status at all: it was purely the raw date cutoff hiding *anything* from
+today, stuck or not.
+
+**Fixed** the same way as 2026-08-23: the query widened to
+`.lte('game_date', today)` and the result is filtered in code with the
+shared `isPastMatch()` from `src/lib/matchStatus.ts` — a match still to
+come later today is dropped, one that's already ended shows up
+immediately regardless of its `scorecard_uploads.status`. No behaviour
+changed for any booking from a prior day. Take-away, same as before: a
+shared same-day-aware helper existing doesn't mean every call site that
+needs it has actually adopted it — worth grepping for a bare
+`game_date < today`/`.lt('game_date'` comparison across the codebase
+whenever this class of bug is fixed again, rather than assuming the
+2026-08-23 pass covered every site.
 
 ---
 
