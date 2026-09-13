@@ -27,8 +27,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { applyFilters, SPLIT_LABEL, type SplitDimension, type TeamMatch } from '@/lib/teamStatsCore'
 import {
-  FILTER_KEYS, FILTER_LABEL, SPLIT_DIMENSIONS,
+  FILTER_LABEL,
   activeFilterKeys, buildTeamStatsHref, clearAllFilters, clearFilter, filterValueLabel, isFilterSet, toTeamFilters,
+  visibleFilterKeys, visibleSplitDimensions,
   type FilterKey, type TeamFilterOptions, type TeamFilterState,
 } from '@/lib/teamStatsFilters'
 
@@ -41,9 +42,15 @@ interface ShellProps {
   options:  TeamFilterOptions
   matches:  TeamMatch[]        // the unfiltered set, for the live "Show N matches" count
   children: ReactNode          // the server-rendered results column
+  // Captain filter/split — restricted to captains, GC and admin, see
+  // features/team-stats.md §3.6. Server-resolved in page.tsx; this only
+  // ever mirrors it, never decides it — a tampered client can't widen
+  // access since page.tsx re-validates any resulting `captain`/`by`/`then`
+  // param independently.
+  canUseCaptainDimension: boolean
 }
 
-export function TeamFilterShell({ state, options, matches, children }: ShellProps) {
+export function TeamFilterShell({ state, options, matches, children, canUseCaptainDimension }: ShellProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [asideOpen, setAsideOpen] = useState(true)
@@ -69,7 +76,8 @@ export function TeamFilterShell({ state, options, matches, children }: ShellProp
 
   const panel = (
     <FilterPanelBody draft={draft} setDraft={setDraft} added={added} setAdded={setAdded}
-      options={options} count={draftCount} dirty={dirty} onApply={apply} onReset={reset} />
+      options={options} count={draftCount} dirty={dirty} onApply={apply} onReset={reset}
+      canUseCaptainDimension={canUseCaptainDimension} />
   )
 
   return (
@@ -131,12 +139,14 @@ interface BodyProps {
   dirty:    boolean
   onApply:  () => void
   onReset:  () => void
+  canUseCaptainDimension: boolean
 }
 
-function FilterPanelBody({ draft, setDraft, added, setAdded, options, count, dirty, onApply, onReset }: BodyProps) {
+function FilterPanelBody({ draft, setDraft, added, setAdded, options, count, dirty, onApply, onReset, canUseCaptainDimension }: BodyProps) {
   const [picking, setPicking] = useState(false)
-  const visible = FILTER_KEYS.filter(k => isFilterSet(draft, k) || added.includes(k))
-  const available = FILTER_KEYS.filter(k => !visible.includes(k))
+  const filterKeys = visibleFilterKeys(canUseCaptainDimension)
+  const visible = filterKeys.filter(k => isFilterSet(draft, k) || added.includes(k))
+  const available = filterKeys.filter(k => !visible.includes(k))
 
   function addKey(k: FilterKey) {
     setPicking(false)
@@ -322,17 +332,18 @@ function FilterSheet({ children, onClose }: { children: ReactNode; onClose: () =
 
 // ── Split-by row ──────────────────────────────────────────────────────────
 
-export function SplitByRow({ state }: { state: TeamFilterState }) {
+export function SplitByRow({ state, canUseCaptainDimension }: { state: TeamFilterState; canUseCaptainDimension: boolean }) {
   // "Then by" is the second-level breakdown shown inside each row when it
   // is expanded (§3.2) — the other way to answer a two-dimension question,
   // alongside filtering one dimension and splitting the other. It offers
   // every dimension except the primary one: splitting a group by the thing
   // that defined it would just yield one sub-row per group.
-  const thenOptions = SPLIT_DIMENSIONS.filter(d => d !== state.by)
+  const splitDimensions = visibleSplitDimensions(canUseCaptainDimension)
+  const thenOptions = splitDimensions.filter(d => d !== state.by)
   return (
     <div className="flex flex-col gap-1.5 mb-2">
       <PillRow label="Split by" active={state.by}
-        options={SPLIT_DIMENSIONS} hrefFor={d => buildTeamStatsHref({ ...state, by: d, then: state.then === d ? null : state.then })} />
+        options={splitDimensions} hrefFor={d => buildTeamStatsHref({ ...state, by: d, then: state.then === d ? null : state.then })} />
       <PillRow label="Then by" active={state.then} includeNone
         options={thenOptions} hrefFor={d => buildTeamStatsHref({ ...state, then: d })}
         noneHref={buildTeamStatsHref({ ...state, then: null })} />
