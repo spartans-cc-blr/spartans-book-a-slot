@@ -671,6 +671,63 @@ way — see §3's "corrections fix what happened, they don't rewrite whether
 it happened" framing, applied here to a charge-cycle row rather than a
 wallet_transactions row).
 
+### 12.2 Q1 2026 charges removed entirely — already collected via the old pre-Hub Google Sheet (fixed September 2026)
+
+**Background.** A backfill/re-sync pass run 11–12 Sep 2026 caused
+`chargeMembershipFeeIfDue()` to fire retroactively for a batch of Q1 2026
+matches (per §12, the charge quarter is derived from the *synced match's
+own* `game_date` via `quarterOf()`, not from "today" — so re-syncing an
+old match legitimately produces a fresh charge for whatever quarter that
+match falls in, months after the fact). This produced 46
+`Membership fee — Q1 2026` debits (₹250 each, ₹11,500 total) across 46
+players. Unlike Q3 2026 (the quarter this feature actually launched
+against, see §12), **Q1 2026's dues had already been collected from
+players the old way, via the pre-Hub Google Sheet process** — the Hub's
+automatic charge was a genuine duplicate for the whole quarter, not a
+per-player exemption case like §12.1's fee-exempt players.
+
+**The admin had already started fixing this by hand** — one row
+(`Membership fee — Q1 2026` for one player) was soft-deleted directly via
+`DELETE /api/wallet/transactions` with `delete_reason: "Already debited as
+part of Hub Sheet"`, and a second row for a different player had been
+edited via `PATCH` from a ₹250 debit into a ₹250 credit (dated the same
+day the amount-can't-be-zero and date-anchor bugs — §3.2 — were still
+live; almost certainly an attempted zero-out that hit the since-fixed
+`!amount` bug and was worked around by flipping the type instead, rather
+than a deliberate distinct transaction).
+
+**Fix — bulk soft-delete, same mechanism as `DELETE /api/wallet/transactions`,
+run directly via Supabase MCP SQL** (one-off fix, not a committed script —
+same convention as §8/§8.1's baseline backfills and §12.1's reversal
+above). All 45 still-active `Membership fee — Q1 2026` rows (44 debits +
+the 1 already-edited credit) were soft-deleted in one pass —
+`deleted_at`/`deleted_by`/`delete_reason` stamped with the same reason text
+the admin's own manual deletion had already used ("Already debited as part
+of Hub Sheet…"), never a real `DELETE` — and each player's
+`wallet_balance` was reversed using **that row's own current type and
+amount**, not an assumed "every row is a debit": a debit's effect is
+undone by adding its amount back, a credit's by subtracting its amount —
+this is what correctly unwound the one player whose row had already been
+flipped to a credit, without needing to special-case it. Net effect:
+₹11,500 restored in aggregate across 45 wallets, all through the standard
+soft-delete path — no player's statement loses its audit trail, the
+removed rows are still fully inspectable (`deleted_at`/`delete_reason`),
+and the pre-existing manual deletion (the 46th row) was left exactly as
+the admin had already made it.
+
+**No Q2 2026 rows existed at all** — confirmed by direct query before
+acting. The request's premise ("Q1 and Q2 2026") only partially matched
+what was actually in the ledger; nothing needed removing for Q2.
+
+**`membership_fee_charges` rows for Q1 2026 were left in place, all 46 of
+them** — same reasoning as §12.1: the row is still factually accurate (a
+real match did trigger each charge), and keeping it is what stops the
+`UNIQUE(player_id, year, quarter)` guard from letting a *future* re-sync
+of the same Q1 2026 matches silently re-charge these players a second
+time. Removing this ledger fix's rows without also touching
+`membership_fee_charges` would have been dangerous — it would have
+reopened exactly that risk.
+
 ### Security (vibe-security)
 
 | Check | Status |
@@ -682,6 +739,8 @@ wallet_transactions row).
 | A detection failure can never fail the scorecard sync it's attached to (same posture as milestone detection and fee reminders) | ✅ |
 | Fee-exempt players excluded server-side before any charge is made (§12.1) — never relies on a later correction to fix what should never have happened | ✅ |
 | The 6-player reversal (§12.1) went through the same audit-logged correction path (`wallet_transaction_edits`) as any other admin correction — no bare `UPDATE`, no deleted row | ✅ |
+| The Q1 2026 bulk removal (§12.2) used the same soft-delete columns `DELETE /api/wallet/transactions` writes — no bare `UPDATE`, no real row deletion, every reversed row stays inspectable | ✅ |
+| The Q1 2026 bulk removal reversed each row by its own current type/amount, not an assumed debit — correctly unwinds a row an admin had already edited into a credit | ✅ |
 
 ### File Map additions
 
