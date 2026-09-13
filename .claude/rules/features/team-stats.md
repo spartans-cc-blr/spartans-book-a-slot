@@ -512,6 +512,68 @@ every viewer regardless of role; only the *comparison feature* built on
 top of it is gated. This is a product/governance decision about which
 aggregate views to expose, not a fix for a data leak.
 
+### 3.7 Tournament split — separate Ongoing / Completed tables (added September 2026)
+
+The Tournament split used to be one flat, Win%-sorted table mixing
+tournaments still being played with ones long finished — a club running
+several tournaments at once had to scan the whole list to tell which rows
+were even still relevant. Per a direct request, choosing "Tournament" as
+the split dimension now renders **two** separate tables instead of one:
+**Ongoing** first, then **Completed** below it. Every other split
+dimension (ground, opponent, format, stage, innings, toss, captain, year,
+month, slot) is unaffected — this only changes how the Tournament split's
+own rows are laid out.
+
+**Every match behind a Team Record row has already been played** —
+`getTeamMatches()` only ever includes a booking whose scorecard has
+synced (§2) — so "Completed" here can't mean "this match is over" the way
+it might read at first; it means the *tournament itself* has nothing left
+to play. `total_league_games` (already on `tournaments`, admin-set from
+`/admin/tournaments`, and the same field Tournament Planner's own
+Ongoing/Completed classification is built around — `features/tournament-planner.md`
+§6) is the signal: a tournament's row counts as **Completed** once its
+`played` count (every synced match for that tournament, league or
+knockout) has reached that target, else it's **Ongoing**. A tournament
+with no `total_league_games` set at all can never be proven complete this
+way, so it's always **Ongoing** — "can't confirm it's done, so don't claim
+it is," the same posture Tournament Planner's own `isCompleted` check
+takes for a tournament with nothing scheduled left.
+
+**Known imprecision, accepted rather than solved here:** `played` for a
+tournament row counts *every* synced match in that tournament regardless
+of `stage_type`, while `total_league_games` is a league-only target. A
+tournament whose knockout games get counted toward that total could in
+theory show as Completed a match or two before its actual league fixtures
+are all done. Team Record has no equivalent of Tournament Planner's own
+"nothing scheduled" signal to disambiguate this (it never fetches
+unplayed/future bookings at all — §2's scope decision), so this is a
+simple proxy, not an exact replica of Tournament Planner's classification;
+good enough for "which tournaments are still live" at a glance, not a
+source of truth for whether a specific tournament has literally finished.
+
+**Implementation — `splitTournamentRowsByStatus()`** (`teamStatsCore.ts`,
+pure, unit-tested in `teamStats.test.ts`) — partitions an already-computed
+`SplitRow[]` (whatever `splitByNested()` produced, `sub` breakdowns and
+all) into `{ ongoing, completed }`, reading `tournamentTotalLeagueGames`
+off any match in the group (every match in a Tournament-split row shares
+one `tournamentId`, so the first is enough). `page.tsx` calls this only
+when `state.by === 'tournament'`; every other split dimension renders the
+single `TeamSplitTable` exactly as before. A table with zero rows in a
+category is skipped entirely (no empty "Completed" section with nothing
+in it) rather than shown with the standard "No matches for this filter"
+text — that text is reserved for the genuinely-nothing-matches-at-all case
+(zero tournament rows overall), which still renders as one plain table so
+the message isn't lost. Each of the two tables keeps its own "Total"
+footer (`TeamSplitTable`'s existing behaviour, unchanged) — an ongoing-only
+aggregate and a completed-only aggregate, not one combined total split
+across two tables.
+
+**`tournamentTotalLeagueGames: number | null`** was added to `TeamMatch`
+— `getTeamMatches()`'s existing `tournaments!bookings_tournament_id_fkey(...)`
+embed widened to also select `total_league_games`, no new query. Every
+other caller of `TeamMatch` is unaffected; the field is simply carried
+along on each match like `isPractice`/`stageType` already are.
+
 ---
 
 ## 4. Knockout flag — `bookings.stage_type` (migration 076)
@@ -663,13 +725,13 @@ show an "unlinked" hint).
 |---|---|
 | `supabase/migrations/076_bookings_stage_type.sql` | `bookings.stage_type` + one-off knockout backfill (§4) |
 | `supabase/migrations/077_opponents_master.sql` | `opponents`, `opponent_aliases`, `bookings.opponent_id`, RLS (§5) |
-| `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `applyFilters()` covers every dimension and `splitByNested()` composes two of them (§3.2) |
-| `src/lib/teamStats.ts` | `getTeamMatches()` fetch; re-exports the core (§2) |
+| `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `applyFilters()` covers every dimension and `splitByNested()` composes two of them (§3.2); `splitTournamentRowsByStatus()` partitions the Tournament split into Ongoing/Completed (§3.7) |
+| `src/lib/teamStats.ts` | `getTeamMatches()` fetch (now also selects `tournaments.total_league_games` → `TeamMatch.tournamentTotalLeagueGames`, §3.7); re-exports the core (§2) |
 | `src/lib/teamStats.test.ts` | Vitest coverage of the aggregators |
 | `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers (`TeamFilterState`, `buildTeamStatsHref`, `toTeamFilters`, chip labels) shared by the page and the panel (§3); `visibleFilterKeys()`/`visibleSplitDimensions()` gate the Captain dimension (§3.6) |
 | `src/lib/opponents.ts` | `normaliseOpponentName()`, `resolveOpponentIdByName()`, `linkSpellingToOpponent()`, `AliasConflictError` (§5) |
 | `src/lib/schemas.ts` | `opponentCreateSchema`, `opponentUpdateSchema`, `opponentLinkSchema` |
-| `src/app/team-stats/page.tsx` | The Team Record page (§3); computes `canUseCaptainDimension` and re-validates `by`/`then`/`captain` against it server-side (§3.6) |
+| `src/app/team-stats/page.tsx` | The Team Record page (§3); computes `canUseCaptainDimension` and re-validates `by`/`then`/`captain` against it server-side (§3.6); renders two tables (Ongoing/Completed) instead of one when `state.by === 'tournament'` (§3.7) |
 | `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `SplitByRow` — the Split by / Then by scrolling pill rows (§3.1, §3.2); both take a `canUseCaptainDimension` prop that decides whether Captain is offered at all (§3.6) |
 | `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher under both stats heroes (§3) |
 | `src/components/team/TeamSplitTable.tsx` | Expandable split table — every row independently toggleable and stays open until tapped closed again (§3.4); includes the second-level sub-rows and their "Not recorded" fallback (§3.2), and `hideMarqueeBadge`/`showTotal` for the Marquee highlight table (§3.3); `FormPills`, `MatchList` |
