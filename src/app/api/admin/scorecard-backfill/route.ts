@@ -8,6 +8,15 @@
 //      status (it unconditionally upserts scorecard_uploads and re-parses),
 //      so no "reset" step is actually required server-side — the client
 //      just needs to be able to find the row and choose to re-run it.
+//
+//      "Past" is resolved via isPastMatch() (src/lib/matchStatus.ts), not a
+//      bare game_date < today cutoff — a match played today still needs to
+//      show up here the moment it's actually ended (e.g. stuck at
+//      pending_parse), same same-day-aware fix already applied to
+//      /api/matches/history and its [bookingId] routes (see
+//      features/post-match-scorecard.md §13). The query itself widens to
+//      .lte('game_date', today) so a same-day row is fetched at all, then
+//      isPastMatch() filters out one that hasn't ended yet.
 // POST /api/admin/scorecard-backfill — process exactly one booking (fetch
 //      from CricHeroes, parse, persist). Called once per row by the admin
 //      backfill page's client-side loop — never loops server-side itself,
@@ -20,6 +29,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 import { backfillOneBooking } from '@/lib/scorecardBackfill'
+import { isPastMatch } from '@/lib/matchStatus'
 
 export const maxDuration = 60
 
@@ -35,11 +45,18 @@ export async function GET(req: NextRequest) {
     .from('bookings')
     .select('id, game_date, slot_time, format, opponent_name, match_id, scorecard_uploads(status, error_message, verified, needs_reconciliation, reconciliation_note, reconciliation_flagged_by, reconciliation_flagged_at)')
     .eq('status', 'confirmed')
-    .lt('game_date', today)
+    .lte('game_date', today)
     .not('match_id', 'is', null)
     .order('game_date', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // A same-day booking is only "past" once it has actually ended —
+  // .lte() above deliberately over-fetches today's rows so this check has
+  // something to filter; a match still to come today is dropped here.
+  const pastBookings = (bookings ?? []).filter((b: any) =>
+    isPastMatch(b.game_date, b.slot_time, b.format, today)
+  )
 
   // scorecard_uploads has several FK columns to players (uploaded_by,
   // fees_applied_by, verified_by, reconciliation_flagged_by) — an embedded
@@ -47,7 +64,7 @@ export async function GET(req: NextRequest) {
   // security.md, so flagger names are resolved via a separate batched
   // lookup instead, same pattern as ledRes/rolesRes in matches/history.
   const flaggedByIds = Array.from(new Set(
-    (bookings ?? [])
+    pastBookings
       .map((b: any) => (Array.isArray(b.scorecard_uploads) ? b.scorecard_uploads[0] : b.scorecard_uploads)?.reconciliation_flagged_by)
       .filter(Boolean)
   ))
@@ -56,7 +73,7 @@ export async function GET(req: NextRequest) {
     : { data: [] as { id: string; name: string }[] }
   const flaggerName = new Map((flaggers ?? []).map((p: any) => [p.id, p.name]))
 
-  const rows = (bookings ?? []).map((b: any) => {
+  const rows = pastBookings.map((b: any) => {
     // scorecard_uploads.booking_id is UNIQUE, so PostgREST should embed
     // this as a single object — but a defensive array check costs
     // nothing and avoids a footgun if that ever changes.
