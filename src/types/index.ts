@@ -83,7 +83,7 @@ export interface Booking {
     captain_id: string | null
     captains: { id: string; name: string; players: { cricheroes_url: string | null } | null } | null
   }
-  ground?: { id: string; name: string; maps_url: string; hospital_url: string } | null
+  ground?: { id: string; name: string; maps_url: string; hospital_url: string; pitch_type?: PitchType | null } | null
   captain?: { id: string; name: string; players: { cricheroes_url: string | null; whatsapp: string | null } | null } | null
   reserved_until?: string | null
   organiser_name?: string | null
@@ -105,6 +105,10 @@ export interface Booking {
 // ── Opponent master (migration 077) ──────────────────────────────
 
 export type StageType = 'league' | 'knockout'
+
+// grounds.pitch_type (migration 078) — NULL means not yet classified.
+// See features/team-stats.md §6 ("Pitch Type").
+export type PitchType = 'Matted' | 'Astro' | 'Turf'
 
 export interface Opponent {
   id:                  string

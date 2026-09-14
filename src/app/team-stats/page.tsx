@@ -19,7 +19,7 @@ import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import {
   getTeamMatches, applyFilters, summarize, recentForm, currentStreak, splitBy, splitByNested, computeRecords,
   filterOptions, sortNewestFirst, splitTournamentRowsByStatus,
-  type FormatFilter, type InningsFilter, type StageFilter, type TossFilter, type SplitDimension,
+  type FormatFilter, type InningsFilter, type StageFilter, type TossFilter, type PitchFilter, type SplitDimension,
 } from '@/lib/teamStats'
 import { toTeamFilters, currentTeamStatsYear, visibleSplitDimensions, type TeamFilterState } from '@/lib/teamStatsFilters'
 import type { Metadata } from 'next'
@@ -32,7 +32,7 @@ function pickEnum<T extends string>(v: string | undefined, allowed: readonly T[]
 }
 
 type SearchParams = Partial<Record<
-  'year' | 'month' | 'format' | 'tournament' | 'ground' | 'opponent' | 'captain' | 'slot'
+  'year' | 'month' | 'format' | 'tournament' | 'ground' | 'pitch' | 'opponent' | 'captain' | 'slot'
   | 'innings' | 'toss' | 'stage' | 'practice' | 'by' | 'then', string>>
 
 export default async function TeamStatsPage({ searchParams }: { searchParams?: SearchParams }) {
@@ -74,6 +74,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
     format:     pickEnum<FormatFilter>(searchParams?.format, ['all', 'T20', 'T30', 'other'], 'all'),
     tournament: options.tournaments.some(t => t.id === searchParams?.tournament) ? searchParams!.tournament! : 'all',
     ground:     options.grounds.some(g => g.id === searchParams?.ground) ? searchParams!.ground! : 'all',
+    pitch:      pickEnum<PitchFilter>(searchParams?.pitch, ['all', 'Matted', 'Astro', 'Turf'], 'all'),
     opponent:   options.opponents.some(o => o.id === searchParams?.opponent) ? searchParams!.opponent! : 'all',
     // Re-validated against the same server-side gate as `by`/`then` above —
     // a non-privileged viewer's `?captain=` is ignored, not just hidden
@@ -224,7 +225,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
         </section>
 
         <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 text-center mt-8 px-4">
-          Covers every confirmed Hub booking whose CricHeroes scorecard has synced. Win % excludes no-results. Defending/chasing and toss splits come from the scorecard&rsquo;s toss line; League/Knockout from the booking&rsquo;s stage flag (unclassified games count as league). Practice games are excluded unless the &ldquo;Practice games&rdquo; filter is added.
+          Covers every confirmed Hub booking whose CricHeroes scorecard has synced. Win % excludes no-results. Defending/chasing and toss splits come from the scorecard&rsquo;s toss line; League/Knockout from the booking&rsquo;s stage flag (unclassified games count as league); Pitch Type from the ground&rsquo;s own classification, set on Grounds by a wrangler/admin (unclassified grounds group under &ldquo;Not set&rdquo;). Practice games are excluded unless the &ldquo;Practice games&rdquo; filter is added.
         </p>
         </TeamFilterShell>
       </div>

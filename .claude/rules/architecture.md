@@ -117,7 +117,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
 | `/api/availability` | GET | None | Slot availability grid with booking rules applied |
-| `/api/grounds` | GET | None | Grounds list (`id, name, maps_url, hospital_url`) — displayed on public fixture cards. Writes are not public: POST is `isGC \|\| isAdmin` (create), PATCH is `isWrangler \|\| isAdmin` (edit) — see `features/wrangler-grounds-menu.md` |
+| `/api/grounds` | GET | None | Grounds list (`id, name, maps_url, hospital_url, pitch_type`) — displayed on public fixture cards. Writes are not public: POST is `isGC \|\| isAdmin` (create), PATCH is `isWrangler \|\| isAdmin` (edit) — see `features/wrangler-grounds-menu.md`. `pitch_type` feeds Team Record's Pitch Type dimension — see `features/team-stats.md` §6 |
 | `/api/tournaments/[id]/organiser-reserve` | POST | None — the app's first unauthenticated write route | Organiser self-service: reserves one exact `{game_date, slot_time, format}` slot-bucket suggestion as a 48h `soft_block`; only when `tournaments.organiser_self_service` is true; rate-limited (`organiserWrite`); re-validates R1–R7 live — see `features/organiser-self-service.md` |
 | `/api/tournaments/[id]/organiser-next-slot` | POST | None | Read-only lookup for the "Not available" step on one slot bucket — `publicRead` rate limit, nothing written |
 | `/api/tournaments/[id]/organiser-attach-url` | POST | None | Attaches a CricHeroes URL to a hold this same flow created; never flips status to `confirmed` — notifies GC for a manual one-click admin confirm |
@@ -278,7 +278,7 @@ Primary scheduling record.
 Canonical opponent identity behind Team Record's head-to-head and marquee list; every raw `bookings.opponent_name` spelling maps to one opponent via an alias. Managed on `/opponents` by captains/GC/wranglers. RLS: `opponents` public SELECT (names already public on fixture cards), `opponent_aliases` service role only. Migration `077_opponents_master.sql` — see `features/team-stats.md` §5.
 
 #### `grounds`
-`id, name, maps_url, hospital_url` — joined into fixture cards and squad announcement text. Managed at `/wrangler/grounds` (not `/admin/*`) — create is `isGC || isAdmin`, edit is `isWrangler || isAdmin`; see `features/wrangler-grounds-menu.md`.
+`id, name, maps_url, hospital_url, pitch_type` — joined into fixture cards and squad announcement text. Managed at `/wrangler/grounds` (not `/admin/*`) — create is `isGC || isAdmin`, edit is `isWrangler || isAdmin`; see `features/wrangler-grounds-menu.md`. `pitch_type` (`'Matted' | 'Astro' | 'Turf'`, nullable — migration `078_grounds_pitch_type.sql`) feeds the Team Record page's Pitch Type filter/split/then-by dimension — see `features/team-stats.md` §6.
  
 ### Sprint 2 Tables (Live)
  

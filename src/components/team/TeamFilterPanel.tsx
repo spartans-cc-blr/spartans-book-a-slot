@@ -232,6 +232,15 @@ function FilterControl({ k, draft, setDraft, options }: { k: FilterKey; draft: T
           {options.grounds.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
       )
+    case 'pitch':
+      return (
+        <select value={draft.pitch} onChange={e => setDraft({ ...draft, pitch: e.target.value as TeamFilterState['pitch'] })} className={SELECT}>
+          <option value="all">All pitch types</option>
+          <option value="Matted">Matted</option>
+          <option value="Astro">Astro</option>
+          <option value="Turf">Turf</option>
+        </select>
+      )
     case 'opponent':
       return (
         <select value={draft.opponent} onChange={e => setDraft({ ...draft, opponent: e.target.value })} className={SELECT}>
