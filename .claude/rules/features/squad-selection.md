@@ -683,3 +683,128 @@ Warm Light "match info" palette `FixturesCard`/`SelectedMatchCard` use.
 | WhatsApp nudge to captain on GC approve/return | ✅ Done | `GCReviewClient.tsx` shows a "Notify captain" WhatsApp button after both `approved` and `returned` decisions, with a re-notify option for squads approved in a prior session. |
 | Automated WhatsApp announcement | Deferred (Sprint 5) | Requires WhatsApp Business API — current flow is manual copy/share from Captains Corner. |
 | CricHeroes post-match stats integration using `bookings.match_id` | Deferred (Sprint 5) | Squad rows linked to booking → `match_id` enables per-player stat attribution. |
+
+---
+
+## 11. Knockout Squad Selection — Tournament MVP Rank Aid (added September 2026)
+
+### Why
+
+A knockout game is the one squad-selection decision where "who has actually
+performed well this tournament" matters more than the usual availability-led
+picking order — the captain isn't just filling 12 slots from whoever
+responded, they're trying to field the strongest XI from among the players
+who represented the tournament through its league stage (see
+`features/knockout-day-protection.md` §6 for the separate, already-enforced
+rule that only such players may even mark availability for a knockout
+booking). Nothing on the Per Slot squad-selection screen surfaced that
+history before this — a captain had to cross-reference `/leaderboard` →
+Detailed, filtered to the tournament, in a separate tab.
+
+### What was added
+
+For a booking whose `stage_type = 'knockout'` (migration `076`, see
+`features/team-stats.md` §4 — `NULL` is treated as league, same convention
+used everywhere else this flag is read), the Per Slot view now:
+
+1. **Shows a `🏆#N` rank badge next to every available player's name** — in
+   both the "Available across all slots" and "Available" sections — where
+   `N` is that player's rank (1 = highest) by total MVP points **for this
+   tournament**, across every match synced so far. No badge is shown for a
+   player with no MVP stats in this tournament (never played, or their
+   scorecard hasn't synced/reconciled yet — see
+   `features/player-identity-resolution.md`), or for a player already
+   struck through as taken elsewhere.
+2. **Lists the top 16 players by tournament MVP who have *not* marked Y/O/E
+   for this specific booking**, as a small "🏆 Top 16 MVP — not yet
+   responded" panel above the squad lists — each entry shows the player's
+   rank and a `PlayerNameLink` to their Hub stats page (or their CricHeroes
+   profile, for the rare unreconciled case). This is deliberately the
+   complement of (1): the same MVP rank list, just the slice a captain
+   would otherwise have no way to see, since a player who hasn't responded
+   at all never appears in either "Available" section.
+
+Neither of these change what a captain can *do* — no new selection, filter,
+or squad-cap logic. This is read-only context layered onto the existing
+Per Slot screen, exactly like the pre-existing "Form" panel (§5).
+
+### Where the rank comes from
+
+`computeMvpRanks(rows: LeaderboardRow[])` (`src/lib/playerStats.ts`) — a
+pure, no-DB-access function — sorts a tournament's `getLeaderboard({
+tournamentId })`/`getLeaderboardsByTournament()` rows by
+`stats.mvpPoints` descending (ties broken by name) and returns a plain
+1-based sequential rank per player, alongside their name/CricHeroes URL for
+display. This is the exact same MVP total (`battingMvp + bowlingMvp +
+fieldingMvp`, `mvp_score` summed from the analytics DB — see `aggregate()`
+in the same file) that already powers `/leaderboard` → Detailed → MVP and
+Tournament Planner's Player Stats table, so a captain never sees a number
+here that disagrees with the club's own Honour Board for the same
+tournament. Practice-tournament matches are excluded from this total by
+the same default `getScopedMatchIds()` already applies everywhere else
+(moot for a knockout tournament, which is never the practice-games
+umbrella).
+
+Unlike `BattingPositionRankEntry`'s tie-sharing podium rank, an exact
+`mvpPoints` tie here is treated as a plain ordering tie-break (alphabetical
+by name), not a shared rank — the MVP score already blends several stat
+categories per player, so an exact float match across two players is
+vanishingly rare in practice (same observation
+`features/post-match-scorecard.md` §15 makes for the single-match MVP
+picker), and a simple sequential rank is both simpler to compute and
+matches what "rank 1 through 16" intuitively means for a squad-selection
+aid.
+
+### Where it's fetched — `src/app/captains-corner/page.tsx`
+
+`knockoutTournamentIds` is derived from the same `scopedBookings` array
+already used for the rest of the page (the next two rolling weekends, §5's
+own file map) — only tournaments with an actual knockout booking in that
+window are looked up, so a page with no knockout games in view costs
+nothing extra. `getLeaderboardsByTournament(knockoutTournamentIds)` (the
+batched, one-round-trip sibling of `getLeaderboard({ tournamentId })` —
+see `features/tournament-planner.md` §2.2 for why the batched form exists)
+is fetched inside the page's existing `Promise.all` alongside
+availability/squad/recent-form, so this doesn't add a sequential round
+trip. `computeMvpRanks()` then turns each tournament's `LeaderboardRow[]`
+into a `MvpRankEntry[]`, passed down to `CaptainsCornerGrid` as
+`mvpRanksByTournament: Record<tournamentId, MvpRankEntry[]>`.
+
+### UI — `CaptainsCornerGrid.tsx`
+
+`SlotCard` reads `booking.tournament_id`/`booking.stage_type` (both newly
+selected on the bookings query, alongside the existing `tournament:
+tournaments(...)` join) to decide `isKnockout` and look up this booking's
+own `mvpRanks` from the prop. `mvpRankByPlayerId` (a plain `Map`, rebuilt
+each render — the list is at most a few dozen entries, no memoization
+needed) feeds the `🏆#N` badge threaded through `SelectablePlayerRow` →
+`PlayerName`; `top16NotResponded` (`mvpRanks.slice(0, 16)` filtered against
+the same `eligible` array — Y/O/E responses only — that already drives the
+"Available" sections) feeds the standalone panel. Both are computed
+per-booking, not per-page, so a weekend mixing a knockout game with
+ordinary league games only shows the aid on the knockout card.
+
+### Explicitly out of scope
+
+- **No intersection with knockout eligibility.** The rank list is every
+  player with MVP stats in the tournament, whether or not they're eligible
+  to mark availability for *this* knockout booking under
+  `features/knockout-day-protection.md` §6's league-representation rule.
+  The two are separate concerns — eligibility gates who *can* respond at
+  all (enforced server-side, independent of this feature); the rank aid is
+  purely informational display for whoever the captain is already looking
+  at.
+- **No squad-selection change** — the rank badge and the not-responded
+  list don't affect the hard cap of 12, the taken-elsewhere cross-slot
+  block, or role assignment in any way.
+- **No admin/GC surface** — this is Captains' Corner (Per Slot) only, same
+  audience as the rest of squad selection. Matrix view is unaffected.
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/lib/playerStats.ts` | `computeMvpRanks()` — pure MVP-rank sort, no DB access |
+| `src/types/index.ts` | `MvpRankEntry` type |
+| `src/app/captains-corner/page.tsx` | Selects `tournament_id, stage_type`; computes `knockoutTournamentIds`, fetches `getLeaderboardsByTournament()` in the existing `Promise.all`, builds `mvpRanksByTournament` |
+| `src/components/captains/CaptainsCornerGrid.tsx` | `Booking.tournament_id`/`stage_type`; `mvpRanksByTournament` prop threaded through `CaptainsCornerGrid` → `SlotCard`; `isKnockout`/`mvpRankByPlayerId`/`top16NotResponded` in `SlotCard`; `🏆#N` badge in `PlayerName`; "Top 16 MVP — not yet responded" panel |

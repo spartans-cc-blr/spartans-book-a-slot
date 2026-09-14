@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { computeSquadVersion } from '@/lib/squadVersion'
-import { getRecentForm } from '@/lib/playerStats'
+import { getRecentForm, getLeaderboardsByTournament, computeMvpRanks } from '@/lib/playerStats'
+import type { MvpRankEntry, LeaderboardRow } from '@/types'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { CaptainsCornerGrid } from '@/components/captains/CaptainsCornerGrid'
 import { getISOWeek, getISOWeekYear, parseISO, startOfISOWeek, addDays, format } from 'date-fns'
@@ -60,6 +61,7 @@ export default async function CaptainsCornerPage() {
       .select(`
         id, game_date, slot_time, format, opponent_name,
         match_time, cricheroes_url, gc_return_note, is_practice,
+        tournament_id, stage_type,
         tournament:tournaments(name, ball_type, is_practice, ground:grounds(name, maps_url, hospital_url)),
         ground:grounds(name, maps_url, hospital_url)
       `)
@@ -116,7 +118,20 @@ export default async function CaptainsCornerPage() {
 
   const bookingIds = scopedBookings.map(b => b.id)
 
-  const [{ data: avail }, { data: squads }, recentFormByPlayer] = await Promise.all([
+  // Knockout-only MVP rank aid (see features/squad-selection.md §11) — a
+  // captain picking a knockout XI can see who has performed well through
+  // the tournament so far. Only computed for tournaments that actually have
+  // a knockout booking in the scoped window; every other tournament's
+  // squad-selection cards are unaffected and cost nothing extra here.
+  const knockoutTournamentIds = Array.from(
+    new Set(
+      scopedBookings
+        .filter((b: any) => b.stage_type === 'knockout' && b.tournament_id)
+        .map((b: any) => b.tournament_id as string)
+    )
+  )
+
+  const [{ data: avail }, { data: squads }, recentFormByPlayer, leaderboardsByTournament] = await Promise.all([
     bookingIds.length > 0
       ? supabase.from('availability').select('player_id, booking_id, response').in('booking_id', bookingIds)
       : Promise.resolve({ data: [] as { player_id: string; booking_id: string; response: string }[] }),
@@ -137,10 +152,19 @@ export default async function CaptainsCornerPage() {
     // lazily per player on tap (GET /api/captains-corner/context-stats), not
     // computed here — see src/lib/playerStats.ts getPlayerBookingContextStats().
     getRecentForm((players ?? []).map(p => p.id)),
+
+    knockoutTournamentIds.length > 0
+      ? getLeaderboardsByTournament(knockoutTournamentIds)
+      : Promise.resolve({} as Record<string, LeaderboardRow[]>),
   ])
 
   const availability: { player_id: string; booking_id: string; response: string }[] = avail ?? []
   const existingSquads: ExistingSquadRow[] = (squads ?? []) as ExistingSquadRow[]
+
+  const mvpRanksByTournament: Record<string, MvpRankEntry[]> = {}
+  for (const tid of knockoutTournamentIds) {
+    mvpRanksByTournament[tid] = computeMvpRanks(leaderboardsByTournament[tid] ?? [])
+  }
 
   const playersWithExempt = (players ?? []).map(p => ({
    ...p,
@@ -288,6 +312,7 @@ export default async function CaptainsCornerPage() {
                 players={playersWithExempt as any}
                 availMap={availMap}
                 initialSquadMap={initialSquadMap}
+                mvpRanksByTournament={mvpRanksByTournament}
               />
             ))}
           </div>

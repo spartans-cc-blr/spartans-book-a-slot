@@ -21,7 +21,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
-import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader } from '@/types'
+import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry } from '@/types'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -673,6 +673,31 @@ export async function getLeaderboardsByTournament(tournamentIds: string[]): Prom
   }
 
   return result
+}
+
+// Ranks a tournament's players by total MVP points, descending — feeds
+// Captains' Corner's knockout-game squad selection aid (see
+// features/squad-selection.md §11): a captain picking a knockout XI can see
+// who has performed well through the tournament's league stage so far.
+// Pure/no DB access — the caller (captains-corner/page.tsx) already has the
+// LeaderboardRow[] from getLeaderboard({ tournamentId }) or
+// getLeaderboardsByTournament(). Rank is a plain 1-based sequential
+// position, not a tie-sharing podium rank like BattingPositionRankEntry —
+// an exact mvpPoints tie is possible in principle but vanishingly rare in
+// practice (mvp_score already blends batting/bowling/fielding contributions
+// — see post-match-scorecard.md §15's identical observation for the match
+// MVP picker), so ties are broken by name for a stable, deterministic order
+// rather than sharing a rank.
+export function computeMvpRanks(rows: LeaderboardRow[]): MvpRankEntry[] {
+  return [...rows]
+    .sort((a, b) => b.stats.mvpPoints - a.stats.mvpPoints || a.playerName.localeCompare(b.playerName))
+    .map((r, i) => ({
+      playerId:      r.playerId,
+      playerName:    r.playerName,
+      cricheroesUrl: r.cricheroesUrl,
+      rank:          i + 1,
+      mvpPoints:     r.stats.mvpPoints,
+    }))
 }
 
 // Top run-scorer(s) at each batting position, for the bar chart above
