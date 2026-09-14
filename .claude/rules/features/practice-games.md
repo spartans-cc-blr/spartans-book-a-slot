@@ -64,6 +64,28 @@ admin explicitly ticks the new checkbox on a booking. No RLS change needed
 (this column is read/written through the same service-role-only path every
 other `bookings` column already uses).
 
+> **Incident (14 Sep 2026) — migration committed and merged, never applied
+> to the live Hub DB, broke `/team-stats` in production.** This is the same
+> failure class documented repeatedly elsewhere in this repo
+> (`post-match-scorecard.md` §5, `availability-nudge.md`, `gc-players.md`
+> §13) — a migration file lands in `supabase/migrations/**` and merges to
+> `main`, but nothing actually runs it against the live Supabase project.
+> `src/lib/teamStats.ts`'s `getTeamMatches()` (widened by this same PR to
+> select `bookings.is_practice` for the additive OR — §4) started throwing
+> `column bookings.is_practice does not exist` on every `/team-stats` load
+> the moment the PR merged. Confirmed via
+> `information_schema.columns` that the column was genuinely absent on the
+> live project (`ymyiwkltedgwdnjynntn`), then fixed by applying this
+> migration's exact SQL directly via Supabase MCP
+> (`mcp__Supabase__apply_migration`, name `078_bookings_is_practice`) —
+> same fix mechanism already used earlier the same day for the sibling
+> `078_grounds_pitch_type.sql` migration (`features/team-stats.md` §6).
+> Re-verified column present (`boolean`, `NOT NULL`, `default false`)
+> immediately after. Take-away, same as every prior instance of this bug:
+> a merged migration file is not the same as an applied one — always
+> cross-check `list_migrations` against `supabase/migrations/*.sql` after a
+> session (or PR) that touches schema, not just after your own session's.
+
 ---
 
 ## 4. Where it's wired in (every call site that used to read only
