@@ -499,11 +499,13 @@ const exemptBadge = player.is_fee_exempt
    ? <span className="ml-1 inline-flex items-center justify-center text-rose-500 dark:text-rose-400" title="Club solidarity — fee exempted"><HeartHandshakeIcon size={12} /></span>
    : null
 
+  // Plain text, no pill/box — just the rank number in the accent colour,
+  // consistent with how the "Top 16 MVP" panel shows its own rank numbers.
   const rankBadge = (mvpRank != null && !isTaken)
     ? <span
-        className="ml-1.5 font-rajdhani text-[9px] font-bold bg-[var(--captains-badge-bg)] dark:bg-gold/10 border border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold px-1 py-px rounded-sm"
+        className="ml-1.5 font-rajdhani text-xs font-bold text-[var(--captains-accent)] dark:text-gold"
         title={`Tournament MVP rank #${mvpRank}`}>
-        🏆#{mvpRank}
+        #{mvpRank}
       </span>
     : null
 
@@ -1198,7 +1200,36 @@ function SlotCard({
   const { copy, copied } = useCopySquad()
 
   const counts   = getCounts(booking.id, players, { ...availMap, [booking.id]: liveAvailMap })
-  const eligible = getSlotPlayers(booking.id, bookings, players, { ...availMap, [booking.id]: liveAvailMap })
+
+  // Knockout-only MVP rank aid — see features/squad-selection.md §11.
+  // stage_type NULL is treated as league, same convention used everywhere
+  // else in this app (features/team-stats.md §4). Computed before
+  // `eligible` below since a knockout booking re-sorts by rank.
+  const isKnockout = booking.stage_type === 'knockout'
+  const tournamentId = booking.tournament_id ?? null
+  const mvpRanks: MvpRankEntry[] = (isKnockout && tournamentId)
+    ? (mvpRanksByTournament?.[tournamentId] ?? [])
+    : []
+  const mvpRankByPlayerId = new Map(mvpRanks.map(r => [r.playerId, r.rank]))
+  const playersById = new Map(players.map(p => [p.id, p]))
+
+  const eligibleByResponse = getSlotPlayers(booking.id, bookings, players, { ...availMap, [booking.id]: liveAvailMap })
+  // For a knockout booking, order by tournament MVP rank (ascending) rather
+  // than the usual captain-first/response-code ordering — a captain picking
+  // a knockout XI wants to see the strongest performers first. Players with
+  // no MVP rank yet (no stats reconciled/synced for this tournament) sort
+  // after every ranked player, alphabetically among themselves.
+  const eligible = isKnockout
+    ? [...eligibleByResponse].sort((a, b) => {
+        const ra = mvpRankByPlayerId.get(a.player.id)
+        const rb = mvpRankByPlayerId.get(b.player.id)
+        if (ra != null && rb != null) return ra - rb
+        if (ra != null) return -1
+        if (rb != null) return 1
+        return a.player.name.localeCompare(b.player.name)
+      })
+    : eligibleByResponse
+
   const atCap           = selected.size >= MAX_SQUAD
   const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
   // Practice games go with whoever's available — Form guidance is only
@@ -1210,21 +1241,22 @@ function SlotCard({
   const exemptInSquad   = players.filter(p => selected.has(p.id) && p.is_fee_exempt).length
   const exemptWarning   = exemptInSquad >= 2
 
-  // Knockout-only MVP rank aid — see features/squad-selection.md §11.
-  // stage_type NULL is treated as league, same convention used everywhere
-  // else in this app (features/team-stats.md §4).
-  const isKnockout = booking.stage_type === 'knockout'
-  const tournamentId = booking.tournament_id ?? null
-  const mvpRanks: MvpRankEntry[] = (isKnockout && tournamentId)
-    ? (mvpRanksByTournament?.[tournamentId] ?? [])
-    : []
-  const mvpRankByPlayerId = new Map(mvpRanks.map(r => [r.playerId, r.rank]))
   // Top 16 by tournament MVP who haven't marked Y/O/E for this specific
   // booking — surfaced separately so a captain can chase down a strong
-  // performer who simply hasn't responded yet.
+  // performer who simply hasn't responded yet. Active players sort ahead of
+  // inactive ones (a stable sort, so rank order is preserved within each
+  // group) — an inactive player is less likely to actually be reachable,
+  // even if their tournament form still makes them worth chasing down.
   const eligiblePlayerIds = new Set(eligible.map(e => e.player.id))
   const top16NotResponded = isKnockout
-    ? mvpRanks.slice(0, 16).filter(r => !eligiblePlayerIds.has(r.playerId))
+    ? mvpRanks
+        .slice(0, 16)
+        .filter(r => !eligiblePlayerIds.has(r.playerId))
+        .sort((a, b) => {
+          const aActive = playersById.get(a.playerId)?.status === 'active' ? 0 : 1
+          const bActive = playersById.get(b.playerId)?.status === 'active' ? 0 : 1
+          return aActive - bActive
+        })
     : []
 
   // All three roles must be assigned before GC submission is allowed
@@ -1584,12 +1616,22 @@ function SlotCard({
                 🏆 Top 16 MVP — not yet responded
               </p>
               <div className="flex flex-wrap gap-x-3 gap-y-1">
-                {top16NotResponded.map(r => (
-                  <span key={r.playerId} className="font-rajdhani text-xs text-[var(--captains-text-2)] dark:text-zinc-300">
-                    <span className="font-bold text-amber-700 dark:text-amber-400">#{r.rank}</span>{' '}
-                    <PlayerNameLink name={r.playerName} playerId={r.playerId} cricHeroesUrl={r.cricheroesUrl} />
-                  </span>
-                ))}
+                {top16NotResponded.map(r => {
+                  const isActive = playersById.get(r.playerId)?.status === 'active'
+                  return (
+                    <span key={r.playerId} className="font-rajdhani text-xs text-[var(--captains-text-2)] dark:text-zinc-300 inline-flex items-center gap-1">
+                      <span className="font-bold text-amber-700 dark:text-amber-400">#{r.rank}</span>
+                      <PlayerNameLink name={r.playerName} playerId={r.playerId} cricHeroesUrl={r.cricheroesUrl} />
+                      <span className={`font-rajdhani text-[8px] font-bold px-1 py-px rounded-sm border ${
+                        isActive
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400'
+                          : 'bg-[var(--captains-border)] dark:bg-zinc-800 border-[var(--captains-border)] dark:border-zinc-700 text-[var(--captains-text-muted)] dark:text-zinc-500'
+                      }`}>
+                        {isActive ? 'ACTIVE' : 'INACTIVE'}
+                      </span>
+                    </span>
+                  )
+                })}
               </div>
             </div>
           )}
