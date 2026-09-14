@@ -163,6 +163,13 @@ function shortTourney(name: string | null | undefined): string {
   return name.length > 12 ? name.slice(0, 11) + '…' : name
 }
 
+// Zero-pads a tournament MVP rank ("1" -> "01") so every rank badge is the
+// same character width and the names it precedes line up on a consistent
+// left edge — see features/squad-selection.md §11.
+function padRank(rank: number): string {
+  return String(rank).padStart(2, '0')
+}
+
 function isSharedPlayer(
   playerId: string,
   bookings: Booking[],
@@ -499,13 +506,14 @@ const exemptBadge = player.is_fee_exempt
    ? <span className="ml-1 inline-flex items-center justify-center text-rose-500 dark:text-rose-400" title="Club solidarity — fee exempted"><HeartHandshakeIcon size={12} /></span>
    : null
 
-  // Plain text, no pill/box — just the rank number in the accent colour,
-  // consistent with how the "Top 16 MVP" panel shows its own rank numbers.
+  // Plain text, no pill/box — the zero-padded rank number, in the accent
+  // colour, preceding the name so every row's name starts at the same left
+  // edge regardless of whether the rank is one or two digits.
   const rankBadge = (mvpRank != null && !isTaken)
     ? <span
-        className="ml-1.5 font-rajdhani text-xs font-bold text-[var(--captains-accent)] dark:text-gold"
+        className="mr-1.5 font-rajdhani text-xs font-bold text-[var(--captains-accent)] dark:text-gold tabular-nums"
         title={`Tournament MVP rank #${mvpRank}`}>
-        #{mvpRank}
+        {padRank(mvpRank)}
       </span>
     : null
 
@@ -517,11 +525,11 @@ const exemptBadge = player.is_fee_exempt
         rel="noopener noreferrer"
         onClick={e => e.stopPropagation()}
         className={cls + ' hover:underline underline-offset-2'}>
-        {player.name}{badge}{exemptBadge}{rankBadge}
+        {rankBadge}{player.name}{badge}{exemptBadge}
       </a>
     )
   }
-  return <span className={cls}>{player.name}{badge}{exemptBadge}{rankBadge}</span>
+  return <span className={cls}>{rankBadge}{player.name}{badge}{exemptBadge}</span>
 }
 
 // ── Match Role SVG Icons ──────────────────────────────────────────
@@ -1243,21 +1251,18 @@ function SlotCard({
 
   // Top 16 by tournament MVP who haven't marked Y/O/E for this specific
   // booking — surfaced separately so a captain can chase down a strong
-  // performer who simply hasn't responded yet. Active players sort ahead of
-  // inactive ones (a stable sort, so rank order is preserved within each
-  // group) — an inactive player is less likely to actually be reachable,
-  // even if their tournament form still makes them worth chasing down.
+  // performer who simply hasn't responded yet. Split into two groups
+  // (active first, inactive after) rather than a per-name badge — an
+  // inactive player is less likely to actually be reachable, even if their
+  // tournament form still makes them worth chasing down. Each group keeps
+  // the original rank order (mvpRanks is already rank-ascending, and
+  // filtering preserves order).
   const eligiblePlayerIds = new Set(eligible.map(e => e.player.id))
-  const top16NotResponded = isKnockout
-    ? mvpRanks
-        .slice(0, 16)
-        .filter(r => !eligiblePlayerIds.has(r.playerId))
-        .sort((a, b) => {
-          const aActive = playersById.get(a.playerId)?.status === 'active' ? 0 : 1
-          const bActive = playersById.get(b.playerId)?.status === 'active' ? 0 : 1
-          return aActive - bActive
-        })
+  const top16Base = isKnockout
+    ? mvpRanks.slice(0, 16).filter(r => !eligiblePlayerIds.has(r.playerId))
     : []
+  const top16Active   = top16Base.filter(r => playersById.get(r.playerId)?.status === 'active')
+  const top16Inactive = top16Base.filter(r => playersById.get(r.playerId)?.status !== 'active')
 
   // All three roles must be assigned before GC submission is allowed
   const rolesComplete = !!roles.captain && !!roles.vc && roles.wk.size > 0
@@ -1609,30 +1614,38 @@ function SlotCard({
           )}
 
           {/* Top 16 by tournament MVP who haven't responded to this booking —
-              knockout games only. See features/squad-selection.md §11. */}
-          {isKnockout && top16NotResponded.length > 0 && (
+              knockout games only. Active players listed on their own line,
+              inactive players on the next — no per-name status badge. See
+              features/squad-selection.md §11. */}
+          {isKnockout && (top16Active.length > 0 || top16Inactive.length > 0) && (
             <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-300 dark:border-amber-800/50">
               <p className="font-rajdhani text-[10px] font-bold tracking-[1.5px] uppercase text-amber-700 dark:text-amber-400 mb-1.5">
                 🏆 Top 16 MVP — not yet responded
               </p>
-              <div className="flex flex-wrap gap-x-3 gap-y-1">
-                {top16NotResponded.map(r => {
-                  const isActive = playersById.get(r.playerId)?.status === 'active'
-                  return (
-                    <span key={r.playerId} className="font-rajdhani text-xs text-[var(--captains-text-2)] dark:text-zinc-300 inline-flex items-center gap-1">
-                      <span className="font-bold text-amber-700 dark:text-amber-400">#{r.rank}</span>
+              {top16Active.length > 0 && (
+                <p className="font-rajdhani text-xs text-[var(--captains-text-2)] dark:text-zinc-300 leading-relaxed">
+                  <span className="font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 mr-1">Active:</span>
+                  {top16Active.map((r, i) => (
+                    <span key={r.playerId}>
+                      <span className="font-bold text-amber-700 dark:text-amber-400 tabular-nums">{padRank(r.rank)}</span>{' '}
                       <PlayerNameLink name={r.playerName} playerId={r.playerId} cricHeroesUrl={r.cricheroesUrl} />
-                      <span className={`font-rajdhani text-[8px] font-bold px-1 py-px rounded-sm border ${
-                        isActive
-                          ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400'
-                          : 'bg-[var(--captains-border)] dark:bg-zinc-800 border-[var(--captains-border)] dark:border-zinc-700 text-[var(--captains-text-muted)] dark:text-zinc-500'
-                      }`}>
-                        {isActive ? 'ACTIVE' : 'INACTIVE'}
-                      </span>
+                      {i < top16Active.length - 1 ? ', ' : ''}
                     </span>
-                  )
-                })}
-              </div>
+                  ))}
+                </p>
+              )}
+              {top16Inactive.length > 0 && (
+                <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-500 leading-relaxed mt-1">
+                  <span className="font-bold uppercase tracking-wide text-[var(--captains-text-muted)] dark:text-zinc-500 mr-1">Inactive:</span>
+                  {top16Inactive.map((r, i) => (
+                    <span key={r.playerId}>
+                      <span className="font-bold text-amber-700 dark:text-amber-400 tabular-nums">{padRank(r.rank)}</span>{' '}
+                      <PlayerNameLink name={r.playerName} playerId={r.playerId} cricHeroesUrl={r.cricheroesUrl} />
+                      {i < top16Inactive.length - 1 ? ', ' : ''}
+                    </span>
+                  ))}
+                </p>
+              )}
             </div>
           )}
 
