@@ -29,7 +29,7 @@ export default async function TournamentPlannerPage() {
       .from('bookings')
       .select(`
         id, game_date, slot_time, format, cricheroes_url, match_id, opponent_name,
-        captain_id,
+        captain_id, is_practice,
         tournament:tournaments!bookings_tournament_id_fkey(
           id, name, organiser_name, organiser_contact,
           total_league_games, cricheroes_points_table_url,
@@ -52,17 +52,18 @@ export default async function TournamentPlannerPage() {
   // in the slot-target/bandwidth model this page is built around (ALL_SLOTS
   // has no entry for them) — excluded here so they don't skew captain
   // bandwidth counts or silently render an empty slot-balance section.
-  // Practice games (tournaments.is_practice) are excluded too — the planner
-  // is a real-tournament pace/bandwidth tool, and the "Practice games"
-  // umbrella tournament has no league games, no captain workload, and no
-  // slot-target model that makes sense here — same "real stats only"
-  // posture as the leaderboard (see features/leaderboard.md §10).
+  // Practice games (tournaments.is_practice, additively OR'd with a
+  // booking's own is_practice flag — see features/practice-games.md) are
+  // excluded too — the planner is a real-tournament pace/bandwidth tool,
+  // and a practice game has no league-game/captain-workload/slot-target
+  // model that makes sense here — same "real stats only" posture as the
+  // leaderboard (see features/leaderboard.md §10).
   const normalizedBookings = (rawBookings ?? [])
     .map(b => ({
       ...b,
       tournament: Array.isArray(b.tournament) ? b.tournament[0] ?? null : b.tournament,
     }))
-    .filter(b => !isInformalFormat(b.format) && !b.tournament?.is_practice)
+    .filter(b => !isInformalFormat(b.format) && !b.tournament?.is_practice && !(b as any).is_practice)
 
   // match_stats_cache lookup is scoped to every confirmed booking with a
   // tournament (not just the informal/practice-filtered set) — matches the

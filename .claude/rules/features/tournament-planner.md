@@ -59,12 +59,13 @@ Fetches, in order:
      rare admin-only quick-game formats, so including them would either
      skew captain bandwidth counts or silently render an empty
      slot-balance section.
-   - **Practice-tournament bookings** (`tournament.is_practice`, see
-     `features/leaderboard.md` §10) — the planner is a real-tournament
-     pace/bandwidth tool; the "Practice games" umbrella tournament has no
-     league-game count, no captain workload, and no slot-target model
-     that makes sense here. Same "real stats only" posture as the
-     leaderboard.
+   - **Practice bookings** (`tournament.is_practice`, see
+     `features/leaderboard.md` §10, additively OR'd with a booking's own
+     `is_practice` override since September 2026 — `features/practice-games.md`)
+     — the planner is a real-tournament pace/bandwidth tool; a practice
+     game has no league-game count, no captain workload, and no
+     slot-target model that makes sense here. Same "real stats only"
+     posture as the leaderboard.
 2. **Match results** for any booking with a `match_id`, read from
    `match_stats_cache` (the same read-through cache
    `features/post-match-scorecard.md` documents) — best-effort attach,

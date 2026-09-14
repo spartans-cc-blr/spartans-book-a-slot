@@ -132,7 +132,7 @@ export async function attachGroundTournamentInfo(
 
   const { data } = await supabase
     .from('bookings')
-    .select('id, ground_id, tournament:tournaments(ground_id, is_practice, ground:grounds(name))')
+    .select('id, ground_id, is_practice, tournament:tournaments(ground_id, is_practice, ground:grounds(name))')
     .in('id', bookings.map(b => b.id))
 
   interface ResolvedInfo { groundId: string | null; groundName: string | null; isPractice: boolean }
@@ -141,7 +141,10 @@ export async function attachGroundTournamentInfo(
     const tournamentRow = row.tournament
     const groundId   = (row.ground_id as string | null) ?? (tournamentRow?.ground_id as string | null) ?? null
     const groundName = (tournamentRow?.ground?.name as string | null) ?? null
-    const isPractice = !!tournamentRow?.is_practice
+    // Additive — this booking's own is_practice flag counts the same as its
+    // tournament being the "Practice games" umbrella. See
+    // features/practice-games.md.
+    const isPractice = !!tournamentRow?.is_practice || !!row.is_practice
     return [row.id as string, { groundId, groundName, isPractice }]
   }))
 

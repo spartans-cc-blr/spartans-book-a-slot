@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   const {
     game_date, slot_time, format, tournament_id,
     notes, opponent_name, match_id, cricheroes_url,
-    match_time, match_stage, match_fee_override, stage_type,
+    match_time, match_stage, match_fee_override, stage_type, is_practice,
     // Both validated below and defaulted from the tournament when the key
     // is omitted entirely — see the resolution after the tournament fetch.
     captain_id, ground_id,
@@ -70,6 +70,10 @@ export async function POST(req: NextRequest) {
 
   if (stage_type != null && stage_type !== 'league' && stage_type !== 'knockout') {
     return NextResponse.json({ error: 'stage_type must be league, knockout or null' }, { status: 400 })
+  }
+
+  if (is_practice != null && typeof is_practice !== 'boolean') {
+    return NextResponse.json({ error: 'is_practice must be a boolean' }, { status: 400 })
   }
 
   if (!GAME_DATE_REGEX.test(game_date)) {
@@ -169,6 +173,7 @@ export async function POST(req: NextRequest) {
       match_time:         match_time ?? null,
       match_stage:        match_stage ?? null,
       stage_type:         stage_type ?? null,
+      is_practice:        is_practice ?? false,
       match_fee_override: match_fee_override ?? null,
       // Canonical opponent, resolved server-side from the typed spelling via
       // opponent_aliases — never taken from the client (features/team-stats.md §5)

@@ -27,7 +27,7 @@ export async function syncMatchStatsForBooking(
 
   const { data: booking, error: bookingErr } = await supabase
     .from('bookings')
-    .select('match_id, game_date, tournament:tournaments(is_practice)')
+    .select('match_id, game_date, is_practice, tournament:tournaments(is_practice)')
     .eq('id', bookingId)
     .single()
 
@@ -153,7 +153,11 @@ export async function syncMatchStatsForBooking(
       .filter((id): id is string => Boolean(id))
   ))
   const tournamentRow = Array.isArray(booking.tournament) ? booking.tournament[0] : booking.tournament
-  const isPractice = !!(tournamentRow as any)?.is_practice
+  // Additive — this one booking's own is_practice flag counts the same as
+  // its tournament being the "Practice games" umbrella. Lets a single game
+  // under any real tournament be marked practice without routing it through
+  // that tournament. See features/practice-games.md.
+  const isPractice = !!(tournamentRow as any)?.is_practice || !!(booking as any).is_practice
 
   await Promise.all([
     detectAndLogMilestones(bookingId, year, playerIds),

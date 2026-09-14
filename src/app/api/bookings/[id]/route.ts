@@ -80,6 +80,10 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
     return NextResponse.json({ error: 'stage_type must be league, knockout or null' }, { status: 400 })
   }
 
+  if ('is_practice' in safeUpdates && typeof safeUpdates.is_practice !== 'boolean') {
+    return NextResponse.json({ error: 'is_practice must be a boolean' }, { status: 400 })
+  }
+
   if (safeUpdates.game_date && !GAME_DATE_REGEX.test(safeUpdates.game_date)) {
     return NextResponse.json({ error: 'game_date must be in YYYY-MM-DD format' }, { status: 400 })
   }
