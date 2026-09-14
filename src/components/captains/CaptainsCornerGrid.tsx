@@ -14,10 +14,11 @@
 // booking's tournament/ground/format record via /api/captains-corner/context-stats.
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import type { BookingContextStats, PlayerStatsTotals } from '@/types'
+import type { BookingContextStats, PlayerStatsTotals, MvpRankEntry } from '@/types'
 import { isPracticeMatch } from '@/types'
 import { matchDisplayTime } from '@/lib/matchStatus'
 import { useTheme } from '@/components/ui/ThemeProvider'
+import { PlayerNameLink } from '@/lib/playerLink'
 
 interface Booking {
   id: string
@@ -39,6 +40,12 @@ interface Booking {
   // This booking's own practice-game flag, additive to the tournament's own
   // is_practice — see features/practice-games.md.
   is_practice?: boolean
+  // Machine-readable league/knockout flag (features/team-stats.md §4) and
+  // this booking's own tournament id — both needed to look up this booking's
+  // tournament MVP rank list (see mvpRanksByTournament below). NULL
+  // stage_type is treated as league, same convention used everywhere else.
+  tournament_id?: string | null
+  stage_type?: string | null
 }
 
 interface Player {
@@ -85,6 +92,11 @@ interface Props {
   availMap:  Record<string, Record<string, string>>
   squadMap?: Record<string, string[]>
   initialSquadMap?: Record<string, InitialSquad>
+  // Tournament MVP rank aid for knockout games — tournamentId → players
+  // ranked by total MVP points, descending. Only populated for tournaments
+  // that actually have a knockout booking in view; see
+  // features/squad-selection.md §11 and computeMvpRanks() in playerStats.ts.
+  mvpRanksByTournament?: Record<string, MvpRankEntry[]>
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -465,9 +477,14 @@ function StatusBadge({ status }: { status: 'draft' | 'pending' | 'approved' | 'a
 
 // ── PlayerName — conditional CricHeroes link ──────────────────────
 function PlayerName({
-  player, isTaken, hasDues,
+  player, isTaken, hasDues, mvpRank,
 }: {
   player: Player; isTaken: boolean; hasDues: boolean
+  // Tournament MVP rank (1-based) for a knockout booking — see
+  // mvpRanksByTournament / features/squad-selection.md §11. null/undefined
+  // when this isn't a knockout booking, or this player has no MVP stats
+  // (not yet reconciled/synced) for this tournament.
+  mvpRank?: number | null
 }) {
   const cls = [
     'font-rajdhani text-sm flex-1 leading-none',
@@ -482,6 +499,14 @@ const exemptBadge = player.is_fee_exempt
    ? <span className="ml-1 inline-flex items-center justify-center text-rose-500 dark:text-rose-400" title="Club solidarity — fee exempted"><HeartHandshakeIcon size={12} /></span>
    : null
 
+  const rankBadge = (mvpRank != null && !isTaken)
+    ? <span
+        className="ml-1.5 font-rajdhani text-[9px] font-bold bg-[var(--captains-badge-bg)] dark:bg-gold/10 border border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold px-1 py-px rounded-sm"
+        title={`Tournament MVP rank #${mvpRank}`}>
+        🏆#{mvpRank}
+      </span>
+    : null
+
   if (player.cricheroes_url && !isTaken) {
     return (
       <a
@@ -490,11 +515,11 @@ const exemptBadge = player.is_fee_exempt
         rel="noopener noreferrer"
         onClick={e => e.stopPropagation()}
         className={cls + ' hover:underline underline-offset-2'}>
-        {player.name}{badge}{exemptBadge}
+        {player.name}{badge}{exemptBadge}{rankBadge}
       </a>
     )
   }
-  return <span className={cls}>{player.name}{badge}{exemptBadge}</span>
+  return <span className={cls}>{player.name}{badge}{exemptBadge}{rankBadge}</span>
 }
 
 // ── Match Role SVG Icons ──────────────────────────────────────────
@@ -607,7 +632,7 @@ function MatchRoleIcon({ role, ballType = 'red' }: {
 // FIX 5: Added matchRole and onMatchRoleToggle to props
 function SelectablePlayerRow({
   player, response, selected, atCap, status, takenLabel, roles,
-  matchRole, ballType, bookingId, isPractice, onToggle, onRoleToggle, onMatchRoleToggle,
+  matchRole, ballType, bookingId, isPractice, mvpRank, onToggle, onRoleToggle, onMatchRoleToggle,
 }: {
   player:             Player
   response:           string
@@ -620,6 +645,7 @@ function SelectablePlayerRow({
   ballType: 'red' | 'white' | 'pink'   // ADD
   bookingId:          string   // for the tap-to-expand "Form" panel — see ContextStatsPanel
   isPractice:         boolean  // practice games go with whoever's available — Form guidance is noise here
+  mvpRank:            number | null  // tournament MVP rank for a knockout booking — see PlayerName
   onToggle:           (id: string) => void
   onRoleToggle:       (id: string, role: 'captain' | 'vc' | 'wk') => void
   onMatchRoleToggle:  (id: string, role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null) => void  // FIX 5
@@ -689,7 +715,7 @@ function SelectablePlayerRow({
           {isSel && <span className="text-[8px] text-white font-bold leading-none">✓</span>}
         </span>
 
-        <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} />
+        <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} mvpRank={mvpRank} />
 
         {/* Form toggle — only shown for players with at least one reconciled
             match; opens the tournament/ground/format panel below. Hidden
@@ -1045,7 +1071,7 @@ function AddPlayerPanel({
 
 // ── SlotCard ──────────────────────────────────────────────────────
 function SlotCard({
-  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad, onSelectedChange, onStatusChange,
+  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad, mvpRanksByTournament, onSelectedChange, onStatusChange,
 }: {
   booking:     Booking
   bookings:    Booking[]
@@ -1054,6 +1080,7 @@ function SlotCard({
   squadMap:    Record<string, string[]>
   defaultOpen: boolean
   initialSquad?: InitialSquad
+  mvpRanksByTournament?: Record<string, MvpRankEntry[]>
   onSelectedChange: (bookingId: string, selected: Set<string>) => void
   onStatusChange?: (bookingId: string, status: SquadStatus) => void
 }) {
@@ -1182,6 +1209,23 @@ function SlotCard({
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
   const exemptInSquad   = players.filter(p => selected.has(p.id) && p.is_fee_exempt).length
   const exemptWarning   = exemptInSquad >= 2
+
+  // Knockout-only MVP rank aid — see features/squad-selection.md §11.
+  // stage_type NULL is treated as league, same convention used everywhere
+  // else in this app (features/team-stats.md §4).
+  const isKnockout = booking.stage_type === 'knockout'
+  const tournamentId = booking.tournament_id ?? null
+  const mvpRanks: MvpRankEntry[] = (isKnockout && tournamentId)
+    ? (mvpRanksByTournament?.[tournamentId] ?? [])
+    : []
+  const mvpRankByPlayerId = new Map(mvpRanks.map(r => [r.playerId, r.rank]))
+  // Top 16 by tournament MVP who haven't marked Y/O/E for this specific
+  // booking — surfaced separately so a captain can chase down a strong
+  // performer who simply hasn't responded yet.
+  const eligiblePlayerIds = new Set(eligible.map(e => e.player.id))
+  const top16NotResponded = isKnockout
+    ? mvpRanks.slice(0, 16).filter(r => !eligiblePlayerIds.has(r.playerId))
+    : []
 
   // All three roles must be assigned before GC submission is allowed
   const rolesComplete = !!roles.captain && !!roles.vc && roles.wk.size > 0
@@ -1532,6 +1576,24 @@ function SlotCard({
             </div>
           )}
 
+          {/* Top 16 by tournament MVP who haven't responded to this booking —
+              knockout games only. See features/squad-selection.md §11. */}
+          {isKnockout && top16NotResponded.length > 0 && (
+            <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-300 dark:border-amber-800/50">
+              <p className="font-rajdhani text-[10px] font-bold tracking-[1.5px] uppercase text-amber-700 dark:text-amber-400 mb-1.5">
+                🏆 Top 16 MVP — not yet responded
+              </p>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {top16NotResponded.map(r => (
+                  <span key={r.playerId} className="font-rajdhani text-xs text-[var(--captains-text-2)] dark:text-zinc-300">
+                    <span className="font-bold text-amber-700 dark:text-amber-400">#{r.rank}</span>{' '}
+                    <PlayerNameLink name={r.playerName} playerId={r.playerId} cricHeroesUrl={r.cricheroesUrl} />
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Available across all slots */}
           {priorityPlayers.length > 0 && (
             <>
@@ -1554,6 +1616,7 @@ function SlotCard({
                   ballType={ballType}
                   bookingId={booking.id}
                   isPractice={isPractice}
+                  mvpRank={mvpRankByPlayerId.get(player.id) ?? null}
                   onToggle={toggle}
                   onRoleToggle={handleRoleToggle}
                   onMatchRoleToggle={handleMatchRoleToggle}
@@ -1603,6 +1666,7 @@ function SlotCard({
                 ballType={ballType}
                 bookingId={booking.id}
                 isPractice={isPractice}
+                mvpRank={mvpRankByPlayerId.get(player.id) ?? null}
                 onToggle={toggle}
                 onRoleToggle={handleRoleToggle}
                 onMatchRoleToggle={handleMatchRoleToggle}
@@ -1995,7 +2059,7 @@ function Legend() {
 }
 
 // ── Main export ────────────────────────────────────────────────────
-export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {}, initialSquadMap = {} }: Props) {
+export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {}, initialSquadMap = {}, mvpRanksByTournament = {} }: Props) {
 
   const [view, setView] = useState<'slot' | 'matrix'>('slot')
   const weekendBookings = bookings.filter(b => isWeekendDate(b.game_date))
@@ -2118,6 +2182,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
               squadMap={liveSquadMap}
               defaultOpen={i === 0}
               initialSquad={initialSquadMap[b.id]}
+              mvpRanksByTournament={mvpRanksByTournament}
               onSelectedChange={updateSelected}
               onStatusChange={updateStatus}
             />

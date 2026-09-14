@@ -291,6 +291,20 @@ export interface LeaderboardRow {
   halfCenturies: number
 }
 
+// A tournament's players ranked by total MVP points (descending) — feeds
+// Captains' Corner's knockout-game squad selection aid, so a captain can
+// see who has performed well through the tournament so far when picking a
+// knockout XI. `rank` is a plain 1-based sequential position (ties broken
+// by name) — see src/lib/playerStats.ts computeMvpRanks() and
+// features/squad-selection.md §11.
+export interface MvpRankEntry {
+  playerId:      string
+  playerName:    string
+  cricheroesUrl: string | null
+  rank:          number
+  mvpPoints:     number
+}
+
 // One ranked tier of the batting-position leaderboard (see
 // BattingPositionLeader below) — `rank` is a podium position (1/2/3), not a
 // row index, so a genuine tie (same runs AND same innings) shares one rank
