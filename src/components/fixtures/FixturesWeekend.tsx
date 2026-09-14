@@ -36,6 +36,7 @@ interface BookingEntry {
   hasDues:         boolean
   slotLocked:      boolean
   squadAnnounced:  boolean
+  knockoutIneligible?: boolean
 }
 
 interface Props {
@@ -171,6 +172,7 @@ export function FixturesWeekendGroup({
             hasDues={b.hasDues}
             slotLocked={b.slotLocked}
             squadAnnounced={b.squadAnnounced}
+            knockoutIneligible={b.knockoutIneligible}
           />
 )}
         </div>

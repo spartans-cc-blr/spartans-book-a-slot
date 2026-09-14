@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
+import { isEligibleForKnockoutTournament, KNOCKOUT_INELIGIBLE_MESSAGE } from '@/lib/knockoutEligibility'
 
 const LOCK_MSG = 'Availability locked — Squad selection in progress'
 
@@ -81,6 +82,28 @@ export async function POST(req: NextRequest) {
   if (!player.isCaptain && !player.isGC && !player.isAdmin) {
     const freezeMsg = await checkFreeze(supabase, booking_id)
     if (freezeMsg) return NextResponse.json({ error: freezeMsg }, { status: 403 })
+  }
+
+  // ── GUARD 3: knockout-stage eligibility ───────────────────────────────────
+  // A knockout booking can only be self-marked by a player who represented
+  // this tournament in at least one league game (announced squad — batting/
+  // bowling/fielding involvement is not required). Captains, GC, and admins
+  // bypass, same carve-out as GUARD 2 — they manage the pool directly, incl.
+  // via the captain-availability proxy route, which is never subject to this
+  // check. See features/knockout-day-protection.md §6.
+  if (!player.isCaptain && !player.isGC && !player.isAdmin) {
+    const { data: bookingRow } = await supabase
+      .from('bookings')
+      .select('stage_type, tournament_id')
+      .eq('id', booking_id)
+      .single()
+
+    if (bookingRow?.stage_type === 'knockout' && bookingRow.tournament_id) {
+      const eligible = await isEligibleForKnockoutTournament(supabase, bookingRow.tournament_id, player.playerId)
+      if (!eligible) {
+        return NextResponse.json({ error: KNOCKOUT_INELIGIBLE_MESSAGE }, { status: 403 })
+      }
+    }
   }
 
   // ── Explicit SELECT → INSERT or UPDATE (no upsert) ────────────────────────
