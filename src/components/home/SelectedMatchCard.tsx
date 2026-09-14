@@ -5,11 +5,15 @@
 // field (date/slot/format, tournament + opponent + ground + match_stage,
 // the ball/jersey/CricHeroes/ground/hospital icon row, the collapsible
 // announced-squad section with its match-fee row and wallet-after-this-
-// match projection, and the squad grid with C/VC/WK badges) — but
-// re-themed to this dashboard's Warm Light palette instead of
-// FixturesCard's hardcoded dark gradient (see navigation.md §3.1), since
-// this is a distinct, dashboard-native component, not that same component
-// reskinned in place.
+// match projection, and the squad grid with C/VC/WK badges) — but re-themed
+// to this dashboard's own Warm Light palette in light mode, instead of
+// FixturesCard's original hardcoded dark gradient (see navigation.md §3.1),
+// since this is a distinct, dashboard-native component, not that same
+// component reskinned in place. In dark mode, this card's tokens are
+// aligned to FixturesCard's own DARK tokens instead (see the LIGHT/DARK
+// definitions below) — so "You're Selected to Play" and the "Upcoming
+// Fixtures" list right below it (which renders real FixturesCard instances)
+// read as one consistent dark theme rather than two different ones.
 //
 // Deliberately excluded: the "⚠ Slot underfilled" availability nudge —
 // that's about whether a slot still needs more Y responses, which is moot
@@ -27,31 +31,43 @@ import {
 import { useTheme } from '@/components/ui/ThemeProvider'
 
 // Light/Dark tokens — see ui-theme.md "Light/Dark/System". Light is this
-// card's original Warm Light palette, unchanged; dark reuses the app's
-// original ink tokens. A plain client-side lookup (not the CSS-variable
-// approach page.tsx uses) since this is already a 'use client' component
-// and can read useTheme() directly.
+// card's original Warm Light palette, unchanged. Dark is aligned to
+// FixturesCard.tsx's own DARK tokens byte-for-byte wherever the two cards
+// share a concept (fixed September 2026 — dark previously reused the app's
+// generic ink tokens instead, so this card's dark-mode card background,
+// borders, and accents visibly diverged from FixturesCard's own dark
+// theme sitting right below it in the "Upcoming Fixtures" list on this same
+// page). `squadOwn` (highlighting the viewer's own row) has no FixturesCard
+// equivalent — set to FixturesCard's own dark gold accent so it still
+// reads as "gold" the same way the rest of this card's dark accents do. A
+// plain client-side lookup (not the CSS-variable approach page.tsx uses)
+// since this is already a 'use client' component and can read useTheme()
+// directly.
 const LIGHT = {
   cardBg: '#FFFFFF', cardBorder: '#F5D9A8',
   dateText: '#B45309', accentGradient: 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)',
-  headingText: '#1C1917', accent: '#D97706',
+  headingText: '#1C1917', accentUnderline: '#D97706',
   subtitleText: '#57534E', opponentText: '#44403C',
   groundText: '#78716C', divider: '#E7E0D3', faintText: '#A8A29E',
   stageBg: '#FEF3C7', stageText: '#B45309', stageBorder: '#F5D9A8',
+  squadHeading: '#059669',
   feeText: '#78716C', feeBorder: '#F1EBDD', feeAmount: '#B45309',
+  walletPositive: '#059669', walletNegative: '#D97706',
   squadOwn: '#B45309', squadOther: '#44403C', squadUnderline: '#D4C9B0',
   cBadgeBg: '#FEF3C7', cBadgeText: '#B45309', cBadgeBorder: '#F5D9A8',
 }
 const DARK = {
-  cardBg: 'linear-gradient(160deg, #1A1A1A 0%, #111111 100%)', cardBorder: '#7A6030',
-  dateText: '#E8C97A', accentGradient: 'linear-gradient(90deg, #C9A84C, #E8C97A, #C9A84C)',
-  headingText: '#F0E8D0', accent: '#C9A84C',
-  subtitleText: '#D4CBB0', opponentText: '#D4CBB0',
-  groundText: '#A3987E', divider: '#242424', faintText: '#7A7264',
-  stageBg: '#3d2e00', stageText: '#E8C97A', stageBorder: '#7A6030',
-  feeText: '#A3987E', feeBorder: '#242424', feeAmount: '#E8C97A',
-  squadOwn: '#E8C97A', squadOther: '#D4CBB0', squadUnderline: '#2E2E2E',
-  cBadgeBg: '#3d2e00', cBadgeText: '#E8C97A', cBadgeBorder: '#7A6030',
+  cardBg: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)', cardBorder: '#2D3748',
+  dateText: '#C9A84C', accentGradient: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)',
+  headingText: '#F5F5F5', accentUnderline: '#C9A84C',
+  subtitleText: '#9CA3AF', opponentText: '#D1D5DB',
+  groundText: '#6B7280', divider: '#2D3748', faintText: '#6B7280',
+  stageBg: '#2d1f00', stageText: '#f59e0b', stageBorder: '#d97706',
+  squadHeading: '#4ade80',
+  feeText: '#9CA3AF', feeBorder: '#1F2937', feeAmount: '#F5D78E',
+  walletPositive: '#4ADE80', walletNegative: '#F59E0B',
+  squadOwn: '#C9A84C', squadOther: '#D1D5DB', squadUnderline: '#C9A84C55',
+  cBadgeBg: '#2d2400', cBadgeText: '#C9A84C', cBadgeBorder: '#C9A84C',
 }
 
 type SquadPlayer = {
@@ -123,7 +139,7 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
         <p className="font-cinzel text-base font-bold leading-snug" style={{ color: t.headingText }}>
           {match.tournament?.cricheroes_points_table_url ? (
             <a href={match.tournament.cricheroes_points_table_url} target="_blank" rel="noopener noreferrer"
-              style={{ color: t.headingText, textDecoration: 'underline', textDecorationColor: t.accent, textUnderlineOffset: '3px' }}>
+              style={{ color: t.headingText, textDecoration: 'underline', textDecorationColor: t.accentUnderline, textUnderlineOffset: '3px' }}>
               {match.tournament?.name}
             </a>
           ) : (
@@ -201,7 +217,7 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
           className="w-full flex items-center justify-between py-1"
           style={{ background: 'none', border: 'none', cursor: 'pointer' }}
         >
-          <span className="font-rajdhani text-[11px] font-bold uppercase tracking-wide" style={{ color: '#059669' }}>
+          <span className="font-rajdhani text-[11px] font-bold uppercase tracking-wide" style={{ color: t.squadHeading }}>
             ✅ Squad Announced · {match.squad.length} players
           </span>
           <span className="text-sm" style={{ color: t.faintText }}>{squadOpen ? '▲' : '▼'}</span>
@@ -221,7 +237,7 @@ export function SelectedMatchCard({ match, viewerPlayerId }: { match: SelectedMa
             Your wallet after this match:{' '}
             <span style={{
               fontWeight: 700,
-              color: (match.loggedInWalletBalance - match.feePerPlayer) < 0 ? t.accent : '#059669',
+              color: (match.loggedInWalletBalance - match.feePerPlayer) < 0 ? t.walletNegative : t.walletPositive,
             }}>
               ₹{match.loggedInWalletBalance - match.feePerPlayer}
             </span>
