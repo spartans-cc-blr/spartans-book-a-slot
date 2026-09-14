@@ -734,76 +734,98 @@ show an "unlinked" hint).
 
 ---
 
-## 6. Pitch Type — `grounds.pitch_type` (migration 078, added September 2026)
+## 6. Pitch Type — `tournaments.pitch_type` (migration 079, added September 2026; moved off `grounds` the same day)
 
-A third grounds-level attribute, alongside `maps_url`/`hospital_url`:
-**Matted**, **Astro** or **Turf** — `text CHECK (pitch_type IN ('Matted',
-'Astro', 'Turf'))`, nullable. Added specifically to give Team Record a
-fourth ground-adjacent dimension (a tournament's own venue is one thing,
-what it was actually played *on* is another) — filterable, splittable, and
+A **Matted** / **Astro** / **Turf** attribute — `text CHECK (pitch_type IN
+('Matted', 'Astro', 'Turf'))`, nullable — filterable, splittable, and
 usable as a "then by" second-level breakdown, the same as every other
 dimension on this page (§3.2).
 
-### Backfill — Turf derived from tournament name, the rest left unset
+### Corrected the same day — tournament-level, not ground-level
 
-Rather than guess a pitch type for every ground, only the one signal the
-data actually supports was auto-populated: a ground counts as **Turf** if
-any tournament whose *name* contains "Turf" was played there. At the time
-of writing this was exactly two tournaments — "MSB Turf T30 Champions
-Trophy Season-6" and "Sara Inaugural Turf" — and, cross-checked against
-every one of their bookings' own `ground_id` (not just each tournament's
-default `ground_id`, since a booking can override it — migration 066),
-both were played exclusively at one ground each: **MSB Turf Ground** and
-**Sara Turf Ground** respectively. Both were set to `'Turf'` in the
-migration itself.
+**Originally shipped as `grounds.pitch_type`** (migration
+`078_grounds_pitch_type.sql`, same day) — the reasoning at the time was
+that pitch type reads like a property of the physical ground. On second
+thought that was the wrong anchor: **a ground's actual surface can change
+over time** (resurfacing), so a static ground-level field would eventually
+go stale, and correcting it later would silently repaint *every*
+historical match ever played there, including ones played on the old
+surface before the resurfacing — nothing in this schema would ever notice
+or flag that. **A tournament, by contrast, runs on one surface for its
+entire duration**, so it's the right place to snapshot "what pitch type
+these matches were actually played on" — immune to whatever happens to the
+ground afterward. Migration `079_move_pitch_type_to_tournaments.sql`
+reverses the column onto `tournaments` and drops it from `grounds`
+entirely, same day, before the ground-level version had seen any real use
+beyond its own backfill.
 
-**Every other ground was left `NULL`** ("not set") rather than guessed
-between Matted and Astro — that distinction needs real-world knowledge of
-each ground (which physical surface it actually has) that nothing in this
-schema can derive. This includes "Sachin Tendulkar Turf Ground" — its own
-*name* says Turf, but it has zero bookings and zero tournaments referencing
-it, so the tournament-name rule genuinely has nothing to go on for it; it
-was deliberately left unset rather than pattern-matched on its own name,
-to keep the backfill rule single and explainable (tournament name, not
-ground name). A wrangler/admin can reclassify any ground — Turf included —
-at any time from `/wrangler/grounds`.
+The one case this doesn't fit — the "Practice games" umbrella tournament,
+which deliberately rotates across many different grounds/surfaces (see
+`features/tournament-planner.md` §7) — doesn't matter: practice matches
+are excluded from Team Record by default anyway (§2), and pitch type isn't
+meaningful for a tournament with no single surface regardless of which
+table it lived on.
 
-### Where it's set — `/wrangler/grounds`
+### Backfill — carried forward from the ground-level migration, not re-derived from scratch
 
-`GroundsClient.tsx` gained a **Pitch Type** select (Not set / Matted /
-Astro / Turf) in both the "＋ Add Ground" form and the per-row edit panel,
-and its own column in the grounds table — a ground with no pitch type set
-shows an amber "⚠ Not set — classify" link (wrangler/admin only, same
-pattern as the existing Maps/Hospital "⚠ Not set — add link" affordance),
-plain "⚠ Not set" text otherwise. Optional on create (a ground doesn't have
-to be classified up front) and independently editable at any time, same
-`canAdd`/`canEdit` split as every other field on this page — see
-`features/wrangler-grounds-menu.md`. `GET`/`POST`/`PATCH /api/grounds`
-(`src/app/api/grounds/route.ts`) validate `pitch_type` server-side against
+- **Turf**: same name-based rule as before ("a tournament whose *name*
+  contains 'Turf'"), just applied directly to the tournament instead of
+  via ground indirection — "MSB Turf T30 Champions Trophy Season-6" and
+  "Sara Inaugural Turf".
+- **Matted**: the ground-level migration's own backfill only covered Turf
+  by design (§6 originally said Matted/Astro "needs real-world knowledge
+  ... that nothing in this schema can derive"), but in the short window
+  the ground-level column existed, a wrangler had already manually
+  classified **"Macushala Cricket Ground"** as `Matted` via
+  `/wrangler/grounds` — real, human-entered data, not a guess. Rather than
+  lose it in the move, migration 079 checked which tournaments actually
+  played there (`Champions Trophy Ed-3 (T30 - White Ball)`, `Extreme
+  Cricket Champions Tourney Ed-6 (White Ball - T30)`, `Extreme Cricket
+  Summer Cup Season 1`) — confirmed via direct query that all three used
+  that one ground exclusively, so there's no ambiguity moving the
+  classification up a level — and set `Matted` on those three tournaments
+  by id.
+- **Every other tournament was left `NULL`** ("not set") — same "don't
+  guess" posture the original migration took.
+
+### Where it's set — `/admin/tournaments`
+
+The Pitch Type select moved from `GroundsClient.tsx` (`/wrangler/grounds`)
+to the tournament Add/Edit forms on `/admin/tournaments`
+(`src/app/admin/tournaments/page.tsx`) — admin-only, matching who can
+already write every other tournament master-data field (`architecture.md`
+§3's role table; unlike grounds, there's no wrangler-level write access to
+tournaments). Optional on create, independently editable at any time.
+`POST`/`PATCH /api/tournaments` validate `pitch_type` server-side against
 the three allowed values (or `null`/`''` to clear it back to "not set")
 before it ever reaches the DB's own `CHECK` constraint — an invalid value
-400s with a clear message rather than a raw 500.
+400s with a clear message rather than a raw 500, same guard shape the
+grounds route used to carry. `/wrangler/grounds` no longer has any pitch
+type UI at all — `GroundsClient.tsx` is back to just Maps/Hospital links.
 
 ### Where it's used — Team Record
 
-`grounds!bookings_ground_id_fkey(id, name, pitch_type)` is now part of
-`getTeamMatches()`'s single booking fetch (`src/lib/teamStats.ts`) — no new
-query. `TeamMatch.pitchType: PitchType | null` carries it through;
-`'pitch'` is a full `SplitDimension` (`src/lib/teamStatsCore.ts`) and a
-`TeamFilters.pitch` filter, wired into `applyFilters()`/`groupsFor()`
-exactly like every other dimension. **Unlike toss/innings, an unset pitch
-type is its own visible group — `{ key: 'unset', label: 'Not set' }` —
-rather than being dropped.** Most grounds have no pitch type yet at the
-time this shipped, so silently excluding them from the split would hide
-most of the data; showing "Not set" as a real row is what makes the gap
-visible and actionable (the same way an unresolved opponent spelling shows
-as "unlinked" rather than disappearing, §5). The *filter*, by contrast,
-only offers the three real values plus "All pitch types" — there's no
-"filter to just the unclassified ones" option, matching how every other
+`tournaments!bookings_tournament_id_fkey(id, name, is_practice,
+total_league_games, pitch_type)` is now part of `getTeamMatches()`'s
+single booking fetch (`src/lib/teamStats.ts`) — no new query; the `grounds`
+join lost its `pitch_type` column but is otherwise unchanged.
+`TeamMatch.pitchType: PitchType | null` carries it through unchanged —
+`'pitch'` is still a full `SplitDimension` (`src/lib/teamStatsCore.ts`) and
+a `TeamFilters.pitch` filter, wired into `applyFilters()`/`groupsFor()`
+exactly like every other dimension; only where the value is *sourced* from
+changed. **Unlike toss/innings, an unset pitch type is its own visible
+group — `{ key: 'unset', label: 'Not set' }` — rather than being dropped.**
+Most tournaments have no pitch type yet at the time this shipped, so
+silently excluding them from the split would hide most of the data;
+showing "Not set" as a real row is what makes the gap visible and
+actionable (the same way an unresolved opponent spelling shows as
+"unlinked" rather than disappearing, §5). The *filter*, by contrast, only
+offers the three real values plus "All pitch types" — there's no "filter
+to just the unclassified ones" option, matching how every other
 fixed-enum filter (stage, toss, innings) is scoped.
 
 Open to every viewer, same as every dimension except Captain (§3.6) — a
-ground's pitch surface isn't sensitive, so `visibleFilterKeys()`/
+tournament's pitch surface isn't sensitive, so `visibleFilterKeys()`/
 `visibleSplitDimensions()` don't gate it.
 
 ---
@@ -838,7 +860,7 @@ ground's pitch surface isn't sensitive, so `visibleFilterKeys()`/
 | Toss read from the analytics DB server-side only (`ANALYTICS_SUPABASE_KEY`), never from the client | ✅ |
 | Client-safe module split (`teamStatsCore.ts`) — no server-only import reachable from a `'use client'` file; verified by `next build` | ✅ |
 | Captain filter/split/then-by gated to captain/GC/admin server-side (`canUseCaptainDimension` in `page.tsx`) — a non-privileged `?by=captain`/`?then=captain`/`?captain=<id>` is ignored, not just hidden from the UI (§3.6) | ✅ |
-| `grounds.pitch_type` writes (`POST`/`PATCH /api/grounds`) validated server-side against the three allowed values (or cleared to `null`) before reaching the DB — an invalid value 400s rather than hitting the CHECK constraint (§6) | ✅ |
+| `tournaments.pitch_type` writes (`POST`/`PATCH /api/tournaments`, admin-only) validated server-side against the three allowed values (or cleared to `null`) before reaching the DB — an invalid value 400s rather than hitting the CHECK constraint (§6) | ✅ |
 
 ---
 
@@ -848,9 +870,10 @@ ground's pitch surface isn't sensitive, so `visibleFilterKeys()`/
 |---|---|
 | `supabase/migrations/076_bookings_stage_type.sql` | `bookings.stage_type` + one-off knockout backfill (§4) |
 | `supabase/migrations/077_opponents_master.sql` | `opponents`, `opponent_aliases`, `bookings.opponent_id`, RLS (§5) |
-| `supabase/migrations/078_grounds_pitch_type.sql` | `grounds.pitch_type` + the Turf-only backfill (§6) |
+| `supabase/migrations/078_grounds_pitch_type.sql` | Superseded the same day by migration 079 — added `grounds.pitch_type` + the Turf-only backfill; see §6's "Corrected the same day" note |
+| `supabase/migrations/079_move_pitch_type_to_tournaments.sql` | Drops `grounds.pitch_type`, adds `tournaments.pitch_type`, re-derives the Turf backfill and carries forward the one real Matted classification (§6) |
 | `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `applyFilters()` covers every dimension and `splitByNested()` composes two of them (§3.2); `splitTournamentRowsByStatus()` partitions the Tournament split into Ongoing/Completed (§3.7); `PitchFilter`/the `'pitch'` `SplitDimension` (§6) |
-| `src/lib/teamStats.ts` | `getTeamMatches()` fetch (now also selects `tournaments.total_league_games` → `TeamMatch.tournamentTotalLeagueGames`, §3.7, and `grounds.pitch_type` → `TeamMatch.pitchType`, §6; `TeamMatch.isPractice` also ORs in the booking's own `is_practice` — `features/practice-games.md`); re-exports the core (§2) |
+| `src/lib/teamStats.ts` | `getTeamMatches()` fetch (now also selects `tournaments.total_league_games` → `TeamMatch.tournamentTotalLeagueGames`, §3.7, and `tournaments.pitch_type` → `TeamMatch.pitchType`, §6; `TeamMatch.isPractice` also ORs in the booking's own `is_practice` — `features/practice-games.md`); re-exports the core (§2) |
 | `src/lib/teamStats.test.ts` | Vitest coverage of the aggregators |
 | `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers (`TeamFilterState`, `buildTeamStatsHref`, `toTeamFilters`, chip labels) shared by the page and the panel (§3); `visibleFilterKeys()`/`visibleSplitDimensions()` gate the Captain dimension (§3.6); `pitch` filter key (§6) |
 | `src/lib/opponents.ts` | `normaliseOpponentName()`, `resolveOpponentIdByName()`, `linkSpellingToOpponent()`, `AliasConflictError` (§5) |
@@ -862,13 +885,15 @@ ground's pitch surface isn't sensitive, so `visibleFilterKeys()`/
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` | Opponent master + reconciliation queue (§5) |
 | `src/app/api/opponents/route.ts` | GET / POST / PATCH |
 | `src/app/api/opponents/link/route.ts` | POST — link a spelling |
-| `src/app/api/grounds/route.ts` | GET now also returns `pitch_type`; POST/PATCH validate it server-side (§6) |
-| `src/components/wrangler/GroundsClient.tsx` | Pitch Type select on the Add/Edit forms + table column, gated by the same `canAdd`/`canEdit` split as every other field (§6) |
+| `src/app/api/grounds/route.ts` | No longer touches `pitch_type` — reverted to Maps/Hospital only once the field moved to tournaments (§6) |
+| `src/components/wrangler/GroundsClient.tsx` | No longer has a Pitch Type select or column — reverted once the field moved to `/admin/tournaments` (§6) |
+| `src/app/api/tournaments/route.ts` | GET returns `pitch_type` via `select('*')`; POST/PATCH validate it server-side, admin-only (§6) |
+| `src/app/admin/tournaments/page.tsx` | Pitch Type select on the tournament Add/Edit forms (§6) |
 | `src/app/api/bookings/route.ts`, `src/app/api/bookings/[id]/route.ts` | Accept `stage_type`; derive `opponent_id` server-side |
 | `src/components/admin/StageTypeToggle.tsx` | League/Knockout toggle on both admin booking forms |
 | `src/app/admin/bookings/new/page.tsx`, `src/app/admin/bookings/[id]/page.tsx` | Render the toggle, send `stage_type` |
 | `src/components/ui/SiteNav.tsx`, `src/components/ui/MobileTabBar.tsx` | Stats ▾ dropdown, Team Record + Opponents entries (§7) |
-| `src/types/index.ts` | `StageType`, `Opponent`, `Booking.stage_type` / `opponent_id`, `PitchType` (§6) |
+| `src/types/index.ts` | `StageType`, `Opponent`, `Booking.stage_type` / `opponent_id`, `Tournament.pitch_type`, `PitchType` (§6) |
 
 ---
 
@@ -877,7 +902,7 @@ ground's pitch surface isn't sensitive, so `visibleFilterKeys()`/
 | Item | Notes |
 |---|---|
 | Reconcile the 93 existing spellings | Manual, via the `/opponents` queue — nothing auto-seeded (§5). Once done, the "unlinked" hints on Team Record disappear. |
-| Classify the remaining ~36 grounds as Matted or Astro | Manual, via `/wrangler/grounds` — only Turf was auto-derivable from tournament names (§6); everything else needs a wrangler/admin who knows the physical surface. Until then those grounds' matches show under Team Record's Pitch Type "Not set" bucket. |
+| Classify the remaining tournaments as Matted or Astro | Manual, via `/admin/tournaments` — only Turf was auto-derivable from tournament names, and Matted only for the one tournament trio that inherited a real wrangler-entered classification during the brief ground-level window (§6); everything else needs an admin who knows the physical surface each tournament actually played on. Until then those tournaments' matches show under Team Record's Pitch Type "Not set" bucket. |
 | Pre-Hub matches (~170 in the analytics DB) | Out of scope by decision (§1). Including them needs bookings backfilled with format/ground/opponent first — `/admin/booking-backfill` is the existing tool for that. |
 | Unlink / delete an alias | Not built — a mis-link is fixed by renaming/relinking. Add a DELETE on `/api/opponents/link` if it comes up. |
 | Toss columns on `match_stats_cache` | Not needed today (§2); revisit only if the extra analytics-DB read shows up in latency. |
