@@ -707,16 +707,20 @@ For a booking whose `stage_type = 'knockout'` (migration `076`, see
 `features/team-stats.md` §4 — `NULL` is treated as league, same convention
 used everywhere else this flag is read), the Per Slot view now:
 
-1. **Shows a `#N` rank next to every available player's name** — in both
-   the "Available across all slots" and "Available" sections — where `N`
-   is that player's rank (1 = highest) by total MVP points **for this
-   tournament**, across every match synced so far. Plain text in the
-   accent colour, no icon and no pill/badge box — deliberately quieter
-   than the CAP/exempt badges next to it, since it's shown on every row
-   rather than a rare exception. No rank is shown for a player with no MVP
-   stats in this tournament (never played, or their scorecard hasn't
-   synced/reconciled yet — see `features/player-identity-resolution.md`),
-   or for a player already struck through as taken elsewhere.
+1. **Precedes every available player's name with their zero-padded rank**
+   (`01`, `02`, … `16`, `23`, …) — in both the "Available across all slots"
+   and "Available" sections — where the rank is that player's position
+   (1 = highest) by total MVP points **for this tournament**, across every
+   match synced so far. Plain text in the accent colour, no icon and no
+   pill/badge box — deliberately quieter than the CAP/exempt badges next
+   to it, since it's shown on every row rather than a rare exception. The
+   zero-pad (`padRank()`) is purely cosmetic — it keeps every row's name
+   starting at the same left edge regardless of whether the rank is one or
+   two digits — and has no effect on the underlying number. No rank is
+   shown for a player with no MVP stats in this tournament (never played,
+   or their scorecard hasn't synced/reconciled yet — see
+   `features/player-identity-resolution.md`), or for a player already
+   struck through as taken elsewhere.
 2. **Both sections are themselves ordered by that same rank** (ascending —
    rank 1 first), replacing the usual captain-first/response-code/name
    ordering for a knockout booking specifically. A player with no rank yet
@@ -725,31 +729,37 @@ used everywhere else this flag is read), the Per Slot view now:
    unchanged.
 3. **Lists the top 16 players by tournament MVP who have *not* marked Y/O/E
    for this specific booking**, as a small "🏆 Top 16 MVP — not yet
-   responded" panel above the squad lists — each entry shows the player's
-   rank, a `PlayerNameLink` to their Hub stats page (or their CricHeroes
-   profile, for the rare unreconciled case), and an ACTIVE/INACTIVE badge
-   (`players.status`) — active players sort first, inactive next, since an
-   inactive player is less reachable even if their tournament form still
-   makes them worth chasing down. This is deliberately the complement of
-   (1)/(2): the same MVP rank list, just the slice a captain would
-   otherwise have no way to see, since a player who hasn't responded at
-   all never appears in either "Available" section.
+   responded" panel above the squad lists — split into two lines, "Active:"
+   and "Inactive:" (from `players.status`), each a comma-separated run of
+   `rank name` pairs (the name a `PlayerNameLink` to the player's Hub stats
+   page, or their CricHeroes profile for the rare unreconciled case). No
+   per-name status badge — the grouping itself is the signal, active names
+   on their own line ahead of inactive ones, since an inactive player is
+   less reachable even if their tournament form still makes them worth
+   chasing down. Either line is omitted entirely when its group is empty.
+   This is deliberately the complement of (1)/(2): the same MVP rank list,
+   just the slice a captain would otherwise have no way to see, since a
+   player who hasn't responded at all never appears in either "Available"
+   section.
 
 Neither of these change what a captain can *do* — no new selection, filter,
 or squad-cap logic. This is read-only context layered onto the existing
 Per Slot screen, exactly like the pre-existing "Form" panel (§5).
 
-**Revised the same week** — the first cut showed a `🏆#N` pill badge (icon
-+ background/border box, matching the CAP/exempt badge treatment) and left
-both "Available" sections in their normal captain-first/response-code
-order, with no distinction between active/inactive players in the Top 16
-panel. Per direct feedback: the trophy icon was dropped and the badge
-flattened to plain coloured text (§ item 1 above); the two "Available"
-sections were changed to sort by rank instead of just displaying it inline
-(§ item 2); and the Top 16 panel gained the ACTIVE/INACTIVE badge plus its
-active-first ordering (§ item 3). The underlying rank computation
-(`computeMvpRanks()`) and data-fetching path are unchanged by this — only
-presentation and ordering.
+**Revised twice the same week.** First cut: a `🏆#N` pill badge (icon +
+background/border box, matching the CAP/exempt badge treatment) *after*
+the player's name, both "Available" sections left in their normal
+captain-first/response-code order, and a per-name ACTIVE/INACTIVE badge in
+the Top 16 panel with active-first ordering. First revision, per direct
+feedback: dropped the trophy icon and flattened the badge to plain
+coloured text; sorted both "Available" sections by rank instead of just
+displaying it inline. Second revision, per further feedback: moved the
+rank to *precede* the name and zero-padded it for alignment (item 1
+above); replaced the Top 16 panel's per-name ACTIVE/INACTIVE badge with
+two separate lines — one for active players, one for inactive (item 3
+above) — rather than a badge on every entry. The underlying rank
+computation (`computeMvpRanks()`) and data-fetching path are unchanged by
+either revision — only presentation and ordering.
 
 ### Where the rank comes from
 
@@ -808,16 +818,20 @@ entries, no memoization needed) back both pieces:
   ascending, unranked players last — see item 2 above. Every other booking
   keeps `getSlotPlayers()`'s original captain-first/response-code/name
   sort untouched.
-- The plain-text `#N` rank feeds through `SelectablePlayerRow` →
-  `PlayerName`.
-- `top16NotResponded` (`mvpRanks.slice(0, 16)` filtered against the same
+- The plain-text, zero-padded rank (`padRank()`, a small module-level
+  helper) feeds through `SelectablePlayerRow` → `PlayerName`, rendered
+  *before* `player.name` in both the CricHeroes-link and plain-text
+  branches.
+- `top16Base` (`mvpRanks.slice(0, 16)` filtered against the same
   `eligible` array — Y/O/E responses only — that already drives the
-  "Available" sections, then sorted active-first via `playersById`) feeds
-  the standalone panel.
+  "Available" sections) is split via `playersById` into `top16Active`/
+  `top16Inactive` — two plain filters, not a re-sort, so each keeps
+  `mvpRanks`'s original rank-ascending order. The panel renders one `<p>`
+  line per non-empty group.
 
-All three are computed per-booking, not per-page, so a weekend mixing a
-knockout game with ordinary league games only shows the aid on the
-knockout card.
+All of the above are computed per-booking, not per-page, so a weekend
+mixing a knockout game with ordinary league games only shows the aid on
+the knockout card.
 
 ### Explicitly out of scope
 
@@ -842,4 +856,4 @@ knockout card.
 | `src/lib/playerStats.ts` | `computeMvpRanks()` — pure MVP-rank sort, no DB access |
 | `src/types/index.ts` | `MvpRankEntry` type |
 | `src/app/captains-corner/page.tsx` | Selects `tournament_id, stage_type`; computes `knockoutTournamentIds`, fetches `getLeaderboardsByTournament()` in the existing `Promise.all`, builds `mvpRanksByTournament` |
-| `src/components/captains/CaptainsCornerGrid.tsx` | `Booking.tournament_id`/`stage_type`; `mvpRanksByTournament` prop threaded through `CaptainsCornerGrid` → `SlotCard`; `isKnockout`/`mvpRankByPlayerId`/`playersById`/`top16NotResponded` in `SlotCard`; rank-sorted `eligible` for a knockout booking; plain-text `#N` rank in `PlayerName` (no icon/pill); "Top 16 MVP — not yet responded" panel with ACTIVE/INACTIVE badge, active-first |
+| `src/components/captains/CaptainsCornerGrid.tsx` | `Booking.tournament_id`/`stage_type`; `mvpRanksByTournament` prop threaded through `CaptainsCornerGrid` → `SlotCard`; `padRank()` helper; `isKnockout`/`mvpRankByPlayerId`/`playersById`/`top16Active`/`top16Inactive` in `SlotCard`; rank-sorted `eligible` for a knockout booking; plain-text, zero-padded rank preceding the name in `PlayerName` (no icon/pill); "Top 16 MVP — not yet responded" panel with separate Active/Inactive lines, no per-name badge |
