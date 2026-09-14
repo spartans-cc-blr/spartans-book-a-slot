@@ -15,6 +15,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { BookingContextStats, PlayerStatsTotals } from '@/types'
+import { isPracticeMatch } from '@/types'
 import { matchDisplayTime } from '@/lib/matchStatus'
 import { useTheme } from '@/components/ui/ThemeProvider'
 
@@ -35,6 +36,9 @@ interface Booking {
   // This booking's own ground (migration 066) — takes priority over the
   // tournament's ground, which is now only a fallback for older rows.
   ground?: { name: string; maps_url: string; hospital_url: string } | null
+  // This booking's own practice-game flag, additive to the tournament's own
+  // is_practice — see features/practice-games.md.
+  is_practice?: boolean
 }
 
 interface Player {
@@ -1171,8 +1175,9 @@ function SlotCard({
   const atCap           = selected.size >= MAX_SQUAD
   const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
   // Practice games go with whoever's available — Form guidance is only
-  // useful when there's a real pool to choose between.
-  const isPractice = booking.tournament?.is_practice ?? false
+  // useful when there's a real pool to choose between. Additive: this
+  // booking's own flag counts the same as its tournament being flagged.
+  const isPractice = isPracticeMatch(booking.is_practice, booking.tournament?.is_practice)
   const priorityPlayers = eligible.filter(e => e.player.priority_pick)
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
   const exemptInSquad   = players.filter(p => selected.has(p.id) && p.is_fee_exempt).length

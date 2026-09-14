@@ -250,8 +250,9 @@ Primary scheduling record.
 | `cricheroes_url` | text | Direct CricHeroes match link |
 | `match_time` | text | Actual start time (may differ from slot). Admin booking form defaults this to the chosen `slot_time` once a slot is picked, unless already saved or manually overridden — see §8.1 |
 | `match_stage` | text | Free-text narrative stage ("Tournament Opener", "Semi Final") — never parsed as a signal |
-| `stage_type` | text | `league` · `knockout` · NULL (unclassified, treated as league) — structured flag for Team Record's League/Knockout split, set from the admin form; migration 076 — see `features/team-stats.md` §4 |
+| `stage_type` | text | `league` · `knockout` · NULL (unclassified, treated as league) — structured flag for Team Record's League/Knockout split, set from the admin form (defaults to `league` on a new booking as of September 2026); migration 076 — see `features/team-stats.md` §4 |
 | `opponent_id` | uuid FK | → `opponents.id`, nullable; derived server-side from `opponent_name` via `opponent_aliases` on create/edit, or linked on `/opponents`; migration 077 |
+| `is_practice` | boolean | `NOT NULL DEFAULT false` — per-booking practice-game override, additive to `tournaments.is_practice` (a match counts as practice when either is true); set from the admin form's "🎯 Practice Game" checkbox; migration 078 — see `features/practice-games.md` |
 | `reserved_until` | timestamptz | 48 hr expiry for `soft_block` |
 | `organiser_name` | text | External organiser (reservations) |
 | `organiser_phone` | text | WhatsApp for expiry warnings |
@@ -911,7 +912,8 @@ Next.js API Routes (server-side)
 | `src/app/team-stats/page.tsx` + `src/components/team/*` + `src/lib/teamStatsFilters.ts` | `/team-stats` — Team Record page; filter panel (chip summary row, desktop aside / mobile bottom sheet, staged apply), scrolling split row, expandable split table — see `features/team-stats.md` §3.1 |
 | `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher rendered under both `/leaderboard`'s and `/team-stats`'s hero |
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` + `src/app/api/opponents/**` | `/opponents` — opponent master + reconciliation queue and its API |
-| `src/components/admin/StageTypeToggle.tsx` | League/Knockout toggle on both admin booking forms → `bookings.stage_type` |
+| `src/components/admin/StageTypeToggle.tsx` | League/Knockout toggle on both admin booking forms → `bookings.stage_type` (defaults to `league` on a new booking) |
+| `src/components/admin/PracticeToggle.tsx` | Per-booking practice-game checkbox on both admin booking forms → `bookings.is_practice`, additive to `tournaments.is_practice` — see `features/practice-games.md` |
 | `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()`, `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()` — shared analytics-DB query layer, also used by Captains' Corner recent-form |
 | `src/lib/leaderboardMilestones.ts` | Plain (non-`'use client'`) module — `minGamesThreshold()`, `minDismissalsThreshold()`, `bestBy()`/`bestByAll()`, `totalDismissals()`; deliberately kept free of React/JSX so server-only callers like `leaderboardGlossary.ts` can import it safely — see `features/leaderboard.md` |
 | `src/lib/leaderboardGlossary.ts` | Builds the "What do these numbers mean?" entries at the bottom of `/leaderboard`, quoting the real thresholds currently in effect |

@@ -54,7 +54,7 @@ export async function getTeamMatches(): Promise<TeamMatch[]> {
     .from('bookings')
     .select(`
       id, game_date, slot_time, format, match_id, opponent_name, opponent_id,
-      tournament_id, ground_id, venue, match_stage, stage_type,
+      tournament_id, ground_id, venue, match_stage, stage_type, is_practice,
       tournament:tournaments!bookings_tournament_id_fkey(id, name, is_practice, total_league_games),
       ground:grounds!bookings_ground_id_fkey(id, name),
       opponent:opponents!bookings_opponent_id_fkey(id, name, is_marquee)
@@ -147,7 +147,10 @@ export async function getTeamMatches(): Promise<TeamMatch[]> {
       tournamentId:   tournament?.id ?? b.tournament_id ?? null,
       tournamentName: tournament?.name ?? null,
       tournamentTotalLeagueGames: num(tournament?.total_league_games),
-      isPractice:     !!tournament?.is_practice,
+      // Additive — a booking's own is_practice flag counts the same as its
+      // tournament being the "Practice games" umbrella. See
+      // features/practice-games.md.
+      isPractice:     !!tournament?.is_practice || !!b.is_practice,
       groundId:       ground?.id ?? b.ground_id ?? null,
       // Legacy rows from before migration 066 only have free-text venue
       groundName:     ground?.name ?? (b.venue ? String(b.venue).split(',')[0].trim() : null),

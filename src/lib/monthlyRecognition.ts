@@ -31,7 +31,7 @@ export async function getMonthSyncStatus(month: string): Promise<MonthSyncStatus
 
   const { data: bookings, error } = await supabase
     .from('bookings')
-    .select('id, tournament:tournaments(is_practice), scorecard_uploads(status)')
+    .select('id, is_practice, tournament:tournaments(is_practice), scorecard_uploads(status)')
     .eq('status', 'confirmed')
     .gte('game_date', startDate)
     .lt('game_date', endDate)
@@ -40,10 +40,12 @@ export async function getMonthSyncStatus(month: string): Promise<MonthSyncStatus
 
   // Practice-tournament bookings aren't real fixtures — see
   // getPracticeTournamentIds()'s comment in src/lib/playerStats.ts for the
-  // same exclusion applied to every other stats surface.
+  // same exclusion applied to every other stats surface. A booking's own
+  // is_practice flag is additive to the tournament-level one — see
+  // features/practice-games.md.
   const relevant = (bookings ?? []).filter((b: any) => {
     const tournament = Array.isArray(b.tournament) ? b.tournament[0] : b.tournament
-    return !tournament?.is_practice
+    return !tournament?.is_practice && !b.is_practice
   })
 
   const totalMatches = relevant.length

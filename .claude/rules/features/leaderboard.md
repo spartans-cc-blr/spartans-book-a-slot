@@ -559,6 +559,16 @@ A flag rather than a hardcoded name match, so a future rename of the
 tournament — or a second practice-style umbrella tournament — doesn't
 silently break the exclusion.
 
+**Additive per-booking override (added September 2026):**
+`bookings.is_practice` (migration `078_bookings_is_practice.sql`) lets a
+single game under *any* real tournament be individually marked practice,
+without rebooking it under the umbrella tournament above. A match counts
+as practice when either flag is true. See `features/practice-games.md` for
+the full list of call sites this widened (it's the same `getScopedMatchIds()`
+chokepoint described immediately below, plus several sites outside this
+page — Team Record, milestone/membership-fee detection, the availability
+nudge, Tournament Planner, Captains' Corner).
+
 **Where it's enforced — `getScopedMatchIds()` in `src/lib/playerStats.ts`:**
 every caller of this shared resolver excludes bookings under any
 `is_practice` tournament by default. Three ways to see through the
