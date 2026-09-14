@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
+import { DateChipSlider } from '@/components/ui/DateChipSlider'
+import { groupDatesIntoChips } from '@/lib/dateChipGroups'
 
 export interface DashboardBookingRow {
   id:               string
@@ -152,6 +154,7 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
   // fetch small. Explicitly clearing the month chip shows everything.
   const [monthFilter, setMonthFilter]         = useState(currentMonthStr())
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
+  const [dayFilter, setDayFilter]   = useState<string | null>(null)
   const [months, setMonths]         = useState<string[]>([])
   const [bookings, setBookings]     = useState<DashboardBookingRow[]>([])
   const [truncated, setTruncated]   = useState(false)
@@ -162,6 +165,7 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
     let cancelled = false
     setLoading(true)
     setError('')
+    setDayFilter(null) // a new month/all-time selection can't still contain the previously-picked date
     const qs = monthFilter ? `?month=${monthFilter}` : ''
     fetch(`/api/admin/bookings/past${qs}`)
       .then(res => res.json())
@@ -193,6 +197,22 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
     setMonthPickerOpen(false)
   }
   const monthGroups = groupMonthsByYear(months)
+
+  // Date-chip quick filter — same combined-weekend-chip convention as
+  // Upcoming Matches (/fixtures) and Past Matches (/matches/history),
+  // layered on top of the month stepper above rather than replacing it:
+  // the month picker scopes the server fetch, this just narrows what's
+  // shown from whatever that fetch already returned. Reverse-chronological
+  // (most recent first), matching the query's own game_date-desc order.
+  const distinctDates = useMemo(
+    () => Array.from(new Set(bookings.map(b => b.game_date))).sort(),
+    [bookings]
+  )
+  const dateChipGroups = useMemo(() => groupDatesIntoChips(distinctDates).reverse(), [distinctDates])
+  const selectedGroup = dayFilter ? dateChipGroups.find(g => g.key === dayFilter) : undefined
+  const visibleBookings = dayFilter && selectedGroup
+    ? bookings.filter(b => selectedGroup.dates.includes(b.game_date))
+    : bookings
 
   return (
     <div className="space-y-3">
@@ -283,7 +303,21 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
               Showing the most recent {bookings.length} bookings across all time — pick a specific month above to see everything from that period.
             </p>
           )}
-          <BookingsTable bookings={bookings} emptyLabel="No past bookings found." />
+          {dateChipGroups.length > 0 && (
+            <div className="bg-ink-4 border border-ink-5 rounded-xl p-3">
+              <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={setDayFilter} />
+            </div>
+          )}
+          {dayFilter && visibleBookings.length === 0 ? (
+            <p className="font-rajdhani text-sm text-zinc-600 text-center py-6">
+              No past bookings on {selectedGroup && selectedGroup.dates.length > 1 ? 'those dates' : 'that date'}.{' '}
+              <button onClick={() => setDayFilter(null)} className="text-gold underline">
+                Show all dates
+              </button>
+            </p>
+          ) : (
+            <BookingsTable bookings={visibleBookings} emptyLabel="No past bookings found." />
+          )}
         </>
       )}
     </div>

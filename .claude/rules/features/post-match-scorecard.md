@@ -488,6 +488,29 @@ flagged it, with an admin-only **Resolve** action that clears the flag
 without re-running the fetch (a false-alarm override, distinct from "Reset
 Upload").
 
+**Date-chip quick filter (added September 2026)** — the same combined-
+weekend-chip `DateChipSlider` used by Upcoming Matches (`/fixtures`, see
+`features/player-availability.md` §10.1) and Past Matches
+(`/matches/history`, see §16 below), reused here without any pagination
+concept (this route's GET is unpaginated — every eligible booking is
+fetched in one shot, see the `/api/admin/scorecard-backfill` row above),
+so no `hasMore`/`onLoadMore` props are passed. Sits directly under the
+Match ID search box; both filters compose (`matchIdFiltered` narrowed
+further by the selected date group), so "Select all shown"/"Run Backfill"
+and the ⚠ Needs Reconciliation/All Matches split all operate on whichever
+subset is currently narrowed by match ID *and* date. Dates are derived from
+whatever `matchIdFiltered` currently holds (`groupDatesIntoChips()`,
+`src/lib/dateChipGroups.ts`) and shown reverse-chronologically — most
+recently played first, since a recent match is the one most likely to need
+a re-run. Uses `DateChipSlider`'s default `theme="auto"`, same as every
+other call site — this page's own shell stays the classic dark-ink look
+(not yet converted to Light/Dark/System), so the slider renders
+byte-identical to that look for a dark-preference visitor; a Light-
+preference visitor sees the one small seam already accepted elsewhere in
+this app for shared components crossing a still-unconverted page (see
+`ui-theme.md`'s Light/Dark/System section) — no page-level reskin was done
+here.
+
 ### `/api/cron/backfill-scorecards` — twice daily, self-healing
 Runs at 13:00 and 19:00 IST (GitHub Actions: `"30 7,13 * * *"`). `vercel.json`
 carries a single-fire backup at `"30 13 * * *"` (19:00 IST only) — **Vercel

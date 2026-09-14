@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { DateChipSlider } from '@/components/ui/DateChipSlider'
+import { groupDatesIntoChips } from '@/lib/dateChipGroups'
 
 interface Booking {
   booking_id:     string
@@ -89,6 +91,7 @@ export default function ScorecardBackfillPage() {
   const [resetting, setResetting] = useState<Set<string>>(new Set())
 
   const [matchIdQuery, setMatchIdQuery] = useState('')
+  const [dayFilter, setDayFilter] = useState<string | null>(null)
 
   function load() {
     setLoading(true)
@@ -116,11 +119,30 @@ export default function ScorecardBackfillPage() {
 
   useEffect(load, [])
 
-  const filtered = useMemo(() => {
+  const matchIdFiltered = useMemo(() => {
     const q = matchIdQuery.trim().toLowerCase()
     if (!q) return bookings
     return bookings.filter(b => b.match_id.toLowerCase().includes(q))
   }, [bookings, matchIdQuery])
+
+  // Date-chip quick filter — same combined-weekend-chip convention as
+  // Upcoming Matches (/fixtures) and Past Matches (/matches/history), but
+  // purely client-side over the already-fetched, unpaginated list this
+  // page works with (no cursor/"Load Older" needed here). Reverse-
+  // chronological so the most recently played matches — the ones most
+  // likely to need a backfill/re-run — lead the row.
+  const distinctDates = useMemo(
+    () => Array.from(new Set(matchIdFiltered.map(b => b.game_date))).sort(),
+    [matchIdFiltered]
+  )
+  const dateChipGroups = useMemo(() => groupDatesIntoChips(distinctDates).reverse(), [distinctDates])
+  const selectedGroup = dayFilter ? dateChipGroups.find(g => g.key === dayFilter) : undefined
+
+  const filtered = useMemo(() => {
+    if (!dayFilter || !selectedGroup) return matchIdFiltered
+    const dateSet = new Set(selectedGroup.dates)
+    return matchIdFiltered.filter(b => dateSet.has(b.game_date))
+  }, [matchIdFiltered, dayFilter, selectedGroup])
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -255,8 +277,20 @@ export default function ScorecardBackfillPage() {
             />
           </div>
 
+          {dateChipGroups.length > 0 && (
+            <div className="bg-ink-3 border border-ink-5 rounded-xl p-3 mb-4">
+              <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={setDayFilter} />
+            </div>
+          )}
+
           {filtered.length === 0 ? (
-            <p className="font-rajdhani text-sm text-zinc-600">No matches found for that match_id.</p>
+            <p className="font-rajdhani text-sm text-zinc-600">
+              {dayFilter
+                ? <>No matches on {selectedGroup && selectedGroup.dates.length > 1 ? 'those dates' : 'that date'}.{' '}
+                    <button onClick={() => setDayFilter(null)} className="text-gold underline">Show all dates</button>
+                  </>
+                : 'No matches found for that match_id.'}
+            </p>
           ) : (
             <>
               <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
