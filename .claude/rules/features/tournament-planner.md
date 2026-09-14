@@ -217,6 +217,63 @@ shape.
 
 ---
 
+## 2.3 "Players Represented" undercounted relative to Leaderboard → Detailed (fixed September 2026)
+
+**Reported symptom:** for "BlendIn Challengers 3.0," this page's Player
+Stats board showed 32 players while `/leaderboard` → Detailed, filtered to
+the same tournament, showed 39.
+
+**Root cause — the two pages sourced their player list from two genuinely
+different places.** This page's `tournamentPlayersMap` (§ above) has
+always been built exclusively from **Hub `squad` rows with `status =
+'announced'`**, for this tournament's *past* bookings — i.e. "who a
+captain officially selected and announced through Captains' Corner."
+`/leaderboard` → Detailed (via `getLeaderboard({ tournamentId })`) has no
+notion of the Hub's `squad` table at all — it reads whoever's name
+resolved to a Hub `player_id` in the analytics DB's `batting_stats`/
+`bowling_stats`/`fielding_stats`/`team_list` for this tournament's synced
+match_ids (see `features/player-identity-resolution.md`). These two sets
+can diverge whenever a real match's scorecard has players the Hub's own
+squad table never recorded.
+
+Confirmed live for this exact tournament: one of its six played bookings
+(2026-02-08, `match_id 21868467`) had **zero rows in `squad`** at all —
+never drafted or announced through Captains' Corner, even though its
+scorecard synced cleanly with 12 real players. All four of that match's
+players were therefore invisible on this page but correctly counted on
+Leaderboard. A fifth player, from a *different* booking that did have an
+announced squad, also only ever appeared in that match's scorecard —
+i.e. played, but was never one of the 12 names the captain actually
+announced (a late substitution the Hub was never told about). Together
+these five were exactly the 39 − 32 gap.
+
+**Fixed** by widening what feeds `tournamentPlayersMap`, not by changing
+what Leaderboard does (Leaderboard's reasoning — "who genuinely appears on
+the synced scorecard" — is the more complete signal, and is also already
+being computed on this very page for `tournamentStatsMap`). §2.2's
+`getLeaderboardsByTournament()` call is now scoped to **every tournament
+with a confirmed booking** (`tournamentIdsWithBookings`, derived from
+`bookings` itself) instead of only the tournaments that already had at
+least one squad-announced player, and its result is merged into
+`tournamentPlayersMap` — any `LeaderboardRow` whose `playerId` isn't
+already in the squad-derived list for that tournament is appended (name/
+CricHeroes URL taken from the row itself) before the list's existing
+alphabetical sort re-runs. `tournamentStatsMap` is built from the same
+`leaderboardsByTournament` result, over the same widened tournament-id
+set, so a merged-in player's stats line was already available with no
+second fetch.
+
+Squad-announced players stay the primary/first-added source (unaffected
+players' ordering, and the captain/role designations elsewhere on this
+page, are untouched) — this only ever **adds** players a real, synced
+scorecard already vouches for; it never removes or second-guesses an
+announced squad. A player merged in this way has no "via squad" signal of
+any kind on this page (no C/VC/WK badge, since `squad` never had a row for
+them here) — same as any other Player Stats row, which was already purely
+a stats line, not a squad card.
+
+---
+
 ## 3. Slot Model — `ALL_SLOTS` / `distributeSlotTargets()`
 
 Both the in-file copy (`TournamentPlannerClient.tsx`) and the extracted
@@ -510,8 +567,13 @@ booked games across 3+ games.
 
 Sourced from `tournamentPlayersMap`/`tournamentStatsMap` (§2, step 4) —
 players who actually appeared in an *announced* squad for a *past*
-booking in this tournament, joined to their **this-tournament-only**
-aggregated stats. Trimmed to five headline columns (Matches / Runs /
+booking in this tournament, **plus** (fixed September 2026, see §2.3) any
+player with synced stats for this tournament who was never part of an
+announced squad row at all — a real match's scorecard is the more
+complete signal, and this merge is what keeps this table's player count
+from silently trailing `/leaderboard` → Detailed for the same tournament.
+Joined to their **this-tournament-only** aggregated stats. Trimmed to five
+headline columns (Matches / Runs /
 Wickets / Dismissals / MVP — `STAT_COLUMNS`) rather than Captains'
 Corner's fuller `ContextStatsTable` (Avg/SR/Econ included) — this board is
 meant to stay glanceable, not replace the per-player Form panel captains
@@ -627,7 +689,7 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 
 | File | Role |
 |---|---|
-| `src/app/tournament-planner/page.tsx` | Server component — role guard, all data fetching described in §2, `emptyTournaments` computation (§2.1); fires its independent Supabase reads via `Promise.all` and its per-tournament stats board via one batched `getLeaderboardsByTournament()` call instead of one `getLeaderboard()` call per tournament (§2.2) |
+| `src/app/tournament-planner/page.tsx` | Server component — role guard, all data fetching described in §2, `emptyTournaments` computation (§2.1); fires its independent Supabase reads via `Promise.all` and its per-tournament stats board via one batched `getLeaderboardsByTournament()` call instead of one `getLeaderboard()` call per tournament (§2.2), scoped to every tournament with a confirmed booking and merged into `tournamentPlayersMap` so a scorecard-only player is never dropped (§2.3) |
 | `src/components/tournament-planner/TournamentPlannerClient.tsx` | Root client component — `BandwidthSection`, `TournamentBlock`, `MatchTabsSection`, `SlotBalanceByDay`, `GameTimelineCard`, `InlineGameCountEditor`; owns `classifiedTournaments`/Show-filter state and `expandRequest` (view-to-scroll-and-expand); `tournamentMap` merges `emptyTournaments` in as zero-game entries (§2.1) |
 | `src/components/tournament-planner/TournamentShareButton.tsx` | Native-share-or-clipboard-copy button for the public share page's URL — used both here (admin/GC only) and on `TournamentShareCard.tsx` |
 | `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` / `resolveActiveFormats()` (§3.1) — the extracted copy used by the public share page and the organiser self-service suggestion engine; this page keeps its own historical in-file duplicate of `ALL_SLOTS`/`distributeSlotTargets` (§1) but not of `resolveActiveFormats`, which it inlines instead |

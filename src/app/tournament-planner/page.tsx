@@ -194,10 +194,7 @@ export default async function TournamentPlannerPage() {
 
   // Per-tournament player stats board — aggregated purely from each
   // tournament's own synced matches, never career-wide analytics. Keyed by
-  // real Hub player_id (reconciled — see src/lib/playerIdentityResolution.ts),
-  // so a player represented in the squad above with no reconciled match for
-  // this tournament simply has no entry and the UI shows "No stats synced"
-  // instead of a zero row.
+  // real Hub player_id (reconciled — see src/lib/playerIdentityResolution.ts).
   //
   // Batched into a single analytics-DB round trip via
   // getLeaderboardsByTournament() rather than one getLeaderboard() call per
@@ -205,10 +202,40 @@ export default async function TournamentPlannerPage() {
   // scaled this page's analytics-DB round trips linearly with the number of
   // tournaments ever played, and was the dominant cause of this page being
   // slow to load. See features/tournament-planner.md.
-  const tournamentIdsWithPlayers = Object.keys(tournamentPlayersMap)
-  const leaderboardsByTournament = await getLeaderboardsByTournament(tournamentIdsWithPlayers)
+  //
+  // Scoped to every tournament with a confirmed booking here — not just the
+  // ones that already had a squad-announced player above — so a tournament
+  // whose scorecard synced for a booking with no squad ever recorded in the
+  // Hub still gets its analytics rows fetched. Without this, such a booking's
+  // players were invisible everywhere on this page even though they show up
+  // correctly on /leaderboard's Detailed view (which reads the same analytics
+  // rows directly, with no dependency on the Hub's own squad table at all).
+  const tournamentIdsWithBookings = Array.from(new Set(
+    bookings.map(b => b.tournament?.id).filter((id): id is string => !!id)
+  ))
+  const leaderboardsByTournament = await getLeaderboardsByTournament(tournamentIdsWithBookings)
+
+  // Merge in any player who has synced stats for this tournament but was
+  // never part of an announced Hub squad row for it — e.g. a booking whose
+  // squad was never entered into Captains' Corner, or a late substitution
+  // that only ever showed up on the real CricHeroes scorecard. Without this,
+  // "Player Stats — N" here could under-count relative to /leaderboard's
+  // Detailed view filtered to the same tournament, which has no notion of
+  // squad announcement at all — see features/tournament-planner.md §5.7.
+  for (const tid of tournamentIdsWithBookings) {
+    const rows = leaderboardsByTournament[tid] ?? []
+    if (rows.length === 0) continue
+    const list = tournamentPlayersMap[tid] ?? (tournamentPlayersMap[tid] = [])
+    for (const row of rows) {
+      if (!list.some(p => p.id === row.playerId)) {
+        list.push({ id: row.playerId, name: row.playerName, cricheroes_url: row.cricheroesUrl })
+      }
+    }
+    list.sort((a, b) => a.name.localeCompare(b.name))
+  }
+
   const tournamentStatsMap: Record<string, Record<string, PlayerStatsTotals>> = {}
-  for (const tid of tournamentIdsWithPlayers) {
+  for (const tid of tournamentIdsWithBookings) {
     tournamentStatsMap[tid] = Object.fromEntries((leaderboardsByTournament[tid] ?? []).map(r => [r.playerId, r.stats]))
   }
 
