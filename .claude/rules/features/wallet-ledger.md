@@ -551,8 +551,10 @@ here can never fail the scorecard sync it's attached to.
 
 **Practice-tournament matches are excluded** — same "real stats only"
 posture as every other aggregate/ranking surface in this app
-(`features/leaderboard.md` §10). A practice game producing a century still
-gets celebrated (see milestone-recognition.md's own carve-out for that),
+(`features/leaderboard.md` §10), now additively including a booking's own
+`is_practice` override alongside its tournament's flag (added September
+2026 — see `features/practice-games.md`). A practice game producing a
+century still gets celebrated (see milestone-recognition.md's own carve-out for that),
 but it was judged that fielding a full team for an informal practice game
 shouldn't itself trigger a real money debit.
 

@@ -217,8 +217,15 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
   const hub = createServiceClient()
   const practiceIds = excludePractice ? await getPracticeTournamentIds() : new Set<string>()
 
+  // A booking's own is_practice flag (additive to the tournament-level one
+  // above) — lets a single game under any real tournament be marked
+  // practice without routing it through the "Practice games" umbrella
+  // tournament. Gated by the same excludePractice predicate as the
+  // tournament flag, so an explicit tournamentId filter or includePractice
+  // opt-in reveals it exactly the same way it already reveals a
+  // practice-tournament match — see features/practice-games.md.
   function withoutPractice(rows: any[]): any[] {
-    return excludePractice ? rows.filter(b => !practiceIds.has(b.tournament_id)) : rows
+    return excludePractice ? rows.filter(b => !practiceIds.has(b.tournament_id) && !b.is_practice) : rows
   }
 
   function baseQuery() {
@@ -228,7 +235,7 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
     // now-stale cancelled attempts happened to be booked for, on top of
     // the one it actually got played in. Confirmed, real incident: see
     // getPerformances()'s comment below.
-    let q = hub.from('bookings').select('match_id, tournament_id').not('match_id', 'is', null).eq('status', 'confirmed')
+    let q = hub.from('bookings').select('match_id, tournament_id, is_practice').not('match_id', 'is', null).eq('status', 'confirmed')
     if (filters.tournamentId) q = q.eq('tournament_id', filters.tournamentId)
     if (filters.month) {
       const [y, m] = filters.month.split('-').map(Number)

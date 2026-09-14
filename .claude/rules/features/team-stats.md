@@ -100,9 +100,12 @@ matches that produced it (§3).
   cricket convention. `null` (rendered "–") when nothing is decided.
 - **Form / streak** read newest-first regardless of input order; a
   no-result neither extends nor breaks a streak.
-- **Practice games** (`tournaments.is_practice`) excluded by default,
-  "Include practice" checkbox opts in — same posture as `/leaderboard` §10.
-- **Unclassified `stage_type` counts as league** (§4).
+- **Practice games** (`tournaments.is_practice`, additively OR'd with a
+  booking's own `bookings.is_practice` override — see
+  `features/practice-games.md`) excluded by default, "Include practice"
+  checkbox opts in — same posture as `/leaderboard` §10.
+- **Unclassified `stage_type` counts as league** (§4). A new booking now
+  defaults its `stage_type` toggle to League rather than "Not set" — see §4.
 - **Toss split** puts a toss-winning match in two buckets — the outcome
   (won/lost the toss) and the decision (chose to bat/field) — since those
   are two different questions. The toss *filter* is won/lost only (§3.2).
@@ -625,6 +628,14 @@ Opportunities", "Semi Final") that `features/knockout-day-protection.md`
 - **Admin form** — a "Game Type" toggle (Not set / 🎖️ League / 🏆
   Knockout, `src/components/admin/StageTypeToggle.tsx`) directly under
   Match Stage on both `/admin/bookings/new` and `/admin/bookings/[id]`.
+  **A new booking's toggle now defaults to League (added September
+  2026)**, instead of "Not set" — the vast majority of games are league
+  fixtures, so a new booking no longer needs an explicit choice to get the
+  common case right. "Not set" is still selectable (e.g. an admin
+  genuinely undecided at creation time) and behaves exactly as before once
+  saved. Only the *new-booking form's* initial state changed — editing an
+  existing booking still hydrates from whatever `stage_type` it actually
+  has, including a genuine `NULL`.
 - **API** — `POST /api/bookings` and `PATCH /api/bookings/[id]` accept
   `stage_type` and 400 on any value other than `league`/`knockout`/null.
 - **NULL means unclassified and is treated as league** by Team Record —
@@ -839,7 +850,7 @@ ground's pitch surface isn't sensitive, so `visibleFilterKeys()`/
 | `supabase/migrations/077_opponents_master.sql` | `opponents`, `opponent_aliases`, `bookings.opponent_id`, RLS (§5) |
 | `supabase/migrations/078_grounds_pitch_type.sql` | `grounds.pitch_type` + the Turf-only backfill (§6) |
 | `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `applyFilters()` covers every dimension and `splitByNested()` composes two of them (§3.2); `splitTournamentRowsByStatus()` partitions the Tournament split into Ongoing/Completed (§3.7); `PitchFilter`/the `'pitch'` `SplitDimension` (§6) |
-| `src/lib/teamStats.ts` | `getTeamMatches()` fetch (now also selects `tournaments.total_league_games` → `TeamMatch.tournamentTotalLeagueGames`, §3.7, and `grounds.pitch_type` → `TeamMatch.pitchType`, §6); re-exports the core (§2) |
+| `src/lib/teamStats.ts` | `getTeamMatches()` fetch (now also selects `tournaments.total_league_games` → `TeamMatch.tournamentTotalLeagueGames`, §3.7, and `grounds.pitch_type` → `TeamMatch.pitchType`, §6; `TeamMatch.isPractice` also ORs in the booking's own `is_practice` — `features/practice-games.md`); re-exports the core (§2) |
 | `src/lib/teamStats.test.ts` | Vitest coverage of the aggregators |
 | `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers (`TeamFilterState`, `buildTeamStatsHref`, `toTeamFilters`, chip labels) shared by the page and the panel (§3); `visibleFilterKeys()`/`visibleSplitDimensions()` gate the Captain dimension (§3.6); `pitch` filter key (§6) |
 | `src/lib/opponents.ts` | `normaliseOpponentName()`, `resolveOpponentIdByName()`, `linkSpellingToOpponent()`, `AliasConflictError` (§5) |

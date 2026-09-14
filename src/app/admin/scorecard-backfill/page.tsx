@@ -28,7 +28,10 @@ type RowStatus = 'idle' | 'processing' | 'success' | 'failed'
 const DELAY_BETWEEN_MS = 4000
 
 // Scalloped-seal "verified" badge — mirrors VerifiedBadge in
-// MatchHistoryClient.tsx so the same match reads identically here.
+// MatchHistoryClient.tsx so the same match reads identically here. Left as
+// literal colours in both themes, same as everywhere else this badge is
+// used — a small, self-contained status graphic that reads fine on either
+// background.
 function VerifiedBadge({ size = 13 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -39,32 +42,37 @@ function VerifiedBadge({ size = 13 }: { size?: number }) {
   )
 }
 
+// Status badge colour combos — each pairs a new light shade (a tinted
+// background, a mid-tone border, a darker text) with the original dark
+// shades kept byte-for-byte as the `dark:` variant. Same
+// "-950/40→-100, -800→-300, -400→-700" stepping squad-selection.md's own
+// Light/Dark/System pass already established for this app's status chips.
 const RUN_STATUS_CONFIG: Record<RowStatus, { label: string; className: string }> = {
-  idle:       { label: 'Pending',   className: 'bg-ink-4 border-ink-5 text-zinc-500' },
-  processing: { label: 'Fetching…', className: 'bg-amber-950/40 border-amber-800 text-amber-400' },
-  success:    { label: 'Done ✓',    className: 'bg-emerald-950/40 border-emerald-800 text-emerald-400' },
-  failed:     { label: 'Failed',    className: 'bg-red-950/40 border-red-800 text-red-400' },
+  idle:       { label: 'Pending',   className: 'bg-[#EEEAE2] border-[#D4C9B0] text-[#78716C] dark:bg-ink-4 dark:border-ink-5 dark:text-zinc-500' },
+  processing: { label: 'Fetching…', className: 'bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400' },
+  success:    { label: 'Done ✓',    className: 'bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400' },
+  failed:     { label: 'Failed',    className: 'bg-red-100 border-red-300 text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-400' },
 }
 
 // The booking's actual scorecard_uploads.status, shown alongside (not
 // instead of) the current run's status — a row can be "already synced"
 // and still sit here waiting to be re-run on purpose.
 const CURRENT_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pending_parse: { label: 'Pending parse', className: 'bg-amber-950/40 border-amber-800 text-amber-400' },
-  parsed:        { label: 'Parsed, not synced', className: 'bg-amber-950/40 border-amber-800 text-amber-400' },
-  synced:        { label: 'Synced', className: 'bg-emerald-950/40 border-emerald-800 text-emerald-400' },
-  fees_applied:  { label: 'Fees applied', className: 'bg-blue-950/40 border-blue-800 text-blue-400' },
+  pending_parse: { label: 'Pending parse', className: 'bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400' },
+  parsed:        { label: 'Parsed, not synced', className: 'bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400' },
+  synced:        { label: 'Synced', className: 'bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400' },
+  fees_applied:  { label: 'Fees applied', className: 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400' },
 }
 
 function CurrentStatusBadge({ status }: { status: string | null }) {
   if (!status) {
     return (
-      <span className="font-rajdhani text-[11px] font-bold px-2 py-0.5 rounded border flex-shrink-0 bg-ink-4 border-ink-5 text-zinc-600">
+      <span className="font-rajdhani text-[11px] font-bold px-2 py-0.5 rounded border flex-shrink-0 bg-[#EEEAE2] border-[#D4C9B0] text-[#78716C] dark:bg-ink-4 dark:border-ink-5 dark:text-zinc-600">
         Never uploaded
       </span>
     )
   }
-  const cfg = CURRENT_STATUS_CONFIG[status] ?? { label: status, className: 'bg-ink-4 border-ink-5 text-zinc-500' }
+  const cfg = CURRENT_STATUS_CONFIG[status] ?? { label: status, className: 'bg-[#EEEAE2] border-[#D4C9B0] text-[#78716C] dark:bg-ink-4 dark:border-ink-5 dark:text-zinc-500' }
   return (
     <span className={`font-rajdhani text-[11px] font-bold px-2 py-0.5 rounded border flex-shrink-0 ${cfg.className}`}>
       {cfg.label}
@@ -249,42 +257,42 @@ export default function ScorecardBackfillPage() {
     <div>
       <div className="mb-6">
         <h1 className="font-cinzel text-xl font-bold text-gold">Scorecard Backfill</h1>
-        <p className="font-rajdhani text-sm text-zinc-500 mt-1">
+        <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 mt-1">
           Fetch, parse, and sync scorecards directly from CricHeroes for any past match — including one that&apos;s
           already synced, if you need to re-run it after a parsing fix. Match fees are never touched by this —
           that stays a fully separate, manual step.
         </p>
       </div>
 
-      {loading && <p className="font-rajdhani text-sm text-zinc-600">Loading…</p>}
-      {loadError && <p className="font-rajdhani text-sm text-red-400">{loadError}</p>}
+      {loading && <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">Loading…</p>}
+      {loadError && <p className="font-rajdhani text-sm text-[#B91C1C] dark:text-red-400">{loadError}</p>}
 
       {!loading && !loadError && bookings.length === 0 && (
-        <p className="font-rajdhani text-sm text-zinc-600">No past matches with a CricHeroes match_id found.</p>
+        <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">No past matches with a CricHeroes match_id found.</p>
       )}
 
       {!loading && !loadError && bookings.length > 0 && (
         <>
-          <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4">
-            <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-zinc-500">
+          <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 mb-4">
+            <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
               Match ID
             </label>
             <input
               value={matchIdQuery}
               onChange={e => setMatchIdQuery(e.target.value)}
               placeholder="e.g. 21868467"
-              className="w-full mt-1 bg-ink-4 border border-ink-5 rounded px-2.5 py-1.5 font-rajdhani text-sm text-zinc-200 max-w-xs"
+              className="w-full mt-1 bg-[#EEEAE2] dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded px-2.5 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 max-w-xs"
             />
           </div>
 
           {dateChipGroups.length > 0 && (
-            <div className="bg-ink-3 border border-ink-5 rounded-xl p-3 mb-4">
+            <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-xl p-3 mb-4">
               <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={setDayFilter} />
             </div>
           )}
 
           {filtered.length === 0 ? (
-            <p className="font-rajdhani text-sm text-zinc-600">
+            <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">
               {dayFilter
                 ? <>No matches on {selectedGroup && selectedGroup.dates.length > 1 ? 'those dates' : 'that date'}.{' '}
                     <button onClick={() => setDayFilter(null)} className="text-gold underline">Show all dates</button>
@@ -293,15 +301,15 @@ export default function ScorecardBackfillPage() {
             </p>
           ) : (
             <>
-              <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
+              <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={toggleAllFiltered}
                     disabled={running}
-                    className="font-rajdhani text-xs font-semibold text-zinc-500 hover:text-gold disabled:opacity-40 transition-colors">
+                    className="font-rajdhani text-xs font-semibold text-[#78716C] dark:text-zinc-500 hover:text-gold disabled:opacity-40 transition-colors">
                     {filtered.every(b => selected.has(b.booking_id)) ? 'Deselect all shown' : 'Select all shown'}
                   </button>
-                  <p className="font-rajdhani text-sm text-zinc-400">
+                  <p className="font-rajdhani text-sm text-[#44403C] dark:text-zinc-400">
                     {selectedInFiltered.length} of {filtered.length} shown selected
                     {matchIdQuery && ` (${bookings.length} total)`}
                     {hasRun && ` · ${successCount} done, ${failedCount} failed`}
@@ -316,7 +324,7 @@ export default function ScorecardBackfillPage() {
               </div>
 
               {selectedFeesApplied.length > 0 && (
-                <div className="bg-blue-950/30 border border-blue-800 text-blue-300 font-rajdhani text-sm px-4 py-3 rounded mb-4">
+                <div className="bg-blue-50 border border-blue-300 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-300 font-rajdhani text-sm px-4 py-3 rounded mb-4">
                   ⚠ {selectedFeesApplied.length} selected match{selectedFeesApplied.length > 1 ? 'es' : ''} already
                   {selectedFeesApplied.length > 1 ? ' have' : ' has'} fees applied. Re-running will re-fetch and
                   re-sync stats only — fees are never re-applied here. Do not re-apply fees for
@@ -332,7 +340,7 @@ export default function ScorecardBackfillPage() {
                   <>
                     {flagged.length > 0 && (
                       <div className="mb-4">
-                        <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-amber-400 mb-2">
+                        <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-amber-700 dark:text-amber-400 mb-2">
                           ⚠ Needs Reconciliation ({flagged.length})
                         </h2>
                         <div className="space-y-2">
@@ -354,7 +362,7 @@ export default function ScorecardBackfillPage() {
                     )}
 
                     {flagged.length > 0 && rest.length > 0 && (
-                      <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">
+                      <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500 mb-2">
                         All Matches
                       </h2>
                     )}
@@ -400,7 +408,9 @@ function BookingRow({
   const status: RowStatus = result?.status ?? 'idle'
   return (
     <div className={`border rounded px-4 py-3 flex items-center gap-3 ${
-      b.needs_reconciliation ? 'bg-amber-950/20 border-amber-800/60' : 'bg-ink-3 border-ink-5'
+      b.needs_reconciliation
+        ? 'bg-amber-50 border-amber-300 dark:bg-amber-950/20 dark:border-amber-800/60'
+        : 'bg-white dark:bg-ink-3 border-[#D4C9B0] dark:border-ink-5'
     }`}>
       <input
         type="checkbox"
@@ -410,26 +420,26 @@ function BookingRow({
         className="flex-shrink-0"
       />
       <div className="flex-1 min-w-0">
-        <p className="font-rajdhani text-sm text-zinc-300">
+        <p className="font-rajdhani text-sm text-[#292524] dark:text-zinc-300">
           {b.game_date} · {b.slot_time} {b.format ?? ''} · vs {b.opponent_name ?? 'TBD'}
-          <span className="text-zinc-600"> · match_id {b.match_id}</span>
+          <span className="text-[#78716C] dark:text-zinc-600"> · match_id {b.match_id}</span>
           {b.verified && (
-            <span className="ml-2 inline-flex items-center gap-1 text-emerald-400 text-xs align-middle">
+            <span className="ml-2 inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 text-xs align-middle">
               <VerifiedBadge /> Verified
             </span>
           )}
         </p>
         {(result?.message || (status === 'idle' && b.error_message)) && (
-          <p className="font-rajdhani text-xs text-red-400 mt-0.5">
+          <p className="font-rajdhani text-xs text-[#B91C1C] dark:text-red-400 mt-0.5">
             {result?.message ?? b.error_message}
           </p>
         )}
         {b.needs_reconciliation && (
           <div className="mt-1.5">
-            <p className="font-rajdhani text-xs text-amber-300">
+            <p className="font-rajdhani text-xs text-amber-800 dark:text-amber-300">
               🚩 {b.reconciliation_note}
             </p>
-            <p className="font-rajdhani text-[10px] text-zinc-500">
+            <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-500">
               Flagged by {b.reconciliation_flagged_by_name ?? 'someone'}
               {b.reconciliation_flagged_at ? ` on ${new Date(b.reconciliation_flagged_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
             </p>
@@ -443,7 +453,7 @@ function BookingRow({
           onClick={onResolveFlag}
           disabled={running || isResetting}
           title="Clear this flag without re-running the backfill — use only for a false alarm"
-          className="font-rajdhani text-xs text-zinc-600 hover:text-amber-400 border border-ink-5 hover:border-amber-700 px-2 py-1 rounded transition-colors flex-shrink-0 disabled:opacity-40">
+          className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-amber-700 dark:hover:text-amber-400 border border-[#D4C9B0] dark:border-ink-5 hover:border-amber-400 dark:hover:border-amber-700 px-2 py-1 rounded transition-colors flex-shrink-0 disabled:opacity-40">
           Resolve
         </button>
       )}
@@ -451,7 +461,7 @@ function BookingRow({
         onClick={onReset}
         disabled={running || isResetting || !b.current_status}
         title={!b.current_status ? 'Nothing to reset — never uploaded' : 'Clear the upload record so it can be re-fetched from scratch'}
-        className="font-rajdhani text-xs text-zinc-600 hover:text-crimson border border-ink-5 hover:border-crimson px-2 py-1 rounded transition-colors flex-shrink-0 disabled:opacity-40 disabled:hover:text-zinc-600 disabled:hover:border-ink-5">
+        className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-crimson border border-[#D4C9B0] dark:border-ink-5 hover:border-crimson px-2 py-1 rounded transition-colors flex-shrink-0 disabled:opacity-40 disabled:hover:text-[#78716C] dark:disabled:hover:text-zinc-600 disabled:hover:border-[#D4C9B0] dark:disabled:hover:border-ink-5">
         {isResetting ? 'Resetting…' : 'Reset Upload'}
       </button>
     </div>

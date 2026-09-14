@@ -17,6 +17,18 @@ export function isInformalFormat(format: string | null | undefined): boolean {
   return format === 'T10' || format === 'T25'
 }
 
+// A match counts as practice when EITHER its own booking-level flag or its
+// tournament's flag is set (migration 078, additive to the existing
+// tournaments.is_practice) — a single game under any real tournament can be
+// marked practice without needing to route it through the "Practice games"
+// umbrella tournament. See features/practice-games.md.
+export function isPracticeMatch(
+  bookingIsPractice: boolean | null | undefined,
+  tournamentIsPractice: boolean | null | undefined
+): boolean {
+  return !!bookingIsPractice || !!tournamentIsPractice
+}
+
 export interface Captain {
   id:         string
   name:       string
@@ -94,6 +106,12 @@ export interface Booking {
   // counterpart to the free-text match_stage. NULL = unclassified, treated
   // as league by the Team Record page. See features/team-stats.md §4.
   stage_type?: StageType | null
+  // Per-booking practice-game override (migration 078), additive to
+  // tournaments.is_practice — lets a single game under any real tournament
+  // be marked practice without routing it through the "Practice games"
+  // umbrella tournament. See isPracticeMatch() below and
+  // features/practice-games.md.
+  is_practice?: boolean
   match_time?: string | null
   opponent_name?: string | null
   // Canonical opponent (migration 077) — resolved from opponent_name via

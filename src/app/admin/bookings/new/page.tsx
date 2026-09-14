@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Tournament, SlotTime, GameFormat, ValidationResult, RuleCheckItem } from '@/types'
 import { StageTypeToggle } from '@/components/admin/StageTypeToggle'
+import { PracticeToggle } from '@/components/admin/PracticeToggle'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
 
@@ -83,7 +84,13 @@ export default function NewBookingPage() {
   const [submitError, setSubmitError] = useState('')
 
   const [matchStage, setMatchStage] = useState('')
-  const [stageType,  setStageType]  = useState<'' | 'league' | 'knockout'>('')
+  // Defaults to League — the vast majority of games are league fixtures,
+  // and leaving this unset ("Not set") is no longer something a new
+  // booking needs to opt into explicitly. "Not set" stays available in the
+  // toggle for the rare case an admin wants to clear it back to
+  // unclassified (e.g. genuinely undecided at creation time).
+  const [stageType,  setStageType]  = useState<'' | 'league' | 'knockout'>('league')
+  const [isPractice, setIsPractice] = useState(false)
 
   function refreshGrounds() {
     fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? []))
@@ -108,6 +115,8 @@ export default function NewBookingPage() {
     setRuleChecks(RULES.map(r => ({ ...r, status: 'pending', message: 'Waiting for input...' })))
     setOverrides({})
     setMatchStage('')
+    setStageType('league')
+    setIsPractice(false)
   }, [mode])
 
   useEffect(() => {
@@ -265,6 +274,7 @@ export default function NewBookingPage() {
           match_id:       matchId || null,
           match_stage:    matchStage || null,
           stage_type:     stageType || null,
+          is_practice:    isPractice,
           cricheroes_url: cricHeroesUrl || null,
           match_time:     matchTime || null,
           overrides: Object.entries(overrides).map(([rule, reason]) => ({ rule, reason })),
@@ -561,6 +571,7 @@ export default function NewBookingPage() {
                       placeholder="e.g. Quarter Final, Semi Final, Final, Knockout" className="form-input" />
                   </div>
                   <StageTypeToggle value={stageType} onChange={setStageType} />
+                  <PracticeToggle checked={isPractice} onChange={setIsPractice} />
                   <div>
                     <label className="form-label">Match Start Time</label>
                     <input type="time" value={matchTime}

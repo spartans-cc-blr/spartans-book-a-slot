@@ -127,8 +127,10 @@ re-sync of the same match can't double-log the same performance.
 
 **Century and five-wicket-haul are recognised even for a practice-tournament
 booking (added August 2026) — every other band still isn't.**
-`tournaments.is_practice` (see `features/leaderboard.md` §10) is passed in
-as `isPractice` from `syncMatchStatsForBooking()`. Half-century,
+`tournaments.is_practice` (see `features/leaderboard.md` §10), additively
+OR'd with the booking's own `is_practice` override since September 2026
+(`features/practice-games.md`), is passed in as `isPractice` from
+`syncMatchStatsForBooking()`. Half-century,
 three-wicket-haul, and five-dismissals rows are skipped whenever
 `isPractice` is true — same "real stats only" posture as every other
 aggregate/ranking surface in this app — but `century` and `five_wicket_haul`

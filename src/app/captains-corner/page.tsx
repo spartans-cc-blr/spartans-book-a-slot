@@ -59,7 +59,7 @@ export default async function CaptainsCornerPage() {
       .from('bookings')
       .select(`
         id, game_date, slot_time, format, opponent_name,
-        match_time, cricheroes_url, gc_return_note,
+        match_time, cricheroes_url, gc_return_note, is_practice,
         tournament:tournaments(name, ball_type, is_practice, ground:grounds(name, maps_url, hospital_url)),
         ground:grounds(name, maps_url, hospital_url)
       `)

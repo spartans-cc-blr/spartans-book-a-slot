@@ -62,6 +62,10 @@ export interface NudgeBooking {
   // doesn't need. Only the 'leaderboard_leader' theme reads them.
   ground_id: string | null
   ground_name: string | null
+  // Despite the name (kept as-is to avoid a wider rename), this is the
+  // combined practice signal — this booking's own is_practice flag OR its
+  // tournament's, resolved together by attachGroundTournamentInfo(). See
+  // features/practice-games.md.
   tournament_is_practice: boolean
 }
 

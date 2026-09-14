@@ -503,13 +503,45 @@ whatever `matchIdFiltered` currently holds (`groupDatesIntoChips()`,
 `src/lib/dateChipGroups.ts`) and shown reverse-chronologically — most
 recently played first, since a recent match is the one most likely to need
 a re-run. Uses `DateChipSlider`'s default `theme="auto"`, same as every
-other call site — this page's own shell stays the classic dark-ink look
-(not yet converted to Light/Dark/System), so the slider renders
-byte-identical to that look for a dark-preference visitor; a Light-
-preference visitor sees the one small seam already accepted elsewhere in
-this app for shared components crossing a still-unconverted page (see
-`ui-theme.md`'s Light/Dark/System section) — no page-level reskin was done
-here.
+other call site.
+
+**Page converted to Light/Dark/System (added September 2026, same week)** —
+superseding the note above about this page "not yet" following the
+toggle. Per a direct request that Upcoming Matches, Past Matches, and this
+page all genuinely follow the visitor's theme choice, every structural
+Tailwind class in `/admin/scorecard-backfill/page.tsx` (page shell,
+search-box/date-chip-slider wrapper cards, `BookingRow`) now carries a
+light base class alongside a `dark:`-prefixed copy of the exact original —
+same conversion pattern `SiteNav.tsx`'s own Warm Light pass established
+(`navigation.md` §4): dark is byte-identical to the page's original,
+always-dark look; light is new, built from the same `#F8F4EE`/`#EEEAE2`/
+`#D4C9B0`/stone-scale-text palette this doc's other Warm Light surfaces
+already use. The `RUN_STATUS_CONFIG`/`CURRENT_STATUS_CONFIG` badges and the
+flagged-row/fees-applied-warning banners follow the same `-950/40→-100,
+-800→-300, -400→-700` stepping `squad-selection.md`'s own status-chip
+Light/Dark/System pass already used — a tinted light background, mid-tone
+border, darker text, with the original dark shades kept as the `dark:`
+variant. `VerifiedBadge`'s own literal `#059669` fill is left unconverted,
+same "small self-contained status graphic reads fine on either background"
+call made for every other status icon in this app; `text-gold`/
+`text-gold-dim`/`border-gold-dim`/`bg-gold/…`/`text-crimson`/
+`border-crimson` accents are likewise left as-is in both themes.
+
+**The shared `AdminLayout`/`AdminSidebar` chrome was converted alongside
+it, not left dark** — leaving the admin top bar/sidebar permanently dark
+while this one page's content went theme-aware would have put a
+genuinely-light page body directly under still-dark chrome, a worse
+mismatch than the one small-slider seam this pass replaces. `src/app/admin/layout.tsx`
+(top bar + root wrapper) and `src/components/admin/AdminSidebar.tsx`
+(desktop sidebar + mobile bottom bar/drawer) both now carry the same
+light/`dark:` class pairing. Every *other* `/admin/**` page's own content
+is still dark-only, unconverted — so a Light-preference visitor now sees
+the admin chrome go light while every page body except this one stays
+dark, which is the same "shared chrome always follows the toggle, page
+content converts incrementally" seam `SiteNav`/`MobileTabBar` already made
+site-wide (`ui-theme.md`'s Light/Dark/System section) — just applied to
+the `/admin/**` subtree for the first time here, rather than a new kind of
+inconsistency.
 
 ### `/api/cron/backfill-scorecards` — twice daily, self-healing
 Runs at 13:00 and 19:00 IST (GitHub Actions: `"30 7,13 * * *"`). `vercel.json`
