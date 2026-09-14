@@ -16,21 +16,27 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen bg-ink flex flex-col">
-      {/* Admin top bar */}
-      <header className="bg-ink-2 border-b border-ink-5 h-12 flex items-center px-5 gap-4 flex-shrink-0">
+    <div className="min-h-screen bg-[#F8F4EE] dark:bg-ink flex flex-col">
+      {/* Admin top bar — theme-aware (Light/Dark/System, see ui-theme.md).
+          Dark values are the original literals, unchanged; light values are
+          new. Every other /admin/** page body is still dark-only, so a
+          Light-preference visitor sees this bar go light while the page
+          below it stays dark — the same "shared chrome always follows the
+          toggle, page content converts incrementally" seam SiteNav/
+          MobileTabBar already established site-wide. */}
+      <header className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 h-12 flex items-center px-5 gap-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <img src="/Transparent High Resolution.png" alt="Spartans CC" className="w-7 h-7 object-contain" />
           <span className="font-cinzel text-gold-dim text-xs tracking-widest">SPARTANS CC</span>
-          <span className="font-rajdhani text-zinc-700 text-xs tracking-widest">/ ADMIN</span>
+          <span className="font-rajdhani text-[#78716C] dark:text-zinc-700 text-xs tracking-widest">/ ADMIN</span>
         </div>
         <div className="ml-auto flex items-center gap-3">
           {session.user?.image && (
             <img src={session.user.image} alt="" className="w-6 h-6 rounded-full opacity-80" />
           )}
-          <span className="font-rajdhani text-xs text-zinc-600 hidden sm:block">{session.user?.email}</span>
+          <span className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hidden sm:block">{session.user?.email}</span>
           <a href="/api/auth/signout"
-            className="font-rajdhani text-xs text-zinc-700 hover:text-zinc-400 border border-ink-5 px-3 py-1 rounded transition-colors">
+            className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-700 hover:text-[#44403C] dark:hover:text-zinc-400 border border-[#D4C9B0] dark:border-ink-5 px-3 py-1 rounded transition-colors">
             Sign out
           </a>
         </div>
