@@ -130,6 +130,43 @@ Unit tests: `src/lib/teamStats.test.ts` (vitest) cover every aggregator
 above against a hand-built fixture, including the toss double-bucketing,
 practice exclusion, marquee pinning and the records/margin derivations.
 
+> **Incident (13 Sep 2026) — one match's `toss_decision` was extracted
+> backwards, silently corrupting a Records card.** `match_stats.toss_decision`
+> for match `23042256` (19 Mar 2026, Spartans vs The Battalion, MSB Turf
+> Ground, MSB Ugadi Cup) was stored as `'bat'` with `toss_won: 'N'` —
+> read by `battedFirst`'s derivation as "the opponent won the toss and
+> elected to bat," i.e. Spartans batted second. The real scorecard PDF
+> says the opposite: The Battalion won the toss and **elected to field**,
+> putting Spartans in to bat first. Spartans batted first, made 74 all
+> out, then bowled The Battalion out for 66 — a genuine defended total,
+> not the chase the wrong toss data implied. This silently pushed
+> Records' "Lowest Total Defended" up to 142 (the next-lowest genuine
+> defend that season) instead of the true 74, with nothing on the page
+> hinting the number was wrong — reported after a club member recalled a
+> lower defended score at MSB than the card showed.
+>
+> **Root cause is upstream, in `spartans-python`'s scorecard extraction**
+> (a separate repo, out of scope here) — the parser read the toss line
+> correctly enough to get `toss_won` right but flipped the decision word.
+> A spot-check of every other 2026 sub-142 win (`87, 114, 115, 127, 128,
+> 138, 139, 141`) found each one internally consistent with its stored
+> toss data (none implied an impossible chase-past-target scenario the
+> way this one did), so this looks like an isolated bad extraction rather
+> than a systemic bug — but it's a reminder that a wrong `toss_won`/
+> `toss_decision` pair has no error signal anywhere in this pipeline; it
+> just quietly changes which Records card wins.
+>
+> **Fixed** with a direct one-row `UPDATE` on the analytics DB's
+> `match_stats.toss_decision` (`'bat'` → `'field'`), applied via Supabase
+> MCP — a one-off data correction, not a code change, following this
+> app's usual "documented here, not committed as a script" convention for
+> this class of fix. No Hub-side re-sync or cache-bust was needed: Team
+> Record reads toss live from the analytics DB on every request (this
+> section's own note above — toss is deliberately never copied into
+> `match_stats_cache`), so the fix took effect on the very next page load.
+> `/leaderboard`'s and `/players/[id]/stats`' own Defending/Chasing
+> filters read the same live source and were corrected by the same write.
+
 ---
 
 ## 3. Page — `src/app/team-stats/page.tsx`
