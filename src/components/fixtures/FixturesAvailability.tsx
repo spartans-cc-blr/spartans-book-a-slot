@@ -7,6 +7,7 @@
 import { signIn } from 'next-auth/react'
 import { FixtureShareButton } from './FixturesCard'
 import { useTheme } from '@/components/ui/ThemeProvider'
+import { KNOCKOUT_INELIGIBLE_MESSAGE } from '@/lib/knockoutEligibility'
 
 type AvailKey  = 'Y' | 'O' | 'E' | 'L'
 type AvailCode = AvailKey | null
@@ -70,6 +71,11 @@ interface Props {
   hasDues?: boolean          // wallet_balance < 0 AND no dues_override
   slotLocked?: boolean       // bookings.availability_locked === true
   squadAnnounced?: boolean
+  // true when this is a knockout booking (stage_type === 'knockout') and the
+  // signed-in player never represented this tournament's league stage — see
+  // src/lib/knockoutEligibility.ts. Captains/GC/admins bypass server-side,
+  // so this is never true for them (computed upstream, same as slotLocked).
+  knockoutIneligible?: boolean
   // Captains, GC, and admins bypass the freeze on the server (see
   // checkFreeze() in /api/player-availability) — these mirror that so the
   // UI doesn't disable buttons the API would happily accept.
@@ -145,6 +151,7 @@ export function FixturesAvailability({
   hasDues,
   slotLocked,
   squadAnnounced,
+  knockoutIneligible,
   isGC,
   isAdmin,
 }: Props) {
@@ -187,6 +194,7 @@ export function FixturesAvailability({
  
    const upstreamBlock =
     hasDues                        ? 'Your account has outstanding dues — please clear your balance to update availability' :
+    knockoutIneligible             ? KNOCKOUT_INELIGIBLE_MESSAGE :
     slotLocked && !bypassesFreeze  ? 'Availability locked — Squad selection in progress' :
     null
  
@@ -260,8 +268,16 @@ export function FixturesAvailability({
         <FixtureShareButton bookingId={bookingId} />
       </div>
 
+      {/* Knockout-eligibility notice — takes priority over the frozen-slot notice below */}
+      {knockoutIneligible && (
+        <p style={{ fontSize: '10px', color: t.frozenText, marginTop: '6px',
+          fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4 }}>
+          🚫 {KNOCKOUT_INELIGIBLE_MESSAGE}
+        </p>
+      )}
+
       {/* Frozen slot notice */}
-{slotLocked && !squadAnnounced && !bypassesFreeze && (
+{!knockoutIneligible && slotLocked && !squadAnnounced && !bypassesFreeze && (
     <p style={{ fontSize: '10px', color: t.frozenText, marginTop: '6px',
       fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4 }}>
       🔒 Availability locked — Squad selection in progress

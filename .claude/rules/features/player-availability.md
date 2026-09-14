@@ -139,6 +139,7 @@ Stateless display card. Squad display section uses match-specific role fields �
 - The SELECT fetches `id, response` (both fields needed — `id` for the update target, `response` for the audit `old_response` value)
 - Auto-reactivates inactive players: if `players.active = false` at time of submission, flips to `true` fire-and-forget — no admin action needed
 - Writes audit row fire-and-forget after the main response is sent — never blocks the response
+- **Knockout games (`bookings.stage_type === 'knockout'`) additionally require the player to have represented this tournament in a league game** (an announced squad row on a past, non-knockout booking) — captain/GC/admin bypass, same as the freeze guard. `DELETE` is not gated by this, so a player can always clear an existing response. See `features/knockout-day-protection.md` §6 for the full design (added September 2026).
 
 ### `DELETE /api/player-availability` — clear response
 
@@ -744,7 +745,8 @@ itself (out of scope here — shared with Match History) was not touched.
 | `src/components/fixtures/FixturesWeekend.tsx` | `FixturesWeekendGroup` — shared state owner; handles API calls; renders card + availability pairs; own "outstanding dues" banner theme-aware via `useTheme()` (§10.3) |
 | `src/components/fixtures/FixturesAvailability.tsx` | Controlled availability button row; runs `getBlockReason()` validation on every render; theme-aware via `useTheme()` — no longer permanently dark (§10.3) |
 | `src/components/fixtures/FixturesCard.tsx` | Match card display; squad section uses `is_match_captain`, `is_vc`, `is_wk` from squad row; theme-aware via `useTheme()` — no longer permanently dark (§10.3) |
-| `src/app/api/player-availability/route.ts` | Self-update API — GET, POST, DELETE; explicit SELECT(`id, response`) → INSERT/UPDATE; auto-reactivation; audit log |
+| `src/app/api/player-availability/route.ts` | Self-update API — GET, POST, DELETE; explicit SELECT(`id, response`) → INSERT/UPDATE; auto-reactivation; audit log; knockout-only eligibility guard on POST (`features/knockout-day-protection.md` §6) |
+| `src/lib/knockoutEligibility.ts` | Knockout-only availability eligibility — `getEligibleTournamentIdsForPlayer()`, `isEligibleForKnockoutTournament()`, `KNOCKOUT_INELIGIBLE_MESSAGE`; see `features/knockout-day-protection.md` §6 |
 | `src/app/api/captain-availability/route.ts` | Captain proxy API — POST (set availability on behalf of player); GET (audit log fetch) |
 | `src/app/captains-corner/page.tsx` | Captain-only server page — fetches all data; renders `CaptainsCornerGrid` per week |
 | `src/components/captains/CaptainsCornerGrid.tsx` | Per Slot + Matrix views; `SlotCard` squad selection; `AddPlayerPanel` proxy flow; `liveAvailMap` for proxy-add reflection; `allSelected` + `liveSquadMap` for cross-slot `takenElsewhere()` blocking; `isoWeekKey()` for cross-week bleed prevention |

@@ -9,6 +9,7 @@ import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
 import { PushSubscribePrompt } from '@/components/fixtures/PushSubscribePrompt'
 import { FixturesDateFilterBar } from '@/components/fixtures/FixturesDateFilterBar'
 import { MatchesSegmentedTabs } from '@/components/matches/MatchesSegmentedTabs'
+import { getEligibleTournamentIdsForPlayer } from '@/lib/knockoutEligibility'
 import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
 
@@ -70,7 +71,7 @@ export default async function FixturesPage() {
       .from('bookings')
       .select(`
         id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
-        match_fee_override,
+        match_fee_override, tournament_id, stage_type,
         tournament:tournaments(name, ball_type, match_fee, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url)),
         ground:grounds(name, maps_url, hospital_url)
       `)
@@ -138,6 +139,25 @@ export default async function FixturesPage() {
   const isGC      = isPlayer && !!player?.isGC
   const isAdmin   = isPlayer && !!player?.isAdmin
 
+  // Knockout-only availability eligibility — a knockout booking can only be
+  // self-marked by a player who represented this tournament in a league
+  // game (announced squad). Captains/GC/admins bypass, mirroring the freeze
+  // bypass elsewhere on this page. Computed once, batched across every
+  // knockout tournament appearing on this page — see
+  // src/lib/knockoutEligibility.ts and features/knockout-day-protection.md §6.
+  const bypassesKnockoutRestriction = isCaptain || isGC || isAdmin
+  const knockoutTournamentIds = Array.from(
+    new Set(
+      (bookings ?? [])
+        .filter((b: any) => b.stage_type === 'knockout' && b.tournament_id)
+        .map((b: any) => b.tournament_id as string)
+    )
+  )
+  const eligibleKnockoutTournamentIds =
+    isPlayer && !bypassesKnockoutRestriction && knockoutTournamentIds.length > 0
+      ? await getEligibleTournamentIdsForPlayer(supabase, knockoutTournamentIds, player?.playerId)
+      : new Set<string>()
+
   // Helper — live exemption check (same logic as admin fee-apply route)
   function isCurrentlyExempt(exemptions: { start_date: string; end_date: string | null }[]): boolean {
     const today = new Date().toISOString().split('T')[0]
@@ -196,7 +216,8 @@ export default async function FixturesPage() {
     cardData:                any
     hasDues:                 boolean
     slotLocked:              boolean
-    squadAnnounced:          boolean 
+    squadAnnounced:          boolean
+    knockoutIneligible:      boolean
     feePerPlayer:            number | null
     isLoggedInPlayerInSquad: boolean
     isLoggedInPlayerExempt:  boolean
@@ -224,7 +245,13 @@ export default async function FixturesPage() {
     const isInSquad = isPlayer && (squadMap[b.id] ?? []).some((p: any) => p.id === player?.playerId)
     const isExempt  = loggedInPlayerExemptMap[b.id] ?? false
     const fee       = feePerPlayerMap[b.id] ?? null
-    
+    const isKnockout = (b as any).stage_type === 'knockout'
+    const knockoutIneligible =
+      isPlayer &&
+      isKnockout &&
+      !bypassesKnockoutRestriction &&
+      !eligibleKnockoutTournamentIds.has((b as any).tournament_id)
+
     weekendMap[wk].push({
       id:                      b.id,
       game_date:               (b as any).game_date,
@@ -244,6 +271,7 @@ export default async function FixturesPage() {
       hasDues:                 hasDues,
       slotLocked:              (b as any).availability_locked ?? false,
       squadAnnounced:          (squadMap[b.id] ?? []).length > 0,
+      knockoutIneligible:      knockoutIneligible,
       feePerPlayer:            feePerPlayerMap[b.id] ?? null,
       isLoggedInPlayerInSquad: isInSquad,
       isLoggedInPlayerExempt:  isExempt,

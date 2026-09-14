@@ -155,7 +155,124 @@ historical context for the `isAdmin`-only choice, not a live cross-reference.
 
 ---
 
-## 6. Dashboard Display Fix
+## 6. Knockout-Only Availability Eligibility (added September 2026)
+
+**Ratified rule:** a knockout game can only be marked available/unavailable
+by a player who actually represented the tournament during its league
+stage — named in an *announced* squad for at least one of the tournament's
+league games. Batting, bowling, or effecting a dismissal is not required —
+being selected in the XI for one league game (i.e. genuinely on the field)
+is enough to be eligible for the knockout.
+
+This is a distinct concept from R7/§2–§5 above: R7 protects the *calendar
+slot* a knockout occupies from a clashing booking; this section restricts
+*who* may respond to the knockout booking's own availability panel, once
+it exists. Both key off the same `bookings.stage_type = 'knockout'` flag
+(`features/team-stats.md` §4) rather than `match_stage` (§4 above still
+applies — free text, never a machine-readable signal).
+
+### Eligibility check — `src/lib/knockoutEligibility.ts`
+
+`getEligibleTournamentIdsForPlayer(supabase, tournamentIds, playerId)` —
+batched across every knockout tournament a page needs to check at once
+(rather than one query per booking, matching this codebase's established
+"batch, don't loop" convention — see `features/leaderboard.md` §8.2,
+`features/tournament-planner.md` §2.2):
+
+1. Fetches every **confirmed** booking under the given tournament id(s)
+   whose `game_date` is strictly in the past (`< today`) — a booking still
+   to be played doesn't yet prove anyone actually took the field.
+2. Filters those down to **non-knockout** bookings — `stage_type !==
+   'knockout'`, so a `NULL` `stage_type` is treated as league, same
+   convention Team Record already uses.
+3. Fetches this player's `squad` rows with `status = 'announced'` across
+   those league booking ids. Any hit means eligible for every knockout
+   booking under that tournament.
+
+`isEligibleForKnockoutTournament(supabase, tournamentId, playerId)` is a
+single-tournament convenience wrapper over the same function — used by the
+API guard, which only ever needs to check one booking's own tournament.
+
+`KNOCKOUT_INELIGIBLE_MESSAGE` is exported from the same file and imported
+by both the API route and the client-side button UI, so the two can never
+show different wording for the same block — the same "shared plain module,
+no server-only imports" pattern `features/team-stats.md` §2 documents for
+`teamStatsCore.ts`, which is what makes it safe to import from a `'use
+client'` component too.
+
+### Where it's enforced
+
+- **Server — `POST /api/player-availability`** (GUARD 3, after the
+  existing wallet-dues and freeze guards): for a booking whose
+  `stage_type === 'knockout'`, a non-privileged player who isn't eligible
+  is rejected with a 403. This is the actual gate — the UI below mirrors
+  it, never replaces it.
+- **Server — `DELETE /api/player-availability`** is **not** gated by this
+  check — a player may always clear their own existing response, even one
+  marked before this rule existed or while currently ineligible. Same
+  "self-withdrawal is always allowed" posture the freeze design already
+  established for a player's own `L` (`features/player-availability.md`
+  §10) — clearing a response never creates a new problem, only removes an
+  existing one.
+- **Server — `POST /api/captain-availability` (the captain proxy route)
+  is entirely unaffected.** Only self-service marking on `/fixtures` is
+  restricted; a captain/GC/admin can still set any player's response for
+  a knockout game via the proxy flow in Captains' Corner, exactly as
+  before — this mirrors the existing freeze bypass for those roles and
+  keeps squad-management judgment calls (e.g. fielding a reserve) with the
+  people who already make them.
+- **UI — `FixturesAvailability.tsx`**: a `knockoutIneligible` prop
+  (computed server-side, never client-derived) feeds into the same
+  `upstreamBlock` chain that already disables every button for dues/freeze
+  — every Y/O/E/L button is disabled with `KNOCKOUT_INELIGIBLE_MESSAGE` as
+  its tooltip, and a standing 🚫 notice renders under the button row (the
+  same treatment the 🔒 frozen-slot notice already gets, and mutually
+  exclusive with it — knockout ineligibility is shown first). An already-
+  active response (marked before the rule applied) stays visible and can
+  still be tapped to clear it (→ `DELETE`), matching the server's own
+  "can withdraw, can't (re-)commit" rule. Captains/GC/admins never see
+  this block, mirroring `bypassesFreeze`.
+- **`src/app/fixtures/page.tsx`** and **`src/app/fixtures/[id]/page.tsx`**
+  (the standalone share page) both compute this server-side per booking
+  for the signed-in viewer and pass it down through `FixturesWeekendGroup`
+  — the same prop-threading pattern already used for `isCaptain`/`isGC`/
+  `isAdmin` (`features/player-availability.md` §10's "UI didn't mirror the
+  server's captain/GC/admin bypass" fix note documents the same threading
+  shape). `bookings.tournament_id`/`stage_type` were added to both pages'
+  existing `bookings` select — no new query beyond the batched eligibility
+  lookup itself.
+
+### Explicitly out of scope
+
+- **Captains' Corner squad selection is untouched.** This restricts the
+  self-service availability *panel* on `/fixtures` only — a captain can
+  still select any player (eligible or not) into a knockout squad via
+  Captains' Corner; only marking Y/O/E/L for oneself on `/fixtures` is
+  gated. Extending this to squad selection itself was not requested.
+- **No new database column.** `bookings.stage_type` (already built for
+  Team Record, §above) and `squad.status = 'announced'` (already the
+  existing "genuinely selected" signal used throughout this app — e.g.
+  `features/tournament-planner.md`'s `tournamentPlayersMap`) were
+  sufficient; this feature is application logic only.
+- **A same-day league game does not yet count.** Eligibility only looks at
+  bookings with `game_date < today` — a league game played the same day as
+  the knockout (not a real scenario for this club, but a theoretical edge
+  case) would not yet make a player eligible for that knockout.
+
+### File Map — this section
+
+| File | Role |
+|---|---|
+| `src/lib/knockoutEligibility.ts` | `getEligibleTournamentIdsForPlayer()` (batched), `isEligibleForKnockoutTournament()` (single-tournament wrapper), `KNOCKOUT_INELIGIBLE_MESSAGE` |
+| `src/app/api/player-availability/route.ts` | `POST` GUARD 3 — the real enforcement |
+| `src/components/fixtures/FixturesAvailability.tsx` | `knockoutIneligible` prop feeding `upstreamBlock`; the 🚫 standing notice |
+| `src/components/fixtures/FixturesWeekend.tsx` | Threads `knockoutIneligible` from `BookingEntry` down to `FixturesAvailability` |
+| `src/app/fixtures/page.tsx` | Selects `tournament_id, stage_type`; computes `knockoutIneligible` per booking for the signed-in player, batched via `getEligibleTournamentIdsForPlayer()` |
+| `src/app/fixtures/[id]/page.tsx` | Same computation for the standalone share page (single booking, so uses the single-tournament wrapper) |
+
+---
+
+## 7. Dashboard Display Fix
 
 `DashboardBookingsTabs.tsx` previously showed either `block_reason` *or*
 `tournament_name` for a `soft_block` row, never both — harmless before
@@ -166,7 +283,7 @@ tournament is attached.
 
 ---
 
-## 7. Security (vibe-security)
+## 8. Security (vibe-security)
 
 | Check | Status |
 |---|---|
@@ -174,10 +291,13 @@ tournament is attached.
 | R7 applies to every booking path, not just the one that introduced it | ✅ Lives in the shared `validateBooking()` engine — the confirmed-booking form, the reservation form, and self-service (see `organiser-self-service.md`) all inherit it automatically |
 | Tournament Planner's new read-only pieces are `isAdmin`-only | ✅ Stricter than the `isAdmin \|\| isGC` Suggested-Slots panel that existed at the time (since removed — see §5) |
 | Reason logged for any R7 override | ✅ Same `booking_rule_overrides` audit trail as every other rule |
+| Knockout-only availability eligibility (§6) enforced server-side, not just hidden in the UI | ✅ `POST /api/player-availability` GUARD 3 re-derives eligibility independently on every call — the client-side `knockoutIneligible` prop is a mirror, never the real gate |
+| `DELETE /api/player-availability` deliberately left unguarded by this check | ✅ Deliberate — self-withdrawal never creates a new problem; mirrors the pre-existing `L`-withdrawal-while-frozen carve-out |
+| Captain/GC/admin proxy route (`/api/captain-availability`) unaffected | ✅ Confirmed by reading the route — this restriction was only added to the self-service route |
 
 ---
 
-## 8. File Map
+## 9. File Map
 
 | File | Role |
 |---|---|
@@ -189,15 +309,17 @@ tournament is attached.
 | `src/app/tournament-planner/page.tsx` + `TournamentPlannerClient.tsx` | Admin-only qualification nudge + existing-hold display |
 | `src/app/admin/bookings/new/page.tsx`, `src/app/admin/bookings/[id]/page.tsx` | `RULES` rule-check-strip lists updated with R7 |
 | `src/lib/schemas.ts` | `bookingRuleOverrideSchema`'s rule enum widened to include `'R7'` |
+| See §6's own File Map table for the knockout-only availability eligibility feature's files | |
 
 ---
 
-## 9. Pending / Known Gaps
+## 10. Pending / Known Gaps
 
 | Item | Notes |
 |---|---|
 | No automated test coverage for R7 | `validation.ts` has no test file at all today (pre-existing gap, not introduced by this feature) |
 | Qualification nudge threshold is fixed (≥half games won) | Not currently admin-configurable per tournament |
+| No admin UI to preview "who is eligible for this knockout" before it's booked | An admin/captain can't currently see the eligible-player list ahead of time — only individual players discover their own eligibility when they open the availability panel |
 
 ---
 

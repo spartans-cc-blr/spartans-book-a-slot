@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
 import { BackButton } from '@/components/ui/BackButton'
+import { isEligibleForKnockoutTournament } from '@/lib/knockoutEligibility'
 
 export const revalidate = 60
 
@@ -21,6 +22,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     .from('bookings')
     .select(`
       id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
+      tournament_id, stage_type,
       tournament:tournaments(name, ball_type, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url)),
       ground:grounds(name, maps_url, hospital_url)
     `)
@@ -87,6 +89,19 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     hasDues = (playerRow?.wallet_balance ?? 0) < 0 && !playerRow?.dues_override
   }
 
+  // Knockout-only availability eligibility — mirrors /fixtures' own check.
+  // Captains/GC/admins bypass, same as the freeze guard elsewhere on this page.
+  // See src/lib/knockoutEligibility.ts and features/knockout-day-protection.md §6.
+  let knockoutIneligible = false
+  const bypassesKnockoutRestriction = isCaptain || isGC || isAdmin
+  if (
+    isPlayer && user?.playerId && !bypassesKnockoutRestriction &&
+    (booking as any).stage_type === 'knockout' && (booking as any).tournament_id
+  ) {
+    const eligible = await isEligibleForKnockoutTournament(supabase, (booking as any).tournament_id, user.playerId)
+    knockoutIneligible = !eligible
+  }
+
   const entry = {
     id:              booking.id,
     game_date:       booking.game_date,
@@ -98,6 +113,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     hasDues,
     slotLocked:      (booking as any).availability_locked ?? false,
     squadAnnounced:  (squad ?? []).length > 0,
+    knockoutIneligible,
   }
 
   return (
