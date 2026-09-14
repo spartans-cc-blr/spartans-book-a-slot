@@ -33,20 +33,21 @@ export function AdminSidebar() {
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className="w-52 bg-ink-2 border-r border-ink-5 flex-shrink-0 hidden md:flex flex-col py-4">
+      {/* Desktop sidebar — theme-aware, same convention as AdminLayout's top
+          bar above (dark preserved exactly, light new). */}
+      <aside className="w-52 bg-white dark:bg-ink-2 border-r border-[#D4C9B0] dark:border-ink-5 flex-shrink-0 hidden md:flex flex-col py-4">
         {NAV.map(item => {
           const isActive = item.exact ? path === item.href : path.startsWith(item.href)
           return (
             <div key={item.href}>
               {item.section && (
-                <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 px-5 pt-4 pb-1">
+                <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-[#78716C] dark:text-zinc-700 px-5 pt-4 pb-1">
                   {item.section}
                 </p>
               )}
               <Link href={item.href}
                 className={`flex items-center gap-2.5 px-5 py-2.5 font-rajdhani text-sm font-medium transition-all border-l-2
-                  ${isActive ? 'text-gold border-gold bg-gold/5' : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-ink-3'}`}>
+                  ${isActive ? 'text-gold border-gold bg-gold/5' : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-[#292524] dark:hover:text-zinc-300 hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                 <span className="text-base w-5 text-center">{item.icon}</span>
                 {item.label}
               </Link>
@@ -56,22 +57,22 @@ export function AdminSidebar() {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-ink-2 border-t border-ink-5">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-ink-2 border-t border-[#D4C9B0] dark:border-ink-5">
         {/* Mobile nav drawer */}
         {open && (
-          <div className="bg-ink-2 border-t border-ink-5 px-4 py-3 flex flex-col gap-1 max-h-[70vh] overflow-y-auto">
+          <div className="bg-white dark:bg-ink-2 border-t border-[#D4C9B0] dark:border-ink-5 px-4 py-3 flex flex-col gap-1 max-h-[70vh] overflow-y-auto">
             {NAV.map(item => {
               const isActive = item.exact ? path === item.href : path.startsWith(item.href)
               return (
                 <div key={item.href}>
                   {item.section && (
-                    <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-zinc-700 px-2 pt-3 pb-1">
+                    <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-[#78716C] dark:text-zinc-700 px-2 pt-3 pb-1">
                       {item.section}
                     </p>
                   )}
                   <Link href={item.href} onClick={() => setOpen(false)}
                     className={`flex items-center gap-3 px-3 py-3 rounded font-rajdhani text-sm font-medium transition-all
-                      ${isActive ? 'text-gold bg-gold/5' : 'text-zinc-400 hover:text-zinc-200 hover:bg-ink-3'}`}>
+                      ${isActive ? 'text-gold bg-gold/5' : 'text-[#44403C] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-zinc-200 hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                     <span className="text-base w-5 text-center">{item.icon}</span>
                     {item.label}
                   </Link>
@@ -83,7 +84,7 @@ export function AdminSidebar() {
 
         {/* Bottom bar */}
         <div className="flex items-center justify-between px-5 h-12">
-          <span className="font-rajdhani text-xs text-zinc-500 truncate max-w-[60%]">
+          <span className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 truncate max-w-[60%]">
             {currentPage?.icon} {currentPage?.label ?? 'Admin'}
           </span>
           <button onClick={() => setOpen(v => !v)}
