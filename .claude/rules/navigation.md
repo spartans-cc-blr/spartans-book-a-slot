@@ -149,6 +149,30 @@ no new query — and having each row look itself up in that map instead of
 comparing against `nextFixture.id`. `nextFixtureResponse` is kept
 unchanged for the nudge logic that already depended on it.
 
+**Bug fixed (September 2026) — a same-day match that had already ended
+still counted as "upcoming."** `getPlayerData()`'s query 1
+(Upcoming Matches count), query 3 (`upcomingPreview`), and query 7
+("You're Selected to Play") all filtered purely on `game_date >= today` —
+unlike `/fixtures` (`src/app/fixtures/page.tsx`'s own `getMatchStatus()`),
+which also excludes a match played *today* once it has actually ended
+(real start time + a format-based duration, via `hasMatchEnded()` in
+`src/lib/matchStatus.ts` — the same shared helper
+`features/post-match-scorecard.md` §13 documents fixing an identical gap
+in three other call sites). So a match that finished hours earlier the
+same day still showed up in the Upcoming Matches stat tile, the Upcoming
+Fixtures preview, and "You're Selected to Play" for the rest of that
+calendar day — a real divergence from what `/fixtures` itself would show
+for the same booking. Fixed by importing `hasMatchEnded()` and filtering
+query 1's rows (widened from a bare `count: 'exact', head: true` to
+fetching `id, game_date, slot_time, format` so there's something to run
+`hasMatchEnded()` against) and query 3's `upcomingPreview` through a
+shared `notEnded()` predicate before anything downstream (`nextFixture`,
+`otherUpcoming`, `previewResponses`) is derived from them; query 7's
+`selectedUpcomingBookings` filter gained the same `!hasMatchEnded(...)`
+clause. `getMatchStatus()` itself was not touched or imported — this pulls
+in the shared `hasMatchEnded()` helper directly, matching the convention
+`post-match-scorecard.md` established for reusing it outside `/fixtures`.
+
 **My Tournaments (query 6)** counts distinct `tournament_id`s from every
 `squad` row this player has ever been announced in — Hub-side only (`squad`
 → `bookings.tournament_id`), deliberately not sourced from the analytics DB,
@@ -385,15 +409,38 @@ gained an `export` keyword (no logic changes): `stageIcon`,
 `SelectedMatchCard` imports these directly rather than re-implementing
 them.
 
-Still **re-themed to the dashboard's own Warm Light palette** (`#FFFFFF`
-card, `#D4C9B0`/`#F5D9A8` borders, `#D97706` gold accents) rather than
-`FixturesCard`'s hardcoded dark gradient (`player-availability.md` §10.1
-already documents why `FixturesCard`/`FixturesAvailability` stay dark
-even on an otherwise-Warm-Light page shell — this card is a different,
-dashboard-native component reusing `FixturesCard`'s *logic and icons*,
-not that same component reskinned in place or rendered as-is). The
+In **light** mode, still re-themed to the dashboard's own Warm Light
+palette (`#FFFFFF` card, `#D4C9B0`/`#F5D9A8` borders, `#D97706` gold
+accents) rather than `FixturesCard`'s own light variant — this card is a
+different, dashboard-native component reusing `FixturesCard`'s *logic and
+icons*, not that same component reskinned in place or rendered as-is. The
 viewer's own row in the squad list is tinted gold (`#B45309`) rather than
 the default slate, so they can spot themselves in the list at a glance.
+
+**In dark mode, this card's tokens are aligned to `FixturesCard`'s own
+dark tokens byte-for-byte (fixed September 2026)** — the paragraph above,
+and the note in §3.1 below it about `FixturesCard` "staying dark," both
+predate the Light/Dark/System toggle (`player-availability.md` §10.3
+reversed that decision; `FixturesCard` is now theme-aware too). Once both
+components could render dark, `SelectedMatchCard`'s `DARK` object had
+independently been built from the app's generic "ink" dark palette
+(`#1A1A1A`/`#111111` card, `#C9A84C`/`#7A6030` gold) rather than copied
+from `FixturesCard`'s own dark gradient (`#1C2333`/`#111827` navy card,
+`#2D3748` border) — so in dark mode, "You're Selected to Play" cards and
+the "Upcoming Fixtures" cards directly below them (real `FixturesCard`
+instances) rendered two visibly different dark themes on the same page.
+Reported live and fixed by rewriting `SelectedMatchCard.tsx`'s `DARK`
+object to reuse `FixturesCard`'s exact dark values key-for-key (card
+background/border, date/heading/subtitle/opponent/ground text, divider,
+stage badge, fee/wallet-projection colors, squad-name/underline colors,
+C/VC badge colors) — `LIGHT` is untouched. Two keys that only existed on
+`SelectedMatchCard` (`accent`, used for both the tournament-name underline
+and the wallet-negative color) were split into `accentUnderline` and
+`walletNegative`/`walletPositive` to match `FixturesCard`'s own separate
+concepts for those two uses; `squadOwn` (highlighting the viewer's own row
+— a concept `FixturesCard` doesn't have) was set to `FixturesCard`'s dark
+gold accent so it still reads as "gold" the same way the rest of the
+card's dark accents do.
 
 ### Dashboard Sections
 

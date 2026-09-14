@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
+import { hasMatchEnded } from '@/lib/matchStatus'
 import Link from 'next/link'
 import { getNudgeForPlayer, getWeekendGapForPlayer } from '@/lib/availabilityNudge'
 import { WeekendAvailabilityGreeting } from '@/components/ui/WeekendAvailabilityGreeting'
@@ -25,7 +26,7 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
   // full squad list for "You're Selected to Play" bookings — runs as a
   // follow-up after this Promise.all resolves, see below.)
   const [
-    { count: upcomingCount },
+    { data: upcomingCountRows },
     { data: avail },
     { data: upcomingPreview },
     { data: squadPlayedRows },
@@ -35,10 +36,15 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     nudge,
     weekendGap,
   ] = await Promise.all([
-    // Upcoming fixtures count
+    // Upcoming fixtures count. Fetches slot_time/format (not just a bare
+    // head-count) so a same-day match that has already ended can be
+    // excluded below via hasMatchEnded() — game_date alone can't tell
+    // "starts later today" apart from "already finished", same gap
+    // src/app/fixtures/page.tsx's own getMatchStatus() already closes for
+    // its own bookings query.
     supabase
       .from('bookings')
-      .select('id', { count: 'exact', head: true })
+      .select('id, game_date, slot_time, format')
       .eq('status', 'confirmed')
       .gte('game_date', today),
 
@@ -125,7 +131,17 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     getWeekendGapForPlayer(supabase, playerId, playerStatus),
   ])
 
-  const nextFixture = upcomingPreview?.[0] ?? null
+  // Exclude a same-day match that has already ended — same "game_date
+  // alone isn't enough" logic src/app/fixtures/page.tsx applies to its own
+  // bookings query, so a match played this morning doesn't linger in the
+  // Upcoming Matches count/preview or "You're Selected to Play" for the
+  // rest of the calendar day.
+  const notEnded = (b: any) => !hasMatchEnded(b.game_date, b.slot_time, b.format)
+
+  const upcomingCount = (upcomingCountRows ?? []).filter(notEnded).length
+  const activeUpcomingPreview = (upcomingPreview ?? []).filter(notEnded)
+
+  const nextFixture = activeUpcomingPreview[0] ?? null
 
   // Player's availability for next fixture
   const nextFixtureResponse = nextFixture
