@@ -56,7 +56,7 @@ export async function getTeamMatches(): Promise<TeamMatch[]> {
       id, game_date, slot_time, format, match_id, opponent_name, opponent_id,
       tournament_id, ground_id, venue, match_stage, stage_type, is_practice,
       tournament:tournaments!bookings_tournament_id_fkey(id, name, is_practice, total_league_games),
-      ground:grounds!bookings_ground_id_fkey(id, name),
+      ground:grounds!bookings_ground_id_fkey(id, name, pitch_type),
       opponent:opponents!bookings_opponent_id_fkey(id, name, is_marquee)
     `)
     .eq('status', 'confirmed')
@@ -154,6 +154,7 @@ export async function getTeamMatches(): Promise<TeamMatch[]> {
       groundId:       ground?.id ?? b.ground_id ?? null,
       // Legacy rows from before migration 066 only have free-text venue
       groundName:     ground?.name ?? (b.venue ? String(b.venue).split(',')[0].trim() : null),
+      pitchType:      ground?.pitch_type ?? null,
       stageType:      b.stage_type === 'knockout' ? 'knockout' : b.stage_type === 'league' ? 'league' : null,
       matchStage:     b.match_stage ?? null,
       tossWon,

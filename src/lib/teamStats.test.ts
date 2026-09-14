@@ -13,7 +13,7 @@ function m(over: Partial<TeamMatch> & { gameDate: string }): TeamMatch {
     teamTotal: 150, teamWickets: 5, teamOvers: 20, oppTotal: 120, oppWickets: 10, oppOvers: 18.4,
     opponentName: 'Rising Phoenix CC', opponentId: null, opponentLabel: 'Rising Phoenix CC', isMarquee: false,
     tournamentId: 't1', tournamentName: 'Trumphate', tournamentTotalLeagueGames: null, isPractice: false,
-    groundId: 'g1', groundName: 'Mario Turner', stageType: null, matchStage: null,
+    groundId: 'g1', groundName: 'Mario Turner', pitchType: null, stageType: null, matchStage: null,
     tossWon: true, tossDecision: 'bat', battedFirst: true,
     captainId: 'p1', captainName: 'Muthu',
     ...over,
@@ -70,6 +70,12 @@ describe('applyFilters', () => {
     expect(applyFilters(sample, { includePractice: true, format: 'T30' }).length).toBe(1)
     expect(applyFilters(sample, { year: 2025 }).length).toBe(0)
   })
+  it('filters by pitch type', () => {
+    const withPitch = [...sample, m({ gameDate: '2026-03-01', pitchType: 'Turf' })]
+    expect(applyFilters(withPitch, { pitch: 'Turf' }).length).toBe(1)
+    expect(applyFilters(withPitch, { pitch: 'Matted' }).length).toBe(0)
+    expect(applyFilters(withPitch, {}).length).toBe(5) // pitch: 'all'/absent doesn't restrict, practice still excluded
+  })
 })
 
 describe('splitBy', () => {
@@ -85,6 +91,13 @@ describe('splitBy', () => {
   it('treats unclassified stage as league', () => {
     const rows = splitBy(sample, 'stage')
     expect(rows.map(r => [r.key, r.played])).toEqual([['knockout', 1], ['league', 4]])
+  })
+  it('groups an unclassified pitch type under its own "Not set" bucket rather than dropping it', () => {
+    const withPitch = [...sample.slice(0, 4), m({ gameDate: '2026-03-01', pitchType: 'Turf' })]
+    const rows = splitBy(withPitch, 'pitch')
+    expect(rows.reduce((n, r) => n + r.played, 0)).toBe(5) // every match lands in exactly one group
+    expect(rows.find(r => r.key === 'unset')?.played).toBe(4)
+    expect(rows.find(r => r.key === 'Turf')?.played).toBe(1)
   })
   it('puts a toss-winning match in both the outcome and decision buckets', () => {
     const rows = splitBy(sample, 'toss')

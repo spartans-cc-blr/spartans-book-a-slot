@@ -13,7 +13,7 @@
 // the other, or split one and "then by" the other.
 
 import { monthLabel, slotLabel } from '@/lib/teamStatsCore'
-import type { FormatFilter, InningsFilter, StageFilter, TossFilter, SplitDimension, TeamFilters } from '@/lib/teamStatsCore'
+import type { FormatFilter, InningsFilter, StageFilter, TossFilter, PitchFilter, SplitDimension, TeamFilters } from '@/lib/teamStatsCore'
 
 export interface TeamFilterState {
   year:       string        // 'all' | 'YYYY'
@@ -21,6 +21,7 @@ export interface TeamFilterState {
   format:     FormatFilter
   tournament: string        // 'all' | id
   ground:     string        // 'all' | id
+  pitch:      PitchFilter
   opponent:   string        // 'all' | opponentKey
   captain:    string        // 'all' | captainKey
   slot:       string        // 'all' | 'HH:MM'
@@ -37,7 +38,7 @@ export type FilterKey = Exclude<keyof TeamFilterState, 'by' | 'then'>
 // Order the panel lists them in — broadest scope first, then the
 // match-level slices.
 export const FILTER_KEYS: FilterKey[] = [
-  'year', 'month', 'tournament', 'ground', 'opponent', 'captain',
+  'year', 'month', 'tournament', 'ground', 'pitch', 'opponent', 'captain',
   'format', 'slot', 'innings', 'toss', 'stage', 'practice',
 ]
 
@@ -46,6 +47,7 @@ export const FILTER_LABEL: Record<FilterKey, string> = {
   month:      'Month',
   tournament: 'Tournament',
   ground:     'Ground',
+  pitch:      'Pitch Type',
   opponent:   'Opponent',
   captain:    'Captain',
   format:     'Format',
@@ -56,7 +58,7 @@ export const FILTER_LABEL: Record<FilterKey, string> = {
   practice:   'Practice games',
 }
 
-export const SPLIT_DIMENSIONS: SplitDimension[] = ['tournament', 'ground', 'opponent', 'format', 'stage', 'innings', 'toss', 'captain', 'year', 'month', 'slot']
+export const SPLIT_DIMENSIONS: SplitDimension[] = ['tournament', 'ground', 'pitch', 'opponent', 'format', 'stage', 'innings', 'toss', 'captain', 'year', 'month', 'slot']
 
 // The Captain dimension (filter, split, and "then by") is restricted to
 // captains, GC and admin — see features/team-stats.md §3.6. Comparing
@@ -80,7 +82,7 @@ export function visibleSplitDimensions(canUseCaptainDimension: boolean): SplitDi
 
 export const DEFAULT_TEAM_FILTER_STATE: TeamFilterState = {
   year: 'all', month: 'all', format: 'all', tournament: 'all', ground: 'all',
-  opponent: 'all', captain: 'all', slot: 'all', innings: 'all', toss: 'all',
+  pitch: 'all', opponent: 'all', captain: 'all', slot: 'all', innings: 'all', toss: 'all',
   stage: 'all', practice: false, by: 'tournament', then: null,
 }
 
@@ -129,6 +131,7 @@ export function toTeamFilters(state: TeamFilterState): TeamFilters {
     format: state.format,
     tournamentId: state.tournament === 'all' ? null : state.tournament,
     groundId: state.ground === 'all' ? null : state.ground,
+    pitch: state.pitch,
     opponentKey: state.opponent === 'all' ? null : state.opponent,
     captainKey: state.captain === 'all' ? null : state.captain,
     slotTime: state.slot === 'all' ? null : state.slot,
@@ -156,6 +159,7 @@ export function buildTeamStatsHref(state: TeamFilterState): string {
   if (state.month !== 'all')      params.set('month', state.month)
   if (state.tournament !== 'all') params.set('tournament', state.tournament)
   if (state.ground !== 'all')     params.set('ground', state.ground)
+  if (state.pitch !== 'all')      params.set('pitch', state.pitch)
   if (state.opponent !== 'all')   params.set('opponent', state.opponent)
   if (state.captain !== 'all')    params.set('captain', state.captain)
   if (state.format !== 'all')     params.set('format', state.format)
@@ -177,6 +181,7 @@ export function filterValueLabel(state: TeamFilterState, key: FilterKey, options
     case 'month':      return named(options.months, state.month) || monthLabel(state.month)
     case 'tournament': return named(options.tournaments, state.tournament)
     case 'ground':     return named(options.grounds, state.ground)
+    case 'pitch':      return state.pitch === 'all' ? 'All pitch types' : state.pitch
     case 'opponent':   return named(options.opponents, state.opponent)
     case 'captain':    return named(options.captains, state.captain)
     case 'slot':       return named(options.slots, state.slot) || slotLabel(state.slot)

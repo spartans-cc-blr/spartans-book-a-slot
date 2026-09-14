@@ -69,7 +69,7 @@ describe('teamStatsFilters', () => {
   it('toTeamFilters converts sentinels to nulls/numbers', () => {
     const s: TeamFilterState = { ...DEFAULT_TEAM_FILTER_STATE, year: '2025', opponent: 'id:o1', innings: 'chasing', captain: 'p1' }
     expect(toTeamFilters(s)).toEqual({
-      year: 2025, month: null, format: 'all', tournamentId: null, groundId: null, opponentKey: 'id:o1',
+      year: 2025, month: null, format: 'all', tournamentId: null, groundId: null, pitch: 'all', opponentKey: 'id:o1',
       captainKey: 'p1', slotTime: null, innings: 'chasing', toss: 'all', stage: 'all', includePractice: false,
     })
     const bare = toTeamFilters(DEFAULT_TEAM_FILTER_STATE)

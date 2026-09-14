@@ -11,7 +11,7 @@
 
 import { normaliseOpponentName } from '@/lib/opponents'
 import { isInformalFormat } from '@/types'
-import type { StageType } from '@/types'
+import type { StageType, PitchType } from '@/types'
 
 export type MatchResult = 'won' | 'lost' | 'tied' | 'nr'
 
@@ -43,6 +43,10 @@ export interface TeamMatch {
   isPractice:     boolean
   groundId:       string | null
   groundName:     string | null
+  // grounds.pitch_type (migration 078) — Matted / Astro / Turf, or null
+  // when the ground hasn't been classified yet (a ground attribute, not
+  // derivable from anything else on the match).
+  pitchType:      PitchType | null
   stageType:      StageType | null
   matchStage:     string | null
   // From the analytics DB's match_stats.toss_won/toss_decision (100%
@@ -73,6 +77,7 @@ export type FormatFilter = 'all' | 'T20' | 'T30' | 'other'
 export type InningsFilter = 'all' | 'defending' | 'chasing'
 export type StageFilter = 'all' | 'league' | 'knockout'
 export type TossFilter = 'all' | 'won' | 'lost'
+export type PitchFilter = 'all' | PitchType
 
 // Every dimension the page can split by is also filterable (added
 // September 2026, see features/team-stats.md §3.2) — that's what makes a
@@ -84,6 +89,7 @@ export interface TeamFilters {
   format?:         FormatFilter
   tournamentId?:   string | null
   groundId?:       string | null
+  pitch?:          PitchFilter
   opponentKey?:    string | null     // opponentKey() value
   captainKey?:     string | null     // captainKey() value
   slotTime?:       string | null     // 'HH:MM'
@@ -120,6 +126,7 @@ export function applyFilters(matches: TeamMatch[], f: TeamFilters): TeamMatch[] 
     }
     if (f.tournamentId && m.tournamentId !== f.tournamentId) return false
     if (f.groundId && m.groundId !== f.groundId) return false
+    if (f.pitch && f.pitch !== 'all' && m.pitchType !== f.pitch) return false
     if (f.opponentKey && opponentKey(m) !== f.opponentKey) return false
     if (f.month && m.gameDate.slice(0, 7) !== f.month) return false
     if (f.captainKey && captainKey(m) !== f.captainKey) return false
@@ -214,12 +221,13 @@ export interface SplitRow extends Summary {
 }
 
 export type SplitDimension =
-  | 'tournament' | 'ground' | 'opponent' | 'format' | 'stage'
+  | 'tournament' | 'ground' | 'pitch' | 'opponent' | 'format' | 'stage'
   | 'innings' | 'toss' | 'year' | 'month' | 'captain' | 'slot'
 
 export const SPLIT_LABEL: Record<SplitDimension, string> = {
   tournament: 'Tournament',
   ground:     'Ground',
+  pitch:      'Pitch Type',
   opponent:   'Opponent',
   format:     'Format',
   stage:      'League / Knockout',
@@ -251,6 +259,12 @@ function groupsFor(m: TeamMatch, dim: SplitDimension): { key: string; label: str
       return [{ key: m.tournamentId ?? 'none', label: m.tournamentName ?? 'No tournament' }]
     case 'ground':
       return [{ key: m.groundId ?? `name:${m.groundName ?? 'unknown'}`, label: m.groundName ?? 'Unknown ground' }]
+    case 'pitch':
+      // A real, first-class group rather than an empty return (unlike toss/
+      // innings' "no data" case) — most grounds have no pitch_type set yet
+      // at the time this dimension shipped, and that's worth surfacing as
+      // its own "Not set" bucket so it's visible, not silently dropped.
+      return [{ key: m.pitchType ?? 'unset', label: m.pitchType ?? 'Not set' }]
     case 'opponent':
       return [{ key: opponentKey(m), label: m.opponentLabel, meta: { opponentId: m.opponentId, isMarquee: m.isMarquee, reconciled: !!m.opponentId } }]
     case 'format':
