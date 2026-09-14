@@ -43,9 +43,11 @@ export interface TeamMatch {
   isPractice:     boolean
   groundId:       string | null
   groundName:     string | null
-  // grounds.pitch_type (migration 078) — Matted / Astro / Turf, or null
-  // when the ground hasn't been classified yet (a ground attribute, not
-  // derivable from anything else on the match).
+  // tournaments.pitch_type (migration 079) — Matted / Astro / Turf, or null
+  // when the tournament hasn't been classified yet. Tournament-level, not
+  // ground-level: a ground's physical surface can change over time, but a
+  // tournament runs on one surface for its whole duration — see
+  // features/team-stats.md §6.
   pitchType:      PitchType | null
   stageType:      StageType | null
   matchStage:     string | null
@@ -261,9 +263,9 @@ function groupsFor(m: TeamMatch, dim: SplitDimension): { key: string; label: str
       return [{ key: m.groundId ?? `name:${m.groundName ?? 'unknown'}`, label: m.groundName ?? 'Unknown ground' }]
     case 'pitch':
       // A real, first-class group rather than an empty return (unlike toss/
-      // innings' "no data" case) — most grounds have no pitch_type set yet
-      // at the time this dimension shipped, and that's worth surfacing as
-      // its own "Not set" bucket so it's visible, not silently dropped.
+      // innings' "no data" case) — most tournaments have no pitch_type set
+      // yet at the time this dimension shipped, and that's worth surfacing
+      // as its own "Not set" bucket so it's visible, not silently dropped.
       return [{ key: m.pitchType ?? 'unset', label: m.pitchType ?? 'Not set' }]
     case 'opponent':
       return [{ key: opponentKey(m), label: m.opponentLabel, meta: { opponentId: m.opponentId, isMarquee: m.isMarquee, reconciled: !!m.opponentId } }]

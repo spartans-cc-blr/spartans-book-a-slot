@@ -144,7 +144,7 @@ Unchanged from the original plan — fully implemented, no action needed:
 | Apply match fees | ❌ | ❌ | ❌ | ✅ only |
 | Clear a reconciliation flag without reprocessing | ❌ | ❌ | ❌ | ✅ only |
 | Run the one-time backfill page | ❌ | ❌ | ❌ | ✅ only |
-| Edit an existing ground (pitch type/maps/hospital link) | ❌ | ❌ | ✅ | ✅ |
+| Edit an existing ground (maps/hospital link) | ❌ | ❌ | ✅ | ✅ |
 | Create a new ground | ❌ | ❌ | ❌ (GC only, not wrangler) | ✅ |
 
 > **Grounds management (added July 2026):** wrangler also covers editing

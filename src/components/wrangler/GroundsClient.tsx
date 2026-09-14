@@ -2,18 +2,13 @@
 
 import { useState, useEffect } from 'react'
 
-type PitchType = 'Matted' | 'Astro' | 'Turf'
-
 type Ground = {
   id: string
   name: string
   maps_url: string
   hospital_url: string
-  pitch_type: PitchType | null
   created_at: string
 }
-
-const PITCH_TYPES: PitchType[] = ['Matted', 'Astro', 'Turf']
 
 interface GroundsClientProps {
   canAdd:  boolean // create new grounds — GC or admin
@@ -26,7 +21,7 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm,  setEditForm]  = useState<Partial<Ground>>({})
   const [showAdd,   setShowAdd]   = useState(false)
-  const [addForm,   setAddForm]   = useState<{ name: string; maps_url: string; hospital_url: string; pitch_type: PitchType | '' }>({ name: '', maps_url: '', hospital_url: '', pitch_type: '' })
+  const [addForm,   setAddForm]   = useState<{ name: string; maps_url: string; hospital_url: string }>({ name: '', maps_url: '', hospital_url: '' })
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
 
@@ -40,7 +35,7 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
   function startEdit(g: Ground) {
     if (!canEdit) return
     setEditingId(g.id)
-    setEditForm({ name: g.name, maps_url: g.maps_url, hospital_url: g.hospital_url, pitch_type: g.pitch_type })
+    setEditForm({ name: g.name, maps_url: g.maps_url, hospital_url: g.hospital_url })
     setError('')
   }
 
@@ -72,13 +67,13 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
     const res = await fetch('/api/grounds', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...addForm, pitch_type: addForm.pitch_type || null }),
+      body: JSON.stringify(addForm),
     })
     if (res.ok) {
       const d = await res.json()
       setGrounds(prev => [d.ground, ...prev])
       setShowAdd(false)
-      setAddForm({ name: '', maps_url: '', hospital_url: '', pitch_type: '' })
+      setAddForm({ name: '', maps_url: '', hospital_url: '' })
     } else {
       setError('Failed to add ground.')
     }
@@ -90,7 +85,7 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-cinzel text-xl font-bold text-gold">Grounds</h1>
-          <p className="font-rajdhani text-zinc-500 text-sm mt-1">Manage grounds — pitch type, Google Maps link and nearest hospital link.</p>
+          <p className="font-rajdhani text-zinc-500 text-sm mt-1">Manage grounds — Google Maps link and nearest hospital link.</p>
         </div>
         {canAdd && (
           <button onClick={() => { setShowAdd(v => !v); setError('') }}
@@ -109,14 +104,6 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
               <label className="form-label">Ground Name <span className="text-crimson">*</span></label>
               <input value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="e.g. Chinnaswamy Ground 1" className="form-input" />
-            </div>
-            <div>
-              <label className="form-label">Pitch Type</label>
-              <select value={addForm.pitch_type} onChange={e => setAddForm(f => ({ ...f, pitch_type: e.target.value as PitchType | '' }))} className="form-input">
-                <option value="">Not set</option>
-                {PITCH_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <p className="font-rajdhani text-xs text-zinc-600 mt-1">Optional — can be classified later.</p>
             </div>
             <div>
               <label className="form-label">Google Maps URL <span className="text-crimson">*</span></label>
@@ -159,33 +146,26 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
           <table className="w-full">
             <thead>
               <tr className="border-b border-ink-5 bg-ink-4">
-                {['Ground', 'Pitch Type', 'Maps Link', 'Hospital Link', ...(canEdit ? [''] : [])].map(h => (
+                {['Ground', 'Maps Link', 'Hospital Link', ...(canEdit ? [''] : [])].map(h => (
                   <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={canEdit ? 5 : 4} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">Loading...</td></tr>
+                <tr><td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">Loading...</td></tr>
               )}
               {!loading && grounds.length === 0 && (
-                <tr><td colSpan={canEdit ? 5 : 4} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No grounds added yet.</td></tr>
+                <tr><td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No grounds added yet.</td></tr>
               )}
               {grounds.map(g => (
                 <tr key={g.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
                   {editingId === g.id ? (
-                    <td colSpan={canEdit ? 5 : 4} className="px-4 py-4">
+                    <td colSpan={canEdit ? 4 : 3} className="px-4 py-4">
                       <div className="grid sm:grid-cols-2 gap-3">
                         <div className="sm:col-span-2">
                           <label className="form-label">Ground Name</label>
                           <input value={editForm.name ?? ''} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} className="form-input" />
-                        </div>
-                        <div>
-                          <label className="form-label">Pitch Type</label>
-                          <select value={editForm.pitch_type ?? ''} onChange={e => setEditForm(f => ({ ...f, pitch_type: (e.target.value || null) as PitchType | null }))} className="form-input">
-                            <option value="">Not set</option>
-                            {PITCH_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
-                          </select>
                         </div>
                         <div>
                           <label className="form-label">Google Maps URL</label>
@@ -223,18 +203,6 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
                   ) : (
                     <>
                       <td className="px-4 py-3 font-rajdhani font-semibold text-sm text-parchment">{g.name}</td>
-                      <td className="px-4 py-3">
-                        {g.pitch_type ? (
-                          <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded border border-ink-5 text-zinc-300">{g.pitch_type}</span>
-                        ) : canEdit ? (
-                          <button onClick={() => startEdit(g)}
-                            className="font-rajdhani text-xs text-amber-500 hover:text-amber-400 hover:underline">
-                            ⚠ Not set — classify
-                          </button>
-                        ) : (
-                          <span className="font-rajdhani text-xs text-amber-500">⚠ Not set</span>
-                        )}
-                      </td>
                       <td className="px-4 py-3">
                         {g.maps_url ? (
                           <a href={g.maps_url} target="_blank" rel="noopener noreferrer"

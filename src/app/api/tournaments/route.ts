@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import type { PitchType } from '@/types'
+
+const PITCH_TYPES: PitchType[] = ['Matted', 'Astro', 'Turf']
+
+// Absent/null/'' means "not set" (a tournament doesn't have to be
+// classified up front); anything else must be one of PITCH_TYPES — never
+// trusts the client further than that, so an invalid value 400s here
+// rather than hitting the DB's own CHECK constraint and surfacing a raw
+// 500. See features/team-stats.md §6.
+function isValidPitchType(v: unknown): v is PitchType | null | '' | undefined {
+  return v === undefined || v === null || v === '' || (typeof v === 'string' && (PITCH_TYPES as string[]).includes(v))
+}
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -31,9 +43,12 @@ export async function POST(request: Request) {
   const {
     name, organiser_name, organiser_contact, ball_type = 'red', ground_id,
     total_league_games, cricheroes_points_table_url, match_fee, captain_id,
-    intended_formats, tentative_start_date,
+    intended_formats, tentative_start_date, pitch_type,
   } = safeBody
   if (!name?.trim()) return NextResponse.json({ error: 'name is required' }, { status: 400 })
+  if (!isValidPitchType(pitch_type)) {
+    return NextResponse.json({ error: 'pitch_type must be Matted, Astro or Turf' }, { status: 400 })
+  }
 
   // vibe-security: verify captain exists and is active if provided
   if (captain_id) {
@@ -61,6 +76,7 @@ export async function POST(request: Request) {
       captain_id: captain_id || null,
       intended_formats: Array.isArray(intended_formats) && intended_formats.length ? intended_formats : null,
       tentative_start_date: tentative_start_date || null,
+      pitch_type: pitch_type || null,
     })
     .select('*, captains!tournaments_captain_id_fkey(id, name, players(cricheroes_url, whatsapp))')
     .single()
@@ -76,6 +92,12 @@ export async function PATCH(request: Request) {
   // vibe-security: strip vc_captain_id — deprecated, never written
   const { id, vc_captain_id: _dropped, ...updates } = body
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+  if ('pitch_type' in updates) {
+    if (!isValidPitchType(updates.pitch_type)) {
+      return NextResponse.json({ error: 'pitch_type must be Matted, Astro or Turf' }, { status: 400 })
+    }
+    updates.pitch_type = updates.pitch_type || null
+  }
 
   // vibe-security: validate captain if being changed
   if (updates.captain_id) {

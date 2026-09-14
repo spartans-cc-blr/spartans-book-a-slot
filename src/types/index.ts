@@ -54,6 +54,11 @@ export interface Tournament {
   // features/leaderboard.md §10. Drives the per-booking ground picker on
   // /admin/bookings/new and /admin/bookings/[id].
   is_practice:                 boolean
+  // Matted / Astro / Turf — NULL means not yet classified. Tournament-level
+  // (not ground-level) because a ground's physical surface can change over
+  // time, but a tournament runs on one surface for its whole duration — see
+  // features/team-stats.md §6. Never meaningful for a practice tournament.
+  pitch_type:                  PitchType | null
   // Admin-declared format(s), used only as the slot-distribution/suggestion
   // fallback for a tournament with zero confirmed bookings yet — see
   // resolveActiveFormats() in src/lib/slotTargets.ts. Null means
@@ -95,7 +100,7 @@ export interface Booking {
     captain_id: string | null
     captains: { id: string; name: string; players: { cricheroes_url: string | null } | null } | null
   }
-  ground?: { id: string; name: string; maps_url: string; hospital_url: string; pitch_type?: PitchType | null } | null
+  ground?: { id: string; name: string; maps_url: string; hospital_url: string } | null
   captain?: { id: string; name: string; players: { cricheroes_url: string | null; whatsapp: string | null } | null } | null
   reserved_until?: string | null
   organiser_name?: string | null
@@ -124,8 +129,9 @@ export interface Booking {
 
 export type StageType = 'league' | 'knockout'
 
-// grounds.pitch_type (migration 078) — NULL means not yet classified.
-// See features/team-stats.md §6 ("Pitch Type").
+// tournaments.pitch_type (migration 079, moved off grounds by that same
+// migration) — NULL means not yet classified. See features/team-stats.md
+// §6 ("Pitch Type").
 export type PitchType = 'Matted' | 'Astro' | 'Turf'
 
 export interface Opponent {
