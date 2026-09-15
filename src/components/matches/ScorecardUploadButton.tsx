@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from 'react'
 export type ScorecardStatus = 'pending_parse' | 'parsed' | 'synced' | 'fees_applied'
 
 export const SCORECARD_STATUS_CONFIG: Record<ScorecardStatus, { label: string; className: string }> = {
-  pending_parse: { label: 'Processing…',        className: 'bg-ink-4 border-ink-5 text-zinc-400' },
-  parsed:        { label: 'Awaiting Admin Sync', className: 'bg-amber-950/40 border-amber-800 text-amber-400' },
-  synced:        { label: 'Stats Synced ✓',      className: 'bg-emerald-950/40 border-emerald-800 text-emerald-400' },
-  fees_applied:  { label: 'Fees Applied ✓',      className: 'bg-emerald-950/40 border-emerald-800 text-emerald-400' },
+  pending_parse: { label: 'Processing…',        className: 'bg-[var(--scorecard-table-bg)] border-[var(--scorecard-table-border)] text-[var(--scorecard-text-faint)]' },
+  parsed:        { label: 'Awaiting Admin Sync', className: 'bg-[var(--fx-badge-bg)] border-[var(--fx-badge-border)] text-[var(--fx-badge-text)]' },
+  synced:        { label: 'Stats Synced ✓',      className: 'bg-[var(--fx-success-bg)] border-[var(--fx-success-border)] text-[var(--fx-success-text)]' },
+  fees_applied:  { label: 'Fees Applied ✓',      className: 'bg-[var(--fx-success-bg)] border-[var(--fx-success-border)] text-[var(--fx-success-text)]' },
 }
 
 function Spinner() {
@@ -124,7 +124,7 @@ export function ScorecardUploadButton({
 
   const input = <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFile} />
   const progress = uploading && stepMessage && (
-    <p className="font-rajdhani text-[10px] text-zinc-500 mt-1 max-w-[220px]">{stepMessage}</p>
+    <p className="font-rajdhani text-[10px] text-[var(--scorecard-text-faint)] mt-1 max-w-[220px]">{stepMessage}</p>
   )
 
   // parsed/synced/fees_applied are server-confirmed checkpoints — re-uploading
@@ -155,10 +155,10 @@ export function ScorecardUploadButton({
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="font-rajdhani text-[10px] font-semibold text-zinc-500 hover:text-gold disabled:opacity-40 underline underline-offset-2 transition-colors block">
+          className="font-rajdhani text-[10px] font-semibold text-[var(--scorecard-text-faint)] hover:text-[var(--fx-accent)] disabled:opacity-40 underline underline-offset-2 transition-colors block">
           Stuck? Retry upload
         </button>
-        {error && <p className="font-rajdhani text-[10px] text-red-400">{error}</p>}
+        {error && <p className="font-rajdhani text-[10px]" style={{ color: 'var(--fx-danger-text)' }}>{error}</p>}
       </div>
     )
   }
@@ -169,11 +169,11 @@ export function ScorecardUploadButton({
       <button
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
-        className="font-rajdhani text-[11px] font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-2.5 py-1 rounded transition-colors">
+        className="font-rajdhani text-[11px] font-bold tracking-wide bg-[var(--fx-badge-bg)] border border-[var(--fx-badge-border)] text-[var(--fx-badge-text)] hover:opacity-80 disabled:opacity-40 px-2.5 py-1 rounded transition-opacity">
         {uploading ? 'Uploading…' : 'Upload Scorecard'}
       </button>
       {progress}
-      {error && <p className="font-rajdhani text-[10px] text-red-400 mt-1">{error}</p>}
+      {error && <p className="font-rajdhani text-[10px] mt-1" style={{ color: 'var(--fx-danger-text)' }}>{error}</p>}
     </div>
   )
 }

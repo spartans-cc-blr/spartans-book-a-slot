@@ -96,17 +96,17 @@ function PerformerRow({ bookingId, performer, gameDate, tournamentName, ballType
   }
 
   return (
-    <div style={{ padding: '6px 0', borderBottom: '1px solid #1F2937' }}>
+    <div style={{ padding: '6px 0', borderBottom: '1px solid var(--scorecard-divider)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ minWidth: 0 }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#F5F5F5', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--scorecard-heading-text)', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {performer.reason === 'top_scorer' ? '🏏' : <BallIcon type={ballType} size={12} />} {performer.name}
           </p>
-          <p style={{ fontSize: '10px', color: '#6B7280' }}>{performer.statLine}</p>
+          <p style={{ fontSize: '10px', color: 'var(--scorecard-text-faint)' }}>{performer.statLine}</p>
         </div>
-        <button onClick={openWhatsApp} style={{ flexShrink: 0 }}
+        <button onClick={openWhatsApp} style={{ flexShrink: 0, color: 'var(--fx-success-text)' }}
           title={performer.whatsapp ? `Send to ${performer.name} on WhatsApp` : 'Send via WhatsApp (no number on file — pick a recipient)'}
-          className="text-emerald-400 hover:text-emerald-300 transition-colors">
+          className="hover:opacity-80 transition-opacity">
           {WA_ICON}
         </button>
       </div>
@@ -115,7 +115,7 @@ function PerformerRow({ bookingId, performer, gameDate, tournamentName, ballType
           the click handler above, not safe to read during render). Shown
           so the wrangler can see the personalised text before sending it,
           not just the performer's name and stat line. */}
-      <p style={{ fontSize: '10px', color: '#9CA3AF', fontStyle: 'italic', whiteSpace: 'pre-line', marginTop: '4px', lineHeight: 1.4 }}>
+      <p style={{ fontSize: '10px', color: 'var(--scorecard-text-muted)', fontStyle: 'italic', whiteSpace: 'pre-line', marginTop: '4px', lineHeight: 1.4 }}>
         “{buildMessageText(performer, gameDate, tournamentName)}”
       </p>
     </div>
@@ -137,12 +137,12 @@ export function PerformerShareButton({ bookingId, performers, gameDate, tourname
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
       <button onClick={() => setOpen(v => !v)}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-        className="font-rajdhani text-[10px] font-bold tracking-wide text-blue-400 hover:text-blue-300 transition-colors">
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--scorecard-link-text)' }}
+        className="font-rajdhani text-[10px] font-bold tracking-wide hover:opacity-80 transition-opacity">
         Request top performer to verify
       </button>
       {open && (
-        <div style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid #2D3748', borderRadius: '8px', padding: '4px 10px' }}>
+        <div style={{ width: '100%', background: 'var(--scorecard-panel-bg)', border: '1px solid var(--scorecard-card-border)', borderRadius: '8px', padding: '4px 10px' }}>
           {resolved.map(p => (
             <PerformerRow key={p.player_id} bookingId={bookingId} performer={p} gameDate={gameDate} tournamentName={tournamentName} ballType={ballType} />
           ))}

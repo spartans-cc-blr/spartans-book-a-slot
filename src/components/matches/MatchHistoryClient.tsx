@@ -174,7 +174,7 @@ function slotLabel(slot: string): string {
 // "Stats synced"/"Fees applied" caption — redundant once the verification
 // row exists, so only the pre-verification-eligible 'parsed' state remains.
 const SYNC_INDICATOR: Partial<Record<ScorecardStatus, { icon: string; label: string; color: string }>> = {
-  parsed: { icon: '⏳', label: 'Awaiting sync', color: '#9CA3AF' },
+  parsed: { icon: '⏳', label: 'Awaiting sync', color: 'var(--scorecard-text-muted)' },
 }
 
 function ScorecardSyncIndicator({ status }: { status: ScorecardStatus }) {
@@ -183,7 +183,7 @@ function ScorecardSyncIndicator({ status }: { status: ScorecardStatus }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }} title={cfg.label}>
       <span style={{ fontSize: '15px', lineHeight: 1, color: cfg.color }}>{cfg.icon}</span>
-      <span style={{ fontSize: '9px', color: '#6B7280', whiteSpace: 'nowrap' }}>{cfg.label}</span>
+      <span style={{ fontSize: '9px', color: 'var(--scorecard-text-faint)', whiteSpace: 'nowrap' }}>{cfg.label}</span>
     </div>
   )
 }
@@ -724,8 +724,8 @@ function MatchHistoryCard({
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
-      border: '1px solid #2D3748',
+      background: 'var(--scorecard-card-bg)',
+      border: '1px solid var(--scorecard-card-border)',
       borderRadius: '12px',
       padding: '14px 16px',
       display: 'flex',
@@ -736,11 +736,11 @@ function MatchHistoryCard({
       position: 'relative',
       overflow: 'hidden',
     }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'var(--scorecard-accent-gradient)' }} />
 
       {/* Date + slot + format */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '12px', fontWeight: 600, color: '#C9A84C', letterSpacing: '0.05em' }}>
+        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fx-accent)', letterSpacing: '0.05em' }}>
           {formatDate(match.game_date)} · {match.match_time
             ? match.match_time.slice(0, 5).replace(/^0/, '') + ' ' + (parseInt(match.match_time) < 12 ? 'AM' : 'PM')
             : slotLabel(match.slot_time)}
@@ -754,7 +754,7 @@ function MatchHistoryCard({
 
       {/* Tournament + opponent */}
       <div>
-        <div style={{ fontSize: '15px', fontWeight: 700, color: '#F5F5F5', lineHeight: 1.3, marginBottom: '3px' }}>
+        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--scorecard-heading-text)', lineHeight: 1.3, marginBottom: '3px' }}>
           {/* Links into "Yours Statistically" (/leaderboard) pre-filtered to
               this tournament — category defaults to mvp (Honor Board's
               Overall/Monthly sub-tabs ignore/reset tournament scoping, see
@@ -767,7 +767,7 @@ function MatchHistoryCard({
               rather than blending into the plain white heading text. */}
           {match.tournament_id ? (
             <Link href={`/leaderboard?tournament=${match.tournament_id}&category=mvp&year=all`}
-              style={{ color: '#F5F5F5', textDecoration: 'underline', textDecorationColor: '#C9A84C', textUnderlineOffset: '3px' }}
+              style={{ color: 'var(--scorecard-heading-text)', textDecoration: 'underline', textDecorationColor: 'var(--fx-accent)', textUnderlineOffset: '3px' }}
               title="View stats for this tournament">
               {match.tournament_name ?? 'Unassigned'}
             </Link>
@@ -775,14 +775,14 @@ function MatchHistoryCard({
             match.tournament_name ?? 'Unassigned'
           )}
         </div>
-        <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
-          vs <span style={{ color: '#D1D5DB', fontWeight: 500 }}>{match.opponent_name || 'TBD'}</span>
+        <div style={{ fontSize: '12px', color: 'var(--scorecard-text-muted)' }}>
+          vs <span style={{ color: 'var(--scorecard-text-2)', fontWeight: 500 }}>{match.opponent_name || 'TBD'}</span>
         </div>
         {/* Ground link mirrors FixturesCard: hyperlinked when the tournament
             has a maps_url, falling back to the booking's free-text venue
             when no ground record is attached. */}
         {match.ground?.name ? (
-          <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--scorecard-text-faint)', marginTop: '4px' }}>
             {'@ '}
             {match.ground.maps_url ? (
               <a href={match.ground.maps_url} target="_blank" rel="noopener noreferrer"
@@ -794,7 +794,7 @@ function MatchHistoryCard({
             )}
           </div>
         ) : match.venue ? (
-          <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>📍 {match.venue}</div>
+          <div style={{ fontSize: '11px', color: 'var(--scorecard-text-faint)', marginTop: '4px' }}>📍 {match.venue}</div>
         ) : null}
       </div>
 
@@ -802,12 +802,12 @@ function MatchHistoryCard({
           so it's the first thing anyone sees on a flagged match, not a
           detail buried after the score. */}
       {match.needs_reconciliation && (
-        <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(180, 83, 9, 0.5)', borderRadius: '8px', padding: '8px 10px' }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#FBBF24', display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <div style={{ background: 'var(--scorecard-warn-bg)', border: '1px solid var(--scorecard-warn-border)', borderRadius: '8px', padding: '8px 10px' }}>
+          <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--scorecard-warn-text)', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <NotifyIcon size={12} /> Stats Discrepancy Reported
           </p>
-          <p style={{ fontSize: '11px', color: '#FCD34D', marginTop: '2px' }}>{match.reconciliation_note}</p>
-          <p style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '2px' }}>
+          <p style={{ fontSize: '11px', color: 'var(--scorecard-warn-text-2)', marginTop: '2px' }}>{match.reconciliation_note}</p>
+          <p style={{ fontSize: '10px', color: 'var(--scorecard-text-muted)', marginTop: '2px' }}>
             Reported by {match.reconciliation_flagged_by_name ?? 'someone'}
             {match.reconciliation_flagged_at ? ` on ${new Date(match.reconciliation_flagged_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
             {' '}· queued for re-fetch
@@ -822,17 +822,17 @@ function MatchHistoryCard({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {match.stats.match_result && <ResultBadge result={match.stats.match_result} />}
-              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{scoreLine(match.stats)}</span>
+              <span style={{ fontSize: '11px', color: 'var(--scorecard-text-muted)' }}>{scoreLine(match.stats)}</span>
             </div>
             {(match.stats.top_bat || match.stats.top_bowl) && (
-              <div style={{ fontSize: '10px', color: '#6B7280', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ fontSize: '10px', color: 'var(--scorecard-text-faint)', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                 {match.stats.top_bat && (
-                  <span>🏏 <span style={{ color: '#C9A84C' }}>{match.stats.top_bat.name}</span> — {match.stats.top_bat.runs} ({match.stats.top_bat.balls})</span>
+                  <span>🏏 <span style={{ color: 'var(--fx-accent)' }}>{match.stats.top_bat.name}</span> — {match.stats.top_bat.runs} ({match.stats.top_bat.balls})</span>
                 )}
                 {match.stats.top_bowl && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     <BallIcon type={ballType} size={12} />
-                    <span style={{ color: '#C9A84C' }}>{match.stats.top_bowl.name}</span> — {match.stats.top_bowl.wickets}/{match.stats.top_bowl.runs} ({match.stats.top_bowl.overs} ov)
+                    <span style={{ color: 'var(--fx-accent)' }}>{match.stats.top_bowl.name}</span> — {match.stats.top_bowl.wickets}/{match.stats.top_bowl.runs} ({match.stats.top_bowl.overs} ov)
                   </span>
                 )}
               </div>
@@ -859,10 +859,10 @@ function MatchHistoryCard({
       {match.scorecard_status === 'parsed' && match.can_upload && (
         <div>
           <button onClick={handleSyncStats} disabled={syncLoading}
-            className="font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
+            className="font-rajdhani text-xs font-bold tracking-wide bg-[var(--fx-badge-bg)] border border-[var(--fx-badge-border)] text-[var(--fx-badge-text)] hover:opacity-80 disabled:opacity-40 px-3 py-1.5 rounded transition-opacity">
             {syncLoading ? 'Syncing…' : 'Sync Stats from Analytics DB'}
           </button>
-          {syncError && <p className="font-rajdhani text-xs text-red-400 mt-1">{syncError}</p>}
+          {syncError && <p className="font-rajdhani text-xs mt-1" style={{ color: 'var(--fx-danger-text)' }}>{syncError}</p>}
         </div>
       )}
 
@@ -876,10 +876,10 @@ function MatchHistoryCard({
       {match.scorecard_status === 'synced' && match.can_upload && (
         <div>
           <button onClick={handleSyncStats} disabled={syncLoading}
-            className="font-rajdhani text-[10px] font-semibold text-zinc-500 hover:text-gold disabled:opacity-40 underline underline-offset-2 transition-colors">
+            className="font-rajdhani text-[10px] font-semibold text-[var(--scorecard-text-faint)] hover:text-[var(--fx-accent)] disabled:opacity-40 underline underline-offset-2 transition-colors">
             {syncLoading ? 'Re-syncing…' : 'Re-sync stats from Analytics DB'}
           </button>
-          {syncError && <p className="font-rajdhani text-[10px] text-red-400 mt-1">{syncError}</p>}
+          {syncError && <p className="font-rajdhani text-[10px] mt-1" style={{ color: 'var(--fx-danger-text)' }}>{syncError}</p>}
         </div>
       )}
 
@@ -892,7 +892,7 @@ function MatchHistoryCard({
           reasoning as Ground: one real, clickable icon, reused, not two. */}
       {(showSyncIndicator || (match.cricheroes_url && !verifyRowHasCricHeroesLink)) && (
         <>
-          <div style={{ height: '1px', background: '#2D3748' }} />
+          <div style={{ height: '1px', background: 'var(--scorecard-divider)' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             {showSyncIndicator && match.scorecard_status && (
               <ScorecardSyncIndicator status={match.scorecard_status} />
@@ -902,7 +902,7 @@ function MatchHistoryCard({
               <a href={match.cricheroes_url} target="_blank" rel="noopener noreferrer" title="Open in CricHeroes"
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
                 <CricHeroesIcon size={22} />
-                <span style={{ fontSize: '9px', color: '#6B7280' }}>CricHeroes</span>
+                <span style={{ fontSize: '9px', color: 'var(--scorecard-text-faint)' }}>CricHeroes</span>
               </a>
             )}
           </div>
@@ -953,20 +953,20 @@ function MatchHistoryCard({
           the rare post-sync correction. */}
       {(!match.stats || !match.roles_complete) && (
         <div>
-          <div style={{ height: '1px', background: '#2D3748' }} />
+          <div style={{ height: '1px', background: 'var(--scorecard-divider)' }} />
           <button
             onClick={() => setSquadOpen(v => !v)}
             style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#C9A84C' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--fx-accent)' }}>
               SQUAD{detail ? ` · ${detail.squad.length} players` : ''}
             </span>
-            <span style={{ fontSize: '14px', color: '#6B7280' }}>{squadOpen ? '▲' : '▼'}</span>
+            <span style={{ fontSize: '14px', color: 'var(--scorecard-text-faint)' }}>{squadOpen ? '▲' : '▼'}</span>
           </button>
 
           {squadOpen && (
             <div style={{ paddingTop: '4px', paddingBottom: '2px' }}>
-              {detailLoading && <p className="font-rajdhani text-sm text-zinc-600">Loading squad…</p>}
-              {detailError && <p className="font-rajdhani text-sm text-red-400">{detailError}</p>}
+              {detailLoading && <p className="font-rajdhani text-sm" style={{ color: 'var(--scorecard-text-faint)' }}>Loading squad…</p>}
+              {detailError && <p className="font-rajdhani text-sm" style={{ color: 'var(--fx-danger-text)' }}>{detailError}</p>}
               {detail && (
                 <SquadPanel
                   detail={detail}
@@ -983,20 +983,20 @@ function MatchHistoryCard({
       {/* Collapsible full scorecard — only once stats have been synced */}
       {match.stats && (
         <div>
-          <div style={{ height: '1px', background: '#2D3748' }} />
+          <div style={{ height: '1px', background: 'var(--scorecard-divider)' }} />
           <button
             onClick={() => setScorecardOpen(v => !v)}
             style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#C9A84C' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--fx-accent)' }}>
               SCORECARD
             </span>
-            <span style={{ fontSize: '14px', color: '#6B7280' }}>{scorecardOpen ? '▲' : '▼'}</span>
+            <span style={{ fontSize: '14px', color: 'var(--scorecard-text-faint)' }}>{scorecardOpen ? '▲' : '▼'}</span>
           </button>
 
           {scorecardOpen && (
             <div style={{ paddingTop: '4px', paddingBottom: '2px' }}>
-              {scorecardLoading && <p className="font-rajdhani text-sm text-zinc-600">Loading scorecard…</p>}
-              {scorecardError && <p className="font-rajdhani text-sm text-red-400">{scorecardError}</p>}
+              {scorecardLoading && <p className="font-rajdhani text-sm" style={{ color: 'var(--scorecard-text-faint)' }}>Loading scorecard…</p>}
+              {scorecardError && <p className="font-rajdhani text-sm" style={{ color: 'var(--fx-danger-text)' }}>{scorecardError}</p>}
               {scorecard && (
                 <ScorecardTables
                   batting={scorecard.batting}
@@ -1082,7 +1082,7 @@ function SquadPanel({
                   name={p.player_name}
                   playerId={p.player_id}
                   cricHeroesUrl={p.cricheroes_url}
-                  className="font-rajdhani text-sm text-zinc-300 truncate"
+                  className="font-rajdhani text-sm text-[var(--scorecard-text-2)] truncate"
                 />
                 {!canEditRoles && (
                   <>
@@ -1102,12 +1102,12 @@ function SquadPanel({
             </div>
           ))}
         {editedSquad.length === 0 && (
-          <p className="font-rajdhani text-sm text-zinc-600">No squad recorded for this match.</p>
+          <p className="font-rajdhani text-sm text-[var(--scorecard-text-faint)]">No squad recorded for this match.</p>
         )}
       </div>
 
       {showWarning && (
-        <p className="font-rajdhani text-xs text-amber-400 bg-amber-950/30 border border-amber-800/50 rounded px-3 py-2">
+        <p className="font-rajdhani text-xs rounded px-3 py-2" style={{ color: 'var(--scorecard-warn-text-2)', background: 'var(--scorecard-warn-bg)', border: '1px solid var(--scorecard-warn-border)' }}>
           ⚠ This squad has {captainCount} captain{captainCount === 1 ? '' : 's'} and {vcCount} vice-captain{vcCount === 1 ? '' : 's'} marked — expected exactly one of each.
         </p>
       )}
@@ -1117,10 +1117,10 @@ function SquadPanel({
           <button
             onClick={saveRoles}
             disabled={!rolesDirty || rolesSaving}
-            className="font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
+            className="font-rajdhani text-xs font-bold tracking-wide bg-[var(--fx-badge-bg)] border border-[var(--fx-badge-border)] text-[var(--fx-badge-text)] hover:opacity-80 disabled:opacity-40 px-3 py-1.5 rounded transition-opacity">
             {rolesSaving ? 'Saving…' : 'Save Role Changes'}
           </button>
-          {rolesError && <p className="font-rajdhani text-xs text-red-400">{rolesError}</p>}
+          {rolesError && <p className="font-rajdhani text-xs" style={{ color: 'var(--fx-danger-text)' }}>{rolesError}</p>}
         </div>
       )}
 
@@ -1141,7 +1141,8 @@ function SquadPanel({
 
 function RoleBadge({ label }: { label: string }) {
   return (
-    <span className="font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1.5 py-0.5 rounded">
+    <span className="font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded"
+      style={{ background: 'var(--fx-badge-bg)', border: '1px solid var(--fx-badge-border)', color: 'var(--fx-badge-text)' }}>
       {label}
     </span>
   )
@@ -1151,11 +1152,11 @@ function RoleToggle({ active, label, onClick }: { active: boolean; label: string
   return (
     <button
       onClick={onClick}
-      className={`font-rajdhani text-[10px] font-bold px-2 py-1 rounded border transition-colors ${
-        active
-          ? 'bg-gold/20 border-gold-dim text-gold'
-          : 'bg-ink-4 border-ink-5 text-zinc-600 hover:text-zinc-400'
-      }`}>
+      className="font-rajdhani text-[10px] font-bold px-2 py-1 rounded border transition-colors"
+      style={active
+        ? { background: 'var(--fx-badge-bg)', borderColor: 'var(--fx-badge-border)', color: 'var(--fx-badge-text)' }
+        : { background: 'var(--scorecard-table-bg)', borderColor: 'var(--scorecard-table-border)', color: 'var(--scorecard-text-faint)' }
+      }>
       {label}
     </button>
   )
@@ -1204,7 +1205,7 @@ function TournamentReassign({
   }
 
   return (
-    <div className="border-t border-ink-5 pt-3 space-y-2">
+    <div className="pt-3 space-y-2" style={{ borderTop: '1px solid var(--scorecard-table-border)' }}>
       <label className="form-label">Tournament (admin correction)</label>
       <div className="flex items-center gap-2">
         <select value={selected} onChange={e => setSelected(e.target.value)} className="form-input text-xs flex-1">
@@ -1220,9 +1221,9 @@ function TournamentReassign({
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
-      {error && <p className="font-rajdhani text-xs text-red-400">{error}</p>}
+      {error && <p className="font-rajdhani text-xs" style={{ color: 'var(--fx-danger-text)' }}>{error}</p>}
       {!dirty && currentTournamentName && (
-        <p className="font-rajdhani text-[10px] text-zinc-600">Currently: {currentTournamentName}</p>
+        <p className="font-rajdhani text-[10px]" style={{ color: 'var(--scorecard-text-faint)' }}>Currently: {currentTournamentName}</p>
       )}
     </div>
   )
