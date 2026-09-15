@@ -88,10 +88,15 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       .select('booking:bookings!inner(game_date, status)')
       .eq('player_id', playerId),
 
-    // Wallet balance — feeds the Wallet Balance stat tile
+    // Wallet balance — feeds the Wallet Balance stat tile. Also carries the
+    // player's own standing fee_exemptions rows so the tile's "Exempted"
+    // tag can be driven by a genuine fee exemption rather than
+    // dues_override (a separate, unrelated flag that only gates whether a
+    // player with a negative balance can still self-mark availability —
+    // see .claude/rules/navigation.md §3.1).
     supabase
       .from('players')
-      .select('wallet_balance, dues_override')
+      .select('wallet_balance, fee_exemptions(start_date, end_date)')
       .eq('id', playerId)
       .single(),
 
@@ -149,7 +154,6 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     : null
 
   const walletBalance = playerRow?.wallet_balance ?? 0
-  const duesOverride = !!playerRow?.dues_override
 
   const tournamentCount = new Set(
     (squadTournamentRows ?? [])
@@ -202,6 +206,9 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
       e => e.start_date <= today && (e.end_date === null || e.end_date >= today)
     )
   }
+
+  // Wallet Balance tile tag — a standing fee exemption, not dues_override.
+  const feeExempt = isCurrentlyExempt((playerRow as any)?.fee_exemptions ?? [])
 
   let selectedToPlay: any[] = []
   if (selectedUpcomingBookings.length > 0) {
@@ -266,7 +273,7 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     upcomingCount: upcomingCount ?? 0,
     upcomingPreview: otherUpcoming,
     nextFixture, nextFixtureResponse, previewResponses, nudge, weekendGap,
-    walletBalance, duesOverride, tournamentCount,
+    walletBalance, feeExempt, tournamentCount,
     matchesPlayedThisYear, lastPlayedOn,
     selectedToPlay,
   }
@@ -540,14 +547,14 @@ export default async function HomePage() {
                 tag={
                   playerData.walletBalance >= 0
                     ? undefined
-                    : playerData.duesOverride
+                    : playerData.feeExempt
                     ? 'Exempted'
                     : 'Overdue'
                 }
                 tone={
                   playerData.walletBalance >= 0
                     ? 'emerald'
-                    : playerData.duesOverride
+                    : playerData.feeExempt
                     ? 'amber'
                     : 'crimson'
                 }

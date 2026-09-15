@@ -122,7 +122,7 @@ Play" note below:
 | 2 | `availability` rows for this player | `nextFixtureResponse`, `previewResponses` |
 | 3 | Next confirmed bookings (`.limit(8)`, was `.limit(3)` then `.limit(1).single()` pre-rebuild — over-fetched so a full 3 rows are still left over once query 7's bookings are excluded, see below) with tournament join | Upcoming Fixtures preview list, after exclusion (`otherUpcoming`, see "You're Selected to Play" below); `nextFixture = upcomingPreview[0]` |
 | 4 | `squad` rows for this player, joined to `bookings(game_date, status)` | Matches Played stat tile (this year's count + all-time last-played date) |
-| 5 | `players.wallet_balance, dues_override` | Wallet Balance stat tile |
+| 5 | `players.wallet_balance, fee_exemptions(start_date, end_date)` | Wallet Balance stat tile |
 | 6 | `squad` rows for this player, joined to `bookings(tournament_id)` | My Tournaments stat tile (distinct tournament count) |
 | 7 | `squad` rows for this player with `status='announced'`, joined to `bookings(...tournament, ground)` | "You're Selected to Play" card, and — via `selectedBookingIds` — which bookings query 3's preview must exclude (added September 2026 — see below) |
 | 8 | `getNudgeForPlayer()` | Availability nudge banner |
@@ -219,8 +219,8 @@ filter needed no equivalent param — `roleFilter` already defaults to
 `'played'` ("I Played") for any viewer with a `playerId`, which is exactly
 who this tile is rendered for.
 
-**Wallet Balance (query 5)** reuses the same `wallet_balance`/`dues_override`
-fields `/fixtures` already reads for its own dues gate — there is no
+**Wallet Balance (query 5)** reuses the same `wallet_balance` field
+`/fixtures` already reads for its own dues gate — there is no
 separate "ground fee" vs "match contribution" breakdown in this schema
 (single `wallet_balance` per player), so the reference screenshot's two
 separate fee tiles were deliberately collapsed into this one real tile
@@ -239,11 +239,38 @@ right below it and was dropped (fixed September 2026; `StatTile`'s `tag`
 prop is now optional, and the pill itself only renders when `tag` is
 truthy — no other tile passes an empty tag today, but the prop stayed
 generic rather than adding a wallet-tile-specific flag) — `Exempted`/amber
-when negative but `dues_override` is set (still not blocked from booking,
-but the tile is honest that the balance itself is negative), else
+when negative and this player has a standing fee exemption, else
 `Overdue`/crimson. `duesAmount`/`duesCleared` were renamed to
-`walletBalance`/`duesOverride` in `getPlayerData()`'s return shape to
-match.
+`walletBalance`/`feeExempt` in `getPlayerData()`'s return shape to match.
+
+**"Exempted" corrected to read `fee_exemptions`, not `dues_override`
+(fixed September 2026)** — the tile originally keyed "Exempted" off
+`players.dues_override`, a boolean the "Allow self-update" pill on
+`/admin/players` sets (next to a player's wallet balance, whenever
+`wallet_balance < 0`). That flag only ever gates whether a player with a
+negative balance can still self-mark their own availability
+(`POST /api/player-availability`'s wallet-dues guard) — it has nothing to
+do with fee exemption. This produced a real, reported confusion: a player
+(Dharmarajan Sundaram) showed "Exempted"/amber on Home while carrying zero
+rows in `fee_exemptions` and no `EXEMPT · {reason}` badge on `/admin/players`'
+own master-data list — the tile and the master-data page were each
+correctly reporting a genuine but *different* fact, both of which happen to
+use the word "exempt."
+
+Fixed by re-deriving the tag from the same `fee_exemptions` signal
+`/fixtures` and the "You're Selected to Play" fee projection already use
+(`isCurrentlyExempt()`, the date-range check against `start_date`/`end_date`)
+instead of `dues_override`. Query 5 now selects
+`wallet_balance, fee_exemptions(start_date, end_date)` instead of
+`wallet_balance, dues_override`; `getPlayerData()` computes
+`feeExempt = isCurrentlyExempt(playerRow?.fee_exemptions ?? [])` right
+after the `isCurrentlyExempt()` helper is declared (function-hoisted, so
+this is safe despite reading before its textual definition), and the tile's
+`tag`/`tone` now branch on `playerData.feeExempt`. Net effect: "Exempted"
+on Home now means the same thing "EXEMPT · {reason}" means on
+`/admin/players` — a real `fee_exemptions` row currently in its date range
+— and a player who only has `dues_override` set (self-update allowed
+despite dues) correctly shows "Overdue" instead.
 
 **"You're Selected to Play" (added September 2026, exclusion + full
 replica shipped a few days later)** — a card per upcoming confirmed
