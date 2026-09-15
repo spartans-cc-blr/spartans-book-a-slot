@@ -127,6 +127,15 @@ mobile.** Concretely:
   (`/leaderboard`, `/team-stats`) show **no** back — they are where back
   lands, not somewhere to go back *from*.
 
+  > **Superseded for `/leaderboard` (September 2026)** — see
+  > `features/squad-selection.md` §12. Captains' Corner's per-slot game
+  > names now hyperlink into `/leaderboard`, tournament-filtered, giving it
+  > a genuine drill-down entry point it didn't have when the rule above was
+  > written. `/leaderboard` now passes `back={{ fallbackHref: '/', label:
+  > 'Home' }}` to `<SiteNav>` — the one exception to "roots show no back."
+  > `/team-stats` is untouched and still follows the rule as originally
+  > stated.
+
 ### `fixtures/[id]` and body-level `BackButton`s keep their old colours
 
 `BackButton`'s default text colour is `text-gold`; a page whose old link

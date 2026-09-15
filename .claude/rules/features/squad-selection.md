@@ -857,3 +857,70 @@ the knockout card.
 | `src/types/index.ts` | `MvpRankEntry` type |
 | `src/app/captains-corner/page.tsx` | Selects `tournament_id, stage_type`; computes `knockoutTournamentIds`, fetches `getLeaderboardsByTournament()` in the existing `Promise.all`, builds `mvpRanksByTournament` |
 | `src/components/captains/CaptainsCornerGrid.tsx` | `Booking.tournament_id`/`stage_type`; `mvpRanksByTournament` prop threaded through `CaptainsCornerGrid` → `SlotCard`; `padRank()` helper; `isKnockout`/`mvpRankByPlayerId`/`playersById`/`top16Active`/`top16Inactive` in `SlotCard`; rank-sorted `eligible` for a knockout booking; plain-text, zero-padded rank preceding the name in `PlayerName` (no icon/pill); "Top 16 MVP — not yet responded" panel with separate Active/Inactive lines, no per-name badge |
+
+---
+
+## 12. Game Name Hyperlink to "Yours Statistically" (added September 2026)
+
+Every `SlotCard` in the Per Slot view names its game by tournament name in
+the header (`booking.tournament?.name ?? 'Match'`). This is now a hyperlink
+into `/leaderboard` ("Yours Statistically"), pre-filtered to that
+tournament — `?tournament=<id>&category=mvp&year=all`, the exact same URL
+shape `MatchHistoryCard`'s own tournament-name link already uses (see
+`features/post-match-scorecard.md` §9) — `category=mvp` because the Honor
+Board's Overall/Monthly sub-tabs ignore/reset tournament scoping
+(`LeaderboardFilters.tsx`), `year=all` so a tournament spanning outside the
+current calendar year isn't hidden by the page's own current-year default.
+
+**Applies to every game regardless of `stage_type`** — league, knockout, or
+unclassified all get the link, since the whole point is "let a captain see
+this tournament's stats," which is just as useful picking a league XI as a
+knockout one. **Practice games are excluded** (`isPractice`, already
+computed per-`SlotCard` — see §11's `isPracticeMatch()` usage) — a practice
+game has no real tournament to show stats for, so it falls back to plain
+text, same as a booking with no `tournament_id` at all.
+
+### Header had to stop being a `<button>`
+
+The whole header (date block, tournament name, opponent, status chips) was
+one giant `<button onClick={() => setOpen(...)}>` toggling the card
+open/closed — nesting a real `<a>`/`<Link>` inside a `<button>` is invalid
+HTML. Converted to a `<div role="button" tabIndex={0} onClick={...}
+onKeyDown={...}>` (Enter/Space also toggle) — the exact same substitution
+already used for this exact problem in `/admin/wallet`'s club-wide feed row
+(see `features/wallet-ledger.md` §7.1). The tournament-name `<Link>` calls
+`e.stopPropagation()` on click, the same pattern already used throughout
+this file for player-name links inside a clickable row, so tapping the link
+navigates instead of also toggling the card.
+
+### Back button — `/leaderboard` gains one, despite being a "root" page
+
+`/leaderboard` is one of the two pages the mobile bottom tab bar's "More"
+sheet treats as roots (`navigation.md` §4.1), and `features/back-navigation.md`
+§4 explicitly lists it as a page that deliberately shows **no** back
+affordance — "they are where back lands, not somewhere to go back *from*."
+That call predates this feature: `/leaderboard` had no drill-down entry
+point from a page a captain would actually want to return to. It's now
+reachable as a genuine tournament-filtered drill-down from Captains'
+Corner (and already was, less prominently, from `MatchHistoryCard` — see
+above), which — same reasoning as every other page in the back-navigation
+audit — needs a way back on an installed PWA with no browser chrome.
+
+`src/app/leaderboard/page.tsx` now passes `back={{ fallbackHref: '/', label:
+'Home' }}` to `<SiteNav>`. No new wiring was needed beyond that one prop —
+`NavHistoryProvider` (mounted globally in `providers.tsx`) already tracks
+every client-side navigation app-wide, so `router.back()` (via
+`BackButton`, rendered by `SiteNav`'s `back` prop) correctly returns to
+Captains' Corner for a visitor who tapped through from there. `Home` is the
+fallback for a cold open (a shared link, a bookmark) — Leaderboard has no
+single natural parent the way most other pages do, so the generic
+site-wide default was used rather than picking one entry point over
+another. `/team-stats` (the doc's other "root") is unaffected — this change
+is scoped to `/leaderboard` only.
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/components/captains/CaptainsCornerGrid.tsx` | `SlotCard`'s header converted from `<button>` to `<div role="button">`; tournament name hyperlinked to `/leaderboard?tournament=<id>&category=mvp&year=all` when `!isPractice` |
+| `src/app/leaderboard/page.tsx` | `<SiteNav back={{ fallbackHref: '/', label: 'Home' }} />` — this page's first back affordance |
