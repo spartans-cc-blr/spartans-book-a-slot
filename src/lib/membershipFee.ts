@@ -48,11 +48,26 @@ import { sendPushToPlayer } from '@/lib/webpush'
 
 export const MEMBERSHIP_FEE_AMOUNT = 250
 
+// The feature launched mid-Q3 2026 (see features/wallet-ledger.md §12) —
+// no quarter before this should ever be charged, no matter which match's
+// game_date a sync happens to be processing. Without this floor, syncing
+// or re-syncing an old match (a historical backfill, a reconciliation
+// re-sync) derives its quarter purely from that match's own game_date and
+// charges it retroactively — this is exactly what produced real Q4 2025 /
+// Q1 2026 / Q2 2026 debits in production (all removed — see §12.3).
+export const MEMBERSHIP_FEE_START_YEAR = 2026
+export const MEMBERSHIP_FEE_START_QUARTER = 3
+
 export function quarterOf(dateStr: string): { year: number; quarter: number } {
   const d = new Date(dateStr)
   const year = d.getFullYear()
   const quarter = Math.floor(d.getMonth() / 3) + 1
   return { year, quarter }
+}
+
+export function isBeforeMembershipFeeStart(year: number, quarter: number): boolean {
+  return year < MEMBERSHIP_FEE_START_YEAR ||
+    (year === MEMBERSHIP_FEE_START_YEAR && quarter < MEMBERSHIP_FEE_START_QUARTER)
 }
 
 export async function chargeMembershipFeeIfDue(
@@ -66,6 +81,9 @@ export async function chargeMembershipFeeIfDue(
 ): Promise<void> {
   try {
     if (isPractice) return
+
+    const { year, quarter } = quarterOf(gameDate)
+    if (isBeforeMembershipFeeStart(year, quarter)) return
 
     const matchDateLabel = new Date(gameDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -89,7 +107,6 @@ export async function chargeMembershipFeeIfDue(
     }
     if (qualifyingIds.size === 0) return
 
-    const { year, quarter } = quarterOf(gameDate)
     const supabase = createServiceClient()
 
     // A player with a standing fee_exemptions row covering this match's
