@@ -26,22 +26,28 @@ function resolveSystem(): ResolvedTheme {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Seeded from the DOM attribute the inline head script already set, so the
-  // first client render matches what was actually painted — no mismatch flash.
-  const [preference, setPreferenceState] = useState<ThemePreference>('system')
+  // Both seeded synchronously — from localStorage and from the DOM attribute
+  // the inline head script already set — so the first client render already
+  // matches what was actually painted. `preference` used to default to the
+  // literal 'system' and only get corrected by a separate effect after an
+  // async localStorage read; on the very first commit the "apply" effect
+  // below (keyed on [preference]) ran against that still-stale 'system'
+  // value and briefly overwrote resolvedTheme/data-theme with the OS-level
+  // preference instead of the visitor's actually-stored choice. Lazy-
+  // initializing here removes the race instead of chasing it with effect
+  // ordering.
+  const [preference, setPreferenceState] = useState<ThemePreference>(() => {
+    if (typeof window === 'undefined') return 'system'
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw === 'light' || raw === 'dark' || raw === 'system') return raw
+    } catch {}
+    return 'system'
+  })
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => {
     if (typeof document === 'undefined') return 'dark'
     return (document.documentElement.getAttribute('data-theme') as ResolvedTheme | null) ?? 'dark'
   })
-
-  useEffect(() => {
-    let stored: ThemePreference = 'system'
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw === 'light' || raw === 'dark' || raw === 'system') stored = raw
-    } catch {}
-    setPreferenceState(stored)
-  }, [])
 
   useEffect(() => {
     const apply = () => {

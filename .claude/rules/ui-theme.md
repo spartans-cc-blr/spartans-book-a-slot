@@ -64,6 +64,67 @@ Switching devices or browsers resets it to `system`.
 | CSS custom properties | `src/app/globals.css` | For anywhere colour is set via an inline `style={{...}}` prop rather than a Tailwind class (common on Server Components, which can't call `useTheme()`) — a `var(--xxx)` reference resolves live off `[data-theme="light"]`/`[data-theme="dark"]` blocks in this file, the CSS equivalent of the Tailwind `dark:` mechanism above. Scoped per-surface (`--home-*`, `--fx-*`, `--stats-*` — see the per-page sections below) rather than one global palette, matching this doc's existing "Warm Light island" precedent of bespoke-but-consistent per-page palettes. |
 | `ThemeToggleNav` / `ThemeToggleSheet` | `src/components/ui/ThemeToggle.tsx` | The actual Light/Dark/System control — two presentational variants sharing `useTheme()`: `ThemeToggleNav` (Tailwind `dark:`-aware, styled to match `SiteNav`'s dropdown rows) and `ThemeToggleSheet` (styled from `MobileTabBar`'s own inline colour-token dictionary, so it matches whichever of that component's two token sets — light/dark — is currently active). |
 
+### Fixed — `preference` state seeded from a stale closure, not localStorage (September 2026)
+
+`ThemeProvider`'s `preference` state originally defaulted to the literal
+`'system'` via a plain `useState('system')`, corrected only afterward by an
+async `useEffect([])` that read `localStorage` and called
+`setPreferenceState()`. `resolvedTheme` (the value everything actually
+renders off) was always correctly *lazy-initialized* by reading the
+`data-theme` attribute the no-FOUC head script had already stamped — but a
+second effect (`useEffect(apply, [preference])`, the one that keeps
+`resolvedTheme`/`data-theme` in sync with `preference`) runs in the same
+initial commit as the first, using whatever `preference` its render closed
+over — which, on the very first render, was still the hardcoded `'system'`
+default, regardless of what was actually stored. That effect then computed
+`resolveSystem()` (the OS-level `prefers-color-scheme`) and overwrote both
+`resolvedTheme` state and the `data-theme` DOM attribute with it — even for
+a visitor who had explicitly picked a *different* stored preference (e.g.
+"Light" while their phone's OS-level setting is dark). Only once the first
+effect's `setPreferenceState(stored)` triggered a second render did the
+second effect re-run with the correct value and self-correct. Net effect: a
+visible flash to the wrong theme on every fresh load for anyone with a
+non-`system` stored preference, and — since components that read
+`resolvedTheme` via `useTheme()` (rather than the `dark:` CSS mechanism,
+which reads the DOM attribute directly) render off this same stale first
+pass — a real risk of a `useTheme()`-driven component staying on the wrong
+theme past that first commit too, depending on render timing.
+
+**Fixed** by converting `preference`'s `useState` into a lazy initializer
+that synchronously reads `localStorage` on the client — the identical
+pattern `resolvedTheme` already used for the DOM attribute — removing the
+race outright instead of trying to out-order two effects. The now-redundant
+first `useEffect` was deleted.
+
+### Fixed — a Tailwind opacity modifier on a bare CSS-var arbitrary value silently dropped the border (September 2026)
+
+Reported as "a line after every row in the scorecard in dark theme" on
+`ScorecardTables.tsx`'s Batting/Bowling/Fielding tables (`features/post-match-scorecard.md`
+§16.2). Every row's divider was `border-b border-[var(--scorecard-table-border)]/50`
+— reusing the exact `border-ink-5/50` shape the pre-theming code used, just
+with a CSS-var arbitrary value swapped in for the real Tailwind colour
+token. That swap is what broke it: Tailwind can resolve `ink-5`'s opacity
+modifier at build time because it's a real theme colour it knows the RGB
+channels of, but it has no way to blend an opacity into an opaque `var(--x)`
+reference the same way — the generated `border-color` declaration is either
+invalid (silently dropped by the browser, falling back to the UA default of
+`currentColor` — i.e. a solid, full-opacity line in the row's own *text*
+colour, exactly the "ugly line" reported, more visible in dark mode where
+that text colour is a light gray) or resolved via `color-mix()` depending on
+the exact Tailwind/browser combination — either way, not the same subtle
+half-opacity fade the original `ink-5/50` produced.
+
+**Fixed** by adding a pre-blended `--scorecard-table-divider` token (a real
+`rgba(...)` value, alpha baked in) to both the light and dark blocks in
+`globals.css`, and referencing it directly with no `/NN` opacity suffix at
+all (`border-b border-[var(--scorecard-table-divider)]`) — sidesteps the
+opacity-modifier-on-CSS-var ambiguity entirely rather than depending on a
+specific Tailwind/browser resolution behaviour. **General rule going
+forward: never pair a Tailwind opacity modifier (`/NN`) with a `var(--x)`
+arbitrary value** — bake the alpha into the CSS variable itself (as an
+`rgba()`/`hsla()` value) instead, the way `--scorecard-panel-bg`/
+`--scorecard-warn-bg` already did correctly from the start.
+
 ### Where the toggle lives
 
 Reachable from every page, next to Sign Out — not a separate settings page:
@@ -81,7 +142,7 @@ Either pattern is fine — match whichever the surrounding code already leans to
 
 ### Rollout scope (as of this pass)
 
-Theme-aware today: **Home** (`/`, `src/app/page.tsx` + `SelectedMatchCard.tsx`), **Fixtures** (`/fixtures` shell, `FixturesCard`, `FixturesAvailability`), **Past Matches** (`/matches/history`, both the page shell and `MatchHistoryClient.tsx`'s filter chrome — `MatchHistoryCard` itself stays permanently dark by design, see `features/post-match-scorecard.md` §16), **Player Stats** (`/players/[id]/stats`), **Leaderboard** (`/leaderboard`), **Admin Scorecard Backfill** (`/admin/scorecard-backfill`, added alongside the shared admin chrome below — see `features/post-match-scorecard.md` §8), and the pieces of shared chrome that wrap every page — **`SiteNav`**, **`MobileTabBar`** (both now genuinely dual-themed rather than hardcoded light — see §4/§4.1 corrections below), and, newly, the **`/admin/**` shell** (`src/app/admin/layout.tsx`'s top bar + `AdminSidebar.tsx`) — the first `/admin/**` surface to follow the toggle at all.
+Theme-aware today: **Home** (`/`, `src/app/page.tsx` + `SelectedMatchCard.tsx`), **Fixtures** (`/fixtures` shell, `FixturesCard`, `FixturesAvailability`), **Past Matches** (`/matches/history`, both the page shell/filter chrome and, as of September 2026, the scorecard family itself — `MatchHistoryCard`, `ScorecardTables.tsx`, `ScorecardVerifyPanel.tsx`, `PerformerShareButton.tsx`, `ScorecardUploadButton.tsx`, and the standalone `/matches/history/[bookingId]` page — see `features/post-match-scorecard.md` §16.2), **Player Stats** (`/players/[id]/stats`), **Leaderboard** (`/leaderboard`), **Admin Scorecard Backfill** (`/admin/scorecard-backfill`, added alongside the shared admin chrome below — see `features/post-match-scorecard.md` §8), and the pieces of shared chrome that wrap every page — **`SiteNav`**, **`MobileTabBar`** (both now genuinely dual-themed rather than hardcoded light — see §4/§4.1 corrections below), and, newly, the **`/admin/**` shell** (`src/app/admin/layout.tsx`'s top bar + `AdminSidebar.tsx`) — the first `/admin/**` surface to follow the toggle at all.
 
 Everything else keeps rendering exactly as it always has, in the single dark-ink look, **regardless of the visitor's Light/Dark/System choice** — this is intentional, not a bug: the Rollout Policy above (no proactive page-by-page migration) still applies to the *content* of untouched pages, only the shared nav/tab-bar chrome above them now follows the toggle everywhere. A dark-ink page body sitting under a now-theme-following nav/tab bar is the same "accepted seam" this doc already documented for the Warm Light rollout, just with the seam now able to appear or disappear depending on the visitor's own choice rather than being fixed per page. The same reasoning was applied one level down inside `/admin/**` (added September 2026): converting the shared `AdminLayout`/`AdminSidebar` chrome alongside the one admin page that was explicitly requested (`/admin/scorecard-backfill`) means every *other* `/admin/**` page's body still renders dark-only under a chrome that can now go light — the identical seam, just scoped to the admin subtree instead of the whole app.
 
