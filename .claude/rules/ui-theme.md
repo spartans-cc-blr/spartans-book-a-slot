@@ -114,28 +114,31 @@ that text colour is a light gray) or resolved via `color-mix()` depending on
 the exact Tailwind/browser combination — either way, not the same subtle
 half-opacity fade the original `ink-5/50` produced.
 
-**First attempt** — a pre-blended `--scorecard-table-divider` token (a real
-`rgba(...)` value, alpha baked in), referenced with no `/NN` opacity suffix
-at all (`border-b border-[var(--scorecard-table-divider)]`). This sidesteps
-the opacity-modifier-on-CSS-var ambiguity entirely, and reproduces the
-pre-theming dark-mode value byte-for-byte (`rgba(46, 46, 46, 0.5)`, the same
-numbers `ink-5/50` resolves to) — but the visitor still reported seeing a
-line after every row, unchanged.
+**Fixed** by adding a pre-blended `--scorecard-table-divider` token (a real
+`rgba(...)` value, alpha baked in) to both theme blocks in `globals.css`,
+referenced with no `/NN` opacity suffix at all
+(`border-b border-[var(--scorecard-table-divider)]`) — sidesteps the
+opacity-modifier-on-CSS-var ambiguity entirely, and reproduces the
+pre-theming dark-mode value byte-for-byte (`rgba(46, 46, 46, 0.5)`, the
+same numbers `ink-5/50` resolves to). **General rule going forward: never
+pair a Tailwind opacity modifier (`/NN`) with a `var(--x)` arbitrary
+value** — bake the alpha into the CSS variable itself (as an `rgba()`/
+`hsla()` value) instead, the way `--scorecard-panel-bg`/`--scorecard-warn-bg`
+already did correctly from the start.
 
-**Fixed for real by removing the per-row border outright** — no divider,
-not even a faint one. `isTop`'s bold gold text already distinguishes the
-top scorer/wicket-taker/fielder row from the rest without needing a line
-under every row to do it, and a plain no-border table reads cleaner than
-chasing the exact right opacity. The `--scorecard-table-divider` token was
-removed from both theme blocks in `globals.css` as unused. The header
-row's own `border-b border-[var(--scorecard-table-border)]` (no opacity
-modifier — a plain, solid reference, never ambiguous) is untouched; it
-still delimits the column headers from the body. **General rule going
-forward, for any future divider that does get reintroduced: never pair a
-Tailwind opacity modifier (`/NN`) with a `var(--x)` arbitrary value** —
-bake the alpha into the CSS variable itself (as an `rgba()`/`hsla()`
-value) instead, the way `--scorecard-panel-bg`/`--scorecard-warn-bg`
-already do.
+**Briefly overcorrected, then reverted the same day.** The visitor
+reported still seeing a line right after this fix went out — most likely
+deploy/cache propagation lag on a PWA with a service worker, not a real
+failure of the fix — but rather than confirm that, the per-row border was
+removed outright as a belt-and-braces measure. That went too far: the
+divider was never the defect once correctly blended, it's the same
+always-present, deliberately faint separator the scorecard has had since
+before any theming work — pre-theming code always carried
+`border-b border-ink-5/50` on every row (confirmed by reading the
+pre-theming commit directly). Removing it left a visible gap where that
+faint line used to sit. Reinstated with the exact same pre-blended token;
+the divider is unchanged from its original pre-theming design, only the
+CSS mechanism producing it is different.
 
 ### Where the toggle lives
 

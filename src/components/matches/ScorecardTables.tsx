@@ -185,7 +185,7 @@ export function ScorecardTables({
                 const runs = num(row, ['runs', 'total_runs'])
                 const isTop = topBatRuns > 0 && runs === topBatRuns
                 return (
-                  <tr key={i} className={isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}>
+                  <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                     <td className="text-right py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
@@ -318,7 +318,7 @@ export function ScorecardTables({
                 const wkts = num(row, ['wickets', 'wickets_taken'])
                 const isTop = topBowlWkts > 0 && wkts === topBowlWkts
                 return (
-                  <tr key={i} className={isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}>
+                  <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                     <td className="text-right py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
@@ -368,7 +368,7 @@ export function ScorecardTables({
                   const total = fieldingTotal(row)
                   const isTop = topFieldingTotal > 0 && total === topFieldingTotal
                   return (
-                    <tr key={i} className={isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}>
+                    <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                       <td className="text-right py-1 pr-2">
                         <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                       </td>
