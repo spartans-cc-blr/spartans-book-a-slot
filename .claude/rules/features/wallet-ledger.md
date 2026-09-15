@@ -730,6 +730,54 @@ time. Removing this ledger fix's rows without also touching
 `membership_fee_charges` would have been dangerous — it would have
 reopened exactly that risk.
 
+### 12.3 Every quarter before Q3 2026 removed, and a hard floor added so it can't recur (fixed September 2026)
+
+**§12.2's fix wasn't the end of it.** Two days after that fix shipped, a
+fresh audit of `membership_fee_charges`/`wallet_transactions` found real,
+active charges for **Q4 2025** (15 rows, ₹3,750) and **Q2 2026** (12
+rows, ₹3,000) — neither of which existed when §12.2 was written — plus
+one more **Q1 2026** charge (a player never caught by the earlier bulk
+fix). None of this was a bug in §12.2's own SQL; it was the root cause
+§12.2 never actually closed: `quarterOf()` derives the charge quarter
+purely from the *synced match's own* `game_date`, with no floor at all,
+so every subsequent historical backfill/re-sync of an old match kept
+generating fresh, real charges for whatever quarter that match happened
+to fall in — including quarters years before this feature ever launched.
+
+**Code fix — a hard floor, not another one-off cleanup.**
+`chargeMembershipFeeIfDue()` (`src/lib/membershipFee.ts`) now computes
+`quarterOf(gameDate)` **before** doing any of the batting/bowling/
+fielding qualification work, and returns immediately whenever that
+quarter is before Q3 2026 — the quarter this feature actually launched
+against (§12). Two new exported constants, `MEMBERSHIP_FEE_START_YEAR`
+(2026) and `MEMBERSHIP_FEE_START_QUARTER` (3), plus
+`isBeforeMembershipFeeStart(year, quarter)`, make the floor explicit and
+give any future caller (a report, an admin tool) one shared definition of
+"in scope" rather than a magic date comparison duplicated per call site.
+This is a genuine floor, not a per-quarter denylist — it can never be
+defeated by re-syncing an even-older match that hasn't been tried yet,
+which is exactly the gap §12.2's data-only fix left open.
+
+**Data fix — same soft-delete mechanism as §12.2, wider scope.** Every
+still-active `wallet_transactions` row for `Membership fee — Q4 2025`,
+`Membership fee — Q1 2026`, and `Membership fee — Q2 2026` (28 rows,
+₹7,000 total) was soft-deleted via the same direct Supabase MCP SQL
+pattern — `deleted_at`/`deleted_by`/`delete_reason` stamped, balance
+reversed by each row's own amount, never a real `DELETE`. Combined with
+§12.2's earlier pass, **every** pre-Q3-2026 membership-fee debit in the
+ledger is now soft-deleted (74 rows total across all three quarters); Q3
+2026 itself (47 regular + 6 waived-exempt rows) is untouched. Verified
+directly: a post-fix query confirms zero active `wallet_transactions`
+rows for any quarter before 2026-Q3.
+
+**`membership_fee_charges` rows for all three quarters were again left in
+place (74 rows)** — same §12.1/§12.2 reasoning: still factually accurate,
+and there's no benefit to deleting them now that the code-level floor
+above makes the old "prevents a future re-sync from re-charging" argument
+moot for these specific quarters — leaving them is simply consistent with
+this ledger's append-only posture, not load-bearing for correctness
+anymore.
+
 ### Security (vibe-security)
 
 | Check | Status |
@@ -743,13 +791,15 @@ reopened exactly that risk.
 | The 6-player reversal (§12.1) went through the same audit-logged correction path (`wallet_transaction_edits`) as any other admin correction — no bare `UPDATE`, no deleted row | ✅ |
 | The Q1 2026 bulk removal (§12.2) used the same soft-delete columns `DELETE /api/wallet/transactions` writes — no bare `UPDATE`, no real row deletion, every reversed row stays inspectable | ✅ |
 | The Q1 2026 bulk removal reversed each row by its own current type/amount, not an assumed debit — correctly unwinds a row an admin had already edited into a credit | ✅ |
+| `chargeMembershipFeeIfDue()` now hard-floors at Q3 2026 (§12.3) — no quarter before this can ever be charged, regardless of which match's `game_date` a sync processes, closing the root cause behind both §12.2 and §12.3's data fixes | ✅ |
+| The Q4 2025 / Q1 2026 / Q2 2026 bulk removal (§12.3) used the identical soft-delete mechanism as §12.2 — no bare `UPDATE`, no real row deletion | ✅ |
 
 ### File Map additions
 
 | File | Role |
 |---|---|
 | `supabase/migrations/073_membership_fee_charges.sql` | `membership_fee_charges` table — `UNIQUE(player_id, year, quarter)` is the idempotency guard |
-| `src/lib/membershipFee.ts` | `chargeMembershipFeeIfDue()` / `chargeOnePlayer()` / `quarterOf()` |
+| `src/lib/membershipFee.ts` | `chargeMembershipFeeIfDue()` / `chargeOnePlayer()` / `quarterOf()` / `isBeforeMembershipFeeStart()` — the last two enforce the Q3 2026 floor (§12.3) |
 | `src/lib/matchStatsSync.ts` | Calls `chargeMembershipFeeIfDue()` alongside milestone/performance detection, inside the same `Promise.all()` |
 
 ---
@@ -918,9 +968,10 @@ own statement. No new page or route was added beyond the API endpoint.
   excluded from the charge entirely, not charged-then-refunded. Proration/
   refund for a mid-quarter join or expulsion is still not requested, and
   would need its own design pass if it ever is.
-- **No configurable amount or quarter boundary** — `MEMBERSHIP_FEE_AMOUNT`
-  (₹250) and the calendar-quarter definition are both hardcoded in
-  `src/lib/membershipFee.ts`, not admin-editable settings.
+- **No configurable amount or start-quarter** — `MEMBERSHIP_FEE_AMOUNT`
+  (₹250) and `MEMBERSHIP_FEE_START_YEAR`/`MEMBERSHIP_FEE_START_QUARTER`
+  (Q3 2026, §12.3) are both hardcoded in `src/lib/membershipFee.ts`, not
+  admin-editable settings.
 - **Player-initiated sponsorship transfers** (§14) — a player sponsoring a
   teammate directly from their own `/wallet`, with no admin step, was
   considered and explicitly deferred; every transfer today is admin-
