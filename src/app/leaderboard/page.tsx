@@ -164,7 +164,14 @@ export default async function LeaderboardPage({
 
   return (
     <div className="min-h-screen bg-[var(--stats-shell-bg)] dark:bg-ink grain">
-      <SiteNav activePage="leaderboard" />
+      {/* Deliberately given a back affordance despite being a mobile
+          bottom-tab "root" (see features/back-navigation.md §4's rule) —
+          now reachable as a genuine tournament-filtered drill-down from
+          Captains' Corner's per-slot game names (features/squad-selection.md
+          §12), which needs a way back on a PWA with no browser chrome.
+          router.back() (via BackButton) returns to wherever the visitor
+          actually came from; Home is the fallback for a cold open. */}
+      <SiteNav activePage="leaderboard" back={{ fallbackHref: '/', label: 'Home' }} />
 
       <div className="bg-[var(--stats-card-bg)] dark:bg-ink-2 border-b border-[var(--stats-divider)] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"

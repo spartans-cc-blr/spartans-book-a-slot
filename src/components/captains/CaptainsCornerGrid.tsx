@@ -14,6 +14,7 @@
 // booking's tournament/ground/format record via /api/captains-corner/context-stats.
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import Link from 'next/link'
 import type { BookingContextStats, PlayerStatsTotals, MvpRankEntry } from '@/types'
 import { isPracticeMatch } from '@/types'
 import { matchDisplayTime } from '@/lib/matchStatus'
@@ -1558,10 +1559,22 @@ function SlotCard({
 
   return (
     <div className="bg-[var(--captains-card-bg)] dark:bg-ink-3 border border-[var(--captains-card-border)] dark:border-ink-5 rounded overflow-hidden">
-      {/* Header */}
-      <button
-        className="w-full text-left px-4 py-3.5 hover:bg-[var(--captains-row-hover)] dark:hover:bg-ink-4 transition-colors"
-        onClick={() => setOpen(v => !v)}>
+      {/* Header — a div, not a button, since the tournament name below
+          needs to be a real nested <a>/<Link> (invalid HTML inside a
+          <button>); same role="button"/tabIndex/onKeyDown substitution
+          already used for this exact problem elsewhere in the app — see
+          features/wallet-ledger.md §7.1. */}
+      <div
+        role="button"
+        tabIndex={0}
+        className="w-full text-left px-4 py-3.5 hover:bg-[var(--captains-row-hover)] dark:hover:bg-ink-4 transition-colors cursor-pointer"
+        onClick={() => setOpen(v => !v)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setOpen(v => !v)
+          }
+        }}>
         <div className="flex items-start gap-2">
           <div className="flex-shrink-0 text-center w-14">
             <p className="font-rajdhani text-[10px] text-[var(--captains-text-muted)] dark:text-zinc-500 leading-none mb-0.5">
@@ -1575,7 +1588,24 @@ function SlotCard({
 
           <div className="flex-1 min-w-0">
             <p className="font-cinzel text-sm font-semibold text-[var(--captains-text)] dark:text-parchment truncate leading-none">
-              {booking.tournament?.name ?? 'Match'}
+              {/* Links into "Yours Statistically" (/leaderboard), pre-filtered
+                  to this game's tournament — same URL shape MatchHistoryCard's
+                  own tournament-name link already uses (category defaults to
+                  mvp, year forced to 'all' so a tournament spanning outside
+                  the current calendar year isn't hidden). Every game gets
+                  this link regardless of league/knockout — practice games
+                  are excluded, since they carry no real tournament stats. */}
+              {booking.tournament_id && !isPractice ? (
+                <Link
+                  href={`/leaderboard?tournament=${booking.tournament_id}&category=mvp&year=all`}
+                  onClick={e => e.stopPropagation()}
+                  className="hover:underline underline-offset-2"
+                  title="View stats for this tournament">
+                  {booking.tournament?.name ?? 'Match'}
+                </Link>
+              ) : (
+                booking.tournament?.name ?? 'Match'
+              )}
             </p>
             {booking.opponent_name && (
               <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-500 mt-0.5">
@@ -1598,7 +1628,7 @@ function SlotCard({
             </span>
           </div>
         </div>
-      </button>
+      </div>
 
       {open && (
         <div>
