@@ -1806,20 +1806,28 @@ line in the row's own text colour, far more visible in dark mode (a light
 gray) than light mode (a darker brown-gray), matching exactly what was
 reported.
 
-First attempt: a pre-blended `--scorecard-table-divider` token (a real
-`rgba(...)` value, alpha already baked in), referenced with no `/NN`
-suffix — sidesteps the ambiguity, and reproduces the pre-theming dark-mode
-value byte-for-byte. Reported as still visible afterward, unchanged.
-**Fixed for real by dropping the per-row border entirely** — no divider at
-all between rows; `isTop`'s bold gold text already marks the top scorer/
-wicket-taker/fielder without one. The now-unused `--scorecard-table-divider`
-token was removed from `globals.css`. The header row's own
-`border-b border-[var(--scorecard-table-border)]` (a plain reference, no
-opacity modifier, never ambiguous) is unaffected and still delimits the
-column headers. See `ui-theme.md`'s own "Fixed" note under Light/Dark/
-System for the general rule this establishes for any *future* divider
-(never pair a Tailwind opacity modifier with a bare CSS-var arbitrary
-value).
+**Fixed** by adding a pre-blended `--scorecard-table-divider` token (a real
+`rgba(...)` value, alpha already baked in) to both theme blocks in
+`globals.css`, and referencing it with no `/NN` suffix at all
+(`border-b border-[var(--scorecard-table-divider)]`) — sidesteps the
+ambiguity entirely, and reproduces the pre-theming dark-mode value
+byte-for-byte (`rgba(46, 46, 46, 0.5)`, the same numbers `ink-5/50`
+resolves to). See `ui-theme.md`'s own "Fixed" note under Light/Dark/
+System for the general rule this establishes: never pair a Tailwind
+opacity modifier with a bare CSS-var arbitrary value — bake the alpha
+into the variable itself instead.
+
+**Briefly overcorrected, then reverted.** Reported as still visible right
+after that fix deployed — almost certainly a deploy-propagation or
+service-worker cache lag (the PWA can serve a stale page for a beat after
+a merge), not a real failure of the fix. Rather than confirm that first,
+the per-row border was removed outright as a "can't possibly still look
+wrong" measure. That overcorrected: the border was never the problem
+once correctly blended — it's the same always-present, deliberately faint
+separator the scorecard has had since before any of this theming work,
+and removing it left a visible gap where a subtle divider used to sit.
+Reinstated with the exact same pre-blended token described above; nothing
+about the divider is different from the original pre-theming design.
 
 ### File Map addition
 

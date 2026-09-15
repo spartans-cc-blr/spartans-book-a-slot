@@ -99,6 +99,13 @@
   --scorecard-divider: #E7E0D3;
   --scorecard-table-bg: #F8F4EE;
   --scorecard-table-border: #D4C9B0;
+  /* Pre-blended 50%-alpha row divider, byte-for-byte the same faint fade
+     the pre-theming code produced (border-ink-5/50 = rgb(46,46,46)/0.5 —
+     the dark-mode value below). Referenced with no /NN opacity suffix, per
+     ui-theme.md's "Fixed" note: a Tailwind opacity modifier can't reliably
+     blend a bare CSS-var arbitrary value the way it can a real theme
+     token, so the alpha is baked into the variable itself instead. */
+  --scorecard-table-divider: rgba(212, 201, 176, 0.5);
   --scorecard-panel-bg: rgba(0,0,0,0.02);
   --scorecard-warn-bg: #FEF3C7;
   --scorecard-warn-border: #F5D9A8;
@@ -249,6 +256,7 @@
   --scorecard-divider: #2D3748;
   --scorecard-table-bg: #242424;
   --scorecard-table-border: #2E2E2E;
+  --scorecard-table-divider: rgba(46, 46, 46, 0.5);
   --scorecard-panel-bg: rgba(255,255,255,0.03);
   --scorecard-warn-bg: rgba(245, 158, 11, 0.1);
   --scorecard-warn-border: rgba(180, 83, 9, 0.5);
