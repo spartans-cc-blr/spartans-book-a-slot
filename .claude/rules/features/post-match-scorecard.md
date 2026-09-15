@@ -1791,6 +1791,26 @@ just without that one hover tint. Not reported as a problem, and not worth
 a second mechanism (e.g. a scoped `<style>` block) for a single toggle
 button's hover state.
 
+**Fixed shortly after this shipped — every row divider in Batting/Bowling/
+Fielding rendered as a solid, glaring line in dark theme, not the subtle
+fade it used to be.** `ScorecardTables.tsx`'s three table-body row classes
+carried forward the original `border-ink-5/50` shape verbatim, just
+swapping in the new CSS-var token for the real Tailwind colour it replaced:
+`border-b border-[var(--scorecard-table-border)]/50`. That swap is what
+broke it — Tailwind can resolve `ink-5`'s `/50` opacity modifier at build
+time because it's a real theme colour with known RGB channels; it has no
+equivalent way to blend an opacity into an opaque `var(--x)` reference, so
+the generated declaration either resolves incorrectly or gets dropped by
+the browser as invalid, falling back to `currentColor` — a full-opacity
+line in the row's own text colour, far more visible in dark mode (a light
+gray) than light mode (a darker brown-gray), matching exactly what was
+reported. Fixed by adding a pre-blended `--scorecard-table-divider` token
+(a real `rgba(...)` value, alpha already baked in) to both theme blocks in
+`globals.css`, and referencing it with no `/NN` suffix at all — see
+`ui-theme.md`'s own "Fixed" note under Light/Dark/System for the general
+rule this establishes (never pair a Tailwind opacity modifier with a bare
+CSS-var arbitrary value).
+
 ### File Map addition
 
 | File | Role |
