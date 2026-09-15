@@ -75,6 +75,37 @@
   --fx-success-border: #6EE7B7;
   --fx-success-text: #047857;
 
+  /* Match History scorecard — MatchHistoryCard, ScorecardTables,
+     ScorecardVerifyPanel, PerformerShareButton, and the standalone
+     /matches/history/[bookingId] page (a Server Component, hence CSS
+     vars rather than useTheme()). Reuses --fx-accent, the --fx-badge
+     family, --fx-danger-text and the --fx-success family for roles that
+     already have a match (gold accent, amber badge pill, error,
+     verified-green) rather than duplicating them here. Dark values are
+     this card's original,
+     always-dark palette, copied byte-for-byte; light is new, built from
+     the same Warm Light "match card" palette FixturesCard.tsx/
+     SelectedMatchCard.tsx already use for an identical dark-gradient
+     card layout. See post-match-scorecard.md §16 / features/post-match-
+     scorecard.md's Light/Dark/System note. */
+  --scorecard-page-bg: #F8F4EE;
+  --scorecard-card-bg: linear-gradient(160deg, #FFFFFF 0%, #F8F4EE 100%);
+  --scorecard-card-border: #D4C9B0;
+  --scorecard-accent-gradient: linear-gradient(90deg, #D97706, #F59E0B, #D97706);
+  --scorecard-heading-text: #1C1917;
+  --scorecard-text-2: #44403C;
+  --scorecard-text-muted: #78716C;
+  --scorecard-text-faint: #A8A29E;
+  --scorecard-divider: #E7E0D3;
+  --scorecard-table-bg: #F8F4EE;
+  --scorecard-table-border: #D4C9B0;
+  --scorecard-panel-bg: rgba(0,0,0,0.02);
+  --scorecard-warn-bg: #FEF3C7;
+  --scorecard-warn-border: #F5D9A8;
+  --scorecard-warn-text: #92400E;
+  --scorecard-warn-text-2: #B45309;
+  --scorecard-link-text: #1D4ED8;
+
   /* Player Stats + Leaderboard */
   --stats-shell-bg: #F8F4EE;
   --stats-card-bg: #FFFFFF;
@@ -206,6 +237,24 @@
   --fx-success-bg: #1a4731;
   --fx-success-border: #166534;
   --fx-success-text: #4ade80;
+
+  --scorecard-page-bg: #080808;
+  --scorecard-card-bg: linear-gradient(135deg, #1C2333 0%, #111827 100%);
+  --scorecard-card-border: #2D3748;
+  --scorecard-accent-gradient: linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C);
+  --scorecard-heading-text: #F5F5F5;
+  --scorecard-text-2: #D1D5DB;
+  --scorecard-text-muted: #9CA3AF;
+  --scorecard-text-faint: #6B7280;
+  --scorecard-divider: #2D3748;
+  --scorecard-table-bg: #242424;
+  --scorecard-table-border: #2E2E2E;
+  --scorecard-panel-bg: rgba(255,255,255,0.03);
+  --scorecard-warn-bg: rgba(245, 158, 11, 0.1);
+  --scorecard-warn-border: rgba(180, 83, 9, 0.5);
+  --scorecard-warn-text: #FBBF24;
+  --scorecard-warn-text-2: #FCD34D;
+  --scorecard-link-text: #60A5FA;
 
   --stats-shell-bg: #080808;
   --stats-card-bg: #111111;

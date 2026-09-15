@@ -66,7 +66,7 @@ export function VerifiedBadge({ size = 15 }: { size?: number }) {
 export function VerifiedStatusLine({ cricheroesUrl }: { cricheroesUrl: string | null }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#34D399' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--fx-success-text)' }}>
         <VerifiedBadge size={14} /> Stats verified with <CricHeroesInlineLink url={cricheroesUrl} />
       </span>
     </div>
@@ -148,7 +148,7 @@ export function ReconciliationControls({
   // manually without reprocessing from /admin/scorecard-backfill.
   if (match.needs_reconciliation) {
     return (
-      <p style={{ fontSize: '10px', color: '#6B7280', textAlign: 'right' }}>
+      <p style={{ fontSize: '10px', color: 'var(--scorecard-text-faint)', textAlign: 'right' }}>
         Discrepancy reported — will clear automatically once re-synced.
       </p>
     )
@@ -166,20 +166,20 @@ export function ReconciliationControls({
           disabled={saving}
           onChange={markVerified}
           title="Mark scorecard as verified"
-          style={{ accentColor: '#34D399', cursor: saving ? 'default' : 'pointer' }}
+          style={{ accentColor: 'var(--fx-success-text)', cursor: saving ? 'default' : 'pointer' }}
         />
         <span
           onClick={() => !saving && markVerified()}
-          style={{ cursor: saving ? 'default' : 'pointer' }}
-          className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition-colors">
+          style={{ cursor: saving ? 'default' : 'pointer', color: 'var(--fx-success-text)' }}
+          className="font-rajdhani text-[11px] font-bold tracking-wide hover:opacity-80 underline underline-offset-2 transition-opacity">
           {saving ? 'Saving…' : 'Mark Scorecard as Verified with'}
         </span>
         <CricHeroesInlineLink url={match.cricheroes_url} />
       </div>
 
       <button onClick={() => setFlagOpen(v => !v)} disabled={saving}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-        className="font-rajdhani text-[10px] font-bold tracking-wide text-amber-400 hover:text-amber-300 disabled:opacity-40 underline underline-offset-2 transition-colors">
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--scorecard-warn-text-2)' }}
+        className="font-rajdhani text-[10px] font-bold tracking-wide hover:opacity-80 disabled:opacity-40 underline underline-offset-2 transition-opacity">
         <NotifyIcon size={12} /> Notify stats discrepancy
       </button>
 
@@ -191,22 +191,23 @@ export function ReconciliationControls({
             placeholder="What looks wrong compared to CricHeroes?"
             maxLength={500}
             rows={2}
-            className="w-full bg-ink-4 border border-ink-5 rounded px-2 py-1.5 font-rajdhani text-xs text-zinc-200"
+            className="w-full rounded px-2 py-1.5 font-rajdhani text-xs"
+            style={{ background: 'var(--scorecard-table-bg)', border: '1px solid var(--scorecard-table-border)', color: 'var(--scorecard-text-2)' }}
           />
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button onClick={submitFlag} disabled={saving || note.trim().length < 3}
-              className="font-rajdhani text-[10px] font-bold tracking-wide bg-amber-950/40 border border-amber-800 text-amber-400 hover:bg-amber-900/40 disabled:opacity-40 px-2.5 py-1 rounded transition-colors">
+              className="font-rajdhani text-[10px] font-bold tracking-wide bg-[var(--fx-badge-bg)] border border-[var(--fx-badge-border)] text-[var(--fx-badge-text)] hover:opacity-80 disabled:opacity-40 px-2.5 py-1 rounded transition-opacity">
               {saving ? 'Submitting…' : 'Submit'}
             </button>
             <button onClick={() => setFlagOpen(false)} disabled={saving}
-              className="font-rajdhani text-[10px] font-semibold text-zinc-500 hover:text-zinc-300 disabled:opacity-40 transition-colors">
+              className="font-rajdhani text-[10px] font-semibold text-[var(--scorecard-text-faint)] hover:text-[var(--scorecard-text-2)] disabled:opacity-40 transition-colors">
               Cancel
             </button>
           </div>
         </div>
       )}
 
-      {error && <p style={{ fontSize: '10px', color: '#F87171' }}>{error}</p>}
+      {error && <p style={{ fontSize: '10px', color: 'var(--fx-danger-text)' }}>{error}</p>}
     </div>
   )
 }

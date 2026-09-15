@@ -158,7 +158,7 @@ export function ScorecardTables({
   return (
     <div className="space-y-4">
       <div>
-        <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Batting</p>
+        <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Batting</p>
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-xs font-rajdhani">
             <colgroup>
@@ -170,7 +170,7 @@ export function ScorecardTables({
               <col className="w-[13.6%]" />
             </colgroup>
             <thead>
-              <tr className="text-zinc-600 border-b border-ink-5">
+              <tr className="text-[var(--scorecard-text-faint)] border-b border-[var(--scorecard-table-border)]">
                 <th className="text-center py-1 pr-2">Player</th>
                 <th className="text-center px-1">R</th>
                 <th className="text-center px-1">B</th>
@@ -185,7 +185,7 @@ export function ScorecardTables({
                 const runs = num(row, ['runs', 'total_runs'])
                 const isTop = topBatRuns > 0 && runs === topBatRuns
                 return (
-                  <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
+                  <tr key={i} className={`border-b border-[var(--scorecard-table-border)]/50 ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                     <td className="text-right py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
@@ -198,14 +198,14 @@ export function ScorecardTables({
                 )
               })}
               {battingRows.length === 0 && (
-                <tr><td colSpan={6} className="text-zinc-600 py-2">No batting data.</td></tr>
+                <tr><td colSpan={6} className="text-[var(--scorecard-text-faint)] py-2">No batting data.</td></tr>
               )}
             </tbody>
           </table>
         </div>
         {didNotBatRows.length > 0 && (
-          <p className="font-rajdhani text-xs text-zinc-500 mt-2 flex flex-wrap items-baseline gap-x-1">
-            <span className="text-zinc-600">Did not bat:</span>
+          <p className="font-rajdhani text-xs text-[var(--scorecard-text-faint)] mt-2 flex flex-wrap items-baseline gap-x-1">
+            <span className="text-[var(--scorecard-text-faint)]">Did not bat:</span>
             {didNotBatRows.map((row, i) => {
               const name = pickField(row, ['player_name', 'name'])
               return (
@@ -221,7 +221,7 @@ export function ScorecardTables({
 
       {partnerships.length > 0 && (
         <div>
-          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Partnerships</p>
+          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Partnerships</p>
           <div className="space-y-1.5">
             {partnerships.map(p => {
               // Bar length already encodes rank, same reasoning
@@ -234,11 +234,11 @@ export function ScorecardTables({
               const pct = topPartnershipRuns > 0 ? Math.max((p.runs / topPartnershipRuns) * 100, 6) : 6
               return (
                 <div key={p.wicketNumber} className="flex items-center gap-2">
-                  <span className="font-cinzel text-xs text-zinc-500 w-5 flex-shrink-0 text-right">{p.wicketNumber}</span>
-                  <div className="flex-1 relative h-7 bg-ink-4 rounded overflow-hidden">
+                  <span className="font-cinzel text-xs text-[var(--scorecard-text-faint)] w-5 flex-shrink-0 text-right">{p.wicketNumber}</span>
+                  <div className="flex-1 relative h-7 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">
                     <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
                     <div className="absolute inset-0 flex items-center justify-end px-2.5">
-                      <span className="font-rajdhani text-xs font-semibold text-parchment truncate text-right">
+                      <span className="font-rajdhani text-xs font-semibold text-[var(--scorecard-heading-text)] truncate text-right">
                         {p.players.map((player, i) => {
                           // player.playerId already comes straight from
                           // batting_stats.player_id — the authoritative,
@@ -281,7 +281,7 @@ export function ScorecardTables({
                       right-aligned to the same edge regardless of bar
                       length. */}
                   <span className="font-rajdhani text-xs font-bold text-gold w-20 flex-shrink-0 text-right">
-                    {p.runs}{p.outPlayer == null && '*'} <span className="text-zinc-500 font-normal">({oversToBalls(p.overTo) - oversToBalls(p.overFrom)})</span>
+                    {p.runs}{p.outPlayer == null && '*'} <span className="text-[var(--scorecard-text-faint)] font-normal">({oversToBalls(p.overTo) - oversToBalls(p.overFrom)})</span>
                   </span>
                 </div>
               )
@@ -291,7 +291,7 @@ export function ScorecardTables({
       )}
 
       <div>
-        <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Bowling</p>
+        <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Bowling</p>
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-xs font-rajdhani">
             <colgroup>
@@ -303,7 +303,7 @@ export function ScorecardTables({
               <col className="w-[13.6%]" />
             </colgroup>
             <thead>
-              <tr className="text-zinc-600 border-b border-ink-5">
+              <tr className="text-[var(--scorecard-text-faint)] border-b border-[var(--scorecard-table-border)]">
                 <th className="text-center py-1 pr-2">Player</th>
                 <th className="text-center px-1">O</th>
                 <th className="text-center px-1">Dots</th>
@@ -318,7 +318,7 @@ export function ScorecardTables({
                 const wkts = num(row, ['wickets', 'wickets_taken'])
                 const isTop = topBowlWkts > 0 && wkts === topBowlWkts
                 return (
-                  <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
+                  <tr key={i} className={`border-b border-[var(--scorecard-table-border)]/50 ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                     <td className="text-right py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                     </td>
@@ -331,7 +331,7 @@ export function ScorecardTables({
                 )
               })}
               {bowlingRows.length === 0 && (
-                <tr><td colSpan={6} className="text-zinc-600 py-2">No bowling data.</td></tr>
+                <tr><td colSpan={6} className="text-[var(--scorecard-text-faint)] py-2">No bowling data.</td></tr>
               )}
             </tbody>
           </table>
@@ -340,7 +340,7 @@ export function ScorecardTables({
 
       {fieldingRows.length > 0 && (
         <div>
-          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">Fielding</p>
+          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Fielding</p>
           <div className="overflow-x-auto">
             <table className="w-full table-fixed text-xs font-rajdhani">
               <colgroup>
@@ -351,7 +351,7 @@ export function ScorecardTables({
                 <col className="w-[13.6%]" />
               </colgroup>
               <thead>
-                <tr className="text-zinc-600 border-b border-ink-5">
+                <tr className="text-[var(--scorecard-text-faint)] border-b border-[var(--scorecard-table-border)]">
                   <th className="text-center py-1 pr-2">Player</th>
                   <th className="text-center px-1">Ct</th>
                   <th className="text-center px-1">St</th>
@@ -368,7 +368,7 @@ export function ScorecardTables({
                   const total = fieldingTotal(row)
                   const isTop = topFieldingTotal > 0 && total === topFieldingTotal
                   return (
-                    <tr key={i} className={`border-b border-ink-5/50 ${isTop ? 'text-gold font-semibold' : 'text-zinc-300'}`}>
+                    <tr key={i} className={`border-b border-[var(--scorecard-table-border)]/50 ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                       <td className="text-right py-1 pr-2">
                         <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                       </td>

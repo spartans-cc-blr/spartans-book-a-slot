@@ -10,19 +10,9 @@ import { computeTopPerformers, summarizeTopPerformance } from '@/lib/matchTopPer
 import { MatchVerifyBlock } from '@/components/matches/MatchVerifyBlock'
 import { NotifyIcon, VerifiedStatusLine } from '@/components/matches/ScorecardVerifyPanel'
 import { BallIcon } from '@/components/matches/BallIcon'
+import { ResultBadge } from '@/components/shared/ResultBadge'
 
 export const revalidate = 0
-
-// Result is the headline of a completed match — win gets the celebratory
-// solid-fill pill, anything else is stated plainly in colour (mirrors
-// MatchHistoryClient's resultBadgeStyle so both surfaces read the same way).
-function resultBadgeStyle(result: string | null): { pill: boolean; bg: string; color: string; label: string } {
-  const r = (result ?? '').toLowerCase()
-  if (r.includes('win'))  return { pill: true,  bg: '#059669', color: '#FFFFFF', label: 'WON' }
-  if (r.includes('los'))  return { pill: false, bg: '',        color: '#F87171', label: 'LOST' }
-  if (r.includes('tie'))  return { pill: false, bg: '',        color: '#FBBF24', label: 'TIED' }
-  return { pill: false, bg: '', color: '#94A3B8', label: (result ?? 'NO RESULT').toUpperCase() }
-}
 
 function scoreLine(stats: {
   team_total: number | null; team_wickets: number | null; team_overs: number | null
@@ -155,16 +145,16 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   return (
     <>
       <SiteNav activePage="matches" back={{ fallbackHref: '/matches/history', label: 'Past Matches' }} />
-      <main className="min-h-screen bg-ink-1 px-4 md:px-8 py-8 max-w-2xl mx-auto">
+      <main className="min-h-screen px-4 md:px-8 py-8 max-w-2xl mx-auto" style={{ background: 'var(--scorecard-page-bg)' }}>
         {/* Desktop only — mobile gets the same control in SiteNav's top row */}
         <BackButton fallbackHref="/matches/history" fallbackLabel="Past Matches" className="hidden md:inline-flex" />
 
-        <div className="mt-4 relative overflow-hidden rounded-xl border border-[#2D3748] p-5"
-          style={{ background: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
-          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' }} />
+        <div className="mt-4 relative overflow-hidden rounded-xl p-5"
+          style={{ background: 'var(--scorecard-card-bg)', border: '1px solid var(--scorecard-card-border)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
+          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: 'var(--scorecard-accent-gradient)' }} />
 
           <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-semibold text-gold tracking-wide">
+            <span className="text-xs font-semibold tracking-wide" style={{ color: 'var(--fx-accent)' }}>
               {formatDate(booking.game_date)} · {booking.slot_time}
             </span>
             {booking.format && (
@@ -175,14 +165,14 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
           </div>
 
           <div className="mb-3">
-            <div className="text-lg font-bold text-zinc-100 leading-tight mb-1">
+            <div className="text-lg font-bold leading-tight mb-1" style={{ color: 'var(--scorecard-heading-text)' }}>
               {tournament?.name ?? 'Unassigned'}
             </div>
-            <div className="text-sm text-zinc-400">
-              vs <span className="text-zinc-200 font-medium">{booking.opponent_name || 'TBD'}</span>
+            <div className="text-sm" style={{ color: 'var(--scorecard-text-muted)' }}>
+              vs <span className="font-medium" style={{ color: 'var(--scorecard-text-2)' }}>{booking.opponent_name || 'TBD'}</span>
             </div>
             {ground?.name && (
-              <div className="text-xs text-zinc-500 mt-1">
+              <div className="text-xs mt-1" style={{ color: 'var(--scorecard-text-faint)' }}>
                 {'@ '}
                 {ground.maps_url ? (
                   <a href={ground.maps_url} target="_blank" rel="noopener noreferrer" className="text-[#34A853]">
@@ -197,12 +187,12 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
               the result strip so it's the first thing anyone sees on a
               flagged match. Mirrors MatchHistoryCard's banner exactly. */}
           {upload?.needs_reconciliation && (
-            <div className="mb-2" style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(180, 83, 9, 0.5)', borderRadius: '8px', padding: '8px 10px' }}>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: '#FBBF24', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div className="mb-2" style={{ background: 'var(--scorecard-warn-bg)', border: '1px solid var(--scorecard-warn-border)', borderRadius: '8px', padding: '8px 10px' }}>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--scorecard-warn-text)', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <NotifyIcon size={12} /> Stats Discrepancy Reported
               </p>
-              <p style={{ fontSize: '11px', color: '#FCD34D', marginTop: '2px' }}>{upload.reconciliation_note}</p>
-              <p style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '2px' }}>
+              <p style={{ fontSize: '11px', color: 'var(--scorecard-warn-text-2)', marginTop: '2px' }}>{upload.reconciliation_note}</p>
+              <p style={{ fontSize: '10px', color: 'var(--scorecard-text-muted)', marginTop: '2px' }}>
                 Reported by {flagger?.name ?? 'someone'}
                 {upload.reconciliation_flagged_at ? ` on ${new Date(upload.reconciliation_flagged_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
                 {' '}· queued for re-fetch
@@ -210,38 +200,32 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
             </div>
           )}
 
-          {stats && (() => {
-            const badge = resultBadgeStyle(stats.match_result)
-            return (
-              <div className="flex flex-col gap-1 mb-1">
-                <div className="flex items-center gap-2">
-                  <span style={badge.pill
-                    ? { background: badge.bg, color: badge.color, fontSize: 13, fontWeight: 800, padding: '4px 12px', borderRadius: 6, letterSpacing: '0.06em' }
-                    : { color: badge.color, fontSize: 13, fontWeight: 800, letterSpacing: '0.06em' }}>
-                    {badge.label}
-                  </span>
-                  <span className="text-xs text-zinc-400">{scoreLine(stats)}</span>
-                </div>
-                {topPerformance && (topPerformance.top_bat || topPerformance.top_bowl) && (
-                  <div className="flex flex-wrap gap-2.5 text-[10px] text-zinc-500">
-                    {topPerformance.top_bat && (
-                      <span>🏏 <span className="text-gold">{topPerformance.top_bat.name}</span> — {topPerformance.top_bat.runs} ({topPerformance.top_bat.balls})</span>
-                    )}
-                    {topPerformance.top_bowl && (
-                      <span className="inline-flex items-center gap-1">
-                        <BallIcon type={ballType} size={12} />
-                        <span className="text-gold">{topPerformance.top_bowl.name}</span> — {topPerformance.top_bowl.wickets}/{topPerformance.top_bowl.runs} ({topPerformance.top_bowl.overs} ov)
-                      </span>
-                    )}
-                  </div>
-                )}
+          {stats && (
+            <div className="flex flex-col gap-1 mb-1">
+              <div className="flex items-center gap-2">
+                {stats.match_result && <ResultBadge result={stats.match_result} />}
+                <span className="text-xs" style={{ color: 'var(--scorecard-text-muted)' }}>{scoreLine(stats)}</span>
               </div>
-            )
-          })()}
+              {topPerformance && (topPerformance.top_bat || topPerformance.top_bowl) && (
+                <div className="flex flex-wrap gap-2.5 text-[10px]" style={{ color: 'var(--scorecard-text-faint)' }}>
+                  {topPerformance.top_bat && (
+                    <span>🏏 <span style={{ color: 'var(--fx-accent)' }}>{topPerformance.top_bat.name}</span> — {topPerformance.top_bat.runs} ({topPerformance.top_bat.balls})</span>
+                  )}
+                  {topPerformance.top_bowl && (
+                    <span className="inline-flex items-center gap-1">
+                      <BallIcon type={ballType} size={12} />
+                      <span style={{ color: 'var(--fx-accent)' }}>{topPerformance.top_bowl.name}</span> — {topPerformance.top_bowl.wickets}/{topPerformance.top_bowl.runs} ({topPerformance.top_bowl.overs} ov)
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {booking.cricheroes_url && (
             <a href={booking.cricheroes_url} target="_blank" rel="noopener noreferrer"
-              className="inline-block mt-2 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors">
+              className="inline-block mt-2 text-[11px] transition-colors"
+              style={{ color: 'var(--scorecard-text-faint)' }}>
               View original scorecard on CricHeroes ↗
             </a>
           )}
@@ -277,11 +261,11 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
           {stats ? (
             <ScorecardTables batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} fallOfWickets={stats.fall_of_wickets ?? []} teamTotal={stats.team_total} teamOvers={stats.team_overs} teamWickets={stats.team_wickets} squad={squad} />
           ) : (
-            <p className="font-rajdhani text-sm text-zinc-500">
+            <p className="font-rajdhani text-sm" style={{ color: 'var(--scorecard-text-faint)' }}>
               Scorecard not yet synced to Hub for this match.
               {booking.cricheroes_url && (
                 <> In the meantime, see it on{' '}
-                  <a href={booking.cricheroes_url} target="_blank" rel="noopener noreferrer" className="text-gold underline">
+                  <a href={booking.cricheroes_url} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--fx-accent)' }}>
                     CricHeroes
                   </a>.
                 </>

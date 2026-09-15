@@ -1657,9 +1657,10 @@ pass, for the full list of what changed and the two new
 `DateChipSlider`'s `theme="light"` overrides on this page's call sites
 were removed too, so both now default to `theme="auto"` the same as on
 `/fixtures`. `MatchHistoryCard` and the standalone
-`/matches/history/[bookingId]` page are unaffected by this pass and stay
-permanently dark, exactly as this note originally described — only the
-page shell around them changed.
+`/matches/history/[bookingId]` page were unaffected by *this* pass and
+stayed permanently dark, exactly as this note originally described — only
+the page shell around them changed. **That gap was closed a few days
+later — see §16.2.**
 
 ## 16.1 Deep-link support — `?month=all` (added September 2026)
 
@@ -1689,6 +1690,112 @@ URL.
 |---|---|
 | `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component (`groups: DateChipGroup[]`, `selected`, `onSelect`), plus optional `hasMore`/`loadingMore`/`onLoadMore` for a trailing "Load Older" chip (used here only — `/fixtures` omits them, unaffected) |
 | `src/lib/dateChipGroups.ts` | `groupDatesIntoChips()` — pure Sat+Sun pairing helper Match History uses to build combined weekend chips from its own flat date list, mirroring `/fixtures`' booking-level grouping without needing one |
+
+## 16.2 The scorecard itself converted (added September 2026)
+
+**"MatchHistoryCard stays permanently dark, deliberately" — reversed,
+same reasoning as `FixturesCard`'s own reversal (`player-availability.md`
+§10.3).** Reported directly: with the page shell now following Light/
+Dark/System, the actual per-match scorecard card — result strip, icon
+row, verify/reconciliation controls, the collapsible SQUAD/SCORECARD
+panels — was the one remaining piece still hardcoded dark, an obvious
+seam once everything around it could go light. Converted the whole
+"scorecard family":
+
+- `MatchHistoryCard` (in `MatchHistoryClient.tsx`) and the `SquadPanel`/
+  `RoleBadge`/`RoleToggle`/`TournamentReassign` sub-components it renders
+  inside its collapsible SQUAD panel
+- `ScorecardTables.tsx` — the actual batting/bowling/fielding/
+  partnerships tables
+- `ScorecardVerifyPanel.tsx` — the shared verify/flag UI (§14/§15),
+  used by both this card and the standalone page's `MatchVerifyBlock.tsx`
+- `PerformerShareButton.tsx` — the wrangler-only share panel (§15)
+- `ScorecardUploadButton.tsx` — the upload/status pill (§9)
+- the standalone `/matches/history/[bookingId]/page.tsx` — a Server
+  Component, so it can't call `useTheme()` the way the rest of this
+  family does; converted via the same CSS-variable mechanism its own page
+  shell already used for `/matches/history`
+
+**New `--scorecard-*` CSS variable set** (`src/app/globals.css`, both
+`[data-theme="light"]` and `[data-theme="dark"]` blocks), rather than the
+local `LIGHT`/`DARK` JS-object-plus-`useTheme()` pattern `FixturesCard.tsx`
+uses for an otherwise near-identical dark-gradient card. CSS vars were the
+better fit here specifically because the standalone page is a genuine
+Server Component — it has no client-side theme knowledge at request time,
+so a JS-object branch isn't an option for it the way it is for `FixturesCard`
+(always rendered client-side) — and reusing one CSS variable set across
+every file in the family (client and server alike) avoids maintaining the
+same palette as two separate representations that could drift. Dark values
+are this card's original, always-dark palette, copied byte-for-byte;
+light is new, built from the same Warm Light "match card" palette
+`FixturesCard.tsx`/`SelectedMatchCard.tsx` already use for an identical
+layout (`--scorecard-card-bg`'s light gradient is byte-identical to
+`FixturesCard`'s own `LIGHT.cardBg`).
+
+Ten new tokens (`--scorecard-page-bg`, `--scorecard-card-bg`,
+`--scorecard-card-border`, `--scorecard-accent-gradient`,
+`--scorecard-heading-text`, `--scorecard-text-2`, `--scorecard-text-muted`,
+`--scorecard-text-faint`, `--scorecard-divider`, `--scorecard-table-bg`,
+`--scorecard-table-border`, `--scorecard-panel-bg`) plus four for the
+reconciliation/warning banner (`--scorecard-warn-bg`/`-border`/`-text`/
+`-text-2`) and one for the wrangler-only "Request top performer to verify"
+link (`--scorecard-link-text`). Everywhere a role already had a good match
+among the existing Fixtures-area tokens, those are reused directly rather
+than duplicated: `--fx-accent` (date/time label, tournament-link underline,
+SQUAD/SCORECARD section headers, top-bat/top-bowl name highlight),
+`--fx-badge-bg`/`--fx-badge-border`/`--fx-badge-text` (Upload/Sync/Save-
+role-changes buttons, the amber "Awaiting Admin Sync" pill, C/VC role
+badges/toggles — the same gold-accent-button contrast fix Captains'
+Corner's own light-theme pass already made, see `squad-selection.md`
+§9.1), `--fx-success-bg`/`-border`/`-text` (the emerald "Stats Synced"/
+"Fees Applied" pill, the "Mark Scorecard as Verified"/`VerifiedStatusLine`
+green), and `--fx-danger-text` (every inline error message in this
+family).
+
+**Small, self-contained status chips are left as plain literals in both
+themes**, same call every other themed surface in this app has made: the
+format pill (`#1E3A5F`/`#93C5FD`), the ground/maps green link (`#34A853`),
+`isTop`'s `text-gold`/the partnership bar's `bg-gold/40` fill (both already
+established as reading fine on either background — see
+`player-stats-batting-position.md` §8), and `ResultBadge`'s own win/loss/
+tie colours (unchanged, already Tailwind-class-based and legible on
+either background — see below).
+
+**The standalone page's duplicate result-badge logic was deleted, not
+themed.** `page.tsx` had its own local `resultBadgeStyle()`/inline JSX —
+a second, independent implementation of the exact win/pill-vs-plain-text
+convention `MatchHistoryClient.tsx` had already extracted into the shared
+`<ResultBadge>` component specifically to prevent this kind of drift (see
+§9's "Result rendering itself now comes from the shared `<ResultBadge>`"
+note). Rather than adding a fourth colour-theming pass to a duplicate that
+shouldn't have existed, the page now imports and renders `<ResultBadge>`
+directly — one less place to theme, and the two surfaces can no longer
+disagree on what a result badge looks like. `resultBadgeStyle()` and its
+local literal colours (`#059669`/`#F87171`/`#FBBF24`/`#94A3B8`) were
+removed entirely.
+
+**`bg-ink-1`, the standalone page's original `<main>` background class,
+was a silent no-op the whole time — a real, separate bug this pass also
+closed.** `tailwind.config.ts`'s `ink` scale only ever defined `DEFAULT`/
+`2`/`3`/`4`/`5` — there has never been an `ink-1` shade, so this class
+compiled to nothing and the page had no explicit background at all,
+relying entirely on whatever the browser's own default happened to be.
+Replaced with `style={{ background: 'var(--scorecard-page-bg)' }}` (light
+`#F8F4EE`, dark `#080808`, matching `--fx-shell-bg`'s values).
+
+**`RoleToggle`'s inactive-state hover effect was dropped, not re-themed** —
+its Tailwind hover class (`hover:text-zinc-400`) has no clean equivalent
+once the base colours moved to inline-style CSS vars (inline `style`
+doesn't support pseudo-classes); the button is still fully functional,
+just without that one hover tint. Not reported as a problem, and not worth
+a second mechanism (e.g. a scoped `<style>` block) for a single toggle
+button's hover state.
+
+### File Map addition
+
+| File | Role |
+|---|---|
+| `src/app/globals.css` | New `--scorecard-*` token set (§16.2) — light + dark, reused alongside `--fx-accent`/`--fx-badge-*`/`--fx-success-*`/`--fx-danger-text` |
 
 ---
 
