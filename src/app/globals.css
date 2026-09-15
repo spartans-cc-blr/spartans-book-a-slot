@@ -78,10 +78,11 @@
   /* Match History scorecard — MatchHistoryCard, ScorecardTables,
      ScorecardVerifyPanel, PerformerShareButton, and the standalone
      /matches/history/[bookingId] page (a Server Component, hence CSS
-     vars rather than useTheme()). Reuses --fx-accent/--fx-badge-*/
-     --fx-danger-*/--fx-success-* for roles that already have a match
-     (gold accent, amber badge pill, error, verified-green) rather than
-     duplicating them here. Dark values are this card's original,
+     vars rather than useTheme()). Reuses --fx-accent, the --fx-badge
+     family, --fx-danger-text and the --fx-success family for roles that
+     already have a match (gold accent, amber badge pill, error,
+     verified-green) rather than duplicating them here. Dark values are
+     this card's original,
      always-dark palette, copied byte-for-byte; light is new, built from
      the same Warm Light "match card" palette FixturesCard.tsx/
      SelectedMatchCard.tsx already use for an identical dark-gradient
