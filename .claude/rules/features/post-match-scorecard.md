@@ -1804,12 +1804,22 @@ the generated declaration either resolves incorrectly or gets dropped by
 the browser as invalid, falling back to `currentColor` — a full-opacity
 line in the row's own text colour, far more visible in dark mode (a light
 gray) than light mode (a darker brown-gray), matching exactly what was
-reported. Fixed by adding a pre-blended `--scorecard-table-divider` token
-(a real `rgba(...)` value, alpha already baked in) to both theme blocks in
-`globals.css`, and referencing it with no `/NN` suffix at all — see
-`ui-theme.md`'s own "Fixed" note under Light/Dark/System for the general
-rule this establishes (never pair a Tailwind opacity modifier with a bare
-CSS-var arbitrary value).
+reported.
+
+First attempt: a pre-blended `--scorecard-table-divider` token (a real
+`rgba(...)` value, alpha already baked in), referenced with no `/NN`
+suffix — sidesteps the ambiguity, and reproduces the pre-theming dark-mode
+value byte-for-byte. Reported as still visible afterward, unchanged.
+**Fixed for real by dropping the per-row border entirely** — no divider at
+all between rows; `isTop`'s bold gold text already marks the top scorer/
+wicket-taker/fielder without one. The now-unused `--scorecard-table-divider`
+token was removed from `globals.css`. The header row's own
+`border-b border-[var(--scorecard-table-border)]` (a plain reference, no
+opacity modifier, never ambiguous) is unaffected and still delimits the
+column headers. See `ui-theme.md`'s own "Fixed" note under Light/Dark/
+System for the general rule this establishes for any *future* divider
+(never pair a Tailwind opacity modifier with a bare CSS-var arbitrary
+value).
 
 ### File Map addition
 

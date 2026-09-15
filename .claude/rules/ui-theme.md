@@ -114,16 +114,28 @@ that text colour is a light gray) or resolved via `color-mix()` depending on
 the exact Tailwind/browser combination — either way, not the same subtle
 half-opacity fade the original `ink-5/50` produced.
 
-**Fixed** by adding a pre-blended `--scorecard-table-divider` token (a real
-`rgba(...)` value, alpha baked in) to both the light and dark blocks in
-`globals.css`, and referencing it directly with no `/NN` opacity suffix at
-all (`border-b border-[var(--scorecard-table-divider)]`) — sidesteps the
-opacity-modifier-on-CSS-var ambiguity entirely rather than depending on a
-specific Tailwind/browser resolution behaviour. **General rule going
-forward: never pair a Tailwind opacity modifier (`/NN`) with a `var(--x)`
-arbitrary value** — bake the alpha into the CSS variable itself (as an
-`rgba()`/`hsla()` value) instead, the way `--scorecard-panel-bg`/
-`--scorecard-warn-bg` already did correctly from the start.
+**First attempt** — a pre-blended `--scorecard-table-divider` token (a real
+`rgba(...)` value, alpha baked in), referenced with no `/NN` opacity suffix
+at all (`border-b border-[var(--scorecard-table-divider)]`). This sidesteps
+the opacity-modifier-on-CSS-var ambiguity entirely, and reproduces the
+pre-theming dark-mode value byte-for-byte (`rgba(46, 46, 46, 0.5)`, the same
+numbers `ink-5/50` resolves to) — but the visitor still reported seeing a
+line after every row, unchanged.
+
+**Fixed for real by removing the per-row border outright** — no divider,
+not even a faint one. `isTop`'s bold gold text already distinguishes the
+top scorer/wicket-taker/fielder row from the rest without needing a line
+under every row to do it, and a plain no-border table reads cleaner than
+chasing the exact right opacity. The `--scorecard-table-divider` token was
+removed from both theme blocks in `globals.css` as unused. The header
+row's own `border-b border-[var(--scorecard-table-border)]` (no opacity
+modifier — a plain, solid reference, never ambiguous) is untouched; it
+still delimits the column headers from the body. **General rule going
+forward, for any future divider that does get reintroduced: never pair a
+Tailwind opacity modifier (`/NN`) with a `var(--x)` arbitrary value** —
+bake the alpha into the CSS variable itself (as an `rgba()`/`hsla()`
+value) instead, the way `--scorecard-panel-bg`/`--scorecard-warn-bg`
+already do.
 
 ### Where the toggle lives
 
