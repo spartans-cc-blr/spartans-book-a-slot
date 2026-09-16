@@ -14,7 +14,7 @@ win/loss record, sliced every way the data allows:
 |---|---|
 | Win/loss % by tournament, ground, format, year, month, slot time, captain | "Split by" table, one dimension at a time |
 | Marquee opponents + head-to-head vs any opponent | Pinned "Marquee opponents" section + the Opponent split; backed by the new opponent master (§5) |
-| Highest / lowest team total, best chase, lowest defended, biggest wins, totals conceded | Records cards |
+| Highest team total, lowest score/total conceded in a losing cause, best chase, lowest defended, biggest/narrowest wins | Records cards |
 | Chasing vs defending | Innings split + Defending/Chasing filter |
 | League vs knockout | Stage split + filter, backed by the new `bookings.stage_type` flag (§4) |
 | Toss | Toss split (won/lost the toss; chose to bat/field) |
@@ -312,10 +312,36 @@ controls, and the marquee highlight moved to where it's actually relevant:
 2. **Recent matches** — last five, linking to Match History. Moved up
    (was last) to sit directly under Current form, since both answer the
    same "what's happened lately" question.
-3. **Records** — up to eight cards (highest/lowest total, highest
-   successful chase, lowest total defended, biggest win by runs / by
-   wickets, highest/lowest total conceded), each linking to its match.
-   Moved up from below the split table.
+3. **Records** — up to nine cards (`computeRecords()`, `teamStatsCore.ts`),
+   each linking to its match: Highest team total · Lowest team total
+   (losing cause) · Highest successful chase · Lowest total defended ·
+   Biggest/Narrowest win by runs · Biggest/Narrowest win by wickets ·
+   Highest total conceded (losing cause). Moved up from below the split
+   table.
+
+   **"Lowest team total" and "Highest total conceded" are scoped to a
+   losing cause, not the raw min/max (fixed September 2026).** Both used
+   to consider every match regardless of result — a real report was that
+   "Lowest team total" could point at a match Spartans actually *won* (a
+   tiny target successfully defended, already its own record — "Lowest
+   total defended") and "Highest total conceded" could point at a match
+   Spartans won too (a huge total chased down, already "Highest successful
+   chase"). Both cards are meant to flag a defensive low point, and a win
+   isn't one — showing one there read backwards. `pick()`'s predicate on
+   each now requires `m.result === 'lost'`, and both titles gained a
+   "(losing cause)" suffix so the scoping is visible on the card itself,
+   not just implied.
+
+   **"Narrowest win by runs"/"Narrowest win by wickets" added the same
+   pass** — the mirror of the existing "Biggest win by …" pair, same
+   `winMargin()` pool, `pick(..., 'min')` instead of `'max'`.
+
+   **"Lowest total conceded" was dropped outright, not rescoped.**
+   Restricted to wins (the only sensible scope for "total conceded" once
+   "Highest total conceded" moved to losses) it never carried information
+   "Biggest win by runs" didn't already cover — bowling a side out cheaply
+   and winning big is, in practice, the same match either card would point
+   at, so keeping both was redundant rather than complementary.
 4. **Split by / Then by, then the table** — `SplitByRow` (§3.1/§3.2), the
    Marquee highlight when applicable (below), then `TeamSplitTable` for
    the chosen dimension. One table shape for every dimension: label · P ·

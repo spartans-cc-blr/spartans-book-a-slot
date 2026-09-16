@@ -417,15 +417,37 @@ export function computeRecords(matches: TeamMatch[]): RecordEntry[] {
   const theirs = (m: TeamMatch) => scoreString(m.oppTotal, m.oppWickets, m.oppOvers)
 
   add('Highest team total', pick(scored, () => true, m => m.teamTotal!, 'max'), ours)
-  add('Lowest team total', pick(scored, () => true, m => m.teamTotal!, 'min'), ours)
+  // Scoped to a loss, not "our lowest total ever" (fixed September 2026) —
+  // a low total we still won with (a tiny target successfully defended,
+  // already covered by "Lowest total defended" below) isn't a low point,
+  // it's a bowling performance. Showing it under "Lowest team total" read
+  // backwards: a card meant to flag a capitulation was sometimes actually
+  // a win.
+  add('Lowest team total (losing cause)', pick(scored, m => m.result === 'lost', m => m.teamTotal!, 'min'), ours)
   add('Highest successful chase', pick(scored, m => m.result === 'won' && m.battedFirst === false, m => m.teamTotal!, 'max'), ours)
   add('Lowest total defended', pick(scored, m => m.result === 'won' && m.battedFirst === true, m => m.teamTotal!, 'min'), ours)
   add('Biggest win by runs', pick(scored, m => winMargin(m)?.kind === 'runs', m => winMargin(m)!.value, 'max'),
     m => `by ${winMargin(m)!.value} runs`)
+  // Narrowest wins (added September 2026) — same winMargin() pool as
+  // "Biggest win by …" above, just the other end of the range.
+  add('Narrowest win by runs', pick(scored, m => winMargin(m)?.kind === 'runs', m => winMargin(m)!.value, 'min'),
+    m => `by ${winMargin(m)!.value} runs`)
   add('Biggest win by wickets', pick(scored, m => winMargin(m)?.kind === 'wickets', m => winMargin(m)!.value, 'max'),
     m => `by ${winMargin(m)!.value} wickets`)
-  add('Highest total conceded', pick(scored.filter(m => m.oppTotal !== null), () => true, m => m.oppTotal!, 'max'), theirs)
-  add('Lowest total conceded', pick(scored.filter(m => m.oppTotal !== null), () => true, m => m.oppTotal!, 'min'), theirs)
+  add('Narrowest win by wickets', pick(scored, m => winMargin(m)?.kind === 'wickets', m => winMargin(m)!.value, 'min'),
+    m => `by ${winMargin(m)!.value} wickets`)
+  // Scoped to a loss too, same reasoning as "Lowest team total" above — the
+  // biggest total we've ever conceded is only a meaningful low point if we
+  // actually lost that match. Conceding a big total and still winning (an
+  // even bigger chase) is "Highest successful chase" above, not a
+  // defensive low. "Lowest total conceded" was dropped outright rather
+  // than rescoped (September 2026) — restricted to wins (its only sensible
+  // scope, since a low total conceded in a loss would mean we somehow lost
+  // defending a tiny total, effectively already "Lowest total defended"
+  // inverted) it never carried information "Biggest win by runs" didn't
+  // already cover: bowling a side out cheaply and winning big is, in
+  // practice, the same match either card would point at.
+  add('Highest total conceded (losing cause)', pick(scored.filter(m => m.oppTotal !== null), m => m.result === 'lost', m => m.oppTotal!, 'max'), theirs)
   return out
 }
 

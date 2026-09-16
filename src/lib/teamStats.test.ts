@@ -234,10 +234,30 @@ describe('records', () => {
     const recs = computeRecords(sample)
     const by = (t: string) => recs.find(r => r.title === t)!
     expect(by('Highest team total').match.gameDate).toBe('2026-02-15')
-    expect(by('Lowest team total').match.gameDate).toBe('2026-01-11')
+    expect(by('Lowest team total (losing cause)').match.gameDate).toBe('2026-01-11')
     expect(by('Highest successful chase').value).toBe('181/4 (20 ov)')
     expect(by('Lowest total defended').match.gameDate).toBe('2026-01-04')
     expect(by('Biggest win by runs').value).toBe('by 110 runs')
+    expect(by('Narrowest win by runs').value).toBe('by 30 runs')
     expect(by('Biggest win by wickets').value).toBe('by 6 wickets')
+    expect(by('Narrowest win by wickets').value).toBe('by 6 wickets') // only one qualifying win in the sample
+    expect(by('Highest total conceded (losing cause)').match.gameDate).toBe('2026-01-11')
+    expect(recs.find(r => r.title === 'Lowest total conceded')).toBeUndefined()
+  })
+
+  it('scopes "Lowest team total" and "Highest total conceded" to a losing cause, not just the raw min/max (fixed September 2026)', () => {
+    // A tiny total we still won with (a defended target) must not win
+    // "Lowest team total" — that's a bowling performance, not a capitulation.
+    const tinyDefendedWin = m({ gameDate: '2026-03-08', result: 'won', battedFirst: true, teamTotal: 60, teamWickets: 3, oppTotal: 55 })
+    // A big total we conceded while still winning a huge chase must not win
+    // "Highest total conceded" — that's "Highest successful chase", not a
+    // defensive low.
+    const bigChaseWin = m({ gameDate: '2026-03-01', result: 'won', battedFirst: false, teamWickets: 3, teamTotal: 200, oppTotal: 190 })
+    const recs = computeRecords([...sample, tinyDefendedWin, bigChaseWin])
+    const by = (t: string) => recs.find(r => r.title === t)!
+    // Still the 2026-01-11 loss (teamTotal 90 / oppTotal 180), not the
+    // lower/higher figures from the two wins just added.
+    expect(by('Lowest team total (losing cause)').match.gameDate).toBe('2026-01-11')
+    expect(by('Highest total conceded (losing cause)').match.gameDate).toBe('2026-01-11')
   })
 })
