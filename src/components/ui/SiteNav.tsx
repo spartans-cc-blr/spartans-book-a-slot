@@ -74,7 +74,15 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
 
   return (
     <>
-    <nav className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 sticky top-0 z-50">
+    {/* transform-gpu + will-change-transform: forces this sticky nav onto its
+        own GPU compositor layer, so iOS WebKit recomputes its position
+        against the live viewport instead of occasionally leaving it painted
+        at a stale scroll offset ("stuck" mid-page) — the same rendering bug
+        class MobileTabBar.tsx's FIXED_LAYER_STYLE fixes for the bottom tab
+        bar, here applied to a `position: sticky` element instead of `fixed`.
+        See navigation.md §4.1's "Fixed tab bar detaching mid-scroll on iOS"
+        note. */}
+    <nav className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 sticky top-0 z-50 transform-gpu will-change-transform">
       <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
         {/* Mobile back — router.back() with in-app history, else the page's parent */}
         {back && (
