@@ -51,6 +51,18 @@ function tokens(theme: MobileTabBarTheme) {
 }
 type Tokens = ReturnType<typeof tokens>
 
+// Forces each `position: fixed` layer here onto its own GPU compositor
+// layer. Without this, iOS Safari/WebKit (standalone-PWA mode especially)
+// can leave a fixed element rendered at a stale scroll offset — appearing
+// "stuck" mid-page — after a scroll gesture or a dynamic-toolbar
+// show/hide animation, instead of staying pinned to the viewport edge.
+// See navigation.md §4.1's "Fixed tab bar detaching mid-scroll on iOS" note.
+const FIXED_LAYER_STYLE: React.CSSProperties = {
+  transform: 'translateZ(0)',
+  WebkitTransform: 'translateZ(0)',
+  willChange: 'transform',
+}
+
 // Toggles a body class so globals.css can reserve bottom space for the
 // fixed tab bar on mobile — see the `.has-mobile-tabbar` rule there.
 // Scoped to mount lifetime so a page that never renders this component
@@ -76,14 +88,14 @@ export function MobileTabBar(props: MobileTabBarProps) {
         <div
           onClick={() => setMoreOpen(false)}
           className="md:hidden fixed inset-0 top-14 z-40"
-          style={{ background: t.scrim }}
+          style={{ background: t.scrim, ...FIXED_LAYER_STYLE }}
         />
       )}
 
       {moreOpen && (
         <div
           className="md:hidden fixed inset-x-0 bottom-16 z-50 rounded-t-2xl shadow-2xl max-h-[70vh] flex flex-col"
-          style={{ background: t.sheetBg, borderTop: `1px solid ${t.navBorder}`, borderLeft: `1px solid ${t.navBorder}`, borderRight: `1px solid ${t.navBorder}` }}
+          style={{ background: t.sheetBg, borderTop: `1px solid ${t.navBorder}`, borderLeft: `1px solid ${t.navBorder}`, borderRight: `1px solid ${t.navBorder}`, ...FIXED_LAYER_STYLE }}
         >
           <div className="w-9 h-1 rounded-full mx-auto mt-2.5 mb-1 flex-none" style={{ background: t.handle }} />
           <div className="overflow-y-auto px-5 pb-6 pt-2">
@@ -193,7 +205,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
 
       <nav
         className="md:hidden fixed inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)]"
-        style={{ background: t.navBg, borderTop: `1px solid ${t.navBorder}` }}
+        style={{ background: t.navBg, borderTop: `1px solid ${t.navBorder}`, ...FIXED_LAYER_STYLE }}
       >
         <div className="h-16 flex items-stretch">
           {isExpelled ? (
