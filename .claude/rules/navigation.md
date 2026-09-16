@@ -897,6 +897,38 @@ A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `ma
 
 Since the tab bar is `fixed`, page content needs bottom padding so the bar doesn't cover it. `MobileTabBar` toggles a `document.body.classList.add('has-mobile-tabbar')` in a `useEffect` (removed on unmount), and `src/app/globals.css` reserves `padding-bottom: 4.5rem` on `body.has-mobile-tabbar` under a `max-width: 767px` media query. This means the padding only ever applies on pages that actually mount `MobileTabBar` (i.e. render `SiteNav`) — the `/admin/*` subtree (which uses `AdminLayout`/`AdminSidebar` instead, see `admin_console.md`) is unaffected.
 
+### Fixed tab bar detaching mid-scroll on iOS (fixed September 2026)
+
+**Reported symptom:** on iPhone (both installed-PWA and Safari-tab use), the
+bottom tab bar would intermittently render mid-page — overlapping a fixture
+card, with real page content visible both above and below it — instead of
+staying pinned to the bottom of the viewport, after scrolling. Reported
+alongside a recent iOS update, but this is a long-standing WebKit rendering
+bug, not something a specific iOS version introduced or something this
+app's own layout caused (no nested `overflow` scroll container, no
+`html`/`body` height trick exists anywhere in `globals.css` — the page is
+a plain document-flow scroller).
+
+**Root cause:** `<nav>` (the fixed tab bar itself), the "More" bottom
+sheet, and its scrim were all plain `position: fixed` elements with no
+compositing hint. WebKit on iOS is known to occasionally leave a bare
+`fixed` element painted at a stale scroll offset — effectively "stuck"
+mid-page — after a scroll gesture or when the dynamic Safari toolbar
+animates in/out, rather than recomputing its position against the current
+visual viewport. This shows up worse in standalone PWA mode (no browser
+chrome to force a reflow) and has been a recurring WebKit regression across
+several iOS point releases, not a one-off bug tied to any single update.
+
+**Fix:** `MobileTabBar.tsx`'s `FIXED_LAYER_STYLE` constant
+(`{ transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)',
+willChange: 'transform' }`) is now spread onto the `<nav>`, the "More"
+sheet panel, and its scrim — forcing each onto its own GPU compositor
+layer, which is the standard mitigation for this WebKit bug class: browsers
+recompute a composited layer's position against the live viewport far more
+reliably than a plain `fixed` box painted in the main document layer. This
+is a pure rendering hint — no layout, sizing, or `z-index` change, and no
+behavioural difference outside of iOS's own rendering quirk.
+
 ### Warm Light variant — `theme` prop, now the default everywhere (added September 2026, defaulted site-wide a few days later)
 
 `MobileTabBar` accepts an optional `theme?: 'dark' | 'light'` prop.
