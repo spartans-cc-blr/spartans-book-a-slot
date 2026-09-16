@@ -717,6 +717,29 @@ the dark nav that used to sit above the Home dashboard's light Warm Light
 island) is an accepted seam, not a bug — reskinning every page body was
 explicitly out of scope for this change.
 
+### Sticky top nav also detaching mid-scroll on iOS (fixed September 2026)
+
+Same underlying WebKit bug §4.1 documents for the bottom tab bar, reported
+separately on this bar. **Reported symptom:** on iPad/iPhone, the top nav
+would render mid-page after scrolling — with page content that belongs
+*below* it in normal document flow (e.g. `/matches/history`'s "WON"/"LOST"
+result-filter pills) visibly rendering *above* it — instead of staying
+pinned to the top of the viewport.
+
+**Root cause:** this `<nav>` uses `position: sticky` (`sticky top-0 z-50`,
+not `fixed` — see the top of §4), with no compositing hint. WebKit is
+known to occasionally leave a `position: sticky` element painted at a
+stale scroll offset after a scroll gesture, the same rendering-detachment
+bug class §4.1 describes for `position: fixed` elements — it isn't
+specific to either positioning mode.
+
+**Fix:** the `<nav>` gained Tailwind's `transform-gpu` and
+`will-change-transform` utilities — the same GPU-compositor-layer
+promotion `MobileTabBar.tsx`'s `FIXED_LAYER_STYLE` applies to the bottom
+tab bar, expressed as Tailwind classes here since this element is styled
+entirely via `className` rather than inline `style`. Pure rendering hint,
+no layout or behavioural change.
+
 ### Link Structure
  
 ```ts
