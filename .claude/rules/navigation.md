@@ -45,6 +45,15 @@ they can drift apart:
    before this fix needs to reinstall it (remove and re-"Add to Home
    Screen") to pick up the new `start_url` — a PWA manifest is normally
    cached and isn't re-read on every app launch.
+
+**`id` added to the manifest (September 2026)** — a PWA install/analysis
+audit flagged that without an explicit `id`, `start_url` doubles as the
+app's identity to the browser/OS, so a future `start_url` change (like the
+one just described) would make an already-installed copy look like a
+*different* app rather than update in place. `src/app/manifest.ts` now sets
+`id: '/'` explicitly, independent of `start_url` — if `start_url` ever
+needs to change again, `id` should stay `'/'` rather than following it, so
+existing installs keep resolving to the same app identity.
 ---
  
 ## 2. File Map
