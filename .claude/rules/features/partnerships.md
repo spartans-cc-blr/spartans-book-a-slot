@@ -92,8 +92,9 @@ anyway) wouldn't be usable by anything downstream.
 
 ### `ScorecardExtractor.extract_fall_of_wickets()` (`utils/field_extractors.py`)
 
-Parses the PDF's raw "Fall of Wickets" line, which has two real gotchas
-found while building this against actual scorecards:
+Parses the PDF's raw "Fall of Wickets" line, which has real gotchas
+found while building this (and, in one case, operating) it against
+actual scorecards:
 
 - **Entries wrap across physical PDF text lines mid-entry** — e.g. one
   line can end at `"140-6 (Mohan Chimbili,"` with the next line
@@ -106,9 +107,13 @@ found while building this against actual scorecards:
   regex (`FALL_OF_WICKET_PATTERN` in `utils/field_config.py`) is anchored
   on the very specific `", <over> ov)"` closing sequence rather than a
   naive comma split, so it doesn't get confused by an embedded `(SR)`.
+- **The wrap can also land exactly between the score's hyphen and the
+  wicket number itself** — a sub-case the original line-join fix above
+  didn't cover; see the incident write-up right after the code block
+  below for the real match that caught it and the fix.
 
 ```python
-FALL_OF_WICKET_PATTERN = re.compile(r'(\d+)-(\d+)\s*\((.+?),\s*([\d.]+)\s*ov\)')
+FALL_OF_WICKET_PATTERN = re.compile(r'(\d+)-\s*(\d+)\s*\((.+?),\s*([\d.]+)\s*ov\)')
 ```
 
 Each entry becomes `{'wicket_number': int, 'team_score': int, 'over':
@@ -118,6 +123,69 @@ float, 'player_name': str}`. `player_name` is run through the same
 text normalize to the identical `"Khanush"` that `batting_stats.
 player_name` already stores for that player, so a later reader can join
 the two by a plain string match.
+
+### Incident — line-wrap landing between the score's hyphen and the wicket number (fixed September 2026)
+
+**Reported symptom:** a not-out batter (Muthukumar R) never showed up
+anywhere in the Partnerships chart for Hub match `14114256` (5 Jan 2025
+vs Shiney 11) — not just missing the unbroken tag, absent from the chart
+entirely, even though `batting_stats` clearly showed him `not_out`.
+
+**Root cause:** the real PDF's Fall of Wickets line for this innings
+wraps mid-entry, right between the score's hyphen and the wicket number:
+
+```
+...143-6 (Santosh, 21.5 ov), 187-
+7 (Abhishek Prajapati, 25.3 ov), 188-8 (Manohar B Reddy, 26 ov)
+```
+
+`_extract_fow_entries()`'s existing line-join (documented above) strips
+and joins each physical line with a single space, which turned this into
+`"...187- 7 (Abhishek Prajapati, 25.3 ov), 188-8 (...)"`. The pre-fix
+`FALL_OF_WICKET_PATTERN`, `r'(\d+)-(\d+)\s*\(...'`, required the wicket
+number to sit immediately against the hyphen with no gap — so this one
+entry (wicket 7, Abhishek Prajapati) silently failed to match and was
+dropped, while every other entry (which happened to wrap somewhere the
+existing fix already handled, or not wrap at all) parsed fine. The
+analytics DB and Hub's `match_stats_cache` both ended up with only 7 Fall
+of Wickets rows against a real `team_wickets` of 8.
+
+This didn't just hide one row — it broke the whole downstream derivation.
+`computePartnerships()`'s crease-pointer walk (§4) advanced one step
+short of where it should have, which (a) silently merged two real
+wickets (7 and 8) into one wrong "45-run, Abhishek Prajapati & Manohar B
+Reddy" partnership, and (b) never brought Muthukumar R into the crease at
+all, so the completeness check added in §4.3
+(`fow.length === finalScore.wickets`, 7 ≠ 8) correctly refused to
+synthesize the unbroken closing stand between Suyash Pancholi and
+Muthukumar R — the derivation logic did exactly what it was designed to
+do once handed genuinely incomplete data; the incomplete data was the bug.
+
+**Fix:** `FALL_OF_WICKET_PATTERN` widened from a bare `-` to `-\s*`
+between the score and the wicket number, so it tolerates the inserted
+join-space without weakening the match in the ordinary no-wrap case
+(zero whitespace still matches fine). Verified against the real joined
+text from this match (all 8 wickets now parse correctly, in the right
+order) and against a regression check that the change doesn't alter
+matches on an unaffected, non-wrapped Fall of Wickets string from the
+same PDF (the opponent's own innings). See `field_config.py`'s comment on
+`FALL_OF_WICKET_PATTERN` for the in-code version of this note.
+
+**Data correction, applied directly (no re-sync needed):** the real
+wicket 7 (187 runs, over 25.3, Abhishek Prajapati — read off the actual
+CricHeroes PDF) was inserted directly into both the analytics DB's
+`fall_of_wickets` table and the Hub's already-synced
+`match_stats_cache.fall_of_wickets` jsonb array for this one booking
+(`fb9d6518-e38f-470a-b372-350e778c8d97`), same "database-side patch, not
+a re-sync loop" convention `features/post-match-scorecard.md` §15
+documents for an equivalent stale-cache fix. With `fow.length` now `8`,
+matching `team_wickets`, the chart correctly derives all 9 partnerships —
+including the previously-missing unbroken `30*` stand between Suyash
+Pancholi and Muthukumar R. No other booking was touched as part of this
+fix — see §9 for the open question of how many other historical matches
+this same line-wrap sub-case may have silently affected.
+
+---
 
 ### Shared name-normalization helper
 
@@ -363,6 +431,20 @@ truthiness) is still the right general check rather than a narrower
 `fow.length === 0` special-case, since it costs nothing extra and
 correctly covers that hypothetical case too, should a future parsing
 regression ever produce one.
+
+> **Correction (September 2026, see §3's incident write-up):** "extraction
+> is all-or-nothing per match" above turned out to be wrong in one real
+> case — match `14114256`'s Fall of Wickets was genuinely *partial* (7 of
+> 8 real wickets), silently produced by a line-wrap sub-case the original
+> extractor regex didn't handle. This is exactly the hypothetical the `<`
+> comparison above was already written to cover "should a future parsing
+> regression ever produce one" — and it did. The completeness check held
+> correctly even then: it refused to synthesize a wrong unbroken
+> partnership from the incomplete 7-row set, which is what first
+> surfaced the missing row as a reported symptom rather than a second,
+> silently wrong fabrication. No change to this check was needed; only
+> the upstream extraction bug that produced the partial data needed
+> fixing.
 
 **Validated:** re-ran the exact three §4.2 scenarios (real match
 `26908096`, synthetic `219/0`, FCC-Rockers all-out-166) against the
@@ -692,6 +774,7 @@ as the external-link fallback when there's no `playerId` at all.
 |---|---|
 | First real end-to-end cron proof | See §6.5 — the manual Phase 3 validation and this feature's own Phase 4/6 code are both in place, but no match has yet gone through the automated `backfill-scorecards` cron with the FOW-aware pipeline live end-to-end. Worth a follow-up note here once that's been observed. |
 | Highest partnership by runs/wickets on the Honour Board (`/leaderboard`) | Explicitly deferred — requested as a follow-on once the base feature was confirmed working, not yet started. Would need a season-wide aggregation over `computePartnerships()` output across every synced match, distinct from `getLeaderboard()`'s existing per-player season totals (`src/lib/playerStats.ts`) — probably its own function in that file rather than a batch call to `computePartnerships()` per match, given `getLeaderboard()`'s existing pagination-cap lessons (`features/leaderboard.md` §8.1). |
+| Other historical matches possibly affected by the score-hyphen/wicket-number line-wrap bug (§3's incident) | Only match `14114256` has been confirmed and manually corrected so far — the fix to `FALL_OF_WICKET_PATTERN` prevents this specific sub-case going forward (and on any future re-sync), but no audit has been run across the rest of the historical backlog for a `fall_of_wickets` row count that falls short of `team_wickets` by exactly one, which is the fingerprint this bug leaves behind. Worth a targeted query if this is suspected elsewhere. |
 
 ---
 
