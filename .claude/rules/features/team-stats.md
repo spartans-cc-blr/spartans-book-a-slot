@@ -17,7 +17,7 @@ win/loss record, sliced every way the data allows:
 | Highest team total, lowest score/total conceded in a losing cause, best chase, lowest defended, biggest/narrowest wins | Records cards |
 | Chasing vs defending | Innings split + Defending/Chasing filter |
 | League vs knockout | Stage split + filter, backed by the new `bookings.stage_type` flag (§4) |
-| Toss | Toss split (won/lost the toss; chose to bat/field) |
+| Toss | Toss split — four mutually-exclusive buckets: won/lost the toss × batted/fielded first |
 | Current form | Last-5 pills + current streak in the headline strip |
 
 Reached from the desktop **Stats ▾** dropdown (Yours Statistically · Team
@@ -106,9 +106,13 @@ matches that produced it (§3).
   checkbox opts in — same posture as `/leaderboard` §10.
 - **Unclassified `stage_type` counts as league** (§4). A new booking now
   defaults its `stage_type` toggle to League rather than "Not set" — see §4.
-- **Toss split** puts a toss-winning match in two buckets — the outcome
-  (won/lost the toss) and the decision (chose to bat/field) — since those
-  are two different questions. The toss *filter* is won/lost only (§3.2).
+- **Toss split** is four mutually-exclusive buckets — Won the toss &
+  batted first / Won the toss & fielded first / Lost the toss & batted
+  first / Lost the toss & fielded first — derived from `tossWon` crossed
+  with `battedFirst` (**standardised September 2026**, see the incident
+  note right below this list). The toss *filter* stays won/lost only
+  (§3.2) — "batted/fielded first" is already the Defending/Chasing filter,
+  and offering both would be two controls for one question.
 - **Every dimension is both filterable and splittable** (§3.2), and
   `splitByNested()` composes two of them; a match that a dimension can't
   group (no toss data) drops out of both its filter and its split.
@@ -125,13 +129,35 @@ matches that produced it (§3).
   captain, innings, stage) uniformly — three dimensions keep their own fixed order
   regardless: `year`/`month` (newest first, still a timeline) and `slot`
   (chronological by time-of-day), plus `toss`, which follows a fixed
-  logical sequence (won → lost → the two toss-winner decisions) rather
-  than a ranking. Marquee opponents still pin ahead of everything else on
-  the Opponent split, same as before.
+  logical sequence — won-bat, won-field, lost-bat, lost-field
+  (`TOSS_ORDER`) — rather than a ranking. Marquee opponents still pin
+  ahead of everything else on the Opponent split, same as before.
 
 Unit tests: `src/lib/teamStats.test.ts` (vitest) cover every aggregator
-above against a hand-built fixture, including the toss double-bucketing,
-practice exclusion, marquee pinning and the records/margin derivations.
+above against a hand-built fixture, including the toss split's four
+mutually-exclusive buckets, practice exclusion, marquee pinning and the
+records/margin derivations.
+
+> **Fixed (September 2026) — the toss split used to put one match in two
+> rows at once, with nothing on screen showing they were the same match.**
+> The original design (`groupsFor()`'s `'toss'` case) put every
+> toss-winning match into *both* a "Won the toss" row and a separate "Won
+> toss & chose to bat/field" row — deliberately, per the original design
+> note that used to sit here: "since those are two different questions."
+> In practice this read as a real bug, not a feature: a toss-winning
+> match's "Won the toss" row and its "Won toss & chose to field" row had
+> byte-identical P/W/Win%/Last-played values (same match, shown twice),
+> and reported live as exactly that — a 2-match opponent record (P=2)
+> whose expanded toss breakdown showed 3 rows, with nothing distinguishing
+> the duplicate from a genuinely third match. Fixed by replacing the two
+> overlapping questions with the four real, mutually-exclusive outcomes a
+> toss can produce: `groupsFor()`'s `'toss'` case now derives a single key
+> per match from `tossWon` crossed with `battedFirst` (`toss-won-bat` /
+> `toss-won-field` / `toss-lost-bat` / `toss-lost-field`), so a sub-split's
+> rows always sum back to exactly their parent's P — no double-counting,
+> no duplicate-looking rows. `TOSS_ORDER` was updated to the new four keys
+> in the same order. The toss *filter* (won/lost only) is unaffected — see
+> the bullet above.
 
 > **Incident (13 Sep 2026) — one match's `toss_decision` was extracted
 > backwards, silently corrupting a Records card.** `match_stats.toss_decision`
@@ -287,11 +313,11 @@ knowing:
   Defending/Chasing give a match with no toss data no group at all, and
   once a "then by" is chosen the parent row no longer lists its matches
   directly — without this they would be unreachable.
-- **Toss sub-rows can sum to more than their parent's P**, because the toss
-  dimension deliberately puts a toss-winning match in both a "Won the toss"
-  and a "Won toss & chose to …" bucket, exactly as it does at the top
-  level. The Total footer is unaffected: it still counts distinct matches
-  across the *primary* rows only.
+- **Every dimension's sub-rows sum back to exactly their parent's P** — no
+  dimension double-buckets a match (see the September 2026 toss fix, §2).
+  A match with no data for the second dimension (no toss/innings data)
+  simply isn't in any sub-row and surfaces via the "Not recorded" row
+  above instead.
 
 **Capped at two levels on purpose.** Three-deep nesting stops being
 readable in one table, and the filters cover any further narrowing.
@@ -360,13 +386,17 @@ controls, and the marquee highlight moved to where it's actually relevant:
    **A "Total" footer row** (added the same day, on request) closes every
    split with the aggregate P/W/L/T-NR/Win %/form/last-played across the
    rows above it — computed from the *distinct* matches behind those rows
-   (`summarize()` over a `bookingId`-deduped set), not by summing the rows,
-   since the Toss split deliberately puts a toss-winning match in two
-   buckets. Hidden when the split has a single row (it would just repeat
-   it). This total can differ from the headline strip on purpose: the
-   Innings and Toss splits drop matches with no toss data, so their total
-   is "of the matches we have toss data for", while the headline counts
-   every filtered match.
+   (`summarize()` over a `bookingId`-deduped set), not by summing the rows.
+   No dimension double-buckets a match today (see the September 2026 toss
+   fix, §2), so summing the rows would in practice give the same number —
+   the dedup is kept as the safer, more robust implementation regardless
+   (correct automatically if a future dimension ever did multi-bucket, and
+   free of the toss split's old inflated-P bug while that still existed).
+   Hidden when the split has a single row (it would just repeat it). This
+   total can differ from the headline strip on purpose: the Innings and
+   Toss splits drop matches with no toss data, so their total is "of the
+   matches we have toss data for", while the headline counts every
+   filtered match.
 
 **Marquee opponents — now Opponent-split-only, not pinned everywhere
 (changed September 2026).** The original design pinned a marquee
