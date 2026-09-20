@@ -58,7 +58,9 @@ const DETAILED_LABEL: Record<TableCategory, string> = {
 // slicing the option string itself would truncate both.
 const SELECT_TRUNCATE = 'truncate min-w-0'
 
-function pillClass(active: boolean): string {
+// Exported so PitchTypeTabs.tsx (Detailed → Bat/Bowl's pitch-type tab row)
+// reuses this exact pill treatment instead of a second, drifting copy.
+export function pillClass(active: boolean): string {
   return `font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors whitespace-nowrap
     ${active
       ? 'bg-[var(--stats-badge-bg)] dark:bg-gold/20 border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold'

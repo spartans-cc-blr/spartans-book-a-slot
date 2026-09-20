@@ -354,6 +354,76 @@ needed — this is the only reason the feature stayed small.
 
 ---
 
+## 6.2 Pitch Type Tabs (Detailed → Bat / Bowl) — added September 2026
+
+An "All / Matted / Astro / Turf" tab row on Detailed → Bat (below
+`BattingPositionLeaders`, §6.1) and Detailed → Bowl (in the equivalent spot,
+directly above the table — there's no per-position chart on Bowl to sit
+under), narrowing `LeaderboardTable` below it to matches played on one
+surface. Reuses `tournaments.pitch_type` (migration 079 — see
+`features/team-stats.md` §6), the same tournament-level classification Team
+Record's own Pitch Type split/filter already reads, rather than inventing a
+second signal.
+
+**Hidden whenever a Tournament or Ground filter is already active.** A
+specific tournament already pins one fixed `pitch_type` (or none at all) —
+stacking an independent pitch filter on top of an already-single-tournament
+view would be redundant at best and misleading at worst (a tournament with
+no `pitch_type` set would show an empty table for every tab except "All").
+`showPitchTabs` in `page.tsx` gates both the tabs' visibility and whether
+the filter is actually applied — `(category === 'batting' || category ===
+'bowling') && tournamentId === 'all' && groundId === 'all'` — so a
+hand-edited `?pitch=Turf&tournament=<id>` URL is inert, not just
+UI-hidden, the same "server re-derives, UI only mirrors" posture this app
+applies everywhere else.
+
+**No "Not set" tab** — same convention as Team Record's own Pitch Type
+*filter* (as opposed to its *split*, which does show an unclassified
+bucket — see `features/team-stats.md` §6): the tabs are All/Matted/Astro/
+Turf only. Most tournaments still have no `pitch_type` classified as of
+this writing, so picking Matted/Astro/Turf can legitimately show a very
+thin table — expected, not a bug, and the same gap Team Record already
+documents as a pending manual-classification task.
+
+**Data — `getScopedMatchIds()` (`src/lib/playerStats.ts`)** gained an
+optional `pitchType?: PitchType` filter, resolved the same way the
+existing `is_practice` exclusion resolves its tournament set:
+`getPitchTournamentIds(pitchType)` looks up every `tournaments.id` with
+that `pitch_type`, and a new `withPitchType()` step filters the booking
+rows already fetched for date/format/tournament/ground scoping down to
+just those tournaments' bookings — no new query shape, no join, just
+another in-memory filter alongside `withoutPractice()`. `getLeaderboard()`'s
+filter type grew the same `pitchType?: PitchType` field, which flows
+straight through to `getScopedMatchIds()`.
+
+**Only ever applied to `rows` (the table), never to the chart above it or
+to Overall's Centuries/5-Wicket Hauls lists.** `page.tsx` keeps
+`overallFilters` (year/tournament/ground/format/innings) exactly as it was
+— `battingPositionLeaders` (`getTopScorersByBattingPosition(overallFilters)`)
+and `yearlyPerformances` (Overall-only) are both still built from that
+unmodified object, so the position chart always shows the club's overall
+leaders regardless of which pitch tab is selected below it; only the
+`getLeaderboard()` call feeding `rows` gets `{ ...overallFilters, pitchType }`.
+This matches the request's own framing — the tabs sit *after* the chart and
+filter *the table*, not the chart.
+
+**UI — `PitchTypeTabs.tsx`:** a small `'use client'` component, styled with
+the same `pillClass()` treatment `LeaderboardFilters.tsx` uses for its own
+Honor Board/Detailed/sub-tab pills (exported from that file for reuse
+rather than duplicated). Navigates via a plain `?pitch=` query param,
+merged into whatever's already in the URL (`useSearchParams()` +
+`router.push()`, same pattern as `CaptainPicker.tsx` on
+`/captains-corner/unavailable-dates`) — this is what lets Year/Format/etc.
+survive a pitch-tab tap. The reverse isn't true by design:
+`LeaderboardFilters.tsx`'s own `navigate()` rebuilds the URL from just its
+own props and was left untouched, so it never carries `pitch` forward —
+any change made there (year, tournament, format, switching category, the
+month stepper, …) naturally drops the pitch tab back to "All". That's the
+correct behaviour the moment a Tournament/Ground is picked (the tabs
+disappear at the same time), and harmless everywhere else.
+
+---
+
 ## 7. Architecture — `src/lib/leaderboardMilestones.ts`
 
 Plain module, deliberately **not** `'use client'` and **not** importing
@@ -523,16 +593,17 @@ sequential-await pattern on its own independent Supabase reads.
 
 | File | Role |
 |---|---|
-| `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`, `getTopScorersByBattingPosition` for Detailed → Bat only — §6.1), glossary building; the six category-gated analytics reads run as one `Promise.all()` batch rather than sequential awaits (§8.2) |
-| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), `getTopScorersByBattingPosition()` (§6.1), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10); `fetchAllRows()` pages every multi-row analytics-DB read past PostgREST's default 1000-row cap (§8.1) |
-| `src/components/leaderboard/BattingPositionLeaders.tsx` | Detailed → Bat only — horizontal bar chart of the leading run-scorer(s) per batting position, tap a bar for the "Top 3" modal (§6.1) |
+| `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`, `getTopScorersByBattingPosition` for Detailed → Bat only — §6.1), glossary building; computes `showPitchTabs`/`pitchType` for the Pitch Type tabs (§6.2), applied only to the `getLeaderboard()` call that feeds `rows`; the six category-gated analytics reads run as one `Promise.all()` batch rather than sequential awaits (§8.2) |
+| `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), `getTopScorersByBattingPosition()` (§6.1), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10) and, as of §6.2, accepts an optional `pitchType` filter resolved via `getPitchTournamentIds()`/`withPitchType()`; `fetchAllRows()` pages every multi-row analytics-DB read past PostgREST's default 1000-row cap (§8.1) |
+| `src/components/leaderboard/BattingPositionLeaders.tsx` | Detailed → Bat only — horizontal bar chart of the leading run-scorer(s) per batting position, tap a bar for the "Top 3" modal (§6.1); unaffected by the Pitch Type tabs rendered below it (§6.2) |
+| `src/components/leaderboard/PitchTypeTabs.tsx` | Detailed → Bat/Bowl — All/Matted/Astro/Turf tab row narrowing `LeaderboardTable`, hidden and inert whenever a Tournament/Ground is selected (§6.2) |
 | `src/components/ui/Dialog.tsx` | Shared modal — reused as-is for the "Top 3 at Position N" popup, no new modal primitive needed (§6.1) |
 | `src/components/players/PlayerStatsClient.tsx` | `/players/[id]/stats` filter bar — Year/Ground/Format/As Captain/Defending/Chasing, plus the "Include Practice Games" opt-in (§10) |
 | `src/app/api/players/[id]/match-history/route.ts` | Feeds `PlayerStatsClient.tsx` — parses `practice=1` into `includePractice` (§10) |
 | `supabase/migrations/054_tournament_is_practice.sql` | `tournaments.is_practice` flag (§10) |
 | `src/lib/leaderboardMilestones.ts` | Plain thresholds/tie-handling module (§7) — the fix for §8's incident |
 | `src/lib/leaderboardGlossary.ts` | `buildOverallGlossary()`/`buildMonthlyGlossary()`/`buildDetailedGlossary()` — server-side, quotes real thresholds |
-| `src/components/leaderboard/LeaderboardFilters.tsx` | Nav tree + filter bar (§2) — pushes `searchParams`, page re-fetches server-side |
+| `src/components/leaderboard/LeaderboardFilters.tsx` | Nav tree + filter bar (§2) — pushes `searchParams`, page re-fetches server-side; exports `pillClass()`, reused by `PitchTypeTabs.tsx` (§6.2) |
 | `src/components/leaderboard/LeaderboardMilestones.tsx` | Overall tab — tie-inclusive cards (§4) + year-scoped collapsible bands (§5) + Tournament/Ground-scoped always-open lists (§5.1) + Most Dismissals (§6) |
 | `src/components/leaderboard/LeaderboardMonthly.tsx` | Monthly tab — single-winner cards + always-open Centuries/Half-Centuries/5-Wicket/3-Wicket Hauls panels (trimmed to 2, then Half-Centuries/3-Wicket Hauls restored on Monthly only, §5.1) |
 | `src/components/leaderboard/InningsRow.tsx` | Shared `ClickableRow`/`BattingInningsRow`/`BowlingInningsRow` — whole-row click to `/matches/history/[bookingId]`, used by both Milestones and Monthly |
