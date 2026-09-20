@@ -961,6 +961,24 @@ reliably than a plain `fixed` box painted in the main document layer. This
 is a pure rendering hint — no layout, sizing, or `z-index` change, and no
 behavioural difference outside of iOS's own rendering quirk.
 
+**⚠️ This same hint must never be applied to a shared ancestor of this
+`<nav>` — it would break the fix, not extend it.** A CSS `transform` on
+any ancestor establishes a new containing block for that ancestor's
+`position: fixed` descendants — the fixed element then positions itself
+relative to that transformed ancestor's box instead of the viewport. Since
+`SiteNav.tsx` renders `MobileTabBar` internally, and every page renders
+`<SiteNav />` somewhere inside its own root wrapper (and, ultimately,
+inside `src/app/layout.tsx`'s `<body>`), promoting `<body>` or any
+per-page wrapper `<div>` to its own GPU layer — a tempting broader fix for
+this same WebKit bug class recurring elsewhere in the app, e.g. the ghost-
+frame variant fixed on `StatsSegmentedTabs` (`features/team-stats.md` §3)
+— would silently re-anchor the bottom tab bar to that ancestor's box
+instead of the viewport, very likely making it detach far worse than the
+original bug. A fix for this bug class is only safe on the affected
+element itself, or on a genuine **sibling** subtree of `<SiteNav />` (as
+`StatsSegmentedTabs`'s hero `<div>` is on both stats pages) — never on
+anything that sits between `<SiteNav />` and `<body>` in the tree.
+
 ### Warm Light variant — `theme` prop, now the default everywhere (added September 2026, defaulted site-wide a few days later)
 
 `MobileTabBar` accepts an optional `theme?: 'dark' | 'light'` prop.
