@@ -459,6 +459,31 @@ used by the headline strip and Recent matches),
 `src/components/stats/StatsSegmentedTabs.tsx` (server — the two-pill stats
 switcher, shared with `/leaderboard`).
 
+**Ghost frame of the previous page after tapping between the two stats
+pages (fixed September 2026).** Reported live on iPadOS: switching from
+`/leaderboard` to `/team-stats` via the Stats ▾ dropdown left a visible
+remnant of `/leaderboard`'s own segmented-tabs pill ("…Statistically" —
+the tail of "Yours Statistically") painted over the top of the new page,
+overlapping the OS status bar above `SiteNav` — the new page's real
+content (the correctly-positioned `SiteNav`, "Team Record" hero, Honor
+Board/Detailed tabs) rendered normally underneath it. Same WebKit
+rendering-layer bug class documented in `navigation.md` §4.1 (a stale
+painted frame surviving where it shouldn't), but triggered by a
+client-side route transition rather than a scroll gesture, and landing on
+an ordinary in-flow element (`StatsSegmentedTabs` has no `fixed`/`sticky`
+positioning of its own) rather than a positioned one.
+
+Fixed the same way — `StatsSegmentedTabs.tsx`'s own wrapping `<div>`
+gained Tailwind's `transform-gpu` + `will-change-transform`, promoting it
+onto its own GPU compositor layer so WebKit repaints it fresh on
+navigation instead of occasionally reusing a stale composited tile from
+the previous route. Safe to apply directly here because this component
+(and the hero `<div>` wrapping it) is a **sibling** of `<SiteNav />` on
+both pages, never an ancestor — see `navigation.md` §4.1's note on why
+the identical hint can *not* be applied to any shared ancestor of
+`SiteNav`/`MobileTabBar` (e.g. the root layout's `<body>`) without
+breaking `MobileTabBar`'s `position: fixed` bottom tab bar.
+
 ### 3.4 Multiple rows stay expanded at once (changed September 2026)
 
 `TeamSplitTable`'s top-level rows were a single-row accordion — tapping a
