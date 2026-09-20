@@ -415,6 +415,11 @@ export interface PlayerMatchHistoryRow {
   // a scorecard the "Toss" line couldn't be extracted from). See
   // src/lib/playerStats.ts's getPlayerMatchHistory() for the derivation.
   battedFirst:    boolean | null
+  // tournaments.pitch_type (migration 079) — null when the match's booking
+  // couldn't be resolved, or the tournament has no surface classified yet.
+  // Feeds the Pitch Type tabs above Innings History on /players/[id]/stats
+  // — see .claude/rules/features/player-stats-batting-position.md.
+  pitchType:      PitchType | null
   batting: {
     runs: number; balls: number; fours: number; sixes: number
     notOut: boolean; strikeRate: number | null; howOut: string | null

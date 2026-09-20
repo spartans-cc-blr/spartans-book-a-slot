@@ -422,6 +422,15 @@ month stepper, …) naturally drops the pitch tab back to "All". That's the
 correct behaviour the moment a Tournament/Ground is picked (the tabs
 disappear at the same time), and harmless everywhere else.
 
+**Extended to `/players/[id]/stats` (added September 2026)** — the same
+All/Matted/Astro/Turf tabs, hidden whenever a Ground is selected, now sit
+above that page's own "Innings History" too. That page holds its match
+list in client state rather than re-rendering server-side per filter (see
+`features/player-stats-batting-position.md` §9), so its version is a
+purely client-side array filter (`selectedPitch`) rather than a `?pitch=`
+URL param — same end result, different mechanism because the two pages
+already fetch data two different ways.
+
 ---
 
 ## 7. Architecture — `src/lib/leaderboardMilestones.ts`

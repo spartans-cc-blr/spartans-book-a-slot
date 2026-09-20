@@ -461,7 +461,7 @@ export async function getPlayerMatchHistory(
   // returned row shape. DB-guaranteed non-null — see matchStatus.ts.
   const { data: bookingRows, error: bookingErr } = await hub
     .from('bookings')
-    .select('id, match_id, game_date, format, match_time, tournament:tournaments(name)')
+    .select('id, match_id, game_date, format, match_time, tournament:tournaments(name, pitch_type)')
     .in('match_id', matchIds)
     .eq('status', 'confirmed')
   if (bookingErr) throw new Error(bookingErr.message)
@@ -503,6 +503,7 @@ export async function getPlayerMatchHistory(
       opponentName:    m?.opponent_name ?? null,
       matchResult:     m?.match_result ?? null,
       battedFirst:     deriveBattedFirst(m),
+      pitchType:       (Array.isArray(booking?.tournament) ? booking?.tournament[0]?.pitch_type : booking?.tournament?.pitch_type) ?? null,
       batting: battedThisMatch ? {
         runs: num(bat.runs), balls: num(bat.balls), fours: num(bat.fours), sixes: num(bat.sixes),
         notOut: bat.not_out === 'Y',
