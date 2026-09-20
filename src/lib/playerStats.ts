@@ -21,7 +21,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
-import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry } from '@/types'
+import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType } from '@/types'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -185,6 +185,18 @@ async function getPracticeTournamentIds(): Promise<Set<string>> {
   return new Set<string>((data ?? []).map((t: any) => t.id))
 }
 
+// Tournaments carrying a given tournaments.pitch_type (migration 079 — see
+// features/team-stats.md §6). Same "resolve ids from a separate table,
+// filter bookings in code" shape as getPracticeTournamentIds() above —
+// pitch_type lives on the tournament, not the booking, so there's no
+// column on `bookings` itself to filter on directly.
+async function getPitchTournamentIds(pitchType: PitchType): Promise<Set<string>> {
+  const hub = createServiceClient()
+  const { data, error } = await hub.from('tournaments').select('id').eq('pitch_type', pitchType)
+  if (error) throw new Error(error.message)
+  return new Set<string>((data ?? []).map((t: any) => t.id))
+}
+
 // Resolves a {year|month, tournamentId, groundId, formats} filter to a
 // concrete list of Hub bookings.match_id values. Returns null when nothing
 // is set — the caller should treat null as "no restriction" (all-time, all
@@ -203,7 +215,7 @@ async function getPracticeTournamentIds(): Promise<Set<string>> {
 // never combined by any caller today — Monthly scopes by month alone, every
 // other view scopes by year alone — so `month` simply takes precedence
 // when both happen to be set, rather than trying to intersect the two.
-async function getScopedMatchIds(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; includePractice?: boolean }): Promise<string[] | null> {
+async function getScopedMatchIds(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; includePractice?: boolean; pitchType?: PitchType }): Promise<string[] | null> {
   const hasFormatRestriction = !!filters.formats && filters.formats.length > 0
 
   // Excluding practice games is itself a restriction, so the "nothing is
@@ -211,11 +223,12 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
   // whenever the exclusion is in effect — an explicit tournamentId always
   // wins (that's a deliberate, narrow request, not a default aggregate).
   const excludePractice = !filters.tournamentId && !filters.includePractice
-  const hasAnyFilter = !!filters.year || !!filters.month || !!filters.tournamentId || !!filters.groundId || hasFormatRestriction
+  const hasAnyFilter = !!filters.year || !!filters.month || !!filters.tournamentId || !!filters.groundId || hasFormatRestriction || !!filters.pitchType
   if (!hasAnyFilter && !excludePractice) return null
 
   const hub = createServiceClient()
   const practiceIds = excludePractice ? await getPracticeTournamentIds() : new Set<string>()
+  const pitchTournamentIds = filters.pitchType ? await getPitchTournamentIds(filters.pitchType) : null
 
   // A booking's own is_practice flag (additive to the tournament-level one
   // above) — lets a single game under any real tournament be marked
@@ -226,6 +239,18 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
   // practice-tournament match — see features/practice-games.md.
   function withoutPractice(rows: any[]): any[] {
     return excludePractice ? rows.filter(b => !practiceIds.has(b.tournament_id) && !b.is_practice) : rows
+  }
+
+  // pitch_type lives on tournaments, not bookings — narrow to whichever
+  // tournaments carry the requested surface, resolved once above via
+  // getPitchTournamentIds(). Only ever set by /leaderboard's Detailed →
+  // Bat/Bowl pitch tabs, and only while no Tournament/Ground is already
+  // selected (see src/app/leaderboard/page.tsx) — a tournament already
+  // pins a specific pitch_type (or none), so combining the two would be
+  // redundant at best; this filter still composes correctly if a future
+  // caller ever does combine them.
+  function withPitchType(rows: any[]): any[] {
+    return pitchTournamentIds ? rows.filter(b => pitchTournamentIds!.has(b.tournament_id)) : rows
   }
 
   function baseQuery() {
@@ -251,7 +276,7 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
   if (!filters.groundId) {
     const { data, error } = await baseQuery()
     if (error) throw new Error(error.message)
-    return Array.from(new Set<string>(withoutPractice(data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+    return Array.from(new Set<string>(withPitchType(withoutPractice(data ?? [])).map((b: any) => b.match_id).filter(Boolean)))
   }
 
   // Each booking now carries its own ground_id directly (migration 066) —
@@ -275,8 +300,8 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
   if (byLegacyVenue.error) throw new Error(byLegacyVenue.error.message)
 
   const matchIds = new Set<string>()
-  for (const b of withoutPractice(byGroundId.data ?? [])) if (b.match_id) matchIds.add(b.match_id)
-  for (const b of withoutPractice(byLegacyVenue.data ?? [])) if (b.match_id) matchIds.add(b.match_id)
+  for (const b of withPitchType(withoutPractice(byGroundId.data ?? []))) if (b.match_id) matchIds.add(b.match_id)
+  for (const b of withPitchType(withoutPractice(byLegacyVenue.data ?? []))) if (b.match_id) matchIds.add(b.match_id)
   return Array.from(matchIds)
 }
 
@@ -436,7 +461,7 @@ export async function getPlayerMatchHistory(
   // returned row shape. DB-guaranteed non-null — see matchStatus.ts.
   const { data: bookingRows, error: bookingErr } = await hub
     .from('bookings')
-    .select('id, match_id, game_date, format, match_time, tournament:tournaments(name)')
+    .select('id, match_id, game_date, format, match_time, tournament:tournaments(name, pitch_type)')
     .in('match_id', matchIds)
     .eq('status', 'confirmed')
   if (bookingErr) throw new Error(bookingErr.message)
@@ -478,6 +503,7 @@ export async function getPlayerMatchHistory(
       opponentName:    m?.opponent_name ?? null,
       matchResult:     m?.match_result ?? null,
       battedFirst:     deriveBattedFirst(m),
+      pitchType:       (Array.isArray(booking?.tournament) ? booking?.tournament[0]?.pitch_type : booking?.tournament?.pitch_type) ?? null,
       batting: battedThisMatch ? {
         runs: num(bat.runs), balls: num(bat.balls), fours: num(bat.fours), sixes: num(bat.sixes),
         notOut: bat.not_out === 'Y',
@@ -499,7 +525,7 @@ export async function getPlayerMatchHistory(
   return rows
 }
 
-export async function getLeaderboard(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; innings?: 'defending' | 'chasing' } = {}): Promise<LeaderboardRow[]> {
+export async function getLeaderboard(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; innings?: 'defending' | 'chasing'; pitchType?: PitchType } = {}): Promise<LeaderboardRow[]> {
   let scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return []
   scoped = await applyInningsFilter(scoped, filters.innings)

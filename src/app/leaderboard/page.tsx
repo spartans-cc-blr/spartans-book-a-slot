@@ -7,6 +7,7 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import { LeaderboardFilters, type LeaderboardCategory, type Format, type InningsKey } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { BattingPositionLeaders } from '@/components/leaderboard/BattingPositionLeaders'
+import { PitchTypeTabs } from '@/components/leaderboard/PitchTypeTabs'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
 import { LeaderboardGlossary } from '@/components/leaderboard/LeaderboardGlossary'
@@ -14,6 +15,7 @@ import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
 import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
 import { getMonthSyncStatus } from '@/lib/monthlyRecognition'
+import type { PitchType } from '@/types'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Yours Statistically — Spartans CC' }
@@ -33,10 +35,14 @@ function monthLabel(m: string): string {
   return new Date(Date.UTC(y, mo - 1, 1)).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 }
 
+function isPitchType(v: string | undefined): v is PitchType {
+  return v === 'Matted' || v === 'Astro' || v === 'Turf'
+}
+
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams?: { year?: string; month?: string; tournament?: string; ground?: string; category?: string; format?: string; innings?: string }
+  searchParams?: { year?: string; month?: string; tournament?: string; ground?: string; category?: string; format?: string; innings?: string; pitch?: string }
 }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
@@ -118,6 +124,18 @@ export default async function LeaderboardPage({
     innings: category === 'mvp' ? restrictedInnings?.[0] : undefined,
   }
 
+  // Pitch Type tabs (Detailed → Bat/Bowl only) — see PitchTypeTabs.tsx.
+  // Only shown, and only ever applied, when no Tournament/Ground is already
+  // selected: a tournament already pins one specific pitch_type (or none at
+  // all), so a second, independent pitch filter alongside it would either be
+  // redundant or silently contradict the tournament's own surface. Same
+  // "no 'not set' bucket, All/Matted/Astro/Turf only" convention Team
+  // Record's own Pitch Type filter already uses — see features/team-stats.md §6.
+  const pitchParam = searchParams?.pitch
+  const pitch: PitchType | 'all' = isPitchType(pitchParam) ? pitchParam : 'all'
+  const showPitchTabs = (category === 'batting' || category === 'bowling') && tournamentId === 'all' && groundId === 'all'
+  const pitchType: PitchType | undefined = showPitchTabs && pitch !== 'all' ? pitch : undefined
+
   // Individual centuries/5-wicket-haul lists for the Overall tab's bands —
   // fetched for a specific year (not "All Time") or whenever a
   // Tournament/Ground filter is active (scoped), matching the same scope as
@@ -141,7 +159,11 @@ export default async function LeaderboardPage({
   // §5/§5.1/§10 for the full history (removed, then restored, on the
   // Monthly tab specifically).
   const [rows, monthlyPerformances, monthlyPerformancesNoPractice, monthSyncStatus, yearlyPerformances, battingPositionLeaders] = await Promise.all([
-    category === 'monthly' ? getLeaderboard({ month, formats: restrictedFormats }) : getLeaderboard(overallFilters),
+    // pitchType only ever narrows `rows` (the Detailed table) — the batting
+    // position chart below (battingPositionLeaders) and, on Overall, the
+    // Centuries/5-Wicket Hauls lists (yearlyPerformances) deliberately stay
+    // scoped to `overallFilters` alone, unaffected by the pitch tabs.
+    category === 'monthly' ? getLeaderboard({ month, formats: restrictedFormats }) : getLeaderboard({ ...overallFilters, pitchType }),
     category === 'monthly' ? getPerformances({ month, includePractice: true }) : Promise.resolve(null),
     category === 'monthly' ? getPerformances({ month }) : Promise.resolve(null),
     // WhatsApp share for the Monthly tab, open to any signed-in player — see
@@ -243,6 +265,7 @@ export default async function LeaderboardPage({
             {battingPositionLeaders && battingPositionLeaders.length > 0 && (
               <BattingPositionLeaders leaders={battingPositionLeaders} />
             )}
+            {showPitchTabs && <PitchTypeTabs active={pitch} />}
             <LeaderboardTable key={category} rows={rows} category={category} tournamentFiltered={tournamentId !== 'all'} />
           </>
         )}

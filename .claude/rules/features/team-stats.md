@@ -909,6 +909,32 @@ Open to every viewer, same as every dimension except Captain (§3.6) — a
 tournament's pitch surface isn't sensitive, so `visibleFilterKeys()`/
 `visibleSplitDimensions()` don't gate it.
 
+### More consumers — `/leaderboard` and `/players/[id]/stats` Pitch Type tabs (added September 2026)
+
+`tournaments.pitch_type` also backs an All/Matted/Astro/Turf tab row on
+`/leaderboard`'s Detailed → Bat and Bowl tabs, narrowing that page's own
+`LeaderboardTable` — see `features/leaderboard.md` §6.2 for the full
+design. Same "no 'Not set' option on the filter side" convention as this
+section's own Pitch Type *filter* (as opposed to the *split*, which does
+show an unclassified bucket) — the leaderboard's tabs are All/Matted/
+Astro/Turf only, with no fourth "unclassified" tab. `src/lib/playerStats.ts`'s
+`getScopedMatchIds()` resolves the filter independently of
+`src/lib/teamStats.ts`'s own resolution (a separate `getPitchTournamentIds()`
+helper, since Team Record and the leaderboard already read `tournaments`
+through two unrelated query paths) — both ultimately read the same
+`tournaments.pitch_type` column, so the two pages can never disagree on
+which tournaments count as Matted/Astro/Turf, even though nothing is
+shared beyond the column itself.
+
+The same tabs were extended to `/players/[id]/stats`'s Innings History the
+same month — see `features/player-stats-batting-position.md` §9. That
+page already holds its match list in client state rather than re-fetching
+server-side per filter, so it resolves `pitchType` once per match (via
+`getPlayerMatchHistory()`'s own widened `tournaments` select) and filters
+client-side, rather than calling `getPitchTournamentIds()` again — a
+third, narrower way of reading the same column, not a third
+implementation of the filter logic itself.
+
 ---
 
 ## 7. Navigation changes

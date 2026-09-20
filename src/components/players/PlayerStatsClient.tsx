@@ -28,7 +28,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import type { PlayerStatsTotals, PlayerMatchHistoryRow } from '@/types'
+import type { PlayerStatsTotals, PlayerMatchHistoryRow, PitchType } from '@/types'
 
 interface PlayerInfo {
   id: string
@@ -48,6 +48,17 @@ type Format = 'T20' | 'T30'
 type Innings = 'defending' | 'chasing'
 type StatTab = 'batting' | 'bowling' | 'fielding'
 const STAT_TABS: StatTab[] = ['batting', 'bowling', 'fielding']
+
+// Pitch Type tabs above Innings History — same All/Matted/Astro/Turf set,
+// same "no 'Not set' option" convention, as /leaderboard's Detailed →
+// Bat/Bowl tabs (features/leaderboard.md §6.2) and Team Record's own Pitch
+// Type filter (features/team-stats.md §6).
+const PITCH_TABS: { key: PitchType | 'all'; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'Matted', label: 'Matted' },
+  { key: 'Astro', label: 'Astro' },
+  { key: 'Turf', label: 'Turf' },
+]
 
 export function PlayerStatsClient({
   player, grounds, initialCareer, initialMatches,
@@ -81,9 +92,19 @@ export function PlayerStatsClient({
   // new match set, since a position that had matches under the old filter
   // may not exist at all under the new one.
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null)
+  // Pitch Type tabs above Innings History — same reset-on-refetch rationale
+  // as selectedPosition, plus it's only ever shown/applied while no Ground
+  // is selected (a specific ground/tournament combination isn't modelled
+  // here the way /leaderboard's is, but Ground alone already pins matches
+  // to one physical venue, so a second, independent pitch filter on top
+  // would be redundant the same way it would be there — see
+  // features/player-stats-batting-position.md).
+  const [selectedPitch, setSelectedPitch] = useState<PitchType | 'all'>('all')
+  const showPitchTabs = groundId === 'all'
 
   const fetchScoped = useCallback(async () => {
     setSelectedPosition(null)
+    setSelectedPitch('all')
     if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain && innings.size === 2 && !includePractice) {
       setScoped(initialCareer)
       setMatches(initialMatches)
@@ -155,9 +176,18 @@ export function PlayerStatsClient({
       .sort((a, b) => a.position - b.position)
   }, [matches])
 
+  // Only ever narrows Innings History below — positionData (the chart
+  // above) stays scoped to `matches` directly, same "chart above stays
+  // unaffected, only the table narrows" convention the leaderboard's own
+  // Pitch Type tabs use (features/leaderboard.md §6.2).
+  const matchesForPitch = useMemo(
+    () => (!showPitchTabs || selectedPitch === 'all') ? matches : matches.filter(m => m.pitchType === selectedPitch),
+    [matches, selectedPitch, showPitchTabs],
+  )
+
   const matchesForPosition = useMemo(
-    () => selectedPosition == null ? matches : matches.filter(m => m.batting?.battingOrder === selectedPosition),
-    [matches, selectedPosition],
+    () => selectedPosition == null ? matchesForPitch : matchesForPitch.filter(m => m.batting?.battingOrder === selectedPosition),
+    [matchesForPitch, selectedPosition],
   )
 
   const tabMatches = useMemo(
@@ -294,6 +324,24 @@ export function PlayerStatsClient({
             <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold mb-1">Runs by Batting Position</h2>
             <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">Tap a position to filter the innings history below.</p>
             <BattingPositionChart data={positionData} selected={selectedPosition} onSelect={togglePosition} />
+          </div>
+        )}
+
+        {/* Pitch Type — narrows Innings History below only; hidden once a
+            Ground is already selected, same reasoning /leaderboard's own
+            tabs use for Tournament/Ground (features/leaderboard.md §6.2). */}
+        {showPitchTabs && (
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mr-1">Pitch</span>
+            {PITCH_TABS.map(t => (
+              <button key={t.key} onClick={() => setSelectedPitch(t.key)}
+                className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors
+                  ${selectedPitch === t.key
+                    ? 'bg-[var(--stats-badge-bg)] border-[var(--stats-badge-border)] text-[var(--stats-badge-text)]'
+                    : 'border-[var(--stats-card-border)] text-[var(--stats-text-muted)] hover:text-[var(--stats-text-2)]'}`}>
+                {t.label}
+              </button>
+            ))}
           </div>
         )}
 

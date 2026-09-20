@@ -1,4 +1,4 @@
-# Player Stats — Runs by Batting Position
+# Player Stats — Runs by Batting Position & Pitch Type Tabs
 
 **Spartans Hub · `/players/[id]/stats` · Added: September 2026**
 
@@ -24,6 +24,12 @@ itself is built from whatever match set those filters currently produce,
 and re-derives (dropping any active position selection) every time they
 change, since a position with matches under one filter combination may not
 exist at all under another.
+
+**Pitch Type tabs (added September 2026, see §9)** — a second, independent
+narrowing control directly above "Innings History": All / Matted / Astro /
+Turf, hidden whenever a Ground is already selected. Extends the identical
+tabs `/leaderboard`'s Detailed → Bat/Bowl tabs already ship
+(`features/leaderboard.md` §6.2) to this page.
 
 ---
 
@@ -228,6 +234,94 @@ role (headings, selected-filter labels, non-highlighted stat values), not
 just literal pill badges — its dark value (`#E8C97A`) is legible against
 the dark card background where the more muted `--stats-accent-dim`
 (`#7A6030` in dark) would not have been.
+
+---
+
+## 9. Pitch Type Tabs (added September 2026)
+
+An "All / Matted / Astro / Turf" tab row directly above the "Innings
+History" card, narrowing it the same way `selectedPosition` (§4) already
+does — extends the identical tabs already shipped on `/leaderboard`'s
+Detailed → Bat/Bowl tabs (`features/leaderboard.md` §6.2) to this page.
+Reuses `tournaments.pitch_type` (migration 079 — see
+`features/team-stats.md` §6), the same tournament-level classification
+Team Record and the leaderboard already read, rather than inventing a
+second signal.
+
+**Hidden whenever a Ground is already selected.** This page has no
+separate Tournament filter (only Ground), so "no location filter already
+narrowing the result" reduces to `groundId === 'all'` — the direct
+counterpart of the leaderboard's `tournamentId === 'all' && groundId ===
+'all'` gate. `showPitchTabs` in `PlayerStatsClient.tsx` gates both the
+tabs' visibility and whether the filter is actually applied, so a stale
+`selectedPitch` left over from before a Ground was picked can never
+silently keep filtering underneath a hidden control.
+
+**No "Not set" tab** — same All/Matted/Astro/Turf-only convention as
+`/leaderboard`'s tabs and Team Record's own Pitch Type *filter*. Most
+tournaments still have no `pitch_type` classified, so picking Matted/
+Astro/Turf can legitimately show a thin (or empty) Innings History —
+expected, not a bug.
+
+**Data — `getPlayerMatchHistory()` (`src/lib/playerStats.ts`)** widens its
+existing `bookings` select from `tournament:tournaments(name)` to
+`tournament:tournaments(name, pitch_type)` and adds `pitchType` to each
+returned row, resolved the same array-vs-object-embed way
+`tournamentName` already is. `PlayerMatchHistoryRow.pitchType: PitchType |
+null` (`src/types/index.ts`) is the new field — `null` when the match's
+booking couldn't be resolved, or its tournament has no surface classified
+yet. `GET /api/players/[id]/match-history` needed no changes at all, same
+"already forwards the result verbatim" story `battingOrder` had in §2 —
+the field reaches the client for free.
+
+**Purely client-side, no new fetch** — unlike `/leaderboard` (which
+re-renders server-side per filter tap), this page already holds its full
+`matches` array in client state (from the initial page load, or the most
+recent `fetchScoped()` re-fetch). `selectedPitch` is local component state
+filtering that already-fetched array, exactly like `selectedPosition`.
+
+**Only ever narrows Innings History — never the "Runs by Batting
+Position" chart above it.** `positionData` stays derived from `matches`
+directly, unaffected by `selectedPitch`, matching the "chart above stays
+unaffected, only the table narrows" convention `features/leaderboard.md`
+§6.2 established for the near-identical `battingPositionLeaders`/`rows`
+split there. The filtering chain is `matches` → `matchesForPitch`
+(pitch) → `matchesForPosition` (position) → `tabMatches` (stat tab) — pitch
+applied first since it sits visually above the position chart's own filter
+and is the coarser of the two, though the two are independent (a match can
+be excluded by either without affecting how the other is computed).
+
+**Reset alongside `selectedPosition`.** `fetchScoped()` sets
+`selectedPitch` back to `'all'` the moment any top-of-page filter changes
+(year/ground/format/captain/innings/practice) and pulls in a new match
+set — same rationale as `selectedPosition`'s own reset (§4): a pitch that
+had matches under the old filter combination may not exist at all under
+the new one, and changing Ground specifically is also what makes the tabs
+disappear, so there'd otherwise be a stale, invisible filter left active.
+
+**UI styling matches this page's own tab row** (`STAT_TABS`'
+Batting/Bowling/Fielding buttons), not `LeaderboardFilters.tsx`'s
+`pillClass()` — this page reads every colour via `var(--stats-*)` with no
+`dark:` Tailwind pairs at all (§8's theming pattern), so a second styling
+convention borrowed from the leaderboard's own `dark:`-paired pills would
+have been visually inconsistent within this one file.
+
+### Security (vibe-security)
+
+Same posture as §5 — read-only, no new write path, no new API route.
+`pitchType` is scoped identically to every other field already returned by
+`GET /api/players/[id]/match-history`. `selectedPitch` is pure client-side
+UI state narrowing an already-fetched, already-authorized array; nothing
+about it is ever sent back to the server.
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/components/players/PlayerStatsClient.tsx` | `PITCH_TABS`, `selectedPitch`/`showPitchTabs` state, `matchesForPitch` derivation, the Pitch Type tab row above Innings History |
+| `src/lib/playerStats.ts` | `getPlayerMatchHistory()` — now also selects `tournament.pitch_type` and includes `pitchType` per match |
+| `src/types/index.ts` | `PlayerMatchHistoryRow.pitchType` |
+| `src/app/api/players/[id]/match-history/route.ts` | Unchanged — already forwards `getPlayerMatchHistory()`'s result verbatim |
 
 ---
 
