@@ -99,11 +99,17 @@ describe('splitBy', () => {
     expect(rows.find(r => r.key === 'unset')?.played).toBe(4)
     expect(rows.find(r => r.key === 'Turf')?.played).toBe(1)
   })
-  it('puts a toss-winning match in both the outcome and decision buckets', () => {
+  it('buckets each match into exactly one of the four won/lost × bat/field toss groups', () => {
+    // 01-04 & 02-15 default to tossWon:true/battedFirst:true → toss-won-bat.
+    // 01-11 is tossWon:false/battedFirst:false → toss-lost-field.
+    // 02-01 is tossWon:true/battedFirst:false → toss-won-field.
+    // 02-08 has no toss data at all and belongs to no group.
     const rows = splitBy(sample, 'toss')
-    expect(rows.map(r => r.key)).toEqual(['toss-won', 'toss-lost', 'chose-bat', 'chose-field'])
-    expect(rows.find(r => r.key === 'toss-won')!.played).toBe(3)
-    expect(rows.find(r => r.key === 'chose-field')!.played).toBe(1)
+    expect(rows.map(r => r.key)).toEqual(['toss-won-bat', 'toss-won-field', 'toss-lost-field'])
+    expect(rows.reduce((n, r) => n + r.played, 0)).toBe(4) // no double-counting
+    expect(rows.find(r => r.key === 'toss-won-bat')!.played).toBe(2)
+    expect(rows.find(r => r.key === 'toss-won-field')!.played).toBe(1)
+    expect(rows.find(r => r.key === 'toss-lost-field')!.played).toBe(1)
   })
   it('drops matches with no toss data from the innings split', () => {
     const rows = splitBy(sample, 'innings')
@@ -192,8 +198,9 @@ describe('splitByNested', () => {
     const sub = rows[0].sub!
     // splitByNested groups whatever it is given — practice exclusion is
     // applyFilters' job upstream, so all five sample matches are in play.
-    expect(sub.find(r => r.key === 'toss-won')).toMatchObject({ played: 3, won: 3 })
-    expect(sub.find(r => r.key === 'toss-lost')).toMatchObject({ played: 1, lost: 1 })
+    expect(sub.find(r => r.key === 'toss-won-bat')).toMatchObject({ played: 2, won: 2 })
+    expect(sub.find(r => r.key === 'toss-won-field')).toMatchObject({ played: 1, won: 1 })
+    expect(sub.find(r => r.key === 'toss-lost-field')).toMatchObject({ played: 1, lost: 1 })
     // Sub-rows only ever cover the parent's own matches.
     for (const r of sub) for (const match of r.matches) {
       expect(rows[0].matches.map(x => x.bookingId)).toContain(match.bookingId)

@@ -253,8 +253,8 @@ export function slotLabel(t: string): string {
   return `${h12}:${String(m).padStart(2, '0')} ${period}`
 }
 
-// A match can belong to zero groups (e.g. no toss data), one group, or —
-// only for `toss`, which is really two questions at once — more than one.
+// A match belongs to zero groups (e.g. no toss/innings data) or exactly
+// one — every dimension, including `toss`, is mutually exclusive.
 function groupsFor(m: TeamMatch, dim: SplitDimension): { key: string; label: string; meta?: SplitRow['meta'] }[] {
   switch (dim) {
     case 'tournament':
@@ -279,12 +279,17 @@ function groupsFor(m: TeamMatch, dim: SplitDimension): { key: string; label: str
         ? [{ key: 'defending', label: 'Batted first (defending)' }]
         : [{ key: 'chasing',   label: 'Batted second (chasing)' }]
     case 'toss': {
-      if (m.tossWon === null) return []
-      const out = [{ key: m.tossWon ? 'toss-won' : 'toss-lost', label: m.tossWon ? 'Won the toss' : 'Lost the toss' }]
-      if (m.tossWon && m.tossDecision) {
-        out.push({ key: `chose-${m.tossDecision}`, label: m.tossDecision === 'bat' ? 'Won toss & chose to bat' : 'Won toss & chose to field' })
-      }
-      return out
+      // Standardised to the four real, mutually-exclusive outcomes a toss
+      // can produce — won/lost crossed with batted/fielded first — instead
+      // of the old "won the toss" / "lost the toss" / "chose to bat" /
+      // "chose to field" scheme, which put a toss-winning match in two
+      // buckets at once (its outcome bucket AND its decision bucket) with
+      // nothing on screen showing they were the same match. See
+      // features/team-stats.md §2.
+      if (m.tossWon === null || m.battedFirst === null) return []
+      const key = `toss-${m.tossWon ? 'won' : 'lost'}-${m.battedFirst ? 'bat' : 'field'}`
+      const label = `${m.tossWon ? 'Won' : 'Lost'} the toss & ${m.battedFirst ? 'batted' : 'fielded'} first`
+      return [{ key, label }]
     }
     case 'year':
       return [{ key: m.gameDate.slice(0, 4), label: m.gameDate.slice(0, 4) }]
@@ -320,8 +325,9 @@ export function splitBy(matches: TeamMatch[], dim: SplitDimension): SplitRow[] {
   }
   // Chronological/fixed-sequence dimensions keep their own natural order
   // (a season reads newest-first, a toss outcome reads
-  // won-then-lost-then-the-two-decisions); everything else ranks by Win %
-  // descending — the number this whole page exists to answer — with
+  // won-bat, won-field, lost-bat, lost-field — TOSS_ORDER); everything
+  // else ranks by Win % descending — the number this whole page exists to
+  // answer — with
   // Played descending, then alphabetical, as tie-breaks. Marquee opponents
   // still pin to the top of the Opponent split ahead of any of that.
   rows.sort((a, b) => {
@@ -340,7 +346,7 @@ export function splitBy(matches: TeamMatch[], dim: SplitDimension): SplitRow[] {
   })
   return rows
 }
-const TOSS_ORDER = ['toss-won', 'toss-lost', 'chose-bat', 'chose-field']
+const TOSS_ORDER = ['toss-won-bat', 'toss-won-field', 'toss-lost-bat', 'toss-lost-field']
 
 // Two-dimension split: group by `dim`, then group each group's own matches
 // by `then` — e.g. captain, then toss. Deliberately capped at two levels:
@@ -350,10 +356,10 @@ const TOSS_ORDER = ['toss-won', 'toss-lost', 'chose-bat', 'chose-field']
 // `then` equal to `dim`, or absent, gives a plain single-level split, so a
 // caller can pass whatever the URL says without checking first.
 //
-// Note the sub-rows of a `toss` sub-split can sum to more than their
-// parent's P — the toss dimension deliberately puts a toss-winning match
-// in both a "Won the toss" and a "Won toss & chose to …" bucket, exactly
-// as it does at the top level.
+// Every dimension's groups are mutually exclusive (see groupsFor() above),
+// so a sub-split's rows always sum back to exactly their parent's P — a
+// match with no data for the second dimension (e.g. no toss data) is
+// simply absent from every sub-row instead of double-counted anywhere.
 export function splitByNested(matches: TeamMatch[], dim: SplitDimension, then?: SplitDimension | null): SplitRow[] {
   const rows = splitBy(matches, dim)
   if (!then || then === dim) return rows
