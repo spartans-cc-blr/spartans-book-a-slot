@@ -7,6 +7,14 @@ interface SquadRef {
   player_id:      string
   player_name:    string
   cricheroes_url: string | null
+  // Match-specific role designations (squad.is_captain/is_vc/is_wk — the
+  // per-match record, not players.is_captain, see
+  // features/squad-selection.md §3). Optional: not every caller of
+  // ScorecardTables fetches these, and a squad row missing them just shows
+  // no role tag, same as a squad-less match shows no tag at all.
+  is_captain?:    boolean
+  is_vc?:         boolean
+  is_wk?:         boolean
 }
 
 // Analytics DB field names aren't part of this repo's schema, so every
@@ -49,6 +57,38 @@ function findPlayerId(row: any, name: string, squad?: SquadRef[]): string | null
   }
   const byName = squad.find(p => p.player_name?.trim().toLowerCase() === name?.trim().toLowerCase())
   return byName?.player_id ?? null
+}
+
+// Same resolution order as findPlayerId/findCricHeroesUrl — returns the
+// full squad row (not just an id) so its role flags can be read.
+function findSquadMember(row: any, name: string, squad?: SquadRef[]): SquadRef | null {
+  if (!squad) return null
+  const playerId = pickField(row, ['player_id'])
+  if (playerId) {
+    const byId = squad.find(p => p.player_id === playerId)
+    if (byId) return byId
+  }
+  const byName = squad.find(p => p.player_name?.trim().toLowerCase() === name?.trim().toLowerCase())
+  return byName ?? null
+}
+
+// Match-specific role tag rendered next to a player's name wherever it
+// appears in the scorecard — "(C)", "(WK)", or, when a player holds more
+// than one role for this match, all of them combined into one tag, e.g.
+// "(C, WK)" for a player who is both match captain and wicket-keeper.
+function roleLabel(member: SquadRef | null): string | null {
+  if (!member) return null
+  const tags: string[] = []
+  if (member.is_captain) tags.push('C')
+  if (member.is_vc) tags.push('VC')
+  if (member.is_wk) tags.push('WK')
+  return tags.length > 0 ? `(${tags.join(', ')})` : null
+}
+
+function RoleTag({ member }: { member: SquadRef | null }) {
+  const label = roleLabel(member)
+  if (!label) return null
+  return <span className="text-[var(--scorecard-text-faint)] font-normal"> {label}</span>
 }
 
 // catches + caught_behind (keeper catches are stored separately from
@@ -188,6 +228,7 @@ export function ScorecardTables({
                   <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                     <td className="text-right py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                      <RoleTag member={findSquadMember(row, name, squad)} />
                     </td>
                     <td className="text-center px-1">{runs}</td>
                     <td className="text-center px-1">{num(row, ['balls', 'balls_faced'])}</td>
@@ -211,6 +252,7 @@ export function ScorecardTables({
               return (
                 <span key={name}>
                   <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                  <RoleTag member={findSquadMember(row, name, squad)} />
                   {i < didNotBatRows.length - 1 ? ',' : ''}
                 </span>
               )
@@ -260,7 +302,13 @@ export function ScorecardTables({
                           // No separate "(out)" marker either: the next row
                           // down already carries the survivor forward, so
                           // which of this row's two names was dismissed is
-                          // readable from the sequence itself.
+                          // readable from the sequence itself. Same reason
+                          // the C/VC/WK role tag shown next to a name in
+                          // every other table (RoleTag, above) is
+                          // deliberately left off here — two names already
+                          // squeeze into this bar; a role tag on top would
+                          // push it back into the same truncation problem
+                          // this first-name-only change fixed.
                           return (
                             <span key={i}>
                               {i > 0 && ' & '}
@@ -321,6 +369,7 @@ export function ScorecardTables({
                   <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                     <td className="text-right py-1 pr-2">
                       <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                      <RoleTag member={findSquadMember(row, name, squad)} />
                     </td>
                     <td className="text-center px-1">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
                     <td className="text-center px-1">{num(row, ['dots'])}</td>
@@ -371,6 +420,7 @@ export function ScorecardTables({
                     <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                       <td className="text-right py-1 pr-2">
                         <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                        <RoleTag member={findSquadMember(row, name, squad)} />
                       </td>
                       <td className="text-center px-1">{catches}</td>
                       <td className="text-center px-1">{stumpings}</td>

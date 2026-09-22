@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { redirect, notFound } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 import { isPastMatch } from '@/lib/matchStatus'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { BackButton } from '@/components/ui/BackButton'
@@ -11,16 +12,24 @@ import { MatchVerifyBlock } from '@/components/matches/MatchVerifyBlock'
 import { NotifyIcon, VerifiedStatusLine } from '@/components/matches/ScorecardVerifyPanel'
 import { BallIcon } from '@/components/matches/BallIcon'
 import { ResultBadge } from '@/components/shared/ResultBadge'
+import {
+  deriveBattedFirst, buildTossLine, buildOrderedScoreLine, computeMatchMargin, formatMarginLine,
+  normaliseMatchResultKind,
+} from '@/lib/matchResultDisplay'
 
 export const revalidate = 0
 
+// Orders the two innings by who actually batted first — see
+// matchResultDisplay.ts.
 function scoreLine(stats: {
   team_total: number | null; team_wickets: number | null; team_overs: number | null
   opponent_total: number | null; opponent_wickets: number | null; opponent_overs: number | null
-}): string {
-  const own = `${stats.team_total ?? '—'}/${stats.team_wickets ?? '—'} (${stats.team_overs ?? '—'} ov)`
-  const opp = `${stats.opponent_total ?? '—'}/${stats.opponent_wickets ?? '—'} (${stats.opponent_overs ?? '—'} ov)`
-  return `${own} vs ${opp}`
+}, battedFirst: boolean | null): string {
+  return buildOrderedScoreLine(
+    battedFirst,
+    stats.team_total, stats.team_wickets, stats.team_overs,
+    stats.opponent_total, stats.opponent_wickets, stats.opponent_overs,
+  )
 }
 
 function formatDate(dateStr: string): string {
@@ -76,10 +85,12 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   const ground = ownGround ?? (tournament?.ground ? (Array.isArray(tournament.ground) ? tournament.ground[0] ?? null : tournament.ground) : null)
   const ballType = (tournament?.ball_type as any) ?? 'red'
 
-  const [{ data: squadRows }, statsRes, uploadRes] = await Promise.all([
+  const analytics = createAnalyticsClient()
+
+  const [{ data: squadRows }, statsRes, uploadRes, tossRes] = await Promise.all([
     supabase
       .from('squad')
-      .select('player_id, is_captain, is_vc, players(name, cricheroes_url)')
+      .select('player_id, is_captain, is_vc, is_wk, players(name, cricheroes_url)')
       .eq('booking_id', booking.id),
     booking.match_id
       ? supabase
@@ -98,16 +109,27 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
       .select('status, verified, needs_reconciliation, reconciliation_note, reconciliation_flagged_by, reconciliation_flagged_at')
       .eq('booking_id', booking.id)
       .maybeSingle(),
+    // Toss — the analytics DB's own match_stats table, never
+    // match_stats_cache (see features/team-stats.md §2). Missing entirely
+    // when no analytics client is configured, or no toss synced yet.
+    booking.match_id && analytics
+      ? analytics.from('match_stats').select('toss_won, toss_decision').eq('match_id', booking.match_id).maybeSingle()
+      : Promise.resolve({ data: null as { toss_won: string | null; toss_decision: string | null } | null }),
   ])
 
   const squad = (squadRows ?? []).map((r: any) => ({
     player_id:      r.player_id,
     player_name:    r.players?.name ?? 'Unknown',
     cricheroes_url: r.players?.cricheroes_url ?? null,
+    is_captain:     r.is_captain,
+    is_vc:          r.is_vc,
+    is_wk:          r.is_wk,
   }))
 
   const stats = statsRes.data
   const upload = uploadRes.data
+  const battedFirst = deriveBattedFirst(tossRes.data?.toss_won, tossRes.data?.toss_decision)
+  const tossLine = buildTossLine(tossRes.data?.toss_won, tossRes.data?.toss_decision)
 
   const { data: flagger } = upload?.reconciliation_flagged_by
     ? await supabase.from('players').select('name').eq('id', upload.reconciliation_flagged_by).maybeSingle()
@@ -141,6 +163,12 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
   const eligibleToVerify = !!upload && ['synced', 'fees_applied'].includes(upload.status) && !upload.needs_reconciliation
   const showVerifyBlock = !upload?.verified && canAct && (upload?.needs_reconciliation || eligibleToVerify)
+
+  const resultKind = normaliseMatchResultKind(stats?.match_result ?? null)
+  const margin = stats
+    ? computeMatchMargin(resultKind, battedFirst, stats.team_total, stats.team_wickets, stats.opponent_total, stats.opponent_wickets)
+    : null
+  const marginLine = formatMarginLine(resultKind, margin)
 
   return (
     <>
@@ -202,10 +230,16 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
           {stats && (
             <div className="flex flex-col gap-1 mb-1">
+              {tossLine && (
+                <span className="text-[10px]" style={{ color: 'var(--scorecard-text-faint)' }}>{tossLine}</span>
+              )}
               <div className="flex items-center gap-2">
                 {stats.match_result && <ResultBadge result={stats.match_result} />}
-                <span className="text-xs" style={{ color: 'var(--scorecard-text-muted)' }}>{scoreLine(stats)}</span>
+                <span className="text-xs" style={{ color: 'var(--scorecard-text-muted)' }}>{scoreLine(stats, battedFirst)}</span>
               </div>
+              {marginLine && (
+                <span className="text-[10px] font-semibold" style={{ color: 'var(--scorecard-text-muted)' }}>{marginLine}</span>
+              )}
               {topPerformance && (topPerformance.top_bat || topPerformance.top_bowl) && (
                 <div className="flex flex-wrap gap-2.5 text-[10px]" style={{ color: 'var(--scorecard-text-faint)' }}>
                   {topPerformance.top_bat && (

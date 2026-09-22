@@ -1837,6 +1837,130 @@ about the divider is different from the original pre-theming design.
 
 ---
 
+## 17. Toss line, batting-order score line, match-margin line, and match-specific role tags (added September 2026)
+
+Three small, related additions to the result strip shown above a synced
+scorecard (`MatchHistoryCard` on `/matches/history` and the standalone
+`/matches/history/[bookingId]` page), plus one addition to `ScorecardTables`
+itself — all sourced from data this feature already fetches, no new upload
+or sync step.
+
+### 17.1 Shared logic — `src/lib/matchResultDisplay.ts`
+
+A small, pure, client-safe module (no server imports) with the toss-line,
+score-ordering, and margin-line derivations, used by both the list card and
+the standalone page so the two surfaces can't drift on wording:
+
+- **`buildTossLine(tossWon, tossDecision)`** — "Spartans CC won the toss
+  and elected to bat/field" when we won it, or "Spartans CC lost the toss
+  and was put in to bat/field" when we didn't (the opposite of what the
+  actual toss winner — the opponent — chose, since a toss decision is
+  always framed as the winner's own action). `null` without toss data.
+- **`buildOrderedScoreLine(battedFirst, ...)`** — the two innings shown
+  **in batting order** (whoever batted first, then whoever chased), rather
+  than always leading with our own score. Falls back to the pre-existing
+  own-first order when `battedFirst` can't be derived (no toss synced yet).
+- **`computeMatchMargin(result, battedFirst, ...)`** /
+  **`formatMarginLine(result, margin)`** — "Won by N runs"/"Won by N
+  wickets"/"Lost by N runs"/"Lost by N wickets"/"Match tied", mirroring
+  `src/lib/teamStatsCore.ts`'s existing `winMargin()` for a win (defending
+  a total is a runs margin, chasing successfully is a wickets margin) and
+  extending the identical logic symmetrically for a loss (the opponent
+  chasing us down is a wickets margin *for them*; us falling short of a
+  chase is a runs margin). `null` for a no-result or when the underlying
+  scores/toss data aren't available.
+- **`deriveBattedFirst`** / **`normaliseMatchResultKind`** — the same
+  toss-derivation and result-string-normalisation `src/lib/playerStats.ts`'s
+  `deriveBattedFirst()` and `src/lib/teamStatsCore.ts`'s `normaliseResult()`
+  already use, kept as small local copies (per this file's own established
+  convention — see `src/lib/teamStats.ts`'s inline toss derivation) rather
+  than importing either of those larger, differently-scoped modules.
+
+Unit-tested end to end (`matchResultDisplay.test.ts`) — every toss/win/loss/
+tie combination, plus the "no toss data" and "no result" fallbacks.
+
+### 17.2 Where toss is fetched from
+
+Neither `match_stats_cache` (Hub DB) nor the list/detail routes previously
+fetched toss at all — `features/team-stats.md` §2 already documents that
+toss is deliberately **not** copied into `match_stats_cache`, and is read
+live from the analytics DB's own `match_stats.toss_won`/`toss_decision`
+columns instead, same as Team Record and the Defending/Chasing filters
+already do.
+
+- **`GET /api/matches/history`** (the list route) now also selects
+  `bookings.match_id` and, once the page's bookings are resolved, does one
+  batched `analytics.from('match_stats').select('match_id, toss_won,
+  toss_decision').in('match_id', matchIds)` call (via
+  `createAnalyticsClient()`) — a single unchunked `.in()`, since a page is
+  at most `limit + TODAY_SLOT_BUFFER` (≤54) bookings, well under any
+  chunking concern elsewhere in this codebase. `summarizeStats()` now takes
+  the resolved toss row as a second argument and includes
+  `toss_won`/`toss_decision` in each card's `stats` payload. Missing
+  entirely (no analytics client configured, or no toss synced for that
+  match) just omits the toss line for that card, same as any other
+  not-yet-synced field.
+- **`/matches/history/[bookingId]/page.tsx`** (the standalone page) fetches
+  the same two columns for its one `match_id`, in the same `Promise.all` as
+  its other reads (squad, match_stats_cache, scorecard_uploads).
+
+### 17.3 Rendering
+
+Both surfaces show, top to bottom: the toss line (small, muted) → the
+result badge + ordered score line → the margin line (small, muted, bold) →
+the existing top-bat/top-bowl summary. Any of the three new lines is simply
+omitted when its inputs aren't available (no toss synced yet, or a
+no-result match) — nothing renders an empty placeholder.
+
+### 17.4 Match-specific role tags in `ScorecardTables`
+
+`ScorecardTables.tsx`'s `SquadRef` gained three optional fields —
+`is_captain`/`is_vc`/`is_wk` (the per-match `squad` designation, not
+`players.is_captain` — see `features/squad-selection.md` §3). A new
+`RoleTag` component renders `(C)`/`(VC)`/`(WK)`, or every role a player
+holds for this one match combined into a single tag (e.g. `(C, WK)` for a
+player who is both match captain and wicket-keeper), next to their name in
+the Batting, Bowling, and Fielding tables and the "Did not bat" line.
+Resolved via `findSquadMember()` — the same player_id-then-name resolution
+order `findPlayerId()`/`findCricHeroesUrl()` already use — so a squad-less
+match or an unreconciled scorecard row simply shows no tag, same as it
+already shows no CricHeroes link.
+
+**Deliberately left off the Partnerships bar chart.** That bar already
+shortens both names to first-name-only and drops the wicket's own "(out)"
+marker purely for space (see that section's own comment) — a two-name bar
+already at its limit is the wrong place to add a third piece of text.
+
+**Callers already fetching the roles get this for free.** The standalone
+page's own squad select was widened from `is_captain, is_vc` to also
+include `is_wk` (it already had the first two, for the verify/flag
+`canAct` check) — the list card's `MatchHistoryClient.tsx` and the admin
+Post-Match panel's scorecard preview (`/admin/bookings/[id]`) already
+fetched all three via their own existing squad queries, so both picked up
+role tags with no changes beyond `ScorecardTables` itself.
+
+### 17.5 Security (vibe-security)
+
+Purely additive, read-only display logic — no new write path, no new
+client-reachable input. The toss fetch reuses the existing
+`ANALYTICS_SUPABASE_KEY` service-role analytics client already used
+throughout this feature (never exposed to the browser); the role tags read
+data already returned by each page's existing, already-authorized squad
+query. No new access surface introduced anywhere in this section.
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/lib/matchResultDisplay.ts` | `buildTossLine()`, `buildOrderedScoreLine()`, `computeMatchMargin()`/`formatMarginLine()`, `deriveBattedFirst()`, `normaliseMatchResultKind()` — pure, client-safe (§17.1) |
+| `src/lib/matchResultDisplay.test.ts` | Unit coverage for every toss/win/loss/tie combination |
+| `src/app/api/matches/history/route.ts` | Selects `bookings.match_id`; batched analytics toss fetch; `summarizeStats()` now includes `toss_won`/`toss_decision` (§17.2) |
+| `src/components/matches/MatchHistoryClient.tsx` | `StatsSummary.toss_won`/`toss_decision`; result strip renders the toss/ordered-score/margin lines (§17.3) |
+| `src/app/matches/history/[bookingId]/page.tsx` | Analytics toss fetch for the single `match_id`; squad select widened to include `is_wk`; result strip renders the toss/ordered-score/margin lines (§17.2/§17.3) |
+| `src/components/matches/ScorecardTables.tsx` | `SquadRef.is_captain`/`is_vc`/`is_wk`, `findSquadMember()`, `roleLabel()`, `RoleTag` — rendered next to a name in Batting/Bowling/Fielding/Did-not-bat, deliberately omitted from the Partnerships bar (§17.4) |
+
+---
+
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*
 *Security audit: vibe-security patterns applied per SKILL.md*
 *Analytics pipeline: `spartans-python` repo (Render) · Hub: `spartans-book-a-slot` repo (Vercel)*

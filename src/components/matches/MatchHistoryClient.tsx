@@ -14,6 +14,10 @@ import { PerformerShareButton, type TopPerformerInfo } from '@/components/matche
 import { BallIcon, type BallType } from '@/components/matches/BallIcon'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
 import { groupDatesIntoChips } from '@/lib/dateChipGroups'
+import {
+  deriveBattedFirst, buildTossLine, buildOrderedScoreLine, computeMatchMargin, formatMarginLine,
+  normaliseMatchResultKind,
+} from '@/lib/matchResultDisplay'
 
 interface Ground {
   name:          string
@@ -29,6 +33,11 @@ interface StatsSummary {
   opponent_total:   number | null
   opponent_wickets: number | null
   opponent_overs:   number | null
+  // Analytics DB's own toss_won ('Y'/'N', relative to our team)/
+  // toss_decision ('bat'/'field') — see matchResultDisplay.ts. Null when no
+  // toss data has been synced for this match yet.
+  toss_won:      string | null
+  toss_decision: string | null
   top_bat:  { name: string; runs: number; balls: number } | null
   top_bowl: { name: string; wickets: number; runs: number; overs: number } | null
 }
@@ -188,10 +197,15 @@ function ScorecardSyncIndicator({ status }: { status: ScorecardStatus }) {
   )
 }
 
+// Orders the two innings by who actually batted first (see
+// matchResultDisplay.ts) rather than always leading with our own score.
 function scoreLine(stats: StatsSummary): string {
-  const own = `${stats.team_total ?? '—'}/${stats.team_wickets ?? '—'} (${stats.team_overs ?? '—'} ov)`
-  const opp = `${stats.opponent_total ?? '—'}/${stats.opponent_wickets ?? '—'} (${stats.opponent_overs ?? '—'} ov)`
-  return `${own} vs ${opp}`
+  const battedFirst = deriveBattedFirst(stats.toss_won, stats.toss_decision)
+  return buildOrderedScoreLine(
+    battedFirst,
+    stats.team_total, stats.team_wickets, stats.team_overs,
+    stats.opponent_total, stats.opponent_wickets, stats.opponent_overs,
+  )
 }
 
 export function MatchHistoryClient({
@@ -817,13 +831,31 @@ function MatchHistoryCard({
 
       {/* Result strip — only once stats have been synced. This is the
           headline of a completed match, so it gets the bordered/prominent
-          treatment — a passive "stats synced" note should never outshine it. */}
-      {match.stats && (
+          treatment — a passive "stats synced" note should never outshine it.
+          Toss line above the score, margin line below it — see
+          matchResultDisplay.ts and features/post-match-scorecard.md §17. */}
+      {match.stats && (() => {
+        const battedFirst = deriveBattedFirst(match.stats.toss_won, match.stats.toss_decision)
+        const tossLine = buildTossLine(match.stats.toss_won, match.stats.toss_decision)
+        const resultKind = normaliseMatchResultKind(match.stats.match_result)
+        const margin = computeMatchMargin(
+          resultKind, battedFirst,
+          match.stats.team_total, match.stats.team_wickets,
+          match.stats.opponent_total, match.stats.opponent_wickets,
+        )
+        const marginLine = formatMarginLine(resultKind, margin)
+        return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {tossLine && (
+              <span style={{ fontSize: '10px', color: 'var(--scorecard-text-faint)' }}>{tossLine}</span>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {match.stats.match_result && <ResultBadge result={match.stats.match_result} />}
               <span style={{ fontSize: '11px', color: 'var(--scorecard-text-muted)' }}>{scoreLine(match.stats)}</span>
             </div>
+            {marginLine && (
+              <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--scorecard-text-muted)' }}>{marginLine}</span>
+            )}
             {(match.stats.top_bat || match.stats.top_bowl) && (
               <div style={{ fontSize: '10px', color: 'var(--scorecard-text-faint)', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                 {match.stats.top_bat && (
@@ -838,7 +870,8 @@ function MatchHistoryCard({
               </div>
             )}
           </div>
-      )}
+        )
+      })()}
 
       {/* Only the actionable states render here — no upload yet, or a stuck
           pending_parse needing retry. Once a status is confirmed (parsed,
