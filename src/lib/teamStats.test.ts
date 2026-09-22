@@ -65,16 +65,29 @@ describe('applyFilters', () => {
     expect(applyFilters(sample, { includePractice: true }).length).toBe(5)
   })
   it('filters by innings, stage, format and year', () => {
-    expect(applyFilters(sample, { innings: 'chasing' }).map(x => x.gameDate)).toEqual(['2026-01-11', '2026-02-01'])
-    expect(applyFilters(sample, { stage: 'knockout' }).length).toBe(1)
-    expect(applyFilters(sample, { includePractice: true, format: 'T30' }).length).toBe(1)
-    expect(applyFilters(sample, { year: 2025 }).length).toBe(0)
+    expect(applyFilters(sample, { innings: ['chasing'] }).map(x => x.gameDate)).toEqual(['2026-01-11', '2026-02-01'])
+    expect(applyFilters(sample, { stage: ['knockout'] }).length).toBe(1)
+    expect(applyFilters(sample, { includePractice: true, format: ['T30'] }).length).toBe(1)
+    expect(applyFilters(sample, { year: [2025] }).length).toBe(0)
   })
   it('filters by pitch type', () => {
     const withPitch = [...sample, m({ gameDate: '2026-03-01', pitchType: 'Turf' })]
-    expect(applyFilters(withPitch, { pitch: 'Turf' }).length).toBe(1)
-    expect(applyFilters(withPitch, { pitch: 'Matted' }).length).toBe(0)
-    expect(applyFilters(withPitch, {}).length).toBe(5) // pitch: 'all'/absent doesn't restrict, practice still excluded
+    expect(applyFilters(withPitch, { pitch: ['Turf'] }).length).toBe(1)
+    expect(applyFilters(withPitch, { pitch: ['Matted'] }).length).toBe(0)
+    expect(applyFilters(withPitch, {}).length).toBe(5) // pitch: []/absent doesn't restrict, practice still excluded
+  })
+  // Multi-select (added September 2026) — several selected values on the
+  // same dimension OR together, matching how a checkbox list reads: "show
+  // me any of these", not "show me only this one".
+  it('multi-select ORs several values on the same dimension', () => {
+    expect(applyFilters(sample, { stage: ['knockout', 'league'] }).length).toBe(4) // every non-practice match
+    expect(applyFilters(sample, { includePractice: true, format: ['T20', 'T30'] }).length).toBe(5)
+    const withPitch = [...sample, m({ gameDate: '2026-03-01', pitchType: 'Turf' }), m({ gameDate: '2026-03-08', pitchType: 'Matted' })]
+    expect(applyFilters(withPitch, { pitch: ['Turf', 'Matted'] }).map(x => x.gameDate)).toEqual(['2026-03-01', '2026-03-08'])
+  })
+  it('an empty array is the same as the filter being absent — no restriction', () => {
+    expect(applyFilters(sample, { stage: [] }).length).toBe(applyFilters(sample, {}).length)
+    expect(applyFilters(sample, { toss: [] }).length).toBe(applyFilters(sample, {}).length)
   })
 })
 
@@ -138,33 +151,41 @@ describe('splitBy', () => {
 
 describe('applyFilters — toss / captain / month / slot', () => {
   it('filters by toss outcome, dropping matches with no toss data', () => {
-    expect(applyFilters(sample, { toss: 'won' }).map(x => x.gameDate)).toEqual(['2026-01-04', '2026-02-01'])
-    expect(applyFilters(sample, { toss: 'lost' }).map(x => x.gameDate)).toEqual(['2026-01-11'])
+    expect(applyFilters(sample, { toss: ['won'] }).map(x => x.gameDate)).toEqual(['2026-01-04', '2026-02-01'])
+    expect(applyFilters(sample, { toss: ['lost'] }).map(x => x.gameDate)).toEqual(['2026-01-11'])
     // The 8 Feb no-toss match is in neither, and the 15 Feb one is
     // practice (excluded by default) — so neither side ever sees it.
-    expect(applyFilters(sample, { toss: 'won' }).some(x => x.gameDate === '2026-02-08')).toBe(false)
+    expect(applyFilters(sample, { toss: ['won'] }).some(x => x.gameDate === '2026-02-08')).toBe(false)
   })
 
   it('filters by captain, month and slot time', () => {
     const withOther = [...sample, m({ gameDate: '2026-03-01', slotTime: '14:30', captainId: 'p2', captainName: 'Keshav' })]
-    expect(applyFilters(withOther, { captainKey: 'p2' }).map(x => x.gameDate)).toEqual(['2026-03-01'])
-    expect(applyFilters(withOther, { month: '2026-01' }).map(x => x.gameDate)).toEqual(['2026-01-04', '2026-01-11'])
-    expect(applyFilters(withOther, { slotTime: '14:30' }).map(x => x.gameDate)).toEqual(['2026-03-01'])
-    expect(applyFilters(withOther, { slotTime: '07:30' })).toHaveLength(4)
+    expect(applyFilters(withOther, { captainKey: ['p2'] }).map(x => x.gameDate)).toEqual(['2026-03-01'])
+    expect(applyFilters(withOther, { month: ['2026-01'] }).map(x => x.gameDate)).toEqual(['2026-01-04', '2026-01-11'])
+    expect(applyFilters(withOther, { slotTime: ['14:30'] }).map(x => x.gameDate)).toEqual(['2026-03-01'])
+    expect(applyFilters(withOther, { slotTime: ['07:30'] })).toHaveLength(4)
   })
 
   it('buckets a booking with no recorded captain under "unknown"', () => {
     const noCaptain = m({ gameDate: '2026-04-01', captainId: null, captainName: null })
     expect(captainKey(noCaptain)).toBe('unknown')
-    expect(applyFilters([...sample, noCaptain], { captainKey: 'unknown' })).toHaveLength(1)
+    expect(applyFilters([...sample, noCaptain], { captainKey: ['unknown'] })).toHaveLength(1)
   })
 
   it('combines a filter with a split — the two-dimension case', () => {
     // "How does each captain do after winning the toss": filter one, split
     // the other. See features/team-stats.md §3.2.
-    const rows = splitBy(applyFilters(sample, { toss: 'won' }), 'captain')
+    const rows = splitBy(applyFilters(sample, { toss: ['won'] }), 'captain')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ label: 'Muthu', played: 2, won: 2, winPct: 100 })
+  })
+
+  it('multi-select ORs several captains/months/slots together', () => {
+    const withOther = [...sample, m({ gameDate: '2026-03-01', slotTime: '14:30', captainId: 'p2', captainName: 'Keshav' })]
+    expect(applyFilters(withOther, { captainKey: ['p1', 'p2'] }).length).toBe(withOther.filter(x => !x.isPractice).length)
+    expect(applyFilters(withOther, { month: ['2026-01', '2026-03'] }).map(x => x.gameDate)).toEqual(['2026-01-04', '2026-01-11', '2026-03-01'])
+    expect(applyFilters(withOther, { slotTime: ['07:30', '14:30'] }).length).toBe(withOther.filter(x => !x.isPractice).length)
+    expect(applyFilters(sample, { toss: ['won', 'lost'] }).map(x => x.gameDate)).toEqual(['2026-01-04', '2026-01-11', '2026-02-01'])
   })
 })
 

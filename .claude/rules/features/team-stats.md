@@ -209,11 +209,14 @@ follows Light/Dark/System like `/leaderboard`, `ui-theme.md`).
 `ground`, `opponent` (an `opponentKey()`), `captain` (a `captainKey()`),
 `slot` (`HH:MM`), `innings` (`defending`/`chasing`), `toss` (`won`/`lost`),
 `stage` (`league`/`knockout`), `practice=1`, `by` (the split dimension) and
-`then` (the second-level split, §3.2). Invalid/absent values fall back to
-"no restriction"; a `tournament`/`ground`/`opponent`/`captain`/`month`/
-`slot` value not present in the data falls back to "all" rather than
-rendering a `<select>` with no matching option. The URL shape lives
-in one pure module, `src/lib/teamStatsFilters.ts` (`TeamFilterState`,
+`then` (the second-level split, §3.2). **Every one of those (`by`/`then`
+excepted) is multi-select as of September 2026 (§3.8)** — the query value
+is a comma-separated list (`?tournament=t1,t2`), and a bare/single value
+still works unchanged (`?tournament=t1`). Invalid/unknown entries in a
+list are dropped individually rather than invalidating the whole param;
+an empty or fully-invalid list falls back to "no restriction" (year
+excepted — see §3.8/§3.5). The URL shape lives in one pure module,
+`src/lib/teamStatsFilters.ts` (`TeamFilterState`, `parseTeamFilterState()`,
 `buildTeamStatsHref()`, `toTeamFilters()`, `clearFilter()`, …), imported by
 both the Server Component and the client panel below so the two can never
 disagree on what a link means. Unit-tested in `teamStatsFilters.test.ts`.
@@ -229,9 +232,14 @@ round-trip. Reported with a screenshot the same day it shipped; replaced by
 
 - **Summary row** (all widths) — a "Filters · N" button plus one removable
   chip per active filter ("2026 ✕", "Thunder 5 ✕", "Practice included ✕")
-  and a "Clear all". Removing a chip navigates immediately. With nothing
-  applied it reads "All matches — no filters applied", so the current view
-  is always legible without opening anything.
+  and a "Clear all". Removing a chip clears every value checked for that
+  *dimension* (not just one) and navigates immediately — a dimension is
+  either filtered or it isn't, there's no per-value removal from the chip
+  row. With nothing applied it reads "All matches — no filters applied",
+  so the current view is always legible without opening anything. A
+  dimension with more than one value checked shows one chip whose label is
+  the first value's name plus a "+N more" count (§3.8), not one chip per
+  value.
 - **Desktop (`md+`)** — the panel is a persistent left aside (`sticky`,
   272px) beside the results; "‹ Hide" collapses it and the summary row's
   Filters button brings it back.
@@ -244,7 +252,9 @@ round-trip. Reported with a screenshot the same day it shipped; replaced by
 - **Progressive "+ Add filter"** inside the panel — the panel only shows
   the filters that are set; "+ Add filter" lists the rest (Season,
   Tournament, Ground, Opponent, Format, Defending / Chasing, League /
-  Knockout, Practice games), and picking one adds its row with a select.
+  Knockout, Practice games), and picking one adds its row with a checkbox
+  list (§3.8) — every dimension is multi-select, so a freshly-added row
+  starts with nothing checked rather than an "All …" option selected.
   Adding "Practice games" just means *include them* (there's no value to
   pick), so it toggles straight on.
 - **Staged, applied once.** Edits go into a local draft; the footer button
@@ -568,6 +578,18 @@ No change to the year `<select>` itself (`TeamFilterPanel.tsx`) — its "All
 time" option already existed and already set `state.year = 'all'`; only
 what a *bare* URL/absent value resolves to changed.
 
+> **Superseded by §3.8's multi-select rework.** Every `'all'` referenced
+> above as `state.year`'s internal value is now the empty array `[]` —
+> `year` became `string[]` along with every other filter field, and
+> `isFilterSet()` now checks `state.year.length > 0` rather than
+> `state.year !== 'all'`. Nothing about the *behaviour* described in this
+> section changed: `[]` still means "no restriction" internally, the URL
+> still spells an explicit all-time choice out as `?year=all` rather than
+> omitting it (for the identical round-tripping reason above), and the
+> default still resolves to `[currentTeamStatsYear()]` when the URL carries
+> no `year` param at all. Only the literal representation moved from a
+> sentinel string to a one-element (or empty) array; see §3.8.
+
 ### 3.6 Captain dimension restricted to captains, GC and admin (added September 2026)
 
 The Captain filter, split, and "then by" option let anyone compare
@@ -605,16 +627,19 @@ export function visibleSplitDimensions(canUseCaptainDimension: boolean): SplitDi
 **Server-side re-validation, not just a hidden UI control** — the same
 "UI mirrors the API, never replaces it" posture this app applies
 everywhere else (`wrangler-grounds-menu.md` §4, `fee-reminders.md` §6).
-`page.tsx` runs `by`/`then` against `visibleSplitDimensions(canUseCaptainDimension)`
+`parseTeamFilterState()` (`teamStatsFilters.ts`, called from `page.tsx` —
+see §3.8) runs `by`/`then` against `visibleSplitDimensions(canUseCaptainDimension)`
 instead of the raw `SPLIT_DIMENSIONS` list, so a non-privileged viewer
 hand-typing `?by=captain` or `?then=captain` falls back to the ordinary
 invalid-value behaviour (silently ignored, same as any other unrecognised
 value) rather than actually switching the split. The `captain` filter
-itself gets an extra `canUseCaptainDimension &&` guard alongside its
-existing "does this id exist in `options.captains`" check, so `?captain=<id>`
-is ignored the same way for a non-privileged viewer. There is no API route
-to bypass this through — `/team-stats` has no separate data endpoint, so
-`page.tsx`'s own `searchParams` handling is the entire surface.
+itself is resolved to `[]` outright when `!canUseCaptainDimension`, before
+its own "does this id exist in `options.captains`" check ever runs, so
+`?captain=<id>,<id2>` is ignored the same way for a non-privileged viewer
+regardless of how many ids are listed. There is no API route to bypass
+this through — `/team-stats` has no separate data endpoint, so
+`parseTeamFilterState()`'s handling of `page.tsx`'s `searchParams` is the
+entire surface.
 
 **Threaded down as a plain boolean prop, not re-derived client-side** —
 `TeamFilterShell`/`FilterPanelBody` and `SplitByRow` (`TeamFilterPanel.tsx`)
@@ -694,6 +719,87 @@ across two tables.
 embed widened to also select `total_league_games`, no new query. Every
 other caller of `TeamMatch` is unaffected; the field is simply carried
 along on each match like `isPractice`/`stageType` already are.
+
+### 3.8 Every filter is multi-select (added September 2026)
+
+Each of the panel's twelve filterable dimensions (§3) originally let a
+viewer pick exactly one value per dimension — a `<select>` per row, and a
+URL value that was a single id/enum string (or the `all` sentinel).
+Per a direct request, every dimension except `by`/`then` (the split
+pickers, which are inherently "choose one dimension to split by") is now
+multi-select: check any number of tournaments, opponents, captains,
+formats, etc., and a match counts if it matches *any* of the checked
+values on that dimension — an OR within a dimension, still ANDed across
+dimensions exactly as before.
+
+**Representation flip: "no restriction" is an empty array, not a string
+sentinel.** `TeamFilterState`'s twelve filter fields (`year`, `month`,
+`tournament`, `ground`, `pitch`, `opponent`, `captain`, `format`, `slot`,
+`innings`, `toss`, `stage`) all changed from a single string value
+(`'all' | <id>`) to `string[]` (each field's own array-element type, e.g.
+`PitchFilter[]`) — an unchecked checkbox list is `[]`, which means exactly
+what `'all'` used to mean. `isFilterSet()` correspondingly changed from
+`state[key] !== 'all'` to `state[key].length > 0`, and every other helper
+in `teamStatsFilters.ts` (`clearFilter`, `activeFilterKeys`,
+`filterValueLabel`, `buildTeamStatsHref`, `toTeamFilters`) was updated to
+match — see that file's own header comment. `TeamFilters` (the shape
+`applyFilters()` in `teamStatsCore.ts` consumes) changed the same way, one
+array per dimension; `applyFilters()`'s per-dimension checks became "is
+this match's value included in the filter's array" (`.includes()`/`.some()`)
+instead of strict equality, with an empty/absent array short-circuiting to
+"don't restrict" exactly as `'all'`/absent did before.
+
+**`year` keeps its special default, now as an array of one.** Team Record
+still pre-filters to the current season by default (§3.5) — the one filter
+whose "unset" state isn't "no restriction" but "this year specifically".
+`state.year` defaults to `[currentTeamStatsYear()]` when the URL carries no
+`year` param at all; an explicit "All time" (every checkbox in the Season
+list unchecked) is `[]`, still spelled out in the URL as `year=all` rather
+than omitted, for the same round-tripping reason §3.5 already documents.
+Selecting more than one year, or a single year other than the current one,
+comma-joins as usual.
+
+**URL encoding — comma-separated, one param per dimension.** A dimension
+with values checked encodes as `?tournament=t1,t2`; a single checked value
+still reads as a bare `?tournament=t1` (comma-joining one element is a
+no-op). `parseCsvParam()` (`teamStatsFilters.ts`) splits, trims, and dedupes
+on read. Unknown/invalid entries within a list are dropped individually —
+`?tournament=t1,bogus` keeps `t1` and silently drops `bogus` — rather than
+invalidating the whole param the way a single-select's fallback-to-`'all'`
+used to. `parseTeamFilterState()` is the one function that turns a raw
+`searchParams` object into a validated `TeamFilterState`; it was extracted
+out of `page.tsx` (where the equivalent logic used to be inline) into
+`teamStatsFilters.ts` specifically so it's unit-testable without Next's
+request machinery, and so the Captain-dimension gate (§3.6) has exactly one
+implementation regardless of how many query params reference it.
+
+**UI — `CheckboxList`, replacing every `<select>` in the panel**
+(`TeamFilterPanel.tsx`). A small generic component (`options`, `selected`,
+`onChange`) rendering one checkbox per option inside a scrollable,
+bordered box (`max-h-48 overflow-y-auto`) — used for both the option-list
+dimensions (Season, Tournament, Ground, Opponent, Captain, Month, Slot
+time, all sourced from `TeamFilterOptions`) and the fixed-enum dimensions
+(Pitch Type, Toss, Format, Defending/Chasing, League/Knockout, each backed
+by a small local constant array — `PITCH_OPTIONS`, `TOSS_OPTIONS`, etc.).
+Generic over the option id's literal type (`CheckboxList<T extends
+string>`) so an enum dimension's `onChange` is correctly typed without a
+cast, the same way a plain string-id dimension's is. Practice games stays
+its own single boolean checkbox, unaffected — it was never a "pick one of
+several values" dimension to begin with.
+
+**The summary row's chip label** for a multi-valued dimension is the first
+selected value's name plus a count — `"Thunder 5 +1 more"` for two
+tournaments checked — rather than a chip per value or a bare count, so the
+row stays a fixed, glanceable width regardless of how many boxes are
+checked (`filterValueLabel()`). Removing that chip clears the whole
+dimension, same as before.
+
+**Split by / Then by (§3.2) are unaffected** — those remain single-choice
+pill rows, since "which dimension to split the table by" is a genuinely
+different kind of question than "which values of a dimension to keep":
+splitting by two tournaments *at once* wouldn't mean anything, whereas
+filtering to two tournaments at once (their combined head-to-head record)
+does.
 
 ---
 
@@ -957,7 +1063,7 @@ implementation of the filter logic itself.
 | Check | Status |
 |---|---|
 | `/team-stats` requires a signed-in, non-expelled session; read-only, no write path | ✅ |
-| Every filter is validated server-side against the actual option list / enum before use — an unknown id or value falls back to "all" | ✅ |
+| Every filter is multi-select; each value is validated server-side against the actual option list / enum before use — an unknown id or value is dropped from its list individually, an empty/fully-invalid list falls back to "no restriction" (§3.8) | ✅ |
 | `/opponents` page gate is visibility only; `/api/opponents*` re-check captain/GC/wrangler/admin on every write | ✅ |
 | All opponent writes Zod-validated (`.strict()`), rate-limited (`captainWrite`) | ✅ |
 | `bookings.opponent_id` never client-supplied — stripped in PATCH, derived server-side from `opponent_name` in both booking routes | ✅ |
@@ -979,14 +1085,14 @@ implementation of the filter logic itself.
 | `supabase/migrations/077_opponents_master.sql` | `opponents`, `opponent_aliases`, `bookings.opponent_id`, RLS (§5) |
 | `supabase/migrations/078_grounds_pitch_type.sql` | Superseded the same day by migration 079 — added `grounds.pitch_type` + the Turf-only backfill; see §6's "Corrected the same day" note |
 | `supabase/migrations/079_move_pitch_type_to_tournaments.sql` | Drops `grounds.pitch_type`, adds `tournaments.pitch_type`, re-derives the Turf backfill and carries forward the one real Matted classification (§6) |
-| `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `applyFilters()` covers every dimension and `splitByNested()` composes two of them (§3.2); `splitTournamentRowsByStatus()` partitions the Tournament split into Ongoing/Completed (§3.7); `PitchFilter`/the `'pitch'` `SplitDimension` (§6) |
+| `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `TeamFilters`' twelve fields are all arrays and `applyFilters()` ORs within a dimension (§3.8); `splitByNested()` composes two split dimensions (§3.2); `splitTournamentRowsByStatus()` partitions the Tournament split into Ongoing/Completed (§3.7); `PitchFilter`/the `'pitch'` `SplitDimension` (§6) |
 | `src/lib/teamStats.ts` | `getTeamMatches()` fetch (now also selects `tournaments.total_league_games` → `TeamMatch.tournamentTotalLeagueGames`, §3.7, and `tournaments.pitch_type` → `TeamMatch.pitchType`, §6; `TeamMatch.isPractice` also ORs in the booking's own `is_practice` — `features/practice-games.md`); re-exports the core (§2) |
-| `src/lib/teamStats.test.ts` | Vitest coverage of the aggregators |
-| `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers (`TeamFilterState`, `buildTeamStatsHref`, `toTeamFilters`, chip labels) shared by the page and the panel (§3); `visibleFilterKeys()`/`visibleSplitDimensions()` gate the Captain dimension (§3.6); `pitch` filter key (§6) |
+| `src/lib/teamStats.test.ts` | Vitest coverage of the aggregators, including multi-select OR-within-a-dimension cases (§3.8) |
+| `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers — `TeamFilterState` (array-valued per dimension), `parseTeamFilterState()` (the one URL→state parser, replacing inline logic that used to live in `page.tsx`), `parseCsvParam()`, `buildTeamStatsHref`, `toTeamFilters`, chip labels (§3.8) — shared by the page and the panel (§3); `visibleFilterKeys()`/`visibleSplitDimensions()` gate the Captain dimension (§3.6); `pitch` filter key (§6) |
 | `src/lib/opponents.ts` | `normaliseOpponentName()`, `resolveOpponentIdByName()`, `linkSpellingToOpponent()`, `AliasConflictError` (§5) |
 | `src/lib/schemas.ts` | `opponentCreateSchema`, `opponentUpdateSchema`, `opponentLinkSchema` |
-| `src/app/team-stats/page.tsx` | The Team Record page (§3); computes `canUseCaptainDimension` and re-validates `by`/`then`/`captain` against it server-side (§3.6); renders two tables (Ongoing/Completed) instead of one when `state.by === 'tournament'` (§3.7) |
-| `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `SplitByRow` — the Split by / Then by scrolling pill rows (§3.1, §3.2); both take a `canUseCaptainDimension` prop that decides whether Captain is offered at all (§3.6) |
+| `src/app/team-stats/page.tsx` | The Team Record page (§3); calls `parseTeamFilterState()` for all URL parsing (§3.8), computes `canUseCaptainDimension` which that parser re-validates `by`/`then`/`captain` against server-side (§3.6); renders two tables (Ongoing/Completed) instead of one when `state.by === 'tournament'` (§3.7) |
+| `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `CheckboxList` — the generic multi-select control every filter dimension renders (§3.8); `SplitByRow` — the (still single-choice) Split by / Then by scrolling pill rows (§3.1, §3.2); both take a `canUseCaptainDimension` prop that decides whether Captain is offered at all (§3.6) |
 | `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher under both stats heroes (§3) |
 | `src/components/team/TeamSplitTable.tsx` | Expandable split table — every row independently toggleable and stays open until tapped closed again (§3.4); includes the second-level sub-rows and their "Not recorded" fallback (§3.2), and `hideMarqueeBadge`/`showTotal` for the Marquee highlight table (§3.3); `FormPills`, `MatchList` |
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` | Opponent master + reconciliation queue (§5) |

@@ -19,23 +19,14 @@ import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import {
   getTeamMatches, applyFilters, summarize, recentForm, currentStreak, splitBy, splitByNested, computeRecords,
   filterOptions, sortNewestFirst, splitTournamentRowsByStatus,
-  type FormatFilter, type InningsFilter, type StageFilter, type TossFilter, type PitchFilter, type SplitDimension,
 } from '@/lib/teamStats'
-import { toTeamFilters, currentTeamStatsYear, visibleSplitDimensions, type TeamFilterState } from '@/lib/teamStatsFilters'
+import { toTeamFilters, parseTeamFilterState, type TeamStatsRawSearchParams } from '@/lib/teamStatsFilters'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Team Record — Spartans CC' }
 export const revalidate = 0
 
-function pickEnum<T extends string>(v: string | undefined, allowed: readonly T[], fallback: T): T {
-  return (allowed as readonly string[]).includes(v ?? '') ? (v as T) : fallback
-}
-
-type SearchParams = Partial<Record<
-  'year' | 'month' | 'format' | 'tournament' | 'ground' | 'pitch' | 'opponent' | 'captain' | 'slot'
-  | 'innings' | 'toss' | 'stage' | 'practice' | 'by' | 'then', string>>
-
-export default async function TeamStatsPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function TeamStatsPage({ searchParams }: { searchParams?: TeamStatsRawSearchParams }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
   if (!session) {
@@ -51,43 +42,15 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: S
   // feature doc. This is the one server-side gate that decides it; the
   // filter/split UI just mirrors whatever it resolves to.
   const canUseCaptainDimension = !!user?.isCaptain || !!user?.isGC || !!user?.isAdmin
-  const splitDimensions = visibleSplitDimensions(canUseCaptainDimension)
 
   const all = await getTeamMatches()
   const options = filterOptions(all)
 
-  // Pre-filters to the current season by default — a bare or invalid/
-  // out-of-range `?year=` resolves to this year, not "all time". `?year=all`
-  // is the explicit opt-out (round-trips via buildTeamStatsHref, which
-  // spells 'all' out in the URL for exactly this reason).
-  const yearParam =
-    searchParams?.year === 'all' ? 'all'
-    : searchParams?.year && /^\d{4}$/.test(searchParams.year) && options.years.includes(searchParams.year) ? searchParams.year
-    : currentTeamStatsYear()
-  const by = pickEnum<SplitDimension>(searchParams?.by, splitDimensions, 'tournament')
-  // A `then` equal to `by` is a no-op (splitByNested ignores it) — treated
-  // as "none" here so it never round-trips back into the URL either.
-  const thenParam = splitDimensions.includes(searchParams?.then as SplitDimension) ? searchParams!.then as SplitDimension : null
-  const state: TeamFilterState = {
-    year:       yearParam,
-    month:      options.months.some(m => m.id === searchParams?.month) ? searchParams!.month! : 'all',
-    format:     pickEnum<FormatFilter>(searchParams?.format, ['all', 'T20', 'T30', 'other'], 'all'),
-    tournament: options.tournaments.some(t => t.id === searchParams?.tournament) ? searchParams!.tournament! : 'all',
-    ground:     options.grounds.some(g => g.id === searchParams?.ground) ? searchParams!.ground! : 'all',
-    pitch:      pickEnum<PitchFilter>(searchParams?.pitch, ['all', 'Matted', 'Astro', 'Turf'], 'all'),
-    opponent:   options.opponents.some(o => o.id === searchParams?.opponent) ? searchParams!.opponent! : 'all',
-    // Re-validated against the same server-side gate as `by`/`then` above —
-    // a non-privileged viewer's `?captain=` is ignored, not just hidden
-    // from the select.
-    captain:    canUseCaptainDimension && options.captains.some(c => c.id === searchParams?.captain) ? searchParams!.captain! : 'all',
-    slot:       options.slots.some(o => o.id === searchParams?.slot) ? searchParams!.slot! : 'all',
-    innings:    pickEnum<InningsFilter>(searchParams?.innings, ['all', 'defending', 'chasing'], 'all'),
-    toss:       pickEnum<TossFilter>(searchParams?.toss, ['all', 'won', 'lost'], 'all'),
-    stage:      pickEnum<StageFilter>(searchParams?.stage, ['all', 'league', 'knockout'], 'all'),
-    practice:   searchParams?.practice === '1',
-    by,
-    then:       thenParam === by ? null : thenParam,
-  }
+  // Pre-filters to the current season by default, every dimension is
+  // multi-select, and the Captain dimension is re-validated against the
+  // same server-side gate `by`/`then` use — see parseTeamFilterState()'s
+  // own header comment and features/team-stats.md §3.6/§3.8.
+  const state = parseTeamFilterState(searchParams, options, canUseCaptainDimension)
 
   const matches = applyFilters(all, toTeamFilters(state))
 
