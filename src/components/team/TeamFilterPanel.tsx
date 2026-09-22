@@ -25,7 +25,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { applyFilters, SPLIT_LABEL, type SplitDimension, type TeamMatch } from '@/lib/teamStatsCore'
+import { applyFilters, SPLIT_LABEL, type FormatFilter, type InningsFilter, type PitchFilter, type StageFilter, type SplitDimension, type TeamMatch, type TossFilter } from '@/lib/teamStatsCore'
 import {
   FILTER_LABEL,
   activeFilterKeys, buildTeamStatsHref, clearAllFilters, clearFilter, filterValueLabel, isFilterSet, toTeamFilters,
@@ -33,7 +33,6 @@ import {
   type FilterKey, type TeamFilterOptions, type TeamFilterState,
 } from '@/lib/teamStatsFilters'
 
-const SELECT = 'form-input font-rajdhani text-sm py-1.5 w-full truncate min-w-0 bg-[var(--stats-card-bg)] dark:bg-zinc-900 border-[var(--stats-card-border)] dark:border-zinc-700 text-[var(--stats-text)] dark:text-zinc-100'
 const LABEL  = 'font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] dark:text-zinc-500'
 const CARD   = 'bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5'
 
@@ -209,98 +208,114 @@ function FilterPanelBody({ draft, setDraft, added, setAdded, options, count, dir
   )
 }
 
+const PITCH_OPTIONS: { id: PitchFilter; name: string }[] = [
+  { id: 'Matted', name: 'Matted' }, { id: 'Astro', name: 'Astro' }, { id: 'Turf', name: 'Turf' },
+]
+const TOSS_OPTIONS: { id: TossFilter; name: string }[] = [
+  { id: 'won', name: 'Won the toss' }, { id: 'lost', name: 'Lost the toss' },
+]
+const FORMAT_OPTIONS: { id: FormatFilter; name: string }[] = [
+  { id: 'T20', name: 'T20' }, { id: 'T30', name: 'T30' }, { id: 'other', name: 'Other (T10/T25)' },
+]
+const INNINGS_OPTIONS: { id: InningsFilter; name: string }[] = [
+  { id: 'defending', name: 'Defending (batted first)' }, { id: 'chasing', name: 'Chasing (batted second)' },
+]
+const STAGE_OPTIONS: { id: StageFilter; name: string }[] = [
+  { id: 'league', name: 'League' }, { id: 'knockout', name: 'Knockout' },
+]
+
+// One checkbox per option — every filter dimension is multi-select (added
+// September 2026, see features/team-stats.md §3.8), so "no boxes checked"
+// is what used to be the '<dimension> = all' sentinel. Generic over the
+// option id's literal type so a caller like `pitch` (PitchFilter) gets a
+// correctly-typed onChange with no cast, while an id-based dimension like
+// `tournament` (plain string ids from the fetched option list) still works
+// the same way.
+function CheckboxList<T extends string>({ options, selected, onChange, emptyLabel }: {
+  options: { id: T; name: string }[]
+  selected: T[]
+  onChange: (next: T[]) => void
+  emptyLabel: string
+}) {
+  function toggle(id: T) {
+    onChange(selected.includes(id) ? selected.filter(v => v !== id) : [...selected, id])
+  }
+  return (
+    <div className={`rounded-md ${CARD} max-h-48 overflow-y-auto p-1.5 flex flex-col gap-0.5`}>
+      {options.length === 0 ? (
+        <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 px-1.5 py-1">{emptyLabel}</p>
+      ) : options.map(o => (
+        <label key={o.id} className="flex items-center gap-2 font-rajdhani text-sm px-1.5 py-1 rounded text-[var(--stats-text)] dark:text-zinc-200 cursor-pointer select-none hover:bg-[var(--stats-row-hover)] dark:hover:bg-ink-4">
+          <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggle(o.id)}
+            className="accent-[var(--stats-accent)] dark:accent-gold flex-none" />
+          <span className="truncate">{o.name}</span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
 function FilterControl({ k, draft, setDraft, options }: { k: FilterKey; draft: TeamFilterState; setDraft: (s: TeamFilterState) => void; options: TeamFilterOptions }) {
   switch (k) {
     case 'year':
       return (
-        <select value={draft.year} onChange={e => setDraft({ ...draft, year: e.target.value })} className={SELECT}>
-          <option value="all">All time</option>
-          {options.years.map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
+        <CheckboxList options={options.years.map(y => ({ id: y, name: y }))} selected={draft.year}
+          onChange={v => setDraft({ ...draft, year: v })} emptyLabel="No seasons yet" />
       )
     case 'tournament':
       return (
-        <select value={draft.tournament} onChange={e => setDraft({ ...draft, tournament: e.target.value })} className={SELECT}>
-          <option value="all">All tournaments</option>
-          {options.tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        <CheckboxList options={options.tournaments} selected={draft.tournament}
+          onChange={v => setDraft({ ...draft, tournament: v })} emptyLabel="No tournaments yet" />
       )
     case 'ground':
       return (
-        <select value={draft.ground} onChange={e => setDraft({ ...draft, ground: e.target.value })} className={SELECT}>
-          <option value="all">All grounds</option>
-          {options.grounds.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-        </select>
+        <CheckboxList options={options.grounds} selected={draft.ground}
+          onChange={v => setDraft({ ...draft, ground: v })} emptyLabel="No grounds yet" />
       )
     case 'pitch':
       return (
-        <select value={draft.pitch} onChange={e => setDraft({ ...draft, pitch: e.target.value as TeamFilterState['pitch'] })} className={SELECT}>
-          <option value="all">All pitch types</option>
-          <option value="Matted">Matted</option>
-          <option value="Astro">Astro</option>
-          <option value="Turf">Turf</option>
-        </select>
+        <CheckboxList options={PITCH_OPTIONS} selected={draft.pitch}
+          onChange={v => setDraft({ ...draft, pitch: v })} emptyLabel="No pitch types" />
       )
     case 'opponent':
       return (
-        <select value={draft.opponent} onChange={e => setDraft({ ...draft, opponent: e.target.value })} className={SELECT}>
-          <option value="all">All opponents</option>
-          {options.opponents.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
+        <CheckboxList options={options.opponents} selected={draft.opponent}
+          onChange={v => setDraft({ ...draft, opponent: v })} emptyLabel="No opponents yet" />
       )
     case 'month':
       return (
-        <select value={draft.month} onChange={e => setDraft({ ...draft, month: e.target.value })} className={SELECT}>
-          <option value="all">All months</option>
-          {options.months.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
+        <CheckboxList options={options.months} selected={draft.month}
+          onChange={v => setDraft({ ...draft, month: v })} emptyLabel="No months yet" />
       )
     case 'captain':
       return (
-        <select value={draft.captain} onChange={e => setDraft({ ...draft, captain: e.target.value })} className={SELECT}>
-          <option value="all">All captains</option>
-          {options.captains.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
+        <CheckboxList options={options.captains} selected={draft.captain}
+          onChange={v => setDraft({ ...draft, captain: v })} emptyLabel="No captains yet" />
       )
     case 'slot':
       return (
-        <select value={draft.slot} onChange={e => setDraft({ ...draft, slot: e.target.value })} className={SELECT}>
-          <option value="all">All slot times</option>
-          {options.slots.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
+        <CheckboxList options={options.slots} selected={draft.slot}
+          onChange={v => setDraft({ ...draft, slot: v })} emptyLabel="No slot times yet" />
       )
     case 'toss':
       return (
-        <select value={draft.toss} onChange={e => setDraft({ ...draft, toss: e.target.value as TeamFilterState['toss'] })} className={SELECT}>
-          <option value="all">Won + lost the toss</option>
-          <option value="won">Won the toss</option>
-          <option value="lost">Lost the toss</option>
-        </select>
+        <CheckboxList options={TOSS_OPTIONS} selected={draft.toss}
+          onChange={v => setDraft({ ...draft, toss: v })} emptyLabel="No toss data" />
       )
     case 'format':
       return (
-        <select value={draft.format} onChange={e => setDraft({ ...draft, format: e.target.value as TeamFilterState['format'] })} className={SELECT}>
-          <option value="all">All formats</option>
-          <option value="T20">T20</option>
-          <option value="T30">T30</option>
-          <option value="other">Other (T10/T25)</option>
-        </select>
+        <CheckboxList options={FORMAT_OPTIONS} selected={draft.format}
+          onChange={v => setDraft({ ...draft, format: v })} emptyLabel="No formats" />
       )
     case 'innings':
       return (
-        <select value={draft.innings} onChange={e => setDraft({ ...draft, innings: e.target.value as TeamFilterState['innings'] })} className={SELECT}>
-          <option value="all">Defending + Chasing</option>
-          <option value="defending">Defending only</option>
-          <option value="chasing">Chasing only</option>
-        </select>
+        <CheckboxList options={INNINGS_OPTIONS} selected={draft.innings}
+          onChange={v => setDraft({ ...draft, innings: v })} emptyLabel="No innings data" />
       )
     case 'stage':
       return (
-        <select value={draft.stage} onChange={e => setDraft({ ...draft, stage: e.target.value as TeamFilterState['stage'] })} className={SELECT}>
-          <option value="all">League + Knockout</option>
-          <option value="league">League only</option>
-          <option value="knockout">Knockout only</option>
-        </select>
+        <CheckboxList options={STAGE_OPTIONS} selected={draft.stage}
+          onChange={v => setDraft({ ...draft, stage: v })} emptyLabel="No stages" />
       )
     case 'practice':
       return (

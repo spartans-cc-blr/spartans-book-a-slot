@@ -75,29 +75,36 @@ export function normaliseResult(raw: string | null | undefined): MatchResult | n
 
 // ── Filters ────────────────────────────────────────────────────────────────
 
-export type FormatFilter = 'all' | 'T20' | 'T30' | 'other'
-export type InningsFilter = 'all' | 'defending' | 'chasing'
-export type StageFilter = 'all' | 'league' | 'knockout'
-export type TossFilter = 'all' | 'won' | 'lost'
-export type PitchFilter = 'all' | PitchType
+// A dimension's single-value type — no 'all' member any more. Multi-select
+// (added September 2026, see features/team-stats.md §3) represents "no
+// restriction on this dimension" as an empty array rather than a sentinel
+// string, so every one of these is now the *element* type of a filter
+// array, not a value that can itself mean "everything".
+export type FormatFilter = 'T20' | 'T30' | 'other'
+export type InningsFilter = 'defending' | 'chasing'
+export type StageFilter = 'league' | 'knockout'
+export type TossFilter = 'won' | 'lost'
+export type PitchFilter = PitchType
 
 // Every dimension the page can split by is also filterable (added
 // September 2026, see features/team-stats.md §3.2) — that's what makes a
 // two-dimension question like "how does each captain do after winning the
-// toss" answerable: filter on one, split by the other.
+// toss" answerable: filter on one, split by the other. Every field here is
+// now a multi-select array — an empty (or absent) array means "no
+// restriction on this dimension", matching an unchecked checkbox list.
 export interface TeamFilters {
-  year?:           number | null     // null/undefined = all time
-  month?:          string | null     // 'YYYY-MM'
-  format?:         FormatFilter
-  tournamentId?:   string | null
-  groundId?:       string | null
-  pitch?:          PitchFilter
-  opponentKey?:    string | null     // opponentKey() value
-  captainKey?:     string | null     // captainKey() value
-  slotTime?:       string | null     // 'HH:MM'
-  innings?:        InningsFilter
-  toss?:           TossFilter
-  stage?:          StageFilter
+  year?:           number[]     // empty/undefined = all time
+  month?:          string[]     // 'YYYY-MM'
+  format?:         FormatFilter[]
+  tournamentId?:   string[]
+  groundId?:       string[]
+  pitch?:          PitchFilter[]
+  opponentKey?:    string[]     // opponentKey() values
+  captainKey?:     string[]     // captainKey() values
+  slotTime?:       string[]     // 'HH:MM'
+  innings?:        InningsFilter[]
+  toss?:           TossFilter[]
+  stage?:          StageFilter[]
   includePractice?: boolean
 }
 
@@ -122,27 +129,30 @@ export function effectiveStage(m: Pick<TeamMatch, 'stageType'>): StageType {
 export function applyFilters(matches: TeamMatch[], f: TeamFilters): TeamMatch[] {
   return matches.filter(m => {
     if (!f.includePractice && m.isPractice) return false
-    if (f.year && !m.gameDate.startsWith(`${f.year}-`)) return false
-    if (f.format && f.format !== 'all') {
-      if (f.format === 'other' ? !isInformalFormat(m.format) : m.format !== f.format) return false
+    if (f.year && f.year.length > 0 && !f.year.some(y => m.gameDate.startsWith(`${y}-`))) return false
+    if (f.format && f.format.length > 0) {
+      const hit = f.format.some(v => v === 'other' ? isInformalFormat(m.format) : m.format === v)
+      if (!hit) return false
     }
-    if (f.tournamentId && m.tournamentId !== f.tournamentId) return false
-    if (f.groundId && m.groundId !== f.groundId) return false
-    if (f.pitch && f.pitch !== 'all' && m.pitchType !== f.pitch) return false
-    if (f.opponentKey && opponentKey(m) !== f.opponentKey) return false
-    if (f.month && m.gameDate.slice(0, 7) !== f.month) return false
-    if (f.captainKey && captainKey(m) !== f.captainKey) return false
-    if (f.slotTime && m.slotTime !== f.slotTime) return false
-    if (f.innings && f.innings !== 'all') {
-      if (f.innings === 'defending' ? m.battedFirst !== true : m.battedFirst !== false) return false
+    if (f.tournamentId && f.tournamentId.length > 0 && !(m.tournamentId && f.tournamentId.includes(m.tournamentId))) return false
+    if (f.groundId && f.groundId.length > 0 && !(m.groundId && f.groundId.includes(m.groundId))) return false
+    if (f.pitch && f.pitch.length > 0 && !(m.pitchType && f.pitch.includes(m.pitchType))) return false
+    if (f.opponentKey && f.opponentKey.length > 0 && !f.opponentKey.includes(opponentKey(m))) return false
+    if (f.month && f.month.length > 0 && !f.month.includes(m.gameDate.slice(0, 7))) return false
+    if (f.captainKey && f.captainKey.length > 0 && !f.captainKey.includes(captainKey(m))) return false
+    if (f.slotTime && f.slotTime.length > 0 && !f.slotTime.includes(m.slotTime)) return false
+    if (f.innings && f.innings.length > 0) {
+      const val: InningsFilter | null = m.battedFirst === null ? null : m.battedFirst ? 'defending' : 'chasing'
+      if (!val || !f.innings.includes(val)) return false
     }
     // A match with no toss data can't satisfy either side of a toss
     // filter, so it drops out entirely — same as the toss *split*, which
     // gives it no group to sit in.
-    if (f.toss && f.toss !== 'all') {
-      if (f.toss === 'won' ? m.tossWon !== true : m.tossWon !== false) return false
+    if (f.toss && f.toss.length > 0) {
+      const val: TossFilter | null = m.tossWon === null ? null : m.tossWon ? 'won' : 'lost'
+      if (!val || !f.toss.includes(val)) return false
     }
-    if (f.stage && f.stage !== 'all' && effectiveStage(m) !== f.stage) return false
+    if (f.stage && f.stage.length > 0 && !f.stage.includes(effectiveStage(m))) return false
     return true
   })
 }
