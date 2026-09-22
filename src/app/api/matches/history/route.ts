@@ -52,6 +52,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { computeTopPerformers, computeMatchMVP, summarizeTopPerformance, type SquadRef } from '@/lib/matchTopPerformers'
 import { isPastMatch } from '@/lib/matchStatus'
+import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 
 const DEFAULT_LIMIT = 15
 const MAX_LIMIT = 50
@@ -83,8 +84,11 @@ function num(row: any, keys: string[]): number {
 
 // Derives a light top-bat/top-bowl summary server-side so the list response
 // stays small — the full batting/bowling arrays are only sent by the
-// dedicated scorecard endpoint when a card is expanded.
-function summarizeStats(row: any) {
+// dedicated scorecard endpoint when a card is expanded. `toss` is passed in
+// separately (see the analytics-DB toss fetch below) — match_stats_cache
+// itself never stores it (see features/team-stats.md §2's "Not copied into
+// match_stats_cache" note).
+function summarizeStats(row: any, toss: { toss_won: string | null; toss_decision: string | null } | undefined) {
   const { top_bat, top_bowl } = summarizeTopPerformance(row.batting ?? [], row.bowling ?? [])
 
   return {
@@ -95,6 +99,8 @@ function summarizeStats(row: any) {
     opponent_total:   row.opponent_total ?? null,
     opponent_wickets: row.opponent_wickets ?? null,
     opponent_overs:   row.opponent_overs ?? null,
+    toss_won:         toss?.toss_won ?? null,
+    toss_decision:    toss?.toss_decision ?? null,
     top_bat,
     top_bowl,
   }
@@ -213,7 +219,7 @@ export async function GET(req: NextRequest) {
   let query = applySharedFilters(
     supabase
       .from('bookings')
-      .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, venue, cricheroes_url, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url)), ground:grounds(name, maps_url, hospital_url)')
+      .select('id, game_date, slot_time, match_time, opponent_name, format, tournament_id, venue, cricheroes_url, match_id, tournament:tournaments(name, ball_type, ground:grounds(name, maps_url, hospital_url)), ground:grounds(name, maps_url, hospital_url)')
   )
     .order('game_date', { ascending: false })
     .order('slot_time', { ascending: false })
@@ -274,6 +280,20 @@ export async function GET(req: NextRequest) {
   const uploadByBooking = new Map((uploadsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const statsByBooking  = new Map((statsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const ledBookingIds   = new Set((ledRes.data ?? []).map((r: any) => r.booking_id))
+
+  // Toss — read from the analytics DB's own match_stats table, not
+  // match_stats_cache (which never stores it, see features/team-stats.md
+  // §2's "Not copied into match_stats_cache" note). Batched by match_id
+  // across this one page of results — a page is at most limit+4 (≤54)
+  // bookings, well under any chunking concern. Missing entirely (no
+  // ANALYTICS_SUPABASE_URL/KEY configured) just means every card's toss
+  // line is omitted, same as a match with no toss data synced yet.
+  const matchIds = Array.from(new Set((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+  const analytics = createAnalyticsClient()
+  const { data: tossRows } = analytics && matchIds.length
+    ? await analytics.from('match_stats').select('match_id, toss_won, toss_decision').in('match_id', matchIds)
+    : { data: [] as any[] }
+  const tossByMatch = new Map((tossRows ?? []).map((r: any) => [r.match_id, r]))
 
   const canSeeWhatsapp = !!user?.isWrangler || !!user?.isAdmin
 
@@ -373,7 +393,7 @@ export async function GET(req: NextRequest) {
       reconciliation_note:            upload?.reconciliation_note ?? null,
       reconciliation_flagged_at:      upload?.reconciliation_flagged_at ?? null,
       reconciliation_flagged_by_name: upload?.reconciliation_flagged_by ? (flaggerName.get(upload.reconciliation_flagged_by) ?? null) : null,
-      stats: statsRow ? summarizeStats(statsRow) : null,
+      stats: statsRow ? summarizeStats(statsRow, tossByMatch.get(b.match_id)) : null,
       roles_complete: (() => {
         const r = rolesByBooking.get(b.id)
         return !!r && r.captain && r.vc && r.wk
