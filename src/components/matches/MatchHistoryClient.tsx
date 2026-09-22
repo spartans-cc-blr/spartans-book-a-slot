@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { ScorecardUploadButton, type ScorecardStatus } from '@/components/matches/ScorecardUploadButton'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
-import { ResultBadge } from '@/components/shared/ResultBadge'
+import { MatchResultBadge } from '@/components/matches/MatchResultBadge'
 import {
   CricHeroesIcon, CricHeroesInlineLink, VerifiedStatusLine, ReconciliationControls, NotifyIcon,
 } from '@/components/matches/ScorecardVerifyPanel'
@@ -15,7 +15,7 @@ import { BallIcon, type BallType } from '@/components/matches/BallIcon'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
 import { groupDatesIntoChips } from '@/lib/dateChipGroups'
 import {
-  deriveBattedFirst, buildTossLine, buildOrderedScoreLine, computeMatchMargin, formatMarginLine,
+  deriveBattedFirst, buildTossLine, buildOrderedScoreLine, computeMatchMargin, buildResultLine,
   normaliseMatchResultKind,
 } from '@/lib/matchResultDisplay'
 
@@ -167,14 +167,15 @@ function slotLabel(slot: string): string {
 // a "verify this scorecard" action looks like. See that file for the
 // original doc comments on each.
 
-// Result rendering itself now comes from the shared <ResultBadge> (same
-// component TournamentPlannerClient and TournamentShareCard use) instead of
-// a local duplicate — that duplicate is exactly the kind of drift
-// ResultBadge's own doc comment was written to prevent: this card's pill
-// used a bigger, squared-off shape (padding 4px 12px, borderRadius 6px) with
-// no border, while the shared one is a proper small rounded-full pill
-// (text-[10px], px-2 py-0.5) — same colours, different shape, so the two
-// surfaces didn't actually match.
+// Result rendering used to come from the shared <ResultBadge> (same
+// component TournamentPlannerClient and TournamentShareCard use), shown
+// next to the score line, with a separate "Won by 30 runs" margin line
+// underneath — the two were saying the same thing twice. Replaced with
+// <MatchResultBadge>, which folds the margin into the result line itself
+// ("WON BY 30 RUNS") — see matchResultDisplay.ts's buildResultLine() and
+// MatchResultBadge.tsx's own header comment for why this isn't just
+// <ResultBadge> extended in place (its other callers don't have a margin
+// to fold in).
 
 // Passive, read-only checkpoint for the one scorecard_uploads state that
 // isn't already covered by the verification row below (ReconciliationControls
@@ -832,7 +833,7 @@ function MatchHistoryCard({
       {/* Result strip — only once stats have been synced. This is the
           headline of a completed match, so it gets the bordered/prominent
           treatment — a passive "stats synced" note should never outshine it.
-          Toss line above the score, margin line below it — see
+          Toss line above the score, the result+margin badge below it — see
           matchResultDisplay.ts and features/post-match-scorecard.md §17. */}
       {match.stats && (() => {
         const battedFirst = deriveBattedFirst(match.stats.toss_won, match.stats.toss_decision)
@@ -843,19 +844,14 @@ function MatchHistoryCard({
           match.stats.team_total, match.stats.team_wickets,
           match.stats.opponent_total, match.stats.opponent_wickets,
         )
-        const marginLine = formatMarginLine(resultKind, margin)
+        const resultLine = buildResultLine(match.stats.match_result, margin)
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {tossLine && (
               <span style={{ fontSize: '10px', color: 'var(--scorecard-text-faint)' }}>{tossLine}</span>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {match.stats.match_result && <ResultBadge result={match.stats.match_result} />}
-              <span style={{ fontSize: '11px', color: 'var(--scorecard-text-muted)' }}>{scoreLine(match.stats)}</span>
-            </div>
-            {marginLine && (
-              <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--scorecard-text-muted)' }}>{marginLine}</span>
-            )}
+            <span style={{ fontSize: '11px', color: 'var(--scorecard-text-muted)' }}>{scoreLine(match.stats)}</span>
+            <MatchResultBadge line={resultLine} />
             {(match.stats.top_bat || match.stats.top_bowl) && (
               <div style={{ fontSize: '10px', color: 'var(--scorecard-text-faint)', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                 {match.stats.top_bat && (

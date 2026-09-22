@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   normaliseMatchResultKind, deriveBattedFirst, buildTossLine, buildOrderedScoreLine,
-  computeMatchMargin, formatMarginLine,
+  computeMatchMargin, buildResultLine,
 } from './matchResultDisplay'
 
 describe('normaliseMatchResultKind', () => {
@@ -60,33 +60,45 @@ describe('buildOrderedScoreLine', () => {
   })
 })
 
-describe('computeMatchMargin + formatMarginLine', () => {
+describe('computeMatchMargin', () => {
   it('a win batting first is a runs margin (defended)', () => {
-    const margin = computeMatchMargin('won', true, 150, 5, 120, 10)
-    expect(margin).toEqual({ kind: 'runs', value: 30 })
-    expect(formatMarginLine('won', margin)).toBe('Won by 30 runs')
+    expect(computeMatchMargin('won', true, 150, 5, 120, 10)).toEqual({ kind: 'runs', value: 30 })
   })
   it('a win batting second is a wickets margin (chased)', () => {
-    const margin = computeMatchMargin('won', false, 121, 4, 120, 10)
-    expect(margin).toEqual({ kind: 'wickets', value: 6 })
-    expect(formatMarginLine('won', margin)).toBe('Won by 6 wickets')
+    expect(computeMatchMargin('won', false, 121, 4, 120, 10)).toEqual({ kind: 'wickets', value: 6 })
   })
   it('a loss batting first is a wickets margin (opponent chased)', () => {
-    const margin = computeMatchMargin('lost', true, 120, 10, 121, 4)
-    expect(margin).toEqual({ kind: 'wickets', value: 6 })
-    expect(formatMarginLine('lost', margin)).toBe('Lost by 6 wickets')
+    expect(computeMatchMargin('lost', true, 120, 10, 121, 4)).toEqual({ kind: 'wickets', value: 6 })
   })
   it('a loss batting second is a runs margin (we fell short)', () => {
-    const margin = computeMatchMargin('lost', false, 120, 10, 150, 5)
-    expect(margin).toEqual({ kind: 'runs', value: 30 })
-    expect(formatMarginLine('lost', margin)).toBe('Lost by 30 runs')
+    expect(computeMatchMargin('lost', false, 120, 10, 150, 5)).toEqual({ kind: 'runs', value: 30 })
   })
-  it('a tie has no margin, just a fixed line', () => {
+  it('a tie has no margin', () => {
     expect(computeMatchMargin('tied', true, 120, 10, 120, 8)).toBeNull()
-    expect(formatMarginLine('tied', null)).toBe('Match tied')
   })
-  it('missing data yields no margin line', () => {
-    expect(formatMarginLine('won', null)).toBeNull()
-    expect(formatMarginLine(null, null)).toBeNull()
+})
+
+describe('buildResultLine', () => {
+  it('a win with a margin is a pill-worthy "WON BY N RUNS/WICKETS" line', () => {
+    expect(buildResultLine('WON', { kind: 'runs', value: 30 })).toEqual({ kind: 'won', label: 'WON BY 30 RUNS' })
+    expect(buildResultLine('WON', { kind: 'wickets', value: 6 })).toEqual({ kind: 'won', label: 'WON BY 6 WICKETS' })
+  })
+  it('a loss with a margin is plain-text "LOST BY N RUNS/WICKETS"', () => {
+    expect(buildResultLine('LOST', { kind: 'wickets', value: 6 })).toEqual({ kind: 'lost', label: 'LOST BY 6 WICKETS' })
+    expect(buildResultLine('LOST', { kind: 'runs', value: 30 })).toEqual({ kind: 'lost', label: 'LOST BY 30 RUNS' })
+  })
+  it('falls back to a bare WON/LOST when no margin can be computed yet', () => {
+    expect(buildResultLine('WON', null)).toEqual({ kind: 'won', label: 'WON' })
+    expect(buildResultLine('LOST', null)).toEqual({ kind: 'lost', label: 'LOST' })
+  })
+  it('a tie is always just "MATCH TIED", margin or not', () => {
+    expect(buildResultLine('TIED', null)).toEqual({ kind: 'tied', label: 'MATCH TIED' })
+  })
+  it('an unrecognised result falls back to the raw uppercased string', () => {
+    expect(buildResultLine('rained out', null)).toEqual({ kind: null, label: 'RAINED OUT' })
+  })
+  it('no result string at all renders nothing', () => {
+    expect(buildResultLine(null, null)).toBeNull()
+    expect(buildResultLine(undefined, null)).toBeNull()
   })
 })

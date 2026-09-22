@@ -11,9 +11,9 @@ import { computeTopPerformers, summarizeTopPerformance } from '@/lib/matchTopPer
 import { MatchVerifyBlock } from '@/components/matches/MatchVerifyBlock'
 import { NotifyIcon, VerifiedStatusLine } from '@/components/matches/ScorecardVerifyPanel'
 import { BallIcon } from '@/components/matches/BallIcon'
-import { ResultBadge } from '@/components/shared/ResultBadge'
+import { MatchResultBadge } from '@/components/matches/MatchResultBadge'
 import {
-  deriveBattedFirst, buildTossLine, buildOrderedScoreLine, computeMatchMargin, formatMarginLine,
+  deriveBattedFirst, buildTossLine, buildOrderedScoreLine, computeMatchMargin, buildResultLine,
   normaliseMatchResultKind,
 } from '@/lib/matchResultDisplay'
 
@@ -168,7 +168,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   const margin = stats
     ? computeMatchMargin(resultKind, battedFirst, stats.team_total, stats.team_wickets, stats.opponent_total, stats.opponent_wickets)
     : null
-  const marginLine = formatMarginLine(resultKind, margin)
+  const resultLine = buildResultLine(stats?.match_result ?? null, margin)
 
   return (
     <>
@@ -233,13 +233,8 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
               {tossLine && (
                 <span className="text-[10px]" style={{ color: 'var(--scorecard-text-faint)' }}>{tossLine}</span>
               )}
-              <div className="flex items-center gap-2">
-                {stats.match_result && <ResultBadge result={stats.match_result} />}
-                <span className="text-xs" style={{ color: 'var(--scorecard-text-muted)' }}>{scoreLine(stats, battedFirst)}</span>
-              </div>
-              {marginLine && (
-                <span className="text-[10px] font-semibold" style={{ color: 'var(--scorecard-text-muted)' }}>{marginLine}</span>
-              )}
+              <span className="text-xs" style={{ color: 'var(--scorecard-text-muted)' }}>{scoreLine(stats, battedFirst)}</span>
+              <MatchResultBadge line={resultLine} />
               {topPerformance && (topPerformance.top_bat || topPerformance.top_bowl) && (
                 <div className="flex flex-wrap gap-2.5 text-[10px]" style={{ color: 'var(--scorecard-text-faint)' }}>
                   {topPerformance.top_bat && (

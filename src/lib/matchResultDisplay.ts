@@ -102,9 +102,25 @@ export function computeMatchMargin(
   return null
 }
 
-export function formatMarginLine(result: MatchResultKind, margin: MatchMargin | null): string | null {
-  if (result === 'tied') return 'Match tied'
-  if (!margin || margin.value <= 0) return null
-  const verb = result === 'won' ? 'Won' : 'Lost'
-  return `${verb} by ${margin.value} ${margin.kind}`
+export interface ResultLine {
+  kind:  MatchResultKind
+  label: string
+}
+
+// The single result+margin line rendered by MatchResultBadge.tsx — folds
+// the old separate "WON"/"LOST" pill (redundant once the margin line below
+// it also says "won"/"lost") into one line: "WON BY 30 RUNS" as a pill,
+// "LOST BY 6 WICKETS" as plain text, matching the same win/loss visual
+// weighting src/components/shared/ResultBadge.tsx already established
+// (win = celebratory pill, everything else = plain coloured text). Falls
+// back to a bare "WON"/"LOST" when no margin can be computed yet (missing
+// toss data), and to the raw uppercased result string for anything that
+// doesn't normalise to won/lost/tied (e.g. "NO RESULT").
+export function buildResultLine(rawResult: string | null | undefined, margin: MatchMargin | null): ResultLine | null {
+  if (!rawResult) return null
+  const kind = normaliseMatchResultKind(rawResult)
+  if (kind === 'won')  return { kind, label: margin && margin.value > 0 ? `WON BY ${margin.value} ${margin.kind.toUpperCase()}` : 'WON' }
+  if (kind === 'lost') return { kind, label: margin && margin.value > 0 ? `LOST BY ${margin.value} ${margin.kind.toUpperCase()}` : 'LOST' }
+  if (kind === 'tied') return { kind, label: 'MATCH TIED' }
+  return { kind, label: rawResult.toUpperCase() }
 }
