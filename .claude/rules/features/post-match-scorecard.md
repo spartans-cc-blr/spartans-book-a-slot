@@ -1860,15 +1860,20 @@ the standalone page so the two surfaces can't drift on wording:
   **in batting order** (whoever batted first, then whoever chased), rather
   than always leading with our own score. Falls back to the pre-existing
   own-first order when `battedFirst` can't be derived (no toss synced yet).
-- **`computeMatchMargin(result, battedFirst, ...)`** /
-  **`formatMarginLine(result, margin)`** — "Won by N runs"/"Won by N
-  wickets"/"Lost by N runs"/"Lost by N wickets"/"Match tied", mirroring
+- **`computeMatchMargin(result, battedFirst, ...)`** — the numeric margin
+  (`{ kind: 'runs' | 'wickets', value }`), mirroring
   `src/lib/teamStatsCore.ts`'s existing `winMargin()` for a win (defending
   a total is a runs margin, chasing successfully is a wickets margin) and
   extending the identical logic symmetrically for a loss (the opponent
   chasing us down is a wickets margin *for them*; us falling short of a
   chase is a runs margin). `null` for a no-result or when the underlying
   scores/toss data aren't available.
+- **`buildResultLine(rawResult, margin)`** — combines the result and the
+  margin into one `{ kind, label }` (`"WON BY 30 RUNS"`, `"LOST BY 6
+  WICKETS"`, `"MATCH TIED"`, or a bare `"WON"`/`"LOST"` when no margin can
+  be computed yet). This is what `MatchResultBadge.tsx` (§17.6) actually
+  renders — see that section for why the original separate WON/LOST pill
+  and margin line were merged into one.
 - **`deriveBattedFirst`** / **`normaliseMatchResultKind`** — the same
   toss-derivation and result-string-normalisation `src/lib/playerStats.ts`'s
   `deriveBattedFirst()` and `src/lib/teamStatsCore.ts`'s `normaliseResult()`
@@ -1907,8 +1912,8 @@ already do.
 ### 17.3 Rendering
 
 Both surfaces show, top to bottom: the toss line (small, muted) → the
-result badge + ordered score line → the margin line (small, muted, bold) →
-the existing top-bat/top-bowl summary. Any of the three new lines is simply
+ordered score line (plain text, no badge) → the result+margin badge
+(§17.6) → the existing top-bat/top-bowl summary. Any of these is simply
 omitted when its inputs aren't available (no toss synced yet, or a
 no-result match) — nothing renders an empty placeholder.
 
@@ -1948,15 +1953,46 @@ throughout this feature (never exposed to the browser); the role tags read
 data already returned by each page's existing, already-authorized squad
 query. No new access surface introduced anywhere in this section.
 
+### 17.6 Merged result+margin badge — `MatchResultBadge.tsx` (fixed September 2026)
+
+**The redundancy this closes.** The first cut of §17.3 kept the
+pre-existing `<ResultBadge>` (a solid "WON" pill, or plain "LOST" text)
+next to the score line, and added the new margin line ("Won by 30 runs")
+as a second, separate line below it — so a win showed both a "WON" pill
+*and* a "Won by 30 runs" line right underneath it, saying the same thing
+twice. Reported directly: the pill is now redundant once the margin line
+exists, so remove it and have the margin line itself carry the result —
+using the same pill-for-a-win/plain-text-for-anything-else visual
+convention, not a new one.
+
+**Fix.** `buildResultLine(rawResult, margin)` (§17.1) replaces the old
+`formatMarginLine()` — instead of returning just the margin phrase, it
+returns the *whole* result+margin line: `"WON BY 30 RUNS"` (win, margin
+known), `"LOST BY 6 WICKETS"` (loss, margin known), `"MATCH TIED"`, or a
+bare `"WON"`/`"LOST"` when no margin can be computed yet (missing toss
+data) — the same graceful-degradation the old separate pill already had
+on its own. `MatchResultBadge.tsx` (a new, plain, stateless component,
+sibling to `src/components/shared/ResultBadge.tsx` rather than an edit to
+it — see the file's own header comment for why `ResultBadge`'s other
+callers, Tournament Planner and the organiser share page, don't need a
+margin and stay on the original) renders it: a solid emerald pill for a
+win, plain red text for a loss, plain amber text for a tie, plain grey
+text for anything else — identical colour/weight rules to `ResultBadge`,
+just with the margin folded into the same string. The old `<ResultBadge>`
+next to the score line was removed outright; the score line itself is now
+plain text with no badge beside it, and `MatchResultBadge` renders where
+the old separate margin line used to sit.
+
 ### File Map additions
 
 | File | Role |
 |---|---|
-| `src/lib/matchResultDisplay.ts` | `buildTossLine()`, `buildOrderedScoreLine()`, `computeMatchMargin()`/`formatMarginLine()`, `deriveBattedFirst()`, `normaliseMatchResultKind()` — pure, client-safe (§17.1) |
-| `src/lib/matchResultDisplay.test.ts` | Unit coverage for every toss/win/loss/tie combination |
+| `src/lib/matchResultDisplay.ts` | `buildTossLine()`, `buildOrderedScoreLine()`, `computeMatchMargin()`, `buildResultLine()` (§17.6), `deriveBattedFirst()`, `normaliseMatchResultKind()` — pure, client-safe (§17.1) |
+| `src/lib/matchResultDisplay.test.ts` | Unit coverage for every toss/win/loss/tie combination, including `buildResultLine()`'s pill-vs-plain-text label output |
 | `src/app/api/matches/history/route.ts` | Selects `bookings.match_id`; batched analytics toss fetch; `summarizeStats()` now includes `toss_won`/`toss_decision` (§17.2) |
-| `src/components/matches/MatchHistoryClient.tsx` | `StatsSummary.toss_won`/`toss_decision`; result strip renders the toss/ordered-score/margin lines (§17.3) |
-| `src/app/matches/history/[bookingId]/page.tsx` | Analytics toss fetch for the single `match_id`; squad select widened to include `is_wk`; result strip renders the toss/ordered-score/margin lines (§17.2/§17.3) |
+| `src/components/matches/MatchHistoryClient.tsx` | `StatsSummary.toss_won`/`toss_decision`; result strip renders the toss line, plain score line, and `<MatchResultBadge>` (§17.3/§17.6) |
+| `src/app/matches/history/[bookingId]/page.tsx` | Analytics toss fetch for the single `match_id`; squad select widened to include `is_wk`; result strip renders the toss line, plain score line, and `<MatchResultBadge>` (§17.2/§17.3/§17.6) |
+| `src/components/matches/MatchResultBadge.tsx` | The merged result+margin badge — pill for a win, plain coloured text otherwise (§17.6) |
 | `src/components/matches/ScorecardTables.tsx` | `SquadRef.is_captain`/`is_vc`/`is_wk`, `findSquadMember()`, `roleLabel()`, `RoleTag` — rendered next to a name in Batting/Bowling/Fielding/Did-not-bat, deliberately omitted from the Partnerships bar (§17.4) |
 
 ---
