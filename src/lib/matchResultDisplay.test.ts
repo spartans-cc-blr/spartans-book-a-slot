@@ -79,23 +79,23 @@ describe('computeMatchMargin', () => {
 })
 
 describe('buildResultLine', () => {
-  it('a win with a margin is a pill-worthy "WON BY N RUNS/WICKETS" line', () => {
-    expect(buildResultLine('WON', { kind: 'runs', value: 30 })).toEqual({ kind: 'won', label: 'WON BY 30 RUNS' })
-    expect(buildResultLine('WON', { kind: 'wickets', value: 6 })).toEqual({ kind: 'won', label: 'WON BY 6 WICKETS' })
+  it('a win keeps a bare "WON" word, with the margin as separate text', () => {
+    expect(buildResultLine('WON', { kind: 'runs', value: 30 })).toEqual({ kind: 'won', word: 'WON', marginText: 'by 30 runs' })
+    expect(buildResultLine('WON', { kind: 'wickets', value: 6 })).toEqual({ kind: 'won', word: 'WON', marginText: 'by 6 wickets' })
   })
-  it('a loss with a margin is plain-text "LOST BY N RUNS/WICKETS"', () => {
-    expect(buildResultLine('LOST', { kind: 'wickets', value: 6 })).toEqual({ kind: 'lost', label: 'LOST BY 6 WICKETS' })
-    expect(buildResultLine('LOST', { kind: 'runs', value: 30 })).toEqual({ kind: 'lost', label: 'LOST BY 30 RUNS' })
+  it('a loss keeps a bare "LOST" word, with the margin as separate text', () => {
+    expect(buildResultLine('LOST', { kind: 'wickets', value: 6 })).toEqual({ kind: 'lost', word: 'LOST', marginText: 'by 6 wickets' })
+    expect(buildResultLine('LOST', { kind: 'runs', value: 30 })).toEqual({ kind: 'lost', word: 'LOST', marginText: 'by 30 runs' })
   })
-  it('falls back to a bare WON/LOST when no margin can be computed yet', () => {
-    expect(buildResultLine('WON', null)).toEqual({ kind: 'won', label: 'WON' })
-    expect(buildResultLine('LOST', null)).toEqual({ kind: 'lost', label: 'LOST' })
+  it('no margin text when no margin can be computed yet', () => {
+    expect(buildResultLine('WON', null)).toEqual({ kind: 'won', word: 'WON', marginText: null })
+    expect(buildResultLine('LOST', null)).toEqual({ kind: 'lost', word: 'LOST', marginText: null })
   })
-  it('a tie is always just "MATCH TIED", margin or not', () => {
-    expect(buildResultLine('TIED', null)).toEqual({ kind: 'tied', label: 'MATCH TIED' })
+  it('a tie is always just "MATCH TIED", with no margin text', () => {
+    expect(buildResultLine('TIED', null)).toEqual({ kind: 'tied', word: 'MATCH TIED', marginText: null })
   })
-  it('an unrecognised result falls back to the raw uppercased string', () => {
-    expect(buildResultLine('rained out', null)).toEqual({ kind: null, label: 'RAINED OUT' })
+  it('an unrecognised result falls back to the raw uppercased string, with no margin text', () => {
+    expect(buildResultLine('rained out', null)).toEqual({ kind: null, word: 'RAINED OUT', marginText: null })
   })
   it('no result string at all renders nothing', () => {
     expect(buildResultLine(null, null)).toBeNull()

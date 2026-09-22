@@ -104,23 +104,29 @@ export function computeMatchMargin(
 
 export interface ResultLine {
   kind:  MatchResultKind
-  label: string
+  // Just the result word ("WON"/"LOST"/"MATCH TIED"/a raw fallback) — this
+  // is the only part MatchResultBadge.tsx renders as a pill/coloured text,
+  // matching src/components/shared/ResultBadge.tsx's own win/loss weighting
+  // (win = celebratory pill, everything else = plain coloured text).
+  word: string
+  // "by 30 runs" / "by 6 wickets" — rendered in the original plain, muted
+  // margin-line style, never inside the pill. `null` when no margin can be
+  // computed yet (missing toss data) or the result has no margin at all
+  // (a tie, or anything that doesn't normalise to won/lost).
+  marginText: string | null
 }
 
-// The single result+margin line rendered by MatchResultBadge.tsx — folds
-// the old separate "WON"/"LOST" pill (redundant once the margin line below
-// it also says "won"/"lost") into one line: "WON BY 30 RUNS" as a pill,
-// "LOST BY 6 WICKETS" as plain text, matching the same win/loss visual
-// weighting src/components/shared/ResultBadge.tsx already established
-// (win = celebratory pill, everything else = plain coloured text). Falls
-// back to a bare "WON"/"LOST" when no margin can be computed yet (missing
-// toss data), and to the raw uppercased result string for anything that
-// doesn't normalise to won/lost/tied (e.g. "NO RESULT").
+// Word + margin for the result strip — kept as two separate fields rather
+// than one combined string so MatchResultBadge.tsx can style them
+// differently: the word alone gets the pill/coloured-text treatment, the
+// margin stays the original plain muted text next to it. See
+// features/post-match-scorecard.md §17.6.
 export function buildResultLine(rawResult: string | null | undefined, margin: MatchMargin | null): ResultLine | null {
   if (!rawResult) return null
   const kind = normaliseMatchResultKind(rawResult)
-  if (kind === 'won')  return { kind, label: margin && margin.value > 0 ? `WON BY ${margin.value} ${margin.kind.toUpperCase()}` : 'WON' }
-  if (kind === 'lost') return { kind, label: margin && margin.value > 0 ? `LOST BY ${margin.value} ${margin.kind.toUpperCase()}` : 'LOST' }
-  if (kind === 'tied') return { kind, label: 'MATCH TIED' }
-  return { kind, label: rawResult.toUpperCase() }
+  const marginText = margin && margin.value > 0 ? `by ${margin.value} ${margin.kind}` : null
+  if (kind === 'won')  return { kind, word: 'WON', marginText }
+  if (kind === 'lost') return { kind, word: 'LOST', marginText }
+  if (kind === 'tied') return { kind, word: 'MATCH TIED', marginText: null }
+  return { kind, word: rawResult.toUpperCase(), marginText: null }
 }
