@@ -21,8 +21,8 @@ const LOCKED_STATUSES = ['pending_approval', 'approved', 'announced']
 
 // Knockout games may start squad selection (and therefore GC review) before
 // the Thursday 08:00 IST window opens, as soon as this many players have
-// marked Y for that booking — see features/squad-selection.md §4.
-const KNOCKOUT_EARLY_SELECTION_MIN_Y = 12
+// marked Y, O or E for that booking — see features/squad-selection.md §4.
+const KNOCKOUT_EARLY_SELECTION_MIN_AVAILABLE = 12
 
 // The weekend currently "open" for squad selection: the Sat/Sun governed by
 // the most recent Thursday on/before now (mirrors the lock-availability
@@ -165,12 +165,12 @@ export async function POST(req: NextRequest) {
   // still over a week out, well before that weekend's own Thursday.
   //
   // Knockout exception: a booking with stage_type = 'knockout' skips this
-  // window entirely once at least KNOCKOUT_EARLY_SELECTION_MIN_Y players
-  // have marked Y for it. Knockouts are a crucial stage of a tournament, and
+  // window entirely once at least KNOCKOUT_EARLY_SELECTION_MIN_AVAILABLE players
+  // have marked Y, O or E for it. Knockouts are a crucial stage of a tournament, and
   // an early squad lets the selected players start preparing mentally. League
   // games deliberately stay gated: saving a draft locks availability (see the
   // lock write below), and captains must not lock players ahead of the
-  // regular Thursday availability lock window. Y-count is always re-derived
+  // regular Thursday availability lock window. The count is always re-derived
   // here from `availability`, never trusted from the client.
   if (currentRows.length === 0) {
     const { data: newSquadBooking } = await supabase
@@ -180,19 +180,19 @@ export async function POST(req: NextRequest) {
       .single()
 
     let knockoutEarlyUnlocked = false
-    let knockoutYCount = 0
+    let knockoutAvailableCount = 0
     if (newSquadBooking?.stage_type === 'knockout') {
-      const { data: yRows } = await supabase
+      const { data: availRows } = await supabase
         .from('availability')
         .select('player_id')
         .eq('booking_id', booking_id)
-        .eq('response', 'Y')
-      knockoutYCount = yRows?.length ?? 0
-      knockoutEarlyUnlocked = knockoutYCount >= KNOCKOUT_EARLY_SELECTION_MIN_Y
+        .in('response', ['Y', 'O', 'E'])
+      knockoutAvailableCount = availRows?.length ?? 0
+      knockoutEarlyUnlocked = knockoutAvailableCount >= KNOCKOUT_EARLY_SELECTION_MIN_AVAILABLE
     }
 
     const knockoutHint = newSquadBooking?.stage_type === 'knockout'
-      ? ` — or, for this knockout game, as soon as ${KNOCKOUT_EARLY_SELECTION_MIN_Y} players mark Y (currently ${knockoutYCount})`
+      ? ` — or, for this knockout game, as soon as ${KNOCKOUT_EARLY_SELECTION_MIN_AVAILABLE} players mark Y/O/E (currently ${knockoutAvailableCount})`
       : ''
 
     if (newSquadBooking && isWeekend(newSquadBooking.game_date) && !knockoutEarlyUnlocked) {

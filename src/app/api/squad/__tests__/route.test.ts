@@ -350,14 +350,25 @@ describe('POST /api/squad — knockout early squad selection (before Thu 08:00 I
     expect(res.status).toBe(200)
   })
 
-  it('still blocks a knockout draft early when fewer than 12 players have marked Y', async () => {
+  it('counts O and E toward the 12 for a knockout', async () => {
+    tables.bookings.push({ id: 'ko-3', game_date: '2026-09-26', stage_type: 'knockout' })
+    seedAvailability('ko-3', player12.slice(0, 6), 'Y')
+    seedAvailability('ko-3', player12.slice(6, 9), 'O')
+    seedAvailability('ko-3', player12.slice(9, 12), 'E')
+    mockGetServerSession.mockResolvedValue(captainSession('captain-a'))
+    const res = await POST(postRequest(draftBody('ko-3', player12)))
+    expect(res.status).toBe(200)
+  })
+
+  it('still blocks a knockout draft early when fewer than 12 players have marked Y/O/E', async () => {
     tables.bookings.push({ id: 'ko-2', game_date: '2026-09-26', stage_type: 'knockout' })
-    seedAvailability('ko-2', player12.slice(0, 11))
-    seedAvailability('ko-2', ['p12'], 'O')
+    seedAvailability('ko-2', player12.slice(0, 9))
+    seedAvailability('ko-2', player12.slice(9, 11), 'E')
+    seedAvailability('ko-2', ['p12'], 'L')
     mockGetServerSession.mockResolvedValue(captainSession('captain-a'))
     const res = await POST(postRequest(draftBody('ko-2', player12.slice(0, 11))))
     expect(res.status).toBe(403)
-    expect((await res.json()).error).toMatch(/12 players mark Y \(currently 11\)/)
+    expect((await res.json()).error).toMatch(/12 players mark Y\/O\/E \(currently 11\)/)
   })
 
   it('still blocks a league draft early even with 12 Y', async () => {
