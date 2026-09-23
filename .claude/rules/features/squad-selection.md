@@ -982,6 +982,12 @@ Two more header links on the same `SlotCard`, same `<Link>` +
   that key, its filter validation drops the unknown value and the page
   shows the unfiltered record — same accepted fallback as above.
 
+**Back navigation.** Both destinations return to Captains' Corner via the
+mobile "‹ Back": `/leaderboard` already had `back` (§12); `/team-stats` now
+gets the same `back={{ fallbackHref: '/', label: 'Home' }}`. Filter taps on
+both pages now use `router.replace()`, so Back skips straight past any
+filters the captain changed there — see `features/back-navigation.md` §2.
+
 `src/app/captains-corner/page.tsx` now also selects `opponent_id` and the
 `id` of both ground embeds (`ground:grounds(id, …)` and the tournament's).
 

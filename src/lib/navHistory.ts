@@ -11,6 +11,15 @@
 // back to its hardcoded parent link one step early. Never the reverse
 // (claiming history exists when it doesn't), which is the case that would
 // actually strand a standalone-PWA user.
+//
+// Same-pathname changes (only the query string differs) are treated as a
+// *replace* of the current entry, not a push. Filter-driven pages
+// (/team-stats, /leaderboard) switch filters with router.replace() so the
+// browser's own history doesn't grow per filter tap — "‹ Back" then returns
+// to the page the player came from (e.g. Captains' Corner), not the previous
+// filter combination. Recording those as pushes would claim history the
+// browser doesn't have. If some page still *pushes* a same-path URL, the
+// pointer ends up one too low — the safe failure mode described above.
 
 export interface NavHistoryState {
   stack:   string[]
@@ -24,12 +33,22 @@ export function recordNavigation(state: NavHistoryState, url: string): NavHistor
   if (pointer >= 0 && stack[pointer] === url) return state                  // same page (re-render, hash change)
   if (pointer > 0 && stack[pointer - 1] === url) return { stack, pointer: pointer - 1 }   // back
   if (pointer + 1 < stack.length && stack[pointer + 1] === url) return { stack, pointer: pointer + 1 } // forward
+  if (pointer >= 0 && pathOf(stack[pointer]) === pathOf(url)) {             // same page, new query → replace
+    const replaced = stack.slice(0, pointer + 1)
+    replaced[pointer] = url
+    return { stack: replaced, pointer }
+  }
   const next = stack.slice(0, pointer + 1)
   next.push(url)
   // Bound the stack — nobody navigates 200 pages deep in one tab, and
   // sessionStorage has a per-origin quota.
   const trimmed = next.length > 200 ? next.slice(next.length - 200) : next
   return { stack: trimmed, pointer: trimmed.length - 1 }
+}
+
+function pathOf(url: string): string {
+  const i = url.indexOf('?')
+  return i === -1 ? url : url.slice(0, i)
 }
 
 export function canGoBack(state: NavHistoryState): boolean {

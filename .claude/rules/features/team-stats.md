@@ -260,6 +260,12 @@ round-trip. Reported with a screenshot the same day it shipped; replaced by
   starts with nothing checked rather than an "All …" option selected.
   Adding "Practice games" just means *include them* (there's no value to
   pick), so it toggles straight on.
+- **Filter changes replace, never push (September 2026).** Apply, chip
+  removal, Clear all and the Split by / Then by pills all use
+  `router.replace()` / `<Link replace>`, and the page's `SiteNav` now has
+  `back={{ fallbackHref: '/', label: 'Home' }}` — "‹ Back" returns to
+  wherever the player came from (e.g. an opponent link in Captains' Corner),
+  not the previous filter set. See `features/back-navigation.md` §2.
 - **Staged, applied once.** Edits go into a local draft; the footer button
   reads **"Show N matches"** and pushes one URL (`buildTeamStatsHref`) when
   tapped, so a five-filter change is one navigation instead of five. The

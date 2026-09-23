@@ -19,8 +19,10 @@
 //      primary interaction and shouldn't be buried in the panel.
 //
 // Still entirely URL-driven: the Server Component owns the data and parses
-// searchParams; this only ever pushes a new href (buildTeamStatsHref), so
-// every view remains a shareable link and BackButton restores it.
+// searchParams; this only ever *replaces* the href (buildTeamStatsHref) —
+// never pushes — so filter taps don't pile up browser history and "‹ Back"
+// returns to the page the player came from (features/back-navigation.md §3).
+// Every view remains a shareable link and BackButton restores it.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -70,7 +72,7 @@ export function TeamFilterShell({ state, options, matches, children, canUseCapta
   const draftCount = useMemo(() => applyFilters(matches, toTeamFilters(draft)).length, [matches, draft])
   const active = activeFilterKeys(state)
 
-  function apply() { setSheetOpen(false); if (dirty) router.push(draftHref) }
+  function apply() { setSheetOpen(false); if (dirty) router.replace(draftHref) }
   function reset() { setDraft(state); setAdded([]) }
 
   const panel = (
@@ -108,9 +110,9 @@ export function TeamFilterShell({ state, options, matches, children, canUseCapta
             <>
               {active.map(k => (
                 <Chip key={k} label={filterValueLabel(state, k, options)} title={FILTER_LABEL[k]}
-                  onRemove={() => router.push(buildTeamStatsHref(clearFilter(state, k)))} />
+                  onRemove={() => router.replace(buildTeamStatsHref(clearFilter(state, k)))} />
               ))}
-              <button onClick={() => router.push(buildTeamStatsHref(clearAllFilters(state)))}
+              <button onClick={() => router.replace(buildTeamStatsHref(clearAllFilters(state)))}
                 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--stats-text-muted)] dark:text-zinc-500 hover:text-[var(--stats-accent)] dark:hover:text-gold">
                 Clear all
               </button>
@@ -399,10 +401,10 @@ function PillRow({ label, active, options, hrefFor, includeNone, noneHref }: {
       <span className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-[var(--stats-text-faint)] dark:text-zinc-600 flex-none w-[4.5rem]">{label}</span>
       <div ref={ref} className="flex gap-2 overflow-x-auto -my-1 py-1 min-w-0" style={{ scrollbarWidth: 'none' }}>
         {includeNone && (
-          <Link href={noneHref!} data-active={active === null} scroll={false} className={splitPill(active === null)}>None</Link>
+          <Link href={noneHref!} data-active={active === null} scroll={false} replace className={splitPill(active === null)}>None</Link>
         )}
         {options.map(d => (
-          <Link key={d} href={hrefFor(d)} data-active={active === d} scroll={false} className={splitPill(active === d)}>
+          <Link key={d} href={hrefFor(d)} data-active={active === d} scroll={false} replace className={splitPill(active === d)}>
             {SPLIT_LABEL[d]}
           </Link>
         ))}

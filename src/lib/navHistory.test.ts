@@ -36,4 +36,18 @@ describe('recordNavigation', () => {
     const again = recordNavigation(s, '/a')
     expect(again).toBe(s)
   })
+  it('treats a query-only change on the same page as a replace', () => {
+    let s = recordNavigation(EMPTY_NAV_HISTORY, '/captains-corner')
+    s = recordNavigation(s, '/team-stats?year=all&opponent=id:x')
+    s = recordNavigation(s, '/team-stats?year=all&opponent=id:x&by=year')
+    expect(s.stack).toEqual(['/captains-corner', '/team-stats?year=all&opponent=id:x&by=year'])
+    expect(s.pointer).toBe(1)
+    s = recordNavigation(s, '/captains-corner')   // back lands on the origin page
+    expect(s.pointer).toBe(0)
+  })
+  it('never claims history on a cold open followed by filter changes', () => {
+    let s = recordNavigation(EMPTY_NAV_HISTORY, '/leaderboard?ground=g1')
+    s = recordNavigation(s, '/leaderboard?ground=g1&category=batting')
+    expect(canGoBack(s)).toBe(false)
+  })
 })
