@@ -20,12 +20,14 @@ GC/admin-only and built around admin-style fields (active/inactive status,
 wallet balance, a dues filter). Per a direct request it was turned into
 this directory instead:
 
-- **Removed:** status (Active/Inactive/Expelled filter and badges), wallet
-  balance, and the "Dues outstanding" toggle.
+- **Removed:** wallet balance, the "Dues outstanding" toggle, and the
+  Expelled filter (expelled players aren't listed at all).
 - **Added:** a name/jersey-name search box, and per-card career highlights
   (§3) — the numbers that stand out for that player.
 - **Kept:** photo/initials avatar, jersey number and name, skill pills,
-  Captain badge, A–Z bar, "Last played" date.
+  Captain badge, A–Z bar, "Last played" date, and — restored the same week
+  on request — an **Active / Inactive / All** filter, **defaulting to
+  Active** (see §4).
 
 `/gc-players` now just `redirect('/players')`, so old links still work.
 GC-only members no longer have an in-app view of the roster's wallet
@@ -38,7 +40,7 @@ balances or dues. Admins still have `/admin/players` and `/admin/wallet`.
 | Check | Status |
 |---|---|
 | Signed-in session required (redirect to `/login`), expelled → `/` | ✅ |
-| Select limited to public-profile fields: `id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain` | ✅ No wallet, status, gmail, dob, whatsapp, blood group |
+| Select limited to public-profile fields: `id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain`, plus `status` read server-side only to derive an `is_active` boolean | ✅ No wallet, gmail, dob, whatsapp, blood group; the raw status string never reaches the client |
 | Expelled players excluded server-side (`.neq('status', 'expelled')`) | ✅ |
 | No write path, no new API route | ✅ Server Component reads via `createServiceClient()` |
 | Career stats are the same numbers already public on every `/players/[id]/stats` page | ✅ |
@@ -94,13 +96,20 @@ tiny sample from producing a flashy average. Unit tests are in
 
 ## 4. UI — `PlayerDirectoryGrid.tsx`
 
-Client component. It has a search box (name or jersey name, which resets
-the letter filter), an A–Z bar (letters with no matches under the current
-search are disabled), a result count, and a responsive card grid. The
+Client component. It has an **Active / Inactive / All** pill row with
+counts, defaulting to **Active** (added the same week as the page, on
+request — `players.status`, maintained by the `sync-player-status` cron:
+active = marked Y/O/E in the last 30 days, see `gc-players.md` §2), a
+search box (name or jersey name) — both reset the letter filter — an A–Z
+bar (letters with no matches under the current status and search are
+disabled), a result count, and a responsive card grid. The
 **whole card is a link** to `/players/[id]/stats`. Theming uses the shared
 `--stats-*` tokens, so it follows Light/Dark/System like `/leaderboard` and
 `/team-stats`. It replaced the old Slate & Teal palette, which was
 light-only. The avatar reuses `PlayerAvatar`.
+
+A card in the All view carries a small "Inactive" pill when the player is
+inactive, so the two groups stay distinguishable without a filter.
 
 The footer shows the match count (from highlights) and "Last played
 &lt;date&gt;". Last played is still Hub-side: the latest confirmed,
@@ -127,7 +136,7 @@ already-played booking the player was squadded for.
 | File | Role |
 |---|---|
 | `src/app/players/page.tsx` | Server page — auth gate, public-field player fetch, last-played, highlights |
-| `src/components/players/PlayerDirectoryGrid.tsx` | Search, A–Z, cards |
+| `src/components/players/PlayerDirectoryGrid.tsx` | Active/Inactive/All filter (default Active), search, A–Z, cards |
 | `src/lib/playerHighlights.ts` (+ `.test.ts`) | `CareerHighlights` type, `pickHighlights()` |
 | `src/lib/playerStats.ts` | `getCareerHighlightsByPlayer()` |
 | `src/app/gc-players/page.tsx` | Redirect to `/players` |
