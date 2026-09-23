@@ -280,9 +280,24 @@ These are distinct. A player with `players.is_captain = false` can be designated
 - **Knockout exception (added September 2026):** a booking with `bookings.stage_type = 'knockout'`
   (`features/team-stats.md` §4) skips the time gate above entirely — both the Mon–Wed/pre-Thu-8am
   block and the `getActiveLockWeekend()` check — once at least **12 players have marked `Y`** for
-  that booking (`KNOCKOUT_EARLY_SELECTION_MIN_Y` in `src/app/api/squad/route.ts`). A knockout is
-  usually known days ahead, so captains can draft and submit for GC review as soon as enough
-  players have committed, instead of waiting for Thursday. Only `Y` counts (not O/E, which are
+  that booking (`KNOCKOUT_EARLY_SELECTION_MIN_Y` in `src/app/api/squad/route.ts`), so captains can
+  draft and submit for GC review as soon as enough players have committed, instead of waiting for
+  Thursday.
+
+  **Why knockouts get this (product decision):** knockout games are a crucial stage of a
+  tournament. Getting the squad selected, GC-approved and announced early gives the selected
+  players time to start preparing mentally for that match, rather than finding out only a day or
+  two before.
+
+  **Why league (and unclassified) games don't (product decision):** drafting a squad locks that
+  booking's player availability (the lock-on-draft-save trigger below). If captains could draft
+  league squads early, they could lock players in ahead of the regular Thursday 08:00 IST
+  availability lock window, before the rest of the club has had its normal chance to respond. The
+  Thursday gate exists to keep everyone on that shared schedule. A knockout is the one deliberate
+  exception, and even then only once 12 `Y` responses exist, so an early lock never freezes an
+  underfilled pool.
+
+  Only `Y` counts (not O/E, which are
   shared across other slots — same reasoning as the Y-only "Slot underfilled" nudge in §5). The
   Y-count is re-derived server-side from `availability` on every first-draft save, never taken
   from the client. Below 12 Y, the normal gate still applies, and its 403 message names the

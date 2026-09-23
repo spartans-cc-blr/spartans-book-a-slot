@@ -166,9 +166,12 @@ export async function POST(req: NextRequest) {
   //
   // Knockout exception: a booking with stage_type = 'knockout' skips this
   // window entirely once at least KNOCKOUT_EARLY_SELECTION_MIN_Y players
-  // have marked Y for it — a knockout is usually known days in advance and
-  // captains want the squad through GC review early. Y-count is always
-  // re-derived here from `availability`, never trusted from the client.
+  // have marked Y for it. Knockouts are a crucial stage of a tournament, and
+  // an early squad lets the selected players start preparing mentally. League
+  // games deliberately stay gated: saving a draft locks availability (see the
+  // lock write below), and captains must not lock players ahead of the
+  // regular Thursday availability lock window. Y-count is always re-derived
+  // here from `availability`, never trusted from the client.
   if (currentRows.length === 0) {
     const { data: newSquadBooking } = await supabase
       .from('bookings')
