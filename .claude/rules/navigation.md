@@ -26,7 +26,7 @@ they can drift apart:
 
 1. **A normal signed-in browser session** — there is no server-side
    redirect away from `/` for a logged-in player. `middleware.ts`'s
-   `matcher` only guards `/gc/:path*`, `/gc-review`, `/gc-players`, and
+   `matcher` only guards `/gc/:path*`, `/gc-review`, and
    `/admin/:path*`; `/lib/auth.ts` has no custom `callbacks.redirect`. The
    Home page's own "Sign in with Google" button links straight to
    `/api/auth/signin` with no `callbackUrl` query param, so NextAuth's
@@ -919,7 +919,7 @@ link) that toggles the bottom sheet — it shows the same active-gold
 treatment whenever the sheet is open, or whenever `activePage` is one of
 the values that only live inside the sheet (`isAdminOrGcHighlighted()`:
 `dugout`, `leaderboard`, `team-stats`, `opponents`, `profile`, `planner`, `captains`,
-`captains-unavailable`, `gc`, `gc-players`, `wrangler`, `schedule` —
+`captains-unavailable`, `gc`, `players`, `wrangler`, `schedule` —
 deliberately excludes `matches` and `my-stats`, both covered by their own
 tab's `active` check instead).
 
