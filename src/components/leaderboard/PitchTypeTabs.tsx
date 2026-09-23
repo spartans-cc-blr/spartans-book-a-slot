@@ -36,7 +36,7 @@ export function PitchTypeTabs({ active }: { active: PitchType | 'all' }) {
     const params = new URLSearchParams(searchParams.toString())
     if (key === 'all') params.delete('pitch')
     else params.set('pitch', key)
-    router.push(`/leaderboard?${params.toString()}`)
+    router.replace(`/leaderboard?${params.toString()}`)
   }
 
   return (

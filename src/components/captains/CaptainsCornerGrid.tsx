@@ -20,6 +20,7 @@ import { isPracticeMatch } from '@/types'
 import { matchDisplayTime } from '@/lib/matchStatus'
 import { useTheme } from '@/components/ui/ThemeProvider'
 import { PlayerNameLink } from '@/lib/playerLink'
+import { opponentKey } from '@/lib/teamStatsCore'
 
 interface Booking {
   id: string
@@ -27,17 +28,20 @@ interface Booking {
   slot_time: string
   format: string
   opponent_name: string | null
+  // Canonical opponent (features/team-stats.md §5) — drives the Team Record
+  // deep link, keyed the same way Team Record's own opponent filter is.
+  opponent_id?: string | null
   match_time: string  // DB-guaranteed non-null — see matchStatus.ts
   cricheroes_url: string | null
   tournament: {
      name: string
      ball_type: string
      is_practice?: boolean
-     ground: { name: string; maps_url: string; hospital_url: string } | null
+     ground: { id?: string; name: string; maps_url: string; hospital_url: string } | null
    } | null
   // This booking's own ground (migration 066) — takes priority over the
   // tournament's ground, which is now only a fallback for older rows.
-  ground?: { name: string; maps_url: string; hospital_url: string } | null
+  ground?: { id?: string; name: string; maps_url: string; hospital_url: string } | null
   // This booking's own practice-game flag, additive to the tournament's own
   // is_practice — see features/practice-games.md.
   is_practice?: boolean
@@ -1245,6 +1249,7 @@ function SlotCard({
   // useful when there's a real pool to choose between. Additive: this
   // booking's own flag counts the same as its tournament being flagged.
   const isPractice = isPracticeMatch(booking.is_practice, booking.tournament?.is_practice)
+  const slotGround = booking.ground ?? booking.tournament?.ground ?? null
   const priorityPlayers = eligible.filter(e => e.player.priority_pick)
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
   const exemptInSquad   = players.filter(p => selected.has(p.id) && p.is_fee_exempt).length
@@ -1607,9 +1612,37 @@ function SlotCard({
                 booking.tournament?.name ?? 'Match'
               )}
             </p>
+            {/* Opponent links into Team Record pre-filtered to this opponent
+                (all time), keyed with the same opponentKey() Team Record's
+                own filter uses — canonical id once linked, else the
+                normalised raw spelling. */}
             {booking.opponent_name && (
               <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-500 mt-0.5">
-                vs {booking.opponent_name}
+                vs{' '}
+                <Link
+                  href={`/team-stats?year=all&opponent=${encodeURIComponent(opponentKey({ opponentId: booking.opponent_id ?? null, opponentName: booking.opponent_name }))}`}
+                  onClick={e => e.stopPropagation()}
+                  className="hover:underline underline-offset-2"
+                  title="View our record against this opponent">
+                  {booking.opponent_name}
+                </Link>
+              </p>
+            )}
+            {/* Ground (booking's own override, else the tournament's) links
+                into "Yours Statistically" MVP, pre-filtered to this ground —
+                same shape as the tournament-name link above. */}
+            {slotGround?.name && (
+              <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-500 mt-0.5 truncate">
+                @{' '}
+                {slotGround.id ? (
+                  <Link
+                    href={`/leaderboard?ground=${slotGround.id}&category=mvp&year=all`}
+                    onClick={e => e.stopPropagation()}
+                    className="hover:underline underline-offset-2"
+                    title="View stats at this ground">
+                    {slotGround.name}
+                  </Link>
+                ) : slotGround.name}
               </p>
             )}
           </div>

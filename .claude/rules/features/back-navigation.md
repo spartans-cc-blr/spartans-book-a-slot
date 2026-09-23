@@ -89,6 +89,21 @@ navigation to the same URL as the previous entry as "back", but that
 fails safe (pointer too *low* → fallback link one step early), never the
 other way.
 
+**Query-only changes are replaces (added September 2026).** A URL change
+whose pathname equals the current entry's (only the query string differs)
+overwrites the current entry instead of pushing a new one. `/team-stats`
+(`TeamFilterPanel.tsx` — apply, chip removal, Clear all, and the Split by /
+Then by pills via `<Link replace>`) and `/leaderboard`
+(`LeaderboardFilters.tsx`, `PitchTypeTabs.tsx`) now change filters with
+`router.replace()`, so the browser's history doesn't grow per filter tap
+either — "‹ Back" from a filtered stats page returns to where the player
+came from (Captains' Corner, a match, Home), not the previous filter
+combination. The two changes are a pair: recording a replace as a push
+would claim history the browser doesn't have (a cold open followed by one
+filter tap would show "Back" and `router.back()` would leave the app). A
+page that still *pushes* a same-path URL just leaves the pointer one step
+low — the safe failure mode. Tests in `navHistory.test.ts`.
+
 `sessionStorage` is per-tab and cleared when the tab (or the standalone
 PWA) closes — the lifetime of the browser history it mirrors.
 `document.referrer` is *not* a substitute: empty in standalone mode and
@@ -133,8 +148,11 @@ mobile.** Concretely:
   > a genuine drill-down entry point it didn't have when the rule above was
   > written. `/leaderboard` now passes `back={{ fallbackHref: '/', label:
   > 'Home' }}` to `<SiteNav>` — the one exception to "roots show no back."
-  > `/team-stats` is untouched and still follows the rule as originally
-  > stated.
+  > `/team-stats` now does the same (`back={{ fallbackHref: '/', label:
+  > 'Home' }}`), since Captains' Corner's opponent names link into it
+  > opponent-filtered (`features/squad-selection.md` §12.1). Neither root
+  > renders a desktop inline link — same as before, desktop has the browser's
+  > own back button.
 
 ### `fixtures/[id]` and body-level `BackButton`s keep their old colours
 

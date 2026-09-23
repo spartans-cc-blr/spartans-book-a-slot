@@ -74,7 +74,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: T
 
   return (
     <div className="min-h-screen bg-[var(--stats-shell-bg)] dark:bg-ink grain">
-      <SiteNav activePage="team-stats" />
+      <SiteNav activePage="team-stats" back={{ fallbackHref: '/', label: 'Home' }} />
 
       <div className="bg-[var(--stats-card-bg)] dark:bg-ink-2 border-b border-[var(--stats-divider)] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"

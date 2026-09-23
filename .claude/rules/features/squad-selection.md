@@ -958,3 +958,40 @@ is scoped to `/leaderboard` only.
 |---|---|
 | `src/components/captains/CaptainsCornerGrid.tsx` | `SlotCard`'s header converted from `<button>` to `<div role="button">`; tournament name hyperlinked to `/leaderboard?tournament=<id>&category=mvp&year=all` when `!isPractice` |
 | `src/app/leaderboard/page.tsx` | `<SiteNav back={{ fallbackHref: '/', label: 'Home' }} />` — this page's first back affordance |
+
+### 12.1 Ground line + opponent link (added September 2026)
+
+Two more header links on the same `SlotCard`, same `<Link>` +
+`e.stopPropagation()` pattern as the tournament name above:
+
+- **`@ <ground>` line under "vs opponent"** — the booking's own ground
+  (`bookings.ground_id`, migration 066) falling back to the tournament's.
+  Links to `/leaderboard?ground=<groundId>&category=mvp&year=all` — the
+  ground-level counterpart of the tournament MVP link. Unlike the
+  tournament link it is shown for practice games too, since a ground's
+  record is real regardless of this booking being practice (the leaderboard
+  itself still excludes practice matches from its totals). A ground the
+  leaderboard has no matches for falls back to its unfiltered view (its
+  own `ground` param validation) — accepted, not special-cased.
+- **Opponent name** links to `/team-stats?year=all&opponent=<key>` — Team
+  Record pre-filtered to this opponent, all time. `<key>` is built with
+  `opponentKey()` from `src/lib/teamStatsCore.ts` (client-safe), the same
+  key Team Record's own opponent filter uses: `id:<opponent_id>` once the
+  booking is linked to the opponent master (`features/team-stats.md` §5),
+  else `name:<normalised spelling>`. If Team Record has no past match for
+  that key, its filter validation drops the unknown value and the page
+  shows the unfiltered record — same accepted fallback as above.
+
+**Back navigation.** Both destinations return to Captains' Corner via the
+mobile "‹ Back": `/leaderboard` already had `back` (§12); `/team-stats` now
+gets the same `back={{ fallbackHref: '/', label: 'Home' }}`. Filter taps on
+both pages now use `router.replace()`, so Back skips straight past any
+filters the captain changed there — see `features/back-navigation.md` §2.
+
+`src/app/captains-corner/page.tsx` now also selects `opponent_id` and the
+`id` of both ground embeds (`ground:grounds(id, …)` and the tournament's).
+
+| File | Role |
+|---|---|
+| `src/app/captains-corner/page.tsx` | Selects `opponent_id`, `grounds.id` on both ground embeds |
+| `src/components/captains/CaptainsCornerGrid.tsx` | `Booking.opponent_id`, ground `id`; `slotGround`; `@ ground` line → ground-scoped MVP; opponent → Team Record |

@@ -150,7 +150,7 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
     // so strip it.
     if (next.format === '') params.delete('format')
     if (next.innings === '') params.delete('innings')
-    router.push(`/leaderboard?${params.toString()}`)
+    router.replace(`/leaderboard?${params.toString()}`)
   }
 
   function toggleFormat(fmt: Format) {
