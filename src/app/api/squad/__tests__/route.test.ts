@@ -8,7 +8,7 @@
 // in-memory fake Supabase client (src/app/api/squad/__tests__/fakeSupabase.ts)
 // — no live database is touched.
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { createFakeSupabase, type FakeTables } from './fakeSupabase'
 import { EMPTY_SQUAD_VERSION, computeSquadVersion } from '@/lib/squadVersion'
@@ -316,5 +316,56 @@ describe('POST /api/squad — reopen authorization is scoped to this match\'s ca
     }))
     expect(reopened.status).toBe(200)
     expect(tables.squad_audit[0]).toMatchObject({ booking_id: bookingId, action: 'returned', actor_id: 'admin-1' })
+  })
+})
+
+describe('POST /api/squad — knockout early squad selection (before Thu 08:00 IST)', () => {
+  // Pin "now" to Monday 21 Sep 2026, 10:00 IST — inside the blocked
+  // Mon–Wed window, and the following weekend (26/27 Sep) is not yet the
+  // active one either.
+  const MONDAY_IST_AS_UTC = new Date('2026-09-21T04:30:00Z')
+  const player12 = Array.from({ length: 12 }, (_, i) => `p${i + 1}`)
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(MONDAY_IST_AS_UTC)
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  function draftBody(bookingId: string, ids: string[]) {
+    return {
+      booking_id: bookingId,
+      player_ids: ids,
+      roles: { captain: ids[0], vc: ids[1], wk: [ids[2]] },
+      match_roles: {},
+      expected_version: EMPTY_SQUAD_VERSION,
+    }
+  }
+
+  it('allows a knockout squad draft early once 12 players have marked Y', async () => {
+    tables.bookings.push({ id: 'ko-1', game_date: '2026-09-26', stage_type: 'knockout' })
+    seedAvailability('ko-1', player12)
+    mockGetServerSession.mockResolvedValue(captainSession('captain-a'))
+    const res = await POST(postRequest(draftBody('ko-1', player12)))
+    expect(res.status).toBe(200)
+  })
+
+  it('still blocks a knockout draft early when fewer than 12 players have marked Y', async () => {
+    tables.bookings.push({ id: 'ko-2', game_date: '2026-09-26', stage_type: 'knockout' })
+    seedAvailability('ko-2', player12.slice(0, 11))
+    seedAvailability('ko-2', ['p12'], 'O')
+    mockGetServerSession.mockResolvedValue(captainSession('captain-a'))
+    const res = await POST(postRequest(draftBody('ko-2', player12.slice(0, 11))))
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/12 players mark Y \(currently 11\)/)
+  })
+
+  it('still blocks a league draft early even with 12 Y', async () => {
+    tables.bookings.push({ id: 'lg-1', game_date: '2026-09-26', stage_type: 'league' })
+    seedAvailability('lg-1', player12)
+    mockGetServerSession.mockResolvedValue(captainSession('captain-a'))
+    const res = await POST(postRequest(draftBody('lg-1', player12)))
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).not.toMatch(/knockout/)
   })
 })
