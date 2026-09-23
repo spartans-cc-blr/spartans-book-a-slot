@@ -2,9 +2,8 @@
 // set on the player's profile, otherwise a two-letter initials badge
 // (first letter of first name + first letter of last name, e.g.
 // "Muthukumar Ramamoorthy" -> "MR") instead of a generic placeholder
-// image. Same initials algorithm as GCPlayersGrid.tsx's initials(),
-// re-themed here to this page's dark ink/gold palette instead of GC's
-// slate-teal.
+// image. Also used by the /players directory (PlayerDirectoryGrid.tsx).
+// Themed with the shared --stats-* tokens.
 
 function initials(name: string): string {
   return name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()

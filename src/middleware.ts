@@ -12,5 +12,5 @@ export default withAuth({
 })
 
 export const config = {
-  matcher: ['/gc/:path*', '/gc-review', '/gc-players', '/admin/:path*'],
+  matcher: ['/gc/:path*', '/gc-review', '/admin/:path*'],
 }

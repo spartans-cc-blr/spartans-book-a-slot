@@ -808,6 +808,15 @@ was added as the last item of **Captains' Corner ▾**, **Council ⚖** and
 since captains, GC and wranglers all manage the opponent master. See
 `features/team-stats.md` §6.
 
+### Players directory in Stats ▾ (added September 2026)
+
+**Stats ▾** gained a third item, "👤 Players" → `/players`
+(`activePage === 'players'`), the club-wide player directory that replaced
+the GC-only `/gc-players` (see `features/player-directory.md`). The old
+"👤 Players" rows in Council ⚖ (desktop) and the More sheet's Council
+section were removed. The More sheet instead has a "Players" row after
+Team Record for every logged-in member.
+
 ### `back` prop — mobile "‹ Back" (added September 2026)
 
 `SiteNav` accepts `back?: { fallbackHref: string; label: string }`. When
@@ -835,7 +844,7 @@ there. Full audit, design and per-page fallbacks in
 | Role | Nav items visible |
 |---|---|
 | Public (not signed in) | Schedule · Sign In |
-| Player | Home (logo) · Matches ▾ · Stats ▾ · The Dugout · My Profile |
+| Player | Home (logo) · Matches ▾ · Stats ▾ (Yours Statistically, Team Record, Players) · The Dugout · My Profile |
 | Captain | Home (logo) · Matches ▾ · Captains' Corner ▾ (Squad Selection, Unavailable Dates, Opponents) · Stats ▾ · The Dugout · Tournaments · My Profile |
 | GC | Home (logo) · Matches ▾ · Stats ▾ · The Dugout · Tournaments · My Profile · Council ⚖ (… Grounds, Opponents) |
 | Wrangler | + Wrangler ⚒ dropdown (Squad Backfill, Grounds, Opponents) |
