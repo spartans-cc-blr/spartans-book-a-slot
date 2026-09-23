@@ -811,7 +811,9 @@ since captains, GC and wranglers all manage the opponent master. See
 ### `back` prop — mobile "‹ Back" (added September 2026)
 
 `SiteNav` accepts `back?: { fallbackHref: string; label: string }`. When
-set, a `md:hidden` `BackButton` (`src/components/ui/BackButton.tsx`)
+set, a `BackButton` (every width since September 2026 — was `md:hidden`,
+which left iPad PWA users with no way back; see `features/back-navigation.md`
+§2) (`src/components/ui/BackButton.tsx`)
 renders at the far left of the top row, before the logo lockup:
 `router.back()` when the tab has in-app history (per-tab stack in
 `NavHistoryProvider`, mounted from `providers.tsx`), else a `<Link>` to

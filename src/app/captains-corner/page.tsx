@@ -7,6 +7,8 @@ import { getRecentForm, getLeaderboardsByTournament, computeMvpRanks } from '@/l
 import type { MvpRankEntry, LeaderboardRow } from '@/types'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { CaptainsCornerGrid } from '@/components/captains/CaptainsCornerGrid'
+import { opponentKey } from '@/lib/teamStatsCore'
+import { normaliseOpponentName } from '@/lib/opponents'
 import { getISOWeek, getISOWeekYear, parseISO, startOfISOWeek, addDays, format } from 'date-fns'
 import type { Metadata } from 'next'
 
@@ -131,7 +133,7 @@ export default async function CaptainsCornerPage() {
     )
   )
 
-  const [{ data: avail }, { data: squads }, recentFormByPlayer, leaderboardsByTournament] = await Promise.all([
+  const [{ data: avail }, { data: squads }, recentFormByPlayer, leaderboardsByTournament, { data: pastBookings }, { data: syncedRows }] = await Promise.all([
     bookingIds.length > 0
       ? supabase.from('availability').select('player_id, booking_id, response').in('booking_id', bookingIds)
       : Promise.resolve({ data: [] as { player_id: string; booking_id: string; response: string }[] }),
@@ -156,7 +158,52 @@ export default async function CaptainsCornerPage() {
     knockoutTournamentIds.length > 0
       ? getLeaderboardsByTournament(knockoutTournamentIds)
       : Promise.resolve({} as Record<string, LeaderboardRow[]>),
+
+    // Opponent → Team Record link (features/squad-selection.md §12.1). Team
+    // Record only knows opponents it has a synced match against, so the
+    // link is built from the same universe getTeamMatches() uses — every
+    // confirmed booking with a match_id whose scorecard is in
+    // match_stats_cache — not guessed from the upcoming booking alone.
+    supabase
+      .from('bookings')
+      .select('id, opponent_id, opponent_name, is_practice, tournament:tournaments!bookings_tournament_id_fkey(is_practice)')
+      .eq('status', 'confirmed')
+      .not('match_id', 'is', null)
+      .range(0, 4999),
+    supabase.from('match_stats_cache').select('booking_id, opponent_name').range(0, 4999),
   ])
+
+  // Team Record opponent keys (opponentKey(): `id:<uuid>` once linked, else
+  // `name:<normalised spelling>`) per upcoming booking, collected from every
+  // past synced match against the same opponent — matched by canonical id
+  // *or* by spelling, so a mix of linked/unlinked history is all included
+  // (Team Record's opponent filter is multi-select). Empty = no history,
+  // and the grid renders the name as plain text rather than a link that
+  // would silently fall back to an unfiltered page.
+  const cacheOpponentByBooking = new Map<string, string | null>(
+    (syncedRows ?? []).map((r: any) => [r.booking_id as string, (r.opponent_name as string | null) ?? null])
+  )
+  const pastHistory = ((pastBookings ?? []) as any[])
+    .filter(b => cacheOpponentByBooking.has(b.id))
+    .map(b => {
+      const t = Array.isArray(b.tournament) ? b.tournament[0] : b.tournament
+      const rawName = ((b.opponent_name ?? cacheOpponentByBooking.get(b.id) ?? '') as string).trim() || 'Unknown opponent'
+      return {
+        opponentId: (b.opponent_id as string | null) ?? null,
+        normName:   normaliseOpponentName(rawName),
+        key:        opponentKey({ opponentId: b.opponent_id ?? null, opponentName: rawName }),
+        practice:   !!b.is_practice || !!t?.is_practice,
+      }
+    })
+  for (const b of scopedBookings as any[]) {
+    if (!b.opponent_name) continue
+    const norm = normaliseOpponentName(b.opponent_name)
+    const hits = pastHistory.filter(h => (b.opponent_id && h.opponentId === b.opponent_id) || h.normName === norm)
+    b.opponent_record_keys = Array.from(new Set(hits.map(h => h.key)))
+    // Team Record hides practice games by default — if every past meeting
+    // was a practice game, the link opts in so the page isn't empty.
+    b.opponent_record_practice_only = hits.length > 0 && hits.every(h => h.practice)
+  }
 
   const availability: { player_id: string; booking_id: string; response: string }[] = avail ?? []
   const existingSquads: ExistingSquadRow[] = (squads ?? []) as ExistingSquadRow[]
@@ -253,7 +300,7 @@ export default async function CaptainsCornerPage() {
 
   return (
     <div className="min-h-screen grain" style={{ background: 'var(--captains-shell-bg)' }}>
-      <SiteNav activePage="captains" />
+      <SiteNav activePage="captains" back={{ fallbackHref: '/', label: 'Home' }} />
 
       {/* Hero */}
       <div className="px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden"

@@ -973,18 +973,36 @@ Two more header links on the same `SlotCard`, same `<Link>` +
   itself still excludes practice matches from its totals). A ground the
   leaderboard has no matches for falls back to its unfiltered view (its
   own `ground` param validation) — accepted, not special-cased.
-- **Opponent name** links to `/team-stats?year=all&opponent=<key>` — Team
-  Record pre-filtered to this opponent, all time. `<key>` is built with
-  `opponentKey()` from `src/lib/teamStatsCore.ts` (client-safe), the same
-  key Team Record's own opponent filter uses: `id:<opponent_id>` once the
-  booking is linked to the opponent master (`features/team-stats.md` §5),
-  else `name:<normalised spelling>`. If Team Record has no past match for
-  that key, its filter validation drops the unknown value and the page
-  shows the unfiltered record — same accepted fallback as above.
+- **Opponent name** links to `/team-stats?year=all&opponent=<keys>` — Team
+  Record pre-filtered to this opponent, all time.
 
-**Back navigation.** Both destinations return to Captains' Corner via the
-mobile "‹ Back": `/leaderboard` already had `back` (§12); `/team-stats` now
-gets the same `back={{ fallbackHref: '/', label: 'Home' }}`. Filter taps on
+  **Fixed the same week — the first cut linked every opponent, and most
+  landed on the unfiltered record.** It built one key client-side with
+  `opponentKey()` from the upcoming booking alone. Team Record only knows
+  opponents it has a *synced past match* against, and drops an unknown key
+  silently — so a first-time opponent (most of the upcoming list: Stoik
+  Alpha, Infernos, Eagles, …) or an opponent linked to the master only on
+  the upcoming booking (`id:` key) while its history was still unlinked
+  (`name:` key) opened Team Record showing every match, which read as "the
+  link doesn't work". Now `captains-corner/page.tsx` computes
+  `opponent_record_keys` per booking server-side, from the same universe
+  `getTeamMatches()` uses (confirmed bookings with a `match_id` and a
+  `match_stats_cache` row): every past key whose `opponent_id` equals the
+  booking's, or whose normalised spelling equals it — all of them, comma-
+  joined, since Team Record's opponent filter is multi-select. **No history
+  → plain text, no link** (tooltip "No past matches against this opponent
+  yet"). If every past meeting was a practice game the link adds
+  `practice=1`, since Team Record hides practice by default.
+- All three header links (tournament, opponent, ground) now carry a dotted
+  underline so they read as tappable — previously they looked identical to
+  plain text until hovered, which a phone never does.
+
+**Back navigation.** Both destinations return to Captains' Corner via
+"‹ Back": `/leaderboard` already had `back` (§12); `/team-stats` now gets
+the same `back={{ fallbackHref: '/', label: 'Home' }}`, and so does
+`/captains-corner` itself (it's reached from a nav dropdown, not a bottom
+tab). The `SiteNav` back is now shown at **every** width, not just
+mobile — see `features/back-navigation.md` §2. Filter taps on
 both pages now use `router.replace()`, so Back skips straight past any
 filters the captain changed there — see `features/back-navigation.md` §2.
 

@@ -5,7 +5,6 @@ import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 import { isPastMatch } from '@/lib/matchStatus'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { BackButton } from '@/components/ui/BackButton'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { computeTopPerformers, summarizeTopPerformance } from '@/lib/matchTopPerformers'
 import { MatchVerifyBlock } from '@/components/matches/MatchVerifyBlock'
@@ -174,9 +173,6 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
     <>
       <SiteNav activePage="matches" back={{ fallbackHref: '/matches/history', label: 'Past Matches' }} />
       <main className="min-h-screen px-4 md:px-8 py-8 max-w-2xl mx-auto" style={{ background: 'var(--scorecard-page-bg)' }}>
-        {/* Desktop only — mobile gets the same control in SiteNav's top row */}
-        <BackButton fallbackHref="/matches/history" fallbackLabel="Past Matches" className="hidden md:inline-flex" />
-
         <div className="mt-4 relative overflow-hidden rounded-xl p-5"
           style={{ background: 'var(--scorecard-card-bg)', border: '1px solid var(--scorecard-card-border)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
           <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: 'var(--scorecard-accent-gradient)' }} />
