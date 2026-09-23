@@ -117,12 +117,17 @@ wrapped in `<Suspense fallback={null}>`.
 mobile.** Concretely:
 
 - `SiteNav` has an optional `back?: SiteNavBack` prop
-  (`{ fallbackHref, label }`). When set, a `md:hidden` `BackButton
-  variant="nav"` ("‹ Back" / "‹ {label}") renders at the far left of the
-  top row, before the logo lockup — the standard mobile position. Desktop
-  keeps each page's own inline text link (`className="hidden md:inline-flex"`
-  on the page-body `BackButton`, so the two never show together); the
-  browser has a back button there and a chevron would be noise.
+  (`{ fallbackHref, label }`). When set, a `BackButton variant="nav"`
+  ("‹ Back" / "‹ {label}") renders at the far left of the top row, before
+  the logo lockup — **at every width** (changed September 2026). It was
+  originally `md:hidden`, with desktop relying on the browser's back button
+  plus a page-body inline link on some pages. That stranded tablet users:
+  an installed PWA on an iPad is ≥ `md` wide *and* has no browser chrome,
+  so Team Record/Leaderboard/Captains' Corner showed no way back at all
+  (reported live). The two page-body duplicates that existed only for
+  desktop (`/matches/history/[bookingId]`, `/dugout/gear/[id]`, both
+  `hidden md:inline-flex`) were removed, since the nav one now covers every
+  width.
 - The six pages that had a hardcoded back link now render `BackButton`
   with that same destination as `fallbackHref`:
   `/matches/history/[bookingId]` (→ Past Matches), `/fixtures/[id]` (→ All
@@ -130,6 +135,8 @@ mobile.** Concretely:
   every width), `/dugout/gear/[id]` (→ Gear Exchange), `/profile` (→ Home,
   all three `SiteNav` render branches), `/admin/bookings/[id]` (→ `/admin`,
   labelled "Matches").
+- `/captains-corner` (→ Home) — added September 2026; reached from the
+  Captains' Corner ▾ dropdown, not a bottom tab.
 - Pages that had none: `/players/[id]/stats` (→ Leaderboard — but **only
   when viewing someone else's stats**; a player's own page is the "My
   Stats" bottom tab, so no back there), `/opponents` (→ Team Record),

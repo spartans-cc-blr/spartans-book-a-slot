@@ -27,9 +27,9 @@ interface SiteNavProps {
   // still pass this to keep its tab bar pinned to match, regardless of the
   // visitor's global choice.
   mobileTabBarTheme?: MobileTabBarTheme
-  // Mobile-only back affordance rendered at the far left of the top row.
-  // Desktop keeps each page's own inline text link (the browser has a back
-  // button there). See features/back-navigation.md.
+  // Back affordance rendered at the far left of the top row, at every width
+  // (an installed PWA on a tablet has no browser chrome). See
+  // features/back-navigation.md.
   back?: SiteNavBack
 }
 
@@ -84,9 +84,12 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
         note. */}
     <nav className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 sticky top-0 z-50 transform-gpu will-change-transform">
       <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
-        {/* Mobile back — router.back() with in-app history, else the page's parent */}
+        {/* Back — router.back() with in-app history, else the page's parent.
+            Shown at every width: an installed PWA on an iPad (≥ md) has no
+            browser chrome either, so hiding it on desktop widths stranded
+            tablet users. */}
         {back && (
-          <div className="md:hidden mr-3 flex-none">
+          <div className="mr-3 flex-none">
             <BackButton variant="nav" fallbackHref={back.fallbackHref} fallbackLabel={back.label} />
           </div>
         )}

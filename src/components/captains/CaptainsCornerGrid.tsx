@@ -20,7 +20,6 @@ import { isPracticeMatch } from '@/types'
 import { matchDisplayTime } from '@/lib/matchStatus'
 import { useTheme } from '@/components/ui/ThemeProvider'
 import { PlayerNameLink } from '@/lib/playerLink'
-import { opponentKey } from '@/lib/teamStatsCore'
 
 interface Booking {
   id: string
@@ -31,6 +30,11 @@ interface Booking {
   // Canonical opponent (features/team-stats.md §5) — drives the Team Record
   // deep link, keyed the same way Team Record's own opponent filter is.
   opponent_id?: string | null
+  // Team Record opponent keys with synced history against this opponent,
+  // computed server-side in captains-corner/page.tsx — empty means no past
+  // meeting, so the name renders as plain text.
+  opponent_record_keys?: string[]
+  opponent_record_practice_only?: boolean
   match_time: string  // DB-guaranteed non-null — see matchStatus.ts
   cricheroes_url: string | null
   tournament: {
@@ -1604,7 +1608,7 @@ function SlotCard({
                 <Link
                   href={`/leaderboard?tournament=${booking.tournament_id}&category=mvp&year=all`}
                   onClick={e => e.stopPropagation()}
-                  className="hover:underline underline-offset-2"
+                  className="underline decoration-dotted underline-offset-2 hover:decoration-solid"
                   title="View stats for this tournament">
                   {booking.tournament?.name ?? 'Match'}
                 </Link>
@@ -1613,19 +1617,24 @@ function SlotCard({
               )}
             </p>
             {/* Opponent links into Team Record pre-filtered to this opponent
-                (all time), keyed with the same opponentKey() Team Record's
-                own filter uses — canonical id once linked, else the
-                normalised raw spelling. */}
+                (all time) — only when there's past synced history, using the
+                exact opponent keys Team Record knows (computed server-side).
+                Without history the name stays plain text: an unknown key
+                would just be dropped and show the unfiltered record. */}
             {booking.opponent_name && (
               <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-500 mt-0.5">
                 vs{' '}
-                <Link
-                  href={`/team-stats?year=all&opponent=${encodeURIComponent(opponentKey({ opponentId: booking.opponent_id ?? null, opponentName: booking.opponent_name }))}`}
-                  onClick={e => e.stopPropagation()}
-                  className="hover:underline underline-offset-2"
-                  title="View our record against this opponent">
-                  {booking.opponent_name}
-                </Link>
+                {booking.opponent_record_keys && booking.opponent_record_keys.length > 0 ? (
+                  <Link
+                    href={`/team-stats?year=all&opponent=${encodeURIComponent(booking.opponent_record_keys.join(','))}${booking.opponent_record_practice_only ? '&practice=1' : ''}`}
+                    onClick={e => e.stopPropagation()}
+                    className="underline decoration-dotted underline-offset-2 hover:decoration-solid"
+                    title="View our record against this opponent">
+                    {booking.opponent_name}
+                  </Link>
+                ) : (
+                  <span title="No past matches against this opponent yet">{booking.opponent_name}</span>
+                )}
               </p>
             )}
             {/* Ground (booking's own override, else the tournament's) links
@@ -1638,7 +1647,7 @@ function SlotCard({
                   <Link
                     href={`/leaderboard?ground=${slotGround.id}&category=mvp&year=all`}
                     onClick={e => e.stopPropagation()}
-                    className="hover:underline underline-offset-2"
+                    className="underline decoration-dotted underline-offset-2 hover:decoration-solid"
                     title="View stats at this ground">
                     {slotGround.name}
                   </Link>
