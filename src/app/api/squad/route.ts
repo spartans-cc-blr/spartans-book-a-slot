@@ -19,6 +19,11 @@ async function requireCaptain() {
 // reverted to draft by a plain save — see POST below.
 const LOCKED_STATUSES = ['pending_approval', 'approved', 'announced']
 
+// Knockout games may start squad selection (and therefore GC review) before
+// the Thursday 08:00 IST window opens, as soon as this many players have
+// marked Y for that booking — see features/squad-selection.md §4.
+const KNOCKOUT_EARLY_SELECTION_MIN_Y = 12
+
 // The weekend currently "open" for squad selection: the Sat/Sun governed by
 // the most recent Thursday on/before now (mirrors the lock-availability
 // cron's own thursday+2/+3 calc, but anchored to the Thursday that just
@@ -158,21 +163,43 @@ export async function POST(req: NextRequest) {
   // Captains Corner's up-to-20-bookings view lets a captain draft (and
   // thereby freeze — see the lock write below) a squad for a weekend
   // still over a week out, well before that weekend's own Thursday.
+  //
+  // Knockout exception: a booking with stage_type = 'knockout' skips this
+  // window entirely once at least KNOCKOUT_EARLY_SELECTION_MIN_Y players
+  // have marked Y for it — a knockout is usually known days in advance and
+  // captains want the squad through GC review early. Y-count is always
+  // re-derived here from `availability`, never trusted from the client.
   if (currentRows.length === 0) {
     const { data: newSquadBooking } = await supabase
       .from('bookings')
-      .select('game_date')
+      .select('game_date, stage_type')
       .eq('id', booking_id)
       .single()
 
-    if (newSquadBooking && isWeekend(newSquadBooking.game_date)) {
+    let knockoutEarlyUnlocked = false
+    let knockoutYCount = 0
+    if (newSquadBooking?.stage_type === 'knockout') {
+      const { data: yRows } = await supabase
+        .from('availability')
+        .select('player_id')
+        .eq('booking_id', booking_id)
+        .eq('response', 'Y')
+      knockoutYCount = yRows?.length ?? 0
+      knockoutEarlyUnlocked = knockoutYCount >= KNOCKOUT_EARLY_SELECTION_MIN_Y
+    }
+
+    const knockoutHint = newSquadBooking?.stage_type === 'knockout'
+      ? ` — or, for this knockout game, as soon as ${KNOCKOUT_EARLY_SELECTION_MIN_Y} players mark Y (currently ${knockoutYCount})`
+      : ''
+
+    if (newSquadBooking && isWeekend(newSquadBooking.game_date) && !knockoutEarlyUnlocked) {
       const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000)
       const day     = nowIST.getDay()   // 0=Sun .. 6=Sat
       const hour    = nowIST.getHours()
       const isBlockedWindow = (day >= 1 && day <= 3) || (day === 4 && hour < 8)
       if (isBlockedWindow) {
         return NextResponse.json(
-          { error: 'Squad selection opens Thursday 08:00 IST' },
+          { error: `Squad selection opens Thursday 08:00 IST${knockoutHint}` },
           { status: 403 }
         )
       }
@@ -182,7 +209,7 @@ export async function POST(req: NextRequest) {
         newSquadBooking.game_date === activeWeekend.saturday || newSquadBooking.game_date === activeWeekend.sunday
       if (!isActiveWeekend) {
         return NextResponse.json(
-          { error: 'Squad selection for this match opens on the Thursday before its own weekend' },
+          { error: `Squad selection for this match opens on the Thursday before its own weekend${knockoutHint}` },
           { status: 403 }
         )
       }

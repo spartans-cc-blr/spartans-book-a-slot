@@ -277,6 +277,22 @@ These are distinct. A player with `players.is_captain = false` can be designated
   > weekday game, which was never part of the Thu 8am–Sun lock window to begin with. Fixed by
   > fetching the booking's `game_date` first and skipping the whole gate (`isBlockedWindow` check
   > and `getActiveLockWeekend()` check both) whenever `!isWeekend(game_date)`.
+- **Knockout exception (added September 2026):** a booking with `bookings.stage_type = 'knockout'`
+  (`features/team-stats.md` §4) skips the time gate above entirely — both the Mon–Wed/pre-Thu-8am
+  block and the `getActiveLockWeekend()` check — once at least **12 players have marked `Y`** for
+  that booking (`KNOCKOUT_EARLY_SELECTION_MIN_Y` in `src/app/api/squad/route.ts`). A knockout is
+  usually known days ahead, so captains can draft and submit for GC review as soon as enough
+  players have committed, instead of waiting for Thursday. Only `Y` counts (not O/E, which are
+  shared across other slots — same reasoning as the Y-only "Slot underfilled" nudge in §5). The
+  Y-count is re-derived server-side from `availability` on every first-draft save, never taken
+  from the client. Below 12 Y, the normal gate still applies, and its 403 message names the
+  knockout path and the current Y-count. League/unclassified bookings are unchanged.
+  `POST /api/squad/submit` has never had a time gate of its own, so no change was needed there —
+  once the draft exists, submission for GC review works immediately. Saving the early draft also
+  sets `availability_locked` (the lock-on-draft-save trigger below), same as any other draft.
+  Note Captains' Corner only lists the next two rolling weekends (§5), so a knockout further out
+  than that isn't visible to draft yet regardless of Y-count. Covered by tests in
+  `src/app/api/squad/__tests__/route.test.ts`.
 - **Lock on draft save:** sets `bookings.availability_locked = true` the moment a *non-empty*
   draft is saved — this is a third freeze trigger alongside the Thursday cron and GC submission.
   See `features/player-availability.md` §10/§10.1 for the full freeze design and a 28 Jul 2026

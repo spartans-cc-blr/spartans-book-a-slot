@@ -425,6 +425,11 @@ currently open for selection (Thu 8am IST → Sun), via `getActiveLockWeekend()`
 "today is Thu–Sun." A weekday booking skips this gate entirely, at any time — see
 `features/squad-selection.md` §4's September 2026 incident note for why.
 
+**Knockout exception (September 2026):** for a `stage_type = 'knockout'` booking with ≥12 `Y`
+responses, the first-draft time gate is skipped, so this lock trigger can fire before Thursday
+for that booking — intended, since the captain is actively selecting. See
+`features/squad-selection.md` §4.
+
 > ⚠️ **Incident (28 Jul 2026) — this trigger existed undocumented and unscoped since
 > squad selection shipped, and it froze a booking more than a week early.**
 > Captains Corner lists up to 20 upcoming confirmed bookings across multiple future
