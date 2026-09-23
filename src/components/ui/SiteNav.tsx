@@ -179,7 +179,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
               onMouseLeave={() => setStatsOpen(false)}>
               <button
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
-                  ${activePage === 'leaderboard' || activePage === 'team-stats'
+                  ${activePage === 'leaderboard' || activePage === 'team-stats' || activePage === 'players'
                     ? 'text-gold border-crimson'
                     : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
                 Stats <span className="text-[8px] mt-0.5">▾</span>
@@ -194,9 +194,15 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
                   </Link>
                   <Link href="/team-stats"
                     onClick={() => setStatsOpen(false)}
-                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-b border-[#D4C9B0] dark:border-ink-5
                       ${activePage === 'team-stats' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                     🛡️ Team Record
+                  </Link>
+                  <Link href="/players"
+                    onClick={() => setStatsOpen(false)}
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
+                      ${activePage === 'players' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
+                    👤 Players
                   </Link>
                 </div>
               )}
@@ -234,11 +240,6 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
                     onClick={() => setGcOpen(false)}
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     📋 Feedback
-                  </Link>
-                  <Link href="/gc-players"
-                    onClick={() => setGcOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
-                    👤 Players
                   </Link>
                   <Link href="/dugout/store-orders"
                     onClick={() => setGcOpen(false)}

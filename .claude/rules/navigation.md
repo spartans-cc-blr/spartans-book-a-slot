@@ -26,7 +26,7 @@ they can drift apart:
 
 1. **A normal signed-in browser session** — there is no server-side
    redirect away from `/` for a logged-in player. `middleware.ts`'s
-   `matcher` only guards `/gc/:path*`, `/gc-review`, `/gc-players`, and
+   `matcher` only guards `/gc/:path*`, `/gc-review`, and
    `/admin/:path*`; `/lib/auth.ts` has no custom `callbacks.redirect`. The
    Home page's own "Sign in with Google" button links straight to
    `/api/auth/signin` with no `callbackUrl` query param, so NextAuth's
@@ -808,6 +808,15 @@ was added as the last item of **Captains' Corner ▾**, **Council ⚖** and
 since captains, GC and wranglers all manage the opponent master. See
 `features/team-stats.md` §6.
 
+### Players directory in Stats ▾ (added September 2026)
+
+**Stats ▾** gained a third item, "👤 Players" → `/players`
+(`activePage === 'players'`), the club-wide player directory that replaced
+the GC-only `/gc-players` (see `features/player-directory.md`). The old
+"👤 Players" rows in Council ⚖ (desktop) and the More sheet's Council
+section were removed. The More sheet instead has a "Players" row after
+Team Record for every logged-in member.
+
 ### `back` prop — mobile "‹ Back" (added September 2026)
 
 `SiteNav` accepts `back?: { fallbackHref: string; label: string }`. When
@@ -835,7 +844,7 @@ there. Full audit, design and per-page fallbacks in
 | Role | Nav items visible |
 |---|---|
 | Public (not signed in) | Schedule · Sign In |
-| Player | Home (logo) · Matches ▾ · Stats ▾ · The Dugout · My Profile |
+| Player | Home (logo) · Matches ▾ · Stats ▾ (Yours Statistically, Team Record, Players) · The Dugout · My Profile |
 | Captain | Home (logo) · Matches ▾ · Captains' Corner ▾ (Squad Selection, Unavailable Dates, Opponents) · Stats ▾ · The Dugout · Tournaments · My Profile |
 | GC | Home (logo) · Matches ▾ · Stats ▾ · The Dugout · Tournaments · My Profile · Council ⚖ (… Grounds, Opponents) |
 | Wrangler | + Wrangler ⚒ dropdown (Squad Backfill, Grounds, Opponents) |
@@ -910,7 +919,7 @@ link) that toggles the bottom sheet — it shows the same active-gold
 treatment whenever the sheet is open, or whenever `activePage` is one of
 the values that only live inside the sheet (`isAdminOrGcHighlighted()`:
 `dugout`, `leaderboard`, `team-stats`, `opponents`, `profile`, `planner`, `captains`,
-`captains-unavailable`, `gc`, `gc-players`, `wrangler`, `schedule` —
+`captains-unavailable`, `gc`, `players`, `wrangler`, `schedule` —
 deliberately excludes `matches` and `my-stats`, both covered by their own
 tab's `active` check instead).
 

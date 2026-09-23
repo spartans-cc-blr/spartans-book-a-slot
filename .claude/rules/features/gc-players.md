@@ -3,6 +3,14 @@
 **Spartans Hub · hub.spartanscricketclub.in**
 **Last updated: June 2026 · Sprint 2**
 
+> **Retired (September 2026).** `/gc-players` and `GCPlayersGrid.tsx` were
+> repurposed into the club-wide player directory at `/players` — open to
+> every signed-in, non-expelled member, with status/wallet/dues removed and
+> per-card career highlights added. `/gc-players` now redirects there. See
+> `features/player-directory.md`. §1 and §6–§11 below describe the retired
+> page and are kept for history; §2–§5 (the player `status` model and the
+> `sync-player-status` cron) are unaffected and still current.
+
 ---
 
 ## 1. Overview

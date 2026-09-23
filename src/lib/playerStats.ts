@@ -21,6 +21,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
+import type { CareerHighlights } from '@/lib/playerHighlights'
 import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType } from '@/types'
 
 function round2(n: number): number {
@@ -584,6 +585,72 @@ export async function getLeaderboard(filters: { year?: number; month?: string; t
     rows.push({ playerId, playerName: player.name, cricheroesUrl: player.cricheroes_url ?? null, photoUrl: player.photo_url ?? null, stats, centuries, halfCenturies })
   }
   return rows
+}
+
+// Career highlights for every player at once — feeds the /players
+// directory's per-card "best" stat (features/player-directory.md). Same
+// match scope as the leaderboard's "All time" view and a player's own
+// career stats: confirmed Hub bookings only, practice games excluded.
+// One analytics round trip (4 paginated tables) for the whole roster,
+// never one per player. pickHighlights() (src/lib/playerHighlights.ts)
+// then decides which of these numbers each card leads with.
+export async function getCareerHighlightsByPlayer(): Promise<Record<string, CareerHighlights>> {
+  const scoped = await getScopedMatchIds({})
+  if (scoped && scoped.length === 0) return {}
+  const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ matchIds: scoped })
+
+  const battingByPlayer  = groupBy(batting,  (r: any) => r.player_id)
+  const bowlingByPlayer  = groupBy(bowling,  (r: any) => r.player_id)
+  const fieldingByPlayer = groupBy(fielding, (r: any) => r.player_id)
+  const teamByPlayer     = groupBy(team,     (r: any) => r.player_id)
+
+  const result: Record<string, CareerHighlights> = {}
+  for (const [playerId, teamRows] of Array.from(teamByPlayer.entries())) {
+    const bat  = battingByPlayer.get(playerId)  ?? []
+    const bowl = bowlingByPlayer.get(playerId)  ?? []
+    const fld  = fieldingByPlayer.get(playerId) ?? []
+    const matchIds = new Set<string>(teamRows.map((r: any) => r.match_id).filter(Boolean))
+    const t = aggregate(matchIds, bat, bowl, fld)
+    if (t.matches === 0) continue
+
+    // Highest score: most runs; a not-out beats an out on equal runs, then
+    // fewer balls faced.
+    let bestInnings: CareerHighlights['bestInnings'] = null
+    for (const r of bat) {
+      if (!r.batted) continue
+      const cand = { runs: num(r.runs), balls: num(r.balls), notOut: r.not_out === 'Y' }
+      if (!bestInnings
+        || cand.runs > bestInnings.runs
+        || (cand.runs === bestInnings.runs && cand.notOut && !bestInnings.notOut)
+        || (cand.runs === bestInnings.runs && cand.notOut === bestInnings.notOut && cand.balls < bestInnings.balls)) {
+        bestInnings = cand
+      }
+    }
+
+    // Best bowling: most wickets, then fewest runs conceded.
+    let bestBowling: CareerHighlights['bestBowling'] = null
+    for (const r of bowl) {
+      if (!r.did_bowl) continue
+      const cand = { wickets: num(r.wickets), runs: num(r.runs) }
+      if (!bestBowling || cand.wickets > bestBowling.wickets
+        || (cand.wickets === bestBowling.wickets && cand.runs < bestBowling.runs)) {
+        bestBowling = cand
+      }
+    }
+
+    result[playerId] = {
+      matches: t.matches,
+      runs: t.runs,
+      battingInnings: t.battingInnings,
+      battingAverage: t.battingAverage,
+      wickets: t.wickets,
+      bowlingAverage: t.wickets > 0 ? round2(t.runsConceded / t.wickets) : null,
+      dismissals: t.catches + t.runOuts + t.stumpings,
+      bestInnings,
+      bestBowling,
+    }
+  }
+  return result
 }
 
 // Batched sibling of getLeaderboard({ tournamentId }) — computes the exact

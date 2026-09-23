@@ -113,6 +113,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
                 <SheetLink t={t} href="/dugout" icon={<ShieldIcon size={16} />} label="The Dugout" active={activePage === 'dugout'} onNavigate={() => setMoreOpen(false)} />
                 <SheetLink t={t} href="/leaderboard" icon={<TrophyIcon />} label="Leaderboard" active={activePage === 'leaderboard'} onNavigate={() => setMoreOpen(false)} />
                 <SheetLink t={t} href="/team-stats" icon={<ShieldIcon size={16} />} label="Team Record" active={activePage === 'team-stats'} onNavigate={() => setMoreOpen(false)} />
+                <SheetLink t={t} href="/players" icon={<PersonIcon />} label="Players" active={activePage === 'players'} onNavigate={() => setMoreOpen(false)} />
                 {playerId ? (
                   <>
                     <SheetLink t={t} href="/profile" icon={<PersonIcon />} label="My Profile" active={activePage === 'profile'} onNavigate={() => setMoreOpen(false)} />
@@ -139,7 +140,6 @@ export function MobileTabBar(props: MobileTabBarProps) {
                     <SectionLabel t={t}>Council</SectionLabel>
                     <SheetLink t={t} href="/gc-review" icon={<ScalesIcon />} label="Squad Review" active={activePage === 'gc'} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/gc/feedback" icon={<ClipboardIcon />} label="Feedback" active={false} onNavigate={() => setMoreOpen(false)} />
-                    <SheetLink t={t} href="/gc-players" icon={<PersonIcon />} label="Players" active={activePage === 'gc-players'} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/dugout/store-orders" icon={<JerseyIcon colour="gold" size={16} />} label="Store Orders" active={false} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/wrangler/grounds" icon={<PinIcon />} label="Grounds" active={activePage === 'wrangler'} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/opponents" icon={<SwordsIcon />} label="Opponents" active={activePage === 'opponents'} onNavigate={() => setMoreOpen(false)} />
@@ -252,7 +252,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
 // live in the sheet only (Dugout lost its tab slot to My Stats; Leaderboard
 // never had one — see navigation.md §4.1), so both are listed here.
 function isAdminOrGcHighlighted(activePage?: string) {
-  return ['dugout', 'leaderboard', 'team-stats', 'opponents', 'profile', 'wallet', 'planner', 'captains', 'captains-unavailable', 'gc', 'gc-players', 'wrangler', 'schedule'].includes(activePage ?? '')
+  return ['dugout', 'leaderboard', 'team-stats', 'opponents', 'profile', 'wallet', 'planner', 'captains', 'captains-unavailable', 'gc', 'players', 'wrangler', 'schedule'].includes(activePage ?? '')
 }
 
 function Tab({ t, href, icon, label, active }: { t: Tokens; href: string; icon: React.ReactNode; label: string; active?: boolean }) {
