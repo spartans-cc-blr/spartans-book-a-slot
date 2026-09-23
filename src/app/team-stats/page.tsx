@@ -17,8 +17,8 @@ import { TeamFilterShell, SplitByRow } from '@/components/team/TeamFilterPanel'
 import { TeamSplitTable, FormPills, MatchList } from '@/components/team/TeamSplitTable'
 import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import {
-  getTeamMatches, applyFilters, summarize, recentForm, currentStreak, splitBy, splitByNested, computeRecords,
-  filterOptions, sortNewestFirst, splitTournamentRowsByStatus,
+  getTeamMatches, applyFilters, summarize, recentForm, currentStreak, splitByNested, computeRecords,
+  filterOptions, sortNewestFirst, splitTournamentRowsByStatus, splitOpponentRowsByMarquee,
 } from '@/lib/teamStats'
 import { toTeamFilters, parseTeamFilterState, type TeamStatsRawSearchParams } from '@/lib/teamStatsFilters'
 import type { Metadata } from 'next'
@@ -63,9 +63,11 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: T
   // single Win %-sorted list. See §3.7 in the feature doc.
   const tournamentSplit = state.by === 'tournament' ? splitTournamentRowsByStatus(rows) : null
   const records = computeRecords(matches)
-  // Only needed once Opponent is the chosen split — see the section below
-  // for why this no longer pins itself above every other split.
-  const marquee = state.by === 'opponent' ? splitBy(matches, 'opponent').filter(r => r.meta?.isMarquee) : []
+  // Opponent split only — marquee rivals get their own table, the rest of
+  // the opponents a second one (no overlap), each alphabetical by team name.
+  // Partitioned from `rows` so a "then by" breakdown applies to both.
+  const opponentSplit = state.by === 'opponent' ? splitOpponentRowsByMarquee(rows) : null
+  const marquee = opponentSplit?.marquee ?? []
   const anyMarqueeDefined = all.some(m => m.isMarquee)
   const unlinkedCount = new Set(matches.filter(m => !m.opponentId).map(m => m.opponentName.toLowerCase())).size
   const recent = sortNewestFirst(matches).slice(0, 5)
@@ -146,7 +148,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: T
             <div className="mb-4">
               <SectionHeading title="Marquee opponents" />
               {marquee.length > 0 ? (
-                <TeamSplitTable rows={marquee} hideMarqueeBadge showTotal={false} />
+                <TeamSplitTable rows={marquee} hideMarqueeBadge showOpponentInMatches={false} />
               ) : (
                 <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">
                   No marquee opponents yet — mark the rivals you care about on <Link href="/opponents" className="text-[var(--stats-accent)] dark:text-gold underline decoration-dotted">Manage opponents</Link> and they&rsquo;ll show here.
@@ -173,6 +175,13 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: T
                   </div>
                 )}
               </>
+            )
+          ) : opponentSplit ? (
+            (opponentSplit.others.length > 0 || marquee.length === 0) && (
+              <div>
+                {marquee.length > 0 && <SectionHeading title="Other opponents" />}
+                <TeamSplitTable rows={opponentSplit.others} showOpponentInMatches={false} />
+              </div>
             )
           ) : (
             <TeamSplitTable rows={rows} showOpponentInMatches={state.by !== 'opponent'} />

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   summarize, recentForm, currentStreak, splitBy, splitByNested, computeRecords, winMargin,
   applyFilters, opponentKey, captainKey, filterOptions, normaliseResult, splitTournamentRowsByStatus,
-  type TeamMatch,
+  splitOpponentRowsByMarquee, type TeamMatch,
 } from './teamStatsCore'
 
 function m(over: Partial<TeamMatch> & { gameDate: string }): TeamMatch {
@@ -99,7 +99,19 @@ describe('splitBy', () => {
     const c = m({ gameDate: '2026-03-15', opponentName: 'BW', opponentId: 'o1', opponentLabel: 'Blue Warriors', isMarquee: true })
     const rows = splitBy([a, b, c], 'opponent')
     expect(rows.length).toBe(2)
-    expect(rows[0].meta?.isMarquee).toBe(true) // marquee pinned first despite fewer matches
+    // Alphabetical by team name — marquee no longer pins, it gets its own table
+    expect(rows[0].label).toBe('Blue Warriors')
+  })
+  it('partitions opponent rows into marquee and others, each alphabetical', () => {
+    const rows = splitBy([
+      m({ gameDate: '2026-03-01', opponentName: 'zeta xi', opponentLabel: 'Zeta XI' }),
+      m({ gameDate: '2026-03-02', opponentName: 'alpha cc', opponentLabel: 'alpha CC' }),
+      m({ gameDate: '2026-03-03', opponentName: 'Yak', opponentId: 'o2', opponentLabel: 'Yak', isMarquee: true }),
+      m({ gameDate: '2026-03-04', opponentName: 'Bee', opponentId: 'o3', opponentLabel: 'Bee', isMarquee: true }),
+    ], 'opponent')
+    const { marquee, others } = splitOpponentRowsByMarquee(rows)
+    expect(marquee.map(r => r.label)).toEqual(['Bee', 'Yak'])
+    expect(others.map(r => r.label)).toEqual(['alpha CC', 'Zeta XI'])
   })
   it('treats unclassified stage as league', () => {
     const rows = splitBy(sample, 'stage')
