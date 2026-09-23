@@ -125,17 +125,20 @@ matches that produced it (§3).
   Played descending) — a group with nothing decided yet (`winPct === null`)
   sorts last, never first, since `null` has no rank to offer. This is the
   default *comparator* inside `splitBy()`, so it applies to every
-  categorical dimension (tournament, ground, pitch, opponent, format,
-  captain, innings, stage) uniformly — three dimensions keep their own fixed order
+  categorical dimension (tournament, ground, pitch, format,
+  captain, innings, stage) uniformly — four dimensions keep their own fixed order
   regardless: `year`/`month` (newest first, still a timeline) and `slot`
   (chronological by time-of-day), plus `toss`, which follows a fixed
   logical sequence — won-bat, won-field, lost-bat, lost-field
-  (`TOSS_ORDER`) — rather than a ranking. Marquee opponents still pin
-  ahead of everything else on the Opponent split, same as before.
+  (`TOSS_ORDER`) — rather than a ranking — and `opponent`, which is
+  **alphabetical by team name** (case-insensitive, changed September 2026)
+  with no marquee pin any more: marquee rivals now get their own table
+  instead (`splitOpponentRowsByMarquee()`, §3.3).
 
 Unit tests: `src/lib/teamStats.test.ts` (vitest) cover every aggregator
 above against a hand-built fixture, including the toss split's four
-mutually-exclusive buckets, practice exclusion, marquee pinning and the
+mutually-exclusive buckets, practice exclusion, the alphabetical marquee/others
+opponent partition and the
 records/margin derivations.
 
 > **Fixed (September 2026) — the toss split used to put one match in two
@@ -418,28 +421,31 @@ sits directly above the full opponent table rather than above an unrelated
 split like Captain or Format — a marquee preview above a Captain table
 answered a question the viewer wasn't asking.
 
-- `marquee` is now computed only when `state.by === 'opponent'`
-  (`splitBy(matches, 'opponent').filter(r => r.meta?.isMarquee)`), instead
-  of whenever `by !== 'opponent'`.
-- Rendered inside the same `<section>` as `SplitByRow`/`TeamSplitTable`,
-  between the pills and the full table — a small "Marquee opponents"
-  heading, `TeamSplitTable` scoped to just the marquee rows
-  (`hideMarqueeBadge showTotal={false}`, see below), or the "mark your
-  rivals" nudge to a manager when none are starred yet.
-- **This does duplicate marquee rows** between the small highlight table
-  and the full opponent table below it — `splitBy()` already pins marquee
-  rows to the top of the Opponent split (§2). That's intentional, the same
-  "highlight snippet above the full detail" convention the Honour Board
-  uses for its own tied cards vs. detailed tables — not something to
-  de-duplicate away.
-- **The "Marquee" badge is suppressed inside the highlight table**
-  (`TeamSplitTable`'s new `hideMarqueeBadge` prop, threaded to `RowGroup`) —
-  every row in that table is definitionally marquee, so the pill would
-  just repeat the section heading. The full opponent table below still
-  shows the badge, since it's the one place marquee and non-marquee rows
-  sit side by side. `showTotal={false}` on the highlight table too — a
-  "Total" footer duplicating a subset of the real table right below it
-  added nothing.
+- **Two non-overlapping tables, both alphabetical (changed September
+  2026).** The Opponent split now renders a "Marquee opponents" table and,
+  below it, an "Other opponents" table containing everyone *else* — a
+  marquee rival no longer appears in both. Both are sorted alphabetically
+  by team name (case-insensitive `localeCompare`), not by Win %. The page
+  partitions the already-computed `rows` (so a "then by" breakdown applies
+  to both tables) via `splitOpponentRowsByMarquee()` (`teamStatsCore.ts`,
+  unit-tested), and `splitBy()`'s own opponent comparator is alphabetical
+  too — so an Opponent "then by" sub-split reads the same way.
+  This replaces the earlier design, where the highlight table deliberately
+  duplicated marquee rows that `splitBy()` also pinned to the top of the
+  full opponent table.
+- The "Other opponents" heading only shows when a marquee table sits above
+  it; with no marquee rivals starred, the page renders one plain opponent
+  table (plus the "mark your rivals" nudge for a manager). If every
+  opponent in the filter is marquee, the empty "Other opponents" table is
+  skipped.
+- **Each table keeps its own "Total" footer** — now that the rows don't
+  overlap, the marquee total (H2H record vs rivals) and the others' total
+  are each meaningful, so the old `showTotal={false}` on the highlight
+  table was dropped.
+- **The "Marquee" badge is suppressed inside the marquee table**
+  (`hideMarqueeBadge`) — every row there is definitionally marquee. The
+  other table never has a marquee row, so the badge doesn't appear there
+  either.
 - The old `/team-stats?by=opponent` deep link in the section heading was
   dropped along with the "All opponents →" label — redundant now that the
   section only ever renders while already on the Opponent split.
@@ -1085,7 +1091,7 @@ implementation of the filter logic itself.
 | `supabase/migrations/077_opponents_master.sql` | `opponents`, `opponent_aliases`, `bookings.opponent_id`, RLS (§5) |
 | `supabase/migrations/078_grounds_pitch_type.sql` | Superseded the same day by migration 079 — added `grounds.pitch_type` + the Turf-only backfill; see §6's "Corrected the same day" note |
 | `supabase/migrations/079_move_pitch_type_to_tournaments.sql` | Drops `grounds.pitch_type`, adds `tournaments.pitch_type`, re-derives the Turf backfill and carries forward the one real Matted classification (§6) |
-| `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `TeamFilters`' twelve fields are all arrays and `applyFilters()` ORs within a dimension (§3.8); `splitByNested()` composes two split dimensions (§3.2); `splitTournamentRowsByStatus()` partitions the Tournament split into Ongoing/Completed (§3.7); `PitchFilter`/the `'pitch'` `SplitDimension` (§6) |
+| `src/lib/teamStatsCore.ts` | Pure types/filters/aggregators — client-safe (§2); `TeamFilters`' twelve fields are all arrays and `applyFilters()` ORs within a dimension (§3.8); `splitByNested()` composes two split dimensions (§3.2); `splitTournamentRowsByStatus()` partitions the Tournament split into Ongoing/Completed (§3.7); `splitOpponentRowsByMarquee()` partitions the Opponent split into alphabetical Marquee/Other tables (§3.3); `PitchFilter`/the `'pitch'` `SplitDimension` (§6) |
 | `src/lib/teamStats.ts` | `getTeamMatches()` fetch (now also selects `tournaments.total_league_games` → `TeamMatch.tournamentTotalLeagueGames`, §3.7, and `tournaments.pitch_type` → `TeamMatch.pitchType`, §6; `TeamMatch.isPractice` also ORs in the booking's own `is_practice` — `features/practice-games.md`); re-exports the core (§2) |
 | `src/lib/teamStats.test.ts` | Vitest coverage of the aggregators, including multi-select OR-within-a-dimension cases (§3.8) |
 | `src/lib/teamStatsFilters.ts` + `.test.ts` | Pure URL ⇄ filter-state helpers — `TeamFilterState` (array-valued per dimension), `parseTeamFilterState()` (the one URL→state parser, replacing inline logic that used to live in `page.tsx`), `parseCsvParam()`, `buildTeamStatsHref`, `toTeamFilters`, chip labels (§3.8) — shared by the page and the panel (§3); `visibleFilterKeys()`/`visibleSplitDimensions()` gate the Captain dimension (§3.6); `pitch` filter key (§6) |

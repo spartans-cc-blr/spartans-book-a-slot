@@ -338,13 +338,12 @@ export function splitBy(matches: TeamMatch[], dim: SplitDimension): SplitRow[] {
   // won-bat, won-field, lost-bat, lost-field — TOSS_ORDER); everything
   // else ranks by Win % descending — the number this whole page exists to
   // answer — with
-  // Played descending, then alphabetical, as tie-breaks. Marquee opponents
-  // still pin to the top of the Opponent split ahead of any of that.
+  // Played descending, then alphabetical, as tie-breaks. Opponents are the
+  // exception: always alphabetical by team name, since the Opponent split
+  // is read as a head-to-head directory (marquee rivals get their own table
+  // via splitOpponentRowsByMarquee() below, not a pin at the top).
   rows.sort((a, b) => {
-    if (dim === 'opponent') {
-      const am = a.meta?.isMarquee ? 1 : 0, bm = b.meta?.isMarquee ? 1 : 0
-      if (am !== bm) return bm - am
-    }
+    if (dim === 'opponent') return compareLabels(a.label, b.label)
     if (dim === 'year' || dim === 'month') return b.key.localeCompare(a.key)
     if (dim === 'slot') return a.key.localeCompare(b.key)
     if (dim === 'toss') return TOSS_ORDER.indexOf(a.key) - TOSS_ORDER.indexOf(b.key)
@@ -398,6 +397,21 @@ export function splitTournamentRowsByStatus(rows: SplitRow[]): { ongoing: SplitR
     ;(target !== null && r.played >= target ? completed : ongoing).push(r)
   }
   return { ongoing, completed }
+}
+
+// Opponent split only — partitions rows into the marquee rivals (their own
+// table on /team-stats) and everyone else, so no opponent appears in both.
+// Each half is alphabetical by team name (features/team-stats.md §3.3).
+export function splitOpponentRowsByMarquee(rows: SplitRow[]): { marquee: SplitRow[]; others: SplitRow[] } {
+  const byName = (a: SplitRow, b: SplitRow) => compareLabels(a.label, b.label)
+  return {
+    marquee: rows.filter(r => r.meta?.isMarquee).sort(byName),
+    others:  rows.filter(r => !r.meta?.isMarquee).sort(byName),
+  }
+}
+
+function compareLabels(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { sensitivity: 'base' })
 }
 
 // ── Records ────────────────────────────────────────────────────────────────
