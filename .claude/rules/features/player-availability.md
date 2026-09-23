@@ -425,8 +425,8 @@ currently open for selection (Thu 8am IST → Sun), via `getActiveLockWeekend()`
 "today is Thu–Sun." A weekday booking skips this gate entirely, at any time — see
 `features/squad-selection.md` §4's September 2026 incident note for why.
 
-**Knockout exception (September 2026):** for a `stage_type = 'knockout'` booking with ≥12 `Y`
-responses, the first-draft time gate is skipped, so this lock trigger can fire before Thursday
+**Knockout exception (September 2026):** for a `stage_type = 'knockout'` booking with ≥12 `Y`/`O`/`E`
+responses combined, the first-draft time gate is skipped, so this lock trigger can fire before Thursday
 for that booking. This is intended: knockouts are allowed to lock early so selected players can
 start preparing mentally for a crucial match, while league games stay on the Thursday window so
 captains can't lock players ahead of the regular availability lock. See
