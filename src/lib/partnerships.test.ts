@@ -45,18 +45,30 @@ describe('computePartnerships — retired hurt and return', () => {
     expect(partnerships!.reduce((sum, p) => sum + p.runs, 0)).toBe(282)
   })
 
-  it('the retirement row is flagged and does not end the innings', () => {
+  it('the retirement row is flagged, does not end the innings, and does not consume its own wicket number', () => {
+    // CricHeroes' own raw PDF text for this match reuses wicket number 3
+    // for both Saurav Kalsoor's real dismissal ("98-3") and Anurag T's
+    // retirement ("118-3") — a retirement is never counted as a fallen
+    // wicket. Found by isRetirement, not wicketNumber, since it now shares
+    // its number with the partnership right before it (array index 2).
     const partnerships = computePartnerships(order, fow, finalScore)!
-    const retirement = partnerships.find(p => p.wicketNumber === 4)!
+    const retirement = partnerships.find(p => p.isRetirement)!
     expect(retirement.isRetirement).toBe(true)
     expect(retirement.runs).toBe(20)
+    expect(retirement.wicketNumber).toBe(3)
     expect(retirement.players.map(p => p.playerName).sort()).toEqual(['Anurag T', 'Siva'].sort())
     expect(retirement.outPlayer?.playerName).toBe('Anurag T')
   })
 
-  it('brings in the next batting-order player (Tushar Shankar) immediately after the retirement', () => {
+  it('every partnership carries the true cricket wicket number — 1,2,3,3(ret.),4,5,6,7,8,9, never a bare 1..10 count', () => {
     const partnerships = computePartnerships(order, fow, finalScore)!
-    const p5 = partnerships.find(p => p.wicketNumber === 5)!
+    expect(partnerships.map(p => p.wicketNumber)).toEqual([1, 2, 3, 3, 4, 5, 6, 7, 8, 9])
+  })
+
+  it('brings in the next batting-order player (Tushar Shankar) immediately after the retirement, as the real 4th wicket', () => {
+    const partnerships = computePartnerships(order, fow, finalScore)!
+    const p5 = partnerships[4] // 5th fall_of_wickets entry, 4th real wicket
+    expect(p5.wicketNumber).toBe(4)
     expect(p5.runs).toBe(128)
     expect(p5.isRetirement).toBe(false)
     expect(p5.players.map(p => p.playerName).sort()).toEqual(['Siva', 'Tushar Shankar'].sort())
@@ -66,15 +78,19 @@ describe('computePartnerships — retired hurt and return', () => {
   it('re-seats the returning player instead of the next fresh batter, and their later real dismissal resolves normally', () => {
     const partnerships = computePartnerships(order, fow, finalScore)!
 
-    // Wicket 6: Tushar Shankar out, partnered with the *returned* Anurag T
-    // — not Darshan Shetty, who hasn't entered yet at this point.
-    const p6 = partnerships.find(p => p.wicketNumber === 6)!
+    // Tushar Shankar out, partnered with the *returned* Anurag T — not
+    // Darshan Shetty, who hasn't entered yet at this point. Real 5th
+    // wicket (the retirement two entries earlier didn't consume a number).
+    const p6 = partnerships[5]
+    expect(p6.wicketNumber).toBe(5)
     expect(p6.runs).toBe(15)
     expect(p6.players.map(p => p.playerName).sort()).toEqual(['Anurag T', 'Tushar Shankar'].sort())
     expect(p6.outPlayer?.playerName).toBe('Tushar Shankar')
 
-    // Wicket 7: Anurag T's real, final dismissal — not a second retirement.
-    const p7 = partnerships.find(p => p.wicketNumber === 7)!
+    // Anurag T's real, final dismissal — not a second retirement. Real 6th
+    // wicket.
+    const p7 = partnerships[6]
+    expect(p7.wicketNumber).toBe(6)
     expect(p7.runs).toBe(1)
     expect(p7.isRetirement).toBe(false)
     expect(p7.players.map(p => p.playerName).sort()).toEqual(['Anurag T', 'Darshan Shetty'].sort())
@@ -85,7 +101,7 @@ describe('computePartnerships — retired hurt and return', () => {
     const partnerships = computePartnerships(order, fow, finalScore)!
     expect(partnerships).toHaveLength(10) // no 11th synthesized row
     const last = partnerships[partnerships.length - 1]
-    expect(last.wicketNumber).toBe(10)
+    expect(last.wicketNumber).toBe(9) // real 9th wicket, matching team_wickets
     expect(last.outPlayer?.playerName).toBe('Preetam Patil')
   })
 
@@ -114,6 +130,10 @@ describe('computePartnerships — retired hurt and return', () => {
     expect(unbroken).toBeDefined()
     expect(unbroken!.runs).toBe(50) // 180 - 130
     expect(unbroken!.isRetirement).toBe(false)
+    // realWicketCount (3) + 1 = 4th real wicket-in-progress — not
+    // fow.length (4) + 1 = 5, which would wrongly count the retirement as
+    // if it were a fallen wicket.
+    expect(unbroken!.wicketNumber).toBe(4)
     expect(unbroken!.players.map(p => p.playerName).sort()).toEqual(['E', 'F'])
   })
 })

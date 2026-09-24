@@ -698,6 +698,56 @@ DB and the Hub's `match_stats_cache` — this one additionally needed the
 code deployed (see below) before the corrected data actually renders
 right, unlike every prior incident here, which were pure data fixes.
 
+**Incident, fixed same day — the "Segment" column above is storage order,
+not the wicket number the chart was showing.** The very first render of
+this fix (screenshot-confirmed) labelled row 4, the retirement, as
+**wicket 4** — and every row after it kept counting up sequentially
+(5, 6, 7, …, 10), as if the retirement itself were a fallen wicket.
+Real cricket never counts a retirement as a wicket at all — and the raw
+CricHeroes PDF text this whole feature is built from already says so
+directly: it reuses wicket number **3** for both Saurav Kalsoor's real
+dismissal *and* Anurag T's retirement (`"98-3 (Saurav Kalsoor, ...)"`,
+`"118-3 (Anurag T, ...)"`) before continuing normally at 4 for Siva's
+later dismissal. The bug was that `computePartnerships()` had been passing
+the raw stored `fall_of_wickets.wicket_number` straight through as the
+displayed label (`wicketNumber: entry.wicket_number`) — correct for
+storage/ordering purposes (see §5's PK note below), wrong as a cricket
+wicket count the moment a retirement is in the mix, since the stored
+column has no way to reuse a number under the table's own
+`PRIMARY KEY (match_id, wicket_number)`.
+
+**Fixed** by having `computePartnerships()` derive the displayed
+`Partnership.wicketNumber` itself, independently of the stored column: a
+running count (`displayWicket`) that only advances on a genuine
+dismissal — `if (!entry.is_retirement) displayWicket += 1` — evaluated
+*before* each partnership is pushed, so a retirement row is labelled with
+whatever the count already is (the same number as the partnership right
+before it), never a fresh one of its own. The synthesized unbroken closing
+partnership (§4.2) was changed the same way, from `fow.length + 1` to
+`realWicketCount + 1` — the already-existing variable §4.3's completeness
+check uses — so an unbroken stand after a match with a retirement is
+correctly labelled the *n*-th real wicket-in-progress, not one too high.
+For `25465218` this now renders the label sequence
+`1, 2, 3, 3 (ret.), 4, 5, 6, 7, 8, 9` — matching CricHeroes' own raw text
+exactly — instead of the wrong `1..10`. A match with no retirement is
+completely unaffected: `displayWicket` and `entry.wicket_number` advance
+in lockstep whenever nothing is ever flagged `is_retirement`, so every
+one of this feature's existing incidents/matches keeps rendering exactly
+as before.
+
+**The stored `fall_of_wickets.wicket_number` column itself was
+deliberately left untouched** — still 1..10, strictly ascending, one row
+per segment. It only ever needs to be a stable ordering/PK key for
+`ORDER BY wicket_number` and the table's own uniqueness constraint; it was
+never meant to *be* the cricket-canonical wicket count, and changing its
+meaning to match CricHeroes' reused-number convention would reopen the
+exact PK collision problem `(match_id, wicket_number)`'s uniqueness
+constraint exists to prevent (see §5) — the same failure shape a prior
+re-parse of `18985509` hit by accident (§3). Keeping storage order and
+display numbering as two genuinely separate concerns — one column, one
+derived value — is what let this be a pure code fix with zero data
+migration needed.
+
 **UI — a small "ret." marker**, since the usual "no `(out)` marker, the
 next row already implies who left" reasoning (§6.6) specifically breaks
 for a retirement: the retiring player *does* reappear, in a different,
@@ -713,11 +763,13 @@ Pairs aggregate, which has no per-stand metadata to attach it to).
 dedicated unit test file before this change, only the aggregation layer's
 `partnershipLeaders.test.ts`) covers the real `25465218` sequence end to
 end (all 10 rows, correct pairings for rows 6–7 specifically, correct sum),
-the fail-safe `null` return for an unresolvable `returning_player_name`,
-the completeness-check interaction with a retirement present, and that
-behaviour is byte-for-byte unchanged when neither new field is present.
-`tsc --noEmit`, the full `vitest run` (137 tests), and `npm run build` all
-clean.
+a dedicated assertion on the full `1,2,3,3,4,5,6,7,8,9` label sequence (the
+wicket-number fix above), the fail-safe `null` return for an unresolvable
+`returning_player_name`, the completeness-check interaction with a
+retirement present (including its own `wicketNumber` on the synthesized
+unbroken stand), and that behaviour is byte-for-byte unchanged when
+neither new field is present. `tsc --noEmit`, the full `vitest run` (138
+tests), and `npm run build` all clean.
 
 ---
 
@@ -1018,8 +1070,8 @@ as the external-link fallback when there's no `playerId` at all.
 | `supabase/migrations/071_match_stats_cache_fall_of_wickets.sql` | Hub-side cache column (§5) |
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
-| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2), gated on FOW completeness via `finalScore.wickets` (§4.3); `is_retirement`/`returning_player_name` support, `realWicketCount`, `Partnership.isRetirement` (§4.4) |
-| `src/lib/partnerships.test.ts` | Unit tests — the real `25465218` retirement-and-return sequence, the fail-safe unresolvable-return-name case, the completeness-check interaction, and no-behaviour-change when neither new field is present (§4.4) |
+| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2), gated on FOW completeness via `finalScore.wickets` (§4.3); `is_retirement`/`returning_player_name` support, `realWicketCount`, `Partnership.isRetirement` (§4.4); `Partnership.wicketNumber` is a derived running count of real dismissals (`displayWicket`), not a pass-through of the stored `fall_of_wickets.wicket_number` column — a retirement reuses the previous real wicket's number rather than incrementing (§4.4) |
+| `src/lib/partnerships.test.ts` | Unit tests — the real `25465218` retirement-and-return sequence, the full `1,2,3,3,4,5,6,7,8,9` wicket-number label sequence, the fail-safe unresolvable-return-name case, the completeness-check interaction (including the synthesized unbroken stand's own `wicketNumber`), and no-behaviour-change when neither new field is present (§4.4) |
 | `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, first-name-only labels via a local `firstName()` helper, `*` suffix on an unbroken partnership's runs value, no `(out)` marker, `oversToBalls()` renders `overTo` as a ball count; `teamTotal`/`teamOvers`/`teamWickets` props feed `finalScore`; a small "ret." marker for `p.isRetirement` (§4.4) |
 | `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets`; passes `teamTotal`/`teamOvers`/`teamWickets` from `match.stats` |
 | `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` along with `teamTotal`/`teamOvers`/`teamWickets` |
