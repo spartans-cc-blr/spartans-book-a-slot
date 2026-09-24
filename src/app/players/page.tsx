@@ -1,13 +1,14 @@
 // /players — club player directory, open to every signed-in, non-expelled
 // member. Replaces the GC-only /gc-players Squad Register (which now
 // redirects here). Each card shows the player's standout career numbers
-// instead of wallet/status, and links to their full stats page.
+// instead of wallet balance, and links to their full stats page.
 // See features/player-directory.md.
 //
 // vibe-security: select is limited to public-profile fields (name, photo,
-// jersey, skills, captain flag). No wallet, status, gmail, dob, whatsapp or
-// blood group ever reaches this page. Expelled players are excluded
-// server-side. No write path.
+// jersey, skills, captain flag, and an active/inactive boolean for the
+// filter — the raw status string never reaches the client). No wallet,
+// gmail, dob, whatsapp or blood group ever reaches this page. Expelled
+// players are excluded server-side. No write path.
 
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
@@ -34,7 +35,7 @@ export default async function PlayersDirectoryPage() {
   const [playersRes, playedRes, highlights] = await Promise.all([
     supabase
       .from('players')
-      .select('id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain')
+      .select('id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain, status')
       .neq('status', 'expelled')
       .order('name', { ascending: true }),
     // Last played = most recent confirmed, already-played booking the
@@ -71,6 +72,7 @@ export default async function PlayersDirectoryPage() {
     primary_skill: p.primary_skill,
     secondary_skill: p.secondary_skill,
     is_captain: !!p.is_captain,
+    is_active: p.status === 'active',
     last_played_on: lastPlayed[p.id] ?? null,
     highlights: highlights[p.id] ?? null,
   }))

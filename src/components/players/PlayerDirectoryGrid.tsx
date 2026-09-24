@@ -1,5 +1,6 @@
 'use client'
-// Player directory grid for /players — search, A–Z filter, and one card
+// Player directory grid for /players — Active/Inactive/All filter
+// (default Active), search, A–Z filter, and one card
 // per player showing the career numbers that stand out for them
 // (pickHighlights). Every card links to /players/[id]/stats.
 // Themed with the shared --stats-* tokens (Light/Dark/System).
@@ -19,6 +20,7 @@ export type DirectoryPlayer = {
   primary_skill: string | null
   secondary_skill: string | null
   is_captain: boolean
+  is_active: boolean // players.status === 'active' (expelled never reaches this page)
   last_played_on: string | null
   highlights: CareerHighlights | null
 }
@@ -50,14 +52,34 @@ function formatLastPlayed(d: string | null) {
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
+type StatusFilter = 'active' | 'inactive' | 'all'
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: 'active',   label: 'Active'   },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'all',      label: 'All'      },
+]
+
+function matchesStatus(p: DirectoryPlayer, f: StatusFilter) {
+  return f === 'all' || (f === 'active' ? p.is_active : !p.is_active)
+}
+
 export function PlayerDirectoryGrid({ players }: { players: DirectoryPlayer[] }) {
   const [query, setQuery] = useState('')
   const [letter, setLetter] = useState<string | null>(null)
+  const [status, setStatus] = useState<StatusFilter>('active')
+
+  const counts = useMemo(() => ({
+    active:   players.filter(p => p.is_active).length,
+    inactive: players.filter(p => !p.is_active).length,
+    all:      players.length,
+  }), [players])
 
   const q = query.trim().toLowerCase()
   const searched = useMemo(
-    () => (q ? players.filter(p => p.name.toLowerCase().includes(q) || (p.jersey_name ?? '').toLowerCase().includes(q)) : players),
-    [players, q],
+    () => players
+      .filter(p => matchesStatus(p, status))
+      .filter(p => !q || p.name.toLowerCase().includes(q) || (p.jersey_name ?? '').toLowerCase().includes(q)),
+    [players, q, status],
   )
   const availableLetters = useMemo(
     () => new Set(searched.map(p => p.name[0]?.toUpperCase()).filter(Boolean)),
@@ -67,6 +89,27 @@ export function PlayerDirectoryGrid({ players }: { players: DirectoryPlayer[] })
 
   return (
     <div>
+      {/* Status */}
+      <div className="flex flex-wrap items-center gap-1 mb-3" role="radiogroup" aria-label="Player status">
+        {STATUS_OPTIONS.map(opt => {
+          const on = status === opt.value
+          return (
+            <button
+              key={opt.value}
+              role="radio"
+              aria-checked={on}
+              onClick={() => { setStatus(opt.value); setLetter(null) }}
+              className={`font-rajdhani text-xs font-bold px-3 h-8 rounded-full border transition-colors ${
+                on ? 'bg-[var(--stats-accent)] border-[var(--stats-accent)] text-white dark:text-ink'
+                   : 'bg-[var(--stats-card-bg)] dark:bg-ink-3 border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-2)] hover:text-[var(--stats-accent)]'
+              }`}
+            >
+              {opt.label} <span className={on ? 'opacity-80' : 'text-[var(--stats-text-faint)]'}>({counts[opt.value]})</span>
+            </button>
+          )
+        })}
+      </div>
+
       {/* Search */}
       <input
         type="search"
@@ -120,7 +163,7 @@ export function PlayerDirectoryGrid({ players }: { players: DirectoryPlayer[] })
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <span className="text-4xl mb-3 opacity-30">🏏</span>
-          <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No players match that search</p>
+          <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No {status === 'all' ? '' : status + ' '}players match</p>
         </div>
       )}
     </div>
@@ -157,7 +200,7 @@ function PlayerCard({ p }: { p: DirectoryPlayer }) {
       </div>
 
       {/* Skill pills */}
-      {(primary || secondary || p.is_captain) && (
+      {(primary || secondary || p.is_captain || !p.is_active) && (
         <div className="flex flex-wrap gap-1.5">
           {primary && (
             <span className="font-rajdhani text-xs font-semibold bg-[var(--stats-badge-bg)] border border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] px-2 py-0.5 rounded-full">
@@ -167,6 +210,11 @@ function PlayerCard({ p }: { p: DirectoryPlayer }) {
           {secondary && (
             <span className="font-rajdhani text-xs font-semibold bg-[var(--stats-row-bg)] border border-[var(--stats-card-border)] text-[var(--stats-text-2)] px-2 py-0.5 rounded-full">
               {secondary}
+            </span>
+          )}
+          {!p.is_active && (
+            <span className="font-rajdhani text-xs font-semibold bg-[var(--stats-row-bg)] border border-[var(--stats-card-border)] text-[var(--stats-text-muted)] px-2 py-0.5 rounded-full">
+              Inactive
             </span>
           )}
           {p.is_captain && (
