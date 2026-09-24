@@ -89,8 +89,13 @@ function MatchCaption({ r, showWicket }: { r: PartnershipRecord; showWicket: boo
     : <>{parts}</>
 }
 
-function runsLabel(runs: number, unbroken: boolean): string {
-  return `${runs}${unbroken ? '*' : ''}`
+// isRetirement gets its own "ret." suffix — see src/lib/partnerships.ts's
+// retired-hurt-and-return note. Mutually exclusive with unbroken in
+// practice (a retirement always brings in another batter, so the crease
+// is never still "open" the way an unbroken stand's is), but each is
+// checked independently rather than assuming that.
+function runsLabel(runs: number, unbroken: boolean, isRetirement = false): string {
+  return `${runs}${unbroken ? '*' : ''}${isRetirement ? ' ret.' : ''}`
 }
 
 function Card({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
@@ -125,7 +130,7 @@ export function PartnershipLeadersView({ leaders }: { leaders: PartnershipLeader
             label={`${i + 1}`}
             players={r.players}
             pct={pctOf(r.runs, topMax)}
-            value={runsLabel(r.runs, r.unbroken)}
+            value={runsLabel(r.runs, r.unbroken, r.isRetirement)}
             sub={r.balls != null ? `(${r.balls})` : null}
             caption={<MatchCaption r={r} showWicket />}
           />
@@ -139,7 +144,7 @@ export function PartnershipLeadersView({ leaders }: { leaders: PartnershipLeader
             label={ordinal(r.wicketNumber)}
             players={r.players}
             pct={pctOf(r.runs, wicketMax)}
-            value={runsLabel(r.runs, r.unbroken)}
+            value={runsLabel(r.runs, r.unbroken, r.isRetirement)}
             sub={r.balls != null ? `(${r.balls})` : null}
             caption={<MatchCaption r={r} showWicket={false} />}
           />

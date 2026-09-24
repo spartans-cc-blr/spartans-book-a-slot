@@ -7,7 +7,7 @@ const B: PartnershipPlayer = { playerId: 'b', playerName: 'Bravo' }
 const C: PartnershipPlayer = { playerId: null, playerName: 'Charlie K' }
 
 function p(wicketNumber: number, runs: number, players: [PartnershipPlayer, PartnershipPlayer], overFrom = 0, overTo = 1, unbroken = false): Partnership {
-  return { wicketNumber, runs, overFrom, overTo, players, outPlayer: unbroken ? null : players[0] }
+  return { wicketNumber, runs, overFrom, overTo, players, outPlayer: unbroken ? null : players[0], isRetirement: false }
 }
 function match(id: string, date: string, partnerships: Partnership[]): MatchPartnerships {
   return { matchId: id, bookingId: `bk-${id}`, gameDate: date, opponentName: `Opp ${id}`, partnerships }

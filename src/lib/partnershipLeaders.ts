@@ -71,6 +71,7 @@ export function aggregatePartnershipLeaders(
         runs:         p.runs,
         balls:        balls >= 0 ? balls : null,
         unbroken:     p.outPlayer === null,
+        isRetirement: p.isRetirement,
         players,
         matchId:      m.matchId,
         bookingId:    m.bookingId,
