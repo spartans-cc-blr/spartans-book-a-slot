@@ -1,6 +1,6 @@
 # Batting Partnerships — Feature Summary
 
-**Spartans Hub · Added: September 2026 · Status: All 6 phases shipped, plus unbroken-partnership support (§4.2)**
+**Spartans Hub · Added: September 2026 · Status: All 6 phases shipped, plus unbroken-partnership support (§4.2) and retired-hurt-and-return support (§4.4)**
 
 ---
 
@@ -242,7 +242,19 @@ two matches §9 already names ("Dharmarajan S" vs "DS Sakketha";
 "Kushal Vidya") are a different-shaped mismatch (an unresolved name
 disagreement, not a duplicate row pair) and were not touched by this fix.
 
-### Incident — CricHeroes' own Fall of Wickets text had a duplicate wicket number and a phantom repeated name (Hub `match_id 25465218`, fixed September 2026)
+### Incident — misdiagnosed as a data error, actually a real retired-hurt-and-return (Hub `match_id 25465218`, fixed September 2026)
+
+> **Correction, same day — the root cause below is wrong.** This section
+> originally diagnosed the second "Anurag T" entry as a phantom, non-existent
+> duplicate and deleted it. The person who reported this then supplied the
+> actual match context: Anurag T genuinely retired hurt at 118, came back
+> later, and was genuinely dismissed a second time at 262 — both entries in
+> CricHeroes' own text are real events, not a data error at all. Deleting
+> the second one threw away a real dismissal and left wickets 6–7 silently
+> wrong (see below for exactly how). The original write-up is kept below
+> for history, but **the real fix — a genuine capability for a batter
+> retiring and returning, not a data cleanup — is §4.4.** Skip to there for
+> what actually shipped.
 
 **Reported symptom:** for the 4 Jul 2026 match vs Bangalore Bolsters
 (Hub booking `20bb06ef-2025-48f1-ad29-fe26dbc589a4`), the Partnerships
@@ -254,8 +266,8 @@ produced **wrong numbers, not a hidden chart** — `computePartnerships()`'s
 integrity guard never fired, because every name it checked against the
 crease was technically present.
 
-**Root cause — verified directly against the real CricHeroes PDF**, not
-inferred: the scorecard's own "Fall of Wickets" line reads
+**Originally misdiagnosed root cause:** the scorecard's own "Fall of
+Wickets" line reads
 
 ```
 76-1 (Loki, 6.3 ov), 76-2 (Shivashankara GS, 6.4 ov), 98-3 (Saurav Kalsoor, 8.4 ov),
@@ -264,61 +276,45 @@ inferred: the scorecard's own "Fall of Wickets" line reads
 282-9 (Preetam Patil, 30 ov)
 ```
 
-Two independent errors in CricHeroes' own text, both upstream of anything
-`spartans-python` or the Hub does: **wicket number `3` is used twice**
-(`98-3` for Saurav Kalsoor and `118-3` for Anurag T — the real wicket 4
-onward should all be one higher than printed), and **"Anurag T" is named
-a second time** at `262-6`, even though the batting card shows him
-dismissed only once (32 off 19, stumped). Since `fall_of_wickets`' primary
-key is `(match_id, wicket_number)`, the sync silently kept the first
-`wicket_number: 3` row (Saurav Kalsoor) and dropped the second (`118-3`,
-Anurag T's real dismissal) as a conflicting insert — but the phantom
-second "Anurag T" entry, correctly labeled `wicket_number: 6` in the raw
-text (a number nothing else was using), inserted without any conflict at
-all. Net effect: Anurag T's true, earlier dismissal at 118 vanished, while
-a repeated, non-existent one at 262 took a real wicket-number slot —
-and because the resulting row *count* still happened to equal `team_wickets`
-(9 either way), this wasn't the kind of gap the existing "row count falls
-short" fingerprint (used to audit the line-wrap incident above) would ever
-catch.
+The reused wicket number `3` (`98-3` for Saurav Kalsoor, `118-3` for
+Anurag T) is genuinely CricHeroes' own convention for a retirement — that
+part held up. What didn't: "Anurag T" appearing a **second** time at
+`262-6` was read as a phantom, non-existent duplicate (the batting card's
+single combined R/B/M/4s/6s line for him, 32 off 19, was taken as proof he
+was only ever dismissed once) and deleted outright, on the theory that
+`fall_of_wickets`' `(match_id, wicket_number)` primary key had silently
+dropped his real 118 dismissal in favour of Saurav Kalsoor's `98-3` row,
+and that the phantom `262-6` row had opportunistically claimed an unused
+wicket number. That reasoning was wrong: CricHeroes' batting table
+combines a player's *entire* innings — both stints, before and after a
+retirement — into one line, so a single row there is not evidence of only
+one dismissal. Both "Anurag T" entries are real: the retirement at 118,
+and his genuine, final dismissal at 262 after returning.
 
-**Fix — read directly off the real PDF, not guessed**, same
-"database-side patch" convention as both incidents above: every
-`fall_of_wickets` row for this match was deleted and reinserted from the
-verified PDF text, in both the analytics DB and the Hub's
-`match_stats_cache`, with the corrected sequence:
+**Fix as originally applied (now known incomplete):** every
+`fall_of_wickets` row for this match was deleted and reinserted with the
+262 entry dropped, producing 9 rows that summed to the correct 282 total
+and got wickets 4 and 5 right (the 20-run and 128-run stands) purely by
+structural coincidence — but wickets 6 and 7 were wrong: the stored data
+showed "Tushar Shankar & Darshan Shetty" (15) and "Ramesh
+Shanmugamoorthy & Darshan Shetty" (1), when the real stands were "Tushar
+Shankar & Anurag T (returned)" (15) and "Anurag T & Darshan Shetty" (1) —
+and Anurag T's real, final dismissal was missing from the data entirely.
+See §4.4 for the corrected 10-row dataset and the capability that makes it
+representable at all.
 
-| Wicket | Score | Over | Player |
-|---|---|---|---|
-| 1 | 76 | 6.3 | Loki |
-| 2 | 76 | 6.4 | Shivashankara GS |
-| 3 | 98 | 8.4 | Saurav Kalsoor |
-| 4 | 118 | 10.3 | Anurag T |
-| 5 | 246 | 24.2 | Siva |
-| 6 | 261 | 26.2 | Tushar Shankar |
-| 7 | 262 | 27.1 | Darshan Shetty |
-| 8 | 266 | 28 | Ramesh Shanmugamoorthy |
-| 9 | 282 | 30 | Preetam Patil |
-
-The corrected 9 rows resolve cleanly through the crease-pointer walk and
-sum to the team's real 282 all out, correctly producing the 20-run
-Anurag T/Siva stand and the 128-run Tushar/Siva stand the real scorecard
-shows. `team_wickets` (9) still equals `fow.length` (9), so §4.3's
-completeness check is unaffected; the crease ends at length 1 (Manohar B
-Reddy stranded not out, no partner left in a 10-man lineup), so no
-unbroken closing partnership is synthesized — also correct.
-
-**Scope check — with a sharper fingerprint than the row-count one used
-above.** Since this bug can hide behind a row count that still equals
-`team_wickets` (as it did here), the useful signal is a player name
-appearing **more than once within one match's own `fall_of_wickets`
-array** — `SELECT match_id, elem->>'player_name', count(*) FROM
-match_stats_cache, jsonb_array_elements(fall_of_wickets) elem GROUP BY
-match_id, elem->>'player_name' HAVING count(*) > 1` — which found nothing
-else club-wide after this fix, confirming this incident was isolated to
-`25465218`. Neither this query nor the row-count-shortfall one used for
-the line-wrap incident is a complete audit on its own; a future check for
-this bug class should run both.
+**Scope-check query, still useful going forward** despite the wrong
+conclusion drawn from it that day: a player name appearing more than once
+within one match's own `fall_of_wickets` array —
+`SELECT match_id, elem->>'player_name', count(*) FROM match_stats_cache,
+jsonb_array_elements(fall_of_wickets) elem GROUP BY match_id,
+elem->>'player_name' HAVING count(*) > 1` — is real signal, but it can now
+mean **either** a duplicate-row bug (like `18985509`'s "G-One" incident
+above) **or** a genuine retirement-and-return (like this one). Don't
+delete a repeated name on sight — check whether `batting_stats` shows two
+genuinely different stints (a retirement followed by a real dismissal,
+often with the same combined career-line quirk this match had) before
+concluding it's an error.
 
 ---
 
@@ -607,6 +603,124 @@ either case).
 
 ---
 
+## 4.4 Retired hurt and return (added September 2026)
+
+**The gap.** The crease-pointer walk (§4) has exactly one rule for who's
+next: the lowest-`batting_order` player not yet used. That's correct for
+every ordinary dismissal, but a batter can leave the crease **without**
+being dismissed — retiring hurt — and **come back later**, at which point
+the "next batter" for that later vacancy isn't the next fresh name in
+`batting_order` at all, it's the same player returning. Match `25465218`
+(§3's incident above) is the real case that surfaced this: Anurag T
+retired hurt at 118 (ending a 20-run stand with Siva), Tushar Shankar came
+in per the normal rule, added 128 with Siva, and when Siva got out at 246
+it was **Anurag T who came back** to partner Tushar — not Darshan Shetty,
+who the normal rule would have brought in. Tushar was out at 261, Darshan
+Shetty then came in normally to partner the returned Anurag T, and Anurag
+T was genuinely, finally dismissed at 262. No arrangement of the
+pre-existing schema and algorithm can express this — `nextIn` only ever
+moves forward through `order`, and there was no way to say "bring back
+someone already used."
+
+**There's no textual signal to auto-detect this from the PDF.** CricHeroes'
+own Fall of Wickets text for this match has no "retired hurt" wording
+anywhere — the only hint at all was a reused wicket number, which reads
+identically whether it's a genuine retirement or a plain data-entry error
+(exactly what §3's incident above shows happening the other way, with the
+line-wrap bug). This can never be safely automated from
+`spartans-python`'s extraction; it always needs a human who knows what
+actually happened in the match, the same way this one was reported.
+
+**Schema — migration `006_fall_of_wickets_retirement.sql`** adds two
+nullable-in-spirit columns to `fall_of_wickets`:
+
+```sql
+ALTER TABLE fall_of_wickets
+  ADD COLUMN is_retirement boolean NOT NULL DEFAULT false,
+  ADD COLUMN returning_player_name text;
+```
+
+- **`is_retirement`** — this row's departure isn't a real wicket falling.
+  The retiring player still leaves the crease and the next batter still
+  comes in exactly like any other departure (retirement doesn't change
+  *who fills the vacancy it creates* — only a later row's
+  `returning_player_name` does that, see below); the flag's only effect is
+  excluding this row from the real-wicket count `computePartnerships()`
+  compares against `match_stats.team_wickets` for §4.3's completeness
+  check. `realWicketCount = fow.filter(e => !e.is_retirement).length`
+  replaces the old bare `fow.length` in that comparison — without this,
+  any match with a retirement would have one more `fall_of_wickets` row
+  than real wickets fell, permanently failing the completeness check and
+  blocking a genuine unbroken closing partnership from ever being
+  synthesized for that match.
+- **`returning_player_name`** — set on whichever *later* row's vacancy is
+  filled by a specific, previously-retired player instead of the next
+  unused `batting_order` name. `computePartnerships()` looks this name up
+  directly in `order` (the returning player already has a fixed slot there
+  from their first entry — no second, separate lookup structure needed)
+  and re-seats them without advancing `nextIn`, since no fresh
+  batting-order position is being consumed. If the name doesn't resolve
+  against `order` at all, the function returns `null` and logs a
+  `[partnerships]` error — same "never guess" posture as the pre-existing
+  crease-mismatch guard (§4.1).
+
+**`Partnership.isRetirement: boolean`** — new field, `true` when
+`outPlayer` left by retiring rather than being dismissed. Always `false`
+for a normal wicket and for the synthesized unbroken closing partnership
+(§4.2). Threaded through `PartnershipRecord` (the club-wide leaderboard
+type, §10) the same way, via `aggregatePartnershipLeaders()`.
+
+**Corrected data for `25465218`** — the real 10-segment breakdown (9 real
+wickets + 1 retirement), read directly from the PDF and verified end to
+end against this new logic:
+
+| Segment | Score | Over | Partnership | Ends with |
+|---|---|---|---|---|
+| 1 | 76 | 6.3 | 76, Loki & Saurav Kalsoor | Loki out |
+| 2 | 76 | 6.4 | 0, Shivashankara GS & Saurav Kalsoor | Shivashankara GS out |
+| 3 | 98 | 8.4 | 22, Anurag T & Saurav Kalsoor | Saurav Kalsoor out |
+| 4 | 118 | 10.3 | 20, Anurag T & Siva | **Anurag T retires hurt** |
+| 5 | 246 | 24.2 | 128, Tushar Shankar & Siva | Siva out — **Anurag T returns**, replacing Siva's slot |
+| 6 | 261 | 26.2 | 15, Tushar Shankar & Anurag T | Tushar Shankar out |
+| 7 | 262 | 27 | 1, Anurag T & Darshan Shetty | Anurag T out for real |
+| 8 | 262 | 27.1 | 0, Darshan Shetty & Ramesh Shanmugamoorthy | Darshan Shetty out |
+| 9 | 266 | 28 | 4, Ramesh Shanmugamoorthy & Manohar B Reddy | Ramesh Shanmugamoorthy out |
+| 10 | 282 | 30 | 16, Preetam Patil & Manohar B Reddy | Preetam Patil out (Manohar B Reddy stranded not out) |
+
+Row 4 carries `is_retirement: true`; row 5 carries
+`returning_player_name: 'Anurag T'`. `realWicketCount` is 9, matching
+`team_wickets`, so §4.3's completeness check behaves normally — the crease
+ends at length 1 after row 10 (no partner left for Manohar B Reddy in the
+10-man lineup), so no unbroken closing partnership is synthesized, exactly
+as before this change. Applied as the same "database-side patch, not a
+re-sync loop" as every other incident in this doc, in both the analytics
+DB and the Hub's `match_stats_cache` — this one additionally needed the
+code deployed (see below) before the corrected data actually renders
+right, unlike every prior incident here, which were pure data fixes.
+
+**UI — a small "ret." marker**, since the usual "no `(out)` marker, the
+next row already implies who left" reasoning (§6.6) specifically breaks
+for a retirement: the retiring player *does* reappear, in a different,
+non-adjacent row, which — without any marker — reads exactly like the
+duplicate-row bug this feature has already had to fix twice (§3's "G-One"
+and this section's own first, wrong diagnosis). `ScorecardTables.tsx`
+renders `{p.isRetirement && ' ret.'}` next to the runs value for the
+per-match bar chart; `PartnershipLeaders.tsx`'s `runsLabel()` does the
+same for the club-wide leaderboard's Top/By-Wicket views (not the Top
+Pairs aggregate, which has no per-stand metadata to attach it to).
+
+**Validated:** `src/lib/partnerships.test.ts` (new — this feature had no
+dedicated unit test file before this change, only the aggregation layer's
+`partnershipLeaders.test.ts`) covers the real `25465218` sequence end to
+end (all 10 rows, correct pairings for rows 6–7 specifically, correct sum),
+the fail-safe `null` return for an unresolvable `returning_player_name`,
+the completeness-check interaction with a retirement present, and that
+behaviour is byte-for-byte unchanged when neither new field is present.
+`tsc --noEmit`, the full `vitest run` (137 tests), and `npm run build` all
+clean.
+
+---
+
 ## 5. Database
 
 ### Analytics DB — `fall_of_wickets` (migration `005_fall_of_wickets.sql`)
@@ -642,6 +756,13 @@ always resolves against whatever `batting_stats.player_id` currently is.
 **Nullable on nothing** — every existing match simply has zero rows here
 until it's re-synced, same "code merged ≠ history re-run" posture as
 `004_bowling_order.sql`.
+
+**`is_retirement`/`returning_player_name` (migration
+`006_fall_of_wickets_retirement.sql`, September 2026)** — see §4.4 for
+the full design. `spartans-python` never writes either column (no textual
+signal to detect either from the PDF); both are always set by a direct,
+human-verified database correction on the one match that needs them, same
+as every other `fall_of_wickets` correction in this doc.
 
 ### Hub DB — `match_stats_cache.fall_of_wickets` (migration `071_match_stats_cache_fall_of_wickets.sql`)
 
@@ -888,6 +1009,7 @@ as the external-link fallback when there's no `playerId` at all.
 | File | Role |
 |---|---|
 | `analytics-db/migrations/005_fall_of_wickets.sql` | The new table (§5) |
+| `analytics-db/migrations/006_fall_of_wickets_retirement.sql` | `is_retirement`/`returning_player_name` columns — retired-hurt-and-return support (§4.4) |
 | `spartans-python/utils/field_config.py` | `FALL_OF_WICKET_PATTERN`, `ScorecardConfig.strip_name_annotations()` |
 | `spartans-python/utils/field_extractors.py` | `ScorecardExtractor.extract_fall_of_wickets()` and its helpers |
 | `spartans-python/utils/csv_writers.py` | `FallOfWicketsWriter` |
@@ -896,8 +1018,9 @@ as the external-link fallback when there's no `playerId` at all.
 | `supabase/migrations/071_match_stats_cache_fall_of_wickets.sql` | Hub-side cache column (§5) |
 | `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
-| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2), gated on FOW completeness via `finalScore.wickets` (§4.3) |
-| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, first-name-only labels via a local `firstName()` helper, `*` suffix on an unbroken partnership's runs value, no `(out)` marker, `oversToBalls()` renders `overTo` as a ball count; `teamTotal`/`teamOvers`/`teamWickets` props feed `finalScore` |
+| `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2), gated on FOW completeness via `finalScore.wickets` (§4.3); `is_retirement`/`returning_player_name` support, `realWicketCount`, `Partnership.isRetirement` (§4.4) |
+| `src/lib/partnerships.test.ts` | Unit tests — the real `25465218` retirement-and-return sequence, the fail-safe unresolvable-return-name case, the completeness-check interaction, and no-behaviour-change when neither new field is present (§4.4) |
+| `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, first-name-only labels via a local `firstName()` helper, `*` suffix on an unbroken partnership's runs value, no `(out)` marker, `oversToBalls()` renders `overTo` as a ball count; `teamTotal`/`teamOvers`/`teamWickets` props feed `finalScore`; a small "ret." marker for `p.isRetirement` (§4.4) |
 | `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets`; passes `teamTotal`/`teamOvers`/`teamWickets` from `match.stats` |
 | `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` along with `teamTotal`/`teamOvers`/`teamWickets` |
 
@@ -973,13 +1096,13 @@ Glossary: `buildPartnershipsGlossary()` (`leaderboardGlossary.ts`).
 
 | File | Role |
 |---|---|
-| `src/lib/partnershipLeaders.ts` (+ `.test.ts`) | `aggregatePartnershipLeaders()` — top N, best per wicket, top pairs |
-| `src/lib/playerStats.ts` | `getPartnershipLeaders()` — scoped analytics fetch + name resolution |
-| `src/components/leaderboard/PartnershipLeaders.tsx` | `PartnershipLeadersView` — the three bar charts |
+| `src/lib/partnershipLeaders.ts` (+ `.test.ts`) | `aggregatePartnershipLeaders()` — top N, best per wicket, top pairs; threads `Partnership.isRetirement` into `PartnershipRecord.isRetirement` (§4.4) |
+| `src/lib/playerStats.ts` | `getPartnershipLeaders()` — scoped analytics fetch + name resolution; `fall_of_wickets` select widened to include `is_retirement, returning_player_name` (§4.4) |
+| `src/components/leaderboard/PartnershipLeaders.tsx` | `PartnershipLeadersView` — the three bar charts; `runsLabel()`'s "ret." suffix for the Top/By-Wicket views (§4.4) |
 | `src/components/leaderboard/LeaderboardFilters.tsx` | `DetailedCategory` (adds `'partnerships'`), fifth Detailed pill |
 | `src/app/leaderboard/page.tsx` | `category=partnerships` branch |
 | `src/lib/leaderboardGlossary.ts` | `buildPartnershipsGlossary()` |
-| `src/types/index.ts` | `PartnershipRecord`, `PartnershipPairAggregate`, `PartnershipLeaders`, `PartnershipLeaderPlayer` |
+| `src/types/index.ts` | `PartnershipRecord` (+ `isRetirement`, §4.4), `PartnershipPairAggregate`, `PartnershipLeaders`, `PartnershipLeaderPlayer` |
 
 ---
 

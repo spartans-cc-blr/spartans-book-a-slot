@@ -327,9 +327,21 @@ export function ScorecardTables({
                       dismissal) used to squeeze this text down to nothing.
                       Fixed-width column keeps every row's runs/balls
                       right-aligned to the same edge regardless of bar
-                      length. */}
+                      length. isRetirement gets its own small "ret." marker
+                      — unlike a genuine dismissal, the departing player can
+                      (and, if returning_player_name is set on a later row,
+                      does) reappear in a different row further down, and
+                      the usual "no (out) marker, the next row already
+                      implies who left" reasoning breaks for exactly that
+                      case: without this, the same name resurfacing with no
+                      explanation reads like the duplicate-row bug this
+                      feature has already had to fix twice, not a real
+                      retire-and-return. See src/lib/partnerships.ts's
+                      retired-hurt-and-return note. */}
                   <span className="font-rajdhani text-xs font-bold text-gold w-20 flex-shrink-0 text-right">
-                    {p.runs}{p.outPlayer == null && '*'} <span className="text-[var(--scorecard-text-faint)] font-normal">({oversToBalls(p.overTo) - oversToBalls(p.overFrom)})</span>
+                    {p.runs}{p.outPlayer == null && '*'}
+                    {p.isRetirement && <span className="text-[var(--scorecard-text-faint)] font-normal"> ret.</span>}
+                    {' '}<span className="text-[var(--scorecard-text-faint)] font-normal">({oversToBalls(p.overTo) - oversToBalls(p.overFrom)})</span>
                   </span>
                 </div>
               )

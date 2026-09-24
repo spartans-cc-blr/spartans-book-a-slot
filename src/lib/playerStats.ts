@@ -1061,7 +1061,7 @@ export async function getPartnershipLeaders(
   // match_stats below), so the other two reads can be narrowed to them.
   const [fowRows, summaryRows] = await Promise.all([
     fetchAllRows(() => {
-      const q = analytics!.from('fall_of_wickets').select('match_id, wicket_number, team_score, over, player_name')
+      const q = analytics!.from('fall_of_wickets').select('match_id, wicket_number, team_score, over, player_name, is_retirement, returning_player_name')
         .order('match_id').order('wicket_number')
       return scoped ? q.in('match_id', scoped) : q
     }),
@@ -1103,6 +1103,7 @@ export async function getPartnershipLeaders(
       : null
     const fow = (fowByMatch.get(matchId) ?? []).map((r: any) => ({
       wicket_number: num(r.wicket_number), team_score: num(r.team_score), over: num(r.over), player_name: r.player_name,
+      is_retirement: !!r.is_retirement, returning_player_name: r.returning_player_name ?? null,
     }))
     const batting = (battingByMatch.get(matchId) ?? []).map((r: any) => ({ ...r, batting_order: r.batting_order != null ? num(r.batting_order) : null }))
     const partnerships = computePartnerships(batting, fow, finalScore)

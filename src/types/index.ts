@@ -357,6 +357,10 @@ export interface PartnershipRecord {
   runs:         number
   balls:        number | null
   unbroken:     boolean
+  // The stand ended with one player retiring hurt rather than a genuine
+  // dismissal — see src/lib/partnerships.ts's retired-hurt-and-return note
+  // and features/partnerships.md §4.4. Mutually exclusive with `unbroken`.
+  isRetirement: boolean
   players:      [PartnershipLeaderPlayer, PartnershipLeaderPlayer]
   matchId:      string
   bookingId:    string | null

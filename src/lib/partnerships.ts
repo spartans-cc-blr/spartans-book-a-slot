@@ -21,6 +21,19 @@
 // that simply has no Fall of Wickets data synced yet (see FinalScore and
 // the completeness check further down).
 //
+// Retired hurt and return (migration 006_fall_of_wickets_retirement.sql,
+// added September 2026 — see features/partnerships.md §4.4): a batter can
+// leave the crease without being dismissed (retired hurt) and later come
+// back, which the "next batter is always the next unused batting_order"
+// assumption above can't express on its own. A FallOfWicketRow can be
+// flagged is_retirement (this departure isn't a real wicket — excluded
+// from the completeness check below, but otherwise brings in the next
+// batter exactly like any other departure) and/or carry a
+// returning_player_name (this row's vacancy is filled by a specific
+// previously-retired player instead of the next unused batter). Neither
+// field is ever inferable from the PDF alone — always supplied by a human
+// who knows what actually happened in the match.
+//
 // Deliberately does NOT use matchTopPerformers.ts's resolveSquadMatch()
 // pattern. That function exists because a top-performer row's own
 // player_id can be null pre-reconciliation, so it falls back to a squad
@@ -50,6 +63,10 @@ export interface Partnership {
   // down at all). See FinalScore below for why this can only be populated
   // when the caller supplies one.
   outPlayer:    PartnershipPlayer | null
+  // True when outPlayer left the crease by retiring hurt, not a genuine
+  // dismissal (see the retired-hurt-and-return note above outPlayer's own
+  // type). Always false for the synthesized unbroken closing partnership.
+  isRetirement: boolean
 }
 
 // The innings' final total/overs/wickets — needed to close out an
@@ -82,10 +99,13 @@ interface BattingRow {
 }
 
 interface FallOfWicketRow {
-  wicket_number: number
-  team_score:    number
-  over:          number
-  player_name:   string
+  wicket_number:         number
+  team_score:            number
+  over:                  number
+  player_name:           string
+  // See the retired-hurt-and-return note at the top of this file.
+  is_retirement?:        boolean | null
+  returning_player_name?: string | null
 }
 
 function normalize(name: string | null | undefined): string {
@@ -113,6 +133,11 @@ export function computePartnerships(
   finalScore?: FinalScore | null
 ): Partnership[] | null {
   const fow = (fallOfWickets ?? []).slice().sort((a, b) => a.wicket_number - b.wicket_number)
+  // A retirement row isn't a real wicket — excluded from the completeness
+  // check further down, which compares against the scorecard's own real
+  // wicket count (match_stats.team_wickets). See the retired-hurt-and-
+  // return note at the top of this file.
+  const realWicketCount = fow.filter(e => !e.is_retirement).length
 
   // Real batters only, in true batting order — a placeholder "did not
   // bat" row (batting_order 0, see spartans-python's BattingStatsWriter)
@@ -153,6 +178,7 @@ export function computePartnerships(
       overTo:       entry.over,
       players:      [toPlayer(crease[0]), toPlayer(crease[1])],
       outPlayer:    toPlayer(crease[outIdx]),
+      isRetirement: !!entry.is_retirement,
     })
 
     // The incoming batter fills the vacated slot (outIdx) rather than
@@ -163,7 +189,25 @@ export function computePartnerships(
     // was already there, continuing). Keeping the survivor's index stable
     // means the same name visually persists in the same column across
     // consecutive rows, and only the incoming name changes each time.
-    if (nextIn < order.length) {
+    //
+    // returning_player_name overrides the default "next unused batter"
+    // fill — a specific, previously-retired player re-enters instead (see
+    // the retired-hurt-and-return note at the top of this file). nextIn is
+    // deliberately NOT advanced in that case: the returning player already
+    // occupies a fixed slot in `order` from their first entry, so no fresh
+    // batting-order position is being consumed.
+    if (entry.returning_player_name) {
+      const returning = order.find(p => normalize(p.player_name) === normalize(entry.returning_player_name))
+      if (!returning) {
+        console.error(
+          `[partnerships] Fall of Wickets entry for wicket ${entry.wicket_number} names a returning player ` +
+          `"${entry.returning_player_name}" who isn't in the batting order — dropping partnership derivation ` +
+          `for this match rather than guessing.`
+        )
+        return null
+      }
+      crease[outIdx] = returning
+    } else if (nextIn < order.length) {
       crease[outIdx] = order[nextIn]
       nextIn += 1
     } else {
@@ -184,22 +228,25 @@ export function computePartnerships(
   // innings that genuinely ended exactly on the last recorded wicket —
   // it also guards against ever emitting a negative-runs row.
   //
-  // `fow.length === finalScore.wickets` is the completeness check this
-  // was missing before: without it, a match with real wickets but zero
-  // synced Fall of Wickets rows (predates this feature, or hasn't been
-  // re-synced since) looked identical to a genuine not-out innings —
+  // `realWicketCount === finalScore.wickets` is the completeness check
+  // this was missing before: without it, a match with real wickets but
+  // zero synced Fall of Wickets rows (predates this feature, or hasn't
+  // been re-synced since) looked identical to a genuine not-out innings —
   // `fow` empty either way — and silently rendered one fabricated
   // "partnership" spanning the entire team total, mislabelled as an
-  // unbroken opening stand. Requiring the FOW row count to match the
-  // scorecard's own wicket count means the synthesis only ever fires when
-  // the crease truly reflects reality; `finalScore.wickets == null` (the
-  // column itself missing) fails safe the same way, since a genuine
-  // zero-wicket innings always has `wickets === 0`, never null.
+  // unbroken opening stand. Requiring the real-wicket row count to match
+  // the scorecard's own wicket count means the synthesis only ever fires
+  // when the crease truly reflects reality; `finalScore.wickets == null`
+  // (the column itself missing) fails safe the same way, since a genuine
+  // zero-wicket innings always has `wickets === 0`, never null. Deliberately
+  // realWicketCount, not fow.length — a retirement row doesn't reduce
+  // team_wickets, so counting it here would wrongly block the synthesis on
+  // any match with a retired-hurt batter.
   if (
     crease.length === 2 &&
     finalScore &&
     finalScore.wickets != null &&
-    fow.length === finalScore.wickets &&
+    realWicketCount === finalScore.wickets &&
     finalScore.total > prevScore
   ) {
     partnerships.push({
@@ -209,6 +256,7 @@ export function computePartnerships(
       overTo:       finalScore.overs,
       players:      [toPlayer(crease[0]), toPlayer(crease[1])],
       outPlayer:    null,
+      isRetirement: false,
     })
   }
 
