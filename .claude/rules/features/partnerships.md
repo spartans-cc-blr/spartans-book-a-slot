@@ -316,6 +316,80 @@ genuinely different stints (a retirement followed by a real dismissal,
 often with the same combined career-line quirk this match had) before
 concluding it's an error.
 
+### Incident — two adjacent `batting_order` values swapped, a genuine data error rather than an extraction or retirement case (Hub `match_id 26906716`, fixed September 2026)
+
+**Reported symptom:** the Partnerships chart was entirely absent for this
+match (a booking whose `fall_of_wickets` had only just been synced that
+day, via a re-sync/backfill run — its `batting_stats` rows dated back to
+4 Sep, its `fall_of_wickets` rows to 24 Sep). `match_stats_cache` looked
+complete — 9 Fall of Wickets rows, matching `team_wickets = 9` exactly, 12
+batting rows including the two not-out batters — so this wasn't a repeat
+of §3's "missing rows" or "duplicate rows" shapes; every name involved
+had exactly one row.
+
+**Root cause, found by hand-walking the crease-pointer algorithm (§4)
+against the real data:** after Kushal Vidya's dismissal at 42 (the
+walk's 4th wicket), the crease correctly held Shijil Narayanan
+(`batting_order 5`, already there) and Harsha Konka (`batting_order 6`,
+just brought in per the normal "next unused batter" rule). But the next
+Fall of Wickets entry names **Venkat R** — `batting_order 7`, not yet
+used at all — as the player dismissed at 77. Neither crease occupant
+matched, so `computePartnerships()`'s integrity guard (§4.1) fired
+exactly as designed and returned `null`, hiding the whole chart rather
+than guessing.
+
+Re-running the walk with Harsha Konka and Venkat R's `batting_order`
+values swapped (Venkat R at 6, Harsha Konka at 7 — i.e. Venkat R actually
+came in *before* Harsha Konka, not after) resolved every one of the
+remaining 5 wickets with no mismatch at all, and the 9 resulting
+partnerships summed to exactly 229 — the real team total — matching
+every one of the raw Fall of Wickets score checkpoints (4, 33, 33, 42,
+77, 130, 218, 227, 229) along the way. This is decisive: a genuinely
+wrong pair of `batting_order` values, not a parsing bug, not a duplicate
+row, and not an undeclared retirement (nothing about this match's
+`batting_stats` combined-innings figures suggested two separate stints
+the way `25465218`'s did) — `spartans-python`'s extraction simply
+assigned two adjacent middle-order batters' entry positions the wrong
+way round for this one match.
+
+**Fix — a database-side patch, not a re-sync loop**, same convention as
+every other incident in this doc: `batting_stats.batting_order` was
+swapped for these two players directly in the analytics DB (a single
+atomic `UPDATE ... CASE`, so there was never a moment with two rows
+sharing one `batting_order` mid-statement), and the same swap was applied
+to the matching elements inside the Hub's already-synced
+`match_stats_cache.batting` jsonb array for this booking (no re-sync
+needed). Re-verified by running the actual `computePartnerships()`
+algorithm (not just the hand walk) against the corrected data: 9 clean
+partnerships, zero mismatch, summing to 229.
+
+**This also corrects `features/player-stats-batting-position.md`'s
+"Runs by Batting Position" chart for these two players in this one
+match** — that feature reads the exact same `batting_stats.batting_order`
+column directly, so the same wrong value was misattributing Venkat R's
+77-42=35 (wait — his own individual runs, not the stand) to position 7
+and Harsha Konka's to position 6 there too, for this match specifically.
+One root-cause fix in the shared column benefits both features; no
+separate correction was needed on that page.
+
+**Not the same match as the pending "Kushal Vidya" crease-mismatch flag
+in §9** — that item was raised while validating §10 against a 49-match
+audit taken *before* this booking's own `fall_of_wickets` rows existed
+(they were only synced today), so it necessarily refers to a different,
+earlier-synced match that also happens to involve a player named Kushal
+Vidya. Left open in §9 as its own unresolved item — not touched by this
+fix.
+
+**Scope check not run** — unlike `18985509`'s duplicate-row incident,
+which had a clean SQL fingerprint to audit for (`batting_order` values
+tied within one match), a wrong-but-non-tied `batting_order` swap like
+this one has no equally cheap SQL signature to search for across the
+historical backlog — the only reliable detector is exactly the hand-walk
+done here, which needs a `null` return (or a wrong-but-silently-accepted
+result) to notice in the first place. Worth revisiting if another match
+is reported with an empty or wrong Partnerships chart with otherwise
+complete-looking data.
+
 ---
 
 ### Shared name-normalization helper
@@ -1084,7 +1158,7 @@ as the external-link fallback when there's no `playerId` at all.
 |---|---|
 | First real end-to-end cron proof | See §6.5 — the manual Phase 3 validation and this feature's own Phase 4/6 code are both in place, but no match has yet gone through the automated `backfill-scorecards` cron with the FOW-aware pipeline live end-to-end. Worth a follow-up note here once that's been observed. |
 | Highest partnership by runs/wickets on the Honour Board (`/leaderboard`) | ✅ Shipped September 2026 as Detailed → Partnerships — see §10. |
-| 3 synced matches drop out of every partnership view | Found while validating §10 against live data (49 matches): `computePartnerships()`'s integrity guard returns `null` for matches where a Fall of Wickets name doesn't match either batter at the crease ("Dharmarajan S" vs "DS Sakketha"; "G-One"; "Kushal Vidya"). Likely a scorecard-name mismatch between the FOW text and the batting card, or a wrong batting_order. Those matches show no per-match chart either — a pre-existing data issue, not introduced by §10. **"G-One" (`match_id 18985509`) diagnosed and fixed September 2026** — see §3's "a re-parse split one batter into two duplicate rows" incident; it was a duplicate `(match_id, player_name)` row pair from a re-parse, not a name mismatch. "Dharmarajan S" vs "DS Sakketha" and "Kushal Vidya" are still open — worth checking whether either is the same duplicate-row shape or a genuine unresolved alias. |
+| 3 synced matches drop out of every partnership view | Found while validating §10 against live data (49 matches): `computePartnerships()`'s integrity guard returns `null` for matches where a Fall of Wickets name doesn't match either batter at the crease ("Dharmarajan S" vs "DS Sakketha"; "G-One"; "Kushal Vidya"). Likely a scorecard-name mismatch between the FOW text and the batting card, or a wrong batting_order. Those matches show no per-match chart either — a pre-existing data issue, not introduced by §10. **"G-One" (`match_id 18985509`) diagnosed and fixed September 2026** — see §3's "a re-parse split one batter into two duplicate rows" incident; it was a duplicate `(match_id, player_name)` row pair from a re-parse, not a name mismatch. "Dharmarajan S" vs "DS Sakketha" and "Kushal Vidya" are still open — worth checking whether either is the same duplicate-row shape or a genuine unresolved alias. **A fourth, separate instance of the same `null`-return symptom was diagnosed and fixed September 2026 on a different, later-synced match (`26906716`)** — see §3's "two adjacent `batting_order` values swapped" incident; a genuinely wrong pair of `batting_order` values, not a name mismatch or a duplicate row. That match's `fall_of_wickets` rows postdate the 49-match audit this row's original three names came from, so it isn't one of the three listed here — the two are unrelated, coincidentally-similar bugs. |
 | Other historical matches possibly affected by the score-hyphen/wicket-number line-wrap bug (§3's incident) | Only match `14114256` has been confirmed and manually corrected so far — the fix to `FALL_OF_WICKET_PATTERN` prevents this specific sub-case going forward (and on any future re-sync), but no audit has been run across the rest of the historical backlog for a `fall_of_wickets` row count that falls short of `team_wickets` by exactly one, which is the fingerprint this bug leaves behind. Worth a targeted query if this is suspected elsewhere. |
 
 ---
