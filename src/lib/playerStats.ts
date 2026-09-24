@@ -287,25 +287,21 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
   // overridable, which is exactly what a ground-less umbrella tournament
   // like "Practice games" needs (its matches span many physical grounds,
   // so there's no single tournament-level ground_id to fall back on). A
-  // direct filter on bookings.ground_id now captures that in one query —
-  // no more resolving "which tournaments use this ground" as a proxy.
-  // Legacy fallback: rows from before the migration that never got
-  // backfilled a ground_id still match via the old free-text venue column.
-  const { data: ground, error: groundErr } = await hub.from('grounds').select('name').eq('id', filters.groundId).maybeSingle()
-  if (groundErr) throw new Error(groundErr.message)
-  const groundName = ground?.name ?? null
-
-  const [byGroundId, byLegacyVenue] = await Promise.all([
-    baseQuery().eq('ground_id', filters.groundId),
-    groundName ? baseQuery().is('ground_id', null).ilike('venue', groundName) : Promise.resolve({ data: [] as any[], error: null }),
-  ])
-  if (byGroundId.error) throw new Error(byGroundId.error.message)
-  if (byLegacyVenue.error) throw new Error(byLegacyVenue.error.message)
-
-  const matchIds = new Set<string>()
-  for (const b of withPitchType(withoutPractice(byGroundId.data ?? []))) if (b.match_id) matchIds.add(b.match_id)
-  for (const b of withPitchType(withoutPractice(byLegacyVenue.data ?? []))) if (b.match_id) matchIds.add(b.match_id)
-  return Array.from(matchIds)
+  // direct filter on bookings.ground_id captures that in one query.
+  //
+  // Deliberately no free-text venue fallback — venue is never a reliable
+  // proxy for ground identity (real incident: several Glanz-tournament
+  // bookings carried venue = "Glanz Cricket Ground - 1, Bengaluru
+  // (Bangalore)", which never matched the plain ground name via an exact
+  // ilike, silently hiding those matches from every ground-filtered view;
+  // see features/leaderboard.md §8.3 for the full incident writeup).
+  // Every confirmed, synced booking is expected to carry a real ground_id
+  // by now (backfilled from its tournament where one was missing) — a
+  // booking with no ground_id at all just doesn't match any ground filter,
+  // rather than being guessed at from venue text.
+  const { data, error } = await baseQuery().eq('ground_id', filters.groundId)
+  if (error) throw new Error(error.message)
+  return Array.from(new Set<string>(withPitchType(withoutPractice(data ?? [])).map((b: any) => b.match_id).filter(Boolean)))
 }
 
 // Tournament and ground option lists for the /leaderboard filter bar,
@@ -1203,9 +1199,8 @@ export async function getRecentForm(playerIds: string[], matchCount: number = 5)
 //                tournament like "Practice games" work correctly: its
 //                matches have no single tournament-level ground, but each
 //                one still has its own real ground_id set at booking time.
-//                Rows from before that migration which never got backfilled
-//                a ground_id fall back to a case-insensitive match on the
-//                legacy free-text bookings.venue column.
+//                No free-text venue fallback — see getScopedMatchIds()'s
+//                own comment on why venue is never used as a ground proxy.
 //   format     — every match of this booking's format (T20/T30), across
 //                every tournament and ground
 // A scope with zero qualifying matches (or zero of them featuring this
@@ -1216,7 +1211,6 @@ async function matchIdsForFilter(filter: {
   tournamentId?:    string
   tournamentIdIn?:  string[]
   groundId?:        string
-  venue?:           string
   format?:          string
   gameDateFrom?:    string   // inclusive — 'YYYY-MM-DD'
 }): Promise<string[]> {
@@ -1225,10 +1219,6 @@ async function matchIdsForFilter(filter: {
   if (filter.tournamentId)   query = query.eq('tournament_id', filter.tournamentId)
   if (filter.tournamentIdIn) query = query.in('tournament_id', filter.tournamentIdIn)
   if (filter.groundId)       query = query.eq('ground_id', filter.groundId)
-  // Case-insensitive — CricHeroes/admin-entered venue text and the ground's
-  // own name aren't guaranteed to agree on casing. Legacy-row fallback only
-  // (see getPlayerBookingContextStats) — never combined with groundId.
-  if (filter.venue)          query = query.ilike('venue', filter.venue)
   if (filter.format)         query = query.eq('format', filter.format)
   if (filter.gameDateFrom)   query = query.gte('game_date', filter.gameDateFrom)
 
@@ -1321,7 +1311,7 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
   const hub = createServiceClient()
   const { data: booking, error } = await hub
     .from('bookings')
-    .select('tournament_id, format, venue, ground_id, tournament:tournaments(ground_id, ground:grounds(name))')
+    .select('tournament_id, format, ground_id, tournament:tournaments(ground_id)')
     .eq('id', bookingId)
     .single()
   if (error) throw new Error(error.message)
@@ -1330,16 +1320,10 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
   const tournamentId = booking.tournament_id as string | null
   const tournamentRow = (booking as any).tournament
   // This booking's own ground_id first; the tournament's is only a fallback
-  // for a pre-migration-066 row that was never backfilled one of its own.
+  // for a booking that was never backfilled one of its own. No free-text
+  // venue fallback — see getScopedMatchIds()'s comment on why.
   const groundId      = ((booking as any).ground_id as string | null) ?? (tournamentRow?.ground_id as string | null)
-  const groundName    = tournamentRow?.ground?.name as string | null
-  const venue         = booking.venue as string | null
   const format        = booking.format as string | null
-
-  // Legacy free-text fallback only applies when this booking has no real
-  // ground_id at all — prefer the ground's own name (covers every booking
-  // recorded under that ground) over this booking's raw venue text.
-  const legacyVenueToMatch = !groundId ? (groundName ?? venue ?? null) : null
 
   // Format row is windowed to the last 3 calendar months (not all-time,
   // unlike Tournament/Ground) and gated on MIN_GAMES_FOR_FORMAT_ROW below —
@@ -1349,13 +1333,11 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
   const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0]
 
-  const [tournamentMatchIds, groundDirectIds, groundByLegacyVenue, formatMatchIds] = await Promise.all([
+  const [tournamentMatchIds, groundMatchIds, formatMatchIds] = await Promise.all([
     tournamentId ? matchIdsForFilter({ tournamentId }) : Promise.resolve([]),
     groundId ? matchIdsForFilter({ groundId }) : Promise.resolve([]),
-    legacyVenueToMatch ? matchIdsForFilter({ venue: legacyVenueToMatch }) : Promise.resolve([]),
     format ? matchIdsForFilter({ format, gameDateFrom: threeMonthsAgoStr }) : Promise.resolve([]),
   ])
-  const groundMatchIds = Array.from(new Set([...groundDirectIds, ...groundByLegacyVenue]))
 
   const [tournament, ground, formatStats] = await Promise.all([
     scopedPlayerStats(playerId, tournamentMatchIds),
