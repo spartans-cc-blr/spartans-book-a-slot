@@ -185,6 +185,63 @@ Pancholi and Muthukumar R. No other booking was touched as part of this
 fix — see §9 for the open question of how many other historical matches
 this same line-wrap sub-case may have silently affected.
 
+### Incident — a re-parse split one batter into two duplicate rows under different names (Hub `match_id 18985509`, fixed September 2026)
+
+**Reported symptom:** the Partnerships chart was entirely absent on the
+26 Oct 2025 match vs Disrupters CC (Hub booking
+`a56d4c22-252c-4337-bd60-e11b7ea57faf`, `match_id 18985509`) — this is the
+same "G-One" match already flagged, unresolved, in §9's "3 synced matches
+drop out of every partnership view" row.
+
+**Root cause:** the analytics DB carried **two** rows in `batting_stats`
+for batting position 4 in this match — `"G-One"` (`created_at`
+2026-09-15, `player_id: null`) and `"Jeewan Singh Jalal"` (`created_at`
+2026-07-29, `player_id: null`) — with byte-identical stats (9 runs off 8
+balls, 1 four, caught). The same duplication existed across
+`bowling_stats`, `fielding_stats`, and `team_list` too, all with the exact
+same pair of timestamps: this one match was fully re-parsed on 2026-09-15
+(the same run that backfilled its `fall_of_wickets` rows), and that
+re-parse's batting/bowling/fielding/team-list extraction produced a
+different name spelling for this one real batter than the original July
+sync had — the composite key on every one of these tables is `(match_id,
+player_name)`, so the re-parse's upsert **inserted a new row** rather than
+updating the existing one. Tellingly, the *same* re-parse run's own
+`fall_of_wickets` extraction still named this batter `"Jeewan Singh
+Jalal"` — the two extraction paths disagreed on this one player's name
+within the same PDF, within the same parse.
+
+This broke `computePartnerships()`'s crease-pointer walk (§4) exactly the
+way the integrity guard is designed to: with two rows tied at
+`batting_order: 4`, the stable sort placed `"G-One"` ahead of `"Jeewan
+Singh Jalal"` in the batting order array, so the walk brought `"G-One"`
+into the crease after wicket 2 — then wicket 3's Fall of Wickets entry
+named `"Jeewan Singh Jalal"` as dismissed, which matched neither crease
+occupant, and `computePartnerships()` correctly returned `null` rather
+than guess.
+
+**Fix — a database-side patch, not a re-sync loop**, same convention as
+the incident above: the four spurious `"G-One"` rows (one each in
+`batting_stats`, `bowling_stats`, `fielding_stats`, `team_list`) were
+deleted directly from the analytics DB, keeping the original `"Jeewan
+Singh Jalal"` rows — the name Fall of Wickets already references. The
+Hub's already-synced `match_stats_cache` for this booking was patched the
+same way, stripping the matching `"G-One"` element out of its `batting`/
+`bowling`/`fielding`/`team_list` jsonb arrays (no re-sync needed). With the
+duplicate gone, the batting order resolves cleanly to `Shabarinath →
+Siva → Uday → Jeewan Singh Jalal → Harsha Konka → Darshan Shetty`, and the
+crease-pointer walk now produces all 5 partnerships for this innings
+(4 from Fall of Wickets plus one unbroken closing stand between Darshan
+Shetty and Harsha Konka), summing correctly to the team's 184 all out.
+
+**Scope check:** a follow-up audit
+(`SELECT match_id, batting_order, count(*) FROM batting_stats WHERE
+batting_order > 0 GROUP BY match_id, batting_order HAVING count(*) > 1`)
+found no other match currently carrying this same duplicate-batting-
+position pattern — this incident was isolated to `18985509`. The other
+two matches §9 already names ("Dharmarajan S" vs "DS Sakketha";
+"Kushal Vidya") are a different-shaped mismatch (an unresolved name
+disagreement, not a duplicate row pair) and were not touched by this fix.
+
 ---
 
 ### Shared name-normalization helper
@@ -774,7 +831,7 @@ as the external-link fallback when there's no `playerId` at all.
 |---|---|
 | First real end-to-end cron proof | See §6.5 — the manual Phase 3 validation and this feature's own Phase 4/6 code are both in place, but no match has yet gone through the automated `backfill-scorecards` cron with the FOW-aware pipeline live end-to-end. Worth a follow-up note here once that's been observed. |
 | Highest partnership by runs/wickets on the Honour Board (`/leaderboard`) | ✅ Shipped September 2026 as Detailed → Partnerships — see §10. |
-| 3 synced matches drop out of every partnership view | Found while validating §10 against live data (49 matches): `computePartnerships()`'s integrity guard returns `null` for matches where a Fall of Wickets name doesn't match either batter at the crease ("Dharmarajan S" vs "DS Sakketha"; "G-One"; "Kushal Vidya"). Likely a scorecard-name mismatch between the FOW text and the batting card, or a wrong batting_order. Those matches show no per-match chart either — a pre-existing data issue, not introduced by §10. |
+| 3 synced matches drop out of every partnership view | Found while validating §10 against live data (49 matches): `computePartnerships()`'s integrity guard returns `null` for matches where a Fall of Wickets name doesn't match either batter at the crease ("Dharmarajan S" vs "DS Sakketha"; "G-One"; "Kushal Vidya"). Likely a scorecard-name mismatch between the FOW text and the batting card, or a wrong batting_order. Those matches show no per-match chart either — a pre-existing data issue, not introduced by §10. **"G-One" (`match_id 18985509`) diagnosed and fixed September 2026** — see §3's "a re-parse split one batter into two duplicate rows" incident; it was a duplicate `(match_id, player_name)` row pair from a re-parse, not a name mismatch. "Dharmarajan S" vs "DS Sakketha" and "Kushal Vidya" are still open — worth checking whether either is the same duplicate-row shape or a genuine unresolved alias. |
 | Other historical matches possibly affected by the score-hyphen/wicket-number line-wrap bug (§3's incident) | Only match `14114256` has been confirmed and manually corrected so far — the fix to `FALL_OF_WICKET_PATTERN` prevents this specific sub-case going forward (and on any future re-sync), but no audit has been run across the rest of the historical backlog for a `fall_of_wickets` row count that falls short of `team_wickets` by exactly one, which is the fingerprint this bug leaves behind. Worth a targeted query if this is suspected elsewhere. |
 
 ---
