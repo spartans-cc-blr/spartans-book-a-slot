@@ -958,6 +958,24 @@ games, so `getLeaderboardsByGround()` excludes a practice booking itself
 check `getScopedMatchIds()`'s `withoutPractice()` applies everywhere else —
 see `features/practice-games.md`) before bucketing rows by ground.
 
+**A ground's MVP total includes knockout matches played there, not just
+league ones — the split is which *rank list* a booking uses (§11.1's own
+opening line: knockout → tournament, league → ground), never which matches
+count toward either list's totals.** Neither `getLeaderboardsByGround()`
+nor `getLeaderboardsByTournament()` filters on `bookings.stage_type` at
+all — both simply aggregate every confirmed, non-practice booking in their
+respective scope (this ground, or this tournament), knockout and league
+alike. So a league game at, say, Blendin Cricket Ground ranks players by
+their full record at that ground — including the two knockout matches
+already played there — not just the eight league ones; symmetrically, a
+knockout game's tournament MVP rank (§11) already included that
+tournament's own knockout-stage form even before this section shipped,
+since `getLeaderboardsByTournament()` was never stage-scoped either. Do not
+add a `stage_type != 'knockout'` filter to either function — see the
+comment directly above `getLeaderboardsByGround()`'s definition, which
+flags this explicitly since it's an easy thing for a future edit to
+"correct" by mistake.
+
 `computeMvpRanks()` itself needed no changes — it was already generic over
 any `LeaderboardRow[]`, whether sourced from a tournament or a ground.
 
