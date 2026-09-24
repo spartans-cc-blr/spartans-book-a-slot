@@ -610,6 +610,64 @@ sequential-await pattern on its own independent Supabase reads.
 
 ---
 
+## 8.3 Incident — 24 Sep 2026, Ground filter silently matched nothing for
+several tournaments' historical matches
+
+**Symptom:** filtering "Yours Statistically" to **Glanz Cricket Ground - 1**
+returned almost no data, even though 15 of the club's synced matches were
+genuinely played there.
+
+**Root cause:** `getScopedMatchIds()`'s Ground filter (§3 above) resolves a
+booking's ground primarily via its own `bookings.ground_id` column
+(migration 066), but — before this fix — fell back for any row with
+`ground_id IS NULL` to a **free-text match against `bookings.venue`**:
+`.ilike('venue', groundName)`. Supabase/PostgREST's `ilike()` with no `%`
+wildcards does an **exact** case-insensitive match, not a "contains" match.
+`venue` on these rows held the fuller string CricHeroes writes
+(`"Glanz Cricket Ground - 1, Bengaluru (Bangalore)"`), never the bare
+`grounds.name` value (`"Glanz Cricket Ground - 1"`) the filter compared it
+against — so the fallback never matched anything, and any booking without
+a real `ground_id` silently dropped out of every ground-filtered view. A
+DB audit found 17 confirmed, synced bookings still carrying `ground_id =
+NULL` at the time (10 across the Glanz 7th/19th Editions, plus one each in
+BK Stars Cup - XVII, Sara Cup 7, and two in Sara Premier League, plus 3
+"Practice games" rows with no single tournament-level ground to fall back
+to at all).
+
+**Fixed two ways, together:**
+1. **Data** — the 14 tournament-linked rows (everything but the 3 Practice
+   games ones, which genuinely have no single ground) were backfilled
+   directly: `bookings.ground_id = tournaments.ground_id` for every
+   confirmed, synced booking whose own `ground_id` was still null and whose
+   tournament had one set. One booking (`match_id 12188961`, a genuine
+   exception — see the tournament-table correction this incident followed
+   from) was set to Ground - 2 instead, matching where it was actually
+   played.
+2. **Code** — the free-text venue fallback was removed outright from
+   `getScopedMatchIds()`, rather than fixed to use a wildcard match.
+   Per product decision, `venue` is never used to resolve ground identity
+   anywhere stats are computed: a booking with no real `ground_id` now
+   simply doesn't match any ground filter, instead of being guessed at from
+   a text field that was never guaranteed to agree with `grounds.name` in
+   the first place. The identical pattern in `getPlayerBookingContextStats()`
+   (Captains' Corner's "Form" panel — §11's file map) carried the exact same
+   bug and was removed the same way, along with `matchIdsForFilter()`'s now-
+   unused `venue` filter parameter.
+
+**Left alone, deliberately:** `TeamMatch.groundName` in `src/lib/teamStats.ts`
+still falls back to `venue` — but only as a **display label** when no
+`grounds` row is linked at all (`ground?.name ?? (b.venue ? … : null)`),
+never to decide *which* matches count toward a ground filter. That's a
+different, legitimate use of the field and wasn't part of this bug.
+
+**Take-away:** `venue` is free text entered by CricHeroes/admins and was
+never guaranteed to equal a ground's canonical name — any future ground
+resolution should use `bookings.ground_id` (backfilled from the tournament
+at creation time, migration 066) exclusively, never `venue`, for anything
+that decides which matches belong to a ground.
+
+---
+
 ## 9. File Map
 
 | File | Role |
