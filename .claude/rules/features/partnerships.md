@@ -242,6 +242,84 @@ two matches §9 already names ("Dharmarajan S" vs "DS Sakketha";
 "Kushal Vidya") are a different-shaped mismatch (an unresolved name
 disagreement, not a duplicate row pair) and were not touched by this fix.
 
+### Incident — CricHeroes' own Fall of Wickets text had a duplicate wicket number and a phantom repeated name (Hub `match_id 25465218`, fixed September 2026)
+
+**Reported symptom:** for the 4 Jul 2026 match vs Bangalore Bolsters
+(Hub booking `20bb06ef-2025-48f1-ad29-fe26dbc589a4`), the Partnerships
+chart showed a 148-run stand for wicket 4 between Anurag Tiwari and Siva
+Kumar — but the real scorecard shows a 20-run stand there, followed by a
+separate 128-run stand for wicket 5 between Tushar Shankar and Siva that
+wasn't shown at all. Unlike every other incident in this section, this one
+produced **wrong numbers, not a hidden chart** — `computePartnerships()`'s
+integrity guard never fired, because every name it checked against the
+crease was technically present.
+
+**Root cause — verified directly against the real CricHeroes PDF**, not
+inferred: the scorecard's own "Fall of Wickets" line reads
+
+```
+76-1 (Loki, 6.3 ov), 76-2 (Shivashankara GS, 6.4 ov), 98-3 (Saurav Kalsoor, 8.4 ov),
+118-3 (Anurag T, 10.3 ov), 246-4 (Siva, 24.2 ov), 261-5 (Tushar Shankar, 26.2 ov),
+262-6 (Anurag T, 27 ov), 262-7 (Darshan Shetty, 27.1 ov), 266-8 (Ramesh Shanmugamoorthy, 28 ov),
+282-9 (Preetam Patil, 30 ov)
+```
+
+Two independent errors in CricHeroes' own text, both upstream of anything
+`spartans-python` or the Hub does: **wicket number `3` is used twice**
+(`98-3` for Saurav Kalsoor and `118-3` for Anurag T — the real wicket 4
+onward should all be one higher than printed), and **"Anurag T" is named
+a second time** at `262-6`, even though the batting card shows him
+dismissed only once (32 off 19, stumped). Since `fall_of_wickets`' primary
+key is `(match_id, wicket_number)`, the sync silently kept the first
+`wicket_number: 3` row (Saurav Kalsoor) and dropped the second (`118-3`,
+Anurag T's real dismissal) as a conflicting insert — but the phantom
+second "Anurag T" entry, correctly labeled `wicket_number: 6` in the raw
+text (a number nothing else was using), inserted without any conflict at
+all. Net effect: Anurag T's true, earlier dismissal at 118 vanished, while
+a repeated, non-existent one at 262 took a real wicket-number slot —
+and because the resulting row *count* still happened to equal `team_wickets`
+(9 either way), this wasn't the kind of gap the existing "row count falls
+short" fingerprint (used to audit the line-wrap incident above) would ever
+catch.
+
+**Fix — read directly off the real PDF, not guessed**, same
+"database-side patch" convention as both incidents above: every
+`fall_of_wickets` row for this match was deleted and reinserted from the
+verified PDF text, in both the analytics DB and the Hub's
+`match_stats_cache`, with the corrected sequence:
+
+| Wicket | Score | Over | Player |
+|---|---|---|---|
+| 1 | 76 | 6.3 | Loki |
+| 2 | 76 | 6.4 | Shivashankara GS |
+| 3 | 98 | 8.4 | Saurav Kalsoor |
+| 4 | 118 | 10.3 | Anurag T |
+| 5 | 246 | 24.2 | Siva |
+| 6 | 261 | 26.2 | Tushar Shankar |
+| 7 | 262 | 27.1 | Darshan Shetty |
+| 8 | 266 | 28 | Ramesh Shanmugamoorthy |
+| 9 | 282 | 30 | Preetam Patil |
+
+The corrected 9 rows resolve cleanly through the crease-pointer walk and
+sum to the team's real 282 all out, correctly producing the 20-run
+Anurag T/Siva stand and the 128-run Tushar/Siva stand the real scorecard
+shows. `team_wickets` (9) still equals `fow.length` (9), so §4.3's
+completeness check is unaffected; the crease ends at length 1 (Manohar B
+Reddy stranded not out, no partner left in a 10-man lineup), so no
+unbroken closing partnership is synthesized — also correct.
+
+**Scope check — with a sharper fingerprint than the row-count one used
+above.** Since this bug can hide behind a row count that still equals
+`team_wickets` (as it did here), the useful signal is a player name
+appearing **more than once within one match's own `fall_of_wickets`
+array** — `SELECT match_id, elem->>'player_name', count(*) FROM
+match_stats_cache, jsonb_array_elements(fall_of_wickets) elem GROUP BY
+match_id, elem->>'player_name' HAVING count(*) > 1` — which found nothing
+else club-wide after this fix, confirming this incident was isolated to
+`25465218`. Neither this query nor the row-count-shortfall one used for
+the line-wrap incident is a complete audit on its own; a future check for
+this bug class should run both.
+
 ---
 
 ### Shared name-normalization helper
