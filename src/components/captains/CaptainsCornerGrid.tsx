@@ -106,6 +106,11 @@ interface Props {
   // that actually have a knockout booking in view; see
   // features/squad-selection.md §11 and computeMvpRanks() in playerStats.ts.
   mvpRanksByTournament?: Record<string, MvpRankEntry[]>
+  // Ground MVP rank aid for league (non-knockout) games — groundId →
+  // players ranked by total MVP points at that ground, descending. Only
+  // populated for grounds that actually host a non-knockout, non-practice
+  // booking in view; see features/squad-selection.md §11.1.
+  mvpRanksByGround?: Record<string, MvpRankEntry[]>
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -493,14 +498,16 @@ function StatusBadge({ status }: { status: 'draft' | 'pending' | 'approved' | 'a
 
 // ── PlayerName — conditional CricHeroes link ──────────────────────
 function PlayerName({
-  player, isTaken, hasDues, mvpRank,
+  player, isTaken, hasDues, mvpRank, mvpRankKind,
 }: {
   player: Player; isTaken: boolean; hasDues: boolean
-  // Tournament MVP rank (1-based) for a knockout booking — see
-  // mvpRanksByTournament / features/squad-selection.md §11. null/undefined
-  // when this isn't a knockout booking, or this player has no MVP stats
-  // (not yet reconciled/synced) for this tournament.
+  // MVP rank (1-based) for this booking — tournament MVP for a knockout
+  // game, ground MVP for a league game. See mvpRanksByTournament /
+  // mvpRanksByGround and features/squad-selection.md §11/§11.1. null/
+  // undefined when no rank list applies to this booking, or this player has
+  // no MVP stats (not yet reconciled/synced) for the relevant scope.
   mvpRank?: number | null
+  mvpRankKind?: 'tournament' | 'ground' | null
 }) {
   const cls = [
     'font-rajdhani text-sm flex-1 leading-none',
@@ -521,7 +528,7 @@ const exemptBadge = player.is_fee_exempt
   const rankBadge = (mvpRank != null && !isTaken)
     ? <span
         className="mr-1.5 font-rajdhani text-xs font-bold text-[var(--captains-accent)] dark:text-gold tabular-nums"
-        title={`Tournament MVP rank #${mvpRank}`}>
+        title={`${mvpRankKind === 'ground' ? 'Ground' : 'Tournament'} MVP rank #${mvpRank}`}>
         {padRank(mvpRank)}
       </span>
     : null
@@ -651,7 +658,7 @@ function MatchRoleIcon({ role, ballType = 'red' }: {
 // FIX 5: Added matchRole and onMatchRoleToggle to props
 function SelectablePlayerRow({
   player, response, selected, atCap, status, takenLabel, roles,
-  matchRole, ballType, bookingId, isPractice, mvpRank, onToggle, onRoleToggle, onMatchRoleToggle,
+  matchRole, ballType, bookingId, isPractice, mvpRank, mvpRankKind, onToggle, onRoleToggle, onMatchRoleToggle,
 }: {
   player:             Player
   response:           string
@@ -664,7 +671,8 @@ function SelectablePlayerRow({
   ballType: 'red' | 'white' | 'pink'   // ADD
   bookingId:          string   // for the tap-to-expand "Form" panel — see ContextStatsPanel
   isPractice:         boolean  // practice games go with whoever's available — Form guidance is noise here
-  mvpRank:            number | null  // tournament MVP rank for a knockout booking — see PlayerName
+  mvpRank:            number | null  // tournament or ground MVP rank — see PlayerName
+  mvpRankKind:        'tournament' | 'ground' | null
   onToggle:           (id: string) => void
   onRoleToggle:       (id: string, role: 'captain' | 'vc' | 'wk') => void
   onMatchRoleToggle:  (id: string, role: 'bat' | 'bowl' | 'bat_ar' | 'bowl_ar' | null) => void  // FIX 5
@@ -734,7 +742,7 @@ function SelectablePlayerRow({
           {isSel && <span className="text-[8px] text-white font-bold leading-none">✓</span>}
         </span>
 
-        <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} mvpRank={mvpRank} />
+        <PlayerName player={player} isTaken={isTaken} hasDues={hasDues} mvpRank={mvpRank} mvpRankKind={mvpRankKind} />
 
         {/* Form toggle — only shown for players with at least one reconciled
             match; opens the tournament/ground/format panel below. Hidden
@@ -1090,7 +1098,7 @@ function AddPlayerPanel({
 
 // ── SlotCard ──────────────────────────────────────────────────────
 function SlotCard({
-  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad, mvpRanksByTournament, onSelectedChange, onStatusChange,
+  booking, bookings, players, availMap, squadMap, defaultOpen, initialSquad, mvpRanksByTournament, mvpRanksByGround, onSelectedChange, onStatusChange,
 }: {
   booking:     Booking
   bookings:    Booking[]
@@ -1100,6 +1108,7 @@ function SlotCard({
   defaultOpen: boolean
   initialSquad?: InitialSquad
   mvpRanksByTournament?: Record<string, MvpRankEntry[]>
+  mvpRanksByGround?: Record<string, MvpRankEntry[]>
   onSelectedChange: (bookingId: string, selected: Set<string>) => void
   onStatusChange?: (bookingId: string, status: SquadStatus) => void
 }) {
@@ -1218,25 +1227,42 @@ function SlotCard({
 
   const counts   = getCounts(booking.id, players, { ...availMap, [booking.id]: liveAvailMap })
 
-  // Knockout-only MVP rank aid — see features/squad-selection.md §11.
   // stage_type NULL is treated as league, same convention used everywhere
-  // else in this app (features/team-stats.md §4). Computed before
-  // `eligible` below since a knockout booking re-sorts by rank.
+  // else in this app (features/team-stats.md §4).
   const isKnockout = booking.stage_type === 'knockout'
   const tournamentId = booking.tournament_id ?? null
-  const mvpRanks: MvpRankEntry[] = (isKnockout && tournamentId)
-    ? (mvpRanksByTournament?.[tournamentId] ?? [])
+  // Practice games go with whoever's available — Form guidance (and the MVP
+  // rank sort below) is only useful when there's a real pool to choose
+  // between. Additive: this booking's own flag counts the same as its
+  // tournament being flagged.
+  const isPractice = isPracticeMatch(booking.is_practice, booking.tournament?.is_practice)
+  const slotGround = booking.ground ?? booking.tournament?.ground ?? null
+  const groundId   = slotGround?.id ?? null
+
+  // MVP rank aid — see features/squad-selection.md §11/§11.1. A knockout
+  // game ranks by tournament MVP (a captain picking a knockout XI wants to
+  // see who has performed well through the tournament's league stage so
+  // far); a league game has no "league stage" of its own to rank by, so it
+  // ranks by ground MVP instead — how eligible players have performed at
+  // this specific ground. Computed before `eligible` below since both cases
+  // re-sort by rank.
+  const mvpRankKind: 'tournament' | 'ground' | null = isKnockout
+    ? 'tournament'
+    : (!isPractice && groundId) ? 'ground' : null
+  const mvpRanks: MvpRankEntry[] =
+    mvpRankKind === 'tournament' ? (tournamentId ? (mvpRanksByTournament?.[tournamentId] ?? []) : [])
+    : mvpRankKind === 'ground'   ? (mvpRanksByGround?.[groundId ?? ''] ?? [])
     : []
   const mvpRankByPlayerId = new Map(mvpRanks.map(r => [r.playerId, r.rank]))
   const playersById = new Map(players.map(p => [p.id, p]))
 
   const eligibleByResponse = getSlotPlayers(booking.id, bookings, players, { ...availMap, [booking.id]: liveAvailMap })
-  // For a knockout booking, order by tournament MVP rank (ascending) rather
-  // than the usual captain-first/response-code ordering — a captain picking
-  // a knockout XI wants to see the strongest performers first. Players with
-  // no MVP rank yet (no stats reconciled/synced for this tournament) sort
-  // after every ranked player, alphabetically among themselves.
-  const eligible = isKnockout
+  // When an MVP rank list applies (knockout → tournament, league → ground),
+  // order by rank (ascending) rather than the usual captain-first/response-
+  // code ordering — a captain wants to see the strongest performers first.
+  // Players with no rank yet (no stats reconciled/synced) sort after every
+  // ranked player, alphabetically among themselves.
+  const eligible = mvpRankKind
     ? [...eligibleByResponse].sort((a, b) => {
         const ra = mvpRankByPlayerId.get(a.player.id)
         const rb = mvpRankByPlayerId.get(b.player.id)
@@ -1249,19 +1275,19 @@ function SlotCard({
 
   const atCap           = selected.size >= MAX_SQUAD
   const ballType = (booking.tournament?.ball_type ?? 'red') as 'red' | 'white' | 'pink'
-  // Practice games go with whoever's available — Form guidance is only
-  // useful when there's a real pool to choose between. Additive: this
-  // booking's own flag counts the same as its tournament being flagged.
-  const isPractice = isPracticeMatch(booking.is_practice, booking.tournament?.is_practice)
-  const slotGround = booking.ground ?? booking.tournament?.ground ?? null
   const priorityPlayers = eligible.filter(e => e.player.priority_pick)
   const normalPlayers   = eligible.filter(e => !e.player.priority_pick)
   const exemptInSquad   = players.filter(p => selected.has(p.id) && p.is_fee_exempt).length
   const exemptWarning   = exemptInSquad >= 2
 
   // Top 16 by tournament MVP who haven't marked Y/O/E for this specific
-  // booking — surfaced separately so a captain can chase down a strong
-  // performer who simply hasn't responded yet. Split into two groups
+  // booking — knockout games only. Surfaced separately so a captain can
+  // chase down a strong performer who simply hasn't responded yet. There's
+  // no league equivalent of this panel: the eligibility rule it exists
+  // alongside (features/knockout-day-protection.md §6 — must have
+  // represented the tournament) only ever applies to a knockout booking, so
+  // a "top ground performers who haven't responded" list has no comparable
+  // reason to chase anyone down for a league game. Split into two groups
   // (active first, inactive after) rather than a per-name badge — an
   // inactive player is less likely to actually be reachable, even if their
   // tournament form still makes them worth chasing down. Each group keeps
@@ -1744,6 +1770,7 @@ function SlotCard({
                   bookingId={booking.id}
                   isPractice={isPractice}
                   mvpRank={mvpRankByPlayerId.get(player.id) ?? null}
+                  mvpRankKind={mvpRankKind}
                   onToggle={toggle}
                   onRoleToggle={handleRoleToggle}
                   onMatchRoleToggle={handleMatchRoleToggle}
@@ -1794,6 +1821,7 @@ function SlotCard({
                 bookingId={booking.id}
                 isPractice={isPractice}
                 mvpRank={mvpRankByPlayerId.get(player.id) ?? null}
+                mvpRankKind={mvpRankKind}
                 onToggle={toggle}
                 onRoleToggle={handleRoleToggle}
                 onMatchRoleToggle={handleMatchRoleToggle}
@@ -2186,7 +2214,7 @@ function Legend() {
 }
 
 // ── Main export ────────────────────────────────────────────────────
-export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {}, initialSquadMap = {}, mvpRanksByTournament = {} }: Props) {
+export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {}, initialSquadMap = {}, mvpRanksByTournament = {}, mvpRanksByGround = {} }: Props) {
 
   const [view, setView] = useState<'slot' | 'matrix'>('slot')
   const weekendBookings = bookings.filter(b => isWeekendDate(b.game_date))
@@ -2310,6 +2338,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
               defaultOpen={i === 0}
               initialSquad={initialSquadMap[b.id]}
               mvpRanksByTournament={mvpRanksByTournament}
+              mvpRanksByGround={mvpRanksByGround}
               onSelectedChange={updateSelected}
               onStatusChange={updateStatus}
             />

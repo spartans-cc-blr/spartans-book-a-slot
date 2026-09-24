@@ -894,6 +894,122 @@ the knockout card.
 
 ---
 
+## 11.1 League Games — Ground MVP Rank Aid (added September 2026)
+
+### Why
+
+§11's rank aid only ever applied to a knockout booking, ranked by
+tournament MVP — a league game's "Available"/"Available across all slots"
+lists stayed in their usual captain-first/response-code order with no
+performance signal at all. A league game has no "league stage" of its own
+to rank players against the way a knockout does (a knockout's whole rank
+list *is* that tournament's league stage, see §11), so tournament MVP isn't
+the right yardstick here. Per a direct request, league games instead rank
+eligible players by their **ground MVP** — how they've performed at the
+specific ground this match is being played at — since a captain picking a
+league XI cares more about "who does well at this ground" than an
+unrelated tournament-wide total.
+
+### What changed
+
+For a booking whose `stage_type !== 'knockout'` (NULL/unclassified is
+treated as league, same convention as everywhere else — see
+`features/team-stats.md` §4) and that isn't a practice game
+(`isPracticeMatch()` — practice selection is "whoever's available", so a
+performance ranking is noise there, same carve-out §11's own comment
+already made for the Form panel), the Per Slot view now:
+
+1. **Precedes the player's name with their zero-padded ground MVP rank**
+   (`01`, `02`, …) in both "Available across all slots" and "Available" —
+   identical plain-text treatment to §11's tournament rank badge, just
+   scoped to this booking's ground instead of its tournament. The tooltip
+   reads "Ground MVP rank #N" instead of "Tournament MVP rank #N" so the
+   two are never confused for one another on a page that can show either.
+2. **Both sections are ordered by that same rank** (ascending), the same
+   re-sort §11 already does for a knockout booking — a player with no rank
+   yet (no reconciled/synced stats at this ground) sorts after every ranked
+   player, alphabetically among themselves.
+
+The ground resolved is the exact same one already shown in the card
+header's "@ ground" link (§12.1) — `booking.ground` (this booking's own
+override, migration 066) falling back to `booking.tournament.ground` — so
+the rank a captain sees always matches the ground the card says the match
+is at.
+
+**Deliberately not extended:** the "🏆 Top 16 MVP — not yet responded"
+panel (§11) stays knockout-only. It exists specifically to help a captain
+chase down a strong performer who's eligible for a knockout but hasn't
+responded — a rule (`features/knockout-day-protection.md` §6, "must have
+represented the tournament through its league stage") that has no league
+equivalent. A "top ground performers who haven't responded" list would
+have nothing comparable to chase anyone down for.
+
+### Data — `getLeaderboardsByGround()` (`src/lib/playerStats.ts`)
+
+Batched sibling of §11's `getLeaderboardsByTournament()` — the identical
+one-round-trip-per-request shape (never one `getLeaderboard({ groundId })`
+call per ground), just grouping analytics rows by `bookings.ground_id`
+instead of `tournament_id`. One difference from its tournament sibling:
+`getLeaderboardsByTournament()` is only ever called with real, non-practice
+tournament ids to begin with, so it never needed a practice exclusion — a
+*ground*, unlike a tournament, can host both real fixtures and practice
+games, so `getLeaderboardsByGround()` excludes a practice booking itself
+(the same additive `bookings.is_practice` OR `tournaments.is_practice`
+check `getScopedMatchIds()`'s `withoutPractice()` applies everywhere else —
+see `features/practice-games.md`) before bucketing rows by ground.
+
+`computeMvpRanks()` itself needed no changes — it was already generic over
+any `LeaderboardRow[]`, whether sourced from a tournament or a ground.
+
+### Where it's fetched — `src/app/captains-corner/page.tsx`
+
+`leagueGroundIds` mirrors `knockoutTournamentIds`'s own derivation: from
+the same `scopedBookings` array (the next two rolling weekends), collecting
+the resolved ground id (`booking.ground.id ?? booking.tournament.ground.id`)
+of every non-knockout, non-practice booking in view. `getLeaderboardsByGround(leagueGroundIds)`
+is fetched inside the page's existing `Promise.all` alongside
+`getLeaderboardsByTournament()`, so this adds no extra sequential round
+trip. `mvpRanksByGround: Record<groundId, MvpRankEntry[]>` is built from it
+via `computeMvpRanks()`, the same way `mvpRanksByTournament` already is,
+and passed down to `CaptainsCornerGrid` alongside it.
+
+### UI — `CaptainsCornerGrid.tsx`
+
+`SlotCard` now derives a single `mvpRankKind: 'tournament' | 'ground' |
+null` — `'tournament'` for a knockout booking, `'ground'` for a non-
+practice league booking with a resolved ground id, `null` otherwise (a
+practice game, or a league booking with no ground on record) — and reads
+`mvpRanks` from whichever of `mvpRanksByTournament`/`mvpRanksByGround` that
+resolves to. The `eligible` re-sort that used to check `isKnockout` now
+checks `mvpRankKind` instead, so the identical sort logic applies to both
+cases without duplicating it. `mvpRankKind` is threaded down through
+`SelectablePlayerRow` to `PlayerName`, which uses it only to pick the
+tooltip wording ("Ground" vs "Tournament" MVP rank) — the badge's own
+appearance (plain zero-padded text, no icon/pill) is identical either way.
+
+### Explicitly out of scope
+
+- **No intersection with any eligibility rule** — unlike knockout
+  eligibility (`features/knockout-day-protection.md` §6), there's no
+  "must have played at this ground before" gate on league availability.
+  The rank aid is purely informational display, same as §11's.
+- **No squad-selection change** — same as §11: the rank badge and re-sort
+  don't affect the hard cap of 12, the taken-elsewhere cross-slot block, or
+  role assignment.
+- **No "Top N not yet responded" panel for league games** — see above.
+- **No admin/GC surface** — Captains' Corner (Per Slot) only, same as §11.
+  Matrix view is unaffected.
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/lib/playerStats.ts` | `getLeaderboardsByGround()` — batched ground counterpart of `getLeaderboardsByTournament()`, with practice-booking exclusion |
+| `src/app/captains-corner/page.tsx` | `groundIdOf()`, `leagueGroundIds`, fetches `getLeaderboardsByGround()` in the existing `Promise.all`, builds `mvpRanksByGround` |
+| `src/components/captains/CaptainsCornerGrid.tsx` | `mvpRanksByGround` prop threaded through `CaptainsCornerGrid` → `SlotCard`; `mvpRankKind`/`groundId` in `SlotCard`; `eligible` re-sort keyed on `mvpRankKind` instead of `isKnockout` alone; `mvpRankKind` threaded to `PlayerName` for the tooltip wording |
+
+---
+
 ## 12. Game Name Hyperlink to "Yours Statistically" (added September 2026)
 
 Every `SlotCard` in the Per Slot view names its game by tournament name in

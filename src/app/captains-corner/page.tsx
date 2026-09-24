@@ -3,8 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { computeSquadVersion } from '@/lib/squadVersion'
-import { getRecentForm, getLeaderboardsByTournament, computeMvpRanks } from '@/lib/playerStats'
+import { getRecentForm, getLeaderboardsByTournament, getLeaderboardsByGround, computeMvpRanks } from '@/lib/playerStats'
 import type { MvpRankEntry, LeaderboardRow } from '@/types'
+import { isPracticeMatch } from '@/types'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { CaptainsCornerGrid } from '@/components/captains/CaptainsCornerGrid'
 import { opponentKey } from '@/lib/teamStatsCore'
@@ -133,7 +134,28 @@ export default async function CaptainsCornerPage() {
     )
   )
 
-  const [{ data: avail }, { data: squads }, recentFormByPlayer, leaderboardsByTournament, { data: pastBookings }, { data: syncedRows }] = await Promise.all([
+  // League-game ground MVP rank aid (see features/squad-selection.md §11.1) —
+  // the league counterpart of the knockout tournament MVP list above. A
+  // league game has no "league stage" of its own to rank by, so it ranks
+  // eligible players by how they've performed at this specific ground
+  // instead. Resolved the same way SlotCard's own `slotGround` is (this
+  // booking's own ground override, else the tournament's) — only computed
+  // for grounds that actually host a non-knockout, non-practice booking in
+  // the scoped window; a practice game goes with whoever's available (same
+  // Form-guidance suppression already applied elsewhere on this page), so
+  // it's excluded here too.
+  const groundIdOf = (b: any): string | null =>
+    (b.ground?.id as string | undefined) ?? (b.tournament?.ground?.id as string | undefined) ?? null
+  const leagueGroundIds = Array.from(
+    new Set(
+      scopedBookings
+        .filter((b: any) => b.stage_type !== 'knockout' && !isPracticeMatch(b.is_practice, b.tournament?.is_practice))
+        .map(groundIdOf)
+        .filter((id): id is string => !!id)
+    )
+  )
+
+  const [{ data: avail }, { data: squads }, recentFormByPlayer, leaderboardsByTournament, leaderboardsByGround, { data: pastBookings }, { data: syncedRows }] = await Promise.all([
     bookingIds.length > 0
       ? supabase.from('availability').select('player_id, booking_id, response').in('booking_id', bookingIds)
       : Promise.resolve({ data: [] as { player_id: string; booking_id: string; response: string }[] }),
@@ -157,6 +179,10 @@ export default async function CaptainsCornerPage() {
 
     knockoutTournamentIds.length > 0
       ? getLeaderboardsByTournament(knockoutTournamentIds)
+      : Promise.resolve({} as Record<string, LeaderboardRow[]>),
+
+    leagueGroundIds.length > 0
+      ? getLeaderboardsByGround(leagueGroundIds)
       : Promise.resolve({} as Record<string, LeaderboardRow[]>),
 
     // Opponent → Team Record link (features/squad-selection.md §12.1). Team
@@ -211,6 +237,11 @@ export default async function CaptainsCornerPage() {
   const mvpRanksByTournament: Record<string, MvpRankEntry[]> = {}
   for (const tid of knockoutTournamentIds) {
     mvpRanksByTournament[tid] = computeMvpRanks(leaderboardsByTournament[tid] ?? [])
+  }
+
+  const mvpRanksByGround: Record<string, MvpRankEntry[]> = {}
+  for (const gid of leagueGroundIds) {
+    mvpRanksByGround[gid] = computeMvpRanks(leaderboardsByGround[gid] ?? [])
   }
 
   const playersWithExempt = (players ?? []).map(p => ({
@@ -360,6 +391,7 @@ export default async function CaptainsCornerPage() {
                 availMap={availMap}
                 initialSquadMap={initialSquadMap}
                 mvpRanksByTournament={mvpRanksByTournament}
+                mvpRanksByGround={mvpRanksByGround}
               />
             ))}
           </div>
