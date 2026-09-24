@@ -2,7 +2,8 @@
 // Filter bar for /leaderboard. Grouped nav tree, two branches:
 //
 //   Honor Board — Overall (career milestones, unchanged) · Monthly (new)
-//   Detailed    — MVP / Bat / Bowl / Field (the sortable tables)
+//   Detailed    — MVP / Bat / Bowl / Field (the sortable tables) /
+//                 Partnerships (bar charts — PartnershipLeaders.tsx)
 //
 //   Row 1 — Honor Board / Detailed, then Year (only rendered for Detailed
 //           or Honor Board → Overall — Monthly has its own month stepper
@@ -34,7 +35,11 @@ export type TableCategory = 'batting' | 'bowling' | 'fielding' | 'mvp'
 // (LeaderboardMilestones.tsx, unchanged internally), 'monthly' is the new
 // month-scoped view (LeaderboardMonthly.tsx).
 export type HonorCategory = 'overall' | 'monthly'
-export type LeaderboardCategory = HonorCategory | TableCategory
+// Every Detailed sub-tab — the four table-backed ones plus Partnerships,
+// which renders bar charts (PartnershipLeaders.tsx) rather than a
+// LeaderboardTable, so it's deliberately not a TableCategory.
+export type DetailedCategory = TableCategory | 'partnerships'
+export type LeaderboardCategory = HonorCategory | DetailedCategory
 
 export type Format = 'T20' | 'T30'
 // Defending = our team batted first and set a target. Chasing = our team
@@ -46,8 +51,8 @@ export type Format = 'T20' | 'T30'
 // the other, and unchecking both snaps back to both checked.
 export type InningsKey = 'defending' | 'chasing'
 
-const DETAILED_LABEL: Record<TableCategory, string> = {
-  mvp: 'MVP', batting: 'Bat', bowling: 'Bowl', fielding: 'Field',
+const DETAILED_LABEL: Record<DetailedCategory, string> = {
+  mvp: 'MVP', batting: 'Bat', bowling: 'Bowl', fielding: 'Field', partnerships: 'Partnerships',
 }
 
 // Same convention as shortTourney() in the Captains' Corner matrix header
@@ -192,7 +197,7 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
   function selectHonorSub(sub: HonorCategory) {
     navigate(sub === 'monthly' ? { category: sub, tournament: 'all', ground: 'all', innings: '' } : { category: sub, innings: '' })
   }
-  function selectDetailedSub(sub: TableCategory) {
+  function selectDetailedSub(sub: DetailedCategory) {
     // Defending/Chasing only ever shows next to MVP — clear it on every
     // other sub-tab so it can't keep scoping a table it's no longer
     // visibly filtering.
@@ -279,7 +284,7 @@ export function LeaderboardFilters({ years, months, tournaments, grounds, year, 
       ) : (
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            {(['mvp', 'batting', 'bowling', 'fielding'] as TableCategory[]).map(c => (
+            {(['mvp', 'batting', 'bowling', 'fielding', 'partnerships'] as DetailedCategory[]).map(c => (
               <button key={c} onClick={() => selectDetailedSub(c)} className={pillClass(category === c)}>{DETAILED_LABEL[c]}</button>
             ))}
           </div>

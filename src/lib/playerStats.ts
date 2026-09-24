@@ -22,7 +22,9 @@
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 import type { CareerHighlights } from '@/lib/playerHighlights'
-import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType } from '@/types'
+import { computePartnerships } from '@/lib/partnerships'
+import { aggregatePartnershipLeaders, type MatchPartnerships } from '@/lib/partnershipLeaders'
+import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType, PartnershipLeaders } from '@/types'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -886,6 +888,111 @@ export async function getTopScorersByBattingPosition(
     })
     .filter((l): l is BattingPositionLeader => l !== null)
     .sort((a, b) => a.position - b.position)
+}
+
+// Club-wide partnership leaders for /leaderboard's Detailed → Partnerships
+// tab — top partnerships for any wicket, the best stand for each wicket,
+// and the highest aggregate by a pair. Same match scope as every other
+// Detailed tab (getScopedMatchIds(): year/tournament/ground/format,
+// practice excluded), so the Tournament/Ground filters apply unchanged.
+//
+// Reads batting order, Fall of Wickets and the innings summary straight
+// from the analytics DB rather than match_stats_cache: batting_stats.
+// player_id there is always the live reconciled identity, whereas a cached
+// copy can lag a later reconciliation (see features/post-match-scorecard.md
+// §15's stale-cache incidents). Each match is then run through the same
+// computePartnerships() the per-match scorecard chart uses — including its
+// FOW-completeness guard, so a match with no synced Fall of Wickets
+// contributes nothing rather than a fabricated full-innings stand. See
+// features/partnerships.md §10.
+export async function getPartnershipLeaders(
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
+): Promise<PartnershipLeaders> {
+  const empty: PartnershipLeaders = { top: [], byWicket: [], pairs: [] }
+  const scoped = await getScopedMatchIds(filters)
+  if (scoped && scoped.length === 0) return empty
+
+  const analytics = createAnalyticsClient()
+  if (!analytics) throw new Error('Analytics database is not configured')
+
+  // Fall of Wickets first — only matches that actually have it can yield
+  // any partnership (a zero-wicket innings aside, which also needs
+  // match_stats below), so the other two reads can be narrowed to them.
+  const [fowRows, summaryRows] = await Promise.all([
+    fetchAllRows(() => {
+      const q = analytics!.from('fall_of_wickets').select('match_id, wicket_number, team_score, over, player_name')
+        .order('match_id').order('wicket_number')
+      return scoped ? q.in('match_id', scoped) : q
+    }),
+    fetchAllRows(() => {
+      const q = analytics!.from('match_stats').select('match_id, team_total, team_overs, team_wickets').order('match_id')
+      return scoped ? q.in('match_id', scoped) : q
+    }),
+  ])
+
+  const fowByMatch = groupBy(fowRows as any[], r => r.match_id)
+  // A match qualifies if it has FOW rows, or genuinely lost zero wickets
+  // (then computePartnerships() emits one unbroken opening stand).
+  const matchIds = Array.from(new Set<string>([
+    ...Array.from(fowByMatch.keys()),
+    ...(summaryRows as any[]).filter(r => r.team_wickets === 0 || r.team_wickets === '0').map(r => r.match_id as string),
+  ]))
+  if (matchIds.length === 0) return empty
+
+  const battingRows = await fetchAllRows(() =>
+    analytics!.from('batting_stats').select('match_id, player_name, player_id, batting_order, batted, dismissal_method')
+      .order('match_id').order('player_name')
+      .in('match_id', matchIds)
+  )
+  const battingByMatch = groupBy(battingRows as any[], r => r.match_id)
+  const summaryByMatch = new Map((summaryRows as any[]).map(r => [r.match_id, r]))
+
+  const hub = createServiceClient()
+  const { data: bookings, error: bookErr } = await hub.from('bookings')
+    .select('id, match_id, game_date, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
+  if (bookErr) throw new Error(bookErr.message)
+  const bookingByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b]))
+
+  const perMatch: MatchPartnerships[] = []
+  const playerIds = new Set<string>()
+  for (const matchId of matchIds) {
+    const summary = summaryByMatch.get(matchId)
+    const finalScore = summary && summary.team_total != null && summary.team_overs != null
+      ? { total: num(summary.team_total), overs: num(summary.team_overs), wickets: summary.team_wickets != null ? num(summary.team_wickets) : null }
+      : null
+    const fow = (fowByMatch.get(matchId) ?? []).map((r: any) => ({
+      wicket_number: num(r.wicket_number), team_score: num(r.team_score), over: num(r.over), player_name: r.player_name,
+    }))
+    const batting = (battingByMatch.get(matchId) ?? []).map((r: any) => ({ ...r, batting_order: r.batting_order != null ? num(r.batting_order) : null }))
+    const partnerships = computePartnerships(batting, fow, finalScore)
+    if (!partnerships || partnerships.length === 0) continue
+    partnerships.forEach(p => p.players.forEach(pl => { if (pl.playerId) playerIds.add(pl.playerId) }))
+    const booking = bookingByMatch.get(matchId) as any
+    perMatch.push({
+      matchId,
+      bookingId:    booking?.id ?? null,
+      gameDate:     booking?.game_date ?? null,
+      opponentName: booking?.opponent_name ?? null,
+      partnerships,
+    })
+  }
+  if (perMatch.length === 0) return empty
+
+  const { data: players, error: pErr } = playerIds.size
+    ? await hub.from('players').select('id, name, cricheroes_url').in('id', Array.from(playerIds))
+    : { data: [] as any[], error: null }
+  if (pErr) throw new Error(pErr.message)
+  const playerById = new Map((players ?? []).map((p: any) => [p.id, p]))
+
+  // Unlike getLeaderboard(), an unreconciled (or no-longer-in-Hub) batter
+  // is kept rather than dropped — dropping one would silently erase their
+  // partner's stand too. They show under their scorecard name, unlinked.
+  return aggregatePartnershipLeaders(perMatch, p => {
+    const hubPlayer = p.playerId ? playerById.get(p.playerId) as any : null
+    return hubPlayer
+      ? { playerId: hubPlayer.id, playerName: hubPlayer.name, cricheroesUrl: hubPlayer.cricheroes_url ?? null }
+      : { playerId: null, playerName: p.playerName, cricheroesUrl: null }
+  })
 }
 
 // Distinct 'YYYY-MM' months that have at least one confirmed, synced

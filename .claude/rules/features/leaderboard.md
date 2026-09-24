@@ -46,7 +46,8 @@ Detailed
   ├─ MVP
   ├─ Bat
   ├─ Bowl
-  └─ Field     → LeaderboardTable.tsx (sortable columns, one tab per category)
+  ├─ Field     → LeaderboardTable.tsx (sortable columns, one tab per category)
+  └─ Partnerships → PartnershipLeaders.tsx (bar charts — see §6.3)
 ```
 
 **Year filter** — shown for Detailed and for Honor Board → Overall (both are
@@ -433,6 +434,17 @@ already fetch data two different ways.
 
 ---
 
+## 6.3 Partnerships (Detailed → Partnerships) — added September 2026
+
+A fifth Detailed sub-tab after Field — top 10 partnerships for any wicket,
+the highest stand for each wicket, and the top 5 batting pairs by aggregate
+runs, as bar charts (names in the bar, runs at the end). Same
+Year/Tournament/Ground/Format scope as every other Detailed tab via
+`getScopedMatchIds()` — the Tournament/Ground filters needed no changes.
+`category=partnerships` is a `DetailedCategory`, not a `TableCategory` (it
+renders no `LeaderboardTable`), and skips the `getLeaderboard()` fetch.
+Full design: `features/partnerships.md` §10.
+
 ## 7. Architecture — `src/lib/leaderboardMilestones.ts`
 
 Plain module, deliberately **not** `'use client'` and **not** importing
@@ -617,6 +629,7 @@ sequential-await pattern on its own independent Supabase reads.
 | `src/components/leaderboard/LeaderboardMonthly.tsx` | Monthly tab — single-winner cards + always-open Centuries/Half-Centuries/5-Wicket/3-Wicket Hauls panels (trimmed to 2, then Half-Centuries/3-Wicket Hauls restored on Monthly only, §5.1) |
 | `src/components/leaderboard/InningsRow.tsx` | Shared `ClickableRow`/`BattingInningsRow`/`BowlingInningsRow` — whole-row click to `/matches/history/[bookingId]`, used by both Milestones and Monthly |
 | `src/components/leaderboard/LeaderboardTable.tsx` | Detailed branch — sortable MVP/Bat/Bowl/Field tables |
+| `src/components/leaderboard/PartnershipLeaders.tsx` | Detailed → Partnerships bar charts (§6.3, `features/partnerships.md` §10) |
 | `src/components/leaderboard/LeaderboardGlossary.tsx` | Renders the glossary entries built server-side |
 | `src/components/leaderboard/PlayerAvatar.tsx` | Shared avatar (photo or initials) used across every card/row on this page |
 | `src/components/leaderboard/WicketIcon.tsx` | 3-wicket-haul icon — used by `LeaderboardMonthly.tsx`'s 3-Wicket Hauls panel (restored, §5.1) and by `MilestoneCelebrationModal.tsx`'s unrelated 3-wicket badge (`features/milestone-recognition.md`); not used by `LeaderboardMilestones.tsx` (Overall stays trimmed) |

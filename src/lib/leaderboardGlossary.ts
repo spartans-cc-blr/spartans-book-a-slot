@@ -109,6 +109,17 @@ export function buildDetailedGlossary(category: TableCategory): GlossaryEntry[] 
   ]
 }
 
+export function buildPartnershipsGlossary(): GlossaryEntry[] {
+  return [
+    { term: 'Partnership', definition: 'Runs the team added while the same two batters were at the crease, from one wicket falling to the next. Rebuilt from each synced scorecard\'s batting order and Fall of Wickets.' },
+    { term: 'Wicket', definition: 'Which wicket the stand was for — "3rd wkt" is the stand that ended when (or was going when) the 3rd wicket fell.' },
+    { term: '*', definition: 'Unbroken — neither batter was dismissed before the innings ended.' },
+    { term: '(balls)', definition: 'Balls the partnership lasted.' },
+    { term: 'Pair aggregate', definition: 'Total runs the same two batters have added together across every innings in the current filter, whichever wicket it was for.' },
+    { term: 'Coverage', definition: 'Only matches whose Fall of Wickets has been synced count — older scorecards appear once re-synced. Practice games are excluded, same as every other Detailed tab.' },
+  ]
+}
+
 export function detailedGlossaryTitle(category: TableCategory): string {
   return `${DETAILED_LABEL[category]} columns`
 }
