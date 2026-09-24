@@ -390,6 +390,87 @@ result) to notice in the first place. Worth revisiting if another match
 is reported with an empty or wrong Partnerships chart with otherwise
 complete-looking data.
 
+### Incident — a retirement's Fall of Wickets row dropped by the same reused-wicket-number PK collision `25465218` hit, on a practice game (Hub `match_id 27142448`, fixed September 2026)
+
+**Reported symptom:** the Partnerships chart was entirely absent for the
+19 Sep 2026 practice game (Spartans CC - United vs Rookie Warriors, Hub
+booking `af928ba6-cdbc-49cb-9093-b98d40c11224`). `match_stats_cache`
+again looked complete on paper — 6 Fall of Wickets rows exactly matching
+`team_wickets = 6`, 12 batting rows — but `batting_stats` carried an
+explicit, unambiguous signal the other incidents in this section didn't
+have: `Uday`'s own row has `dismissal_method = 'retired_hurt'` (56 runs
+off 29 balls), yet his name doesn't appear anywhere in the match's synced
+`fall_of_wickets` array at all.
+
+**Root cause, confirmed against the real CricHeroes PDF** (supplied on
+request, same as `25465218`): the raw Fall of Wickets line for this
+innings is
+
+```
+44-1 (Saurav Kalsoor, 3.5 ov), 59-2 (Paddy, 5.3 ov), 69-3 (Dhaval Bhanderi, 6.4 ov),
+97-4 (S Vishnunetaran, 9.4 ov), 158-5 (Rohit Raj, 15 ov), 212-5 (Uday, 18 ov),
+212-6 (Kushal Vidya, 18.1 ov)
+```
+
+**Seven** entries, not six — CricHeroes reused wicket number **5** for
+both Rohit Raj's real dismissal (`158-5`) and Uday's retirement (`212-5`),
+the exact same convention already documented for `25465218`'s `"98-3"`/
+`"118-3"`. But `fall_of_wickets`' `PRIMARY KEY (match_id, wicket_number)`
+can't hold two rows sharing one `wicket_number`, and whatever import path
+this match went through kept Rohit Raj's real dismissal and silently
+dropped Uday's retirement — leaving the crease-pointer walk with no way
+to know Uday ever left, so when the next entry named Kushal Vidya (who,
+under the "next unused batter" rule, hadn't been brought in yet, since
+nothing had removed Uday to make room) the integrity guard correctly
+returned `null`.
+
+**Unlike `25465218`, no misdiagnosis this time** — `batting_stats.
+dismissal_method = 'retired_hurt'` on Uday's own row was direct,
+unambiguous evidence of a genuine retirement from the moment this was
+investigated, not something that first had to be ruled out against a
+"phantom duplicate" theory.
+
+**Fix — a database-side patch, not a re-sync loop**, same convention as
+every other incident in this doc: the existing `wicket_number = 6`
+(Kushal Vidya) row was renumbered to `7` first (to free the slot without
+a transient PK collision), then Uday's retirement was inserted at
+`wicket_number = 6` (`team_score: 212, over: 18, is_retirement: true,
+returning_player_name: null` — Kushal Vidya is simply the next unused
+batting-order player, not a previously-retired batter returning, so no
+`returning_player_name` was needed here). The identical rebuild was
+applied to the Hub's already-synced `match_stats_cache.fall_of_wickets`.
+Re-verified by running the actual `computePartnerships()` algorithm
+against the corrected 7-row data: 8 clean partnerships (including the
+correctly-labelled `5, 5 (ret.)` pair from the §4.4 wicket-number fix),
+summing exactly to 228 — the real team total — and ending in a
+correctly-synthesized `16*` unbroken stand between Shivashankara GS and
+Ramesh Shanmugamoorthy, the two genuine not-out batters. Kushal Vidya's
+own partnership (0 runs, over 18.0→18.1) exactly matches his individual
+stat line (0 runs off 1 ball) — he came in as Uday's replacement and was
+out for a duck one ball later.
+
+**Scope check — run this time, since the fingerprint is cheap and
+exact:** a `retired_hurt` `batting_stats` row whose player name never
+appears in that same match's `fall_of_wickets` array —
+
+```sql
+SELECT b.match_id, b.player_name, b.runs, b.balls
+FROM batting_stats b
+WHERE b.dismissal_method = 'retired_hurt'
+  AND NOT EXISTS (
+    SELECT 1 FROM fall_of_wickets f
+    WHERE f.match_id = b.match_id AND lower(trim(f.player_name)) = lower(trim(b.player_name))
+  );
+```
+
+— found **24 more matches** with this exact shape, not just `27142448`.
+None of the other 24 were fixed as part of this pass — each needs the
+same PDF cross-check `27142448` and `25465218` both got before any
+correction is applied (the missing score/over checkpoint can't be
+inferred from `batting_stats` alone — see the follow-on note this fix's
+own investigation added to `features/partnerships.md`'s pending list).
+See §9.
+
 ---
 
 ### Shared name-normalization helper
@@ -1160,6 +1241,7 @@ as the external-link fallback when there's no `playerId` at all.
 | Highest partnership by runs/wickets on the Honour Board (`/leaderboard`) | ✅ Shipped September 2026 as Detailed → Partnerships — see §10. |
 | 3 synced matches drop out of every partnership view | Found while validating §10 against live data (49 matches): `computePartnerships()`'s integrity guard returns `null` for matches where a Fall of Wickets name doesn't match either batter at the crease ("Dharmarajan S" vs "DS Sakketha"; "G-One"; "Kushal Vidya"). Likely a scorecard-name mismatch between the FOW text and the batting card, or a wrong batting_order. Those matches show no per-match chart either — a pre-existing data issue, not introduced by §10. **"G-One" (`match_id 18985509`) diagnosed and fixed September 2026** — see §3's "a re-parse split one batter into two duplicate rows" incident; it was a duplicate `(match_id, player_name)` row pair from a re-parse, not a name mismatch. "Dharmarajan S" vs "DS Sakketha" and "Kushal Vidya" are still open — worth checking whether either is the same duplicate-row shape or a genuine unresolved alias. **A fourth, separate instance of the same `null`-return symptom was diagnosed and fixed September 2026 on a different, later-synced match (`26906716`)** — see §3's "two adjacent `batting_order` values swapped" incident; a genuinely wrong pair of `batting_order` values, not a name mismatch or a duplicate row. That match's `fall_of_wickets` rows postdate the 49-match audit this row's original three names came from, so it isn't one of the three listed here — the two are unrelated, coincidentally-similar bugs. |
 | Other historical matches possibly affected by the score-hyphen/wicket-number line-wrap bug (§3's incident) | Only match `14114256` has been confirmed and manually corrected so far — the fix to `FALL_OF_WICKET_PATTERN` prevents this specific sub-case going forward (and on any future re-sync), but no audit has been run across the rest of the historical backlog for a `fall_of_wickets` row count that falls short of `team_wickets` by exactly one, which is the fingerprint this bug leaves behind. Worth a targeted query if this is suspected elsewhere. |
+| 24 more matches carry a dropped-retirement-row fingerprint identical to `27142448`'s | Found while diagnosing `27142448` (§3's "a retirement's Fall of Wickets row dropped" incident) — a `batting_stats` row with `dismissal_method = 'retired_hurt'` whose player name never appears in that match's own `fall_of_wickets` array (query is in that incident's own write-up). **Not fixed as part of this pass.** Six carry real numeric CricHeroes `match_id`s and likely have a Hub booking to show a chart on at all: `22039937`, `22530207`, `23760116`, `26702807`, `26805769`, `26919890`. The rest (`Blue-250216-0200`, `Blue-250719-0200`, `Green-250524-1230`, `Green-250726-1230`, `United-250302-0700` ×3 rows, `United-250517-0730` ×5 rows, `United-250815-0200` ×2 rows, `United-251213-0700` ×2 rows) carry pre-Hub textual match IDs with no `bookings.match_id` to link to, so they're out of reach of this feature (and any other Hub-side view) regardless — same "Hub-linked matches only" scoping this doc's other sections already assume. Each of the six numeric ones needs the identical treatment `27142448` and `25465218` both got: the real scorecard PDF, to find the missing score/over checkpoint — it can't be inferred from `batting_stats` alone, so none should be guessed at. |
 
 ---
 
