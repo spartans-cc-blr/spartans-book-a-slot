@@ -659,6 +659,13 @@ export async function getCareerHighlightsByPlayer(): Promise<Record<string, Care
 // N+1 pattern that scaled the page's analytics-DB round trips linearly with
 // the number of tournaments the club has ever played, and was the dominant
 // cause of that page's slow load. See features/tournament-planner.md.
+//
+// Also, not incidentally, not filtered by bookings.stage_type — a
+// tournament's MVP total already includes both its league and knockout
+// matches, which is exactly what Captains' Corner's knockout squad-
+// selection aid (features/squad-selection.md §11) wants: a captain picking
+// a knockout XI sees form built up across the whole tournament to date, not
+// just its league leg.
 export async function getLeaderboardsByTournament(tournamentIds: string[]): Promise<Record<string, LeaderboardRow[]>> {
   const result: Record<string, LeaderboardRow[]> = {}
   for (const tid of tournamentIds) result[tid] = []
@@ -775,6 +782,15 @@ export async function getLeaderboardsByTournament(tournamentIds: string[]): Prom
 // of its own to rank by the way a knockout's tournament does, so it ranks
 // eligible players by how they've performed at this specific ground
 // instead.
+//
+// Deliberately NOT filtered by bookings.stage_type — a ground's MVP total
+// includes every confirmed, non-practice match played there, knockout
+// bookings included, not just league ones. Ground is a property of a
+// place, not of a competition stage, so a player's knockout-day form at
+// this ground is just as relevant to "how do they do here" as their league
+// form is. Do not add a `stage_type != 'knockout'` filter here — that would
+// silently narrow the ground total to less than what a captain actually
+// sees reflected on the ground's own real-world record.
 //
 // Unlike getLeaderboardsByTournament() — always called with real,
 // non-practice tournament ids to begin with — a ground can host both real
