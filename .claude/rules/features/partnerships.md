@@ -773,8 +773,78 @@ as the external-link fallback when there's no `playerId` at all.
 | Item | Notes |
 |---|---|
 | First real end-to-end cron proof | See §6.5 — the manual Phase 3 validation and this feature's own Phase 4/6 code are both in place, but no match has yet gone through the automated `backfill-scorecards` cron with the FOW-aware pipeline live end-to-end. Worth a follow-up note here once that's been observed. |
-| Highest partnership by runs/wickets on the Honour Board (`/leaderboard`) | Explicitly deferred — requested as a follow-on once the base feature was confirmed working, not yet started. Would need a season-wide aggregation over `computePartnerships()` output across every synced match, distinct from `getLeaderboard()`'s existing per-player season totals (`src/lib/playerStats.ts`) — probably its own function in that file rather than a batch call to `computePartnerships()` per match, given `getLeaderboard()`'s existing pagination-cap lessons (`features/leaderboard.md` §8.1). |
+| Highest partnership by runs/wickets on the Honour Board (`/leaderboard`) | ✅ Shipped September 2026 as Detailed → Partnerships — see §10. |
+| 3 synced matches drop out of every partnership view | Found while validating §10 against live data (49 matches): `computePartnerships()`'s integrity guard returns `null` for matches where a Fall of Wickets name doesn't match either batter at the crease ("Dharmarajan S" vs "DS Sakketha"; "G-One"; "Kushal Vidya"). Likely a scorecard-name mismatch between the FOW text and the batting card, or a wrong batting_order. Those matches show no per-match chart either — a pre-existing data issue, not introduced by §10. |
 | Other historical matches possibly affected by the score-hyphen/wicket-number line-wrap bug (§3's incident) | Only match `14114256` has been confirmed and manually corrected so far — the fix to `FALL_OF_WICKET_PATTERN` prevents this specific sub-case going forward (and on any future re-sync), but no audit has been run across the rest of the historical backlog for a `fall_of_wickets` row count that falls short of `team_wickets` by exactly one, which is the fingerprint this bug leaves behind. Worth a targeted query if this is suspected elsewhere. |
+
+---
+
+## 10. Club-wide partnership leaders — `/leaderboard` → Detailed → Partnerships (added September 2026)
+
+A fifth Detailed sub-tab, after Field. Three bar charts, same bar treatment
+as §6.6 (both names inside the bar, runs + balls in a fixed column at the
+end of the bar, `*` for unbroken):
+
+1. **Top 10 partnerships** for any wicket — ranked runs desc, fewer balls
+   breaking a tie, then the most recent match. Caption: wicket, opponent,
+   date, linking to `/matches/history/[bookingId]`.
+2. **Highest partnership for each wicket** (1st–10th) — the #1 of chart 1's
+   ordering for each wicket number. A wicket with no data is simply absent.
+3. **Top 5 batting pairs** by aggregate runs across every innings in the
+   filter, whichever wicket — pair identity is order-independent (A & B =
+   B & A). Tie on runs → fewer innings first. Caption: innings count and
+   best single stand.
+
+**Full names, not first names** (unlike §6.6) — club-wide, two players
+sharing a first name are ambiguous in a way they never are within one
+scorecard.
+
+### Filters — Tournament and Ground reused unchanged
+
+The tab uses the same `getScopedMatchIds()` scope as every other Detailed
+tab, so the existing **Year / Tournament / Ground / Format** controls apply
+with no new code — "best stands in the BlendIn Challengers" or "at
+Macushala" work as-is. Practice games are excluded (same default). Not
+applied here: Defending/Chasing (still MVP-only) and the Pitch Type tabs
+(Bat/Bowl only) — both easy follow-ons if wanted.
+
+### Data — `getPartnershipLeaders()` (`src/lib/playerStats.ts`)
+
+Reads `fall_of_wickets` + `match_stats` (team total/overs/wickets) for the
+scoped matches from the analytics DB, then `batting_stats` only for the
+matches that can yield anything (FOW rows present, or a genuine 0-wicket
+innings). Analytics DB rather than `match_stats_cache` because
+`batting_stats.player_id` there is always the live reconciled identity (a
+cached copy can lag a reconciliation — `post-match-scorecard.md` §15). Every
+multi-row read uses `fetchAllRows()` (`leaderboard.md` §8.1). Each match
+goes through the same `computePartnerships()` as the per-match chart — the
+§4.3 completeness guard and the integrity `null` both apply, so a match with
+no synced FOW contributes nothing.
+
+Unreconciled batters are **kept**, not dropped (unlike `getLeaderboard()`):
+dropping one would erase their partner's stand too. They show under their
+scorecard name, unlinked, and pair up by normalised name.
+
+Ranking lives in the pure, client-safe `aggregatePartnershipLeaders()`
+(`src/lib/partnershipLeaders.ts`, unit-tested in
+`partnershipLeaders.test.ts`). Validated against the live analytics DB (49
+matches with FOW) — top stand 219* for the 1st wicket; 3 matches dropped by
+the integrity guard (see §9).
+
+`page.tsx` skips the `getLeaderboard()` fetch on this tab (nothing uses it).
+Glossary: `buildPartnershipsGlossary()` (`leaderboardGlossary.ts`).
+
+### File map
+
+| File | Role |
+|---|---|
+| `src/lib/partnershipLeaders.ts` (+ `.test.ts`) | `aggregatePartnershipLeaders()` — top N, best per wicket, top pairs |
+| `src/lib/playerStats.ts` | `getPartnershipLeaders()` — scoped analytics fetch + name resolution |
+| `src/components/leaderboard/PartnershipLeaders.tsx` | `PartnershipLeadersView` — the three bar charts |
+| `src/components/leaderboard/LeaderboardFilters.tsx` | `DetailedCategory` (adds `'partnerships'`), fifth Detailed pill |
+| `src/app/leaderboard/page.tsx` | `category=partnerships` branch |
+| `src/lib/leaderboardGlossary.ts` | `buildPartnershipsGlossary()` |
+| `src/types/index.ts` | `PartnershipRecord`, `PartnershipPairAggregate`, `PartnershipLeaders`, `PartnershipLeaderPlayer` |
 
 ---
 

@@ -342,6 +342,42 @@ export interface BattingPositionLeader {
   topThree: BattingPositionRankEntry[]
 }
 
+// Club-wide partnership leaders for /leaderboard's Detailed → Partnerships
+// tab — derived from computePartnerships() over every Hub-linked match in
+// the current filter scope. See src/lib/partnershipLeaders.ts and
+// features/partnerships.md §10.
+export interface PartnershipLeaderPlayer {
+  playerId:      string | null   // null = scorecard name not yet reconciled to a Hub player
+  playerName:    string
+  cricheroesUrl: string | null
+}
+
+export interface PartnershipRecord {
+  wicketNumber: number
+  runs:         number
+  balls:        number | null
+  unbroken:     boolean
+  players:      [PartnershipLeaderPlayer, PartnershipLeaderPlayer]
+  matchId:      string
+  bookingId:    string | null
+  gameDate:     string | null
+  opponentName: string | null
+}
+
+export interface PartnershipPairAggregate {
+  players:  [PartnershipLeaderPlayer, PartnershipLeaderPlayer]
+  runs:     number
+  innings:  number
+  best:     number
+  bestUnbroken: boolean
+}
+
+export interface PartnershipLeaders {
+  top:      PartnershipRecord[]          // highest partnerships for any wicket
+  byWicket: PartnershipRecord[]          // best partnership for each wicket 1-10, wicket order
+  pairs:    PartnershipPairAggregate[]   // highest aggregate runs by a pair
+}
+
 export interface RecentForm {
   matches: number
   runs:    number
