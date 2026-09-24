@@ -766,19 +766,148 @@ export async function getLeaderboardsByTournament(tournamentIds: string[]): Prom
   return result
 }
 
-// Ranks a tournament's players by total MVP points, descending — feeds
-// Captains' Corner's knockout-game squad selection aid (see
-// features/squad-selection.md §11): a captain picking a knockout XI can see
-// who has performed well through the tournament's league stage so far.
-// Pure/no DB access — the caller (captains-corner/page.tsx) already has the
-// LeaderboardRow[] from getLeaderboard({ tournamentId }) or
-// getLeaderboardsByTournament(). Rank is a plain 1-based sequential
-// position, not a tie-sharing podium rank like BattingPositionRankEntry —
-// an exact mvpPoints tie is possible in principle but vanishingly rare in
-// practice (mvp_score already blends batting/bowling/fielding contributions
-// — see post-match-scorecard.md §15's identical observation for the match
-// MVP picker), so ties are broken by name for a stable, deterministic order
-// rather than sharing a rank.
+// Ground counterpart of getLeaderboardsByTournament() above — same batched
+// shape (one analytics-DB round trip for every ground requested, instead of
+// one getLeaderboard({ groundId }) call per ground), computing the exact
+// same per-player aggregates but grouped by bookings.ground_id instead of
+// tournament_id. Feeds Captains' Corner's league-game squad selection aid
+// (features/squad-selection.md §11.1): a league game has no "league stage"
+// of its own to rank by the way a knockout's tournament does, so it ranks
+// eligible players by how they've performed at this specific ground
+// instead.
+//
+// Unlike getLeaderboardsByTournament() — always called with real,
+// non-practice tournament ids to begin with — a ground can host both real
+// fixtures and practice games, so practice bookings are excluded here the
+// same way getScopedMatchIds()'s withoutPractice() excludes them everywhere
+// else (a booking's own is_practice flag, additively OR'd with its
+// tournament's — see features/practice-games.md).
+export async function getLeaderboardsByGround(groundIds: string[]): Promise<Record<string, LeaderboardRow[]>> {
+  const result: Record<string, LeaderboardRow[]> = {}
+  for (const gid of groundIds) result[gid] = []
+  if (groundIds.length === 0) return result
+
+  const hub = createServiceClient()
+  const [{ data: bookingRows, error: bookErr }, practiceTournamentIds] = await Promise.all([
+    hub
+      .from('bookings')
+      .select('match_id, ground_id, tournament_id, is_practice')
+      .in('ground_id', groundIds)
+      .eq('status', 'confirmed')
+      .not('match_id', 'is', null),
+    getPracticeTournamentIds(),
+  ])
+  if (bookErr) throw new Error(bookErr.message)
+
+  // Same assumption getLeaderboardsByTournament() makes for tournament_id —
+  // a match_id belongs to exactly one confirmed booking's ground_id in
+  // practice, so last-write-wins here is a non-issue.
+  const groundByMatch = new Map<string, string>()
+  const allMatchIds: string[] = []
+  for (const row of bookingRows ?? []) {
+    const matchId  = (row as any).match_id as string
+    const groundId = (row as any).ground_id as string
+    const isPractice = !!(row as any).is_practice || practiceTournamentIds.has((row as any).tournament_id)
+    if (isPractice) continue
+    if (!groundByMatch.has(matchId)) allMatchIds.push(matchId)
+    groundByMatch.set(matchId, groundId)
+  }
+  if (allMatchIds.length === 0) return result
+
+  const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ matchIds: allMatchIds })
+
+  // Partition each table's rows by resolved ground up front, then run the
+  // identical per-ground grouping/aggregation getLeaderboard({ groundId })
+  // does — just against an in-memory slice instead of a fresh fetch.
+  function bucketByGround(rows: any[]): Map<string, any[]> {
+    const byGround = new Map<string, any[]>()
+    for (const r of rows) {
+      const gid = groundByMatch.get(r.match_id)
+      if (!gid) continue
+      if (!byGround.has(gid)) byGround.set(gid, [])
+      byGround.get(gid)!.push(r)
+    }
+    return byGround
+  }
+
+  const battingByG  = bucketByGround(batting)
+  const bowlingByG  = bucketByGround(bowling)
+  const fieldingByG = bucketByGround(fielding)
+  const teamByG     = bucketByGround(team)
+
+  const allPlayerIds = new Set<string>()
+  for (const r of team) if ((r as any).player_id) allPlayerIds.add((r as any).player_id)
+  if (allPlayerIds.size === 0) return result
+
+  const { data: players, error: pErr } = await hub.from('players').select('id, name, cricheroes_url, photo_url').in('id', Array.from(allPlayerIds))
+  if (pErr) throw new Error(pErr.message)
+  const playerById = new Map((players ?? []).map((p: any) => [p.id, p]))
+
+  for (const gid of groundIds) {
+    const gBatting  = battingByG.get(gid)  ?? []
+    const gBowling  = bowlingByG.get(gid)  ?? []
+    const gFielding = fieldingByG.get(gid) ?? []
+    const gTeam     = teamByG.get(gid)     ?? []
+    if (gBatting.length === 0 && gBowling.length === 0 && gFielding.length === 0 && gTeam.length === 0) continue
+
+    const battingByPlayer  = groupBy(gBatting,  (r: any) => r.player_id)
+    const bowlingByPlayer  = groupBy(gBowling,  (r: any) => r.player_id)
+    const fieldingByPlayer = groupBy(gFielding, (r: any) => r.player_id)
+    const teamByPlayer     = groupBy(gTeam,     (r: any) => r.player_id)
+
+    const playerIds = new Set<string>()
+    for (const id of Array.from(battingByPlayer.keys()))  playerIds.add(id)
+    for (const id of Array.from(bowlingByPlayer.keys()))  playerIds.add(id)
+    for (const id of Array.from(fieldingByPlayer.keys())) playerIds.add(id)
+    for (const id of Array.from(teamByPlayer.keys()))     playerIds.add(id)
+
+    const rows: LeaderboardRow[] = []
+    for (const playerId of Array.from(playerIds)) {
+      const player = playerById.get(playerId)
+      if (!player) continue
+
+      const matchIds = new Set<string>((teamByPlayer.get(playerId) ?? []).map((r: any) => r.match_id).filter(Boolean))
+      const playerBatting = battingByPlayer.get(playerId) ?? []
+      const stats = aggregate(
+        matchIds,
+        playerBatting,
+        bowlingByPlayer.get(playerId)  ?? [],
+        fieldingByPlayer.get(playerId) ?? [],
+      )
+      if (stats.matches === 0) continue
+
+      let centuries = 0
+      let halfCenturies = 0
+      for (const r of playerBatting) {
+        if (!(r as any).batted) continue
+        const runs = num((r as any).runs)
+        if (runs >= 100) centuries++
+        else if (runs >= 50) halfCenturies++
+      }
+
+      rows.push({ playerId, playerName: player.name, cricheroesUrl: player.cricheroes_url ?? null, photoUrl: player.photo_url ?? null, stats, centuries, halfCenturies })
+    }
+    result[gid] = rows
+  }
+
+  return result
+}
+
+// Ranks a tournament's (or ground's) players by total MVP points,
+// descending — feeds Captains' Corner's squad selection aid: a knockout
+// game ranks by tournament MVP (see features/squad-selection.md §11) since
+// a captain picking a knockout XI can see who has performed well through
+// the tournament's league stage so far; a league game ranks by ground MVP
+// instead (§11.1), since a league game has no "league stage" of its own to
+// rank by. Pure/no DB access — the caller (captains-corner/page.tsx) already
+// has the LeaderboardRow[] from getLeaderboard({ tournamentId | groundId }),
+// getLeaderboardsByTournament(), or getLeaderboardsByGround(). Rank is a
+// plain 1-based sequential position, not a tie-sharing podium rank like
+// BattingPositionRankEntry — an exact mvpPoints tie is possible in principle
+// but vanishingly rare in practice (mvp_score already blends
+// batting/bowling/fielding contributions — see post-match-scorecard.md
+// §15's identical observation for the match MVP picker), so ties are broken
+// by name for a stable, deterministic order rather than sharing a rank.
 export function computeMvpRanks(rows: LeaderboardRow[]): MvpRankEntry[] {
   return [...rows]
     .sort((a, b) => b.stats.mvpPoints - a.stats.mvpPoints || a.playerName.localeCompare(b.playerName))
