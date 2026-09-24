@@ -52,6 +52,16 @@ export interface PartnershipPlayer {
 }
 
 export interface Partnership {
+  // The TRUE cricket wicket number — a running count of real dismissals
+  // only. NOT a pass-through of the stored fall_of_wickets.wicket_number
+  // column: CricHeroes' own scorecards never increment the wicket count
+  // for a retirement (real match 25465218's raw PDF text reuses "3" for
+  // both Saurav Kalsoor's real dismissal and Anurag T's retirement —
+  // "98-3 (Saurav Kalsoor)", "118-3 (Anurag T)" — before continuing
+  // normally at "4" for the next real fall). A retirement's own
+  // partnership therefore carries the same wicketNumber as the partnership
+  // immediately before it, never a new one of its own. See the
+  // retired-hurt-and-return note above and features/partnerships.md §4.4.
   wicketNumber: number
   runs:         number
   overFrom:     number   // over of the previous wicket, 0 for the first partnership
@@ -158,6 +168,12 @@ export function computePartnerships(
   let nextIn = 2
   let prevScore = 0
   let prevOver = 0
+  // Running count of real (non-retirement) dismissals — the true cricket
+  // wicket number. Only ever advances on a real entry; a retirement reuses
+  // whatever it currently is, exactly matching CricHeroes' own convention
+  // of not incrementing the FOW count for a retired-hurt batter. See the
+  // Partnership.wicketNumber doc comment above.
+  let displayWicket = 0
   const partnerships: Partnership[] = []
 
   for (const entry of fow) {
@@ -171,8 +187,14 @@ export function computePartnerships(
       return null
     }
 
+    // Advance the real wicket count only for a genuine dismissal — a
+    // retirement's own partnership row is labelled with whatever this
+    // already is (the same number as the partnership right before it),
+    // never a fresh one.
+    if (!entry.is_retirement) displayWicket += 1
+
     partnerships.push({
-      wicketNumber: entry.wicket_number,
+      wicketNumber: displayWicket,
       runs:         entry.team_score - prevScore,
       overFrom:     prevOver,
       overTo:       entry.over,
@@ -250,7 +272,12 @@ export function computePartnerships(
     finalScore.total > prevScore
   ) {
     partnerships.push({
-      wicketNumber: fow.length + 1,
+      // realWicketCount, not fow.length, for the same reason every entry
+      // above uses displayWicket rather than entry.wicket_number — a
+      // retirement never occupies a real wicket slot, so the unbroken
+      // stand is genuinely the (realWicketCount + 1)th wicket to fall (or
+      // rather, never fall), not the (fow.length + 1)th row.
+      wicketNumber: realWicketCount + 1,
       runs:         finalScore.total - prevScore,
       overFrom:     prevOver,
       overTo:       finalScore.overs,
