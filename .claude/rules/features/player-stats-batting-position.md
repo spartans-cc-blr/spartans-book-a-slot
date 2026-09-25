@@ -325,4 +325,69 @@ about it is ever sent back to the server.
 
 ---
 
+## 10. Career Summary — Highest Score & Best Bowling (added September 2026)
+
+The Career/Filtered Summary card (`PlayerStatsClient.tsx`'s "{isFiltered ?
+'Filtered' : 'Career'} Summary" grid — Matches/Runs/Avg/S/R/Wickets/
+Economy/Dismissals/MVP Pts) gained two more tiles: **Highest Score**
+(`87* (52)`, `*` for not-out, ball count in brackets when known) and
+**Best Bowling** (`4/18`, wickets/runs), placed next to Runs and Wickets
+respectively. Both read `'—'` when the scoped match set has no qualifying
+batting/bowling row at all (e.g. a player who's only ever fielded under
+the current filter).
+
+**Sourced from `PlayerStatsTotals` directly, not a separate fetch or a
+client-side scan of `matches`.** `PlayerStatsTotals` (`src/types/index.ts`)
+gained two new fields — `highestScore: { runs, balls, notOut } | null` and
+`bestBowling: { wickets, runs } | null` — computed inside `aggregate()`
+(`src/lib/playerStats.ts`) in the same per-row loops that already sum
+runs/wickets/etc., so every existing caller of `aggregate()` (via
+`getPlayerStats()`/`getPlayerCareerStats()`/`getPlayerSeasonStats()`, and
+`getLeaderboard()`) gets these two fields for free with no extra analytics
+round trip. `getPlayerStats()` is exactly what this page's `scoped`
+already came from (both `initialCareer` from the server page and every
+`fetchScoped()` re-fetch via `GET /api/players/[id]/match-history`), so no
+route or server-page change was needed — the new fields simply flow
+through the existing `scoped`/`career` payloads.
+
+**Tie-break rules mirror the `/players` directory's career-highlights
+card** (`src/lib/playerHighlights.ts`'s `pickHighlights()`, see
+`features/player-directory.md`) exactly, since both now derive from the
+same underlying logic: highest score is most runs, a not-out beating an
+out on equal runs, then fewer balls faced; best bowling is most wickets,
+then fewest runs conceded. **This scoping is genuinely different from that
+directory card, though** — the directory's `getCareerHighlightsByPlayer()`
+is always unfiltered "all time, real tournaments only," while this page's
+`highestScore`/`bestBowling` reflect whatever Year/Ground/Format/As
+Captain/Defending-Chasing/Practice filters are currently applied, same as
+every other tile in the Summary card.
+
+**`getCareerHighlightsByPlayer()` was simplified to reuse this**, rather
+than keeping two copies of the identical best-innings/best-bowling
+tie-break logic — it already called `aggregate()` to build its
+per-player totals, so its own duplicate loops were dropped in favour of
+reading `t.highestScore`/`t.bestBowling` straight off that result
+(mapped onto `CareerHighlights.bestInnings`/`bestBowling`, which keep
+their original field names in that module). No behaviour change for the
+`/players` directory — same numbers, same tie-breaks, one implementation
+instead of two.
+
+### Security (vibe-security)
+
+Same posture as §5/§9 — purely additive, read-only fields on an
+already-authorized aggregate; no new route, no new client input, no new
+access surface. `highestScore`/`bestBowling` carry only runs/balls/
+wickets figures already visible elsewhere on this same page (the Innings
+History table).
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/types/index.ts` | `PlayerStatsTotals.highestScore` / `.bestBowling` |
+| `src/lib/playerStats.ts` | `aggregate()` computes both fields inline while summing batting/bowling rows; `emptyTotals()` defaults them to `null`; `getCareerHighlightsByPlayer()` now reuses them instead of recomputing |
+| `src/components/players/PlayerStatsClient.tsx` | Two new Summary-card tiles + `formatHighestScore()`/`formatBestBowling()` display helpers |
+
+---
+
 *Maintained by: Spartans CC BLR*

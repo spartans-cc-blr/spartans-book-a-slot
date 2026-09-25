@@ -301,9 +301,11 @@ export function PlayerStatsClient({
                 caption={scoped.battingInnings !== scoped.matches || scoped.bowlingInnings !== scoped.matches
                   ? `Bat ${scoped.battingInnings} · Bowl ${scoped.bowlingInnings}` : undefined} />
               <Stat label="Runs" value={String(scoped.runs)} />
+              <Stat label="Highest Score" value={formatHighestScore(scoped.highestScore)} />
               <Stat label="Avg" value={scoped.battingAverage?.toFixed(2) ?? '—'} />
               <Stat label="S/R" value={scoped.strikeRate?.toFixed(2) ?? '—'} />
               <Stat label="Wickets" value={String(scoped.wickets)} />
+              <Stat label="Best Bowling" value={formatBestBowling(scoped.bestBowling)} />
               <Stat label="Economy" value={scoped.economy?.toFixed(2) ?? '—'} />
               <Stat label="Dismissals" value={String(scoped.catches + scoped.runOuts + scoped.stumpings)} />
               <Stat label="MVP Pts" value={scoped.mvpPoints.toFixed(2)} />
@@ -388,6 +390,18 @@ export function PlayerStatsClient({
       </div>
     </>
   )
+}
+
+// Same display convention as the /players directory's career-highlights
+// cards (src/lib/playerHighlights.ts's pickHighlights()) — a not-out
+// innings gets a trailing '*', best bowling is "wickets/runs".
+function formatHighestScore(h: PlayerStatsTotals['highestScore']): string {
+  if (!h) return '—'
+  return `${h.runs}${h.notOut ? '*' : ''}${h.balls > 0 ? ` (${h.balls})` : ''}`
+}
+function formatBestBowling(b: PlayerStatsTotals['bestBowling']): string {
+  if (!b) return '—'
+  return `${b.wickets}/${b.runs}`
 }
 
 function Stat({ label, value, caption }: { label: string; value: string; caption?: string }) {

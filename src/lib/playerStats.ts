@@ -114,6 +114,7 @@ function emptyTotals(): PlayerStatsTotals {
     bowlingStrikeRate: null,
     catches: 0, runOuts: 0, stumpings: 0, mvpPoints: 0,
     battingMvp: 0, bowlingMvp: 0, fieldingMvp: 0,
+    highestScore: null, bestBowling: null,
   }
 }
 
@@ -128,24 +129,44 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
   // by spartans-python at parse time. Filtering on them here mirrors what
   // ScorecardTables.tsx does with the same placeholder rows for display.
   const battingRows = batting.filter(r => r.batted)
+  // Highest score: most runs; a not-out beats an out on equal runs, then
+  // fewer balls faced. Same tie-break as getCareerHighlightsByPlayer()'s
+  // (now-removed) standalone copy of this logic.
+  let highestScore: PlayerStatsTotals['highestScore'] = null
   for (const r of battingRows) {
     t.runs  += num(r.runs)
     t.balls += num(r.balls)
     t.fours += num(r.fours)
     t.sixes += num(r.sixes)
     if (r.not_out === 'Y') t.notOuts += 1
+    const cand = { runs: num(r.runs), balls: num(r.balls), notOut: r.not_out === 'Y' }
+    if (!highestScore
+      || cand.runs > highestScore.runs
+      || (cand.runs === highestScore.runs && cand.notOut && !highestScore.notOut)
+      || (cand.runs === highestScore.runs && cand.notOut === highestScore.notOut && cand.balls < highestScore.balls)) {
+      highestScore = cand
+    }
   }
+  t.highestScore = highestScore
   t.battingInnings = battingRows.length
   const dismissals = battingRows.length - t.notOuts
   t.battingAverage = dismissals > 0 ? round2(t.runs / dismissals) : null
   t.strikeRate     = t.balls > 0 ? round2((t.runs / t.balls) * 100) : null
 
   const bowlingRows = bowling.filter(r => r.did_bowl)
+  // Best bowling: most wickets, then fewest runs conceded.
+  let bestBowling: PlayerStatsTotals['bestBowling'] = null
   for (const r of bowlingRows) {
     t.wickets      += num(r.wickets)
     t.runsConceded += num(r.runs)
     t.ballsBowled  += oversToBalls(num(r.overs))
+    const cand = { wickets: num(r.wickets), runs: num(r.runs) }
+    if (!bestBowling || cand.wickets > bestBowling.wickets
+      || (cand.wickets === bestBowling.wickets && cand.runs < bestBowling.runs)) {
+      bestBowling = cand
+    }
   }
+  t.bestBowling = bestBowling
   t.bowlingInnings = bowlingRows.length
   t.oversBowled = ballsToOversString(t.ballsBowled)
   t.economy = t.ballsBowled > 0 ? round2(t.runsConceded / (t.ballsBowled / 6)) : null
@@ -611,31 +632,6 @@ export async function getCareerHighlightsByPlayer(): Promise<Record<string, Care
     const t = aggregate(matchIds, bat, bowl, fld)
     if (t.matches === 0) continue
 
-    // Highest score: most runs; a not-out beats an out on equal runs, then
-    // fewer balls faced.
-    let bestInnings: CareerHighlights['bestInnings'] = null
-    for (const r of bat) {
-      if (!r.batted) continue
-      const cand = { runs: num(r.runs), balls: num(r.balls), notOut: r.not_out === 'Y' }
-      if (!bestInnings
-        || cand.runs > bestInnings.runs
-        || (cand.runs === bestInnings.runs && cand.notOut && !bestInnings.notOut)
-        || (cand.runs === bestInnings.runs && cand.notOut === bestInnings.notOut && cand.balls < bestInnings.balls)) {
-        bestInnings = cand
-      }
-    }
-
-    // Best bowling: most wickets, then fewest runs conceded.
-    let bestBowling: CareerHighlights['bestBowling'] = null
-    for (const r of bowl) {
-      if (!r.did_bowl) continue
-      const cand = { wickets: num(r.wickets), runs: num(r.runs) }
-      if (!bestBowling || cand.wickets > bestBowling.wickets
-        || (cand.wickets === bestBowling.wickets && cand.runs < bestBowling.runs)) {
-        bestBowling = cand
-      }
-    }
-
     result[playerId] = {
       matches: t.matches,
       runs: t.runs,
@@ -644,8 +640,10 @@ export async function getCareerHighlightsByPlayer(): Promise<Record<string, Care
       wickets: t.wickets,
       bowlingAverage: t.wickets > 0 ? round2(t.runsConceded / t.wickets) : null,
       dismissals: t.catches + t.runOuts + t.stumpings,
-      bestInnings,
-      bestBowling,
+      // Same highest-score/best-bowling derivation aggregate() already did
+      // above — no need to recompute it here.
+      bestInnings: t.highestScore,
+      bestBowling: t.bestBowling,
     }
   }
   return result
