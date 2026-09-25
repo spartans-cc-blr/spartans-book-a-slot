@@ -24,12 +24,18 @@ import type { BattingPositionLeader } from '@/types'
 
 export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLeader[] }) {
   const maxRuns = Math.max(...leaders.map(l => l.runs), 1)
+  const totalInnings = leaders.reduce((sum, l) => sum + l.totalInnings, 0)
   const [openPosition, setOpenPosition] = useState<number | null>(null)
   const active = leaders.find(l => l.position === openPosition) ?? null
 
   return (
     <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded p-4 mb-4">
-      <h3 className="font-cinzel text-sm text-[var(--stats-accent)] dark:text-gold font-semibold mb-1">Runs by Batting Position</h3>
+      <div className="flex items-baseline justify-between gap-2 mb-1">
+        <h3 className="font-cinzel text-sm text-[var(--stats-accent)] dark:text-gold font-semibold">Runs by Batting Position</h3>
+        <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text-muted)] dark:text-zinc-500 whitespace-nowrap flex-shrink-0">
+          {totalInnings} total inning{totalInnings === 1 ? '' : 's'}
+        </span>
+      </div>
       <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mb-4">
         Leading run-scorer at each position, for the current filter. Tap a bar for the top 3.
       </p>
@@ -47,16 +53,22 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
               className="flex items-center gap-2 cursor-pointer group"
             >
               <span className="font-cinzel text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 w-7 flex-shrink-0 text-right">{l.position}</span>
-              <div className="flex-1 relative h-7 bg-[var(--stats-row-bg)] dark:bg-ink-4 group-hover:bg-[var(--stats-divider)] dark:group-hover:bg-ink-5 rounded overflow-hidden transition-colors">
+              <div className="flex-1 relative h-9 bg-[var(--stats-row-bg)] dark:bg-ink-4 group-hover:bg-[var(--stats-divider)] dark:group-hover:bg-ink-5 rounded overflow-hidden transition-colors">
                 <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
-                <div className="absolute inset-0 flex items-center justify-between gap-2 px-2.5">
-                  <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text)] dark:text-parchment truncate">
+                <div className="absolute inset-0 flex items-center gap-2 px-2.5">
+                  <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text)] dark:text-parchment truncate flex-1 min-w-0">
                     {l.players.map((p, i) => (
                       <span key={p.playerId}>
                         {i > 0 && ', '}
                         <PlayerNameLink name={p.playerName} playerId={p.playerId} cricHeroesUrl={p.cricheroesUrl} />
                       </span>
                     ))}
+                  </span>
+                  <span
+                    className="font-rajdhani text-[9px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 -rotate-90 whitespace-nowrap"
+                    title={`${l.totalInnings} innings played at position ${l.position}`}
+                  >
+                    {l.totalInnings} Inn
                   </span>
                   <span className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] dark:text-gold flex-shrink-0">{l.runs}</span>
                 </div>

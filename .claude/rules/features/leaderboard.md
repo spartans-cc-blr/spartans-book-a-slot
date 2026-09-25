@@ -330,14 +330,53 @@ record at all (see `player-stats-batting-position.md` §2 for why some
 analytics rows still lack it) simply has no entry — never a fabricated
 zero bar.
 
+**`totalInnings` (added September 2026)** — a fourth field on
+`BattingPositionLeader`, summed across *every* player who has batted at
+that position, not just the leader(s) in `topThree`. Computed inside the
+same per-position loop, before the top-3 tier slice, so it can never
+undercount a position with more than 3 distinct performance tiers.
+Distinct from `topThree[i].innings`, which is one tier's own innings
+count (an efficiency tiebreak figure) — `totalInnings` is the position's
+whole workload. Feeds two things on the chart (below): the card header's
+grand total (`leaders.reduce((sum, l) => sum + l.totalInnings, 0)`) and
+each bar's own "N Inn" label.
+
 **UI — `BattingPositionLeaders.tsx`:** `'use client'` (needed for the modal
 open/close state and the bar's `onClick`). Each row is a horizontal
 progress-bar shape (track `bg-ink-4`, fill `bg-gold/40` sized to that
 position's runs relative to the chart's own max), with the leader's
-name(s) — `PlayerNameLink`, comma-joined on a tie — and their run total
-overlaid as text rather than placed outside the bar, since a name can be
-longer than a short bar's fill width. Hidden entirely (not shown empty)
-when the aggregate comes back with zero positions for the current filter.
+name(s) — `PlayerNameLink`, comma-joined on a tie — their run total, and
+(added September 2026) a small rotated "N Inn" label all overlaid as text
+inside the bar, rather than any of it placed outside — a name can be
+longer than a short bar's fill width, and keeping every figure inside the
+bar keeps the row a single scannable unit rather than spreading related
+numbers on either side of it. Hidden entirely (not shown empty) when the
+aggregate comes back with zero positions for the current filter.
+
+**Total-innings label, both header and per-bar (added September 2026).**
+Per a direct request ("show the total Innings as the chart header" +
+"rotated text... vertically up... inside each bar"):
+- The card header (`<h3>Runs by Batting Position</h3>` row) gained a
+  right-aligned "N total innings" figure — the grand total across every
+  position currently in the chart, i.e. every batting innings in the
+  filtered scope with a recorded `batting_order`.
+- Each bar gained a small `-rotate-90` (Tailwind's `transform:
+  rotate(-90deg)`, i.e. 270° clockwise — text reads bottom-to-top) label
+  reading `{totalInnings} Inn` for that position specifically, sitting
+  between the player name(s) and the runs figure inside the bar's overlay
+  row. The bar's own height grew from `h-7` to `h-9` (28px → 36px) to give
+  the rotated label's un-rotated *width* (which becomes its vertical
+  footprint once rotated) enough room without clipping against the row's
+  `overflow-hidden`. The overlay row itself changed from
+  `justify-between` to a plain `flex gap-2` with the name span made
+  `flex-1 min-w-0` — `justify-between` only ever spread space between two
+  children; adding a third fixed-width label needed the name to be the
+  one flexible element instead, so it still truncates correctly and the
+  two fixed-width figures sit snug beside it.
+- This total is deliberately the *position's* (or the chart's) total
+  innings, not each `topThree` tier's own `innings` figure — the modal's
+  "N runs · N inn" line (below) is unrelated and unchanged; that's a
+  single tier's efficiency stat, not a workload total.
 
 The row itself is a clickable `<div role="button">`, not a real
 `<button>` — it wraps `PlayerNameLink`, a genuine nested `<a>`, and
@@ -674,7 +713,7 @@ that decides which matches belong to a ground.
 |---|---|
 | `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`, `getTopScorersByBattingPosition` for Detailed → Bat only — §6.1), glossary building; computes `showPitchTabs`/`pitchType` for the Pitch Type tabs (§6.2), applied only to the `getLeaderboard()` call that feeds `rows`; the six category-gated analytics reads run as one `Promise.all()` batch rather than sequential awaits (§8.2) |
 | `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), `getTopScorersByBattingPosition()` (§6.1), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10) and, as of §6.2, accepts an optional `pitchType` filter resolved via `getPitchTournamentIds()`/`withPitchType()`; `fetchAllRows()` pages every multi-row analytics-DB read past PostgREST's default 1000-row cap (§8.1) |
-| `src/components/leaderboard/BattingPositionLeaders.tsx` | Detailed → Bat only — horizontal bar chart of the leading run-scorer(s) per batting position, tap a bar for the "Top 3" modal (§6.1); unaffected by the Pitch Type tabs rendered below it (§6.2) |
+| `src/components/leaderboard/BattingPositionLeaders.tsx` | Detailed → Bat only — horizontal bar chart of the leading run-scorer(s) per batting position, tap a bar for the "Top 3" modal (§6.1); header shows the grand total innings across all positions, each bar carries a rotated "N Inn" label for that position's own total (§6.1); unaffected by the Pitch Type tabs rendered below it (§6.2) |
 | `src/components/leaderboard/PitchTypeTabs.tsx` | Detailed → Bat/Bowl — All/Matted/Astro/Turf tab row narrowing `LeaderboardTable`, hidden and inert whenever a Tournament/Ground is selected (§6.2) |
 | `src/components/ui/Dialog.tsx` | Shared modal — reused as-is for the "Top 3 at Position N" popup, no new modal primitive needed (§6.1) |
 | `src/components/players/PlayerStatsClient.tsx` | `/players/[id]/stats` filter bar — Year/Ground/Format/As Captain/Defending/Chasing, plus the "Include Practice Games" opt-in (§10) |
