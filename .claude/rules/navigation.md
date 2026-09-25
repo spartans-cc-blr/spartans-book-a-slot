@@ -749,6 +749,36 @@ tab bar, expressed as Tailwind classes here since this element is styled
 entirely via `className` rather than inline `style`. Pure rendering hint,
 no layout or behavioural change.
 
+**Recurred, mitigation strengthened (September 2026) — `backface-visibility:
+hidden`.** Reported again on `/players/[id]/stats`: the bottom tab bar
+rendered mid-page (real content visibly both above and below it) rather
+than pinned to the viewport bottom. Before changing anything, the full
+ancestor chain from `<body>` down to `<SiteNav>`/`<MobileTabBar>` was
+audited for the one thing known to actually *break* this mitigation
+(`navigation.md` §4.1's own warning: a `transform`/`filter`/`contain`/
+`overflow` on a shared ancestor re-anchors a `position: fixed` descendant
+to that ancestor's box instead of the viewport) — `layout.tsx`,
+`providers.tsx`, `ThemeProvider.tsx`, `ChunkErrorBoundary.tsx`, and
+`globals.css`'s `body` rule were all confirmed clean, and nothing in the
+Career Summary work on that page (`features/player-stats-batting-position.md`
+§11) touches an ancestor of either nav component. No code-level regression
+was found — this looks like the same underlying, only-partially-curable
+WebKit compositor bug recurring on live hardware, not something introduced
+by a specific change.
+
+Both `MobileTabBar.tsx`'s `FIXED_LAYER_STYLE` and this `<nav>`'s className
+gained `backface-visibility: hidden` (`[backface-visibility:hidden]
+[-webkit-backface-visibility:hidden]` here) alongside the existing
+`translateZ(0)`/`transform-gpu` — the standard complementary hint paired
+with that promotion for exactly this WebKit bug class (stops WebKit
+re-evaluating the composited layer's back face on every scroll frame).
+Applied as a strengthening of the existing, correctly-implemented
+mitigation, not a new mechanism — genuinely confirming whether it closes
+the gap needs a live device test, which no session so far has had; if it's
+still reproducible after this, the next diagnostic step is Safari Web
+Inspector attached to a real iPhone to see the actual compositing layers,
+not another blind CSS-hint guess.
+
 ### Link Structure
  
 ```ts
@@ -971,6 +1001,14 @@ recompute a composited layer's position against the live viewport far more
 reliably than a plain `fixed` box painted in the main document layer. This
 is a pure rendering hint — no layout, sizing, or `z-index` change, and no
 behavioural difference outside of iOS's own rendering quirk.
+
+**Recurred after this fix, strengthened with `backface-visibility: hidden`
+(September 2026)** — `FIXED_LAYER_STYLE` now also carries `backfaceVisibility:
+'hidden'`/`WebkitBackfaceVisibility: 'hidden'`, the standard complementary
+hint for this exact bug class. Same for the sticky top nav's own copy of
+this mitigation. See §4's "Sticky top nav also detaching mid-scroll on
+iOS" note above for the full incident (ancestor-chain audit, what was
+ruled out, why this is a strengthening rather than a new mechanism).
 
 **⚠️ This same hint must never be applied to a shared ancestor of this
 `<nav>` — it would break the fix, not extend it.** A CSS `transform` on

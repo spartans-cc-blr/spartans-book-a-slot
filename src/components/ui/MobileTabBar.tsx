@@ -57,10 +57,22 @@ type Tokens = ReturnType<typeof tokens>
 // "stuck" mid-page — after a scroll gesture or a dynamic-toolbar
 // show/hide animation, instead of staying pinned to the viewport edge.
 // See navigation.md §4.1's "Fixed tab bar detaching mid-scroll on iOS" note.
+//
+// backface-visibility: hidden (added September 2026, reported still
+// recurring after translateZ(0) alone) is the standard complementary hint
+// paired with translateZ(0) for this exact WebKit bug class — it stops
+// WebKit from re-evaluating the layer's back face on every scroll frame,
+// which is believed to make the promoted layer's position stick more
+// reliably. Not independently confirmed to fully close the bug (this is a
+// live-device-only rendering quirk with no local repro), but it's a
+// standard, low-risk strengthening of the existing mitigation, not a new
+// mechanism — see the same pairing added to SiteNav.tsx's sticky nav.
 const FIXED_LAYER_STYLE: React.CSSProperties = {
   transform: 'translateZ(0)',
   WebkitTransform: 'translateZ(0)',
   willChange: 'transform',
+  backfaceVisibility: 'hidden',
+  WebkitBackfaceVisibility: 'hidden',
 }
 
 // Toggles a body class so globals.css can reserve bottom space for the

@@ -80,9 +80,12 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
         at a stale scroll offset ("stuck" mid-page) — the same rendering bug
         class MobileTabBar.tsx's FIXED_LAYER_STYLE fixes for the bottom tab
         bar, here applied to a `position: sticky` element instead of `fixed`.
-        See navigation.md §4.1's "Fixed tab bar detaching mid-scroll on iOS"
-        note. */}
-    <nav className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 sticky top-0 z-50 transform-gpu will-change-transform">
+        [backface-visibility:hidden] (added September 2026) is the standard
+        complementary hint paired with translateZ(0)/transform-gpu for this
+        exact WebKit bug class — see FIXED_LAYER_STYLE's own comment in
+        MobileTabBar.tsx for the same pairing there. See navigation.md
+        §4.1's "Fixed tab bar detaching mid-scroll on iOS" note. */}
+    <nav className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 sticky top-0 z-50 transform-gpu will-change-transform [backface-visibility:hidden] [-webkit-backface-visibility:hidden]">
       <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
         {/* Back — router.back() with in-app history, else the page's parent.
             Shown at every width: an installed PWA on an iPad (≥ md) has no

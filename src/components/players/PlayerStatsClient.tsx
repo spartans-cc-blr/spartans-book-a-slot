@@ -296,7 +296,7 @@ export function PlayerStatsClient({
           {scoped.matches === 0 ? (
             <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No matches for this filter.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--stats-card-border)]">
               <SummaryColumn title="Overview" mvpLabel="Fielding MVP" mvpValue={scoped.fieldingMvp} mvpColor="text-purple-600 dark:text-purple-400">
                 <Stat label="Matches" value={String(scoped.matches)}
                   caption={scoped.battingInnings !== scoped.matches || scoped.bowlingInnings !== scoped.matches
@@ -404,12 +404,16 @@ function formatBestBowling(b: PlayerStatsTotals['bestBowling']): string {
   return `${b.wickets}/${b.runs}`
 }
 
-// One of the three Career/Filtered Summary panels — Overview, Batting,
-// Bowling, laid out side by side (stacking to one column on mobile) so
-// every batting figure reads as one group and every bowling figure reads
-// as another, rather than interleaved in one flat grid. Each panel's own
-// category MVP (battingMvp/bowlingMvp/fieldingMvp) is pinned below its
-// main stats, replacing the old separate 3-column MVP breakdown row —
+// One of the three Career/Filtered Summary sections — Overview, Batting,
+// Bowling — inside the single Summary card, so every batting figure reads
+// as one group and every bowling figure reads as another, rather than
+// interleaved in one flat grid. Unlike the first cut of this grouping,
+// this is a *section* of the shared card, not its own bordered/shadowed
+// box — the three sit side by side on one row (a thin vertical divider
+// between them) on wider screens, and stack into one column with a
+// horizontal divider between them on mobile, via the parent grid's
+// `divide-x`/`divide-y`. Each section's own category MVP
+// (battingMvp/bowlingMvp/fieldingMvp) is pinned below its main stats,
 // same MvpStat component and colours (emerald/blue/purple) as before.
 function SummaryColumn({
   title, children, mvpLabel, mvpValue, mvpColor,
@@ -421,7 +425,7 @@ function SummaryColumn({
   mvpColor: string
 }) {
   return (
-    <div className="rounded-xl border border-[var(--stats-card-border)] bg-[var(--stats-row-bg)] p-4">
+    <div className="py-4 sm:py-0 sm:px-5 first:pt-0 last:pb-0 sm:first:pl-0 sm:last:pr-0">
       <h3 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mb-3">
         {title}
       </h3>
