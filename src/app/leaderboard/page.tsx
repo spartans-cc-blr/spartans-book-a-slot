@@ -103,6 +103,16 @@ export default async function LeaderboardPage({
       : Promise.resolve(null),
   ])
 
+  // Year dropdown — derived from the same real match data `availableMonths`
+  // already carries, instead of a fixed "current year + 2 back" list. That
+  // hardcoded list is what silently hid every season before 2024 here while
+  // Team Record's own Season filter (derived straight from match data, see
+  // filterOptions() in teamStatsCore.ts) already went back to 2019 — see
+  // features/leaderboard.md for the full incident note.
+  const availableYears = Array.from(new Set(availableMonths.map(m => Number(m.slice(0, 4)))))
+  if (!availableYears.includes(currentYear)) availableYears.push(currentYear)
+  availableYears.sort((a, b) => b - a)
+
   const tournamentParam = searchParams?.tournament && searchParams.tournament !== 'all' ? searchParams.tournament : 'all'
   const groundParam = searchParams?.ground && searchParams.ground !== 'all' ? searchParams.ground : 'all'
   // If a previously-selected Tournament/Ground falls outside the current
@@ -237,7 +247,7 @@ export default async function LeaderboardPage({
 
       <div className="px-5 md:px-8 lg:px-10 py-6">
         <LeaderboardFilters
-          years={[currentYear, currentYear - 1, currentYear - 2]}
+          years={availableYears}
           months={availableMonths}
           tournaments={tournaments}
           grounds={grounds}
