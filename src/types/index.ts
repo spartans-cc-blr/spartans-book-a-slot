@@ -285,6 +285,13 @@ export interface PlayerStatsTotals {
   battingMvp:     number
   bowlingMvp:     number
   fieldingMvp:    number
+  // Best single innings/bowling spell within this stat's own scope (career,
+  // a year, a filtered set — whatever produced this PlayerStatsTotals). Not
+  // out beats out on equal runs, then fewer balls faced; best bowling is
+  // most wickets, then fewest runs conceded. null when no qualifying
+  // batting/bowling row exists in scope.
+  highestScore:   { runs: number; balls: number; notOut: boolean } | null
+  bestBowling:    { wickets: number; runs: number } | null
 }
 
 export interface LeaderboardRow {
