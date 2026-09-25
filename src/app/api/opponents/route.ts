@@ -40,7 +40,21 @@ export async function GET(req: NextRequest) {
   const [{ data: opponents, error: oErr }, { data: aliases, error: aErr }, { data: bookings, error: bErr }] = await Promise.all([
     supabase.from('opponents').select('id, name, is_marquee, cricheroes_team_url, notes, created_at, updated_at').order('name'),
     supabase.from('opponent_aliases').select('opponent_id, alias'),
-    supabase.from('bookings').select('id, opponent_name, opponent_id, game_date').eq('status', 'confirmed').not('opponent_name', 'is', null).range(0, 4999),
+    // Ground/tournament are fetched here purely so the unlinked queue can be
+    // filtered by them client-side — see OpponentsClient's filter bar. A
+    // booking's own ground_id (resolved from the tournament's at creation
+    // time — see POST /api/bookings) is preferred; a pre-migration-066 row
+    // with no ground_id of its own falls back to its tournament's, same
+    // groundIdOf() pattern captains-corner/page.tsx already uses.
+    supabase.from('bookings')
+      .select(`
+        id, opponent_name, opponent_id, game_date,
+        tournament:tournaments!bookings_tournament_id_fkey(id, name, ground:grounds(id, name)),
+        ground:grounds!bookings_ground_id_fkey(id, name)
+      `)
+      .eq('status', 'confirmed')
+      .not('opponent_name', 'is', null)
+      .range(0, 4999),
   ])
   if (oErr) return NextResponse.json({ error: oErr.message }, { status: 500 })
   if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 })
@@ -53,7 +67,15 @@ export async function GET(req: NextRequest) {
     aliasesByOpp.set(a.opponent_id, list)
   }
   const countByOpp = new Map<string, number>()
-  const unlinked = new Map<string, { name: string; count: number; last_played: string }>()
+  type NamedRef = { id: string; name: string }
+  const unlinked = new Map<string, {
+    name: string; count: number; last_played: string
+    tournaments: Map<string, string>; grounds: Map<string, string>
+  }>()
+  const allTournaments = new Map<string, string>()
+  const allGrounds = new Map<string, string>()
+  const one = <T>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null)
+
   for (const b of bookings ?? []) {
     if (b.opponent_id) {
       countByOpp.set(b.opponent_id, (countByOpp.get(b.opponent_id) ?? 0) + 1)
@@ -61,19 +83,40 @@ export async function GET(req: NextRequest) {
     }
     const key = normaliseOpponentName(b.opponent_name)
     if (!key) continue
-    const cur = unlinked.get(key)
-    if (cur) {
-      cur.count++
-      if (b.game_date > cur.last_played) cur.last_played = b.game_date
-    } else {
-      unlinked.set(key, { name: String(b.opponent_name).trim(), count: 1, last_played: b.game_date })
+
+    const tournament = one<any>(b.tournament)
+    const groundDirect = one<any>(b.ground)
+    const groundViaTournament = tournament ? one<any>(tournament.ground) : null
+    const ground = groundDirect ?? groundViaTournament
+
+    const cur = unlinked.get(key) ?? {
+      name: String(b.opponent_name).trim(), count: 0, last_played: b.game_date,
+      tournaments: new Map<string, string>(), grounds: new Map<string, string>(),
     }
+    cur.count++
+    if (b.game_date > cur.last_played) cur.last_played = b.game_date
+    if (tournament?.id) { cur.tournaments.set(tournament.id, tournament.name); allTournaments.set(tournament.id, tournament.name) }
+    if (ground?.id) { cur.grounds.set(ground.id, ground.name); allGrounds.set(ground.id, ground.name) }
+    unlinked.set(key, cur)
   }
+
+  const byName = (a: NamedRef, b: NamedRef) => a.name.localeCompare(b.name)
+  const toRefs = (m: Map<string, string>): NamedRef[] => Array.from(m, ([id, name]) => ({ id, name })).sort(byName)
 
   const roster = (opponents ?? []).map(o => ({ id: o.id, name: o.name }))
   const queue = Array.from(unlinked.values())
-    .map(u => ({ ...u, suggestions: suggestPlayers(u.name, roster, 3) }))
-    .sort((a, b) => b.count - a.count || b.last_played.localeCompare(a.last_played))
+    .map(u => ({
+      name: u.name,
+      count: u.count,
+      last_played: u.last_played,
+      tournaments: toRefs(u.tournaments),
+      grounds: toRefs(u.grounds),
+      suggestions: suggestPlayers(u.name, roster, 3),
+    }))
+    // A–Z by default — the reconciliation queue reads as a list to work
+    // through, not a leaderboard; OpponentsClient's own sort control lets a
+    // manager switch to most-played/most-recent from there.
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   return NextResponse.json({
     opponents: (opponents ?? []).map(o => ({
@@ -82,6 +125,10 @@ export async function GET(req: NextRequest) {
       matches: countByOpp.get(o.id) ?? 0,
     })),
     unlinked: queue,
+    unlinked_filters: {
+      tournaments: toRefs(allTournaments),
+      grounds: toRefs(allGrounds),
+    },
   })
 }
 
