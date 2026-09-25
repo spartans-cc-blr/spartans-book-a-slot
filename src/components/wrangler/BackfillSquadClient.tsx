@@ -63,11 +63,26 @@ export function BackfillSquadClient() {
   const [saving,  setSaving]  = useState(false)
   const [toast,   setToast]   = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
 
+  // Players created inline via "＋ New player" (see handleQuickAddPlayer) —
+  // kept separate from parsed.roster (which reflects the roster at parse
+  // time) rather than mutating that response, and merged back in wherever
+  // the roster is read.
+  const [addedPlayers,   setAddedPlayers]   = useState<RosterPlayer[]>([])
+  const [addPlayerRow,   setAddPlayerRow]   = useState<number | null>(null)
+  const [addPlayerName,  setAddPlayerName]  = useState('')
+  const [addPlayerBusy,  setAddPlayerBusy]  = useState(false)
+  const [addPlayerError, setAddPlayerError] = useState('')
+
+  const combinedRoster = useMemo(
+    () => [...(parsed?.roster ?? []), ...addedPlayers],
+    [parsed, addedPlayers]
+  )
+
   const rosterById = useMemo(() => {
     const map = new Map<string, string>()
-    for (const p of parsed?.roster ?? []) map.set(p.id, p.name)
+    for (const p of combinedRoster) map.set(p.id, p.name)
     return map
-  }, [parsed])
+  }, [combinedRoster])
 
   async function handleParse() {
     setParsing(true)
@@ -95,6 +110,10 @@ export function BackfillSquadClient() {
       setSelectedBookingId(data.booking_id)
       setOverwriteConfirmed(false)
       setManualOverwriteNeeded(false)
+      setAddedPlayers([])
+      setAddPlayerRow(null)
+      setAddPlayerName('')
+      setAddPlayerError('')
     } catch {
       setParseError('Network error while parsing')
     } finally {
@@ -104,6 +123,52 @@ export function BackfillSquadClient() {
 
   function updateRowPlayer(index: number, playerId: string) {
     setRows(prev => prev.map((r, i) => i === index ? { ...r, player_id: playerId || null } : r))
+  }
+
+  function openAddPlayer(index: number) {
+    setAddPlayerRow(index)
+    setAddPlayerName(rows[index]?.name ?? '')
+    setAddPlayerError('')
+  }
+
+  function cancelAddPlayer() {
+    setAddPlayerRow(null)
+    setAddPlayerName('')
+    setAddPlayerError('')
+  }
+
+  // Creates (or, on an exact name match, reuses) a player record for a name
+  // that has no match in the current roster — a player who's left the club,
+  // or a one-off from a match old enough to predate the Hub. Created
+  // inactive, no welcome push — see quick-add-player/route.ts.
+  async function handleQuickAddPlayer(index: number) {
+    const name = addPlayerName.trim()
+    if (!name) {
+      setAddPlayerError('Enter a name')
+      return
+    }
+    setAddPlayerBusy(true)
+    setAddPlayerError('')
+    try {
+      const res = await fetch('/api/wrangler/quick-add-player', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setAddPlayerError(data.error ?? 'Failed to add player')
+        return
+      }
+      setAddedPlayers(prev => prev.some(p => p.id === data.player.id) ? prev : [...prev, data.player])
+      updateRowPlayer(index, data.player.id)
+      setAddPlayerRow(null)
+      setAddPlayerName('')
+    } catch {
+      setAddPlayerError('Network error while adding player')
+    } finally {
+      setAddPlayerBusy(false)
+    }
   }
 
   function handleSelectCandidate(id: string) {
@@ -163,6 +228,10 @@ export function BackfillSquadClient() {
       setSelectedBookingId(null)
       setOverwriteConfirmed(false)
       setManualOverwriteNeeded(false)
+      setAddedPlayers([])
+      setAddPlayerRow(null)
+      setAddPlayerName('')
+      setAddPlayerError('')
     } catch {
       setToast({ kind: 'error', message: 'Network error while saving' })
     } finally {
@@ -335,18 +404,57 @@ export function BackfillSquadClient() {
                           {parsedEntry?.matched_player_id ? (
                             <span className="font-rajdhani text-sm text-emerald-400">{resolvedName}</span>
                           ) : (
-                            <select
-                              value={row.player_id ?? ''}
-                              onChange={e => updateRowPlayer(i, e.target.value)}
-                              className="form-input text-xs">
-                              <option value="">— Select player —</option>
-                              {(parsedEntry?.suggestions?.length
-                                ? parsed.roster.filter(p => parsedEntry.suggestions!.includes(p.name))
-                                : parsed.roster
-                              ).map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                              ))}
-                            </select>
+                            <div className="space-y-1.5">
+                              <select
+                                value={row.player_id ?? ''}
+                                onChange={e => updateRowPlayer(i, e.target.value)}
+                                className="form-input text-xs">
+                                <option value="">— Select player —</option>
+                                {(parsedEntry?.suggestions?.length
+                                  ? parsed.roster.filter(p => parsedEntry.suggestions!.includes(p.name))
+                                  : parsed.roster
+                                ).map(p => (
+                                  <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                                {addedPlayers.map(p => (
+                                  <option key={p.id} value={p.id}>{p.name} (new)</option>
+                                ))}
+                              </select>
+
+                              {addPlayerRow === i ? (
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    value={addPlayerName}
+                                    onChange={e => setAddPlayerName(e.target.value)}
+                                    placeholder="Full name"
+                                    className="form-input text-xs py-1 flex-1"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleQuickAddPlayer(i)}
+                                    disabled={addPlayerBusy}
+                                    className="font-rajdhani text-[10px] font-bold bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white px-2 py-1 rounded whitespace-nowrap">
+                                    {addPlayerBusy ? '…' : 'Create'}
+                                  </button>
+                                  <button
+                                    onClick={cancelAddPlayer}
+                                    disabled={addPlayerBusy}
+                                    className="font-rajdhani text-[10px] text-zinc-500 hover:text-zinc-300 px-1">
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => openAddPlayer(i)}
+                                  className="font-rajdhani text-[10px] text-sky-400 hover:text-sky-300 underline">
+                                  ＋ New player — not in current roster
+                                </button>
+                              )}
+                              {addPlayerRow === i && addPlayerError && (
+                                <p className="font-rajdhani text-[10px] text-red-400">{addPlayerError}</p>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-2.5">

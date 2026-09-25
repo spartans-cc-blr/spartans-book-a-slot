@@ -427,3 +427,9 @@ export const opponentLinkSchema = z.object({
   opponent_id: z.string().uuid(),
   name:        z.string().trim().min(1).max(120),
 }).strict()
+
+// ── SQUAD BACKFILL — quick-add historic player (/api/wrangler/quick-add-player) ──
+// See features/squad-backfill.md §3.
+export const quickAddPlayerSchema = z.object({
+  name: z.string().trim().min(2, 'Name is too short').max(120, 'Name is too long'),
+}).strict()
