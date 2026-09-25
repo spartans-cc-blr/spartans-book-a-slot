@@ -1,11 +1,11 @@
 'use client'
-// Full player stats page — career + filtered (year/ground/format) summary,
-// plus a match-by-match batting/bowling/fielding breakdown. Reachable via
-// PlayerNameLink (see src/lib/playerLink.tsx) wherever a Hub player's name
-// appears, and via avatar on /profile (own) and the GC Players grid.
-// Not linked from Captains' Corner by design, and squad panels only ever
-// get a small avatar icon into this page — never the name-link swap that
-// would lengthen those cards.
+// Full player stats page — career + filtered (year/ground/format/pitch)
+// summary, plus a match-by-match batting/bowling/fielding breakdown.
+// Reachable via PlayerNameLink (see src/lib/playerLink.tsx) wherever a Hub
+// player's name appears, and via avatar on /profile (own) and the GC
+// Players grid. Not linked from Captains' Corner by design, and squad
+// panels only ever get a small avatar icon into this page — never the
+// name-link swap that would lengthen those cards.
 //
 // Ground (not Tournament) is the filter here, and Format is a pair of
 // T20/T30 checkboxes — same convention as /leaderboard's filter bar
@@ -18,17 +18,23 @@
 // was the match-specific captain (squad.is_captain — not players.is_captain,
 // the permanent club-captain flag; see features/squad-selection.md).
 //
-// Innings History below the summary is split into Batting/Bowling/Fielding
-// tabs (plain text, no icons — the tab itself already says what kind of
-// innings this is). Each tab only lists matches carrying that stat line
-// (e.g. Batting hides matches this player didn't bat in) and cards are
-// sorted most-recent first — `matches` already arrives pre-sorted by
-// date+time from getPlayerMatchHistory(), so no client-side sort is
-// needed here.
+// Batting/Bowling/Fielding are three always-visible, self-contained
+// sections (not a tab switcher over one shared table, added September
+// 2026 — see features/player-stats-batting-position.md §12): each carries
+// its own chart (Runs by Batting Position under Batting, a dismissal-type
+// donut under Bowling — Fielding has neither) and its own Innings History
+// table. Pitch Type is the top-most filter and narrows everything on the
+// page — the Summary card, both charts, and all three tables — via
+// aggregateMatchHistoryRows() (src/lib/playerMatchAggregate.ts), a pure
+// client-side re-implementation of the server's aggregate() math, since
+// Pitch (and the two charts' click-to-filter) only ever apply client-side
+// on top of the already-fetched, server-filtered `matches` array.
 
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTheme } from '@/components/ui/ThemeProvider'
 import type { PlayerStatsTotals, PlayerMatchHistoryRow, PitchType } from '@/types'
+import { aggregateMatchHistoryRows, DISMISSAL_TYPE_META, type DismissalKey } from '@/lib/playerMatchAggregate'
 
 interface PlayerInfo {
   id: string
@@ -47,7 +53,6 @@ const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2]
 type Format = 'T20' | 'T30'
 type Innings = 'defending' | 'chasing'
 type StatTab = 'batting' | 'bowling' | 'fielding'
-const STAT_TABS: StatTab[] = ['batting', 'bowling', 'fielding']
 
 // Pitch Type tabs above Innings History — same All/Matted/Astro/Turf set,
 // same "no 'Not set' option" convention, as /leaderboard's Detailed →
@@ -82,31 +87,38 @@ export function PlayerStatsClient({
   // Same convention as `formats`: both checked means no restriction,
   // unchecking one scopes to the other, unchecking both snaps back to both.
   const [innings, setInnings] = useState<Set<Innings>>(new Set<Innings>(['defending', 'chasing']))
-  const [scoped, setScoped] = useState<PlayerStatsTotals>(initialCareer)
   const [matches, setMatches] = useState<PlayerMatchHistoryRow[]>(initialMatches)
   const [loading, setLoading] = useState(false)
-  const [statTab, setStatTab] = useState<StatTab>('batting')
-  // Batting-position bar chart selection — filters the Innings History
-  // table below across all three tabs (batting/bowling/fielding), not just
-  // Batting. Reset whenever the top-of-page filters change and pull in a
-  // new match set, since a position that had matches under the old filter
-  // may not exist at all under the new one.
+  // Batting-position bar chart selection — narrows the Batting section's
+  // own Summary column and its own Innings History table only (not
+  // Bowling/Fielding — each discipline is its own self-contained panel as
+  // of September 2026, see the file-level comment above). Reset whenever
+  // the top-of-page filters change and pull in a new match set, since a
+  // position that had matches under the old filter may not exist at all
+  // under the new one.
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null)
-  // Pitch Type tabs above Innings History — same reset-on-refetch rationale
-  // as selectedPosition, plus it's only ever shown/applied while no Ground
-  // is selected (a specific ground/tournament combination isn't modelled
-  // here the way /leaderboard's is, but Ground alone already pins matches
-  // to one physical venue, so a second, independent pitch filter on top
-  // would be redundant the same way it would be there — see
-  // features/player-stats-batting-position.md).
+  // Dismissal-type donut selection — same rationale, scoped to the Bowling
+  // section only.
+  const [selectedDismissal, setSelectedDismissal] = useState<DismissalKey | null>(null)
+  // Pitch Type — the top-most filter on the page (moved there September
+  // 2026; was previously the last filter, applied only to Innings History).
+  // Client-side only, same reset-on-refetch rationale as selectedPosition,
+  // and only ever shown/applied while no Ground is selected (a specific
+  // ground/tournament combination isn't modelled here the way
+  // /leaderboard's is, but Ground alone already pins matches to one
+  // physical venue, so a second, independent pitch filter on top would be
+  // redundant the same way it would be there — see
+  // features/player-stats-batting-position.md). Unlike before, Pitch now
+  // narrows *everything* on the page — the Summary card and both charts,
+  // not just the tables — see aggregateMatchHistoryRows() below.
   const [selectedPitch, setSelectedPitch] = useState<PitchType | 'all'>('all')
   const showPitchTabs = groundId === 'all'
 
   const fetchScoped = useCallback(async () => {
     setSelectedPosition(null)
+    setSelectedDismissal(null)
     setSelectedPitch('all')
     if (year === 'all' && groundId === 'all' && formats.size === 2 && !asCaptain && innings.size === 2 && !includePractice) {
-      setScoped(initialCareer)
       setMatches(initialMatches)
       return
     }
@@ -121,11 +133,10 @@ export function PlayerStatsClient({
     const res = await fetch(`/api/players/${player.id}/match-history?${params.toString()}`)
     if (res.ok) {
       const d = await res.json()
-      setScoped(d.scoped)
       setMatches(d.matches)
     }
     setLoading(false)
-  }, [year, groundId, formats, asCaptain, innings, includePractice, player.id, initialCareer, initialMatches])
+  }, [year, groundId, formats, asCaptain, innings, includePractice, player.id, initialMatches])
 
   useEffect(() => { fetchScoped() }, [fetchScoped])
 
@@ -157,50 +168,97 @@ export function PlayerStatsClient({
     })
   }
 
-  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain || innings.size === 1 || includePractice
+  const isFiltered = year !== 'all' || groundId !== 'all' || formats.size === 1 || asCaptain || innings.size === 1
+    || includePractice || selectedPitch !== 'all' || selectedPosition != null || selectedDismissal != null
 
-  // Total runs scored at each batting position, across the currently
-  // filtered match set — independent of statTab, since the chart sits
-  // above and feeds all three tabs. Positions with no batting_order on
-  // record (a scorecard synced before that column existed, never
-  // re-synced since — see player-stats-batting-position.md) are simply
-  // excluded from the chart rather than shown as an unlabeled bucket.
+  // Pitch is the top-most filter and narrows everything below it — the
+  // Summary card, both charts, and all three Innings History tables — so
+  // every other derivation in this component reads from matchesForPitch,
+  // never from `matches` directly.
+  const matchesForPitch = useMemo(
+    () => (!showPitchTabs || selectedPitch === 'all') ? matches : matches.filter(m => m.pitchType === selectedPitch),
+    [matches, selectedPitch, showPitchTabs],
+  )
+
+  // Total runs scored at each batting position, across the current
+  // pitch-filtered match set — stays scoped to matchesForPitch directly,
+  // never further narrowed by its own selection, so tapping a bar doesn't
+  // change the shape of the bars underneath it.
   const positionData = useMemo(() => {
     const totals = new Map<number, number>()
-    for (const m of matches) {
+    for (const m of matchesForPitch) {
       if (!m.batting || m.batting.battingOrder == null) continue
       totals.set(m.batting.battingOrder, (totals.get(m.batting.battingOrder) ?? 0) + m.batting.runs)
     }
     return Array.from(totals.entries())
       .map(([position, runs]) => ({ position, runs }))
       .sort((a, b) => a.position - b.position)
-  }, [matches])
+  }, [matchesForPitch])
 
-  // Only ever narrows Innings History below — positionData (the chart
-  // above) stays scoped to `matches` directly, same "chart above stays
-  // unaffected, only the table narrows" convention the leaderboard's own
-  // Pitch Type tabs use (features/leaderboard.md §6.2).
-  const matchesForPitch = useMemo(
-    () => (!showPitchTabs || selectedPitch === 'all') ? matches : matches.filter(m => m.pitchType === selectedPitch),
-    [matches, selectedPitch, showPitchTabs],
-  )
+  // Total wickets taken by each dismissal type, across the current
+  // pitch-filtered match set — same "chart stays whole, only the summary/
+  // table below it narrows" rule as positionData above. Zero-count types
+  // are dropped rather than shown as an empty slice.
+  const dismissalData = useMemo(() => {
+    const totals: Record<DismissalKey, number> = { bowled: 0, caught: 0, caughtBehind: 0, lbw: 0, stumping: 0, other: 0 }
+    for (const m of matchesForPitch) {
+      if (!m.bowling) continue
+      totals.bowled += m.bowling.bowled
+      totals.caught += m.bowling.caught
+      totals.caughtBehind += m.bowling.caughtBehind
+      totals.lbw += m.bowling.lbw
+      totals.stumping += m.bowling.stumping
+      totals.other += m.bowling.other
+    }
+    return DISMISSAL_TYPE_META
+      .map(meta => ({ ...meta, value: totals[meta.key] }))
+      .filter(d => d.value > 0)
+  }, [matchesForPitch])
 
-  const matchesForPosition = useMemo(
-    () => selectedPosition == null ? matchesForPitch : matchesForPitch.filter(m => m.batting?.battingOrder === selectedPosition),
+  // Client-computed Summary numbers — replaces reading the server's
+  // `scoped` aggregate directly, since Pitch/Position/Dismissal-type only
+  // ever apply client-side. Overview reflects Pitch only (never a chart
+  // click — clicking Position 4 shouldn't change the Matches/MVP/Dismissals
+  // tiles, which aren't batting- or bowling-specific); Batting reflects
+  // Pitch + the selected position; Bowling reflects Pitch + the selected
+  // dismissal type.
+  const overviewTotals = useMemo(() => aggregateMatchHistoryRows(matchesForPitch), [matchesForPitch])
+  const battingTotals = useMemo(
+    () => aggregateMatchHistoryRows(selectedPosition == null
+      ? matchesForPitch
+      : matchesForPitch.filter(m => m.batting?.battingOrder === selectedPosition)),
     [matchesForPitch, selectedPosition],
   )
-
-  const tabMatches = useMemo(
-    () => matchesForPosition.filter(m => {
-      if (statTab === 'batting') return !!m.batting
-      if (statTab === 'bowling') return !!m.bowling
-      return !!m.fielding && (m.fielding.catches > 0 || m.fielding.stumpings > 0 || m.fielding.runOuts > 0)
-    }),
-    [matchesForPosition, statTab],
+  const bowlingTotals = useMemo(
+    () => aggregateMatchHistoryRows(selectedDismissal == null
+      ? matchesForPitch
+      : matchesForPitch.filter(m => (m.bowling?.[selectedDismissal] ?? 0) > 0)),
+    [matchesForPitch, selectedDismissal],
   )
+
+  const battingTabMatches = useMemo(
+    () => matchesForPitch.filter(m => !!m.batting && (selectedPosition == null || m.batting!.battingOrder === selectedPosition)),
+    [matchesForPitch, selectedPosition],
+  )
+  const bowlingTabMatches = useMemo(
+    () => matchesForPitch.filter(m => !!m.bowling && (selectedDismissal == null || (m.bowling![selectedDismissal] ?? 0) > 0)),
+    [matchesForPitch, selectedDismissal],
+  )
+  const fieldingTabMatches = useMemo(
+    () => matchesForPitch.filter(m => !!m.fielding && (m.fielding.catches > 0 || m.fielding.stumpings > 0 || m.fielding.runOuts > 0)),
+    [matchesForPitch],
+  )
+  // Denominator for the Batting section's "X of Y" caption — every batting
+  // innings in the current pitch scope, before the position filter narrows
+  // it further.
+  const battingInningsInPitchScope = useMemo(() => matchesForPitch.filter(m => !!m.batting).length, [matchesForPitch])
+  const bowlingInningsInPitchScope = useMemo(() => matchesForPitch.filter(m => !!m.bowling).length, [matchesForPitch])
 
   function togglePosition(position: number) {
     setSelectedPosition(prev => prev === position ? null : position)
+  }
+  function toggleDismissal(key: DismissalKey) {
+    setSelectedDismissal(prev => prev === key ? null : key)
   }
 
   return (
@@ -242,6 +300,28 @@ export function PlayerStatsClient({
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-3xl mx-auto">
         {/* Filters */}
         <div className="flex flex-col gap-2 mb-5">
+          {/* Pitch Type — the top-most filter (moved here September 2026;
+              was previously shown just above Innings History and only ever
+              narrowed that one table). Hidden once a Ground is already
+              selected — a specific ground already pins the surface, same
+              reasoning /leaderboard's own tabs use for Tournament/Ground
+              (features/leaderboard.md §6.2). Now narrows the Summary card
+              and both charts too, not just the tables — see
+              matchesForPitch above. */}
+          {showPitchTabs && (
+            <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+              <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mr-1">Pitch</span>
+              {PITCH_TABS.map(t => (
+                <button key={t.key} onClick={() => setSelectedPitch(t.key)}
+                  className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors
+                    ${selectedPitch === t.key
+                      ? 'bg-[var(--stats-badge-bg)] border-[var(--stats-badge-border)] text-[var(--stats-badge-text)]'
+                      : 'border-[var(--stats-card-border)] text-[var(--stats-text-muted)] hover:text-[var(--stats-text-2)]'}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2 items-center flex-shrink-0">
             <select value={year} onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
               className="font-rajdhani text-sm bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] text-[var(--stats-text)] rounded px-3 py-1.5 flex-shrink-0">
@@ -288,69 +368,50 @@ export function PlayerStatsClient({
           </select>
         </div>
 
-        {/* Summary */}
+        {/* Summary — every number here is computed client-side from
+            matchesForPitch via aggregateMatchHistoryRows(), not read off the
+            server's `scoped` aggregate, so Pitch (and, per-column, the two
+            charts' click-to-filter) can narrow it with no round trip. */}
         <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5 mb-5">
           <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold mb-4">
             {isFiltered ? 'Filtered' : 'Career'} Summary
           </h2>
-          {scoped.matches === 0 ? (
+          {overviewTotals.matches === 0 ? (
             <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No matches for this filter.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--stats-card-border)]">
-              <SummaryColumn title="Overview" mvpLabel="Fielding MVP" mvpValue={scoped.fieldingMvp} mvpColor="text-purple-600 dark:text-purple-400">
-                <Stat label="Matches" value={String(scoped.matches)}
-                  caption={scoped.battingInnings !== scoped.matches || scoped.bowlingInnings !== scoped.matches
-                    ? `Bat ${scoped.battingInnings} · Bowl ${scoped.bowlingInnings}` : undefined} />
-                <Stat label="MVP Pts" value={scoped.mvpPoints.toFixed(2)} />
-                <Stat label="Dismissals" value={String(scoped.catches + scoped.runOuts + scoped.stumpings)} />
+              <SummaryColumn title="Overview" mvpLabel="Fielding MVP" mvpValue={overviewTotals.fieldingMvp} mvpColor="text-purple-600 dark:text-purple-400">
+                <Stat label="Matches" value={String(overviewTotals.matches)}
+                  caption={overviewTotals.battingInnings !== overviewTotals.matches || overviewTotals.bowlingInnings !== overviewTotals.matches
+                    ? `Bat ${overviewTotals.battingInnings} · Bowl ${overviewTotals.bowlingInnings}` : undefined} />
+                <Stat label="MVP Pts" value={overviewTotals.mvpPoints.toFixed(2)} />
+                <Stat label="Dismissals" value={String(overviewTotals.catches + overviewTotals.runOuts + overviewTotals.stumpings)} />
               </SummaryColumn>
-              <SummaryColumn title="Batting" mvpLabel="Batting MVP" mvpValue={scoped.battingMvp} mvpColor="text-emerald-600 dark:text-emerald-400">
-                <Stat label="Runs" value={String(scoped.runs)} />
-                <Stat label="Highest" value={formatHighestScore(scoped.highestScore)} />
-                <Stat label="Avg" value={scoped.battingAverage?.toFixed(2) ?? '—'} />
-                <Stat label="S/R" value={scoped.strikeRate?.toFixed(2) ?? '—'} />
+              <SummaryColumn title="Batting" mvpLabel="Batting MVP" mvpValue={battingTotals.battingMvp} mvpColor="text-emerald-600 dark:text-emerald-400">
+                <Stat label="Runs" value={String(battingTotals.runs)} />
+                <Stat label="Highest" value={formatHighestScore(battingTotals.highestScore)} />
+                <Stat label="Avg" value={battingTotals.battingAverage?.toFixed(2) ?? '—'} />
+                <Stat label="S/R" value={battingTotals.strikeRate?.toFixed(2) ?? '—'} />
               </SummaryColumn>
-              <SummaryColumn title="Bowling" mvpLabel="Bowling MVP" mvpValue={scoped.bowlingMvp} mvpColor="text-blue-600 dark:text-blue-400">
-                <Stat label="Wickets" value={String(scoped.wickets)} />
-                <Stat label="Best Bowling" value={formatBestBowling(scoped.bestBowling)} />
-                <Stat label="Economy" value={scoped.economy?.toFixed(2) ?? '—'} />
-                <Stat label="S/R" value={scoped.bowlingStrikeRate?.toFixed(2) ?? '—'} />
+              <SummaryColumn title="Bowling" mvpLabel="Bowling MVP" mvpValue={bowlingTotals.bowlingMvp} mvpColor="text-blue-600 dark:text-blue-400">
+                <Stat label="Wickets" value={String(bowlingTotals.wickets)} />
+                <Stat label="Best Bowling" value={formatBestBowling(bowlingTotals.bestBowling)} />
+                <Stat label="Economy" value={bowlingTotals.economy?.toFixed(2) ?? '—'} />
+                <Stat label="S/R" value={bowlingTotals.bowlingStrikeRate?.toFixed(2) ?? '—'} />
               </SummaryColumn>
             </div>
           )}
         </div>
 
-        {/* Runs by batting position */}
-        {positionData.length > 0 && (
-          <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5 mb-5">
-            <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold mb-1">Runs by Batting Position</h2>
-            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">Tap a position to filter the innings history below.</p>
-            <BattingPositionChart data={positionData} selected={selectedPosition} onSelect={togglePosition} />
-          </div>
-        )}
+        {loading && <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] mb-5">Loading…</p>}
 
-        {/* Pitch Type — narrows Innings History below only; hidden once a
-            Ground is already selected, same reasoning /leaderboard's own
-            tabs use for Tournament/Ground (features/leaderboard.md §6.2). */}
-        {showPitchTabs && (
-          <div className="flex items-center gap-2 flex-wrap mb-4">
-            <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mr-1">Pitch</span>
-            {PITCH_TABS.map(t => (
-              <button key={t.key} onClick={() => setSelectedPitch(t.key)}
-                className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors
-                  ${selectedPitch === t.key
-                    ? 'bg-[var(--stats-badge-bg)] border-[var(--stats-badge-border)] text-[var(--stats-badge-text)]'
-                    : 'border-[var(--stats-card-border)] text-[var(--stats-text-muted)] hover:text-[var(--stats-text-2)]'}`}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Match by match */}
-        <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold">Innings History</h2>
+        {/* Batting — its own section (September 2026, replacing the old
+            shared Batting/Bowling/Fielding tab switcher): the Runs by
+            Batting Position chart, then this discipline's own Innings
+            History. */}
+        <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5 mb-5">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+            <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold">Batting</h2>
             {selectedPosition != null && (
               <button onClick={() => setSelectedPosition(null)}
                 className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--stats-badge-bg)] border border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] hover:bg-gold/20 transition-colors">
@@ -358,34 +419,64 @@ export function PlayerStatsClient({
               </button>
             )}
           </div>
-          <div className="flex gap-2 mb-3">
-            {STAT_TABS.map(t => (
-              <button key={t} onClick={() => setStatTab(t)}
-                className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors capitalize
-                  ${statTab === t
-                    ? 'bg-[var(--stats-badge-bg)] border-[var(--stats-badge-border)] text-[var(--stats-badge-text)]'
-                    : 'border-[var(--stats-card-border)] text-[var(--stats-text-muted)] hover:text-[var(--stats-text-2)]'}`}>
-                {t}
-              </button>
-            ))}
-          </div>
-          {statTab === 'batting' && selectedPosition != null && (
-            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">
-              {tabMatches.length} of {scoped.battingInnings} innings batted at Position {selectedPosition}
+          {positionData.length > 0 && (
+            <>
+              <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">Runs by batting position — tap a bar to filter below.</p>
+              <BattingPositionChart data={positionData} selected={selectedPosition} onSelect={togglePosition} />
+              <div className="border-t border-[var(--stats-card-border)] my-4" />
+            </>
+          )}
+          {selectedPosition != null && (
+            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-3">
+              {battingTabMatches.length} of {battingInningsInPitchScope} innings batted at Position {selectedPosition}
             </p>
           )}
-          {statTab === 'bowling' && (
-            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">
-              {tabMatches.length} innings bowled
-            </p>
-          )}
-          {loading ? (
-            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">Loading…</p>
-          ) : tabMatches.length === 0 ? (
-            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No {statTab} innings for this filter.</p>
+          {!loading && (battingTabMatches.length === 0 ? (
+            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No batting innings for this filter.</p>
           ) : (
-            <MatchHistoryTable matches={tabMatches} statTab={statTab} />
+            <MatchHistoryTable matches={battingTabMatches} statTab="batting" />
+          ))}
+        </div>
+
+        {/* Bowling — Dismissal-Type donut, then this discipline's own
+            Innings History. */}
+        <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5 mb-5">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+            <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold">Bowling</h2>
+            {selectedDismissal != null && (
+              <button onClick={() => setSelectedDismissal(null)}
+                className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--stats-badge-bg)] border border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] hover:bg-gold/20 transition-colors">
+                {DISMISSAL_TYPE_META.find(d => d.key === selectedDismissal)?.label} ✕
+              </button>
+            )}
+          </div>
+          {dismissalData.length > 0 && (
+            <>
+              <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">How the wickets fell — tap a dismissal type to filter below.</p>
+              <DismissalPieChart data={dismissalData} selected={selectedDismissal} onSelect={toggleDismissal} />
+              <div className="border-t border-[var(--stats-card-border)] my-4" />
+            </>
           )}
+          <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-3">
+            {selectedDismissal != null
+              ? `${bowlingTabMatches.length} of ${bowlingInningsInPitchScope} innings with a ${DISMISSAL_TYPE_META.find(d => d.key === selectedDismissal)?.label} dismissal`
+              : `${bowlingTabMatches.length} innings bowled`}
+          </p>
+          {!loading && (bowlingTabMatches.length === 0 ? (
+            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No bowling innings for this filter.</p>
+          ) : (
+            <MatchHistoryTable matches={bowlingTabMatches} statTab="bowling" />
+          ))}
+        </div>
+
+        {/* Fielding — table only, no chart. */}
+        <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5">
+          <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold mb-4">Fielding</h2>
+          {!loading && (fieldingTabMatches.length === 0 ? (
+            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No fielding innings for this filter.</p>
+          ) : (
+            <MatchHistoryTable matches={fieldingTabMatches} statTab="fielding" />
+          ))}
         </div>
       </div>
     </>
@@ -501,6 +592,115 @@ function BattingPositionChart({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// Dismissal-type donut — added September 2026 alongside the analytics DB's
+// per-bowler bowled/caught/caught_behind/lbw/stumping/other columns (see
+// features/player-stats-batting-position.md §12). A real donut/pie is a
+// deliberate departure from every other chart on this page (single-series
+// magnitude bars) — six genuinely distinct categories summing to one whole
+// is exactly the "part-to-whole at a glance, ≤6 segments" case the app's
+// dataviz guidance calls out as the one legitimate pie/donut use, whereas a
+// bar chart would have been the generic default.
+//
+// Colours are the dataviz skill's validated 8-hue categorical theme, slots
+// 1-6 (DISMISSAL_TYPE_META) — chosen and order-locked specifically because
+// this ordering passes the adjacent-pair CVD/contrast gates against this
+// app's own --stats-card-bg surface in both themes (see that constant's own
+// comment for the exact numbers). Never reorder the slices or reassign a
+// colour per-render — categorical hues are assigned in fixed order.
+//
+// The arcs are decorative, not the click target — a thin ring segment for a
+// rare dismissal type (one stumping in a season) is too small to reliably
+// tap on a phone. Each legend row is the real, full-width <button>, with the
+// value always printed inline (never hover-only, matching every other chart
+// on this page) — this also satisfies the "relief rule" the palette's own
+// contrast WARN calls for (three of the six colours sit under 3:1 on a
+// white card, so the reader must never be relying on the colour alone).
+function DismissalPieChart({
+  data, selected, onSelect,
+}: {
+  data: { key: DismissalKey; label: string; light: string; dark: string; value: number }[]
+  selected: DismissalKey | null
+  onSelect: (key: DismissalKey) => void
+}) {
+  const { resolvedTheme } = useTheme()
+  const total = data.reduce((sum, d) => sum + d.value, 0)
+  const r = 38
+  const circumference = 2 * Math.PI * r
+  const gap = total > 0 ? 2 : 0 // small surface-coloured gap between adjacent slices
+
+  let cumulative = 0
+  const arcs = data.map(d => {
+    const rawLength = (d.value / total) * circumference
+    const visibleLength = Math.max(rawLength - gap, 0)
+    const arc = {
+      key: d.key,
+      color: resolvedTheme === 'dark' ? d.dark : d.light,
+      dashArray: `${visibleLength} ${circumference - visibleLength}`,
+      dashOffset: -cumulative,
+    }
+    cumulative += rawLength
+    return arc
+  })
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-6">
+      <div className="relative w-40 h-40 flex-shrink-0">
+        <svg viewBox="0 0 100 100" className="w-full h-full">
+          <g transform="rotate(-90 50 50)">
+            {arcs.map(a => {
+              const isDimmed = selected != null && selected !== a.key
+              return (
+                <circle
+                  key={a.key}
+                  cx="50" cy="50" r={r}
+                  fill="none"
+                  stroke={a.color}
+                  strokeWidth={selected === a.key ? 16 : 14}
+                  strokeDasharray={a.dashArray}
+                  strokeDashoffset={a.dashOffset}
+                  opacity={isDimmed ? 0.35 : 1}
+                  style={{ transition: 'opacity 150ms, stroke-width 150ms' }}
+                />
+              )
+            })}
+          </g>
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="font-cinzel text-2xl font-bold text-[var(--stats-text)]">{total}</span>
+          <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)]">
+            {total === 1 ? 'Wicket' : 'Wickets'}
+          </span>
+        </div>
+      </div>
+      <div className="flex-1 w-full min-w-0 flex flex-col gap-1">
+        {data.map(d => {
+          const isSelected = selected === d.key
+          const pct = total > 0 ? Math.round((d.value / total) * 100) : 0
+          const color = resolvedTheme === 'dark' ? d.dark : d.light
+          return (
+            <button
+              key={d.key}
+              type="button"
+              aria-pressed={isSelected}
+              onClick={() => onSelect(d.key)}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left
+                ${isSelected ? 'bg-[var(--stats-badge-bg)]' : 'hover:bg-[var(--stats-row-hover)]'}`}
+            >
+              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+              <span className={`font-rajdhani text-sm flex-1 min-w-0 truncate ${isSelected ? 'font-bold text-[var(--stats-badge-text)]' : 'text-[var(--stats-text)]'}`}>
+                {d.label}
+              </span>
+              <span className={`font-rajdhani text-sm font-bold whitespace-nowrap ${isSelected ? 'text-[var(--stats-badge-text)]' : 'text-[var(--stats-text-2)]'}`}>
+                {d.value} <span className="text-[var(--stats-text-muted)] font-normal">({pct}%)</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

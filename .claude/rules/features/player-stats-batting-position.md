@@ -306,6 +306,14 @@ Batting/Bowling/Fielding buttons), not `LeaderboardFilters.tsx`'s
 convention borrowed from the leaderboard's own `dark:`-paired pills would
 have been visually inconsistent within this one file.
 
+> **Superseded (September 2026) — see §12.** Pitch Type moved to be the
+> top-most filter on the page and now narrows the Summary card and both
+> charts too, not just Innings History; the Batting/Bowling/Fielding tab
+> switcher over one shared table was replaced with three always-visible,
+> self-contained sections. The filtering chain described above
+> (`matches` → `matchesForPitch` → `matchesForPosition` → `tabMatches`) no
+> longer exists in that shape — kept here for history.
+
 ### Security (vibe-security)
 
 Same posture as §5 — read-only, no new write path, no new API route.
@@ -455,6 +463,191 @@ posture as §10.
 | File | Role |
 |---|---|
 | `src/components/players/PlayerStatsClient.tsx` | `SummaryColumn` — the three-panel wrapper; Summary card JSX regrouped into Overview/Batting/Bowling; Bowling panel's `S/R` tile reads the pre-existing `scoped.bowlingStrikeRate` |
+
+---
+
+## 12. Dismissal-type donut, per-discipline panels, Pitch as the top-most filter (added September 2026)
+
+### Why — the data already existed, just never read
+
+Investigating "do we have data on how a bowler took his wickets" found the
+analytics DB's `bowling_stats` table already carries a full per-dismissal-
+type breakdown — `bowled`, `caught`, `caught_behind`, `lbw`, `stumping`,
+`other` (all `integer`, alongside the existing `wickets` total) — confirmed
+live via direct query: fully populated across all 1,259 wicket-taking rows
+in the table, going back to December 2025. Nothing in this codebase had
+ever selected, summed, or displayed these six columns — `matchStatsSync.ts`
+already pulls the whole row into `match_stats_cache` via `select('*')`, and
+`getPlayerMatchHistory()`/`aggregate()` (`src/lib/playerStats.ts`) only
+ever read `wickets`/`overs`/`runs`/`economy` off it. This section is what
+finally surfaces that breakdown.
+
+### Design decisions, made up front
+
+Four questions were resolved before building anything, since each changes
+the shape of the work:
+
+1. **Pie slices** — all six raw columns shown separately (Bowled / Caught /
+   Caught Behind / LBW / Stumped / Other), not merged the way the Fielding
+   table already merges `catches` + `caught_behind` into one "Ct" figure.
+2. **Chart-click ↔ Summary linkage** — clicking a chart segment updates
+   *only its own discipline's* Summary column (a Position bar updates
+   Batting; a dismissal slice updates Bowling). The Overview column
+   (Matches/MVP Pts/Dismissals) stays whole-scope with respect to either
+   chart click, since it isn't batting- or bowling-specific.
+3. **Pitch Type scope** — promoted from "narrows Innings History only" to
+   "narrows everything" (Summary card + both charts + all three tables),
+   consistent with how Year/Ground/Format/Captain/Innings/Practice already
+   behave. This retires §9's original "chart above stays unaffected"
+   design for Pitch specifically (see the superseded-note left in §9)
+   — `positionData` and the new `dismissalData` both now derive from
+   `matchesForPitch`, not raw `matches`.
+4. **"Bigger tab"** — not a visual restyle of the existing tab row, but a
+   real structural change: Batting/Bowling/Fielding stopped being three
+   tabs over one shared table and became three always-visible,
+   self-contained sections, each with its own chart (where it has one) and
+   its own Innings History table. A consequence of this, not separately
+   asked for but implied by "each discipline is its own panel": the
+   batting-position chart no longer cross-filters the Bowling/Fielding
+   tables the way it used to (§4's original design had one `selectedPosition`
+   narrowing all three tabs) — `selectedPosition` now scopes to the Batting
+   section only, and the new `selectedDismissal` scopes to the Bowling
+   section only.
+
+### Data layer
+
+`PlayerMatchHistoryRow` (`src/types/index.ts`) widened:
+
+- `bowling.bowled` / `.caught` / `.caughtBehind` / `.lbw` / `.stumping` /
+  `.other` — the six raw counts, straight off `bowling_stats`.
+- `batting.mvpScore`, `bowling.mvpScore`, `fielding.mvpScore` — each
+  discipline's `mvp_score` for that one innings, needed so the client can
+  recompute a filtered MVP total (see below) without a round trip.
+
+`getPlayerMatchHistory()` (`src/lib/playerStats.ts`) populates all seven
+fields from data it already had in memory — `fetchAnalyticsRows()` already
+does `select('*')` on all four analytics tables, so this is a pure mapping
+change, zero new queries.
+
+### Client-side re-aggregation — `src/lib/playerMatchAggregate.ts` (new file)
+
+Pitch Type, the batting-position chart, and the new dismissal-type chart
+are all client-side-only filters layered on top of the server-fetched,
+already-filtered `matches` array — so narrowing the Summary card by any of
+them has to happen client-side too, with no extra fetch. The obvious
+source for that math, `playerStats.ts`'s `aggregate()`, is server-only
+(imports `createAnalyticsClient`/`createServiceClient` at module scope) and
+must never be reached from a `'use client'` file — the exact RSC-boundary
+mistake `features/leaderboard.md` §8 already documents a real production
+incident for, in the same shape (a client file transitively importing a
+server-only module).
+
+`aggregateMatchHistoryRows(rows: PlayerMatchHistoryRow[]): PlayerStatsTotals`
+is a new, deliberately separate pure function — no server import, ever —
+that mirrors `aggregate()`'s math (highest score / best bowling tie-breaks,
+average, strike rate, economy, bowling strike rate, MVP summation) but
+operates directly on the already-shaped `PlayerMatchHistoryRow[]` the
+client already holds, rather than the raw snake_case analytics-DB rows
+`aggregate()` consumes. `PlayerStatsClient.tsx` calls it three times per
+render, once per Summary column, each over a differently-filtered slice of
+`matchesForPitch`:
+
+| Summary column | Row set passed in |
+|---|---|
+| Overview | `matchesForPitch` (Pitch only — never narrowed by a chart click) |
+| Batting | `matchesForPitch`, further filtered to `battingOrder === selectedPosition` when a bar is selected |
+| Bowling | `matchesForPitch`, further filtered to that dismissal-type count `> 0` when a slice is selected |
+
+The page's `scoped: PlayerStatsTotals` state (previously fetched from the
+server alongside `matches` and read directly in the Summary card) was
+removed entirely — `initialCareer`/`GET /api/players/[id]/match-history`'s
+`scoped` field is no longer consumed by the client; every Summary number
+now derives from `matches` via this one function, so there's a single
+source of truth instead of two aggregates that could in principle drift.
+
+### Per-discipline panels
+
+The Batting/Bowling/Fielding tab switcher (§4's original design) is gone.
+In its place, three always-visible cards, top to bottom:
+
+- **Batting** — the existing Runs-by-Batting-Position bar chart (unchanged
+  visually, now reading `matchesForPitch` instead of `matches`), a "Position
+  N ✕" clear pill, then this discipline's own Innings History table
+  (`battingTabMatches`).
+- **Bowling** — the new dismissal-type donut (below), a matching clear
+  pill, then its own table (`bowlingTabMatches`).
+- **Fielding** — table only (`fieldingTabMatches`), no chart — not asked
+  for, and there's no obvious "part-to-whole" or "magnitude by category"
+  breakdown fielding_stats offers that batting/bowling didn't already
+  cover.
+
+Each section shows its own "No `{discipline}` innings for this filter"
+empty state independently, rather than one shared empty state gated on
+whichever tab happened to be active.
+
+### The donut — `DismissalPieChart` (`PlayerStatsClient.tsx`)
+
+A real pie/donut, not another bar — a deliberate exception to this page's
+other charts (single-series magnitude bars). Per the project's `dataviz`
+skill: a donut is the one legitimate use for part-to-whole composition "at
+a glance," capped at ≤6 segments — six dismissal types summing to total
+wickets is exactly that case, not the "comparing close values" shape the
+same skill flags as a donut anti-pattern.
+
+**Colours** — the skill's validated default 8-hue categorical theme, slots
+1–6, order-locked (Bowled → blue, Caught → orange, Caught Behind → aqua,
+LBW → yellow, Stumped → magenta, Other → green). Re-validated with
+`scripts/validate_palette.js` against this app's actual
+`--stats-card-bg` surface (not the skill's generic default) before use:
+
+| Mode | Surface | Result |
+|---|---|---|
+| Light | `#FFFFFF` | PASS (lightness/chroma/CVD/normal-vision all clear); contrast WARN on 3 of 6 colours (aqua/yellow/magenta sub-3:1) |
+| Dark | `#111111` | PASS on every check, including contrast |
+
+The light-mode contrast WARN is satisfied by the skill's own "relief rule"
+rather than dismissed: every value is always shown as a visible legend-row
+label (value + percentage), never left to colour-matching alone — the same
+"labels are always visible, never hover-only" daylight-first principle
+this page's `BattingPositionChart` already follows.
+
+**Legend rows, not arc slices, are the click target.** A thin ring segment
+for a rare dismissal type (one stumping in a season) is too small to
+reliably tap on a phone — each legend row is a full-width `<button>`
+instead, with the arc itself purely decorative (dimmed to 0.35 opacity,
+selected arc's `strokeWidth` bumped from 14→16, when a selection is
+active). Center label shows the total wicket count.
+
+### Security (vibe-security)
+
+Same posture as every other section of this doc — read-only, no new write
+path, no new API route. The six new `bowling_stats` columns and three
+`mvp_score` fields are scoped identically to every other field already
+returned by `GET /api/players/[id]/match-history` (any signed-in,
+non-expelled member, not IDOR-restricted to self). `selectedDismissal` is
+pure client-side UI state narrowing an already-fetched, already-authorized
+array — nothing about it is ever sent back to the server. Dropping the
+server `scoped` field from client consumption removes a code path, not a
+security boundary — the API route itself is unchanged and still computes
+and returns it (harmless, just unread).
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/lib/playerMatchAggregate.ts` | `aggregateMatchHistoryRows()` — pure, client-safe re-implementation of `aggregate()`'s math over `PlayerMatchHistoryRow[]`; `DISMISSAL_TYPE_META`/`DismissalKey` — the six-slot validated categorical palette |
+| `src/types/index.ts` | `PlayerMatchHistoryRow.bowling.{bowled,caught,caughtBehind,lbw,stumping,other}`; `.batting.mvpScore` / `.bowling.mvpScore` / `.fielding.mvpScore` |
+| `src/lib/playerStats.ts` | `getPlayerMatchHistory()` — maps the six new bowling columns and three `mvp_score` fields, zero new queries |
+| `src/components/players/PlayerStatsClient.tsx` | Pitch Type moved to the top of the Filters block; `matchesForPitch`/`dismissalData`/`overviewTotals`/`battingTotals`/`bowlingTotals`/`battingTabMatches`/`bowlingTabMatches`/`fieldingTabMatches`; `selectedDismissal`/`toggleDismissal`; `DismissalPieChart`; three stacked per-discipline section cards replacing the old tab switcher |
+
+### Explicitly out of scope
+
+- No breakdown shown per-row in the Bowling Innings History table
+  (`BowlingCell` still renders the plain `O-D-R-W` line) — the donut is the
+  aggregate view; a per-innings dismissal-type breakdown wasn't asked for.
+- No equivalent chart for Fielding.
+- Server-side `scoped`/`getPlayerStats()` computation itself is unchanged
+  — only this page's client stopped reading it directly.
 
 ---
 

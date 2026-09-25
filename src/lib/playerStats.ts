@@ -530,14 +530,19 @@ export async function getPlayerMatchHistory(
         strikeRate: num(bat.balls) > 0 ? round2((num(bat.runs) / num(bat.balls)) * 100) : null,
         howOut: bat.dismissal_method ?? null,
         battingOrder: bat.batting_order != null ? num(bat.batting_order) : null,
+        mvpScore: num(bat.mvp_score),
       } : null,
       bowling: bowledThisMatch ? {
         overs: bowl.overs, dots: num(bowl.dots), wickets: num(bowl.wickets), runsConceded: num(bowl.runs),
         economy: oversToBalls(num(bowl.overs)) > 0 ? round2(num(bowl.runs) / (oversToBalls(num(bowl.overs)) / 6)) : null,
+        bowled: num(bowl.bowled), caught: num(bowl.caught), caughtBehind: num(bowl.caught_behind),
+        lbw: num(bowl.lbw), stumping: num(bowl.stumping), other: num(bowl.other),
+        mvpScore: num(bowl.mvp_score),
       } : null,
       fielding: field ? {
         catches: num(field.catches) + num(field.caught_behind),
         runOuts: num(field.run_outs), stumpings: num(field.stumpings),
+        mvpScore: num(field.mvp_score),
       } : null,
     }
   })
