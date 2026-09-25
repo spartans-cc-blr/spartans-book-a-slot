@@ -393,11 +393,19 @@ History table).
 ## 11. Career Summary — grouped into Overview / Batting / Bowling columns (added September 2026)
 
 The Summary card's single flat 10-tile grid (§10 above) was reorganized,
-per a direct request, into **three side-by-side panels** — `Overview`,
-`Batting`, `Bowling` — stacking to one column on mobile
-(`grid-cols-1 sm:grid-cols-3`), each its own bordered/tinted box
-(`SummaryColumn`) with a header, a `grid-cols-2` mini-grid of its main
-stats, and its category MVP pinned below a divider:
+per a direct request, into three named sections — `Overview`, `Batting`,
+`Bowling` — each a `grid-cols-2` mini-grid of its main stats with its
+category MVP pinned below a divider. **First shipped as three separate
+bordered/shadowed boxes, corrected the same week** to a single shared
+card (per a follow-up request: "the entire career summary can be in one
+card instead of multiple cards for each discipline") — the outer
+`bg-[var(--stats-card-bg)] border ... rounded-2xl` Summary card (unchanged
+from §10) now contains one `grid-cols-1 sm:grid-cols-3` row of the three
+`SummaryColumn` sections, separated by a thin 1px divider
+(`divide-y sm:divide-y-0 sm:divide-x divide-[var(--stats-card-border)]`)
+instead of by gaps between three independent cards — a row on desktop/
+tablet, a stacked column on mobile, matching "batting related to one row
+or column and bowling similarly" either way the viewport folds it:
 
 | Panel | Tiles | MVP pinned below |
 |---|---|---|
@@ -426,10 +434,16 @@ from "Highest Score" to "Highest" to match the panel-grouped request; the
 underlying value and formatting are unchanged.
 
 `SummaryColumn` (`PlayerStatsClient.tsx`) is a small shared wrapper —
-`title`, `children` (the panel's `Stat` tiles), and `mvpLabel`/`mvpValue`/
-`mvpColor` for the pinned `MvpStat` below — reused three times rather than
-duplicating the card/header/divider markup per panel. `MvpStat` itself is
-unchanged, same emerald/blue/purple colour convention as before.
+`title`, `children` (the section's `Stat` tiles), and `mvpLabel`/
+`mvpValue`/`mvpColor` for the pinned `MvpStat` below — reused three times
+rather than duplicating the header/divider markup per section. It no
+longer renders its own `border`/`bg` (that was the first cut's per-panel
+card look); it's just padding (`py-4 sm:py-0 sm:px-5`, with `first`/`last`
+resets so the outer card's own edge padding isn't doubled) plus the
+section header and its two-tile-wide mini-grid — the parent grid's
+`divide-x`/`divide-y` draws the only separator line between sections now.
+`MvpStat` itself is unchanged, same emerald/blue/purple colour convention
+as before.
 
 ### Security (vibe-security)
 
