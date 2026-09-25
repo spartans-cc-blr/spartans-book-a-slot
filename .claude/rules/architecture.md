@@ -91,7 +91,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
  
 | Route | Component | Data source |
 |---|---|---|
-| `/wrangler/backfill-squad` | Server → client form | Parses WhatsApp squad announcement text, backfills `squad` rows for a booking |
+| `/wrangler/backfill-squad` | Server → client form | Parses WhatsApp squad announcement text, backfills `squad` rows for a booking; unmatched names can be quick-added as a minimal `inactive` player inline — see `features/squad-backfill.md` |
 | `/wrangler/grounds` | Server → `GroundsClient` (client) | `grounds` table — wrangler/admin can edit existing rows, GC/admin can also create new ones; see `features/wrangler-grounds-menu.md` |
  
 ### Admin Routes (`isAdmin`)
@@ -904,6 +904,7 @@ Next.js API Routes (server-side)
 | supabase/migrations/009_push_subscriptions.sql | push_subscriptions table — one row per player per device |
 | `src/lib/playerIdentityResolution.ts` | `resolvePlayerName()` / `backfillPlayerIdForName()` — analytics-DB `player_name` → Hub `players.id` resolution; see `features/player-identity-resolution.md` |
 | `src/lib/nameMatch.ts` | Shared Levenshtein fuzzy-match helpers — extracted from `parse-announcement`, reused by player reconciliation |
+| `src/app/api/wrangler/quick-add-player/route.ts` | Wrangler/admin-only — creates (or reuses, on an exact name match) a minimal `inactive` player record for a squad-backfill name with no roster match; no welcome push. See `features/squad-backfill.md` §3 |
 | `src/lib/cricheroesId.ts` | `resolveCricheroesPlayerId()` / `withCricheroesPlayerId()` — extracts `players.cricheroes_player_id` from `cricheroes_url` on save (direct regex or `chshare.link` redirect-follow); `isCricheroesUrl()` shared with `schemas.ts` validation. See `features/player-identity-resolution.md` §3.1 |
 | `src/app/api/admin/player-reconciliation/route.ts` | GET buckets pending scorecard names, POST confirms/ignores/reconciles |
 | `src/app/admin/player-reconciliation/page.tsx` | Admin reconciliation UI + "Run Reconciliation Pass" client loop |
