@@ -3,16 +3,20 @@
 //
 // Two sections:
 //   1. "Unlinked spellings" — every distinct opponent_name on a confirmed
-//      booking that has no opponents.id yet, most-played first, each with
-//      fuzzy suggestions (src/lib/nameMatch.ts) to link in one tap, a
-//      free pick from the master list, or "create as new opponent".
+//      booking that has no opponents.id yet, each with fuzzy suggestions
+//      (src/lib/nameMatch.ts) to link in one tap, a free pick from the
+//      master list, or "create as new opponent". Searchable, sortable
+//      (A–Z / most played / most recent), and filterable by the tournament
+//      or ground that spelling was booked under — this list can run into
+//      the hundreds, so all three exist to make it something a manager can
+//      actually work through rather than scroll past.
 //   2. "Master list" — every canonical opponent: marquee star, match
 //      count, known spellings, inline edit of name / CricHeroes team URL /
 //      notes.
 // All writes go through /api/opponents and /api/opponents/link, which
 // re-check the captain/GC/wrangler/admin gate server-side.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 interface OpponentRow {
   id: string
@@ -23,22 +27,35 @@ interface OpponentRow {
   aliases: string[]
   matches: number
 }
+interface NamedRef { id: string; name: string }
 interface Unlinked {
   name: string
   count: number
   last_played: string
+  tournaments: NamedRef[]
+  grounds: NamedRef[]
   suggestions: { id: string; name: string; dist: number }[]
 }
+type UnlinkedSort = 'name' | 'count' | 'recent'
 
 const CARD = 'bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded-lg'
 const INPUT = 'form-input font-rajdhani text-sm py-1.5 bg-[var(--stats-card-bg)] dark:bg-zinc-900 border-[var(--stats-card-border)] dark:border-zinc-700 text-[var(--stats-text)] dark:text-zinc-100'
 const BTN = 'font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors disabled:opacity-50'
 const BTN_GOLD = `${BTN} bg-[var(--stats-badge-bg)] dark:bg-gold/20 border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold hover:bg-[var(--stats-accent)] hover:text-white dark:hover:text-ink`
 const BTN_PLAIN = `${BTN} border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-muted)] dark:text-zinc-400 hover:text-[var(--stats-text)] dark:hover:text-zinc-100`
+const BTN_SUGGEST = 'font-rajdhani text-[11px] font-bold tracking-wide px-2 py-1 rounded border transition-colors disabled:opacity-50 bg-[var(--stats-badge-bg)] dark:bg-gold/20 border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold hover:bg-[var(--stats-accent)] hover:text-white dark:hover:text-ink whitespace-nowrap'
+const CHIP = 'font-rajdhani text-[10px] px-1.5 py-0.5 rounded border border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-muted)] dark:text-zinc-500 whitespace-nowrap'
+
+function formatDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 export function OpponentsClient() {
   const [opponents, setOpponents] = useState<OpponentRow[]>([])
   const [unlinked,  setUnlinked]  = useState<Unlinked[]>([])
+  const [unlinkedFilters, setUnlinkedFilters] = useState<{ tournaments: NamedRef[]; grounds: NamedRef[] }>({ tournaments: [], grounds: [] })
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
   const [busy,      setBusy]      = useState<string | null>(null)
@@ -48,6 +65,11 @@ export function OpponentsClient() {
   const [editForm,  setEditForm]  = useState({ name: '', cricheroes_team_url: '', notes: '' })
   const [search,    setSearch]    = useState('')
 
+  const [uSearch,     setUSearch]     = useState('')
+  const [uSort,        setUSort]      = useState<UnlinkedSort>('name')
+  const [uTournament,  setUTournament] = useState('')
+  const [uGround,       setUGround]   = useState('')
+
   async function load() {
     setLoading(true)
     const res = await fetch('/api/opponents')
@@ -55,9 +77,29 @@ export function OpponentsClient() {
     if (!res.ok) { setError(d.error ?? 'Failed to load'); setLoading(false); return }
     setOpponents(d.opponents ?? [])
     setUnlinked(d.unlinked ?? [])
+    setUnlinkedFilters(d.unlinked_filters ?? { tournaments: [], grounds: [] })
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  const uFiltersActive = !!(uSearch || uTournament || uGround || uSort !== 'name')
+  function clearUnlinkedFilters() {
+    setUSearch(''); setUTournament(''); setUGround(''); setUSort('name')
+  }
+
+  const filteredUnlinked = useMemo(() => {
+    const q = uSearch.trim().toLowerCase()
+    const rows = unlinked.filter(u =>
+      (!q || u.name.toLowerCase().includes(q)) &&
+      (!uTournament || u.tournaments.some(t => t.id === uTournament)) &&
+      (!uGround || u.grounds.some(g => g.id === uGround))
+    )
+    return rows.sort((a, b) => {
+      if (uSort === 'count')  return b.count - a.count || a.name.localeCompare(b.name)
+      if (uSort === 'recent') return b.last_played.localeCompare(a.last_played) || a.name.localeCompare(b.name)
+      return a.name.localeCompare(b.name)
+    })
+  }, [unlinked, uSearch, uSort, uTournament, uGround])
 
   async function call(url: string, method: string, body: any, key: string): Promise<boolean> {
     setBusy(key); setError('')
@@ -116,29 +158,84 @@ export function OpponentsClient() {
         {unlinked.length === 0 ? (
           <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">Every booked opponent is linked. 🎉</p>
         ) : (
-          <ul className={`${CARD} divide-y divide-[var(--stats-divider)] dark:divide-ink-4`}>
-            {unlinked.map(u => (
-              <li key={u.name} className="px-4 py-3 flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment truncate">{u.name}</p>
-                  <p className="font-rajdhani text-[11px] text-[var(--stats-text-faint)] dark:text-zinc-600">{u.count} match{u.count === 1 ? '' : 'es'} · last {u.last_played}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {u.suggestions.map(s => (
-                    <button key={s.id} disabled={busy !== null} onClick={() => link(u.name, s.id)} className={BTN_GOLD} title={`Link to ${s.name}`}>
-                      → {s.name}
-                    </button>
-                  ))}
-                  <select className={`${INPUT} w-auto py-1`} defaultValue="" disabled={busy !== null}
-                    onChange={e => { if (e.target.value) link(u.name, e.target.value); e.target.value = '' }}>
-                    <option value="">Link to…</option>
-                    {opponents.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                  </select>
-                  <button disabled={busy !== null} onClick={() => createFromQueue(u.name)} className={BTN_PLAIN}>＋ New opponent</button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className={`${CARD} p-3 mb-2 grid grid-cols-2 md:grid-cols-4 gap-2`}>
+              <input
+                value={uSearch}
+                onChange={e => setUSearch(e.target.value)}
+                placeholder="Search spellings…"
+                className={`${INPUT} col-span-2 md:col-span-1`}
+              />
+              <select value={uSort} onChange={e => setUSort(e.target.value as UnlinkedSort)} className={INPUT}>
+                <option value="name">Sort: A–Z</option>
+                <option value="count">Sort: Most played</option>
+                <option value="recent">Sort: Most recent</option>
+              </select>
+              <select value={uTournament} onChange={e => setUTournament(e.target.value)} className={INPUT}>
+                <option value="">All tournaments</option>
+                {unlinkedFilters.tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <select value={uGround} onChange={e => setUGround(e.target.value)} className={INPUT}>
+                <option value="">All grounds</option>
+                {unlinkedFilters.grounds.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-rajdhani text-[11px] text-[var(--stats-text-faint)] dark:text-zinc-600">
+                Showing {filteredUnlinked.length} of {unlinked.length}
+              </p>
+              {uFiltersActive && (
+                <button onClick={clearUnlinkedFilters} className="font-rajdhani text-[11px] font-bold uppercase tracking-wide text-[var(--stats-accent)] dark:text-gold hover:underline">
+                  Clear filters
+                </button>
+              )}
+            </div>
+
+            {filteredUnlinked.length === 0 ? (
+              <p className={`${CARD} px-4 py-6 text-center font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500`}>
+                No unlinked spellings match these filters.
+              </p>
+            ) : (
+              <ul className={`${CARD} divide-y divide-[var(--stats-divider)] dark:divide-ink-4`}>
+                {filteredUnlinked.map(u => (
+                  <li key={u.name} className="px-4 py-3 space-y-2">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <p className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment">{u.name}</p>
+                      <p className="font-rajdhani text-[11px] text-[var(--stats-text-faint)] dark:text-zinc-600 whitespace-nowrap">
+                        {u.count} match{u.count === 1 ? '' : 'es'} · last {formatDate(u.last_played)}
+                      </p>
+                    </div>
+
+                    {(u.tournaments.length > 0 || u.grounds.length > 0) && (
+                      <div className="flex flex-wrap gap-1">
+                        {u.tournaments.map(t => <span key={t.id} className={CHIP}>🏆 {t.name}</span>)}
+                        {u.grounds.map(g => <span key={g.id} className={CHIP}>📍 {g.name}</span>)}
+                      </div>
+                    )}
+
+                    {u.suggestions.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {u.suggestions.map(s => (
+                          <button key={s.id} disabled={busy !== null} onClick={() => link(u.name, s.id)} className={BTN_SUGGEST} title={`Link to ${s.name}`}>
+                            → {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select className={`${INPUT} flex-1 min-w-[140px] py-1`} defaultValue="" disabled={busy !== null}
+                        onChange={e => { if (e.target.value) link(u.name, e.target.value); e.target.value = '' }}>
+                        <option value="">Link to…</option>
+                        {opponents.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                      </select>
+                      <button disabled={busy !== null} onClick={() => createFromQueue(u.name)} className={BTN_PLAIN}>＋ New opponent</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </section>
 

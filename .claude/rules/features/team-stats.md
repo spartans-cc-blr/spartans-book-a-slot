@@ -896,7 +896,7 @@ shape of solution: a canonical table plus an alias table.
 
 | Route | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/opponents` | GET | Any signed-in, non-expelled member | Master list with aliases + match counts, plus the **unlinked queue**: every distinct normalised `opponent_name` on a confirmed booking with no `opponent_id`, most-played first, each with up to 3 fuzzy suggestions (`suggestPlayers()` from `src/lib/nameMatch.ts`, reused as-is — same Levenshtein threshold) |
+| `/api/opponents` | GET | Any signed-in, non-expelled member | Master list with aliases + match counts, plus the **unlinked queue**: every distinct normalised `opponent_name` on a confirmed booking with no `opponent_id`, A–Z by default (`OpponentsClient.tsx` re-sorts client-side, §5.1), each with up to 3 fuzzy suggestions (`suggestPlayers()` from `src/lib/nameMatch.ts`, reused as-is — same Levenshtein threshold) and the distinct tournaments/grounds it was booked under, plus `unlinked_filters` (every tournament/ground referenced by any queue row, sorted A–Z) — feeds the queue's filter dropdowns |
 | `/api/opponents` | POST | Captain / GC / wrangler / admin | Create (`opponentCreateSchema`); optional `link_name` links a raw spelling in the same call |
 | `/api/opponents` | PATCH | Same | Edit name / marquee / CricHeroes team URL / notes (`opponentUpdateSchema`); a rename also aliases the new name |
 | `/api/opponents/link` | POST | Same | `{ opponent_id, name }` → `linkSpellingToOpponent()` (`opponentLinkSchema`) |
@@ -913,13 +913,71 @@ Reachable from **Captains' Corner ▾**, **Council ⚖** and **Wrangler ⚒**
 `isCaptain || isGC || isWrangler || isAdmin` (redirects to `/team-stats`
 otherwise) — visibility only; the routes above are the real gate.
 
-1. **Unlinked spellings (N)** — the reconciliation queue. Per row: the
-   spelling, match count, last played; then suggestion buttons (one tap
-   links), a "Link to…" picker over the whole master list, and "＋ New
-   opponent" (creates it and links this spelling at once).
+1. **Unlinked spellings (N)** — the reconciliation queue (§5.1 for the
+   search/sort/filter bar above it). Per row: the spelling, match count,
+   last played, and the tournament(s)/ground(s) it was booked under as
+   small chips; then suggestion buttons (one tap links), a "Link to…"
+   picker over the whole master list, and "＋ New opponent" (creates it
+   and links this spelling at once).
 2. **Master list (N)** — ★/☆ marquee toggle, name (links to Team Record
    filtered to that opponent), match count, CricHeroes link, known
    spellings, notes; inline edit; search; "＋ Add opponent" form.
+
+### 5.1 Unlinked-queue search, sort & filters (added September 2026)
+
+**The gap:** the queue's only shipped control was the outer page's own
+"Master list" search box — the unlinked list itself had no search, no
+sort (it was fixed most-played-first), and no way to narrow by tournament
+or ground. At real scale (116 unlinked spellings when this was reported)
+that's an unworkable wall of stacked cards to scroll through by hand —
+reported directly, with a screenshot, as "ugly and unusable."
+
+**Fix — a filter bar above the queue**
+(`OpponentsClient.tsx`), four controls in one row (2-up on mobile, 4-up
+from `md`):
+
+- **Search** — plain substring match on the spelling, case-insensitive.
+- **Sort** — `A–Z` (new default — the queue reads as a list to work
+  through, not a leaderboard), `Most played`, `Most recent`. The API
+  itself now also returns the queue pre-sorted A–Z rather than by count,
+  so anyone hitting `GET /api/opponents` directly gets the same default;
+  the client re-sorts on top so switching sort needs no round trip.
+- **Tournament** / **Ground** — each a plain `<select>` populated from
+  `unlinked_filters` (§ above), filtering to rows where at least one of
+  that spelling's bookings was under the chosen tournament/ground.
+
+A "Showing N of M" count and a "Clear filters" action (shown only once
+something differs from the defaults) sit directly under the bar. All
+filtering/sorting is client-side over the already-fetched queue — no new
+round trip per keystroke or selection.
+
+**Where the tournament/ground data comes from:** `GET /api/opponents`'s
+existing bookings query (already fetched to build the queue) was widened
+to also join `tournament:tournaments!bookings_tournament_id_fkey(id,
+name, ground:grounds(id, name))` and `ground:grounds!bookings_ground_id_fkey(id,
+name)`. Each queue row accumulates the *distinct* tournaments/grounds
+across every booking carrying that spelling (a spelling can span more
+than one tournament). A booking's ground resolves the same way
+`captains-corner/page.tsx`'s `groundIdOf()` already does — the booking's
+own `ground_id` (already backfilled from the tournament's at creation
+time for any booking made after migration 066), falling back to the
+tournament's own ground for an older row that predates that backfill.
+
+**Row layout redesigned alongside the filter bar** — the pre-existing
+row (name/count on one line, then a wall of full-width suggestion
+buttons, a full-width "Link to…" select, and a full-width "＋ New
+opponent" button, each stacked) is now: name + count/last-played on one
+line, a chip row for tournament(s)/ground(s) when known, a compact
+suggestion-button row (smaller, non-wrapping pills), then one shared
+action row (select + button side by side). Smaller, denser controls
+throughout — this was the other half of the "unusable" report, not just
+the missing filters.
+
+**Explicitly out of scope:** no server-side pagination (the queue is
+still fetched in full on page load, same as before — filtering narrows
+what's *shown*, not what's *fetched*) and no equivalent
+search/sort/filter bar on the Master list, which already had its own
+search box and is typically far smaller than the unlinked queue.
 
 ### Data state at launch
 
@@ -1107,8 +1165,8 @@ implementation of the filter logic itself.
 | `src/components/team/TeamFilterPanel.tsx` | `TeamFilterShell` — chip summary row, desktop aside / mobile bottom sheet, progressive "+ Add filter", staged "Show N matches" apply; `CheckboxList` — the generic multi-select control every filter dimension renders (§3.8); `SplitByRow` — the (still single-choice) Split by / Then by scrolling pill rows (§3.1, §3.2); both take a `canUseCaptainDimension` prop that decides whether Captain is offered at all (§3.6) |
 | `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher under both stats heroes (§3) |
 | `src/components/team/TeamSplitTable.tsx` | Expandable split table — every row independently toggleable and stays open until tapped closed again (§3.4); includes the second-level sub-rows and their "Not recorded" fallback (§3.2), and `hideMarqueeBadge`/`showTotal` for the Marquee highlight table (§3.3); `FormPills`, `MatchList` |
-| `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` | Opponent master + reconciliation queue (§5) |
-| `src/app/api/opponents/route.ts` | GET / POST / PATCH |
+| `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` | Opponent master + reconciliation queue (§5); the unlinked queue's search/sort/tournament/ground filter bar and redesigned row layout (§5.1) |
+| `src/app/api/opponents/route.ts` | GET (now also returns each queue row's tournaments/grounds + `unlinked_filters`, §5.1) / POST / PATCH |
 | `src/app/api/opponents/link/route.ts` | POST — link a spelling |
 | `src/app/api/grounds/route.ts` | No longer touches `pitch_type` — reverted to Maps/Hospital only once the field moved to tournaments (§6) |
 | `src/components/wrangler/GroundsClient.tsx` | No longer has a Pitch Type select or column — reverted once the field moved to `/admin/tournaments` (§6) |
