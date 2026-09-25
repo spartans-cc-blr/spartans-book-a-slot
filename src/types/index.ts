@@ -475,11 +475,29 @@ export interface PlayerMatchHistoryRow {
     // was captured, or a match never re-synced since. See
     // .claude/rules/features/player-stats-batting-position.md.
     battingOrder: number | null
+    // batting_stats.mvp_score for this one innings — lets the client
+    // recompute a filtered Batting MVP total (e.g. scoped to one batting
+    // position) without a round trip. See §12 of
+    // .claude/rules/features/player-stats-batting-position.md.
+    mvpScore: number
   } | null
   bowling: {
     overs: string | number; dots: number; wickets: number; runsConceded: number; economy: number | null
+    // bowling_stats' per-dismissal-type wicket breakdown, credited to this
+    // bowler — bowled/caught/lbw/stumped are self-explanatory; caughtBehind
+    // is a keeper catch (kept separate from caught here, unlike the
+    // fielding side's combined "catches" figure — see §12); other covers
+    // anything else (e.g. a run-out effected while bowling). Always
+    // populated going forward (spartans-python writes these at parse time);
+    // 0 rather than missing for a row with no wickets.
+    bowled: number; caught: number; caughtBehind: number; lbw: number; stumping: number; other: number
+    // bowling_stats.mvp_score for this one innings — same rationale as
+    // batting.mvpScore, feeds a filtered Bowling MVP total.
+    mvpScore: number
   } | null
   fielding: {
     catches: number; runOuts: number; stumpings: number
+    // fielding_stats.mvp_score for this one innings.
+    mvpScore: number
   } | null
 }
