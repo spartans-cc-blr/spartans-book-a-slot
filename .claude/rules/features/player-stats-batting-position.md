@@ -390,4 +390,58 @@ History table).
 
 ---
 
+## 11. Career Summary — grouped into Overview / Batting / Bowling columns (added September 2026)
+
+The Summary card's single flat 10-tile grid (§10 above) was reorganized,
+per a direct request, into **three side-by-side panels** — `Overview`,
+`Batting`, `Bowling` — stacking to one column on mobile
+(`grid-cols-1 sm:grid-cols-3`), each its own bordered/tinted box
+(`SummaryColumn`) with a header, a `grid-cols-2` mini-grid of its main
+stats, and its category MVP pinned below a divider:
+
+| Panel | Tiles | MVP pinned below |
+|---|---|---|
+| **Overview** | Matches (with the "Bat N · Bowl N" caption, unchanged), MVP Pts, Dismissals | Fielding MVP |
+| **Batting** | Runs, Highest, Avg, S/R | Batting MVP |
+| **Bowling** | Wickets, Best Bowling, Economy, S/R | Bowling MVP |
+
+**Replaces the old separate 3-column MVP breakdown row** (Batting MVP /
+Bowling MVP / Fielding MVP, previously below the flat grid) — each
+category's MVP now sits inside its own panel instead of in a fourth,
+disconnected row, so a batting figure and "how many of those points came
+from batting" read together.
+
+**Bowling S/R needed no new data** — `PlayerStatsTotals.bowlingStrikeRate`
+(balls per wicket, `t.ballsBowled / t.wickets`) already existed in
+`aggregate()`'s output, just never surfaced on this page before; the
+Bowling panel's `S/R` tile is `scoped.bowlingStrikeRate?.toFixed(2) ?? '—'`.
+Both panels' `S/R` tiles are deliberately unqualified ("S/R", not "Batting
+S/R"/"Bowling S/R") — the panel header already disambiguates units (runs
+per 100 balls vs. balls per wicket), the same way a printed scorecard
+doesn't need to spell that out per column either.
+
+**`Highest` and `Best Bowling` keep the same `formatHighestScore()`/
+`formatBestBowling()` helpers from §10** — only the tile's label shortened
+from "Highest Score" to "Highest" to match the panel-grouped request; the
+underlying value and formatting are unchanged.
+
+`SummaryColumn` (`PlayerStatsClient.tsx`) is a small shared wrapper —
+`title`, `children` (the panel's `Stat` tiles), and `mvpLabel`/`mvpValue`/
+`mvpColor` for the pinned `MvpStat` below — reused three times rather than
+duplicating the card/header/divider markup per panel. `MvpStat` itself is
+unchanged, same emerald/blue/purple colour convention as before.
+
+### Security (vibe-security)
+
+Purely a layout change — no new data, no new fetch, no new route. Same
+posture as §10.
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/components/players/PlayerStatsClient.tsx` | `SummaryColumn` — the three-panel wrapper; Summary card JSX regrouped into Overview/Batting/Bowling; Bowling panel's `S/R` tile reads the pre-existing `scoped.bowlingStrikeRate` |
+
+---
+
 *Maintained by: Spartans CC BLR*

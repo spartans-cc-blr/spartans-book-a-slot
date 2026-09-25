@@ -26,7 +26,7 @@
 // date+time from getPlayerMatchHistory(), so no client-side sort is
 // needed here.
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PlayerStatsTotals, PlayerMatchHistoryRow, PitchType } from '@/types'
 
@@ -296,26 +296,26 @@ export function PlayerStatsClient({
           {scoped.matches === 0 ? (
             <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No matches for this filter.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <Stat label="Matches" value={String(scoped.matches)}
-                caption={scoped.battingInnings !== scoped.matches || scoped.bowlingInnings !== scoped.matches
-                  ? `Bat ${scoped.battingInnings} · Bowl ${scoped.bowlingInnings}` : undefined} />
-              <Stat label="Runs" value={String(scoped.runs)} />
-              <Stat label="Highest Score" value={formatHighestScore(scoped.highestScore)} />
-              <Stat label="Avg" value={scoped.battingAverage?.toFixed(2) ?? '—'} />
-              <Stat label="S/R" value={scoped.strikeRate?.toFixed(2) ?? '—'} />
-              <Stat label="Wickets" value={String(scoped.wickets)} />
-              <Stat label="Best Bowling" value={formatBestBowling(scoped.bestBowling)} />
-              <Stat label="Economy" value={scoped.economy?.toFixed(2) ?? '—'} />
-              <Stat label="Dismissals" value={String(scoped.catches + scoped.runOuts + scoped.stumpings)} />
-              <Stat label="MVP Pts" value={scoped.mvpPoints.toFixed(2)} />
-            </div>
-          )}
-          {scoped.matches > 0 && (
-            <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-[var(--stats-card-border)]">
-              <MvpStat label="Batting MVP" value={scoped.battingMvp} color="text-emerald-600 dark:text-emerald-400" />
-              <MvpStat label="Bowling MVP" value={scoped.bowlingMvp} color="text-blue-600 dark:text-blue-400" />
-              <MvpStat label="Fielding MVP" value={scoped.fieldingMvp} color="text-purple-600 dark:text-purple-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <SummaryColumn title="Overview" mvpLabel="Fielding MVP" mvpValue={scoped.fieldingMvp} mvpColor="text-purple-600 dark:text-purple-400">
+                <Stat label="Matches" value={String(scoped.matches)}
+                  caption={scoped.battingInnings !== scoped.matches || scoped.bowlingInnings !== scoped.matches
+                    ? `Bat ${scoped.battingInnings} · Bowl ${scoped.bowlingInnings}` : undefined} />
+                <Stat label="MVP Pts" value={scoped.mvpPoints.toFixed(2)} />
+                <Stat label="Dismissals" value={String(scoped.catches + scoped.runOuts + scoped.stumpings)} />
+              </SummaryColumn>
+              <SummaryColumn title="Batting" mvpLabel="Batting MVP" mvpValue={scoped.battingMvp} mvpColor="text-emerald-600 dark:text-emerald-400">
+                <Stat label="Runs" value={String(scoped.runs)} />
+                <Stat label="Highest" value={formatHighestScore(scoped.highestScore)} />
+                <Stat label="Avg" value={scoped.battingAverage?.toFixed(2) ?? '—'} />
+                <Stat label="S/R" value={scoped.strikeRate?.toFixed(2) ?? '—'} />
+              </SummaryColumn>
+              <SummaryColumn title="Bowling" mvpLabel="Bowling MVP" mvpValue={scoped.bowlingMvp} mvpColor="text-blue-600 dark:text-blue-400">
+                <Stat label="Wickets" value={String(scoped.wickets)} />
+                <Stat label="Best Bowling" value={formatBestBowling(scoped.bestBowling)} />
+                <Stat label="Economy" value={scoped.economy?.toFixed(2) ?? '—'} />
+                <Stat label="S/R" value={scoped.bowlingStrikeRate?.toFixed(2) ?? '—'} />
+              </SummaryColumn>
             </div>
           )}
         </div>
@@ -402,6 +402,35 @@ function formatHighestScore(h: PlayerStatsTotals['highestScore']): string {
 function formatBestBowling(b: PlayerStatsTotals['bestBowling']): string {
   if (!b) return '—'
   return `${b.wickets}/${b.runs}`
+}
+
+// One of the three Career/Filtered Summary panels — Overview, Batting,
+// Bowling, laid out side by side (stacking to one column on mobile) so
+// every batting figure reads as one group and every bowling figure reads
+// as another, rather than interleaved in one flat grid. Each panel's own
+// category MVP (battingMvp/bowlingMvp/fieldingMvp) is pinned below its
+// main stats, replacing the old separate 3-column MVP breakdown row —
+// same MvpStat component and colours (emerald/blue/purple) as before.
+function SummaryColumn({
+  title, children, mvpLabel, mvpValue, mvpColor,
+}: {
+  title: string
+  children: ReactNode
+  mvpLabel: string
+  mvpValue: number
+  mvpColor: string
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--stats-card-border)] bg-[var(--stats-row-bg)] p-4">
+      <h3 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mb-3">
+        {title}
+      </h3>
+      <div className="grid grid-cols-2 gap-3">{children}</div>
+      <div className="mt-4 pt-3 border-t border-[var(--stats-card-border)]">
+        <MvpStat label={mvpLabel} value={mvpValue} color={mvpColor} />
+      </div>
+    </div>
+  )
 }
 
 function Stat({ label, value, caption }: { label: string; value: string; caption?: string }) {
