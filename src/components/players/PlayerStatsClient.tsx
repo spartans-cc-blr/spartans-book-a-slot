@@ -183,17 +183,23 @@ export function PlayerStatsClient({
   // Total runs scored at each batting position, across the current
   // pitch-filtered match set — stays scoped to matchesForPitch directly,
   // never further narrowed by its own selection, so tapping a bar doesn't
-  // change the shape of the bars underneath it.
+  // change the shape of the bars underneath it. `innings` (added alongside
+  // /leaderboard's own "N Inn" bar label, see BattingPositionLeaders.tsx)
+  // is just a count of matches at that position — this chart is already
+  // scoped to one player, so it's this player's own innings count at the
+  // position, not a club-wide total the way the leaderboard's version is.
   const positionData = useMemo(() => {
-    const totals = new Map<number, number>()
+    const totals = new Map<number, { runs: number; innings: number }>()
     for (const m of matchesForPitch) {
       if (!m.batting || m.batting.battingOrder == null) continue
-      totals.set(m.batting.battingOrder, (totals.get(m.batting.battingOrder) ?? 0) + m.batting.runs)
+      const prev = totals.get(m.batting.battingOrder) ?? { runs: 0, innings: 0 }
+      totals.set(m.batting.battingOrder, { runs: prev.runs + m.batting.runs, innings: prev.innings + 1 })
     }
     return Array.from(totals.entries())
-      .map(([position, runs]) => ({ position, runs }))
+      .map(([position, v]) => ({ position, runs: v.runs, innings: v.innings }))
       .sort((a, b) => a.position - b.position)
   }, [matchesForPitch])
+  const totalBattingInnings = useMemo(() => positionData.reduce((sum, d) => sum + d.innings, 0), [positionData])
 
   // Total wickets taken by each dismissal type, across the current
   // pitch-filtered match set — same "chart stays whole, only the summary/
@@ -421,7 +427,12 @@ export function PlayerStatsClient({
           </div>
           {positionData.length > 0 && (
             <>
-              <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">Runs by batting position — tap a bar to filter below.</p>
+              <div className="flex items-baseline justify-between gap-2 mb-4">
+                <p className="font-rajdhani text-xs text-[var(--stats-text-muted)]">Runs by batting position — tap a bar to filter below.</p>
+                <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text-muted)] whitespace-nowrap flex-shrink-0">
+                  {totalBattingInnings} total inning{totalBattingInnings === 1 ? '' : 's'}
+                </span>
+              </div>
               <BattingPositionChart data={positionData} selected={selectedPosition} onSelect={togglePosition} />
               <div className="border-t border-[var(--stats-card-border)] my-4" />
             </>
@@ -558,22 +569,28 @@ function MvpStat({ label, value, color }: { label: string; value: number; color:
 function BattingPositionChart({
   data, selected, onSelect,
 }: {
-  data: { position: number; runs: number }[]
+  data: { position: number; runs: number; innings: number }[]
   selected: number | null
   onSelect: (position: number) => void
 }) {
   const max = Math.max(...data.map(d => d.runs), 1)
+  // Every entry has at least 1 innings by construction (positionData only
+  // ever creates one when a real match batted at that position) — a flat
+  // 26% floor, rather than the old runs-scaled 4%/1.5% one, so the rotated
+  // "N Inn" label below always has a tall-enough bar to sit inside without
+  // clipping against the column's own overflow.
+  const MIN_PCT = 26
   return (
     <div className="flex items-end gap-1.5 sm:gap-2.5 h-36">
-      {data.map(({ position, runs }) => {
+      {data.map(({ position, runs, innings }) => {
         const isSelected = selected === position
-        const pct = Math.max((runs / max) * 100, runs > 0 ? 4 : 1.5)
+        const pct = Math.max((runs / max) * 100, MIN_PCT)
         return (
           <button
             key={position}
             type="button"
             aria-pressed={isSelected}
-            aria-label={`Batting position ${position} — ${runs} runs. Tap to ${isSelected ? 'clear filter' : 'filter innings history'}.`}
+            aria-label={`Batting position ${position} — ${runs} runs across ${innings} inning${innings === 1 ? '' : 's'}. Tap to ${isSelected ? 'clear filter' : 'filter innings history'}.`}
             onClick={() => onSelect(position)}
             className="flex-1 min-w-0 h-full flex flex-col items-center justify-end gap-1 group"
           >
@@ -582,10 +599,19 @@ function BattingPositionChart({
             </span>
             <div
               style={{ height: `${pct}%` }}
-              className={`w-full rounded-t transition-colors ${
+              className={`relative w-full rounded-t transition-colors ${
                 isSelected ? 'bg-blue-700 dark:bg-blue-400' : 'bg-gold/50 group-hover:bg-gold/70'
               }`}
-            />
+              title={`${innings} innings played at position ${position}`}
+            >
+              <span className="absolute inset-0 flex items-center justify-center overflow-hidden">
+                <span className={`-rotate-90 whitespace-nowrap font-rajdhani text-[9px] leading-none font-semibold ${
+                  isSelected ? 'text-white/90' : 'text-[var(--stats-text-muted)] dark:text-zinc-500'
+                }`}>
+                  {innings} Inn
+                </span>
+              </span>
+            </div>
             <span className={`font-rajdhani text-[10px] font-bold uppercase whitespace-nowrap ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-[var(--stats-text-muted)]'}`}>
               {position}
             </span>
