@@ -570,10 +570,10 @@ source of truth instead of two aggregates that could in principle drift.
 The Batting/Bowling/Fielding tab switcher (§4's original design) is gone.
 In its place, three always-visible cards, top to bottom:
 
-- **Batting** — the existing Runs-by-Batting-Position bar chart (unchanged
-  visually, now reading `matchesForPitch` instead of `matches`), a "Position
-  N ✕" clear pill, then this discipline's own Innings History table
-  (`battingTabMatches`).
+- **Batting** — the existing Runs-by-Batting-Position bar chart (now
+  reading `matchesForPitch` instead of `matches` — see §12.1 below for a
+  later visual change to this same chart), a "Position N ✕" clear pill,
+  then this discipline's own Innings History table (`battingTabMatches`).
 - **Bowling** — the new dismissal-type donut (below), a matching clear
   pill, then its own table (`bowlingTabMatches`).
 - **Fielding** — table only (`fieldingTabMatches`), no chart — not asked
@@ -648,6 +648,62 @@ and returns it (harmless, just unread).
 - No equivalent chart for Fielding.
 - Server-side `scoped`/`getPlayerStats()` computation itself is unchanged
   — only this page's client stopped reading it directly.
+
+---
+
+## 12.1 Total innings — chart header and rotated per-bar label (added September 2026)
+
+Same request, and the same visual treatment, `/leaderboard`'s own "Runs by
+Batting Position" chart got first (`BattingPositionLeaders.tsx`, see
+`features/leaderboard.md` §6.1's "Total-innings label" note) — applied
+here as a deliberate follow-up once it became clear the request meant
+*this* page's chart too, not only the leaderboard's near-identically-named
+one. The two charts are unrelated components (this one is a vertical,
+per-player chart; the leaderboard's is horizontal and club-wide), so this
+needed its own implementation, not a shared one.
+
+- **`positionData`** (§3) now carries `innings` alongside `runs` per
+  position — a count of this player's own matches at that position, not a
+  club-wide total the way `BattingPositionLeader.totalInnings` is on the
+  leaderboard (there's only one player in scope on this page, so "total
+  innings at this position" and "this player's innings at this position"
+  are the same number here).
+- **Chart header** — the subtitle line ("Runs by batting position — tap a
+  bar to filter below.") gained a right-aligned "N total innings" figure,
+  `positionData`'s `innings` values summed (`totalBattingInnings`) — the
+  same grand-total framing as the leaderboard's header.
+- **Each bar** gained a small `-rotate-90` "N Inn" label for that
+  position's own innings count, centered inside the bar's coloured fill
+  (`overflow-hidden` on a wrapping span, so the rotated text can never
+  spill past the bar's own edges).
+- **Minimum bar height raised.** This chart's bars grow from 0% (a
+  genuinely 0-run position could render just a few px tall under the old
+  `runs > 0 ? 4 : 1.5` percent floor) — nowhere near enough room for even a
+  9px rotated label. Replaced with a flat `MIN_PCT = 26` (of the chart's
+  fixed `h-36`/144px height, ≈37px) for every bar, since every entry in
+  `positionData` has at least one real innings by construction — a bar
+  that used to be nearly invisible for a 0-run position is now clearly
+  visible, which reads as more informative, not a regression, once the
+  chart's purpose is "how many innings and runs at each position," not
+  "runs only."
+- **Colour** kept deliberately simple, same posture as the leaderboard's
+  version and this page's own existing unselected-bar-fill/hover-tint
+  choices (§8's "small, self-contained... reads fine on either
+  background" allowance) — `text-[var(--stats-text-muted)] dark:text-zinc-500`
+  unselected, `text-white/90` on the selected (solid blue) bar, no new
+  `--stats-*` token introduced.
+
+### Security (vibe-security)
+
+Same posture as §5/§9/§12 — purely additive, client-side-only derived
+figures over an already-fetched, already-authorized array; no new route,
+no new client input.
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/components/players/PlayerStatsClient.tsx` | `positionData`'s `innings` field, `totalBattingInnings`, the chart header's total figure, `BattingPositionChart`'s rotated per-bar "N Inn" label and raised `MIN_PCT` bar-height floor |
 
 ---
 
