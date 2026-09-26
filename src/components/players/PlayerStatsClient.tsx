@@ -18,17 +18,25 @@
 // was the match-specific captain (squad.is_captain — not players.is_captain,
 // the permanent club-captain flag; see features/squad-selection.md).
 //
-// Batting/Bowling/Fielding are three always-visible, self-contained
-// sections (not a tab switcher over one shared table, added September
-// 2026 — see features/player-stats-batting-position.md §12): each carries
-// its own chart (Runs by Batting Position under Batting, a dismissal-type
-// donut under Bowling — Fielding has neither) and its own Innings History
-// table. Pitch Type is the top-most filter and narrows everything on the
-// page — the Summary card, both charts, and all three tables — via
-// aggregateMatchHistoryRows() (src/lib/playerMatchAggregate.ts), a pure
-// client-side re-implementation of the server's aggregate() math, since
-// Pitch (and the two charts' click-to-filter) only ever apply client-side
-// on top of the already-fetched, server-filtered `matches` array.
+// Batting/Bowling/Fielding are a horizontal tab switcher — only one
+// discipline's own section is on screen at a time (restored September
+// 2026; a brief stint as three always-visible stacked cards was reported
+// hard to scroll through and disconnected from the Summary card above —
+// see features/player-stats-batting-position.md §12.2). Each section
+// carries its own chart (Runs by Batting Position under Batting, a
+// dismissal-type donut under Bowling — Fielding has neither) and its own
+// Innings History table, collapsed by default behind a toggle so the
+// chart/Summary are visible without scrolling past a full match list. The
+// Summary card above the tabs always shows all three disciplines
+// (Overview/Batting/Bowling) together, regardless of which tab is active,
+// and stays reactive to every filter including a chart selection made on
+// a tab that isn't currently visible. Pitch Type is the top-most filter
+// and narrows everything on the page — the Summary card, both charts, and
+// all three tables — via aggregateMatchHistoryRows()
+// (src/lib/playerMatchAggregate.ts), a pure client-side re-implementation
+// of the server's aggregate() math, since Pitch (and the two charts'
+// click-to-filter) only ever apply client-side on top of the
+// already-fetched, server-filtered `matches` array.
 
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -100,6 +108,24 @@ export function PlayerStatsClient({
   // Dismissal-type donut selection — same rationale, scoped to the Bowling
   // section only.
   const [selectedDismissal, setSelectedDismissal] = useState<DismissalKey | null>(null)
+  // Which discipline is currently shown below the Summary card — restored
+  // as a horizontal tab switcher (September 2026, reverting the earlier
+  // "three always-visible stacked cards" design), so only one of Batting/
+  // Bowling/Fielding is on screen at a time. The Summary card above is
+  // unaffected either way — it always shows all three disciplines and
+  // stays reactive to every filter, including a chart selection made on a
+  // tab that isn't currently the active one (selectedPosition/
+  // selectedDismissal are their own state, independent of activeTab).
+  const [activeTab, setActiveTab] = useState<StatTab>('batting')
+  // Each discipline's own Match History table is collapsed by default —
+  // tapping a chart bar/slice auto-opens its own tab's history (see
+  // togglePosition/toggleDismissal below), since that's the moment the
+  // filtered matches are actually wanted; otherwise it stays out of the
+  // way so switching tabs doesn't mean scrolling past a full table just to
+  // see the chart and Summary above it.
+  const [battingHistoryOpen, setBattingHistoryOpen] = useState(false)
+  const [bowlingHistoryOpen, setBowlingHistoryOpen] = useState(false)
+  const [fieldingHistoryOpen, setFieldingHistoryOpen] = useState(false)
   // Pitch Type — the top-most filter on the page (moved there September
   // 2026; was previously the last filter, applied only to Innings History).
   // Client-side only, same reset-on-refetch rationale as selectedPosition,
@@ -261,10 +287,18 @@ export function PlayerStatsClient({
   const bowlingInningsInPitchScope = useMemo(() => matchesForPitch.filter(m => !!m.bowling).length, [matchesForPitch])
 
   function togglePosition(position: number) {
-    setSelectedPosition(prev => prev === position ? null : position)
+    setSelectedPosition(prev => {
+      const next = prev === position ? null : position
+      if (next != null) setBattingHistoryOpen(true)
+      return next
+    })
   }
   function toggleDismissal(key: DismissalKey) {
-    setSelectedDismissal(prev => prev === key ? null : key)
+    setSelectedDismissal(prev => {
+      const next = prev === key ? null : key
+      if (next != null) setBowlingHistoryOpen(true)
+      return next
+    })
   }
 
   return (
@@ -411,84 +445,120 @@ export function PlayerStatsClient({
 
         {loading && <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] mb-5">Loading…</p>}
 
-        {/* Batting — its own section (September 2026, replacing the old
-            shared Batting/Bowling/Fielding tab switcher): the Runs by
-            Batting Position chart, then this discipline's own Innings
-            History. */}
-        <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5 mb-5">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-            <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold">Batting</h2>
-            {selectedPosition != null && (
-              <button onClick={() => setSelectedPosition(null)}
-                className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--stats-badge-bg)] border border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] hover:bg-gold/20 transition-colors">
-                Position {selectedPosition} ✕
-              </button>
-            )}
-          </div>
-          {positionData.length > 0 && (
-            <>
-              <div className="flex items-baseline justify-between gap-2 mb-4">
-                <p className="font-rajdhani text-xs text-[var(--stats-text-muted)]">Runs by batting position — tap a bar to filter below.</p>
-                <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text-muted)] whitespace-nowrap flex-shrink-0">
-                  {totalBattingInnings} total inning{totalBattingInnings === 1 ? '' : 's'}
-                </span>
-              </div>
-              <BattingPositionChart data={positionData} selected={selectedPosition} onSelect={togglePosition} />
-              <div className="border-t border-[var(--stats-card-border)] my-4" />
-            </>
-          )}
-          {selectedPosition != null && (
-            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-3">
-              {battingTabMatches.length} of {battingInningsInPitchScope} innings batted at Position {selectedPosition}
-            </p>
-          )}
-          {!loading && (battingTabMatches.length === 0 ? (
-            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No batting innings for this filter.</p>
-          ) : (
-            <MatchHistoryTable matches={battingTabMatches} statTab="batting" />
+        {/* Discipline tabs — only one of Batting/Bowling/Fielding is shown
+            at a time (restored September 2026; briefly three always-visible
+            stacked cards, reported as hard to scroll through and disconnect
+            from the Summary card above — see features/player-stats-batting-position.md
+            §12.2). The Summary card itself is unaffected by this tab
+            selection — it always shows Overview/Batting/Bowling together
+            and stays reactive to every filter regardless of which tab is
+            active. */}
+        <div className="flex rounded-full p-1 gap-1 mb-5 bg-[var(--stats-row-bg)] border border-[var(--stats-card-border)]">
+          {([
+            { key: 'batting' as const, label: 'Batting', count: battingInningsInPitchScope },
+            { key: 'bowling' as const, label: 'Bowling', count: bowlingInningsInPitchScope },
+            { key: 'fielding' as const, label: 'Fielding', count: fieldingTabMatches.length },
+          ]).map(tab => (
+            <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)}
+              aria-pressed={activeTab === tab.key}
+              className={`flex-1 text-center font-rajdhani text-sm font-bold py-2 rounded-full transition-colors whitespace-nowrap
+                ${activeTab === tab.key ? 'bg-[var(--stats-accent)] text-white dark:text-ink' : 'text-[var(--stats-text-muted)] hover:text-[var(--stats-text)]'}`}>
+              {tab.label} <span className="opacity-70">({tab.count})</span>
+            </button>
           ))}
         </div>
+
+        {/* Batting — the Runs by Batting Position chart, then this
+            discipline's own collapsible Innings History. */}
+        {activeTab === 'batting' && (
+          <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+              <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold">Batting</h2>
+              {selectedPosition != null && (
+                <button onClick={() => setSelectedPosition(null)}
+                  className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--stats-badge-bg)] border border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] hover:bg-gold/20 transition-colors">
+                  Position {selectedPosition} ✕
+                </button>
+              )}
+            </div>
+            {positionData.length > 0 && (
+              <>
+                <div className="flex items-baseline justify-between gap-2 mb-4">
+                  <p className="font-rajdhani text-xs text-[var(--stats-text-muted)]">Runs by batting position — tap a bar to filter below.</p>
+                  <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text-muted)] whitespace-nowrap flex-shrink-0">
+                    {totalBattingInnings} total inning{totalBattingInnings === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <BattingPositionChart data={positionData} selected={selectedPosition} onSelect={togglePosition} />
+                <div className="border-t border-[var(--stats-card-border)] my-4" />
+              </>
+            )}
+            {selectedPosition != null && (
+              <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-3">
+                {battingTabMatches.length} of {battingInningsInPitchScope} innings batted at Position {selectedPosition}
+              </p>
+            )}
+            <CollapsibleHistory open={battingHistoryOpen} onToggle={() => setBattingHistoryOpen(v => !v)} count={battingTabMatches.length}>
+              {!loading && (battingTabMatches.length === 0 ? (
+                <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No batting innings for this filter.</p>
+              ) : (
+                <MatchHistoryTable matches={battingTabMatches} statTab="batting" />
+              ))}
+            </CollapsibleHistory>
+          </div>
+        )}
 
         {/* Bowling — Dismissal-Type donut, then this discipline's own
-            Innings History. */}
-        <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5 mb-5">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-            <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold">Bowling</h2>
-            {selectedDismissal != null && (
-              <button onClick={() => setSelectedDismissal(null)}
-                className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--stats-badge-bg)] border border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] hover:bg-gold/20 transition-colors">
-                {DISMISSAL_TYPE_META.find(d => d.key === selectedDismissal)?.label} ✕
-              </button>
+            collapsible Innings History. */}
+        {activeTab === 'bowling' && (
+          <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+              <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold">Bowling</h2>
+              {selectedDismissal != null && (
+                <button onClick={() => setSelectedDismissal(null)}
+                  className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--stats-badge-bg)] border border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] hover:bg-gold/20 transition-colors">
+                  {DISMISSAL_TYPE_META.find(d => d.key === selectedDismissal)?.label} ✕
+                </button>
+              )}
+            </div>
+            {dismissalData.length > 0 && (
+              <>
+                <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">How the wickets fell — tap a dismissal type to filter below.</p>
+                <DismissalPieChart data={dismissalData} selected={selectedDismissal} onSelect={toggleDismissal} />
+                <div className="border-t border-[var(--stats-card-border)] my-4" />
+              </>
             )}
+            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-3">
+              {selectedDismissal != null
+                ? `${bowlingTabMatches.length} of ${bowlingInningsInPitchScope} innings with a ${DISMISSAL_TYPE_META.find(d => d.key === selectedDismissal)?.label} dismissal`
+                : `${bowlingTabMatches.length} innings bowled`}
+            </p>
+            <CollapsibleHistory open={bowlingHistoryOpen} onToggle={() => setBowlingHistoryOpen(v => !v)} count={bowlingTabMatches.length}>
+              {!loading && (bowlingTabMatches.length === 0 ? (
+                <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No bowling innings for this filter.</p>
+              ) : (
+                <MatchHistoryTable matches={bowlingTabMatches} statTab="bowling" />
+              ))}
+            </CollapsibleHistory>
           </div>
-          {dismissalData.length > 0 && (
-            <>
-              <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-4">How the wickets fell — tap a dismissal type to filter below.</p>
-              <DismissalPieChart data={dismissalData} selected={selectedDismissal} onSelect={toggleDismissal} />
-              <div className="border-t border-[var(--stats-card-border)] my-4" />
-            </>
-          )}
-          <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-3">
-            {selectedDismissal != null
-              ? `${bowlingTabMatches.length} of ${bowlingInningsInPitchScope} innings with a ${DISMISSAL_TYPE_META.find(d => d.key === selectedDismissal)?.label} dismissal`
-              : `${bowlingTabMatches.length} innings bowled`}
-          </p>
-          {!loading && (bowlingTabMatches.length === 0 ? (
-            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No bowling innings for this filter.</p>
-          ) : (
-            <MatchHistoryTable matches={bowlingTabMatches} statTab="bowling" />
-          ))}
-        </div>
+        )}
 
-        {/* Fielding — table only, no chart. */}
-        <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5">
-          <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold mb-4">Fielding</h2>
-          {!loading && (fieldingTabMatches.length === 0 ? (
-            <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No fielding innings for this filter.</p>
-          ) : (
-            <MatchHistoryTable matches={fieldingTabMatches} statTab="fielding" />
-          ))}
-        </div>
+        {/* Fielding — no chart, just the caption + collapsible history. */}
+        {activeTab === 'fielding' && (
+          <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5">
+            <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold mb-1">Fielding</h2>
+            <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-3">
+              {fieldingTabMatches.length} innings with a fielding contribution
+            </p>
+            <CollapsibleHistory open={fieldingHistoryOpen} onToggle={() => setFieldingHistoryOpen(v => !v)} count={fieldingTabMatches.length}>
+              {!loading && (fieldingTabMatches.length === 0 ? (
+                <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No fielding innings for this filter.</p>
+              ) : (
+                <MatchHistoryTable matches={fieldingTabMatches} statTab="fielding" />
+              ))}
+            </CollapsibleHistory>
+          </div>
+        )}
       </div>
     </>
   )
@@ -605,8 +675,8 @@ function BattingPositionChart({
               title={`${innings} innings played at position ${position}`}
             >
               <span className="absolute inset-0 flex items-end justify-center overflow-hidden pb-1.5">
-                <span className={`-rotate-90 whitespace-nowrap font-rajdhani text-[9px] leading-none font-semibold ${
-                  isSelected ? 'text-white/90' : 'text-[var(--stats-text-muted)] dark:text-zinc-500'
+                <span className={`whitespace-nowrap font-rajdhani text-[10px] leading-none font-semibold ${
+                  isSelected ? 'text-white/90' : 'text-[var(--stats-text-muted)] dark:text-zinc-400'
                 }`}>
                   {innings} Inn
                 </span>
@@ -727,6 +797,40 @@ function DismissalPieChart({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// Wraps a discipline's own Innings History table behind a collapsed-by-
+// default toggle (added September 2026, alongside the Batting/Bowling/
+// Fielding tab switcher restoring only one discipline on screen at a
+// time) — so landing on a tab shows its chart/Summary without also having
+// to scroll past a full match table. `count` is shown on the toggle row
+// itself so the total is visible even while collapsed. Opened
+// automatically the moment a chart bar/dismissal slice is tapped (see
+// togglePosition/toggleDismissal) — collapsing by default is about the
+// tab's own resting state, not about hiding results the player just asked
+// to filter to.
+function CollapsibleHistory({
+  open, onToggle, count, children,
+}: {
+  open: boolean
+  onToggle: () => void
+  count: number
+  children: ReactNode
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 py-2 font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--stats-text-muted)] hover:text-[var(--stats-text)] transition-colors"
+      >
+        <span>Match History ({count})</span>
+        <span className={`inline-block transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">▾</span>
+      </button>
+      {open && <div className="mt-2">{children}</div>}
     </div>
   )
 }
