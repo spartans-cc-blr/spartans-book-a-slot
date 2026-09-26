@@ -24,18 +24,12 @@ import type { BattingPositionLeader } from '@/types'
 
 export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLeader[] }) {
   const maxRuns = Math.max(...leaders.map(l => l.runs), 1)
-  const totalInnings = leaders.reduce((sum, l) => sum + l.totalInnings, 0)
   const [openPosition, setOpenPosition] = useState<number | null>(null)
   const active = leaders.find(l => l.position === openPosition) ?? null
 
   return (
     <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded p-4 mb-4">
-      <div className="flex items-baseline justify-between gap-2 mb-1">
-        <h3 className="font-cinzel text-sm text-[var(--stats-accent)] dark:text-gold font-semibold">Runs by Batting Position</h3>
-        <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text-muted)] dark:text-zinc-500 whitespace-nowrap flex-shrink-0">
-          {totalInnings} total inning{totalInnings === 1 ? '' : 's'}
-        </span>
-      </div>
+      <h3 className="font-cinzel text-sm text-[var(--stats-accent)] dark:text-gold font-semibold mb-1">Runs by Batting Position</h3>
       <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mb-4">
         Leading run-scorer at each position, for the current filter. Tap a bar for the top 3.
       </p>
@@ -65,7 +59,7 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
                     ))}
                   </span>
                   <span
-                    className="font-rajdhani text-[10px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 whitespace-nowrap"
+                    className="font-rajdhani text-[10px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 whitespace-nowrap w-11 text-right"
                     title={`${l.topThree[0].innings} innings at position ${l.position}`}
                   >
                     {l.topThree[0].innings} Inn

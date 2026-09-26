@@ -663,11 +663,13 @@ per-player chart; the leaderboard's is horizontal and club-wide), so this
 needed its own implementation, not a shared one.
 
 - **`positionData`** (§3) now carries `innings` alongside `runs` per
-  position — a count of this player's own matches at that position, not a
-  club-wide total the way `BattingPositionLeader.totalInnings` is on the
-  leaderboard (there's only one player in scope on this page, so "total
-  innings at this position" and "this player's innings at this position"
-  are the same number here).
+  position — a count of this player's own matches at that position. There
+  is only one player in scope on this page, so "total innings at this
+  position" and "this player's innings at this position" are the same
+  number here — a distinction the leaderboard's own chart had to make
+  (and, per a later correction, dropped its equivalent club-wide total
+  header entirely — see `features/leaderboard.md` §6.1) since that one
+  aggregates every player at each position, not just one.
 - **Chart header** — the subtitle line ("Runs by batting position — tap a
   bar to filter below.") gained a right-aligned "N total innings" figure,
   `positionData`'s `innings` values summed (`totalBattingInnings`) — the

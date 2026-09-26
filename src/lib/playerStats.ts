@@ -986,17 +986,12 @@ export async function getTopScorersByBattingPosition(
 
   // Group players by identical (runs, innings) — a genuine tie, sharing one
   // podium rank — then sort those tiers runs desc, innings asc, and keep
-  // the top 3. totalInnings is summed across *every* player at the
-  // position, before the top-3 slice — the bar chart's own "N Inn" label
-  // (features/leaderboard.md §6.1) needs the whole position's workload, not
-  // just however much of it belongs to the leader(s).
-  const leaders: { position: number; tiers: { runs: number; innings: number; playerIds: string[] }[]; totalInnings: number }[] = []
+  // the top 3.
+  const leaders: { position: number; tiers: { runs: number; innings: number; playerIds: string[] }[] }[] = []
   const allPlayerIds = new Set<string>()
   for (const [position, byPlayer] of Array.from(totalsByPosition)) {
     const byTuple = new Map<string, { runs: number; innings: number; playerIds: string[] }>()
-    let totalInnings = 0
     for (const [playerId, v] of Array.from(byPlayer.entries())) {
-      totalInnings += v.innings
       const key = `${v.runs}:${v.innings}`
       if (!byTuple.has(key)) byTuple.set(key, { runs: v.runs, innings: v.innings, playerIds: [] })
       byTuple.get(key)!.playerIds.push(playerId)
@@ -1005,7 +1000,7 @@ export async function getTopScorersByBattingPosition(
       .sort((a, b) => b.runs - a.runs || a.innings - b.innings)
       .slice(0, 3)
     tiers.forEach(t => t.playerIds.forEach(id => allPlayerIds.add(id)))
-    leaders.push({ position, tiers, totalInnings })
+    leaders.push({ position, tiers })
   }
 
   const hub = createServiceClient()
@@ -1033,7 +1028,7 @@ export async function getTopScorersByBattingPosition(
         .filter(t => t.players.length > 0)
       if (resolvedTiers.length === 0) return null
       const topThree = resolvedTiers.map((t, i) => ({ rank: i + 1, ...t }))
-      return { position: l.position, runs: topThree[0].runs, players: topThree[0].players, topThree, totalInnings: l.totalInnings }
+      return { position: l.position, runs: topThree[0].runs, players: topThree[0].players, topThree }
     })
     .filter((l): l is BattingPositionLeader => l !== null)
     .sort((a, b) => a.position - b.position)
