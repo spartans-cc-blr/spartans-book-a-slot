@@ -24,3 +24,15 @@ change in the same session. A `SessionStart` hook
 start of every session. Do not route around the gate (e.g. by touching an
 unrelated `.claude/rules/**/*.md` file) — update the doc that actually
 describes the change.
+
+## Hosting limits — Vercel Hobby
+
+The app is deployed on Vercel's **Hobby** plan, which has hard limits that
+have already broken production more than once. Before adding or changing a
+cron, a `vercel.json` setting, a long-running API route, a new dependency,
+or any background work, check the **"Vercel Hobby — checklist before
+shipping any change"** at the top of `.claude/rules/limitations.md`. The
+most important rule: never put a cron that runs more than once a day in
+`vercel.json`. Hobby rejects the entire deployment, and every merge after
+it silently fails to deploy. Use a GitHub Actions workflow instead.
+

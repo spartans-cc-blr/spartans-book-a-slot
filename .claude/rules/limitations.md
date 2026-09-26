@@ -1,6 +1,32 @@
 # Spartans Hub — Permanent Limitations
 
-**Last updated: July 2026**
+**Last updated: September 2026**
+
+---
+
+## Vercel Hobby — checklist before shipping any change
+
+The Hub runs on Vercel **Hobby**. Check every change against this list
+before committing. Each rule comes from a real production failure; details
+are in the sections further down.
+
+| # | Rule | What breaks if ignored |
+|---|---|---|
+| H-1 | **Never schedule a `vercel.json` cron more often than once a day.** Anything hourly or several-times-daily goes in a `.github/workflows/cron-*.yml` workflow **only**, with no `vercel.json` entry. | Vercel **rejects the whole deployment** at config validation. Every later merge fails too, and production silently stays behind `main` (26 Sep 2026: #318–#322 never deployed). |
+| H-2 | **Never rely on a Vercel cron actually firing.** Every scheduled route needs a matching GitHub Actions workflow calling it with `CRON_SECRET`, and the route must be idempotent so a double-fire is harmless. | Crons silently never run (Jul 2026: `lock-availability` and `backfill-scorecards` never fired on schedule). |
+| H-3 | **No day-of-week cron expressions in `vercel.json`.** Schedule daily and gate the day in code (IST-aware), or use the GitHub Actions workflow, which supports day-of-week natively. | The entry is accepted but never fires. |
+| H-4 | **Serverless functions have a 60s ceiling.** Set `maxDuration` no higher than 60, give outbound calls their own timeout well under that, and cap per-run batch sizes (e.g. `MAX_PER_RUN = 3` in `backfill-scorecards`). Long backlogs are driven one item per request from the client, not looped server-side. | `504 FUNCTION_INVOCATION_TIMEOUT` partway through a batch. |
+| H-5 | **No Python runtime.** Python work lives in the separate `spartans-python` repo on Render and is called over HTTP. Render cold-starts take up to ~30s, so warm it up or budget for it inside H-4's 60s. | Build fails, or a cold Render dyno eats the whole function budget. |
+| H-6 | **Expect ~3–4s cold starts on a route's first hit.** Keep new runtime dependencies to a minimum, and never import a heavy library into a shared/page path. Scope it to the one route that needs it. | Slower first loads across unrelated pages. |
+| H-7 | **Don't fire-and-forget async work after returning a response.** Await it before `return NextResponse.json(...)`. | Vercel freezes the function once the response is sent, and the work (push notifications, audit writes) is dropped. |
+
+Also related: **Supabase free tier** has a 50MB storage cap, so there are no
+file uploads to Supabase Storage (see the last section).
+
+When a change needs something Hobby can't do, say so explicitly in the
+change's feature doc and pick a workaround from this list (usually a GitHub
+Actions workflow or the Render microservice) rather than quietly adding
+config Hobby will reject.
 
 ---
 
