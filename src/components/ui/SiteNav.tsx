@@ -144,7 +144,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
               onMouseLeave={() => setCaptainsOpen(false)}>
               <button
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
-                  ${activePage === 'captains' || activePage === 'captains-unavailable'
+                  ${activePage === 'captains' || activePage === 'captains-unavailable' || activePage === 'captains-players'
                     ? 'text-gold border-crimson'
                     : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
                 Captains' Corner <span className="text-[8px] mt-0.5">▾</span>
@@ -162,6 +162,12 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
                     className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
                       ${activePage === 'captains-unavailable' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                     🚫 Unavailable Dates
+                  </Link>
+                  <Link href="/captains-corner/my-players"
+                    onClick={() => setCaptainsOpen(false)}
+                    className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-t border-[#D4C9B0] dark:border-ink-5
+                      ${activePage === 'captains-players' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
+                    📈 My Players
                   </Link>
                   <Link href="/opponents"
                     onClick={() => setCaptainsOpen(false)}
@@ -238,6 +244,11 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
                     onClick={() => setGcOpen(false)}
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     ⚖ Squad Review
+                  </Link>
+                  <Link href="/captains-corner/my-players"
+                    onClick={() => setGcOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
+                    📈 Captaincy Records
                   </Link>
                   <Link href="/gc/feedback"
                     onClick={() => setGcOpen(false)}

@@ -875,8 +875,8 @@ there. Full audit, design and per-page fallbacks in
 |---|---|
 | Public (not signed in) | Schedule · Sign In |
 | Player | Home (logo) · Matches ▾ · Stats ▾ (Yours Statistically, Team Record, Players) · The Dugout · My Profile |
-| Captain | Home (logo) · Matches ▾ · Captains' Corner ▾ (Squad Selection, Unavailable Dates, Opponents) · Stats ▾ · The Dugout · Tournaments · My Profile |
-| GC | Home (logo) · Matches ▾ · Stats ▾ · The Dugout · Tournaments · My Profile · Council ⚖ (… Grounds, Opponents) |
+| Captain | Home (logo) · Matches ▾ · Captains' Corner ▾ (Squad Selection, Unavailable Dates, My Players, Opponents) · Stats ▾ · The Dugout · Tournaments · My Profile |
+| GC | Home (logo) · Matches ▾ · Stats ▾ · The Dugout · Tournaments · My Profile · Council ⚖ (Squad Review, Captaincy Records, … Grounds, Opponents) |
 | Wrangler | + Wrangler ⚒ dropdown (Squad Backfill, Grounds, Opponents) |
 | Admin | All of the above · Schedule · Admin ⚙ |
 | Expelled | Home (logo) only — every other link/dropdown is gated on `!isExpelled` |
@@ -949,7 +949,7 @@ link) that toggles the bottom sheet — it shows the same active-gold
 treatment whenever the sheet is open, or whenever `activePage` is one of
 the values that only live inside the sheet (`isAdminOrGcHighlighted()`:
 `dugout`, `leaderboard`, `team-stats`, `opponents`, `profile`, `planner`, `captains`,
-`captains-unavailable`, `gc`, `players`, `wrangler`, `schedule` —
+`captains-unavailable`, `captains-players`, `gc`, `players`, `wrangler`, `schedule` —
 deliberately excludes `matches` and `my-stats`, both covered by their own
 tab's `active` check instead).
 
@@ -959,8 +959,8 @@ A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `ma
 
 - **Expelled** — just an "Account suspended" notice, no links.
 - **Logged in** — The Dugout (moved here from its own tab slot, September 2026 — see above; `ShieldIcon` at its sheet-row `size={16}`), Leaderboard (the club Honour Board, `/leaderboard` — added back September 2026 once "My Stats" stopped pointing here, see above), Team Record (`/team-stats`, September 2026 — see `features/team-stats.md`), My Profile and My Wallet (both hidden together with the rest of the "logged in" content if `playerId` is null, in favour of "Complete Registration" → `/join`; My Wallet added September 2026, `RupeeIcon` — see `features/wallet-ledger.md`), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
-  - **Captains' Corner** (`isCaptain || isAdmin`) — Squad Selection, Unavailable Dates, Opponents
-  - **Council** (`isGC`) — Squad Review, Feedback, Players, Store Orders, Grounds, Opponents, `GenerateInviteItem`
+  - **Captains' Corner** (`isCaptain || isAdmin`) — Squad Selection, Unavailable Dates, My Players, Opponents
+  - **Council** (`isGC`) — Squad Review, Captaincy Records, Feedback, Players, Store Orders, Grounds, Opponents, `GenerateInviteItem`
   - **Wrangler** (`isWrangler`) — Squad Backfill, Grounds, Opponents
   - **Admin** (`isAdmin`) — Schedule, Admin Panel (crimson row)
   - Club Site (muted, external) and Sign Out always last.
@@ -1200,4 +1200,10 @@ Displays the player's Google profile photo (from `player.photoUrl ?? player.imag
 | `/join` route for unmatched Gmail users | Low | `SiteNav` links to `/join` for unmatched users but the page doesn't exist yet — currently dead link |
 | Optimise `getPlayerData` queries | Low | Queries 3 and 4 both hit `bookings` — could be merged into one query with the pending count derived from the same result set |
 | Consider `Promise.all` in `getPlayerData` | Low | Queries 2 and 3 are independent — running them in parallel would reduce TTFB on the home page |
- 
+
+### My Players / Captaincy Records (added September 2026)
+
+"📈 My Players" (`/captains-corner/my-players`, `activePage === 'captains-players'`)
+sits in Captains' Corner ▾ after Unavailable Dates, and the same page appears
+in Council ⚖ as "📈 Captaincy Records" so a GC member who isn't a captain can
+reach it. The mobile More sheet mirrors both. See `features/captaincy-stats.md`.

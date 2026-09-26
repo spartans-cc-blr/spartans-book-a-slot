@@ -60,7 +60,7 @@ function groupBy<T>(rows: T[], key: (row: T) => string | null | undefined): Map<
 // instead of trusting one request to return everything.
 const ANALYTICS_PAGE_SIZE = 1000
 
-async function fetchAllRows<T = any>(buildQuery: () => any): Promise<T[]> {
+export async function fetchAllRows<T = any>(buildQuery: () => any): Promise<T[]> {
   const rows: T[] = []
   let from = 0
   for (;;) {
