@@ -963,18 +963,27 @@ export async function getTopScorersByBattingPosition(
 
   const analytics = createAnalyticsClient()
   if (!analytics) throw new Error('Analytics database is not configured')
+  // Deliberately NOT filtered to `.not('batting_order', 'is', null)` — a row
+  // with no recorded position still counts toward a player's total innings
+  // (the "/ N" denominator below), even though it can't be bucketed into any
+  // position's own numerator. Bucketing itself still requires a valid
+  // position, checked per-row just below.
   const battingRows = await fetchAllRows(() => {
     let q = analytics!.from('batting_stats').select('player_id, batting_order, runs, batted')
       .order('match_id').order('player_name')
       .not('player_id', 'is', null)
-      .not('batting_order', 'is', null)
     return scoped ? q.in('match_id', scoped) : q
   })
 
-  // Sum runs and count innings per (position, player_id).
+  // Sum runs and count innings per (position, player_id) — the numerator.
   const totalsByPosition = new Map<number, Map<string, { runs: number; innings: number }>>()
+  // Every batted innings for a player, any position (or none recorded) —
+  // the denominator for the "N / M Inn" bar label, same filter scope as
+  // everything else here, mirroring aggregate()'s battingInnings count.
+  const totalInningsByPlayer = new Map<string, number>()
   for (const r of battingRows as any[]) {
     if (!r.batted) continue
+    totalInningsByPlayer.set(r.player_id, (totalInningsByPlayer.get(r.player_id) ?? 0) + 1)
     const position = num(r.batting_order)
     if (!Number.isInteger(position) || position < 1 || position > 12) continue
     if (!totalsByPosition.has(position)) totalsByPosition.set(position, new Map())
@@ -987,7 +996,7 @@ export async function getTopScorersByBattingPosition(
   // Group players by identical (runs, innings) — a genuine tie, sharing one
   // podium rank — then sort those tiers runs desc, innings asc, and keep
   // the top 3.
-  const leaders: { position: number; tiers: { runs: number; innings: number; playerIds: string[] }[] }[] = []
+  const leaders: { position: number; tiers: { runs: number; innings: number; playerIds: string[]; totalInnings: number | null }[] }[] = []
   const allPlayerIds = new Set<string>()
   for (const [position, byPlayer] of Array.from(totalsByPosition)) {
     const byTuple = new Map<string, { runs: number; innings: number; playerIds: string[] }>()
@@ -999,6 +1008,17 @@ export async function getTopScorersByBattingPosition(
     const tiers = Array.from(byTuple.values())
       .sort((a, b) => b.runs - a.runs || a.innings - b.innings)
       .slice(0, 3)
+      // A tier's own total-innings figure only means something when every
+      // tied player shares it — a genuine (runs, position-innings) tie
+      // doesn't guarantee their *overall* innings count also matches, so a
+      // mismatch is surfaced as `null` (the bar/modal then omit the "/ N"
+      // denominator) rather than picking one player's number and silently
+      // mislabelling the others.
+      .map(t => {
+        const totals = t.playerIds.map(id => totalInningsByPlayer.get(id) ?? t.innings)
+        const totalInnings = totals.every(v => v === totals[0]) ? totals[0] : null
+        return { ...t, totalInnings }
+      })
     tiers.forEach(t => t.playerIds.forEach(id => allPlayerIds.add(id)))
     leaders.push({ position, tiers })
   }
@@ -1024,7 +1044,7 @@ export async function getTopScorersByBattingPosition(
       // later deleted from Hub) is dropped entirely rather than leaving a
       // gap in the podium numbering (e.g. rank 1 missing, jumping to 2).
       const resolvedTiers = l.tiers
-        .map(t => ({ runs: t.runs, innings: t.innings, players: resolvePlayers(t.playerIds) }))
+        .map(t => ({ runs: t.runs, innings: t.innings, totalInnings: t.totalInnings, players: resolvePlayers(t.playerIds) }))
         .filter(t => t.players.length > 0)
       if (resolvedTiers.length === 0) return null
       const topThree = resolvedTiers.map((t, i) => ({ rank: i + 1, ...t }))
