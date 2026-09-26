@@ -216,6 +216,7 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Twice daily, 13:00 & 19:00 IST (moved off 07:00 on 2026-08-01 — no games are played 19:00–07:00 IST, so that slot was dead time; the morning slot itself moved 12:00→13:00 IST on 2026-08-08) — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 3/run; see `features/post-match-scorecard.md` |
 | `/api/cron/sync-player-status` | GET | `CRON_SECRET` bearer | Daily at 02:00 IST — recomputes every non-expelled player's `active`/`inactive` status from 42-day availability signal; see `features/gc-players.md` |
 | `/api/cron/availability-nudge` | GET | `CRON_SECRET` bearer | Sun–Wed at 20:45 IST — personalised push reminders for `nextLockWeekend` gaps; see `features/availability-nudge.md` |
+| `/api/cron/reservation-expiry-reminders` | GET | `CRON_SECRET` bearer | Hourly (GitHub Actions is the real trigger here, not just a backstop — Vercel Hobby's once-a-day cap can't give the lead times this needs) — alerts every admin 24h/12h/1h before a `soft_block` reservation's `reserved_until` deadline, so they can nudge the organiser before the slot auto-expires; see `features/reservation-expiry-reminders.md` |
 
 > **GitHub Actions backstop (added 2026-07-16):** Vercel Hobby's own cron
 > scheduler was confirmed unreliable in production — `lock-availability` and
@@ -227,6 +228,10 @@ Access here is genuinely mixed per-route rather than one role — see
 > route is idempotent, so it's safe for both schedulers to fire — a
 > same-day double-invocation is a no-op. Requires `CRON_SECRET` to also be
 > set as a GitHub repo secret (Settings → Secrets and variables → Actions).
+> `reservation-expiry-reminders` (added September 2026) inverts this
+> relationship — its GitHub Actions workflow is the actual hourly trigger,
+> not a backstop for an otherwise-daily Vercel schedule, since Hobby's cap
+> can't reach hourly at all; see `features/reservation-expiry-reminders.md` §5.
  
 ---
  
@@ -873,6 +878,7 @@ Next.js API Routes (server-side)
 | src/lib/webpush.ts | Web push utility — sendPushToPlayer(playerId, payload); VAPID init inside function; 410 cleanup; notifyGCs()/notifyAllSubscribed()/notifyAdmins() broadcast helpers |
 | src/app/api/push/subscribe/route.ts | POST — saves browser push subscription; player_id from session only |
 | `src/lib/feeReminders.ts` | `resolvePendingFee()`/`getPendingFeeBookings()`/`notifyFeeReminderIfPending()` — match fee payment reminder eligibility, shared by the push trigger, the admin modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
+| `src/lib/reservationExpiryReminders.ts` + `src/app/api/cron/reservation-expiry-reminders/route.ts` | `checkAndSendReservationExpiryReminders()` — 24h/12h/1h admin push reminders before a `soft_block` reservation's `reserved_until` deadline; see `features/reservation-expiry-reminders.md` |
 | `src/lib/matchFeeSplit.ts` | `computeMatchFeeSplit()` — shared per-player fee/units/exemption computation used by both `POST` (apply) and `PATCH` (correction) `/api/fees/apply`; see `features/post-match-scorecard.md` §6.1 |
 | `src/app/api/wallet/transactions/route.ts` | GET (own/admin/`scope=all`, paginated, Brought Forward calc), POST (top-up/debit), PATCH (admin corrections) — see `features/wallet-ledger.md` |
 | `src/app/api/wallet/opening-balance/route.ts` | PATCH — admin override of a player's Brought Forward line |
