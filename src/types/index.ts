@@ -340,17 +340,13 @@ export interface BattingPositionRankEntry {
 // rule the modal and the bar chart share; a tier holds more than one player
 // only when both runs AND innings are still tied — the tie-inclusive
 // fallback bestByAll() in src/lib/leaderboardMilestones.ts uses in the same
-// situation. `totalInnings` is the *whole position's* innings count — every
-// player who has ever batted there, not just the leader(s) in `topThree` —
-// summed before the top-3 slice, so it never undercounts once more than 3
-// tiers of performance exist at a position. See features/leaderboard.md's
-// "Runs by Batting Position" section.
+// situation. See features/leaderboard.md's "Runs by Batting Position"
+// section.
 export interface BattingPositionLeader {
-  position:     number
-  runs:         number
-  players:      { playerId: string; playerName: string; cricheroesUrl: string | null }[]
-  topThree:     BattingPositionRankEntry[]
-  totalInnings: number
+  position: number
+  runs:     number
+  players:  { playerId: string; playerName: string; cricheroesUrl: string | null }[]
+  topThree: BattingPositionRankEntry[]
 }
 
 // Club-wide partnership leaders for /leaderboard's Detailed → Partnerships
