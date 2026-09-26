@@ -53,7 +53,7 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
               className="flex items-center gap-2 cursor-pointer group"
             >
               <span className="font-cinzel text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 w-7 flex-shrink-0 text-right">{l.position}</span>
-              <div className="flex-1 relative h-9 bg-[var(--stats-row-bg)] dark:bg-ink-4 group-hover:bg-[var(--stats-divider)] dark:group-hover:bg-ink-5 rounded overflow-hidden transition-colors">
+              <div className="flex-1 relative h-7 bg-[var(--stats-row-bg)] dark:bg-ink-4 group-hover:bg-[var(--stats-divider)] dark:group-hover:bg-ink-5 rounded overflow-hidden transition-colors">
                 <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
                 <div className="absolute inset-0 flex items-center gap-2 px-2.5">
                   <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text)] dark:text-parchment truncate flex-1 min-w-0">
@@ -65,10 +65,10 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
                     ))}
                   </span>
                   <span
-                    className="font-rajdhani text-[9px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 -rotate-90 whitespace-nowrap"
-                    title={`${l.totalInnings} innings played at position ${l.position}`}
+                    className="font-rajdhani text-[10px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 whitespace-nowrap"
+                    title={`${l.topThree[0].innings} innings at position ${l.position}`}
                   >
-                    {l.totalInnings} Inn
+                    {l.topThree[0].innings} Inn
                   </span>
                   <span className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] dark:text-gold flex-shrink-0">{l.runs}</span>
                 </div>
