@@ -105,15 +105,27 @@ describe('buildPlayerUnderCaptains', () => {
 })
 
 describe('buildSeasonProgression', () => {
-  it('splits by year, newest first, with average batting position', () => {
+  it('splits by year, newest first, with the most-played batting position', () => {
     const out = buildSeasonProgression([
       inn({ playerId: 'p', gameDate: '2025-06-01', batting: bat(6, 10) }),
-      inn({ playerId: 'p', gameDate: '2026-06-01', batting: bat(2, 30) }),
+      inn({ playerId: 'p', gameDate: '2025-06-08' }), // did not bat
+      inn({ playerId: 'p', gameDate: '2026-06-01', batting: bat(3, 30) }),
+      inn({ playerId: 'p', gameDate: '2026-06-08', batting: bat(2, 0) }),
       inn({ playerId: 'p', gameDate: '2026-07-01', batting: bat(3, 50), bowling: bowl(6, 8, 1) }),
     ])
     expect(out.map(s => s.year)).toEqual(['2026', '2025'])
-    expect(out[0].averagePosition).toBe(2.5)
+    expect(out[0].mostPlayedPosition).toEqual({ position: 3, innings: 2 })
+    expect(out[0].batting.innings).toBe(3)
+    expect(out[1].batting.innings).toBe(1)
     expect(out[0].batting.runs).toBe(80)
     expect(out[0].bowling.wickets).toBe(1)
+  })
+
+  it('breaks a most-played tie toward the higher order', () => {
+    const out = buildSeasonProgression([
+      inn({ playerId: 'p', gameDate: '2026-01-01', batting: bat(5, 1) }),
+      inn({ playerId: 'p', gameDate: '2026-01-02', batting: bat(2, 1) }),
+    ])
+    expect(out[0].mostPlayedPosition).toEqual({ position: 2, innings: 1 })
   })
 })
