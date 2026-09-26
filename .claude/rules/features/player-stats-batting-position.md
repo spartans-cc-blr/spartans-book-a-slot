@@ -696,8 +696,9 @@ needed its own implementation, not a shared one.
   unselected, `text-white/90` on the selected (solid blue) bar, no new
   `--stats-*` token introduced.
 
-**Bottom-aligned per-bar label (fixed September 2026).** The "N Inn" label
-was originally vertically centered inside each bar
+**Bottom-aligned per-bar label (fixed September 2026, still rotated at the
+time — see §12.2 for the follow-up that actually finished this).** The "N
+Inn" label was originally vertically centered inside each bar
 (`flex items-center justify-center`) — since bar height scales with runs
 (from the `MIN_PCT = 26` floor up to 100%), a low-run position's short bar
 put the label near the chart's baseline while a high-run position's tall
@@ -709,6 +710,9 @@ height, so every label now sits at the same fixed distance from that
 shared baseline and lines up horizontally across the whole chart. The
 bar's own `rounded-t` (top-only rounding) means the bottom corners are
 square, so there's no rounding to clip the label against at that edge.
+This pass only touched vertical alignment — the label was still
+`-rotate-90` and still using the dimmer `dark:text-zinc-500`, both of
+which turned out to still be wrong; see §12.2.
 
 ### Security (vibe-security)
 
@@ -721,6 +725,95 @@ no new client input.
 | File | Role |
 |---|---|
 | `src/components/players/PlayerStatsClient.tsx` | `positionData`'s `innings` field, `totalBattingInnings`, the chart header's total figure, `BattingPositionChart`'s rotated, bottom-aligned per-bar "N Inn" label and raised `MIN_PCT` bar-height floor |
+
+---
+
+## 12.2 De-rotated label, Batting/Bowling/Fielding back to tabs, collapsible Match History (added September 2026)
+
+Reported live, against a real player page: the "N Inn" label was still
+illegible (rotated text clipping against a short bar, low-contrast grey
+on the `bg-gold/50` fill), and — separately — the three always-visible
+discipline sections introduced by §12 had turned out to be hard to scroll
+through and left the Summary card above feeling disconnected from
+whichever discipline the visitor actually cared about. Three related
+fixes, all in `PlayerStatsClient.tsx`:
+
+### The label itself — actually de-rotated this time
+
+§12.1's "bottom-aligned" fix only changed vertical alignment; the label
+was still `-rotate-90` (reading bottom-to-top) and still coloured
+`text-[var(--stats-text-muted)] dark:text-zinc-500`. Against a short bar
+(the `MIN_PCT = 26` floor, ≈37px), a rotated 5-character label needs more
+vertical room than that to render without clipping — combined with the
+dim grey-on-muted-gold contrast, the label was effectively unreadable in
+practice, exactly the symptom reported. Fixed by mirroring the identical
+fix already proven on the leaderboard's own (horizontal) equivalent chart
+(`BattingPositionLeaders.tsx`, `features/leaderboard.md` §6.1): the
+`-rotate-90` class is gone (plain horizontal text now), the font bumped
+`text-[9px]` → `text-[10px]`, and the unselected colour changed to
+`dark:text-zinc-400` (one step lighter than the `zinc-500` this chart had
+been using, matching the leaderboard's proven-legible choice). The
+bottom-alignment itself (`items-end`, `pb-1.5`) from §12.1 is unchanged —
+horizontal text at this size fits comfortably inside even the shortest
+(26%-floor) bar with no further height changes needed.
+
+### Batting/Bowling/Fielding — back to a tab switcher, not three stacked cards
+
+§12's "each discipline is its own always-visible, self-contained section"
+design is reverted for the *section content* (its chart + Innings
+History) — not for the Summary card, see below. A horizontal three-way
+tab row (`activeTab: StatTab`, `'batting' | 'bowling' | 'fielding'`,
+default `'batting'`) now shows exactly one discipline's section at a
+time, styled as a rounded-full segmented control — the same
+`bg-[var(--stats-accent)] text-white dark:text-ink` active /
+`text-[var(--stats-text-muted)] hover:text-[var(--stats-text)]` inactive
+pairing `StatsSegmentedTabs.tsx` already established for the "Yours
+Statistically | Team Record" switcher atop this page and `/leaderboard` —
+reused for visual consistency rather than inventing a second tab
+treatment. Each tab label carries its own already-computed count
+(`battingInningsInPitchScope`, `bowlingInningsInPitchScope`,
+`fieldingTabMatches.length` — all pre-existing values, no new
+aggregation) so a visitor can see roughly how much is behind each tab
+before switching.
+
+**The Summary card is deliberately *not* tab-scoped — it was never
+gated on `activeTab` to begin with, and stays that way on purpose.** It
+already showed Overview/Batting/Bowling side by side, driven by
+`overviewTotals`/`battingTotals`/`bowlingTotals` (Pitch-filtered, and
+further narrowed per-column by whichever chart bar/slice is selected) —
+none of that depended on which discipline section was rendered below it,
+so nothing needed to change there for the tab switcher to land correctly.
+This means the Summary card keeps reflecting a Bowling-tab dismissal
+selection, say, even while the Batting tab is the one currently visible —
+`selectedPosition`/`selectedDismissal` are their own state, independent
+of `activeTab`, exactly as before.
+
+### Match History — collapsed by default under each tab, auto-opens on a chart selection
+
+Each discipline's own Innings History table is now wrapped in
+`CollapsibleHistory` — collapsed by default (a "Match History (N)" toggle
+row, `▾`/rotated-`▾` chevron), so landing on a tab shows its chart and
+caption without also scrolling past a full match table. Tapping a
+Batting-position bar or a Bowling dismissal-type slice auto-opens that
+discipline's own history (`togglePosition`/`toggleDismissal` call
+`setBattingHistoryOpen(true)`/`setBowlingHistoryOpen(true)` whenever a
+selection is made, never on clearing one) — collapsing by default is
+about a tab's *resting* state, not about hiding results a visitor just
+asked to filter to. Fielding (no chart) has no equivalent auto-open
+trigger; its history simply starts collapsed like the other two do before
+any selection.
+
+### Security (vibe-security)
+
+Same posture as every other section of this doc — purely a client-side
+layout/state change (which section renders, whether a table is
+expanded); no new route, no new data, no new client-reachable input.
+
+### File Map additions
+
+| File | Role |
+|---|---|
+| `src/components/players/PlayerStatsClient.tsx` | `BattingPositionChart`'s label de-rotated (plain horizontal `text-[10px]`, `dark:text-zinc-400`); `activeTab`/`StatTab` tab switcher (styled after `StatsSegmentedTabs.tsx`) replacing the three always-visible discipline cards; `CollapsibleHistory` — collapsed-by-default Match History wrapper, auto-opened by `togglePosition`/`toggleDismissal` on selection; Summary card unchanged, still independent of `activeTab` |
 
 ---
 
