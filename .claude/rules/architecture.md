@@ -74,6 +74,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/captains-corner` | Server → `CaptainsCornerGrid` (client) | `bookings`, `players`, `availability`, `squad` |
 | `/captains-corner/unavailable-dates` | Server → `UnavailableDatesPanel` (client) | `bookings` (16-week horizon, any non-`cancelled` status), run through `computeSlotStatus()` (`src/lib/validation.ts`) to compute genuinely open dates/slots — same engine `/api/availability` uses, so slot-overlap rules (a T20 at 10:30 blocking the whole day, etc.) are honoured; `player_future_availability` (own rows, `L` only) via `/api/player/future-availability`; reachable from the "Captains' Corner ▾" nav dropdown — see `features/player-future-availability.md` §6 |
 | `/tournament-planner` | Server → `TournamentPlannerClient` (client) | `bookings`, `captains`, `tournaments` (with `total_league_games`, `cricheroes_points_table_url`) |
+| `/captains-corner/my-players` | Server → `CaptainRecordView` | A captain's own matches (match captain via `squad.is_captain`): top 3 batters per batting position and bowlers used most, from the analytics DB. Gate `isCaptain \|\| isGC \|\| isAdmin`; GC/admin get a `?captainId=` picker, captains only ever see themselves. See `features/captaincy-stats.md` |
  
 ### Captain / GC / Wrangler shared routes
 
@@ -921,6 +922,7 @@ Next.js API Routes (server-side)
 | `src/lib/opponents.ts` | `normaliseOpponentName()` / `resolveOpponentIdByName()` / `linkSpellingToOpponent()` — opponent master resolution, used by both booking routes and `/api/opponents*` |
 | `src/app/team-stats/page.tsx` + `src/components/team/*` + `src/lib/teamStatsFilters.ts` | `/team-stats` — Team Record page; filter panel (chip summary row, desktop aside / mobile bottom sheet, staged apply), scrolling split row, expandable split table — see `features/team-stats.md` §3.1 |
 | `src/components/stats/StatsSegmentedTabs.tsx` | "Yours Statistically \| Team Record" two-pill switcher rendered under both `/leaderboard`'s and `/team-stats`'s hero |
+| `src/lib/captaincyStats.ts` + `src/lib/captaincyStatsCore.ts` + `src/components/captaincy/*` | Captaincy stats: `/captains-corner/my-players` and the "Under each captain" section on `/players/[id]/stats` (player themselves or GC/admin only). See `features/captaincy-stats.md` |
 | `src/app/opponents/page.tsx` + `src/components/opponents/OpponentsClient.tsx` + `src/app/api/opponents/**` | `/opponents` — opponent master + reconciliation queue and its API |
 | `src/components/admin/StageTypeToggle.tsx` | League/Knockout toggle on both admin booking forms → `bookings.stage_type` (defaults to `league` on a new booking) |
 | `src/components/admin/PracticeToggle.tsx` | Per-booking practice-game checkbox on both admin booking forms → `bookings.is_practice`, additive to `tournaments.is_practice` — see `features/practice-games.md` |

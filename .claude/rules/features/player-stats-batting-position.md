@@ -815,6 +815,18 @@ expanded); no new route, no new data, no new client-reachable input.
 |---|---|
 | `src/components/players/PlayerStatsClient.tsx` | `BattingPositionChart`'s label de-rotated (plain horizontal `text-[10px]`, `dark:text-zinc-400`); `activeTab`/`StatTab` tab switcher (styled after `StatsSegmentedTabs.tsx`) replacing the three always-visible discipline cards; `CollapsibleHistory` — collapsed-by-default Match History wrapper, auto-opened by `togglePosition`/`toggleDismissal` on selection; Summary card unchanged, still independent of `activeTab` |
 
+
+---
+
+## 13. "Under each captain" section (added September 2026)
+
+Below the main stats card, the page now renders `PlayerCaptaincyBreakdown`:
+this player's record split by match captain (positions used, batting,
+bowling, a chronological strip), plus a season-by-season table. It is shown
+only to the player themselves and to GC/admin. For anyone else it isn't
+fetched at all. It is all-time and doesn't follow this page's filters. Full
+design is in `features/captaincy-stats.md`.
+
 ---
 
 *Maintained by: Spartans CC BLR*
