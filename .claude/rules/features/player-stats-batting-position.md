@@ -673,9 +673,10 @@ needed its own implementation, not a shared one.
   `positionData`'s `innings` values summed (`totalBattingInnings`) — the
   same grand-total framing as the leaderboard's header.
 - **Each bar** gained a small `-rotate-90` "N Inn" label for that
-  position's own innings count, centered inside the bar's coloured fill
+  position's own innings count, sitting inside the bar's coloured fill
   (`overflow-hidden` on a wrapping span, so the rotated text can never
-  spill past the bar's own edges).
+  spill past the bar's own edges) — see the "bottom-aligned" fix below for
+  where inside the bar it actually sits.
 - **Minimum bar height raised.** This chart's bars grow from 0% (a
   genuinely 0-run position could render just a few px tall under the old
   `runs > 0 ? 4 : 1.5` percent floor) — nowhere near enough room for even a
@@ -693,6 +694,20 @@ needed its own implementation, not a shared one.
   unselected, `text-white/90` on the selected (solid blue) bar, no new
   `--stats-*` token introduced.
 
+**Bottom-aligned per-bar label (fixed September 2026).** The "N Inn" label
+was originally vertically centered inside each bar
+(`flex items-center justify-center`) — since bar height scales with runs
+(from the `MIN_PCT = 26` floor up to 100%), a low-run position's short bar
+put the label near the chart's baseline while a high-run position's tall
+bar put the same label much higher up the column, so the labels read as
+scattered at random heights across the row instead of forming a readable
+line. Fixed by switching the overlay to `flex items-end justify-center
+pb-1.5` — every bar shares the same bottom edge regardless of its own
+height, so every label now sits at the same fixed distance from that
+shared baseline and lines up horizontally across the whole chart. The
+bar's own `rounded-t` (top-only rounding) means the bottom corners are
+square, so there's no rounding to clip the label against at that edge.
+
 ### Security (vibe-security)
 
 Same posture as §5/§9/§12 — purely additive, client-side-only derived
@@ -703,7 +718,7 @@ no new client input.
 
 | File | Role |
 |---|---|
-| `src/components/players/PlayerStatsClient.tsx` | `positionData`'s `innings` field, `totalBattingInnings`, the chart header's total figure, `BattingPositionChart`'s rotated per-bar "N Inn" label and raised `MIN_PCT` bar-height floor |
+| `src/components/players/PlayerStatsClient.tsx` | `positionData`'s `innings` field, `totalBattingInnings`, the chart header's total figure, `BattingPositionChart`'s rotated, bottom-aligned per-bar "N Inn" label and raised `MIN_PCT` bar-height floor |
 
 ---
 
