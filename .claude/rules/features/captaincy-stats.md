@@ -44,6 +44,8 @@ unreconciled scorecard name doesn't appear.
 - **Bowlers used most:** balls bowled, then wickets, then name. The bar shows
   each bowler's share of all balls bowled in that captain's matches. Overs
   are summed in balls, not as decimals (3.4 + 2.5 = 6.3, not 6.9).
+- **Usual position (season table):** the position with the most innings
+  that year, ties going to the lower number.
 - **Player view:** captains ordered by matches played under them, with
   "Captain not recorded" always last. Positions within a captain are ordered
   by innings played there.
@@ -89,10 +91,18 @@ fetch directly.
   open). Each card shows position chips (innings, runs, average, strike
   rate), batting and bowling lines, and the progression strip: a runs bar per
   innings, oldest to latest, labelled with the position, plus wickets/runs
-  chips for bowling. Each bar and chip links to that match. A "Season by
-  season" table follows with matches, average batting position, runs,
-  average, strike rate, overs, wickets and economy. It is all-time and
-  doesn't follow the page's own filters.
+  chips for bowling. Each bar and chip links to that match. A captain the
+  player never batted under reads "Did not bat" in the card header rather
+  than "0 runs". A "Season by season" table follows with batting innings,
+  usual position, runs, average, strike rate, overs, wickets and economy.
+  It is all-time and doesn't follow the page's own filters.
+- **Usual position, not average position (changed September 2026).** The
+  season table first showed matches played and the average batting
+  position. Both were replaced on feedback: matches counted games where the
+  player didn't bat, and an average position (8.9, say) tells neither a
+  captain nor a player where he actually bats. The table now shows batting
+  innings ("Inn") and the most-played position with its innings count
+  ("No. 6 (5)"). A tie goes to the higher order (lower number).
 
 Both use the shared `--stats-*` tokens, so they follow Light/Dark/System.
 

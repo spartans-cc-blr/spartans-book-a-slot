@@ -103,8 +103,9 @@ export interface PlayerUnderCaptain {
 
 export interface SeasonProgression {
   year: string
-  matches: number
-  averagePosition: number | null
+  // The position batted at most often that year (ties go to the higher
+  // order, i.e. the lower number); null if the player didn't bat.
+  mostPlayedPosition: { position: number; innings: number } | null
   batting: BattingLine
   bowling: BowlingLine
 }
@@ -283,14 +284,19 @@ export function buildSeasonProgression(rows: CaptaincyInnings[]): SeasonProgress
   }
   return Array.from(byYear.entries())
     .map(([year, yr]) => {
-      const positions = yr.map(r => r.batting?.position).filter((p): p is number => p != null)
-      return {
-        year,
-        matches: new Set(yr.map(r => r.matchId)).size,
-        averagePosition: positions.length > 0 ? round2(positions.reduce((s, p) => s + p, 0) / positions.length) : null,
-        batting: battingLine(yr),
-        bowling: bowlingLine(yr),
+      const counts = new Map<number, number>()
+      for (const r of yr) {
+        const pos = r.batting?.position
+        if (pos != null) counts.set(pos, (counts.get(pos) ?? 0) + 1)
       }
+      let mostPlayedPosition: SeasonProgression['mostPlayedPosition'] = null
+      for (const [position, innings] of Array.from(counts.entries())) {
+        if (!mostPlayedPosition || innings > mostPlayedPosition.innings
+          || (innings === mostPlayedPosition.innings && position < mostPlayedPosition.position)) {
+          mostPlayedPosition = { position, innings }
+        }
+      }
+      return { year, mostPlayedPosition, batting: battingLine(yr), bowling: bowlingLine(yr) }
     })
     .sort((a, b) => b.year.localeCompare(a.year))
 }

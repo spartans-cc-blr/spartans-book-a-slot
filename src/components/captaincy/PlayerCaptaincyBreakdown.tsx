@@ -97,7 +97,9 @@ function CaptainCard({ c, defaultOpen }: { c: PlayerUnderCaptain; defaultOpen: b
         </div>
         <div className="text-right flex-shrink-0">
           <p className="font-rajdhani text-xs text-[var(--stats-text-2)]">
-            <b className="font-cinzel text-[var(--stats-text)]">{c.batting.runs}</b> runs
+            {c.batting.innings > 0
+              ? <><b className="font-cinzel text-[var(--stats-text)]">{c.batting.runs}</b> runs</>
+              : <span className="text-[var(--stats-text-muted)]">Did not bat</span>}
             {c.bowling.wickets > 0 && <> · <b className="font-cinzel text-[var(--stats-text)]">{c.bowling.wickets}</b> wkts</>}
           </p>
         </div>
@@ -177,8 +179,8 @@ export function PlayerCaptaincyBreakdown({ captains, seasons, isOwn }: {
               <thead>
                 <tr className="text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] text-right">
                   <th className="px-1 py-2 text-left">Year</th>
-                  <th className="px-1 py-2">M</th>
-                  <th className="px-1 py-2" title="Average batting position">Avg pos</th>
+                  <th className="px-1 py-2" title="Batting innings">Inn</th>
+                  <th className="px-1 py-2" title="Position batted at most often, with innings there">Usual pos</th>
                   <th className="px-1 py-2">Runs</th>
                   <th className="px-1 py-2">Avg</th>
                   <th className="px-1 py-2">SR</th>
@@ -191,8 +193,12 @@ export function PlayerCaptaincyBreakdown({ captains, seasons, isOwn }: {
                 {seasons.map(s => (
                   <tr key={s.year} className="border-t border-[var(--stats-divider)] text-right text-[var(--stats-text)]">
                     <td className="px-1 py-2 text-left font-semibold">{s.year}</td>
-                    <td className="px-1 py-2">{s.matches}</td>
-                    <td className="px-1 py-2">{fig(s.averagePosition)}</td>
+                    <td className="px-1 py-2">{s.batting.innings}</td>
+                    <td className="px-1 py-2">
+                      {s.mostPlayedPosition
+                        ? <>No. {s.mostPlayedPosition.position} <span className="text-[var(--stats-text-muted)] text-xs">({s.mostPlayedPosition.innings})</span></>
+                        : '—'}
+                    </td>
                     <td className="px-1 py-2 font-semibold">{s.batting.runs}</td>
                     <td className="px-1 py-2">{fig(s.batting.average)}</td>
                     <td className="px-1 py-2">{fig(s.batting.strikeRate, 0)}</td>
