@@ -707,11 +707,51 @@ that decides which matches belong to a ground.
 
 ---
 
+## 8.4 Incident — 25 Sep 2026, Year dropdown hardcoded to the last 3 years
+while Team Record's own Season filter went back to 2019
+
+**Symptom:** the Honor Board's Year `<select>` only ever offered the
+current year and the two before it (2026/2025/2024 at the time this was
+reported), silently hiding every older season — even though
+`/team-stats`'s own Season filter, over the same match history, correctly
+listed every year back to 2019.
+
+**Root cause:** `src/app/leaderboard/page.tsx` passed a literal
+`years={[currentYear, currentYear - 1, currentYear - 2]}` to
+`LeaderboardFilters` — a fixed three-entry list, never derived from any
+real data. Team Record's equivalent (`filterOptions()` in
+`src/lib/teamStatsCore.ts`) has always derived its `years` list from every
+match actually in `getTeamMatches()`'s result
+(`Array.from(new Set(matches.map(m => m.gameDate.slice(0, 4))))`), so the
+two pages could never agree once the club's real match history grew past
+three years.
+
+**Fixed** by deriving the Year dropdown from `availableMonths` — already
+fetched on this page via `getAvailableMonths()` for the Monthly tab's month
+stepper, itself already a real, data-derived list of every `YYYY-MM` with
+a confirmed, synced booking (see that function's own comment). No new
+DB query was needed: `availableYears` in `page.tsx` is just
+`Array.from(new Set(availableMonths.map(m => Number(m.slice(0, 4)))))`,
+with `currentYear` unioned in (so a brand-new season with zero matches yet
+still shows up as a selectable, if empty, option — matching the pre-fix
+behaviour of always offering the current year) and sorted descending.
+`years={[currentYear, currentYear - 1, currentYear - 2]}` was replaced with
+`years={availableYears}`.
+
+**Deliberately not touched:** the `year` value itself (`Number(yearParam)
+|| currentYear`, from the URL) was never validated against the `years`
+list either before or after this fix — a hand-edited `?year=2019` already
+worked correctly against `getLeaderboard()`/`getPerformances()`, the gap
+was purely in what the dropdown *offered*. This fix only widens the
+dropdown to match what already worked underneath it.
+
+---
+
 ## 9. File Map
 
 | File | Role |
 |---|---|
-| `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`, `getTopScorersByBattingPosition` for Detailed → Bat only — §6.1), glossary building; computes `showPitchTabs`/`pitchType` for the Pitch Type tabs (§6.2), applied only to the `getLeaderboard()` call that feeds `rows`; the six category-gated analytics reads run as one `Promise.all()` batch rather than sequential awaits (§8.2) |
+| `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`, `getTopScorersByBattingPosition` for Detailed → Bat only — §6.1), glossary building; computes `showPitchTabs`/`pitchType` for the Pitch Type tabs (§6.2), applied only to the `getLeaderboard()` call that feeds `rows`; the six category-gated analytics reads run as one `Promise.all()` batch rather than sequential awaits (§8.2); Year dropdown (`availableYears`) derived from `availableMonths` instead of a hardcoded 3-year list (§8.4) |
 | `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), `getTopScorersByBattingPosition()` (§6.1), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10) and, as of §6.2, accepts an optional `pitchType` filter resolved via `getPitchTournamentIds()`/`withPitchType()`; `fetchAllRows()` pages every multi-row analytics-DB read past PostgREST's default 1000-row cap (§8.1) |
 | `src/components/leaderboard/BattingPositionLeaders.tsx` | Detailed → Bat only — horizontal bar chart of the leading run-scorer(s) per batting position, tap a bar for the "Top 3" modal (§6.1); header shows the grand total innings across all positions, each bar carries a rotated "N Inn" label for that position's own total (§6.1); unaffected by the Pitch Type tabs rendered below it (§6.2) |
 | `src/components/leaderboard/PitchTypeTabs.tsx` | Detailed → Bat/Bowl — All/Matted/Astro/Turf tab row narrowing `LeaderboardTable`, hidden and inert whenever a Tournament/Ground is selected (§6.2) |
