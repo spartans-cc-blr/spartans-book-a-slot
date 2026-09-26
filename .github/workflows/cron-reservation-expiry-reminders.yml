@@ -1,0 +1,32 @@
+name: Cron — reservation-expiry-reminders
+
+# Real trigger for this cron, not just a backstop — Vercel Hobby only
+# supports one cron invocation per day per job (see limitations.md), which
+# can't deliver the 24h/12h/1h lead-time reminders this route needs before
+# a soft_block reservation's own reserved_until deadline. GitHub Actions has
+# no such restriction, so it runs hourly here; the vercel.json entry is
+# best-effort daily coverage only, in case this workflow is ever disabled.
+#
+# Safe to run alongside the vercel.json entry, and safe to run every hour
+# regardless of how close/far a reservation is from expiring — the route's
+# own reservation_expiry_reminders table (UNIQUE on booking_id +
+# reminder_type + reserved_until) means a threshold already sent for a
+# given reservation is never re-sent; an hourly double-check just lands as
+# a no-op "already sent" outcome.
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call reservation-expiry-reminders cron endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://hub.spartanscricketclub.in/api/cron/reservation-expiry-reminders
