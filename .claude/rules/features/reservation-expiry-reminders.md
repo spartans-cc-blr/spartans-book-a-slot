@@ -120,20 +120,26 @@ in under 1 hour. Nudge them before the slot expires!` Links to
 
 ---
 
-## 5. Cron scheduling — hourly, GitHub Actions is the real trigger
+## 5. Cron scheduling — hourly, GitHub Actions only
 
 Vercel Hobby caps a single `vercel.json` cron entry at one invocation per
 day (see `limitations.md`) — nowhere near enough resolution for a 1-hour
-lead-time reminder. So unlike most of this app's crons (where the
-`vercel.json` entry is the primary trigger and GitHub Actions is a
-reliability backstop), here it's inverted: the GitHub Actions workflow
+lead-time reminder. So unlike every other cron in this app, this one has
+**no `vercel.json` entry at all**: the GitHub Actions workflow
 (`.github/workflows/cron-reservation-expiry-reminders.yml`, `cron: '0 * *
-* *'`) is the actual mechanism this feature depends on, and the
-`vercel.json` entry (also `"0 * * * *"`, though Hobby will likely only
-honour it once a day in practice) is best-effort extra coverage in case
-the workflow is ever disabled. Both call the same idempotent route, so a
-double-fire from both schedulers in the same hour is harmless — the
-second attempt just lands as `already_sent`.
+* *'`) is the only trigger.
+
+> **Incident (26 Sep 2026) — the hourly `vercel.json` entry blocked every
+> deploy.** This feature originally shipped (PR #318) with a
+> `vercel.json` entry scheduled `"0 * * * *"`, on the assumption that
+> Hobby would just honour it once a day. It doesn't — Hobby **rejects the
+> whole deployment** at config validation when any cron is scheduled more
+> often than daily (the Vercel commit status failed ~9 seconds after push,
+> before any build ran). Every merge after it (#319–#322) failed the same
+> way, so production stayed on #317 while `main` moved on. Fixed by
+> removing the entry entirely. Take-away: never add a sub-daily schedule
+> to `vercel.json` on Hobby — put anything more frequent in a GitHub
+> Actions workflow only.
 
 ---
 
@@ -157,8 +163,7 @@ second attempt just lands as `already_sent`.
 | `supabase/migrations/080_reservation_expiry_reminders.sql` | `reservation_expiry_reminders` table — idempotency + delivery-status log |
 | `src/lib/reservationExpiryReminders.ts` | `checkAndSendReservationExpiryReminders()` — the detection/send logic |
 | `src/app/api/cron/reservation-expiry-reminders/route.ts` | Cron entry point — `CRON_SECRET` bearer auth |
-| `.github/workflows/cron-reservation-expiry-reminders.yml` | Hourly trigger — the real mechanism, not just a backstop (§5) |
-| `vercel.json` | Best-effort daily-capped entry, same route |
+| `.github/workflows/cron-reservation-expiry-reminders.yml` | Hourly trigger — the only one, no `vercel.json` entry (§5) |
 | `src/lib/webpush.ts` | `notifyAdmins()` — reused, not reimplemented |
 | `src/lib/bookingNotify.ts` | `buildOrganiserWhatsAppUrl()` — the existing nudge action the admin lands on after tapping the push |
 

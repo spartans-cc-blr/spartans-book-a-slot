@@ -90,6 +90,13 @@ needs multiple fires per day (`backfill-scorecards` at 13:00 & 19:00 IST)
 must rely on its GitHub Actions workflow for the additional fire(s) —
 `vercel.json` can only ever cover one of them as a backup.
 
+**A sub-daily `vercel.json` schedule doesn't degrade to daily — it blocks
+the deploy.** Confirmed 26 Sep 2026: a `"0 * * * *"` entry for
+`reservation-expiry-reminders` made Vercel reject every deployment at
+config validation, so production silently stayed several merges behind
+`main`. Any cron that needs to run more than once a day must live in a
+GitHub Actions workflow only, with no `vercel.json` entry at all.
+
 **Fix (implemented 2026-07-16):** all five crons now have a matching
 GitHub Actions workflow in `.github/workflows/cron-*.yml` that calls the
 same endpoint with the same `CRON_SECRET` on the same intended schedule,
