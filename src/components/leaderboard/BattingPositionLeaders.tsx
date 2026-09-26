@@ -59,10 +59,16 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
                     ))}
                   </span>
                   <span
-                    className="font-rajdhani text-[10px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 whitespace-nowrap w-11 text-right"
-                    title={`${l.topThree[0].innings} innings at position ${l.position}`}
+                    className="font-rajdhani text-[10px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 whitespace-nowrap w-20 text-right"
+                    title={
+                      l.topThree[0].totalInnings != null
+                        ? `${l.topThree[0].innings} innings at position ${l.position}, out of ${l.topThree[0].totalInnings} innings batted overall (this filter)`
+                        : `${l.topThree[0].innings} innings at position ${l.position}`
+                    }
                   >
-                    {l.topThree[0].innings} Inn
+                    {l.topThree[0].totalInnings != null
+                      ? `${l.topThree[0].innings} / ${l.topThree[0].totalInnings} Inn`
+                      : `${l.topThree[0].innings} Inn`}
                   </span>
                   <span className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] dark:text-gold flex-shrink-0">{l.runs}</span>
                 </div>

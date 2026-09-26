@@ -322,12 +322,19 @@ export interface MvpRankEntry {
 // BattingPositionLeader below) — `rank` is a podium position (1/2/3), not a
 // row index, so a genuine tie (same runs AND same innings) shares one rank
 // and can carry more than one player rather than being arbitrarily split
-// across two ranks.
+// across two ranks. `totalInnings` is this tier's own batted-innings count
+// across *every* batting position (not just this one), same filter scope —
+// the "/ N" denominator on the bar's "N / M Inn" label. Only meaningful when
+// every tied player in the tier shares the same total; `null` when a
+// genuine (runs, innings-at-position) tie doesn't also carry a matching
+// overall-innings total, since picking one player's number would silently
+// mislabel the others.
 export interface BattingPositionRankEntry {
-  rank:    number
-  runs:    number
-  innings: number
-  players: { playerId: string; playerName: string; cricheroesUrl: string | null }[]
+  rank:         number
+  runs:         number
+  innings:      number
+  totalInnings: number | null
+  players:      { playerId: string; playerName: string; cricheroesUrl: string | null }[]
 }
 
 // Top run-scorer(s) at one batting position (1-12), aggregated across the
