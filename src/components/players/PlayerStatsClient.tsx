@@ -604,7 +604,7 @@ function BattingPositionChart({
               }`}
               title={`${innings} innings played at position ${position}`}
             >
-              <span className="absolute inset-0 flex items-center justify-center overflow-hidden">
+              <span className="absolute inset-0 flex items-end justify-center overflow-hidden pb-1.5">
                 <span className={`-rotate-90 whitespace-nowrap font-rajdhani text-[9px] leading-none font-semibold ${
                   isSelected ? 'text-white/90' : 'text-[var(--stats-text-muted)] dark:text-zinc-500'
                 }`}>
