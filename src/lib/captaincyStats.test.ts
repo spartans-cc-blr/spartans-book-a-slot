@@ -96,6 +96,11 @@ describe('buildPlayerUnderCaptains', () => {
     expect(out[0].positions.map(p => [p.position, p.innings])).toEqual([[3, 2], [5, 1]])
   })
 
+  it('lists each position\'s matches newest first', () => {
+    const pos3 = out[0].positions.find(p => p.position === 3)!
+    expect(pos3.matches.map(m => [m.gameDate, m.runs])).toEqual([['2026-04-01', 12], ['2026-01-01', 40]])
+  })
+
   it('builds a chronological timeline', () => {
     expect(out[0].timeline.map(t => t.gameDate)).toEqual(['2026-01-01', '2026-03-01', '2026-04-01'])
     expect(out[0].firstDate).toBe('2026-01-01')

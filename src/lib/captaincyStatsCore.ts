@@ -71,12 +71,23 @@ export interface CaptainRecord {
   bowlers: BowlerUsage[]
 }
 
+export interface PositionMatch {
+  bookingId: string
+  gameDate: string
+  opponentName: string | null
+  runs: number
+  balls: number
+  notOut: boolean
+}
+
 export interface PositionUsage {
   position: number
   innings: number
   runs: number
   average: number | null
   strikeRate: number | null
+  // Newest first — feeds the expandable match list under each position.
+  matches: PositionMatch[]
 }
 
 export interface TimelinePoint {
@@ -247,7 +258,18 @@ export function buildPlayerUnderCaptains(rows: CaptaincyInnings[]): PlayerUnderC
     const positions: PositionUsage[] = Array.from(byPos.entries())
       .map(([position, pr]) => {
         const l = battingLine(pr)
-        return { position, innings: l.innings, runs: l.runs, average: l.average, strikeRate: l.strikeRate }
+        const matches: PositionMatch[] = pr
+          .filter(r => r.batting)
+          .map(r => ({
+            bookingId: r.bookingId,
+            gameDate: r.gameDate,
+            opponentName: r.opponentName,
+            runs: r.batting!.runs,
+            balls: r.batting!.balls,
+            notOut: r.batting!.notOut,
+          }))
+          .sort((a, b) => b.gameDate.localeCompare(a.gameDate))
+        return { position, innings: l.innings, runs: l.runs, average: l.average, strikeRate: l.strikeRate, matches }
       })
       .sort((a, b) => b.innings - a.innings || a.position - b.position)
     out.push({

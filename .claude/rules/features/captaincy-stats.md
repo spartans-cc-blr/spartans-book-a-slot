@@ -90,14 +90,13 @@ fetch directly.
   the top 3.
 - **"Under each captain"** (`PlayerCaptaincyBreakdown`, below the main stats
   on `/players/[id]/stats`): one collapsible card per captain (the first is
-  open). Each card shows position chips (innings, runs, average, strike
-  rate), batting and bowling lines, and the progression strip: a runs bar per
-  innings, oldest to latest, labelled with the position, plus wickets/runs
-  chips for bowling. Each bar and chip links to that match. A captain the
-  player never batted under reads "Did not bat" in the card header rather
-  than "0 runs". A "Season by season" table follows with batting innings,
-  usual position, runs, average, strike rate, overs, wickets and economy.
-  It is all-time and doesn't follow the page's own filters.
+  open). Each card shows an expandable list of batting positions used
+  (innings, runs, average, strike rate), batting and bowling summary lines,
+  and a "Bowling, oldest → latest" chip strip. A captain the player never
+  batted under reads "Did not bat" in the card header rather than "0 runs".
+  A "Season by season" table follows with batting innings, usual position,
+  runs, average, strike rate, overs, wickets and economy. It is all-time
+  and doesn't follow the page's own filters.
 - **Usual position, not average position (changed September 2026).** The
   season table first showed matches played and the average batting
   position. Both were replaced on feedback: matches counted games where the
@@ -113,6 +112,41 @@ fetch directly.
   a second, position-scoped count to be readable. `CaptainPositionChoices.
   totalInnings` was removed from the data layer, not just hidden, since
   nothing else read it.
+- **Batting positions used + the batting bar chart consolidated into one
+  expandable list (changed September 2026).** The player-facing "Under each
+  captain" card originally showed two separate things for batting: a row of
+  static "No. N · innings · runs · avg · SR" chips, and — further down,
+  inside the same card — a horizontal bar chart plotting every innings
+  oldest-to-latest (bar height = runs, label = position). Reported as
+  redundant and unusable at volume: a player with many innings under one
+  captain produced a wide, horizontally-scrolling chart that a phone
+  visitor had no visual cue even existed, and the chips above it already
+  named the same positions with no way to see the matches behind them. Per
+  the explicit request, the bar chart is gone outright (not just hidden or
+  shrunk) and each position chip became a `<details>` row instead
+  (`PositionRow` in `PlayerCaptaincyBreakdown.tsx`): the aggregate line
+  (innings/runs/avg/SR) is always visible, and tapping it expands a
+  newest-first list of the actual matches at that position — date, opponent,
+  runs (with `*` for not-out) and balls faced, each linking to
+  `/matches/history/[bookingId]`. This is a genuine consolidation, not a
+  second UI bolted next to the first: the aggregate and the match list now
+  live in the same row, and nothing else on the card repeats either. The
+  bowling side (a "Bowling, oldest → latest" chip strip — wickets/runs,
+  overs, linking to the match) is unaffected — it was never the reported
+  problem (chips wrap on a phone rather than requiring horizontal scroll)
+  and has no separate "chip summary" to consolidate with, so it kept its
+  own, unchanged component (`BowlingTimeline`, the batting half of the old
+  combined `Timeline` component was deleted entirely rather than kept
+  side-by-side with the new position rows).
+  `PositionUsage` (`captaincyStatsCore.ts`) gained a `matches:
+  PositionMatch[]` field (bookingId/gameDate/opponentName/runs/balls/notOut,
+  sorted newest-first) built directly from the same `CaptaincyInnings` rows
+  already grouped by position in `buildPlayerUnderCaptains()` — no new
+  fetch, no new query; the match-history page it links to already handled
+  the batting-order chart's own click-through the same way
+  (`/players/[id]/stats`' own "Runs by Batting Position" chart, see
+  `player-stats-batting-position.md` §4), so this reuses an established
+  navigation pattern rather than inventing one.
 
 Both use the shared `--stats-*` tokens, so they follow Light/Dark/System.
 
