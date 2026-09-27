@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildCaptainRecord, buildPlayerUnderCaptains, buildSeasonProgression, battingLine, bowlingLine,
-  type CaptaincyInnings,
+  pickRecommendedPosition, type CaptaincyInnings, type PositionUsage,
 } from './captaincyStatsCore'
 
 let seq = 0
@@ -92,8 +92,20 @@ describe('buildPlayerUnderCaptains', () => {
     expect(out[0].matches).toBe(3)
   })
 
-  it('orders positions by innings then position', () => {
+  it('orders positions by batting order (ascending), not innings frequency', () => {
     expect(out[0].positions.map(p => [p.position, p.innings])).toEqual([[3, 2], [5, 1]])
+  })
+
+  it('sorts by position even when innings frequency disagrees', () => {
+    const divergent = buildPlayerUnderCaptains([
+      inn({ playerId: 'q', captainId: 'z', captainName: 'Z', gameDate: '2026-01-01', batting: bat(2, 10) }),
+      inn({ playerId: 'q', captainId: 'z', captainName: 'Z', gameDate: '2026-01-02', batting: bat(8, 20) }),
+      inn({ playerId: 'q', captainId: 'z', captainName: 'Z', gameDate: '2026-01-03', batting: bat(8, 20) }),
+      inn({ playerId: 'q', captainId: 'z', captainName: 'Z', gameDate: '2026-01-04', batting: bat(8, 20) }),
+    ])
+    // Position 8 has the most innings (3) but position 2 still leads —
+    // a plain innings-desc sort would have put 8 first.
+    expect(divergent[0].positions.map(p => p.position)).toEqual([2, 8])
   })
 
   it('lists each position\'s matches newest first', () => {
@@ -105,6 +117,44 @@ describe('buildPlayerUnderCaptains', () => {
     expect(out[0].timeline.map(t => t.gameDate)).toEqual(['2026-01-01', '2026-03-01', '2026-04-01'])
     expect(out[0].firstDate).toBe('2026-01-01')
     expect(out[0].lastDate).toBe('2026-04-01')
+  })
+
+  it('attaches a recommended position once a captain has enough data', () => {
+    // Under X: No.3 (2 inn, 52 runs, avg 26) vs No.5 (1 inn, only — too few
+    // innings to be eligible at all).
+    expect(out[0].recommendedPosition?.position).toBe(3)
+    expect(out[0].recommendedPosition?.reason).toMatch(/2\+ innings/)
+    // Y only ever has one innings recorded at any position — nothing
+    // qualifies yet.
+    const y = out.find(c => c.captainName === 'Y')!
+    expect(y.recommendedPosition).toBeNull()
+  })
+})
+
+describe('pickRecommendedPosition', () => {
+  const pos = (over: Partial<PositionUsage>): PositionUsage =>
+    ({ position: 1, innings: 3, runs: 0, average: null, strikeRate: null, matches: [], ...over })
+
+  it('picks the position with the best blended runs/average/SR, ignoring too-thin samples', () => {
+    const positions = [
+      pos({ position: 3, innings: 3, runs: 30, average: 10, strikeRate: 80 }),
+      pos({ position: 5, innings: 4, runs: 200, average: 66.7, strikeRate: 140 }),
+      pos({ position: 7, innings: 1, runs: 90, average: 90, strikeRate: 200 }), // 1 inn — excluded
+    ]
+    const rec = pickRecommendedPosition(positions)
+    expect(rec?.position).toBe(5)
+  })
+
+  it('returns null when nothing has enough innings', () => {
+    expect(pickRecommendedPosition([pos({ position: 4, innings: 1, runs: 50, average: 50, strikeRate: 120 })])).toBeNull()
+  })
+
+  it('breaks an exact tie toward the lower (earlier) position', () => {
+    const positions = [
+      pos({ position: 6, innings: 3, runs: 60, average: 30, strikeRate: 100 }),
+      pos({ position: 2, innings: 3, runs: 60, average: 30, strikeRate: 100 }),
+    ]
+    expect(pickRecommendedPosition(positions)?.position).toBe(2)
   })
 })
 

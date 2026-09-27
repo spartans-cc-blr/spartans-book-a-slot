@@ -9,7 +9,7 @@
 
 import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
-import type { PlayerUnderCaptain, PositionUsage, SeasonProgression, TimelinePoint } from '@/lib/captaincyStatsCore'
+import type { PlayerUnderCaptain, PositionRecommendation, PositionUsage, SeasonProgression, TimelinePoint } from '@/lib/captaincyStatsCore'
 
 function shortDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
@@ -24,11 +24,17 @@ function fig(v: number | null, digits = 1): string {
 // "batting bar chart" pair. The aggregate line is always visible; the
 // match list (newest first) only renders once opened, so a player with
 // many innings at one position never forces a scroll-heavy chart.
-function PositionRow({ p }: { p: PositionUsage }) {
+// `isRecommended` highlights the one position pickRecommendedPosition()
+// picked out — a gold-tinted border/background rather than a separate
+// badge, so it reads as "this row" without adding more text per row.
+function PositionRow({ p, isRecommended }: { p: PositionUsage; isRecommended: boolean }) {
   return (
-    <details className="group border border-[var(--stats-card-border)] rounded-lg bg-[var(--stats-row-bg)]">
+    <details className={`group border rounded-lg ${isRecommended
+      ? 'border-[var(--stats-badge-border)] bg-[var(--stats-badge-bg)]'
+      : 'border-[var(--stats-card-border)] bg-[var(--stats-row-bg)]'}`}>
       <summary className="list-none cursor-pointer px-3 py-2 flex items-center justify-between gap-2">
         <span className="font-rajdhani text-xs text-[var(--stats-text-2)] truncate">
+          {isRecommended && <span title="Recommended position" className="mr-1">⭐</span>}
           <b className="text-[var(--stats-text)]">No. {p.position}</b> · {p.innings} inn · {p.runs} runs
           {p.average != null && ` · avg ${fig(p.average)}`}
           {p.strikeRate != null && ` · SR ${Math.round(p.strikeRate)}`}
@@ -47,6 +53,16 @@ function PositionRow({ p }: { p: PositionUsage }) {
         ))}
       </ul>
     </details>
+  )
+}
+
+// The plain-language "why this position" note under the heading, right
+// above the row it points at.
+function RecommendationHint({ rec }: { rec: PositionRecommendation }) {
+  return (
+    <p className="font-rajdhani text-[11px] text-[var(--stats-text-muted)] mb-1.5">
+      ⭐ <b className="text-[var(--stats-text-2)]">No. {rec.position}</b> recommended — {rec.reason}
+    </p>
   )
 }
 
@@ -107,14 +123,19 @@ function CaptainCard({ c, defaultOpen }: { c: PlayerUnderCaptain; defaultOpen: b
       <div className="px-4 pb-4 flex flex-col gap-4 border-t border-[var(--stats-divider)] pt-3">
         <div>
           <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mb-1.5">
-            Batting positions used
+            Batting positions used <span className="normal-case tracking-normal font-normal">(in batting order)</span>
           </p>
           {c.positions.length === 0 ? (
             <p className="font-rajdhani text-xs text-[var(--stats-text-faint)]">Did not bat under this captain.</p>
           ) : (
-            <div className="flex flex-col gap-1.5">
-              {c.positions.map(p => <PositionRow key={p.position} p={p} />)}
-            </div>
+            <>
+              {c.recommendedPosition && <RecommendationHint rec={c.recommendedPosition} />}
+              <div className="flex flex-col gap-1.5">
+                {c.positions.map(p => (
+                  <PositionRow key={p.position} p={p} isRecommended={c.recommendedPosition?.position === p.position} />
+                ))}
+              </div>
+            </>
           )}
         </div>
 

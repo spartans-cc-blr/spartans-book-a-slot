@@ -47,8 +47,12 @@ unreconciled scorecard name doesn't appear.
 - **Usual position (season table):** the position with the most innings
   that year, ties going to the lower number.
 - **Player view:** captains ordered by matches played under them, with
-  "Captain not recorded" always last. Positions within a captain are ordered
-  by innings played there.
+  "Captain not recorded" always last. Positions within a captain are
+  ordered by **batting order (position ascending)**, not by how often each
+  slot was used (changed September 2026 — see below).
+- **Recommended position (player view, added September 2026):** which of a
+  captain's positions actually got the most out of the player, with a
+  plain-language reason. See below.
 
 ---
 
@@ -147,6 +151,41 @@ fetch directly.
   (`/players/[id]/stats`' own "Runs by Batting Position" chart, see
   `player-stats-batting-position.md` §4), so this reuses an established
   navigation pattern rather than inventing one.
+- **Positions re-ordered by batting order, and a recommended position
+  surfaced (changed September 2026).** Two follow-ups from the same
+  screenshot, once the consolidated list above shipped: the rows sorted by
+  innings count descending, which read as scrambled rather than a lineup
+  (a position with 2 innings could sit above one with 11, depending on
+  which slot the player happened to bat at more), and there was no signal
+  at all for "which of these positions is actually working out."
+  - **Ordering** — `buildPlayerUnderCaptains()`'s position sort changed
+    from `innings desc, then position asc` to a plain `position asc` —
+    the list now reads top-to-bottom the way a real batting lineup does.
+    This only affects the player-facing "Under each captain" list;
+    `buildCaptainRecord()` (the captain-facing Top-3-per-position view on
+    `/captains-corner/my-players`) already sorted by position ascending
+    and needed no change.
+  - **Recommendation** — `pickRecommendedPosition()` scores every position
+    with at least 2 innings (`MIN_INNINGS_FOR_RECOMMENDATION` — a single
+    cameo shouldn't be able to "win" a position) by blending runs,
+    average, and strike rate, each measured relative to the captain's own
+    best at any position so the score is comparable across positions with
+    very different sample sizes: `0.4 × (runs / maxRuns) + 0.35 ×
+    (average / maxAverage) + 0.25 × (strikeRate / maxStrikeRate)`. Runs
+    weighs heaviest, same reasoning the Top-3 ranking already uses (it
+    reflects both how much the captain trusted the player there and what
+    he did with the trust); average and strike rate refine that by how
+    efficiently he did it. Ties go to the lower (earlier) position
+    number. A captain with no position reaching 2 innings gets
+    `recommendedPosition: null` — nothing is highlighted or claimed for a
+    thin sample.
+  - **UI** — the recommended `PositionRow` gets a gold-tinted border/
+    background (the same `--stats-badge-*` tokens the Top-3 rank-1 pill
+    already uses) and a ⭐, and a one-line hint sits above the position
+    list naming the position and the reason in plain language (e.g. "⭐
+    No. 3 recommended — Best combination of 52 runs in 2 inn, avg 26.0, SR
+    100 among positions with 2+ innings under this captain."). Nothing is
+    shown when `recommendedPosition` is null.
 
 Both use the shared `--stats-*` tokens, so they follow Light/Dark/System.
 

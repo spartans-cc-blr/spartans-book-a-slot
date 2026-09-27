@@ -98,6 +98,11 @@ export interface TimelinePoint {
   bowling: CaptaincyInnings['bowling']
 }
 
+export interface PositionRecommendation {
+  position: number
+  reason: string
+}
+
 export interface PlayerUnderCaptain {
   captainId: string | null
   captainName: string
@@ -105,6 +110,10 @@ export interface PlayerUnderCaptain {
   firstDate: string
   lastDate: string
   positions: PositionUsage[]
+  // The position this captain got the most out of this player, weighing
+  // runs, average and strike-rate together — null when no position has
+  // enough innings to say anything meaningful. See pickRecommendedPosition().
+  recommendedPosition: PositionRecommendation | null
   batting: BattingLine
   bowling: BowlingLine
   // Chronological, oldest first — the "how has he progressed" strip.
@@ -235,6 +244,53 @@ export function buildCaptainRecord(rows: CaptaincyInnings[], topN = 3): CaptainR
   return { matches: matchIds.size, firstDate: first, lastDate: last, positions, bowlers }
 }
 
+// A position needs at least this many innings before its average/strike
+// rate are treated as a real signal rather than a one-off cameo.
+const MIN_INNINGS_FOR_RECOMMENDATION = 2
+
+// Runs, average and strike rate each measured relative to this captain's
+// own best at any position (so the score is always 0-1, comparable across
+// captains with wildly different sample sizes), then blended: runs weighs
+// heaviest since it reflects both how often the captain trusted the player
+// there and what he did with the trust; average and strike rate refine
+// that by how efficiently he did it.
+function scorePosition(p: PositionUsage, maxRuns: number, maxAverage: number, maxStrikeRate: number): number {
+  const runsScore = maxRuns > 0 ? p.runs / maxRuns : 0
+  const avgScore = p.average != null && maxAverage > 0 ? p.average / maxAverage : 0
+  const srScore = p.strikeRate != null && maxStrikeRate > 0 ? p.strikeRate / maxStrikeRate : 0
+  return runsScore * 0.4 + avgScore * 0.35 + srScore * 0.25
+}
+
+// Which position this captain's positions data recommends for this player,
+// with a plain-language reason. Only positions with enough innings to trust
+// the average/strike rate are considered; null if none qualify.
+export function pickRecommendedPosition(positions: PositionUsage[]): PositionRecommendation | null {
+  const eligible = positions.filter(p => p.innings >= MIN_INNINGS_FOR_RECOMMENDATION)
+  if (eligible.length === 0) return null
+
+  const maxRuns = Math.max(...eligible.map(p => p.runs))
+  const maxAverage = Math.max(...eligible.map(p => p.average ?? 0))
+  const maxStrikeRate = Math.max(...eligible.map(p => p.strikeRate ?? 0))
+
+  let best = eligible[0]
+  let bestScore = scorePosition(best, maxRuns, maxAverage, maxStrikeRate)
+  for (const p of eligible.slice(1)) {
+    const score = scorePosition(p, maxRuns, maxAverage, maxStrikeRate)
+    if (score > bestScore || (score === bestScore && p.position < best.position)) {
+      best = p
+      bestScore = score
+    }
+  }
+
+  const parts = [`${best.runs} runs in ${best.innings} inn`]
+  if (best.average != null) parts.push(`avg ${best.average.toFixed(1)}`)
+  if (best.strikeRate != null) parts.push(`SR ${Math.round(best.strikeRate)}`)
+  return {
+    position: best.position,
+    reason: `Best combination of ${parts.join(', ')} among positions with ${MIN_INNINGS_FOR_RECOMMENDATION}+ innings under this captain.`,
+  }
+}
+
 // One player's record, split by match captain. `rows` should already be
 // scoped to that one player. Captains ordered by matches played under them.
 export function buildPlayerUnderCaptains(rows: CaptaincyInnings[]): PlayerUnderCaptain[] {
@@ -271,7 +327,10 @@ export function buildPlayerUnderCaptains(rows: CaptaincyInnings[]): PlayerUnderC
           .sort((a, b) => b.gameDate.localeCompare(a.gameDate))
         return { position, innings: l.innings, runs: l.runs, average: l.average, strikeRate: l.strikeRate, matches }
       })
-      .sort((a, b) => b.innings - a.innings || a.position - b.position)
+      // Batting order, not innings frequency — reads top-to-bottom the
+      // way a lineup does, rather than jumping around by how often each
+      // slot was used.
+      .sort((a, b) => a.position - b.position)
     out.push({
       captainId: key === '__none__' ? null : key,
       captainName: key === '__none__' ? 'Captain not recorded' : (sorted[0].captainName ?? 'Unknown captain'),
@@ -279,6 +338,7 @@ export function buildPlayerUnderCaptains(rows: CaptaincyInnings[]): PlayerUnderC
       firstDate: sorted[0].gameDate,
       lastDate: sorted[sorted.length - 1].gameDate,
       positions,
+      recommendedPosition: pickRecommendedPosition(positions),
       batting: battingLine(sorted),
       bowling: bowlingLine(sorted),
       timeline: sorted.map(r => ({
