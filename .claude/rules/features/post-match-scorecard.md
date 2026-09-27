@@ -631,6 +631,29 @@ successful re-sync, so there's no separate "un-flag" step needed here.
 > external step to pre-warm Render from, and can still occasionally 504 on a
 > cold dyno; acceptable since it's a backup, not the primary trigger.
 
+> **Changed (2026-09-27) — the eligible backlog is now processed
+> newest-match-first, not oldest-first.** The query's ordering had been
+> `game_date`/`slot_time` ascending since the 2026-07-16 incident above —
+> deliberately, since a match that just ended usually isn't posted on
+> CricHeroes yet, and putting it first would waste one of the scarce
+> `MAX_PER_RUN` slots on a guaranteed-to-fail fetch while genuinely-ready
+> older backlog got bumped to the next run. Per a direct request, this was
+> reversed: the most recently played match is now always attempted first,
+> ahead of older backlog (including anything jumped to the front via
+> `needs_reconciliation` — see above — which is itself now newest-flagged-
+> match-first within that bucket, not oldest).
+>
+> The known tradeoff from the pre-2026-07-16 newest-first behaviour is
+> back, accepted rather than re-engineered around: a match still within its
+> first few hours of ending can occasionally eat a run's slot on a "not yet
+> posted" failure. This is judged low-risk in practice — the backlog this
+> route actually drains (reconciliation re-flags, historical gaps) is
+> always well past match day, so the exposure is narrow. `.limit(500)`'s
+> own risk profile flipped for the better at the same time: with
+> newest-first ordering, a too-small limit only ever truncates the oldest
+> tail of history (harmless — it just waits for a later run) instead of
+> starving the query of the recent rows that actually matter.
+
 ### Why the daily-cron-plus-guard shape exists at all
 Vercel Hobby does not support day-of-week-restricted cron expressions —
 this was discovered the hard way on the *separate* `lock-availability`
