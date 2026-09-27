@@ -87,6 +87,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Route | Component | Data source |
 |---|---|---|
 | `/gc-review` | Server → one `GCReviewClient` (client) per rolling weekend | `bookings` (next two rolling weekends, same scoping as `/captains-corner`), `availability`, `squad` (pending/approved/announced) |
+| `/gc/feedback` | Server → `GCFeedbackClient` (client) | GC-collected player feedback campaigns — `feedback_campaigns`/`feedback_responses`/`feedback_claims`, active roster; see `features/gc-feedback.md` |
  
 ### Wrangler Routes (`isWrangler` or `isAdmin`; `/wrangler/grounds` also allows `isGC`)
  
@@ -849,6 +850,7 @@ Next.js API Routes (server-side)
 | `src/app/fixtures/page.tsx` | Main fixtures server component; fetches bookings, availability, squad; includes `cricheroes_points_table_url` in tournament select |
 | `src/app/captains-corner/page.tsx` | Captain-only server page; feeds `CaptainsCornerGrid` |
 | `src/app/gc-review/page.tsx` | GC-only server page; scoped to the next two rolling weekends (same `weekKey()` grouping as `/captains-corner`, not a fixed calendar week — see `features/squad-selection.md`); renders one `GCReviewClient` block per weekend |
+| `src/app/gc/feedback/page.tsx` + `src/components/gc/GCFeedbackClient.tsx` | `/gc/feedback` — GC-collected feedback campaigns; campaign picker, per-player claim/collect/view flow — see `features/gc-feedback.md` |
 | `src/app/admin/` | All admin pages (dashboard, new/edit booking, players, captains, tournaments) |
 | `src/app/admin/layout.tsx` + `src/components/admin/AdminSidebar.tsx` | Shared `/admin/**` chrome (top bar, desktop sidebar, mobile bottom bar/drawer) — converted to Light/Dark/System alongside `/admin/scorecard-backfill` (September 2026, see `features/post-match-scorecard.md` §8 and `ui-theme.md`'s Light/Dark/System section); every other `/admin/**` page body is still dark-only, an accepted seam matching the `SiteNav`/`MobileTabBar` precedent |
 | `src/components/admin/DashboardBookingsTabs.tsx` | `/admin` dashboard's Upcoming/Past bookings tabs (`AdminPastMatchesPanel` backs the Past tab, paginated by `/api/admin/bookings/past`). Past tab gained the same combined-weekend `DateChipSlider` quick filter Upcoming Matches (`/fixtures`) and Past Matches (`/matches/history`) use — layered on top of the existing month stepper (`groupDatesIntoChips()` over whatever month's bookings are currently loaded; resets on month change), purely client-side, no new API param. See `features/post-match-scorecard.md` §8's matching note on `/admin/scorecard-backfill`, which got the identical treatment in the same pass. |
