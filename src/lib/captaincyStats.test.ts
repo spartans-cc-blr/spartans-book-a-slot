@@ -61,7 +61,6 @@ describe('buildCaptainRecord', () => {
     const p1 = rec.positions.find(p => p.position === 1)!
     expect(p1.choices.map(c => c.playerId)).toEqual(['b', 'a', 'c'])
     expect(p1.choices.map(c => c.rank)).toEqual([1, 2, 3])
-    expect(p1.totalInnings).toBe(6)
   })
 
   it('skips innings with no recorded position', () => {

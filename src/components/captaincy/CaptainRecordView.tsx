@@ -39,10 +39,7 @@ export function CaptainRecordView({ record }: { record: CaptainRecord }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {record.positions.map(p => (
               <div key={p.position} className="border border-[var(--stats-card-border)] rounded-xl p-3">
-                <div className="flex items-baseline justify-between mb-2">
-                  <p className="font-cinzel text-base font-bold text-[var(--stats-text)]">No. {p.position}</p>
-                  <p className="font-rajdhani text-[11px] text-[var(--stats-text-faint)]">{p.totalInnings} innings</p>
-                </div>
+                <p className="font-cinzel text-base font-bold text-[var(--stats-text)] mb-2">No. {p.position}</p>
                 <ol className="flex flex-col gap-2">
                   {p.choices.map(c => (
                     <li key={c.playerId} className="flex items-start gap-2">

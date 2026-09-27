@@ -85,7 +85,9 @@ fetch directly.
   runs, innings, average, strike rate, best), and a bowlers table (overs
   with a share bar, innings, wickets, economy, average, best). GC/admin get
   `CaptainSelect` (`?captainId=`, also `replace`). `back` goes to Squad
-  Selection.
+  Selection. A position card no longer shows its own total-innings figure
+  (dropped September 2026 — see below); it's just the "No. N" header over
+  the top 3.
 - **"Under each captain"** (`PlayerCaptaincyBreakdown`, below the main stats
   on `/players/[id]/stats`): one collapsible card per captain (the first is
   open). Each card shows position chips (innings, runs, average, strike
@@ -103,6 +105,14 @@ fetch directly.
   captain nor a player where he actually bats. The table now shows batting
   innings ("Inn") and the most-played position with its innings count
   ("No. 6 (5)"). A tie goes to the higher order (lower number).
+- **Position-card total-innings figure dropped (changed September 2026).**
+  Each position card on `/captains-corner/my-players` used to show a
+  right-aligned "N innings" total (the sum of every batter's innings at
+  that position, under this captain). Reported as redundant — the captain
+  picker already shows total matches led, and the card itself doesn't need
+  a second, position-scoped count to be readable. `CaptainPositionChoices.
+  totalInnings` was removed from the data layer, not just hidden, since
+  nothing else read it.
 
 Both use the shared `--stats-*` tokens, so they follow Light/Dark/System.
 

@@ -55,7 +55,6 @@ export interface PositionChoice extends PlayerRef, BattingLine { rank: number }
 
 export interface CaptainPositionChoices {
   position: number
-  totalInnings: number
   choices: PositionChoice[]
 }
 
@@ -203,7 +202,6 @@ export function buildCaptainRecord(rows: CaptaincyInnings[], topN = 3): CaptainR
         a.playerName.localeCompare(b.playerName))
       return {
         position,
-        totalInnings: lines.reduce((s, l) => s + l.innings, 0),
         choices: lines.slice(0, topN).map((l, i) => ({ rank: i + 1, ...l })),
       }
     })
