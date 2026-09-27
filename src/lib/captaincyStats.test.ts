@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildCaptainRecord, buildPlayerUnderCaptains, buildSeasonProgression, battingLine, bowlingLine,
-  pickRecommendedPosition, type CaptaincyInnings, type PositionUsage,
+  pickRecommendedPosition, filterCaptaincyInnings, type CaptaincyInnings, type PositionUsage,
 } from './captaincyStatsCore'
 
 let seq = 0
@@ -155,6 +155,43 @@ describe('pickRecommendedPosition', () => {
       pos({ position: 2, innings: 3, runs: 60, average: 30, strikeRate: 100 }),
     ]
     expect(pickRecommendedPosition(positions)?.position).toBe(2)
+  })
+})
+
+describe('filterCaptaincyInnings', () => {
+  const rows = [
+    inn({ playerId: 'p', gameDate: '2025-06-01', format: 'T20', captainId: 'x', bookingId: 'bA' }),
+    inn({ playerId: 'p', gameDate: '2026-01-01', format: 'T30', captainId: 'x', bookingId: 'bB' }),
+    inn({ playerId: 'p', gameDate: '2026-06-01', format: 'T20', captainId: 'p', bookingId: 'bC' }),
+  ]
+
+  it('passes everything through with no options', () => {
+    expect(filterCaptaincyInnings(rows, {})).toHaveLength(3)
+  })
+
+  it('narrows by year', () => {
+    expect(filterCaptaincyInnings(rows, { year: 2026 }).map(r => r.bookingId)).toEqual(['bB', 'bC'])
+  })
+
+  it('does not restrict when both known formats are checked, but does when only one is', () => {
+    expect(filterCaptaincyInnings(rows, { formats: new Set(['T20', 'T30']) })).toHaveLength(3)
+    expect(filterCaptaincyInnings(rows, { formats: new Set(['T20']) }).map(r => r.bookingId)).toEqual(['bA', 'bC'])
+  })
+
+  it('restricts to matches where the viewer was the match captain', () => {
+    expect(filterCaptaincyInnings(rows, { asCaptainOnly: true, viewerPlayerId: 'p' }).map(r => r.bookingId)).toEqual(['bC'])
+  })
+
+  it('restricts by defending/chasing via a bookingId-keyed lookup, excluding unknown bookings', () => {
+    const battedFirstByBooking = new Map([['bA', true], ['bB', false]]) // bC deliberately missing
+    expect(filterCaptaincyInnings(rows, { innings: new Set<'defending' | 'chasing'>(['defending']), battedFirstByBooking }).map(r => r.bookingId))
+      .toEqual(['bA'])
+    expect(filterCaptaincyInnings(rows, { innings: new Set<'defending' | 'chasing'>(['chasing']), battedFirstByBooking }).map(r => r.bookingId))
+      .toEqual(['bB'])
+  })
+
+  it('combines filters (AND, not OR)', () => {
+    expect(filterCaptaincyInnings(rows, { year: 2026, formats: new Set(['T20']) }).map(r => r.bookingId)).toEqual(['bC'])
   })
 })
 

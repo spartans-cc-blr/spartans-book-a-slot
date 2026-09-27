@@ -386,3 +386,47 @@ export interface CaptainOption {
   name: string
   matches: number
 }
+
+export interface CaptaincyFilterOptions {
+  // 'all' (or omitted) means no year restriction.
+  year?: number | 'all'
+  // Omitted, or a set covering every known format ('T20'+'T30'), means no
+  // restriction — same "both checked = no restriction" convention the page's
+  // own Format checkboxes already use, so callers can just pass their live
+  // Set through unchanged.
+  formats?: Set<string>
+  // Restrict to matches where `viewerPlayerId` was the match captain
+  // themself (squad.is_captain on that booking) — mirrors the page's own
+  // "As Captain" filter, just applied to this player's own captaincy rows.
+  asCaptainOnly?: boolean
+  viewerPlayerId?: string
+  // Defending = batted first, chasing = batted second. A set covering both
+  // (or omitted) means no restriction. CaptaincyInnings itself carries no
+  // toss/innings data, so the caller supplies it externally, keyed by
+  // bookingId (see PlayerStatsClient.tsx, which derives this from the
+  // player's own already-fetched match history — no extra fetch needed).
+  innings?: Set<'defending' | 'chasing'>
+  battedFirstByBooking?: Map<string, boolean | null>
+}
+
+// Narrows a player's own CaptaincyInnings rows to the same scope as the top
+// filter bar on /players/[id]/stats, wherever this data can express it —
+// Year and Format are already on each row; As Captain and Defending/Chasing
+// need a little help from the caller (see CaptaincyFilterOptions above).
+// Ground and Practice Games aren't representable here yet (no ground_id
+// per row, and practice matches are excluded from the fetch entirely) —
+// deliberately left unfiltered rather than silently wrong; the UI says so.
+export function filterCaptaincyInnings(rows: CaptaincyInnings[], opts: CaptaincyFilterOptions): CaptaincyInnings[] {
+  const { year = 'all', formats, asCaptainOnly, viewerPlayerId, innings, battedFirstByBooking } = opts
+  return rows.filter(r => {
+    if (year !== 'all' && r.gameDate.slice(0, 4) !== String(year)) return false
+    if (formats && formats.size === 1 && r.format !== Array.from(formats)[0]) return false
+    if (asCaptainOnly && r.captainId !== viewerPlayerId) return false
+    if (innings && innings.size === 1 && battedFirstByBooking) {
+      const battedFirst = battedFirstByBooking.get(r.bookingId) ?? null
+      const wantDefending = Array.from(innings)[0] === 'defending'
+      if (battedFirst == null || battedFirst !== wantDefending) return false
+    }
+    return true
+  })
+}
