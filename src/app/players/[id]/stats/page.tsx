@@ -5,8 +5,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { getPlayerStats, getPlayerMatchHistory } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { PlayerStatsClient } from '@/components/players/PlayerStatsClient'
-import { PlayerCaptaincyBreakdown } from '@/components/captaincy/PlayerCaptaincyBreakdown'
-import { getCaptaincyInnings, buildPlayerUnderCaptains, buildSeasonProgression } from '@/lib/captaincyStats'
+import { getCaptaincyInnings } from '@/lib/captaincyStats'
 import type { Metadata } from 'next'
 
 export const revalidate = 0
@@ -22,7 +21,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 // Not IDOR-restricted to self; there is no write path on this page at all.
 // The one exception is the "Under each captain" breakdown, which is only
 // fetched and rendered for the player themselves or GC/admin — see
-// features/captaincy-stats.md.
+// features/captaincy-stats.md. The raw rows are handed to PlayerStatsClient
+// (not pre-aggregated here) so the section can respond to the same
+// Year/Format/As-Captain/Innings filters the rest of the page already
+// tracks client-side — see filterCaptaincyInnings() in captaincyStatsCore.ts.
 export default async function PlayerStatsPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
@@ -66,14 +68,10 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
         grounds={grounds ?? []}
         initialCareer={career}
         initialMatches={matches}
+        captaincyRows={captaincyRows}
+        showCaptaincy={canSeeCaptaincy}
+        isOwnStats={isOwnStats}
       />
-      {canSeeCaptaincy && (
-        <PlayerCaptaincyBreakdown
-          captains={buildPlayerUnderCaptains(captaincyRows)}
-          seasons={buildSeasonProgression(captaincyRows)}
-          isOwn={isOwnStats}
-        />
-      )}
       <footer className="border-t py-5 text-center font-rajdhani text-xs mt-8"
         style={{ borderColor: 'var(--stats-card-border)', color: 'var(--stats-text-muted)' }}>
         © 2026 <span style={{ color: 'var(--stats-badge-text)' }}>Spartans Cricket Club</span> · Bengaluru · Est. 2014

@@ -160,12 +160,28 @@ function CaptainCard({ c, defaultOpen }: { c: PlayerUnderCaptain; defaultOpen: b
   )
 }
 
-export function PlayerCaptaincyBreakdown({ captains, seasons, isOwn }: {
+export function PlayerCaptaincyBreakdown({
+  captains, seasons, isOwn, filterLabel, groundFilterActive, practiceFilterActive, hasAnyData,
+}: {
   captains: PlayerUnderCaptain[]
   seasons: SeasonProgression[]
   isOwn: boolean
+  // Plain-language summary of the page's top filters currently narrowing
+  // this section (e.g. "2026 · T20"), or null when nothing is applied.
+  filterLabel: string | null
+  // Two filters this section can't apply yet (see filterCaptaincyInnings()
+  // in captaincyStatsCore.ts) — surfaced as a caveat rather than silently
+  // ignored, so a player filtering by Ground/Practice elsewhere on the page
+  // isn't misled into thinking this section followed along.
+  groundFilterActive: boolean
+  practiceFilterActive: boolean
+  // Whether this player has any captaincy data at all, regardless of the
+  // current filters — distinct from captains.length === 0, which can also
+  // mean "the filters narrowed it to nothing." Only the former hides the
+  // section outright; the latter shows an empty-state message instead.
+  hasAnyData: boolean
 }) {
-  if (captains.length === 0) return null
+  if (!hasAnyData) return null
 
   return (
     <div className="px-5 md:px-8 lg:px-10 max-w-3xl mx-auto flex flex-col gap-5">
@@ -175,11 +191,18 @@ export function PlayerCaptaincyBreakdown({ captains, seasons, isOwn }: {
         </h2>
         <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] mb-4">
           {isOwn ? 'Visible to you and the Council only.' : 'Visible to this player and the Council only.'}{' '}
-          All time, practice games excluded. Tap a position to see the matches behind it, or a bowling figure to open that match.
+          {filterLabel ? `Filtered to ${filterLabel}` : 'All time'}, practice games excluded.{' '}
+          Tap a position to see the matches behind it, or a bowling figure to open that match.
+          {groundFilterActive && ' Ground filter isn’t applied to this section.'}
+          {practiceFilterActive && ' Practice games stay excluded here regardless.'}
         </p>
-        <div className="flex flex-col gap-2">
-          {captains.map((c, i) => <CaptainCard key={c.captainId ?? 'none'} c={c} defaultOpen={i === 0} />)}
-        </div>
+        {captains.length === 0 ? (
+          <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">No captaincy data for this filter.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {captains.map((c, i) => <CaptainCard key={c.captainId ?? 'none'} c={c} defaultOpen={i === 0} />)}
+          </div>
+        )}
       </section>
 
       {seasons.length > 0 && (

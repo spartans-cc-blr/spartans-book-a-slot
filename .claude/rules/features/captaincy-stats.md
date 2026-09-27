@@ -73,11 +73,15 @@ server-only, and the aggregators are pure and client-safe (unit-tested in
 - `getMatchCaptains()` is Hub-only and lists every match captain with a
   match count. It feeds the GC/admin picker without an analytics read.
 - `buildCaptainRecord()`, `buildPlayerUnderCaptains()`,
-  `buildSeasonProgression()`, `battingLine()` and `bowlingLine()` are the
-  pure aggregators.
+  `buildSeasonProgression()`, `battingLine()`, `bowlingLine()`, and
+  `filterCaptaincyInnings()` (§4.1) are the pure aggregators.
 
-No new table, migration or API route. Both views are Server Components that
-fetch directly.
+No new table, migration or API route. Both views fetch server-side.
+`/captains-corner/my-players` stays a Server Component throughout — its
+own filter (season only) is a URL param, handled server-side same as
+before. `/players/[id]/stats`, as of September 2026, is different: its
+page.tsx fetches the raw `CaptaincyInnings[]` rows but no longer
+aggregates them — see §4.1.
 
 ---
 
@@ -92,15 +96,16 @@ fetch directly.
   Selection. A position card no longer shows its own total-innings figure
   (dropped September 2026 — see below); it's just the "No. N" header over
   the top 3.
-- **"Under each captain"** (`PlayerCaptaincyBreakdown`, below the main stats
-  on `/players/[id]/stats`): one collapsible card per captain (the first is
-  open). Each card shows an expandable list of batting positions used
-  (innings, runs, average, strike rate), batting and bowling summary lines,
-  and a "Bowling, oldest → latest" chip strip. A captain the player never
-  batted under reads "Did not bat" in the card header rather than "0 runs".
-  A "Season by season" table follows with batting innings, usual position,
-  runs, average, strike rate, overs, wickets and economy. It is all-time
-  and doesn't follow the page's own filters.
+- **"Under each captain"** (`PlayerCaptaincyBreakdown`, rendered from inside
+  `PlayerStatsClient` on `/players/[id]/stats` — see §4.1 for why): one
+  collapsible card per captain (the first is open). Each card shows an
+  expandable list of batting positions used (innings, runs, average, strike
+  rate), batting and bowling summary lines, and a "Bowling, oldest →
+  latest" chip strip. A captain the player never batted under reads "Did
+  not bat" in the card header rather than "0 runs". A "Season by season"
+  table follows with batting innings, usual position, runs, average,
+  strike rate, overs, wickets and economy. As of September 2026 it follows
+  the page's own Year/Format/As-Captain/Innings filters — see §4.1.
 - **Usual position, not average position (changed September 2026).** The
   season table first showed matches played and the average batting
   position. Both were replaced on feedback: matches counted games where the
@@ -191,16 +196,102 @@ Both use the shared `--stats-*` tokens, so they follow Light/Dark/System.
 
 ---
 
+## 4.1 "Under each captain" follows the page's top filters (added September 2026)
+
+**The gap this closes.** `/players/[id]/stats` already has a top filter bar
+(Year, T20/T30 format checkboxes, As Captain, Defending/Chasing, Ground,
+Include Practice Games, Pitch Type) narrowing the Summary card and the
+Batting/Bowling/Fielding tabs — but "Under each captain" and "Season by
+season" sat below it, always all-time, deaf to every one of those
+controls. Reported directly: at least Format (T20 vs T30) should narrow
+this section the same way it narrows everything above it.
+
+**Architectural change — the section moved from the Server Component into
+`PlayerStatsClient`.** Previously `page.tsx` called `getCaptaincyInnings()`
+server-side and immediately reduced the result with
+`buildPlayerUnderCaptains()`/`buildSeasonProgression()`, handing only the
+final aggregate to a standalone `<PlayerCaptaincyBreakdown>` rendered as a
+page-level sibling of `<PlayerStatsClient>` — two components with no shared
+state, so there was no way for one's filter bar to reach the other's data.
+`page.tsx` now stops aggregating: it fetches the same raw `CaptaincyInnings[]`
+rows (still gated on `canSeeCaptaincy`, still `[]` for anyone else) and
+passes them straight down as a `captaincyRows` prop to `PlayerStatsClient`,
+alongside `showCaptaincy`/`isOwnStats`. `PlayerStatsClient` now imports
+`buildPlayerUnderCaptains()`/`buildSeasonProgression()` directly from
+`captaincyStatsCore.ts` (never from `captaincyStats.ts` — that module is
+server-only and importing it into a `'use client'` file is exactly the
+RSC-boundary mistake `features/leaderboard.md` §8 documents a real
+production incident for) and renders `<PlayerCaptaincyBreakdown>` itself,
+as the last element in its own returned fragment — same DOM position as
+before, just declared from inside the client component instead of as a
+page-level sibling.
+
+**`filterCaptaincyInnings()`** (`captaincyStatsCore.ts`) is the pure filter
+predicate this enables — narrows a player's raw rows to the same scope as
+the top filter bar, wherever the data can express it:
+
+| Page filter | Applied? | How |
+|---|---|---|
+| Year | ✅ | `CaptaincyInnings.gameDate` |
+| Format (T20/T30) | ✅ | `CaptaincyInnings.format` — both checked (or omitted) means no restriction, same "both-checked = unrestricted" convention the checkboxes themselves use |
+| As Captain | ✅ | `r.captainId === viewerPlayerId` — restricts to matches where *this player* was the match captain (of themselves, in effect) |
+| Defending / Chasing | ✅ | Needs a per-`bookingId` `battedFirst` lookup `CaptaincyInnings` doesn't itself carry — built once from `initialMatches` (the player's own already-fetched, unfiltered career match list, which already has `battedFirst` per `features/player-stats-batting-position.md`), not from the currently-scoped `matches` array, since that one can already be narrowed by Ground/Practice and would silently drop bookings out of the lookup |
+| Ground | ❌ | No `ground_id` on `CaptaincyInnings` — would need widening `getCaptaincyInnings()`'s booking select. Not done in this pass; the section shows a small caveat line instead (see below) rather than silently ignoring the filter |
+| Include Practice Games | ❌ | The fetch already excludes practice matches entirely (§1's Scope) — there's nothing to "include" here regardless of the toggle. Same caveat treatment |
+| Pitch Type / chart selections (`selectedPosition`/`selectedDismissal`) | ❌ (by design) | Explicitly out of scope per the request — these narrow Batting/Bowling specifically, not "who captained this player" |
+
+All four applied filters AND together, matching how the top filter bar's
+own controls already combine.
+
+**Transparency over silent partial support.** `PlayerCaptaincyBreakdown`
+takes a `filterLabel: string | null` prop (built in `PlayerStatsClient`,
+e.g. `"2026 · T20"`) that replaces the old fixed "All time" wording in the
+section's subtitle, plus two booleans (`groundFilterActive`,
+`practiceFilterActive`) that add a one-line caveat — "Ground filter isn't
+applied to this section." / "Practice games stay excluded here
+regardless." — whenever the visitor has one of those two active elsewhere
+on the page. Never silently claims to be filtering by something it isn't.
+
+**Empty-state distinction.** `hasAnyData` (computed as `captaincyRows.length
+> 0`, i.e. *unfiltered*) is the one thing that hides the whole section —
+distinct from `captains.length === 0`, which can now legitimately mean
+"the current filter combination matches nothing" (e.g. Year 2019 for a
+player who joined in 2022) and renders a "No captaincy data for this
+filter." message instead of the section vanishing outright. The original
+guard (`if (captains.length === 0) return null`) would have made a narrow
+filter combination look like the whole feature had disappeared.
+
+**Season table now follows the filters too, on purpose, not by
+oversight.** `buildSeasonProgression()` runs over the same filtered rows as
+`buildPlayerUnderCaptains()` — picking a Format narrows "Season by season"
+down to just the years/positions that satisfy it, same as everywhere else
+on the page. A Year filter can leave it with a single row; that's
+consistent with what every other Year-filtered figure on this page already
+does.
+
+### File Map additions / changes
+
+| File | Role |
+|---|---|
+| `src/lib/captaincyStatsCore.ts` | `filterCaptaincyInnings()` + `CaptaincyFilterOptions` — the pure filter predicate |
+| `src/components/players/PlayerStatsClient.tsx` | Now imports `buildPlayerUnderCaptains()`/`buildSeasonProgression()`/`filterCaptaincyInnings()` from `captaincyStatsCore.ts` directly; owns the `battedFirstByBooking` lookup and the memoized filtered captaincy data; renders `<PlayerCaptaincyBreakdown>` as the last element of its own fragment |
+| `src/components/captaincy/PlayerCaptaincyBreakdown.tsx` | New props: `filterLabel`, `groundFilterActive`, `practiceFilterActive`, `hasAnyData`; empty-filter message distinct from the "hide entirely" guard |
+| `src/app/players/[id]/stats/page.tsx` | No longer imports or calls `buildPlayerUnderCaptains()`/`buildSeasonProgression()`/`PlayerCaptaincyBreakdown` — passes `captaincyRows`/`showCaptaincy`/`isOwnStats` straight through to `PlayerStatsClient` |
+
+---
+
 ## 5. Security (vibe-security)
 
 | Check | Status |
 |---|---|
 | Page gate `isCaptain \|\| isGC \|\| isAdmin`, server-side | ✅ |
 | A captain can only ever see their own matches. `?captainId=` is ignored unless GC/admin, and a GC/admin value is validated against the real captain list | ✅ |
-| Player breakdown fetched only when the viewer is that player or GC/admin. For anyone else the data never leaves the server | ✅ |
+| Player breakdown fetched only when the viewer is that player or GC/admin — `page.tsx` still resolves `captaincyRows: []` server-side for anyone else, same gate as before. For anyone else the data never leaves the server | ✅ |
+| Raw rows (not just the aggregate) now reach the browser for an *authorized* viewer, since aggregation moved client-side (§4.1) — accepted, since `CaptaincyInnings` carries nothing an authorized viewer (self, GC, admin) couldn't already see elsewhere (scorecards, the leaderboard, `/matches/history`), and the server-side gate above still zeroes it out for everyone else | ✅ |
 | Read-only, no write path, no new API route | ✅ |
 | Analytics DB read server-side only (`ANALYTICS_SUPABASE_KEY`) | ✅ |
 | A breakdown fetch failure is logged and hides the section. It never breaks the stats page | ✅ |
+| `filterCaptaincyInnings()` is pure and client-side only — it narrows an already-authorized payload, it never widens what was fetched or bypasses the server-side gate above | ✅ |
 
 ---
 
@@ -216,7 +307,8 @@ Both use the shared `--stats-*` tokens, so they follow Light/Dark/System.
 | `src/components/captaincy/CaptainRecordView.tsx` | Positions grid and bowlers table |
 | `src/components/captaincy/CaptainSelect.tsx` | GC/admin captain picker |
 | `src/components/captaincy/PlayerCaptaincyBreakdown.tsx` | "Under each captain" and "Season by season" |
-| `src/app/players/[id]/stats/page.tsx` | Gates, fetches and renders the breakdown |
+| `src/components/players/PlayerStatsClient.tsx` | Filters, aggregates (client-side, as of §4.1) and renders the breakdown |
+| `src/app/players/[id]/stats/page.tsx` | Gates, fetches the raw rows, hands them to `PlayerStatsClient` (§4.1) |
 | `src/components/ui/SiteNav.tsx`, `src/components/ui/MobileTabBar.tsx` | "My Players" in Captains' Corner, "Captaincy Records" in Council |
 
 ---
@@ -224,10 +316,18 @@ Both use the shared `--stats-*` tokens, so they follow Light/Dark/System.
 ## 7. Out of scope / ideas
 
 - Filters beyond season on the captain view (tournament, format, ground).
+- Ground and Include-Practice-Games filters on the player view's "Under
+  each captain" section — see §4.1's table. `getCaptaincyInnings()` would
+  need a `ground_id` select to close the Ground gap; the Practice gap is
+  structural (practice matches are never fetched into this feature at all).
 - A per-position view for the player that isn't split by captain. The
   existing "Runs by Batting Position" chart already covers it.
 - Fielding by captain.
 - Letting a captain see another captain's record.
+- Syncing "Under each captain" with the two chart-click filters
+  (`selectedPosition`/`selectedDismissal`) — explicitly declined per the
+  September 2026 request that added §4.1; those narrow Batting/Bowling
+  specifically, not "who captained this player."
 
 ---
 

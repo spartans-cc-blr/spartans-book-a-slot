@@ -43,6 +43,11 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from '@/components/ui/ThemeProvider'
 import type { PlayerStatsTotals, PlayerMatchHistoryRow, PitchType } from '@/types'
 import { aggregateMatchHistoryRows, DISMISSAL_TYPE_META, type DismissalKey } from '@/lib/playerMatchAggregate'
+import { PlayerCaptaincyBreakdown } from '@/components/captaincy/PlayerCaptaincyBreakdown'
+import {
+  buildPlayerUnderCaptains, buildSeasonProgression, filterCaptaincyInnings,
+  type CaptaincyInnings,
+} from '@/lib/captaincyStatsCore'
 
 interface PlayerInfo {
   id: string
@@ -74,12 +79,19 @@ const PITCH_TABS: { key: PitchType | 'all'; label: string }[] = [
 ]
 
 export function PlayerStatsClient({
-  player, grounds, initialCareer, initialMatches,
+  player, grounds, initialCareer, initialMatches, captaincyRows, showCaptaincy, isOwnStats,
 }: {
   player: PlayerInfo
   grounds: { id: string; name: string }[]
   initialCareer: PlayerStatsTotals
   initialMatches: PlayerMatchHistoryRow[]
+  // "Under each captain" — raw, unaggregated rows (see captaincyStatsCore.ts).
+  // Passed down rather than pre-aggregated server-side so the section can
+  // share this component's own Year/Format/As-Captain/Innings filter state
+  // instead of being permanently all-time.
+  captaincyRows: CaptaincyInnings[]
+  showCaptaincy: boolean
+  isOwnStats: boolean
 }) {
   const [year, setYear] = useState<number | 'all'>('all')
   const [groundId, setGroundId] = useState<string>('all')
@@ -300,6 +312,38 @@ export function PlayerStatsClient({
       return next
     })
   }
+
+  // "Under each captain" — reuses this component's own Year/Format/
+  // As-Captain/Innings filter state (not selectedPosition/selectedDismissal,
+  // the two chart-click filters, which this section deliberately doesn't
+  // follow — those narrow Batting/Bowling specifically, not "who captained
+  // this player"). Defending/Chasing needs a per-booking battedFirst
+  // lookup that CaptaincyInnings itself doesn't carry; built once from
+  // initialMatches (the player's full, unfiltered career list — not the
+  // currently-scoped `matches`, which can itself be narrowed by Ground/
+  // Practice and would otherwise silently drop bookings out of this map).
+  const battedFirstByBooking = useMemo(() => {
+    const m = new Map<string, boolean | null>()
+    for (const im of initialMatches) if (im.bookingId) m.set(im.bookingId, im.battedFirst)
+    return m
+  }, [initialMatches])
+
+  const captaincyFiltered = useMemo(
+    () => filterCaptaincyInnings(captaincyRows, {
+      year, formats, asCaptainOnly: asCaptain, viewerPlayerId: player.id, innings, battedFirstByBooking,
+    }),
+    [captaincyRows, year, formats, asCaptain, player.id, innings, battedFirstByBooking],
+  )
+  const captaincyCaptains = useMemo(() => buildPlayerUnderCaptains(captaincyFiltered), [captaincyFiltered])
+  const captaincySeasons = useMemo(() => buildSeasonProgression(captaincyFiltered), [captaincyFiltered])
+  const captaincyFilterLabel = useMemo(() => {
+    const parts: string[] = []
+    if (year !== 'all') parts.push(String(year))
+    if (formats.size === 1) parts.push(Array.from(formats)[0])
+    if (asCaptain) parts.push('as captain')
+    if (innings.size === 1) parts.push(Array.from(innings)[0] === 'defending' ? 'defending' : 'chasing')
+    return parts.length > 0 ? parts.join(' · ') : null
+  }, [year, formats, asCaptain, innings])
 
   return (
     <>
@@ -560,6 +604,18 @@ export function PlayerStatsClient({
           </div>
         )}
       </div>
+
+      {showCaptaincy && (
+        <PlayerCaptaincyBreakdown
+          captains={captaincyCaptains}
+          seasons={captaincySeasons}
+          isOwn={isOwnStats}
+          filterLabel={captaincyFilterLabel}
+          groundFilterActive={groundId !== 'all'}
+          practiceFilterActive={includePractice}
+          hasAnyData={captaincyRows.length > 0}
+        />
+      )}
     </>
   )
 }
