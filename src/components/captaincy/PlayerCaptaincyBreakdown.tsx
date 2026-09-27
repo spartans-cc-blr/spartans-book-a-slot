@@ -9,7 +9,7 @@
 
 import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
-import type { PlayerUnderCaptain, SeasonProgression, TimelinePoint } from '@/lib/captaincyStatsCore'
+import type { PlayerUnderCaptain, PositionUsage, SeasonProgression, TimelinePoint } from '@/lib/captaincyStatsCore'
 
 function shortDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
@@ -19,63 +19,61 @@ function fig(v: number | null, digits = 1): string {
   return v == null ? '—' : v.toFixed(digits)
 }
 
-function Timeline({ points }: { points: TimelinePoint[] }) {
-  const batted = points.filter(p => p.batting)
-  const maxRuns = Math.max(1, ...batted.map(p => p.batting!.runs))
+// One batting position, expandable to the matches behind it — this is the
+// consolidated replacement for the old separate "position chip" +
+// "batting bar chart" pair. The aggregate line is always visible; the
+// match list (newest first) only renders once opened, so a player with
+// many innings at one position never forces a scroll-heavy chart.
+function PositionRow({ p }: { p: PositionUsage }) {
+  return (
+    <details className="group border border-[var(--stats-card-border)] rounded-lg bg-[var(--stats-row-bg)]">
+      <summary className="list-none cursor-pointer px-3 py-2 flex items-center justify-between gap-2">
+        <span className="font-rajdhani text-xs text-[var(--stats-text-2)] truncate">
+          <b className="text-[var(--stats-text)]">No. {p.position}</b> · {p.innings} inn · {p.runs} runs
+          {p.average != null && ` · avg ${fig(p.average)}`}
+          {p.strikeRate != null && ` · SR ${Math.round(p.strikeRate)}`}
+        </span>
+        <span className="text-[var(--stats-text-muted)] text-xs transition-transform group-open:rotate-180 flex-shrink-0">▾</span>
+      </summary>
+      <ul className="px-3 pb-2 pt-2 flex flex-col gap-1 border-t border-[var(--stats-divider)]">
+        {p.matches.map(m => (
+          <li key={m.bookingId}>
+            <Link href={`/matches/history/${m.bookingId}`}
+              className="flex items-center justify-between gap-2 font-rajdhani text-xs text-[var(--stats-text-2)] hover:text-[var(--stats-accent)] transition-colors">
+              <span className="truncate">{shortDate(m.gameDate)}{m.opponentName ? ` vs ${m.opponentName}` : ''}</span>
+              <span className="flex-shrink-0 font-semibold text-[var(--stats-text)]">{m.runs}{m.notOut ? '*' : ''} ({m.balls})</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+function BowlingTimeline({ points }: { points: TimelinePoint[] }) {
   const bowled = points.filter(p => p.bowling)
+  if (bowled.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-3">
-      {batted.length > 0 && (
-        <div>
-          <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mb-1">
-            Batting, oldest → latest <span className="normal-case tracking-normal font-normal">(bar = runs, label = position)</span>
-          </p>
-          <div className="overflow-x-auto">
-            <div className="flex items-end gap-1 h-28 min-w-max pb-0.5">
-              {batted.map(p => {
-                const b = p.batting!
-                return (
-                  <Link key={p.bookingId} href={`/matches/history/${p.bookingId}`}
-                    title={`${shortDate(p.gameDate)}${p.opponentName ? ` vs ${p.opponentName}` : ''} — ${b.runs}${b.notOut ? '*' : ''} (${b.balls}) at No. ${b.position ?? '?'}`}
-                    className="flex flex-col items-center justify-end h-full w-7 flex-shrink-0 group">
-                    <span className="font-rajdhani text-[10px] font-semibold text-[var(--stats-text-2)] leading-none mb-0.5">
-                      {b.runs}{b.notOut ? '*' : ''}
-                    </span>
-                    <div className="w-5 rounded-t bg-[var(--stats-accent)] opacity-70 group-hover:opacity-100 transition-opacity"
-                      style={{ height: `${Math.max(3, (b.runs / maxRuns) * 70)}%` }} />
-                    <span className="font-rajdhani text-[10px] text-[var(--stats-text-muted)] leading-none mt-1">
-                      {b.position ?? '–'}
-                    </span>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-      {bowled.length > 0 && (
-        <div>
-          <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mb-1">
-            Bowling, oldest → latest <span className="normal-case tracking-normal font-normal">(wickets/runs, overs)</span>
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {bowled.map(p => {
-              const w = p.bowling!
-              return (
-                <Link key={p.bookingId} href={`/matches/history/${p.bookingId}`}
-                  title={`${shortDate(p.gameDate)}${p.opponentName ? ` vs ${p.opponentName}` : ''}`}
-                  className={`font-rajdhani text-[11px] px-2 py-0.5 rounded border transition-colors hover:border-[var(--stats-accent)]
-                    ${w.wickets >= 3
-                      ? 'bg-[var(--stats-badge-bg)] border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] font-bold'
-                      : 'bg-[var(--stats-row-bg)] border-[var(--stats-card-border)] text-[var(--stats-text-2)]'}`}>
-                  {w.wickets}/{w.runs} <span className="text-[var(--stats-text-muted)] font-normal">({Math.floor(w.balls / 6)}.{w.balls % 6})</span>
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      )}
+    <div>
+      <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mb-1">
+        Bowling, oldest → latest <span className="normal-case tracking-normal font-normal">(wickets/runs, overs)</span>
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {bowled.map(p => {
+          const w = p.bowling!
+          return (
+            <Link key={p.bookingId} href={`/matches/history/${p.bookingId}`}
+              title={`${shortDate(p.gameDate)}${p.opponentName ? ` vs ${p.opponentName}` : ''}`}
+              className={`font-rajdhani text-[11px] px-2 py-0.5 rounded border transition-colors hover:border-[var(--stats-accent)]
+                ${w.wickets >= 3
+                  ? 'bg-[var(--stats-badge-bg)] border-[var(--stats-badge-border)] text-[var(--stats-badge-text)] font-bold'
+                  : 'bg-[var(--stats-row-bg)] border-[var(--stats-card-border)] text-[var(--stats-text-2)]'}`}>
+              {w.wickets}/{w.runs} <span className="text-[var(--stats-text-muted)] font-normal">({Math.floor(w.balls / 6)}.{w.balls % 6})</span>
+            </Link>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -114,14 +112,8 @@ function CaptainCard({ c, defaultOpen }: { c: PlayerUnderCaptain; defaultOpen: b
           {c.positions.length === 0 ? (
             <p className="font-rajdhani text-xs text-[var(--stats-text-faint)]">Did not bat under this captain.</p>
           ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {c.positions.map(p => (
-                <span key={p.position} className="font-rajdhani text-xs px-2 py-1 rounded-lg border border-[var(--stats-card-border)] bg-[var(--stats-row-bg)] text-[var(--stats-text-2)]">
-                  <b className="text-[var(--stats-text)]">No. {p.position}</b> · {p.innings} inn · {p.runs} runs
-                  {p.average != null && ` · avg ${fig(p.average)}`}
-                  {p.strikeRate != null && ` · SR ${Math.round(p.strikeRate)}`}
-                </span>
-              ))}
+            <div className="flex flex-col gap-1.5">
+              {c.positions.map(p => <PositionRow key={p.position} p={p} />)}
             </div>
           )}
         </div>
@@ -141,7 +133,7 @@ function CaptainCard({ c, defaultOpen }: { c: PlayerUnderCaptain; defaultOpen: b
           </div>
         </div>
 
-        <Timeline points={c.timeline} />
+        <BowlingTimeline points={c.timeline} />
       </div>
     </details>
   )
@@ -162,7 +154,7 @@ export function PlayerCaptaincyBreakdown({ captains, seasons, isOwn }: {
         </h2>
         <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] mb-4">
           {isOwn ? 'Visible to you and the Council only.' : 'Visible to this player and the Council only.'}{' '}
-          All time, practice games excluded. Tap a bar or figure to open that match.
+          All time, practice games excluded. Tap a position to see the matches behind it, or a bowling figure to open that match.
         </p>
         <div className="flex flex-col gap-2">
           {captains.map((c, i) => <CaptainCard key={c.captainId ?? 'none'} c={c} defaultOpen={i === 0} />)}

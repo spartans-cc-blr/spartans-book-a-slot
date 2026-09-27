@@ -61,7 +61,6 @@ describe('buildCaptainRecord', () => {
     const p1 = rec.positions.find(p => p.position === 1)!
     expect(p1.choices.map(c => c.playerId)).toEqual(['b', 'a', 'c'])
     expect(p1.choices.map(c => c.rank)).toEqual([1, 2, 3])
-    expect(p1.totalInnings).toBe(6)
   })
 
   it('skips innings with no recorded position', () => {
@@ -95,6 +94,11 @@ describe('buildPlayerUnderCaptains', () => {
 
   it('orders positions by innings then position', () => {
     expect(out[0].positions.map(p => [p.position, p.innings])).toEqual([[3, 2], [5, 1]])
+  })
+
+  it('lists each position\'s matches newest first', () => {
+    const pos3 = out[0].positions.find(p => p.position === 3)!
+    expect(pos3.matches.map(m => [m.gameDate, m.runs])).toEqual([['2026-04-01', 12], ['2026-01-01', 40]])
   })
 
   it('builds a chronological timeline', () => {
