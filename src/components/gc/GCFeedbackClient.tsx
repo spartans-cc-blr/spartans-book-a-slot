@@ -51,6 +51,7 @@ export function GCFeedbackClient({
   const [responses, setResponses] = useState<any[]>([])
   const [claims, setClaims] = useState<any[]>([])
   const [collectingFor, setCollectingFor] = useState<Player | null>(null)
+  const [viewingResponse, setViewingResponse] = useState<{ player: Player; response: any } | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [gcNotes, setGcNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -92,6 +93,14 @@ export function GCFeedbackClient({
     setAnswers({})
     setGcNotes('')
     setError('')
+  }
+
+  function openView(player: Player, response: any) {
+    setViewingResponse({ player, response })
+  }
+
+  function closeView() {
+    setViewingResponse(null)
   }
 
   async function handleClaim(playerId: string) {
@@ -475,9 +484,10 @@ export function GCFeedbackClient({
                 return (
                   <div
                     key={player.id}
-                    className={`bg-white border border-[#D4C9B0] border-l-4 ${borderColor} rounded-lg px-4 py-3 flex items-center gap-3 ${!isCollected && !selectedCampaign.closed_at ? 'cursor-pointer hover:bg-[#EEEAE2]' : ''} transition-colors`}
+                    className={`bg-white border border-[#D4C9B0] border-l-4 ${borderColor} rounded-lg px-4 py-3 flex items-center gap-3 ${isCollected || (!selectedCampaign.closed_at) ? 'cursor-pointer hover:bg-[#EEEAE2]' : ''} transition-colors`}
                     onClick={() => {
-                      if (!isCollected && !selectedCampaign.closed_at) openCollect(player)
+                      if (isCollected) openView(player, (status as any).response)
+                      else if (!selectedCampaign.closed_at) openCollect(player)
                     }}
                   >
                     {player.photo_url && (
@@ -498,7 +508,7 @@ export function GCFeedbackClient({
                     <div className="text-right shrink-0">
                       {isCollected && (
                         <span className="font-rajdhani text-xs text-[#1D9E75] font-semibold">
-                          ✓ Collected by {(status as any).response.collector?.name}
+                          ✓ Collected by {(status as any).response.collector?.name} · <span className="underline">View</span>
                         </span>
                       )}
                       {isClaimedByMe && !selectedCampaign.closed_at && (
@@ -593,6 +603,76 @@ export function GCFeedbackClient({
                   className="font-rajdhani text-xs font-semibold text-stone-400 hover:text-[#1C1917] px-4 py-2 rounded transition-colors"
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewingResponse && selectedCampaign && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center overflow-y-auto py-8 px-4">
+          <div className="bg-[#F8F4EE] border border-[#D4C9B0] rounded-xl w-full max-w-xl shadow-2xl">
+            <div className="px-6 py-4 border-b border-[#D4C9B0] flex items-start justify-between gap-4">
+              <div>
+                <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-0.5">
+                  Submitted Response
+                </p>
+                <h2 className="font-cinzel text-base font-bold text-[#1C1917]">
+                  <PlayerNameLink
+                    name={viewingResponse.player.name}
+                    playerId={viewingResponse.player.id}
+                    cricHeroesUrl={viewingResponse.player.cricheroes_url}
+                  />
+                </h2>
+                <p className="font-rajdhani text-xs text-stone-400">
+                  Collected by {viewingResponse.response.collector?.name ?? 'Unknown'}
+                  {viewingResponse.response.collected_at && (
+                    <> · {new Date(viewingResponse.response.collected_at).toLocaleString()}</>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={closeView}
+                className="font-rajdhani text-stone-400 hover:text-[#1C1917] transition-colors text-xl leading-none mt-0.5"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 py-5 flex flex-col gap-5">
+              {selectedCampaign.questions.map((question, i) => {
+                const value = viewingResponse.response.answers?.[String(i)]
+                return (
+                  <div key={i}>
+                    <p className="font-rajdhani text-xs font-bold tracking-wide text-stone-600 mb-1.5">
+                      {i + 1}. {question}
+                    </p>
+                    {value ? (
+                      <p className="font-rajdhani text-sm text-[#1C1917] bg-white border border-[#D4C9B0] rounded px-3 py-2 whitespace-pre-wrap">
+                        {value}
+                      </p>
+                    ) : (
+                      <p className="font-rajdhani text-sm text-stone-400 italic">No answer recorded</p>
+                    )}
+                  </div>
+                )
+              })}
+              {viewingResponse.response.notes && (
+                <div className="border-t border-[#D4C9B0] pt-4">
+                  <p className="font-rajdhani text-xs font-bold tracking-wide text-stone-500 mb-1.5">
+                    GC Collector Notes <span className="font-normal">(internal memo — not part of player's response)</span>
+                  </p>
+                  <p className="font-rajdhani text-sm text-[#1C1917] bg-white border border-[#D4C9B0] rounded px-3 py-2 whitespace-pre-wrap">
+                    {viewingResponse.response.notes}
+                  </p>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={closeView}
+                  className="font-rajdhani text-xs font-semibold text-stone-400 hover:text-[#1C1917] px-4 py-2 rounded transition-colors"
+                >
+                  Close
                 </button>
               </div>
             </div>
