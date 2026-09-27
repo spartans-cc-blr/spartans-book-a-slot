@@ -49,25 +49,32 @@ export async function GET(req: NextRequest) {
     .eq('status', 'confirmed')
     .lte('game_date', today)
     .not('match_id', 'is', null)
-    // Oldest-first — MAX_PER_RUN only lets a couple of bookings through per
-    // run, so ordering is what actually decides which ones get skipped this
-    // time. Newest-first (the previous order) meant a match that just ended
-    // today always sorted ahead of older, already-waiting backlog — and
-    // since a just-ended match usually isn't marked complete on CricHeroes
-    // yet (see the "Match not yet completed" failure path below), it would
-    // often occupy one of the scarce slots and fail, while an older match
-    // that was genuinely ready to sync got bumped to the next run. Oldest
-    // first guarantees real FIFO draining, matching the "leftover bookings
-    // just get picked up by tomorrow's run" intent described above. slot_time
-    // is a secondary tiebreaker so two same-day matches process in the order
-    // they were actually played.
-    .order('game_date', { ascending: true })
-    .order('slot_time', { ascending: true })
-    // NOTE: this limit applies BEFORE the in-memory sync-status filter below,
-    // and now that the order is oldest-first, a too-small limit here would
-    // silently starve the query — the oldest N rows are almost always
-    // already synced, so the real (recent) backlog would never even be
-    // fetched. 500 is well above the club's total match history (~100
+    // Newest-first (changed 2026-09-27, reversing an earlier oldest-first
+    // fix — see below). MAX_PER_RUN only lets a couple of bookings through
+    // per run, so ordering is what actually decides which ones get skipped
+    // this time; per a direct request, the most recently played match should
+    // always be the first one attempted, ahead of older backlog.
+    //
+    // Known tradeoff, carried over from the oldest-first design this
+    // replaces: a match that *just* ended usually isn't posted on CricHeroes
+    // yet (see the "Match not yet completed" / a fetch failure just after
+    // match end, further down), so putting it first can occasionally burn
+    // one of the scarce MAX_PER_RUN slots on a guaranteed-to-fail fetch,
+    // bumping a genuinely-ready older booking to the next run. Accepted as
+    // the smaller cost — the backlog this run actually drains (reconciliation
+    // re-flags, historical gaps) is always well past match day, so this only
+    // ever bites a match still within its first few hours of being over.
+    // slot_time is a secondary tiebreaker so two same-day matches process in
+    // the order they were actually played (also newest-first).
+    .order('game_date', { ascending: false })
+    .order('slot_time', { ascending: false })
+    // NOTE: this limit applies BEFORE the in-memory sync-status filter below.
+    // With newest-first ordering, a too-small limit only ever truncates the
+    // oldest tail of history (harmless — that's exactly the backlog that
+    // still gets picked up on a later run once the fresher rows ahead of it
+    // are synced) rather than starving the query of the recent rows that
+    // actually matter, the way it would have under the old oldest-first
+    // order. 500 is well above the club's total match history (~100
     // confirmed bookings as of Aug 2026) with years of headroom; MAX_PER_RUN
     // is what actually bounds how many get processed per run.
     .limit(500)
