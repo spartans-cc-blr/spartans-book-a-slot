@@ -108,13 +108,18 @@ Hobby's broader invocation unreliability.
 **Separate, permanent constraint: one invocation per day per cron job.**
 Vercel Hobby does not allow a single `vercel.json` cron entry to fire more
 than once a day, full stop — there's no way to express `"30 6,13 * * *"`
-(twice daily) on the Vercel side the way GitHub Actions can. This is why
-`vercel.json`'s entry for `/api/cron/backfill-scorecards` has only ever
-carried one time of day; it was never an oversight or drift from an
-intended twice-daily config there. Any cron on this project that genuinely
-needs multiple fires per day (`backfill-scorecards` at 13:00 & 19:00 IST)
-must rely on its GitHub Actions workflow for the additional fire(s) —
-`vercel.json` can only ever cover one of them as a backup.
+(twice daily) on the Vercel side the way GitHub Actions can. `backfill-scorecards`
+(13:00 & 19:00 IST) used to carry a single-slot `vercel.json` entry as a
+backup for exactly this reason — one time of day was all Vercel could ever
+cover, never an oversight or drift from an intended twice-daily config
+there. **That backup entry was removed entirely on 2026-09-28** (see
+`features/post-match-scorecard.md`'s Cloudflare-429 incident) — with the
+GitHub Actions workflow already covering both daily slots reliably, the
+Vercel-side entry was just redundant outbound request volume once this
+route's own calls to the analytics microservice started being throttled at
+Render's edge. `backfill-scorecards` now has **no `vercel.json` entry at
+all**, the same as `reservation-expiry-reminders` below — GitHub Actions is
+its sole trigger.
 
 **A sub-daily `vercel.json` schedule doesn't degrade to daily — it blocks
 the deploy.** Confirmed 26 Sep 2026: a `"0 * * * *"` entry for
