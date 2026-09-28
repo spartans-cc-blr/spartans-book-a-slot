@@ -681,6 +681,38 @@ successful re-sync, so there's no separate "un-flag" step needed here.
 > as the cron workflow's own warm-up step. The button reads "Waking
 > analytics service…" while this runs.
 
+> **Follow-up (2026-09-28) — the 429 persisted after the warm-up fix
+> shipped, including a repeat failure on the exact same booking, and the
+> fallback error message itself was thrown away rather than logged
+> anywhere useful.** Before assuming the warm-up fix above was wrong,
+> Render's own dashboard was checked directly: the deployed commit was
+> confirmed current (`e93c850`, the real tip of `spartans-python`'s `main`
+> at the time), auto-deployed successfully and `Live` — ruling out a stale
+> deploy entirely, since nothing had been pushed to that repo since the
+> deploy date. With staleness ruled out and `api.py` re-confirmed to have
+> exactly one 429-raising code path (always carrying a `detail` field),
+> the generic fallback string could only mean one thing: a response that
+> never reached the FastAPI app at all, most likely Render's own free-tier
+> edge rejecting the request before the app saw it — but the code as
+> written had no way to show *what* that rejection actually looked like.
+> `!msRes.ok`'s handler called `msRes.json().catch(() => ({}))` — on a
+> non-JSON response (the expected shape of an infra-level rejection, not
+> an app-level one) this silently collapsed to an empty object and threw
+> the real response body away, leaving `scorecard_uploads.error_message`
+> with nothing more informative than the generic fallback every single
+> time, regardless of what Render's edge actually sent back.
+>
+> **Fixed** by reading the response via `.text()` first instead of
+> `.json()` directly, attempting a `JSON.parse()` only afterward, and — when
+> that either fails or yields no `detail` — writing the raw response body
+> (truncated to 200 chars) plus the response's own `server` header straight
+> into `error_message`. This changes nothing about the expected-case path
+> (a genuine CricHeroes 429/404/502 with a real `detail` field still
+> resolves exactly as before); it only enriches the fallback path that was
+> previously a dead end. The next time this 429 recurs, `scorecard_uploads`
+> itself becomes the diagnostic — no need to separately dig through
+> Render's or Vercel's own log UIs to find out what was actually returned.
+
 > **Changed (2026-09-27) — the eligible backlog is now processed
 > newest-match-first, not oldest-first.** The query's ordering had been
 > `game_date`/`slot_time` ascending since the 2026-07-16 incident above —
