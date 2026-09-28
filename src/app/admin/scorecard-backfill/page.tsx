@@ -95,6 +95,7 @@ export default function ScorecardBackfillPage() {
   const [loading, setLoading]   = useState(true)
   const [loadError, setLoadError] = useState('')
   const [running, setRunning]   = useState(false)
+  const [warmingUp, setWarmingUp] = useState(false)
   const [results, setResults]   = useState<Record<string, { status: RowStatus; message?: string }>>({})
   const [resetting, setResetting] = useState<Set<string>>(new Set())
 
@@ -176,6 +177,23 @@ export default function ScorecardBackfillPage() {
 
   async function runBackfill() {
     setRunning(true)
+
+    // Wake the Render dyno before the real loop starts, mirroring the
+    // cron's own "Warm up Render microservice" step
+    // (.github/workflows/cron-backfill-scorecards.yml) — a manual run
+    // here had no equivalent, so a cold dyno's first request could come
+    // back as a bare 429 from Render's own edge (not CricHeroes) with no
+    // JSON detail body. Best-effort: a failed/slow warmup never blocks
+    // the actual backfill from proceeding.
+    setWarmingUp(true)
+    try {
+      await fetch('/api/admin/scorecard-backfill/warmup')
+    } catch {
+      // ignore — proceed regardless, same as the cron workflow's own
+      // "continuing anyway" posture on a failed warmup ping
+    }
+    setWarmingUp(false)
+
     const toProcess = filtered.filter(b => selected.has(b.booking_id))
 
     for (let i = 0; i < toProcess.length; i++) {
@@ -319,7 +337,7 @@ export default function ScorecardBackfillPage() {
                   onClick={runBackfill}
                   disabled={running || selectedInFiltered.length === 0}
                   className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
-                  {running ? 'Running…' : `Run Backfill (${selectedInFiltered.length})`}
+                  {warmingUp ? 'Waking analytics service…' : running ? 'Running…' : `Run Backfill (${selectedInFiltered.length})`}
                 </button>
               </div>
 
