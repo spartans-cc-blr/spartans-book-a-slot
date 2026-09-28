@@ -94,8 +94,36 @@ export async function backfillOneBooking(bookingId: string): Promise<BackfillRes
   }
 
   if (!msRes.ok) {
-    const errBody = await msRes.json().catch(() => ({} as any))
-    const message = errBody?.detail ?? `Microservice returned HTTP ${msRes.status}`
+    // A genuine CricHeroes-side error (404/429/502 — see api.py's own
+    // fetch_and_parse_scorecard) always comes back as JSON with a `detail`
+    // field, so `errBody?.detail` covers the expected case below unchanged.
+    // When it's absent, the response almost certainly never reached our
+    // FastAPI app at all — something in front of it (most likely Render's
+    // own free-tier edge, rejecting a request before the app sees it)
+    // answered instead. Read the raw body via .text() first (not .json()
+    // directly) so a non-JSON response — the exact signature of an
+    // infra-level rejection — doesn't just collapse into an empty {} and
+    // get thrown away; it's surfaced straight into error_message instead,
+    // so scorecard_uploads itself becomes the diagnostic without needing
+    // to go dig through Render/Vercel's own log UIs. Reported live
+    // 2026-09-28: a persistent bare "Microservice returned HTTP 429" with
+    // Render's deploy independently confirmed current and Live — this is
+    // the fallback that error was always hitting, and it never said what
+    // Render's edge actually sent back.
+    const rawText = await msRes.text().catch(() => '')
+    let detail: string | undefined
+    try {
+      detail = rawText ? JSON.parse(rawText)?.detail : undefined
+    } catch {
+      // Not JSON — confirms this didn't come from our own app's error handling.
+    }
+    const serverHeader = msRes.headers.get('server')
+    const diagnosticBits = [
+      !detail && rawText ? `raw: ${rawText.slice(0, 200)}` : null,
+      serverHeader ? `server header: ${serverHeader}` : null,
+    ].filter(Boolean).join(' · ')
+    const message = detail
+      ?? (diagnosticBits ? `Microservice returned HTTP ${msRes.status} (${diagnosticBits})` : `Microservice returned HTTP ${msRes.status}`)
     await supabase.from('scorecard_uploads').update({ error_message: message }).eq('booking_id', bookingId)
     return { booking_id: bookingId, match_id: booking.match_id, ok: false, parsed: false, synced: false, error: message }
   }
