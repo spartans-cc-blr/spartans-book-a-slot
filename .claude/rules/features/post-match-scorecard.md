@@ -712,6 +712,31 @@ successful re-sync, so there's no separate "un-flag" step needed here.
 > previously a dead end. The next time this 429 recurs, `scorecard_uploads`
 > itself becomes the diagnostic — no need to separately dig through
 > Render's or Vercel's own log UIs to find out what was actually returned.
+>
+> **Confirmed root cause, same day, first real occurrence after the fix
+> above shipped:** `error_message` read `Microservice returned HTTP 429
+> (raw: Too Many Requests · server header: cloudflare)`. Neither
+> CricHeroes nor `spartans-python`'s own app code can produce this — a
+> genuine CricHeroes 429 always comes back as JSON with a `detail` field
+> (ruled out), and there is exactly one 429-raising site in the whole
+> Python app, which also always sets `detail` (ruled out). A bare
+> `server: cloudflare` response with a plain-text `Too Many Requests` body
+> is Cloudflare's own rate-limit page — Render fronts every service,
+> including free-tier ones, with Cloudflare for abuse/DDoS protection, and
+> this request was rejected at that layer before it ever reached the
+> Render dyno or the FastAPI app. **This means the cold-start/warm-up
+> theory from earlier in this incident, while a real and worthwhile fix in
+> its own right, was never the actual root cause of the persistent 429** —
+> it's a separate layer entirely, one neither this repo nor
+> `spartans-python` has any code-level control over (there's no
+> Cloudflare/WAF setting exposed in Render's own dashboard for a hosted
+> service). The most likely trigger was the sheer volume of repeated
+> manual retries against the same `onrender.com` hostname during the
+> multi-hour debugging window itself. No further code fix was made for
+> this specific layer — the two realistic paths forward are waiting out
+> whatever window Cloudflare enforces before retrying, or upgrading off
+> Render's Free plan, which is understood to carry a materially higher
+> (or absent) rate-limiting threshold at this edge layer than Free does.
 
 > **Changed (2026-09-27) — the eligible backlog is now processed
 > newest-match-first, not oldest-first.** The query's ordering had been
