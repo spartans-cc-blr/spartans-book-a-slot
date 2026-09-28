@@ -631,6 +631,56 @@ successful re-sync, so there's no separate "un-flag" step needed here.
 > external step to pre-warm Render from, and can still occasionally 504 on a
 > cold dyno; acceptable since it's a backup, not the primary trigger.
 
+> **Incident (2026-09-28) — `/admin/scorecard-backfill`'s manual "Run
+> Backfill" path had no equivalent of the cron's own warm-up step, and a
+> cold Render dyno was surfacing as a bare 429 with no CricHeroes-side
+> detail text.** Reported as a persistent `Microservice returned HTTP 429`
+> error from the admin backfill page, recurring across a 12+ hour window.
+> Confirmed against `spartans-python/api.py` (the deployed FastAPI wrapper)
+> that a genuine CricHeroes-side 429 always produces a JSON body —
+> `fetch_and_parse_scorecard()` has an explicit
+> `if resp.status_code == 429: raise HTTPException(429, detail="Rate
+> limited by CricHeroes — wait before retrying")` — so Hub's own fallback
+> string (`errBody?.detail ?? "Microservice returned HTTP ${msRes.status}"`,
+> `src/lib/scorecardBackfill.ts`) only ever renders when the microservice's
+> response carried **no** `detail` field at all.
+>
+> Every historical `scorecard_uploads.error_message` row mentioning 429
+> (4 total, across two separate days) showed exactly that generic
+> fallback text — never the friendlier CricHeroes-passthrough detail. Cross-
+> checking against the `cron-backfill-scorecards.yml` GitHub Actions run
+> logs for the same days showed the **cron itself succeeding cleanly** in
+> the same windows, on different bookings — its own "Warm up Render
+> microservice" step (added for the 2026-08-02 incident above) reliably
+> shows a 32-42s `/health` response, i.e. a genuine cold-start every run,
+> before the real fetch. The 429s themselves landed roughly 30 minutes to
+> 12+ hours after the nearest known traffic to the microservice — squarely
+> in "the free-tier Render dyno has spun back down from inactivity since
+> the last request" territory. Put together: this was **Render's own edge
+> answering for a still-asleep dyno**, not CricHeroes throttling anything —
+> the request never reached `fetch_and_parse_scorecard()`'s own
+> CricHeroes-status check at all, which is exactly why its `detail` text
+> never showed up anywhere.
+>
+> The 2026-08-02 fix only ever touched the GitHub Actions workflow — the
+> admin page's manual runs (`/admin/scorecard-backfill` → `POST
+> /api/admin/scorecard-backfill` → `backfillOneBooking()`) never got an
+> equivalent warm-up call, so every manual session's first click raced a
+> cold dyno with nothing absorbing the wake-up cost first.
+>
+> **Fixed** by adding a new `GET /api/admin/scorecard-backfill/warmup`
+> route (admin-only) that pings the microservice's `/health` with its own
+> generous, separate 55s budget, and calling it once from the client's
+> `runBackfill()` — before its selection loop starts, not inside
+> `backfillOneBooking()` itself. Deliberately kept as a preceding, separate
+> call rather than folded into the shared function: burning ~30-40s of a
+> single booking's already-tight 60s Vercel budget on a wake-up wait would
+> reintroduce the exact 504 risk the cron's own warm-up step exists to
+> avoid. Best-effort — a failed or slow warm-up ping never blocks the
+> actual backfill loop from proceeding, same "continuing anyway" posture
+> as the cron workflow's own warm-up step. The button reads "Waking
+> analytics service…" while this runs.
+
 > **Changed (2026-09-27) — the eligible backlog is now processed
 > newest-match-first, not oldest-first.** The query's ordering had been
 > `game_date`/`slot_time` ascending since the 2026-07-16 incident above —
@@ -796,6 +846,7 @@ deep-link (`?month=all`) that overrides it.
 | `src/lib/matchFeeSplit.ts` | `computeMatchFeeSplit()` — shared per-player fee/units/exemption computation, used by both `POST` (initial apply) and `PATCH` (correction, §6.1) `/api/fees/apply` |
 | `supabase/migrations/075_match_fee_corrections.sql` | `match_fee_corrections` — one immutable audit row per match-fee correction event (§6.1) |
 | `src/app/api/admin/scorecard-backfill/route.ts` | One-time backfill: GET lists eligible bookings (via the shared `isPastMatch()`, so a same-day-but-ended match is included — see Section 13's 2026-09-13 incident), POST processes one |
+| `src/app/api/admin/scorecard-backfill/warmup/route.ts` | Admin-only — pings the microservice's `/health` with its own separate budget; called once by the admin page before its backfill loop starts (see Section 8's 2026-09-28 incident) |
 | `src/app/admin/scorecard-backfill/page.tsx` | Admin UI driving the client-side backfill loop |
 | `src/app/api/cron/backfill-scorecards/route.ts` | Daily self-healing cron |
 | `src/app/api/matches/history/route.ts` | Paginated match list — `can_upload`, `can_verify`, `top_performers`, `roles_complete`, `scorecard_status`, `ground` join. `top_performers` is built from `computeMatchMVP()` (single match MVP); `can_verify` still uses `computeTopPerformers()` (tie-inclusive) — see Section 15 |
