@@ -86,9 +86,11 @@ export async function GET(req: NextRequest) {
 
   // A booking is eligible either the normal way (never synced) or because a
   // captain/VC/wrangler/admin flagged it for reconciliation — see
-  // features/post-match-scorecard.md and flag-reconciliation/route.ts. A
-  // flagged booking jumps the queue (sorted first) since a human already
-  // singled it out as wrong, ahead of routine never-synced backlog.
+  // features/post-match-scorecard.md and flag-reconciliation/route.ts.
+  //
+  // Flagged bookings no longer jump the queue ahead of the rest (removed
+  // 2026-09-28 — see the incident note below). They're just part of the
+  // same pool, ordered by game_date/slot_time like everything else.
   //
   // game_date alone can't tell "starts later today" apart from "already
   // finished" — same gap src/lib/matchStatus.ts was written to close for
@@ -105,10 +107,9 @@ export async function GET(req: NextRequest) {
     .filter(b => b.game_date < today || hasMatchEnded(b.game_date, b.slot_time, b.format))
     .filter(b => !b.su || !['synced', 'fees_applied'].includes(b.su.status) || b.su.needs_reconciliation)
 
-  const eligible = [
-    ...withFlag.filter(b => b.su?.needs_reconciliation),
-    ...withFlag.filter(b => !b.su?.needs_reconciliation),
-  ].slice(0, MAX_PER_RUN)
+  // Newest-first, straight off the query's own ordering — see the incident
+  // note below for why a flagged-jumps-the-queue split used to sit here.
+  const eligible = withFlag.slice(0, MAX_PER_RUN)
 
   if (eligible.length === 0) {
     return NextResponse.json({ processed: 0, succeeded: 0, failed: 0, results: [] })

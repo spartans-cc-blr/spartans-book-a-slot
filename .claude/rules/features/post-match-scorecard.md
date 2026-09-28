@@ -589,10 +589,12 @@ count, or failures with reasons).
 
 Eligibility (added with Section 14's verification/reconciliation feature):
 a booking also qualifies here if `needs_reconciliation` is true, regardless
-of its `status` — a human-reported discrepancy jumps the queue ahead of
-routine never-synced backlog (flagged bookings are sorted first within the
-`MAX_PER_RUN` slice). `backfillOneBooking()` clears the flag itself on a
-successful re-sync, so there's no separate "un-flag" step needed here.
+of its `status`. **No longer jumps the queue ahead of newer unflagged
+bookings** (removed 2026-09-28 — a mass reconciliation-flagging pass made
+that starve out genuinely newer matches; see the incident note below). A
+flagged row is just part of the same newest-first pool as everything else
+now. `backfillOneBooking()` still clears the flag itself on a successful
+re-sync, so there's no separate "un-flag" step needed here.
 
 > **Incident (2026-07-16) — this route had never actually fired
 > automatically, and separately, its per-run cap was too high.** Two
@@ -806,6 +808,47 @@ successful re-sync, so there's no separate "un-flag" step needed here.
 > newest-first ordering, a too-small limit only ever truncates the oldest
 > tail of history (harmless — it just waits for a later run) instead of
 > starving the query of the recent rows that actually matter.
+>
+> **Superseded 2026-09-28 — see the incident note below.** The "flagged
+> rows jump ahead of everything else, newest-flagged-first within that
+> bucket" half of this change is reversed there, after a mass
+> reconciliation-flagging pass made it starve out genuinely newer
+> bookings. The plain newest-first ordering itself — no day-of-week
+> special-casing, the `.limit(500)` risk flip — is unaffected and still
+> stands exactly as described above.
+
+> **Incident (2026-09-28) — a bulk reconciliation-flagging pass (~36
+> bookings, flagged 26–27 Sep to backfill Fall of Wickets/Partnership data
+> — see `features/partnerships.md`) starved out the two genuinely newest
+> matches.** The "flagged bookings jump the queue" rule above (added for
+> Section 14's single-urgent-report case — a human spots one wrong
+> scorecard and wants it fixed sooner than routine backlog) was never
+> designed for a bulk sweep this size. Once ~36 rows carried
+> `needs_reconciliation: true` — mostly already `status: 'synced'`, just
+> re-flagged to pick up newly-added FOW/partnership fields, per notes like
+> "Partnership data to be added" — they permanently outranked every
+> unflagged row regardless of date. Two real matches from 27 Sep
+> (`match_id 26452955` vs Whackers Cricket Club, `25408938` vs Rising
+> Phoenix Cricket Club — both still failing on the Cloudflare 429 from the
+> incident above, `needs_reconciliation: false`) sat at the tail of the
+> eligible pool behind the entire flagged backlog, so every run kept
+> picking off whichever flagged row happened to be newest instead of
+> these two actually-newest bookings — reported live as the two
+> just-synced matches looking "very random" rather than the latest.
+>
+> **Fixed** by dropping the flag-priority split in
+> `src/app/api/cron/backfill-scorecards/route.ts` — `eligible` is now
+> just `withFlag.slice(0, MAX_PER_RUN)`, straight off the query's own
+> `game_date`/`slot_time` descending order. A flagged row is still
+> eligible (nothing about *which* bookings qualify changed) and still has
+> its flag auto-cleared by `backfillOneBooking()` on a successful
+> re-sync — it just no longer jumps ahead of a newer unflagged booking. In
+> practice the pool now drains newest-first end to end: the two 27 Sep
+> matches (once past the Cloudflare cooldown) sync first, then the run
+> naturally descends into the flagged historical backlog in date order,
+> down to the January 2026 tail — the same order a human would expect
+> from "process the backlog latest first," with no special case for *why*
+> a row needs (re-)processing.
 
 ### Why the daily-cron-plus-guard shape exists at all
 Vercel Hobby does not support day-of-week-restricted cron expressions —
