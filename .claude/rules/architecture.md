@@ -215,7 +215,7 @@ Access here is genuinely mixed per-route rather than one role — see
 |---|---|---|---|
 | `/api/cron/expire-reservations` | GET | `CRON_SECRET` bearer | Daily at 18:30 UTC — delete expired `soft_block` rows |
 | `/api/cron/lock-availability` | GET | `CRON_SECRET` bearer | Fires daily (Vercel Hobby can't restrict cron by day-of-week — see `limitations.md`); route itself gates to Thursday IST via an in-code check before blanket-locking all confirmed Sat/Sun bookings for the upcoming weekend |
-| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Twice daily, 13:00 & 19:00 IST (moved off 07:00 on 2026-08-01 — no games are played 19:00–07:00 IST, so that slot was dead time; the morning slot itself moved 12:00→13:00 IST on 2026-08-08) — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 3/run; see `features/post-match-scorecard.md` |
+| `/api/cron/backfill-scorecards` | GET | `CRON_SECRET` bearer | Twice daily, 13:00 & 19:00 IST, GitHub Actions only — no `vercel.json` entry as of 2026-09-28, see below (moved off 07:00 on 2026-08-01 — no games are played 19:00–07:00 IST, so that slot was dead time; the morning slot itself moved 12:00→13:00 IST on 2026-08-08) — fetches scorecards directly from CricHeroes for past unsynced bookings, self-healing (queries *all* backlog, not just yesterday), capped at 3/run; see `features/post-match-scorecard.md` |
 | `/api/cron/sync-player-status` | GET | `CRON_SECRET` bearer | Daily at 02:00 IST — recomputes every non-expelled player's `active`/`inactive` status from 42-day availability signal; see `features/gc-players.md` |
 | `/api/cron/availability-nudge` | GET | `CRON_SECRET` bearer | Sun–Wed at 20:45 IST — personalised push reminders for `nextLockWeekend` gaps; see `features/availability-nudge.md` |
 | `/api/cron/reservation-expiry-reminders` | GET | `CRON_SECRET` bearer | Hourly, GitHub Actions only — no `vercel.json` entry, since Vercel Hobby rejects the whole deploy for any sub-daily cron — alerts every admin 24h/12h/1h before a `soft_block` reservation's `reserved_until` deadline, so they can nudge the organiser before the slot auto-expires; see `features/reservation-expiry-reminders.md` |
@@ -230,11 +230,18 @@ Access here is genuinely mixed per-route rather than one role — see
 > route is idempotent, so it's safe for both schedulers to fire — a
 > same-day double-invocation is a no-op. Requires `CRON_SECRET` to also be
 > set as a GitHub repo secret (Settings → Secrets and variables → Actions).
-> `reservation-expiry-reminders` (added September 2026) is the exception —
-> it runs from its GitHub Actions workflow **only**, with no `vercel.json`
-> entry: Hobby rejects the entire deployment if any cron is scheduled more
-> often than daily (this blocked every deploy from #318 to #322); see
-> `features/reservation-expiry-reminders.md` §5.
+> `reservation-expiry-reminders` (added September 2026) was the first
+> exception — it runs from its GitHub Actions workflow **only**, with no
+> `vercel.json` entry: Hobby rejects the entire deployment if any cron is
+> scheduled more often than daily (this blocked every deploy from #318 to
+> #322); see `features/reservation-expiry-reminders.md` §5.
+> `backfill-scorecards`'s own `vercel.json` entry was removed the same way
+> on 2026-09-28, after Render's edge (Cloudflare) started rate-limiting
+> this route's outbound calls to the analytics microservice — with GitHub
+> Actions already reliably covering both daily slots, the Vercel-side entry
+> was redundant request volume against a route that was actively being
+> throttled; see `features/post-match-scorecard.md`'s Cloudflare-429
+> incident write-up and `limitations.md`.
  
 ---
  

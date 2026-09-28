@@ -543,21 +543,43 @@ site-wide (`ui-theme.md`'s Light/Dark/System section) — just applied to
 the `/admin/**` subtree for the first time here, rather than a new kind of
 inconsistency.
 
-### `/api/cron/backfill-scorecards` — twice daily, self-healing
-Runs at 13:00 and 19:00 IST (GitHub Actions: `"30 7,13 * * *"`). `vercel.json`
-carries a single-fire backup at `"30 13 * * *"` (19:00 IST only) — **Vercel
-Hobby caps cron jobs at one invocation per day per job**, so it was never
-possible to mirror both slots there; this is also why `vercel.json` only
-ever had one entry for this route in the first place, not a drift from an
-intended twice-daily config. 19:00 was chosen over the earlier slot for the
-single Vercel-side backup since it's the slot more likely to already have a
-CricHeroes scorecard to fetch. Moved off the original 07:00 slot on
-2026-08-01: no games are ever played between 19:00 and 07:00 IST, so a
-07:00 run never had any new backlog the prior 19:00 run hadn't already seen
-— it was pure dead time. That slot was originally 12:00 IST, then moved to
-13:00 IST on 2026-08-08 — either way it gives CricHeroes room to publish
-the day's morning-slot (07:30/10:30) scorecards before the fetch attempt
-runs. Queries **all** past unsynced
+### `/api/cron/backfill-scorecards` — twice daily, self-healing, GitHub Actions only
+
+Runs at 13:00 and 19:00 IST via GitHub Actions (`"30 7,13 * * *"`) only —
+**there is no `vercel.json` entry for this route any more** (removed
+2026-09-28). It originally carried a single-fire backup at `"30 13 * * *"`
+(19:00 IST only) — **Vercel Hobby caps cron jobs at one invocation per day
+per job**, so it was never possible to mirror both slots there, and this
+one slot was the reason `vercel.json` only ever had one entry for this
+route in the first place, not a drift from an intended twice-daily config.
+19:00 was chosen over the earlier slot for that single Vercel-side backup
+since it's the slot more likely to already have a CricHeroes scorecard to
+fetch.
+
+**Removed outright, not just left alone, during the 2026-09-28 Cloudflare
+incident (see below).** With the GitHub Actions workflow already covering
+both daily slots reliably (see `limitations.md`'s "Cron Jobs Do Not
+Reliably Fire" — Vercel's own scheduler for this project has never been
+trustworthy, and this route's entire `vercel.json` history is a backup for
+that unreliability, not a primary path), the Vercel-side entry was pure
+redundant request volume once Render's own edge started throttling this
+route — a request from Vercel's cron at 13:30 UTC would land in the same
+window as the GitHub Actions run at the same nominal time, doubling
+outbound calls to the microservice for no benefit. Removing it doesn't lose
+any coverage: the route is idempotent (only ever touches bookings not yet
+`synced`/`fees_applied`), and GitHub Actions was already the trigger doing
+the real work — see the 2026-07-16 incident further down, where this same
+route was found to have **zero evidence of ever firing automatically on
+Vercel's own schedule** in its entire history before the GitHub Actions
+workflow existed.
+
+Moved off the original 07:00 IST slot on 2026-08-01 (back when the
+Vercel-side backup still existed): no games are ever played between 19:00
+and 07:00 IST, so a 07:00 run never had any new backlog the prior 19:00 run
+hadn't already seen — it was pure dead time. That slot was originally
+12:00 IST, then moved to 13:00 IST on 2026-08-08 — either way it gives
+CricHeroes room to publish the day's morning-slot (07:30/10:30) scorecards
+before the fetch attempt runs. Queries **all** past unsynced
 bookings with a `match_id`, not just "yesterday" — so a run that's cut
 short, or a match that keeps failing, just rolls into the next run instead
 of being permanently skipped. `MAX_PER_RUN = 3` bounds each individual run
@@ -737,6 +759,30 @@ successful re-sync, so there's no separate "un-flag" step needed here.
 > whatever window Cloudflare enforces before retrying, or upgrading off
 > Render's Free plan, which is understood to carry a materially higher
 > (or absent) rate-limiting threshold at this edge layer than Free does.
+>
+> **Cause narrowed further the same day** by directly measuring
+> `scorecard_uploads.uploaded_at` timestamps against the real GitHub
+> Actions run history for this workflow: on 2026-09-24 (a normal, 429-free
+> day) a single manual `/admin/scorecard-backfill` session pushed through
+> 40 successful syncs across the day in clear multi-request bursts (11
+> requests in a ~40-minute span at one point) — a far higher instantaneous
+> rate than the scheduled cron ever produces (`MAX_PER_RUN = 3` sequential
+> requests, twice a day, none of them anywhere near that day's actual burst
+> windows). This makes the twice-daily cron a much less likely trigger for
+> the Cloudflare block than the volume of manual retries during the
+> multi-hour live debugging session — though since Cloudflare's exact
+> rate-limit window (a tight burst limit vs. a longer cumulative quota)
+> isn't visible from either repo, this isn't certain either way.
+>
+> **Given that uncertainty, `vercel.json`'s own entry for this route was
+> removed outright the same day** (see the section header above) — it was
+> redundant request volume once this route's own outbound calls were the
+> thing being throttled, with GitHub Actions already covering both daily
+> slots reliably. The GitHub Actions workflow itself was deliberately
+> **left enabled** through the Cloudflare cooldown window, on the same
+> "twice a day, 3 requests max" low-rate reasoning above — a decision made
+> knowingly, not an oversight; manual `/admin/scorecard-backfill` runs were
+> paused instead, since those are the higher-confidence contributor.
 
 > **Changed (2026-09-27) — the eligible backlog is now processed
 > newest-match-first, not oldest-first.** The query's ordering had been
