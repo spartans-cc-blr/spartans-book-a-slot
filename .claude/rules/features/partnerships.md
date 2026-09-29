@@ -1,6 +1,6 @@
 # Batting Partnerships — Feature Summary
 
-**Spartans Hub · Added: September 2026 · Status: All 6 phases shipped, plus unbroken-partnership support (§4.2), retired-hurt-and-return support (§4.4), and opponent Fall of Wickets + bowler credit capture (§11, raw data only, no derivation or UI yet)**
+**Spartans Hub · Added: September 2026 · Status: All 6 phases shipped, plus unbroken-partnership support (§4.2), retired-hurt-and-return support (§4.4), opponent Fall of Wickets + bowler credit capture (§11), and batting style (RHB/LHB) capture (§12) — the last two raw data only, no derivation or UI yet**
 
 ---
 
@@ -1513,6 +1513,129 @@ and the `matchStatsSync.ts` fetch.
 | Partnership-breaking derivation | Run `computePartnerships()`'s crease-pointer walk (or a sibling function) against the opponent's own batting order + `opponent_fall_of_wickets`, then surface `bowler_name` per broken partnership. Not built — see "Deliberately raw data only" above. |
 | Surface for the result | Explicitly deferred — a per-match scorecard annotation and a bowler career stat ("partnerships broken") were both discussed and neither was chosen; decide once the derivation above exists. |
 | Historical backfill | Every match synced before this shipped has `opponent_fall_of_wickets: NULL` in the cache and zero rows in the analytics table for that `match_id`, same "code merged is not the same as history re-run" caveat as `fall_of_wickets`/`bowling_order` before it — only a re-sync (manual "Sync Stats", or a `backfill-scorecards` re-run) picks it up. |
+
+---
+
+## 12. Batting style (RHB/LHB) — raw capture only (added September 2026)
+
+### Why
+
+Raised alongside two questions: (1) do we capture Spartans batters'
+dismissal type, and (2) can we get opponent batters' batting handedness,
+to eventually compute "% of our wickets against LHB vs RHB." Answer to
+(1) turned out to be "already have it" — `batting_stats.dismissal_method`
+has captured this for every synced Spartans batter since before this
+feature existed (the `retired_hurt` incidents in §3/§4.4 are built
+directly on it — see e.g. `27142448`'s and `26919890`'s write-ups, both
+keyed on `batting_stats.dismissal_method = 'retired_hurt'`). Nothing was
+added for (1).
+
+(2) was the real gap, and the same shape as §11's: the data was already
+being parsed and thrown away. CricHeroes' own scorecard export carries
+batting handedness as its own parenthetical annotation right next to a
+player's name in the batting card — e.g. `"Sunil Reddy (c & wk) (RHB)"` —
+and `ScorecardConfig.strip_name_annotations()` (`spartans-python/utils/field_config.py`)
+has always blindly regex-stripped *every* parenthetical group off a raw
+name before using it as a dict key, this annotation included, for
+**both** teams (the batting-card extraction loop is symmetric — see §2's
+"Why Fall of Wickets can only ever cover the Spartans innings" note for
+the general shape of this pipeline; batting-lineup extraction has never
+made a Spartans/opponent distinction the way `CSVWriterFactory.write_all()`
+does at the persistence layer).
+
+### What was added
+
+- **`ScorecardConfig.extract_batting_style()`** (`spartans-python/utils/field_config.py`)
+  — a small sibling to `strip_name_annotations()`. Pulls `"RHB"`/`"LHB"`
+  (normalized uppercase, case-insensitive match) out of a raw name via
+  `\(\s*([LR]HB)\s*\)`, or returns `None` when no such annotation is
+  present. Must be called on the raw name **before**
+  `strip_name_annotations()` runs, since that function discards the exact
+  group this one reads.
+- **`ScorecardExtractor._extract_batting_stats()`** (`field_extractors.py`)
+  — the one loop that already builds `player_stats[team][player_name]['batting']`
+  for every batter on both teams — now calls `extract_batting_style()` on
+  the raw name before stripping it, and stores the result as
+  `'batting_style'` inside that same `'batting'` dict. No new extraction
+  pass, no new page read.
+- **`batting_stats.batting_style`** and **`opponent_fall_of_wickets.batting_style`**
+  — two nullable columns on the two existing tables (migration
+  `analytics-db/migrations/008_batting_style.sql`), applied directly to
+  the live analytics project the same session this was written.
+  `BattingStatsWriter` writes it for every Spartans batter with a real
+  batting-card row (empty/NULL for a genuine did-not-bat row, same as
+  every other stat there); `OpponentFallOfWicketsWriter` writes it for
+  the **dismissed opponent batter** on each of its rows — the exact
+  population needed to compute "% of wickets by batting style" with no
+  further join, since a wicket-by-wicket table already has exactly one
+  row per dismissal.
+- **No Hub-side code change at all.** `src/lib/matchStatsSync.ts` already
+  reads both `batting_stats` and `opponent_fall_of_wickets` via a bare
+  `select('*')` (see §11's own note on this pattern, and the `player_id`
+  precedent it was copied from) — the new column rides along into
+  `match_stats_cache.batting[]`/`match_stats_cache.opponent_fall_of_wickets[]`
+  automatically on the next sync, with zero TypeScript touched.
+
+### Deliberately raw data only — no derivation, no UI
+
+Same explicit scoping as §11: this only makes the field capturable and
+queryable. No "% of wickets by batting style" computation exists anywhere
+in the Hub, and nothing reads either new column today.
+
+### Not captured — opponent batters who were never dismissed
+
+`opponent_fall_of_wickets` only ever has a row per **wicket**, so a
+not-out opponent batter's handedness is never captured anywhere (there is
+no `opponent_team_list`/`opponent_batting_stats` table — see §11's own
+"not a widened `fall_of_wickets`" reasoning for why no such table exists
+yet). This is fine for the stated use case (a wickets-by-style
+breakdown only needs the batters who were actually dismissed) but would
+need a genuinely new table — one row per opponent player per match,
+mirroring the Spartans-only `team_list` — if a future ask needs handedness
+for every opponent batter regardless of whether they got out (e.g. "runs
+conceded to LHB vs RHB," which also isn't derivable from anything this
+pipeline stores today — `opponent_fall_of_wickets` has no runs-faced
+figure per batter, only the team's cumulative score at each wicket).
+
+### Verification
+
+`ScorecardConfig.extract_batting_style()` unit-tested standalone against
+six raw-name cases (an `(RHB)` alongside a separate `(c & wk)` group, a
+lowercase `(lhb)`, no annotation at all, only a `(c)` group) — all
+correct. End-to-end verified the same way as §11: a synthetic match run
+through the real `CSVWriterFactory.write_all()` path with `batting_style`
+set on both teams' batting dicts — `batting_stats.csv` correctly carried
+`RHB`/`LHB` per Spartans batter (empty for a `None` value and for a
+did-not-bat row), and `opponent_fall_of_wickets.csv` correctly carried
+the dismissed batter's own style alongside `bowler_name` on the same row.
+The pre-existing §11 smoke test was re-run unmodified (no `batting_style`
+keys in its fixtures) to confirm the new `.get('batting_style') or ''`
+lookups don't error when the key is simply absent.
+
+### Security (vibe-security)
+
+Same posture as §11 — no new PDF parsing (the annotation was already
+being read, just discarded), no new client-reachable input, RLS already
+enabled on both tables (unchanged by this migration), and no API route
+exposes either new column.
+
+### File map
+
+| File | Role |
+|---|---|
+| `analytics-db/migrations/008_batting_style.sql` | `batting_stats.batting_style` + `opponent_fall_of_wickets.batting_style` |
+| `spartans-python/utils/field_config.py` | `ScorecardConfig.extract_batting_style()` |
+| `spartans-python/utils/field_extractors.py` | `_extract_batting_stats()` now captures `batting_style` into the shared `player_stats[team][player_name]['batting']` dict, both teams |
+| `spartans-python/utils/csv_writers.py` | `BattingStatsWriter` writes `batting_style` for Spartans; `OpponentFallOfWicketsWriter` writes it for the dismissed opponent batter |
+| `spartans-python/scripts/import_to_supabase.py` | `batting_style: str` added to both tables' `COLUMN_TYPES` |
+
+### Pending
+
+| Item | Notes |
+|---|---|
+| "% of wickets by batting style" computation | Not built — join `opponent_fall_of_wickets.batting_style` against `bowler_name`/`bowling_stats` at read time whenever this is wanted. |
+| Opponent batting style for non-dismissed batters | Would need a new opponent-side roster table — see "Not captured" above. Not requested. |
+| Historical backfill | Every match synced before this shipped has `batting_style: NULL` for every row on both tables — only a re-sync picks it up, same as every other column added to these tables. |
 
 ---
 
