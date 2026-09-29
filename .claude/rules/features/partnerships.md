@@ -1,6 +1,6 @@
 # Batting Partnerships — Feature Summary
 
-**Spartans Hub · Added: September 2026 · Status: All 6 phases shipped, plus unbroken-partnership support (§4.2) and retired-hurt-and-return support (§4.4)**
+**Spartans Hub · Added: September 2026 · Status: All 6 phases shipped, plus unbroken-partnership support (§4.2), retired-hurt-and-return support (§4.4), and opponent Fall of Wickets + bowler credit capture (§11, raw data only, no derivation or UI yet)**
 
 ---
 
@@ -66,6 +66,17 @@ render against this real data for the first time.
 
 ## 2. Why Fall of Wickets can only ever cover the Spartans innings
 
+> **Partially superseded September 2026 — see §11.** The claim below that
+> the opponent's Fall of Wickets is "parsed transiently and never stored"
+> is no longer true: a second table, `opponent_fall_of_wickets`, now keeps
+> it, credited to the dismissing Spartans bowler. `batting_stats`/
+> `bowling_stats`/`fielding_stats`/`team_list` are still Spartans-only
+> exactly as described here — only Fall of Wickets branched into a second,
+> opponent-side table, and only because that data was already sitting in
+> memory (see §11 for why this needed no new PDF parsing). Kept below for
+> the historical reasoning, which still explains why the other four tables
+> stay Spartans-only.
+
 `spartans-python`'s `CSVWriterFactory.write_all()` has always been
 Spartans-only — `batting_stats`/`bowling_stats`/`fielding_stats`/
 `team_list` never store a row for the opponent's own lineup, regardless
@@ -73,14 +84,15 @@ of which side is batting on a given page. The opponent's batting figures
 are read into memory only as context for Spartans' own bowling MVP
 calculation, then discarded.
 
-Fall of Wickets extraction deliberately mirrors this rather than
-introducing a new, inconsistent scope: `ScorecardExtractor.
+Fall of Wickets extraction deliberately mirrored this rather than
+introducing a new, inconsistent scope, from when it first shipped through
+August 2026: `ScorecardExtractor.
 extract_fall_of_wickets()` itself is symmetric (returns both teams'
 entries, same shape as the pre-existing `extract_team_lists()`), but
 `CSVWriterFactory.write_all()` — the one place that already decides which
-side to persist — picks only the Spartans side's list before handing it
-to the writer. The opponent's Fall of Wickets is parsed transiently and
-never stored, same as their batting stats always have been. This isn't a
+side to persist — picked only the Spartans side's list before handing it
+to the writer. The opponent's Fall of Wickets was parsed transiently and
+never stored, same as their batting stats always have been. This wasn't a
 limitation specific to this feature — nothing else in this database has
 ever tracked an opponent's individual performance, and a partnership
 between two opponent batters (who have no Hub `player_id` to attach to
@@ -1270,10 +1282,13 @@ as the external-link fallback when there's no `playerId` at all.
 | `computePartnerships()` is a pure function — no DB access, no new write path | ✅ |
 | `ScorecardTables.tsx`'s Partnerships table reuses the existing scorecard route's auth — no new access surface, no new data exposed beyond what `batting`/`fall_of_wickets` already carry | ✅ |
 | Extraction is read-only against the PDF; no new write path introduced anywhere in the Hub | ✅ |
-| Spartans-only scope maintained — no opponent data newly persisted | ✅ |
+| `batting_stats`/`bowling_stats`/`fielding_stats`/`team_list` scope maintained — Spartans-only, no opponent data newly persisted there (§11's `opponent_fall_of_wickets` is the one deliberate exception, scoped narrowly — see below) | ✅ |
 | Existing production parsing (`batting_stats`/`bowling_stats`/`team_list` extraction) verified byte-for-byte unchanged before shipping the shared name-normalization refactor | ✅ |
 | `GET /api/matches/history/[bookingId]/scorecard`'s new `fall_of_wickets` field reuses the existing route's auth (any signed-in, non-expelled member) — no new access surface, matches every other field already returned there | ✅ |
 | `match_stats_cache.fall_of_wickets` written only by `syncMatchStatsForBooking()`, same service-role-only path as every other column on that row | ✅ |
+| `opponent_fall_of_wickets` (§11) needed no new PDF parsing — `bowler_name` is derived from the same "how out" text `bowling_stats`'s aggregate dismissal-type counts already read | ✅ |
+| `opponent_fall_of_wickets` / `match_stats_cache.opponent_fall_of_wickets` RLS enabled, no anon/authenticated policies — service role only, same as every other table in this feature | ✅ |
+| No API route reads `match_stats_cache.opponent_fall_of_wickets` yet — captured, not exposed | ✅ |
 
 ---
 
@@ -1283,19 +1298,22 @@ as the external-link fallback when there's no `playerId` at all.
 |---|---|
 | `analytics-db/migrations/005_fall_of_wickets.sql` | The new table (§5) |
 | `analytics-db/migrations/006_fall_of_wickets_retirement.sql` | `is_retirement`/`returning_player_name` columns — retired-hurt-and-return support (§4.4) |
+| `analytics-db/migrations/007_opponent_fall_of_wickets.sql` | `opponent_fall_of_wickets` table — the opponent's own Fall of Wickets, each row carrying `bowler_name` (§11) |
 | `spartans-python/utils/field_config.py` | `FALL_OF_WICKET_PATTERN`, `ScorecardConfig.strip_name_annotations()` |
 | `spartans-python/utils/field_extractors.py` | `ScorecardExtractor.extract_fall_of_wickets()` and its helpers |
-| `spartans-python/utils/csv_writers.py` | `FallOfWicketsWriter` |
-| `spartans-python/scripts/import_to_supabase.py` | `fall_of_wickets.csv` → `fall_of_wickets` table mapping, `CONFLICT_KEYS` |
-| `spartans-python/api.py`, `spartans-python/main.py` | `match_data['fall_of_wickets']` populated; dry-run summary + Drive upload lists updated |
+| `spartans-python/utils/dismissal_parser.py` | `DismissalParser.parse_batting_dismissal()` — the per-batter "how out" text parser `OpponentFallOfWicketsWriter` (§11) reuses to credit a bowler; pre-existing, not added by this feature |
+| `spartans-python/utils/csv_writers.py` | `FallOfWicketsWriter`; `OpponentFallOfWicketsWriter` (§11) |
+| `spartans-python/scripts/import_to_supabase.py` | `fall_of_wickets.csv` → `fall_of_wickets` table mapping, `CONFLICT_KEYS`; same for `opponent_fall_of_wickets.csv` (§11) |
+| `spartans-python/api.py`, `spartans-python/main.py` | `match_data['fall_of_wickets']` populated; dry-run summary + Drive upload lists updated (both, including `opponent_fall_of_wickets.csv` — §11) |
 | `supabase/migrations/071_match_stats_cache_fall_of_wickets.sql` | Hub-side cache column (§5) |
-| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` (ordered by `wicket_number`) and writes it into `match_stats_cache` |
+| `src/lib/matchStatsSync.ts` | `syncMatchStatsForBooking()` now also fetches `fall_of_wickets` and, as of §11, `opponent_fall_of_wickets` (both ordered by `wicket_number`) and writes them into `match_stats_cache` |
 | `src/app/api/matches/history/[bookingId]/scorecard/route.ts` | Now also returns `fall_of_wickets` alongside batting/bowling/fielding/team_list |
 | `src/lib/partnerships.ts` | `computePartnerships()` — the crease-pointer algorithm (§4), pure function; optional `finalScore` param emits an unbroken closing partnership (§4.2), gated on FOW completeness via `finalScore.wickets` (§4.3); `is_retirement`/`returning_player_name` support, `realWicketCount`, `Partnership.isRetirement` (§4.4); `Partnership.wicketNumber` is a derived running count of real dismissals (`displayWicket`), not a pass-through of the stored `fall_of_wickets.wicket_number` column — a retirement reuses the previous real wicket's number rather than incrementing (§4.4) |
 | `src/lib/partnerships.test.ts` | Unit tests — the real `25465218` retirement-and-return sequence, the full `1,2,3,3,4,5,6,7,8,9` wicket-number label sequence, the fail-safe unresolvable-return-name case, the completeness-check interaction (including the synthesized unbroken stand's own `wicketNumber`), and no-behaviour-change when neither new field is present (§4.4) |
 | `src/components/matches/ScorecardTables.tsx` | Partnerships bar chart (§6.6) — between Batting and Bowling, same bar treatment as `BattingPositionLeaders.tsx`, first-name-only labels via a local `firstName()` helper, `*` suffix on an unbroken partnership's runs value, no `(out)` marker, `oversToBalls()` renders `overTo` as a ball count; `teamTotal`/`teamOvers`/`teamWickets` props feed `finalScore`; a small "ret." marker for `p.isRetirement` (§4.4) |
 | `src/components/matches/MatchHistoryClient.tsx` | `FullScorecard` type + prop threading for `fall_of_wickets`; passes `teamTotal`/`teamOvers`/`teamWickets` from `match.stats` |
 | `src/app/matches/history/[bookingId]/page.tsx` | `match_stats_cache` select widened to include `fall_of_wickets`; passed down to `ScorecardTables` along with `teamTotal`/`teamOvers`/`teamWickets` |
+| `supabase/migrations/081_match_stats_cache_opponent_fall_of_wickets.sql` | `match_stats_cache.opponent_fall_of_wickets` — Hub-side cache column (§11) |
 
 ---
 
@@ -1379,6 +1397,122 @@ Glossary: `buildPartnershipsGlossary()` (`leaderboardGlossary.ts`).
 | `src/app/leaderboard/page.tsx` | `category=partnerships` branch |
 | `src/lib/leaderboardGlossary.ts` | `buildPartnershipsGlossary()` |
 | `src/types/index.ts` | `PartnershipRecord` (+ `isRetirement`, §4.4), `PartnershipPairAggregate`, `PartnershipLeaders`, `PartnershipLeaderPlayer` |
+
+---
+
+## 11. Opponent Fall of Wickets + bowler credit — raw capture only (added September 2026)
+
+### Why
+
+Raised as "how do we show that a Spartans bowler broke this opponent
+partnership" — Team Record and the per-match scorecard both already credit
+a bowler with a wicket (`bowling_stats.wickets`, and its
+bowled/caught/caught_behind/lbw/stumping/other breakdown), but nothing
+tied a specific dismissal to a specific opponent partnership, since the
+opponent's own Fall of Wickets was never stored at all (§2).
+
+**No new PDF parsing was needed.** `spartans-python/utils/dismissal_parser.py`'s
+`parse_batting_dismissal()` already parses the full "how out" text (`c
+Fielder b Bowler`, `lbw b Bowler`, `st Keeper b Bowler`, …) per batter,
+opponents included — that's exactly what already fed the
+bowled/caught/caught_behind/lbw/stumping/other counts on a Spartans
+bowler's `bowling_stats` row (via
+`BowlingStatsWriter`→`DismissalParser.extract_bowler_dismissals(opponent_stats)`).
+The gap was purely that this aggregation step collapsed "which specific
+opponent batter" away the moment it counted a dismissal by type — the
+per-batter link was parsed and then discarded, never written anywhere.
+
+### What was added
+
+- **`OpponentFallOfWicketsWriter`** (`spartans-python/utils/csv_writers.py`)
+  — the mirror of `FallOfWicketsWriter`, but for the opponent's own
+  innings. For each opponent Fall of Wickets entry (`wicket_number`,
+  `team_score`, `over`, `player_name` — the dismissed batter, already
+  symmetric-extracted per §2/§3, just never persisted before now), it
+  looks up that batter's own `batting.status` text inside `opponent_stats`
+  (the same dict `BowlingStatsWriter`/`FieldingStatsWriter` already
+  receive) and re-parses it with `DismissalParser.parse_batting_dismissal()`
+  to get `bowler_name` — empty/NULL for a run out, a retirement, or
+  dismissal text the parser can't classify (`method == 'other'`).
+  `CSVWriterFactory.write_all()` now computes `opponent_team_name`
+  (whichever of `team_name`/`opponent_name` isn't Spartans — the same key
+  `opponent_stats` was already looked up under) and calls this writer
+  alongside `FallOfWicketsWriter`.
+- **`opponent_fall_of_wickets`** — new analytics-DB table
+  (`analytics-db/migrations/007_opponent_fall_of_wickets.sql`), applied
+  directly to the live analytics project (`bpkaapmbgbwxsmjkfjii`) the same
+  session this was written. Same `PRIMARY KEY (match_id, wicket_number)`
+  shape as `fall_of_wickets`, plus a nullable `bowler_name`. **Not a
+  widened `fall_of_wickets`** — a separate table, since the two answer
+  different questions with different join keys: `fall_of_wickets.player_name`
+  resolves against our own `batting_stats` (a real Hub player); this
+  table's `player_name` is an opponent batter with no Hub `player_id`
+  anywhere in this schema (display-only, never a join key) — only
+  `bowler_name` resolves to one, the same byte-for-byte way every other
+  Spartans `player_name` in this database already does (no new
+  alias/override path needed).
+- **`match_stats_cache.opponent_fall_of_wickets`** — Hub-side cache
+  mirror (`supabase/migrations/081_match_stats_cache_opponent_fall_of_wickets.sql`),
+  same jsonb-array-per-analytics-table pattern `fall_of_wickets` already
+  established. `syncMatchStatsForBooking()`
+  (`src/lib/matchStatsSync.ts`) fetches it (ordered by `wicket_number`)
+  alongside `fall_of_wickets` in the same `Promise.all()` and writes it
+  into the cache row on every sync, manual or automated.
+
+### Deliberately raw data only — no derivation, no UI
+
+Per an explicit product decision when this was scoped: this pass only
+makes the underlying facts capturable and queryable. It does **not**
+build:
+
+- A "which Spartans bowler broke which opponent partnership" derivation —
+  the natural next step would be running the same crease-pointer walk
+  `computePartnerships()` already does for Spartans' own innings (§4)
+  against the opponent's own batting order (`team_list`) and this new
+  table, then reading off each broken partnership's `bowler_name`. Not
+  built yet.
+- Any UI surface — no opponent-partnerships chart (deliberately ruled
+  out, mirroring §2's original reasoning that an opponent partnership
+  "wouldn't be usable by anything downstream" — now only true of the UI,
+  not the data), no bowler-career "partnerships broken" stat, no
+  per-match scorecard annotation. `match_stats_cache.opponent_fall_of_wickets`
+  has no reader anywhere in the Hub app today.
+
+### Verification
+
+Verified end-to-end with a synthetic match (not a real PDF) run through
+the actual `CSVWriterFactory.write_all()` code path: a bowled dismissal,
+a caught dismissal, and a run out. The bowled/caught wickets correctly
+carried the dismissing bowler's name; the run out correctly carried no
+bowler credit; the pre-existing `fall_of_wickets.csv` (Spartans' own
+innings) was confirmed unchanged in both shape and content, and every
+other writer (`batting_stats`/`bowling_stats`/`fielding_stats`/
+`team_list`/`match_stats`) still wrote successfully with no exceptions.
+The analytics-DB table was confirmed live via `list_tables` (RLS
+enabled, 0 rows — as expected until the next real sync or backfill picks
+it up).
+
+### Security (vibe-security)
+
+See the three new rows added to §7's table — no new PDF parsing, no new
+client-reachable input, RLS enabled with no anon/authenticated policies on
+both the new analytics-DB table and the new Hub cache column, and no API
+route exposes any of it yet.
+
+### File map
+
+See the rows added to §8 — `analytics-db/migrations/007_opponent_fall_of_wickets.sql`,
+`OpponentFallOfWicketsWriter` in `csv_writers.py`, the `import_to_supabase.py`/
+`api.py`/`main.py` wiring, `supabase/migrations/081_match_stats_cache_opponent_fall_of_wickets.sql`,
+and the `matchStatsSync.ts` fetch.
+
+### Pending
+
+| Item | Notes |
+|---|---|
+| Partnership-breaking derivation | Run `computePartnerships()`'s crease-pointer walk (or a sibling function) against the opponent's own batting order + `opponent_fall_of_wickets`, then surface `bowler_name` per broken partnership. Not built — see "Deliberately raw data only" above. |
+| Surface for the result | Explicitly deferred — a per-match scorecard annotation and a bowler career stat ("partnerships broken") were both discussed and neither was chosen; decide once the derivation above exists. |
+| Historical backfill | Every match synced before this shipped has `opponent_fall_of_wickets: NULL` in the cache and zero rows in the analytics table for that `match_id`, same "code merged is not the same as history re-run" caveat as `fall_of_wickets`/`bowling_order` before it — only a re-sync (manual "Sync Stats", or a `backfill-scorecards` re-run) picks it up. |
 
 ---
 
