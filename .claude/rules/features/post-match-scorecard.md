@@ -2244,7 +2244,12 @@ colours still come from the `--scorecard-*`/`--fx-*` tokens):
   aren't bowler wickets so they're excluded).
 - The Fielding table uses the same alignment (left-aligned names, right-aligned
   Ct / St / RO / Total) but deliberately has no contribution bar.
-- Partnerships table is unchanged.
+- Partnerships are now a timeline (vertical rail, a numbered ring per
+  wicket, names + "Partnership · N balls" beside it, runs right-aligned)
+  instead of horizontal bars. Names stay first-name-only and linked; `*`
+  still marks an unbroken stand and "ret." a retirement (now in the
+  subtitle). The bar-length encoding is gone, so `topPartnershipRuns` is
+  no longer used for layout.
 
 ## 18. Re-pulling older scorecards — no fee, milestone or performer prompts (added September 2026)
 
