@@ -63,7 +63,7 @@ export async function syncMatchStatsForBooking(
   // match_stats_cache (and therefore every other consumer of that jsonb
   // array) is whatever Postgres feels like returning, not the real
   // batting/bowling order.
-  const [match, batting, bowling, fielding, team, fallOfWickets, opponentFallOfWickets] = await Promise.all([
+  const [match, batting, bowling, fielding, team, fallOfWickets, opponentFallOfWickets, opponentTeamList] = await Promise.all([
     analyticsSupabase.from('match_stats').select('*').eq('match_id', mid).single(),
     analyticsSupabase.from('batting_stats').select('*').eq('match_id', mid).order('batting_order', { ascending: true }),
     analyticsSupabase.from('bowling_stats').select('*').eq('match_id', mid).order('bowling_order', { ascending: true, nullsFirst: false }),
@@ -76,6 +76,11 @@ export async function syncMatchStatsForBooking(
     // features/partnerships.md §11. Raw facts only, cached the same way as
     // fall_of_wickets above; nothing derives a partnership from this yet.
     analyticsSupabase.from('opponent_fall_of_wickets').select('*').eq('match_id', mid).order('wicket_number', { ascending: true }),
+    // The opponent's own full Playing XI, each row carrying batting_style
+    // — independent of Fall of Wickets, so it covers a not-out opponent
+    // batter too. See analytics-db/migrations/011_opponent_team_list.sql
+    // and features/scorecard-raw-data-capture.md §6.
+    analyticsSupabase.from('opponent_team_list').select('*').eq('match_id', mid),
   ])
 
   if (!match.data) {
@@ -112,6 +117,7 @@ export async function syncMatchStatsForBooking(
     team_list:        team.data ?? [],
     fall_of_wickets:  fallOfWickets.data ?? [],
     opponent_fall_of_wickets: opponentFallOfWickets.data ?? [],
+    opponent_team_list: opponentTeamList.data ?? [],
     synced_at:        new Date().toISOString(),
     synced_by:        syncedBy,
   }, { onConflict: 'match_id' })
