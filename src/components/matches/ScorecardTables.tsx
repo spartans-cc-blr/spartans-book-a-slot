@@ -176,6 +176,7 @@ export function ScorecardTables({
     ? teamTotal
     : battingRows.reduce((sum, r) => sum + num(r, ['runs', 'total_runs']), 0)
   const topBowlWkts = bowlingRows.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
+  const topPartnershipRuns = partnerships.reduce((max, p) => Math.max(max, p.runs), 0)
   const totalBowlWkts = bowlingRows.reduce((sum, r) => sum + num(r, ['wickets', 'wickets_taken']), 0)
   const topFieldingTotal = fieldingRows.reduce((max, r) => Math.max(max, fieldingTotal(r)), 0)
 
@@ -285,47 +286,91 @@ export function ScorecardTables({
       {partnerships.length > 0 && (
         <div>
           <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Partnerships</p>
-          {/* Timeline: a vertical rail with a numbered ring per wicket,
-              names + ball span beside it, runs at the right edge. The
-              row's first-name-only labels, links and "ret."/"*" markers
-              are unchanged from the previous bar layout. */}
           <div className="relative">
-            <div className="absolute left-4 top-3 bottom-3 w-0.5 -translate-x-1/2 bg-[var(--scorecard-divider)]" aria-hidden />
-            <ol className="space-y-3">
-              {partnerships.map(p => {
-                const balls = oversToBalls(p.overTo) - oversToBalls(p.overFrom)
-                return (
-                  <li key={p.wicketNumber} className="relative flex items-center gap-3">
-                    <span className="relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-[var(--fx-accent)] bg-[var(--scorecard-table-bg)] font-rajdhani text-xs font-bold text-[var(--fx-accent)]">
-                      {p.wicketNumber}
-                    </span>
-                    <div className="min-w-0 flex-1 leading-tight">
-                      <p className="font-rajdhani text-sm font-semibold text-[var(--scorecard-heading-text)] truncate">
-                        {p.players.map((player, i) => (
-                          <span key={i}>
-                            {i > 0 && ' & '}
-                            {/* playerId comes straight from batting_stats.player_id (already reconciled) —
-                                deliberately not routed through findPlayerId(), which needs `squad` loaded. */}
-                            <PlayerNameLink
-                              name={firstName(player.playerName)}
-                              playerId={player.playerId}
-                              cricHeroesUrl={findCricHeroesUrl({ player_id: player.playerId }, player.playerName, squad)}
-                            />
-                          </span>
-                        ))}
-                      </p>
-                      <p className="font-rajdhani text-xs text-[var(--scorecard-text-faint)]">
-                        Partnership · {balls} balls
-                        {p.isRetirement && <span> · ret.</span>}
-                      </p>
+            <div className="absolute left-3.5 top-3 bottom-3 w-0.5 -translate-x-1/2 bg-[var(--scorecard-divider)]" aria-hidden />
+          <div className="space-y-2">
+            {partnerships.map(p => {
+              // Bar length already encodes rank, same reasoning
+              // BattingPositionLeaders.tsx (the leaderboard's identical
+              // single-series magnitude-per-category chart) uses — no
+              // separate "biggest stand" highlight needed on top of it.
+              // Floored at 6% so a 0-run stand still renders a visible bar
+              // (and guards divide-by-zero on the rare innings where every
+              // partnership is 0 runs, e.g. a string of wickets in one over).
+              const pct = topPartnershipRuns > 0 ? Math.max((p.runs / topPartnershipRuns) * 100, 6) : 6
+              return (
+                <div key={p.wicketNumber} className="flex items-center gap-2">
+                  <span className="relative z-10 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-[var(--fx-accent)] bg-[var(--scorecard-table-bg)] font-rajdhani text-xs font-bold text-[var(--fx-accent)]">{p.wicketNumber}</span>
+                  <div className="flex-1 relative h-7 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">
+                    <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
+                    <div className="absolute inset-0 flex items-center justify-start px-2.5">
+                      <span className="font-rajdhani text-xs font-semibold text-[var(--scorecard-heading-text)] truncate text-left">
+                        {p.players.map((player, i) => {
+                          // player.playerId already comes straight from
+                          // batting_stats.player_id — the authoritative,
+                          // already-reconciled identity (see
+                          // src/lib/partnerships.ts's own header comment).
+                          // Used directly rather than routed through
+                          // findPlayerId(), which would incorrectly discard
+                          // an already-good id if `squad` hasn't loaded yet
+                          // (a real, non-hypothetical race here: scorecard
+                          // and squad detail fetch in parallel above).
+                          // findCricHeroesUrl() is still used for the
+                          // fallback link when there's no playerId at all.
+                          // First name only, not the full name — a bar this
+                          // narrow can't fit two full names plus an "(out)"
+                          // tag legibly (see the truncated "Shivashankara
+                          // G..." this replaced). The link target and the
+                          // CricHeroes lookup below both still use the full
+                          // player_name — only the visible label shortens.
+                          // No separate "(out)" marker either: the next row
+                          // down already carries the survivor forward, so
+                          // which of this row's two names was dismissed is
+                          // readable from the sequence itself. Same reason
+                          // the C/VC/WK role tag shown next to a name in
+                          // every other table (RoleTag, above) is
+                          // deliberately left off here — two names already
+                          // squeeze into this bar; a role tag on top would
+                          // push it back into the same truncation problem
+                          // this first-name-only change fixed.
+                          return (
+                            <span key={i}>
+                              {i > 0 && ' & '}
+                              <PlayerNameLink
+                                name={firstName(player.playerName)}
+                                playerId={player.playerId}
+                                cricHeroesUrl={findCricHeroesUrl({ player_id: player.playerId }, player.playerName, squad)}
+                              />
+                            </span>
+                          )
+                        })}
+                      </span>
                     </div>
-                    <span className="font-rajdhani text-base font-bold text-gold flex-shrink-0 text-right tabular-nums">
-                      {p.runs}{p.outPlayer == null && '*'}
-                    </span>
-                  </li>
-                )
-              })}
-            </ol>
+                  </div>
+                  {/* Outside the bar, not overlaid — a short bar (a quick
+                      dismissal) used to squeeze this text down to nothing.
+                      Fixed-width column keeps every row's runs/balls
+                      right-aligned to the same edge regardless of bar
+                      length. isRetirement gets its own small "ret." marker
+                      — unlike a genuine dismissal, the departing player can
+                      (and, if returning_player_name is set on a later row,
+                      does) reappear in a different row further down, and
+                      the usual "no (out) marker, the next row already
+                      implies who left" reasoning breaks for exactly that
+                      case: without this, the same name resurfacing with no
+                      explanation reads like the duplicate-row bug this
+                      feature has already had to fix twice, not a real
+                      retire-and-return. See src/lib/partnerships.ts's
+                      retired-hurt-and-return note. */}
+                  <span className="font-rajdhani text-xs font-bold text-gold w-20 flex-shrink-0 text-right">
+                    {p.runs}{p.outPlayer == null && '*'}
+                    {p.isRetirement && <span className="text-[var(--scorecard-text-faint)] font-normal"> ret.</span>}
+                    {' '}<span className="text-[var(--scorecard-text-faint)] font-normal">({oversToBalls(p.overTo) - oversToBalls(p.overFrom)})</span>
+                  </span>
+                </div>
+              )
+            })}
+            </div>
           </div>
         </div>
       )}
