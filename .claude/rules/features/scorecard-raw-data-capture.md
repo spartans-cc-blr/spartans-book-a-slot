@@ -41,11 +41,11 @@ also the match cited in `partnerships.md` §3's line-wrap incident write-up).
 | Plan section | Status |
 |---|---|
 | Match — ID/Ground/Date/Team/Opponent/Toss/Score/Overs/Wickets/Result | ✅ captured |
-| Match — Edition, Format (T20/T30), Ball type, Competition/League name | ❌ not captured as separate fields — the header line `"CHAMPIONS TOURNEY ED-3 (T30 - WHITE BALL) (Super League)"` is read only to classify `match_type` into League/Final/Semi Final/Practice; Format/Ball type/League name are read into a throwaway string and discarded |
-| Match — Winning margin/type (e.g. "by 2 wickets") | ❌ the raw Result text is read into memory only to classify WON/LOST by keyword, then discarded — never persisted |
+| Match — Edition, Format (T20/T30), Ball type, Competition/League name | ✅ Not a scorecard-extraction gap — Format/Ball type/League(knockout) are already Hub-maintained admin data (`bookings.format`, `tournaments.ball_type`, `bookings.stage_type`), Edition is folded into the tournament's own `tournaments.name`. Closed without a capture — see §7 |
+| Match — Winning margin/type (e.g. "by 2 wickets") | ✅ Not a scorecard-extraction gap — already correctly derived Hub-side from already-captured score/wicket/toss data (`computeMatchMargin()`), verified against the real PDF's own printed result. See §7 |
 | Squad/Player — Player, Team, Batting position | ✅ (Spartans only) |
-| Squad/Player — Captain | ⚠️ available as a single match-level name string (`match_stats.team_captain`/`opponent_captain`), not a per-player boolean |
-| Squad/Player — Wicketkeeper | ❌ not captured anywhere, at any level. The raw `"( WK )"`/`"(wk)"` annotation is sitting in the text, same shape `extract_batting_style()` already reads |
+| Squad/Player — Captain | ⚠️ Spartans: Hub-side only (`players.is_captain`/`squad.is_captain`), by design — not a CricHeroes-extraction concern. Opponent: `match_stats.opponent_captain` (match-level name string) is now also cross-referenced onto a per-player `opponent_team_list.is_captain` flag — see §8 |
+| Squad/Player — Wicketkeeper | ✅ Not needed — Spartans' WK is already known from the batting scorecard (`†` annotation) plus Hub squad management; the "how out" attribution to Caught Behind this annotation would otherwise be for is already correctly captured via `dismissal_method`/`dismissal_type` (verified). Closed without a capture — see §7 |
 | Squad/Player — Batting hand | ✅ Both sides, every batter regardless of dismissal — see §6 |
 | Batting — Runs/Balls/Minutes/4s/6s/SR/Not-out | ✅ fully captured |
 | Batting — Bowler who dismissed the batter | ✅ Both sides, at the FOW grain — `fall_of_wickets.bowler_name` (Spartans' own wicket) and `opponent_fall_of_wickets.bowler_name` (opponent's wicket), see §5. `batting_stats.bowler_name` (a second copy, per-player) deliberately **not** added — see §5's redundancy note |
@@ -69,13 +69,13 @@ Each capture gets its own dated section below.
 | # | Item | Status |
 |---|---|---|
 | 1 | Extras (byes/leg byes/wides/no-balls/total conceded while Spartans bowl) | ✅ Done — see §4 |
-| 2 | Wicketkeeper annotation | ⏳ Not started |
+| 2 | Wicketkeeper annotation | ✅ Closed, not needed — see §7 |
 | 3 | Bowler who dismissed a Spartans batter (own `batting_stats`) | ✅ Superseded — see §5's redundancy note. Captured at the FOW grain instead of a duplicate `batting_stats` column |
 | 4 | Bowler credit + dismissal type on Spartans' own `fall_of_wickets` | ✅ Done — see §5 |
 | 5 | Dismissal type on `opponent_fall_of_wickets` | ✅ Done — see §5 |
-| 6 | Match header: Format, Ball type, Edition, League name (split from `tournament_name`/`match_type`) | ⏳ Not started |
-| 7 | Winning margin/type (raw text) | ⏳ Not started |
-| 8 | Per-player Captain/WK boolean flags on `team_list` (vs. today's match-level name string) | ⏳ Not started |
+| 6 | Match header: Format, Ball type, Edition, League name (split from `tournament_name`/`match_type`) | ✅ Closed, not needed — see §7 |
+| 7 | Winning margin/type (raw text) | ✅ Verified correct, no capture needed — see §7 |
+| 8 | Opponent captain flag on `opponent_team_list` (narrowed from "per-player Captain/WK flags on `team_list`" — Spartans stays Hub-side, see §7) | ✅ Done — see §8 |
 | 9 | Batting hand for a not-out opponent batter | ✅ Done — see §6. Corrected below: this was never a Fall-of-Wickets-adjacent gap, just a missing persistence path — see §6's "Correction" note |
 
 Item #3 originally read "Bowler/fielder who dismissed a Spartans batter" —
@@ -83,7 +83,12 @@ narrowed to bowler-only (§3.1), then closed out entirely once §5 shipped
 fielder too, on the FOW tables rather than `batting_stats`. Item #9 (not
 in the original 8-item list) was added once the fielder-descope
 correction (§3.1) prompted a full re-read of the plan document, which
-surfaced this genuinely still-open gap.
+surfaced this genuinely still-open gap. Items #2/#6/#7 were closed by a
+direct review of each item against what already exists (Hub-maintained
+data, or an already-correct Hub-side derivation) — see §7. Item #8 was
+narrowed the same review pass, from a generic "per-player flags on
+`team_list`" ask to specifically an opponent-side captain flag, since
+Spartans' captain/WK are Hub concerns, not CricHeroes-extraction ones.
 
 ---
 
@@ -520,6 +525,208 @@ in this doc — no anon/authenticated policies, service role only.
 |---|---|
 | Historical backfill | Every match synced before this shipped has no `opponent_team_list` rows at all — only a re-sync populates them. |
 | Opponent's full individual batting card (runs/balls/etc.) for a not-out batter | Not captured — deliberately out of scope for this pass, see "Deliberately scoped to batting hand only" above. The data is already sitting in `opponent_stats` in memory; a future pass would just need a wider writer and table. |
+| No derivation or UI | Not built — same explicit scope as every other item in this doc. |
+
+---
+
+## 7. Closed without a new capture — wicketkeeper annotation, match header fields, winning margin (September 2026)
+
+A direct review of Working Order items #2, #6, and #7 found all three
+already covered by data that exists elsewhere — either Hub-maintained
+admin data, or a Hub-side derivation already verified correct — so none
+needed a new scorecard capture. Documented here rather than silently
+dropped, so a future pass doesn't re-open them without first checking
+this section.
+
+### #2 — Wicketkeeper annotation
+
+Per the review: *"we have this from the batting scorecard already plus
+at the squad in Hub we manage for Spartans"* — Spartans' WK is a Hub
+concept (`squad.is_wk`, the match-specific designation set via Captains'
+Corner — see `features/squad-selection.md` §3), not something that needs
+re-deriving from the scorecard's own `"( WK )"` annotation. No capture
+built.
+
+**What the review actually asked to verify:** whether the `†` (wicketkeeper)
+annotation inside a dismissal's raw "how out" text is correctly
+attributed to **Caught Behind** specifically, distinct from a plain
+Caught, for Spartans' own batsmen. Checked against
+`DismissalParser.parse_batting_dismissal()` — it already branches on
+`'c †'`/`'c†'` in the raw status string (e.g. `"c †Keeper b Bowler"`) and
+returns `method: 'caught_behind'`, distinct from the plain `'caught'`
+branch. `BattingStatsWriter.write()` has always written this `method`
+into `batting_stats.dismissal_method` for every Spartans batter (predates
+this whole doc's work), and §5's `fall_of_wickets.dismissal_type` (this
+session) carries the identical value at the FOW grain too. **Both are
+already correct — confirmed against the real sample PDF**, whose Shiney
+11 innings has multiple `caught_behind` dismissals, all correctly
+attributed to the same wicketkeeper as fielder across multiple wickets
+(see §5's own Verification §1). No code change was needed; this item is
+closed as already-satisfied, not newly built.
+
+### #6 — Match header fields (Format, Ball type, Edition, League name)
+
+Per the review: *"these are maintained at Hub side. Not required to be
+extracted from Cricheroes."* Confirmed each sub-field already has a
+Hub-maintained home, admin-set independently of the scorecard PDF:
+
+| Plan sub-field | Hub home |
+|---|---|
+| Format (T20/T30) | `bookings.format` |
+| Ball type | `tournaments.ball_type` (`'red'\|'white'\|'pink'`) |
+| League vs. knockout | `bookings.stage_type` (`features/team-stats.md` §4) |
+| Edition | Folded into the tournament's own `tournaments.name` (e.g. "Champions Trophy Ed-3") — not modelled as a separate structured field, by Hub's own naming convention |
+
+Extracting these a second time from the scorecard's header line would
+duplicate an existing source of truth rather than fill a gap — and could
+disagree with it. No capture built.
+
+### #7 — Winning margin/type
+
+Per the review: *"already being reported at the Hub scorecard. Verify if
+we are good there."* Confirmed correct. `src/lib/matchResultDisplay.ts`'s
+`computeMatchMargin()`/`buildResultLine()` (see
+`features/post-match-scorecard.md` §17) derive the margin purely from
+data already captured and cached — `team_total`/`team_wickets`/
+`opponent_total`/`opponent_wickets` plus toss (`deriveBattedFirst()`) —
+never from a raw "by N runs/wickets" string. Verified against the real
+sample PDF: for the Shiney 11 match, the raw extraction gives
+`toss_won='Y'`/`toss_decision='bat'` (Spartans batted first), `team_total=218`,
+`opp_total=221`, `opp_wickets='8'`, and `match_result='LOST'` (correctly
+derived by `MatchStatsWriter._determine_match_result()` from the raw
+`"Shiney 11 won by 2 wickets"` result line). Hub's `computeMatchMargin()`
+on this data yields `{kind: 'wickets', value: 10 - 8 = 2}` →
+`buildResultLine()` → **"LOST by 2 wickets"** — matching the scorecard's
+own printed result exactly (Spartans lost, opponent chased it down with 2
+wickets in hand). `src/lib/teamStatsCore.ts`'s `winMargin()` (feeds Team
+Record's Records cards) uses the identical formula for the win-side case.
+No capture built — the raw Result text staying discarded after WON/LOST
+classification (per §2's audit) is fine, since nothing downstream needs
+it.
+
+### Security (vibe-security)
+
+No code changed for this section — pure verification. N/A.
+
+### File map
+
+No files touched — verification only, against already-shipped code:
+`spartans-python/utils/dismissal_parser.py`/`csv_writers.py` (§2, §7),
+`src/lib/matchResultDisplay.ts`/`src/lib/teamStatsCore.ts` (§7).
+
+---
+
+## 8. Opponent captain flag on `opponent_team_list` (added September 2026)
+
+### Why
+
+Working Order #8 originally read "per-player Captain/WK boolean flags on
+`team_list`" — a direct review narrowed this: Spartans' captain and WK
+are already Hub concerns (`players.is_captain`/`squad.is_captain` for
+captain, `squad.is_wk` for WK — both managed through Captains' Corner),
+so a Spartans-side capture from CricHeroes would just be a second,
+possibly-conflicting source of truth. The review's actual ask was
+narrower and opponent-only: *"may be worth adding a captain name to the
+opponent table we are maintaining"* — i.e. `opponent_team_list` (§6),
+since Hub has no equivalent concept for an *opposing* team's captain at
+all. No WK capture was asked for on the opponent side either, and none
+was added.
+
+`match_stats.opponent_captain` already existed as a match-level name
+**string** (§2's audit table, unchanged from before this doc), extracted
+by `MatchDetailsExtractor._extract_captains()` from the PDF's Match
+Officials section — an entirely different section of the scorecard from
+the Playing Squad list `opponent_team_list.player_name` comes from. No
+new PDF parsing was needed; this closes the gap between two
+already-extracted facts that had never been cross-referenced against
+each other.
+
+### What was added
+
+- **`BaseCSVWriter._names_match(a, b)`** (`spartans-python/utils/csv_writers.py`)
+  — a small static helper, same exact/casefold/alnum-stripped 3-pass
+  fallback `_lookup_ci()` already uses for a dict-key lookup, but for two
+  plain name strings (since there's no stats dict to look the captain
+  name up *inside* here — just two independently-extracted strings to
+  compare). **Real incident caught during verification, not hypothetical:**
+  the sample PDF's own Match Officials section gives the opponent captain
+  as `'Chethu Cs'`, but that same player's name in the Playing Squad list
+  is `'Chethu CS'` — a bare `==` would have silently left the real captain
+  unflagged. A casefold-normalized pass correctly matches them.
+- **`OpponentTeamListWriter`** — `HEADERS` gained `is_captain`; `write()`
+  gained an `opponent_captain: str = ''` parameter. For each row in
+  `opponent_players`, `is_captain = bool(opponent_captain) and
+  self._names_match(player_name, opponent_captain)` — `False` (never a
+  guess) when the Match Officials section yielded no captain name at all,
+  or matched no roster row.
+- **`CSVWriterFactory.write_all()`** — resolves `opponent_captain` with the
+  identical `is_team_spartans` flip already used for `opponent_players`
+  (§6): `match_data['opp_captain']`/`['team_captain']` are keyed to
+  `match_data['team']`/`['opponent']` (whichever the PDF happened to list
+  first), not to which side is actually Spartans, so the same flip is
+  needed here too. Passes the resolved value into
+  `opponent_team_list_writer.write()`.
+- **`opponent_team_list.is_captain`** — new `boolean not null default
+  false` column (`analytics-db/migrations/012_opponent_team_list_captain.sql`,
+  applied live).
+- **`import_to_supabase.py`** — `COLUMN_TYPES['opponent_team_list']` gained
+  `'is_captain': bool` (parsed from the writer's `'True'`/`'False'` string,
+  same convention as `batted`/`did_bowl` elsewhere in this pipeline).
+- **No Hub-side change at all.** `opponent_team_list` is already fetched
+  via a bare `select('*')` and cached wholesale as a `jsonb` array in
+  `match_stats_cache.opponent_team_list` (§6) — a new column on that table
+  rides in automatically, the same "zero TypeScript touched" story §5/§6
+  already document.
+
+### Verification
+
+1. **Full production pipeline run against the real scorecard PDF** (Hub
+   match `14114256`) — `opponent_team_list.csv` correctly flags exactly one
+   row, `'Chethu CS'` (`is_captain='True'`), matching `match_data['opp_captain']
+   = 'Chethu Cs'` via the casefold pass despite the capitalisation
+   difference; every other opponent player correctly reads `'False'`.
+2. **Synthetic check of the `is_team_spartans=False` branch** — a match
+   where `match_data['team']` is the *opponent* (not Spartans), to prove
+   `write_all()`'s `opponent_captain` flip resolves correctly in both
+   directions, not just the common case the real PDF happens to exercise.
+   Confirmed the real opponent's captain (`'Rival Skipper'`, under
+   `match_data['team_captain']` in this scenario) is the one flagged, not
+   Spartans' own captain.
+3. **Regression** — `smoke_test_batting_style.py` (already exercising
+   `opponent_team_list.csv`, §6) extended with an `opp_captain: 'YARA'`
+   fixture (deliberately differently-cased from the roster's `'Yara'`,
+   mirroring the real `'Chethu Cs'`/`'Chethu CS'` incident) and
+   `is_captain` assertions; `smoke_test_opponent_fow.py`/
+   `smoke_test_extras.py` re-run unchanged as regression checks on the
+   same shared `csv_writers.py` — all pass.
+4. `python3 -m py_compile` on both touched Python files.
+
+### Security (vibe-security)
+
+Read-only PDF parsing, no new client-reachable input, no new write path
+beyond the existing service-role-only sync pipeline. `opponent_team_list.is_captain`
+follows the same RLS posture as every other column in this doc — no
+anon/authenticated policies, service role only.
+
+### File map
+
+| File | Role |
+|---|---|
+| `analytics-db/migrations/012_opponent_team_list_captain.sql` | The new column |
+| `spartans-python/utils/csv_writers.py` | `BaseCSVWriter._names_match()`; `OpponentTeamListWriter`'s `is_captain` column; `write_all()`'s `opponent_captain` resolution |
+| `spartans-python/scripts/import_to_supabase.py` | `COLUMN_TYPES['opponent_team_list']` widened |
+
+No `field_config.py`, `field_extractors.py`, `api.py`, `main.py`, or Hub
+(`src/`) changes — `match_stats.opponent_captain`/`opponent_team_list`
+were both already fully wired; this pass only stopped the two from being
+compared against each other.
+
+### Pending
+
+| Item | Notes |
+|---|---|
+| Historical backfill | Every match synced before this shipped has `is_captain=false` (the column default) for every opponent row — only a re-sync recomputes it. |
+| Opponent WK flag | Not asked for — see "Why" above; Spartans' own WK stays Hub-side (`squad.is_wk`), and the opponent side wasn't part of this review's ask. |
 | No derivation or UI | Not built — same explicit scope as every other item in this doc. |
 
 ---
