@@ -179,9 +179,12 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
             <div className="text-lg font-bold leading-tight mb-1" style={{ color: 'var(--scorecard-heading-text)' }}>
               {tournament?.name ?? 'Unassigned'}
             </div>
-            <div className="text-sm" style={{ color: 'var(--scorecard-text-muted)' }}>
-              vs <span className="font-medium" style={{ color: 'var(--scorecard-text-2)' }}>{booking.opponent_name || 'TBD'}</span>
-            </div>
+            {/* The hero summary below already names the opponent once stats exist. */}
+            {!stats && (
+              <div className="text-sm" style={{ color: 'var(--scorecard-text-muted)' }}>
+                vs <span className="font-medium" style={{ color: 'var(--scorecard-text-2)' }}>{booking.opponent_name || 'TBD'}</span>
+              </div>
+            )}
             {ground?.name && (
               <div className="text-xs mt-1" style={{ color: 'var(--scorecard-text-faint)' }}>
                 {'@ '}

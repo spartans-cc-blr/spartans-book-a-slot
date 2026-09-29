@@ -10,6 +10,14 @@
 import type { ResultLine } from '@/lib/matchResultDisplay'
 import { BallIcon } from '@/components/matches/BallIcon'
 
+// Same shortening as the squad-selection matrix view (mobileMatrixName in
+// CaptainsCornerGrid.tsx): first name + last initial, e.g. "Kushal V.".
+function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) return parts[0] ?? name
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`
+}
+
 type Innings = { total: number | null; wickets: number | null; overs: number | null }
 
 function scoreText(i: Innings): string {
@@ -53,9 +61,22 @@ function CenterResult({ line }: { line: ResultLine | null }) {
   )
 }
 
-function Cell({ icon, children, label }: { icon: React.ReactNode; children: React.ReactNode; label?: string }) {
+// Equal-width column; toss sits left, top scorer centred, best bowler right,
+// with the batting-scorecard row-divider colour as the vertical separator.
+function Cell({ icon, children, label, align, divider }: {
+  icon: React.ReactNode; children: React.ReactNode; label?: string
+  align: 'left' | 'center' | 'right'; divider?: boolean
+}) {
+  if (!children) {
+    return <div style={{ flex: '1 1 0', borderLeft: divider ? '1px solid var(--scorecard-table-divider)' : undefined }} />
+  }
+  const justify = align === 'left' ? 'flex-start' : align === 'right' ? 'flex-end' : 'center'
   return (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+    <div style={{
+      flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: justify, gap: '6px',
+      padding: '0 8px', textAlign: align,
+      borderLeft: divider ? '1px solid var(--scorecard-table-divider)' : undefined,
+    }}>
       <span style={{ fontSize: '16px', lineHeight: 1, flexShrink: 0, display: 'inline-flex' }}>{icon}</span>
       <div style={{ minWidth: 0, fontSize: '10px', lineHeight: 1.3, color: 'var(--scorecard-text-muted)' }}>
         {children}
@@ -89,27 +110,27 @@ export function MatchHeroSummary({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '380px', width: '100%', margin: '0 auto' }}>
         <TeamSide name={left.name} innings={left.innings} align="left" />
         <CenterResult line={resultLine} />
         <TeamSide name={right.name} innings={right.innings} align="right" />
       </div>
 
       {hasBottom && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', borderTop: '1px solid var(--scorecard-divider)', paddingTop: '8px' }}>
-          {tossLine && <Cell icon="🪙">{tossLine}</Cell>}
-          {topBat && (
-            <Cell icon="🏏" label="Top Scorer">
-              <div style={{ color: 'var(--fx-accent)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topBat.name}</div>
+        <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid var(--scorecard-table-divider)', paddingTop: '8px' }}>
+          <Cell icon="🪙" align="left">{tossLine}</Cell>
+          <Cell icon="🏏" label="Top Scorer" align="center" divider>
+            {topBat && (<>
+              <div style={{ color: 'var(--fx-accent)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortName(topBat.name)}</div>
               <div>{topBat.runs} ({topBat.balls})</div>
-            </Cell>
-          )}
-          {topBowl && (
-            <Cell icon={<BallIcon type={ballType as any} size={16} />} label="Best Bowler">
-              <div style={{ color: 'var(--fx-accent)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topBowl.name}</div>
+            </>)}
+          </Cell>
+          <Cell icon={<BallIcon type={ballType as any} size={16} />} label="Best Bowler" align="right" divider>
+            {topBowl && (<>
+              <div style={{ color: 'var(--fx-accent)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortName(topBowl.name)}</div>
               <div>{topBowl.wickets}/{topBowl.runs} ({topBowl.overs} ov)</div>
-            </Cell>
-          )}
+            </>)}
+          </Cell>
         </div>
       )}
     </div>
