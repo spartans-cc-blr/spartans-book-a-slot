@@ -46,7 +46,7 @@ also the match cited in `partnerships.md` §3's line-wrap incident write-up).
 | Squad/Player — Player, Team, Batting position | ✅ (Spartans only) |
 | Squad/Player — Captain | ⚠️ available as a single match-level name string (`match_stats.team_captain`/`opponent_captain`), not a per-player boolean |
 | Squad/Player — Wicketkeeper | ❌ not captured anywhere, at any level. The raw `"( WK )"`/`"(wk)"` annotation is sitting in the text, same shape `extract_batting_style()` already reads |
-| Squad/Player — Batting hand | ✅ Spartans + dismissed opponent batters (`partnerships.md` §12). ❌ still missing for a not-out opponent batter |
+| Squad/Player — Batting hand | ✅ Both sides, every batter regardless of dismissal — see §6 |
 | Batting — Runs/Balls/Minutes/4s/6s/SR/Not-out | ✅ fully captured |
 | Batting — Bowler who dismissed the batter | ✅ Both sides, at the FOW grain — `fall_of_wickets.bowler_name` (Spartans' own wicket) and `opponent_fall_of_wickets.bowler_name` (opponent's wicket), see §5. `batting_stats.bowler_name` (a second copy, per-player) deliberately **not** added — see §5's redundancy note |
 | Batting — Fielder | ✅ Same FOW-grain capture as Bowler above, see §5. Originally descoped (§3.1) as unneeded for any plan metric; captured anyway per an explicit later request to preserve raw data for future need |
@@ -76,7 +76,7 @@ Each capture gets its own dated section below.
 | 6 | Match header: Format, Ball type, Edition, League name (split from `tournament_name`/`match_type`) | ⏳ Not started |
 | 7 | Winning margin/type (raw text) | ⏳ Not started |
 | 8 | Per-player Captain/WK boolean flags on `team_list` (vs. today's match-level name string) | ⏳ Not started |
-| 9 | Batting hand for a not-out opponent batter | ⏳ Not started — needs a new opponent-side roster table (`opponent_team_list`), since `opponent_fall_of_wickets` only ever has a row per *wicket*; a batter never dismissed has no row anywhere to carry it. See `partnerships.md` §12's "Not captured" note |
+| 9 | Batting hand for a not-out opponent batter | ✅ Done — see §6. Corrected below: this was never a Fall-of-Wickets-adjacent gap, just a missing persistence path — see §6's "Correction" note |
 
 Item #3 originally read "Bowler/fielder who dismissed a Spartans batter" —
 narrowed to bowler-only (§3.1), then closed out entirely once §5 shipped
@@ -398,7 +398,128 @@ already had in hand.
 | Item | Notes |
 |---|---|
 | Historical backfill | Every match synced before this shipped has these five columns `NULL` — only a re-sync populates them, same posture as every prior column added to these tables. |
-| Batting hand for a not-out opponent batter (Working Order #9) | Still open — a genuinely separate gap needing a new table, not something this pass's FOW-grain approach can reach (see §3, item #9). |
+| Batting hand for a not-out opponent batter (Working Order #9) | ✅ Done — see §6. Turned out not to need a FOW-grain fix at all. |
+| No derivation or UI | Not built — same explicit scope as every other item in this doc. |
+
+---
+
+## 6. Batting hand — every opponent batter, not just dismissed ones (added September 2026)
+
+### Correction — this was never a Fall of Wickets gap
+
+§3's Working Order item #9 (and, before that, §5's own "Pending" row)
+framed this as needing "a new opponent-side roster table... since
+`opponent_fall_of_wickets` only ever has a row per wicket" — true as far
+as it goes, but it implied the fix would somehow be FOW-adjacent. A direct
+correction closed that gap in reasoning: *"Batting hand of both Spartans
+and opponent should be available from the scorecard itself just after the
+batsman's name. We don't get that from FOW."*
+
+Checked directly against `_extract_batting_stats()`
+(`spartans-python/utils/field_extractors.py`) — it was already right.
+`batting_style` is read off a batter's **raw scorecard name** the moment
+that name is parsed (`self.config.extract_batting_style(player_name_raw)`,
+called before `strip_name_annotations()` throws the `"(RHB)"`/`"(LHB)"`
+annotation away), for **whichever team is batting on that page** — this
+method has never distinguished Spartans from the opponent, and it runs
+regardless of whether the batter ends up dismissed or not-out. So the
+value was already sitting in
+`player_stats[opponent_team][player_name]['batting']['batting_style']`
+for every opponent batter with a real batting-card row, dismissed or
+not — it simply had nowhere to be written for a not-out one, since
+`opponent_fall_of_wickets` (the only opponent-side table besides the
+aggregate `bowling_stats`/`fielding_stats`) only ever gets a row per
+wicket. The actual gap was a **missing persistence path**, not a missing
+extraction — confirmed by reading the extractor before writing a single
+line of the fix, rather than assuming the earlier framing was right.
+
+### What was added
+
+- **`OpponentTeamListWriter`** (`spartans-python/utils/csv_writers.py`) —
+  new writer, mirrors `TeamListWriter` (Spartans' own Playing XI list —
+  just `match_id`/`player_name`) but adds `batting_style`, and covers the
+  opponent's full Playing XI rather than Spartans'. One row per opponent
+  player regardless of whether they batted at all — a genuine did-not-bat
+  tail-ender simply has an empty `batting_style`, same convention as
+  everywhere else in this pipeline.
+- **`CSVWriterFactory.write_all()`** — resolves `opponent_players` (the
+  mirror of the existing `spartans_players` resolution — whichever of
+  `match_data['team_players']`/`['opponent_players']` did **not** get
+  picked as Spartans) and passes it, with the already-in-scope
+  `opponent_stats`, into the new writer.
+- **`opponent_team_list`** — new analytics-DB table
+  (`analytics-db/migrations/011_opponent_team_list.sql`, applied live):
+  `match_id, player_name, batting_style`, `PRIMARY KEY (match_id,
+  player_name)`. No new PDF parsing — same "already parsed, just needed
+  keeping" story as every other item in this doc.
+- **`match_stats_cache.opponent_team_list`** — Hub-side jsonb mirror
+  (`supabase/migrations/083_match_stats_cache_opponent_team_list.sql`,
+  applied live). Unlike the FOW dismissal-detail pass (§5), this **is** a
+  brand-new table rather than new columns on an already-fetched one, so it
+  needed the full "new table" plumbing: `syncMatchStatsForBooking()`
+  (`src/lib/matchStatsSync.ts`) now also fetches `opponent_team_list` and
+  includes it in the `match_stats_cache` upsert, the same shape
+  `opponent_fall_of_wickets` needed when *it* was first introduced
+  (`partnerships.md` §11).
+
+### Deliberately scoped to batting hand only
+
+`opponent_stats[player]['batting']` already carries the opponent's full
+individual batting card (runs, balls, minutes, fours, sixes, strike rate,
+status) for every batter with a card row — the exact same dict
+`OpponentFallOfWicketsWriter` and `BowlingStatsWriter`/
+`FieldingStatsWriter` already read. `opponent_team_list` deliberately
+persists only `batting_style` from it, not a full `opponent_batting_stats`
+table — that wasn't asked for, and would be a much bigger, more useful
+capture in its own right (a not-out opponent's individual runs/balls are
+currently unrecoverable the same way their batting hand was) — worth its
+own explicit ask if wanted, not folded in here as scope creep.
+
+### Verification
+
+1. **Full production pipeline run against the real scorecard PDF** (Hub
+   match `14114256`), same `api.py`-page-selection approach as §5. The
+   opponent's full 12-player Playing XI came back in
+   `opponent_team_list.csv`, correctly including **both not-out
+   batters** (`Srinivas C`, `Rakshith` — `batting_style: 'RHB'` for both,
+   matching what was already visible in the in-memory
+   `player_stats` dict before this pass, confirming the value was never
+   missing, only unpersisted) and correctly leaving the two players who
+   never got a batting-card row at all (`Nandagopal C`, `Amit B`) with an
+   empty `batting_style`.
+2. **Regression** — `smoke_test_batting_style.py` extended with a
+   `Wendy` fixture (not-out, never in `opponent_fall_of_wickets` at all)
+   asserting her `batting_style` now appears in `opponent_team_list.csv`
+   alongside the dismissed opponent batters; `smoke_test_opponent_fow.py`
+   re-run unchanged as a regression check on the same shared
+   `CSVWriterFactory.write_all()` — all pass.
+3. `python3 -m py_compile` on every touched Python file.
+
+### Security (vibe-security)
+
+Read-only PDF parsing, no new client-reachable input, no new write path
+beyond the existing service-role-only sync pipeline. `opponent_team_list`
+and its Hub-side mirror follow the same RLS posture as every other table
+in this doc — no anon/authenticated policies, service role only.
+
+### File map
+
+| File | Role |
+|---|---|
+| `analytics-db/migrations/011_opponent_team_list.sql` | The new table |
+| `supabase/migrations/083_match_stats_cache_opponent_team_list.sql` | Hub-side jsonb mirror on `match_stats_cache` |
+| `spartans-python/utils/csv_writers.py` | `OpponentTeamListWriter`; `write_all()`'s `opponent_players` resolution and the new writer call |
+| `spartans-python/scripts/import_to_supabase.py` | `TABLE_MAPPING`/`COLUMN_TYPES`/`import_all()`'s `import_order`/`clear_all_tables()` all widened for `opponent_team_list` |
+| `spartans-python/api.py` | `summarize_csv_dir()`'s dry-run mapping widened (extraction/`match_data` wiring needed no change — `opponent_players` was already computed) |
+| `spartans-python/main.py` | Drive upload filename list widened |
+| `src/lib/matchStatsSync.ts` | Fetches `opponent_team_list` and includes it in the `match_stats_cache` upsert |
+
+### Pending
+
+| Item | Notes |
+|---|---|
+| Historical backfill | Every match synced before this shipped has no `opponent_team_list` rows at all — only a re-sync populates them. |
+| Opponent's full individual batting card (runs/balls/etc.) for a not-out batter | Not captured — deliberately out of scope for this pass, see "Deliberately scoped to batting hand only" above. The data is already sitting in `opponent_stats` in memory; a future pass would just need a wider writer and table. |
 | No derivation or UI | Not built — same explicit scope as every other item in this doc. |
 
 ---
