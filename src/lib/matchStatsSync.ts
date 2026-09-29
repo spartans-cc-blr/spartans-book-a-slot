@@ -98,6 +98,14 @@ export async function syncMatchStatsForBooking(
     ground:           m.ground ?? null,
     tournament_name:  m.tournament_name ?? null,
     match_date:       m.match_date ?? null,
+    // Extras Spartans conceded while bowling (opponent innings' own
+    // "Extras:" breakdown) — analytics-db/migrations/009_match_extras.sql,
+    // features/scorecard-raw-data-capture.md.
+    extras_byes:      m.extras_byes ?? null,
+    extras_leg_byes:  m.extras_leg_byes ?? null,
+    extras_wides:     m.extras_wides ?? null,
+    extras_no_balls:  m.extras_no_balls ?? null,
+    extras_total:     m.extras_total ?? null,
     batting:          batting.data ?? [],
     bowling:          bowling.data ?? [],
     fielding:         fielding.data ?? [],
