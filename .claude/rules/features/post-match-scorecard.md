@@ -2223,6 +2223,41 @@ spot where the old separate margin line used to sit.
 | `src/components/matches/MatchResultBadge.tsx` | Renders the result word as a pill (win) or plain coloured text (otherwise), with the margin phrase alongside it in the original plain, muted margin-line style — never inside the pill (§17.6) |
 | `src/components/matches/ScorecardTables.tsx` | `SquadRef.is_captain`/`is_vc`/`is_wk`, `findSquadMember()`, `roleLabel()`, `RoleTag` — rendered next to a name in Batting/Bowling/Fielding/Did-not-bat, deliberately omitted from the Partnerships bar (§17.4) |
 
+## 18. Re-pulling older scorecards — no fee, milestone or performer prompts (added September 2026)
+
+**Why.** New stats are being added to the CricHeroes extraction, so older
+scorecards get re-pulled (re-fetched, re-parsed, re-synced) repeatedly. Each
+sync runs the tail of `syncMatchStatsForBooking()`, which used to fire the
+fee reminder push/modal, season-milestone detection and single-match
+performer recognition. For history that is noise.
+
+**Policy.**
+- A re-pull of any game with `game_date` **before 1 Oct 2026** never needs
+  match fees applied, and never triggers a fee reminder, milestone or
+  "Performer of the Match" recognition.
+- A game that has already had match fees applied (`fees_applied`) never needs
+  them applied again. This was already true: `resolvePendingFee()` only
+  considers `status = 'synced'`, and a re-sync never regresses `fees_applied`
+  (see §15's 28 Jul 2026 incident note).
+
+**Implementation.** `src/lib/repullCutoff.ts` exports
+`RECOGNITION_AND_FEE_PROMPTS_START` (`'2026-10-01'`) and
+`isBeforePromptCutoff(gameDate)`.
+- `syncMatchStatsForBooking()` skips `detectAndLogMilestones()`,
+  `detectAndLogMatchPerformances()` and `notifyFeeReminderIfPending()` for a
+  pre-cutoff game. Stats sync into `match_stats_cache` as normal, and the
+  quarterly membership fee is unaffected (it has its own Q3 2026 floor,
+  `wallet-ledger.md` §12.3).
+- `resolvePendingFee()` (`src/lib/feeReminders.ts`) drops pre-cutoff bookings,
+  so they also vanish from the admin fee-reminder modal and `/admin/wallet`'s
+  pending-fees list.
+
+**Consequences.** A pre-Oct-2026 match never gets an achievement row written
+on re-pull, so nothing can surface later. An admin can still apply a fee to
+one by hand from `/admin/bookings/[id]`; it just isn't nagged. To move the
+cutoff, change the one constant. The wrangler's "Request top performer to
+verify" share button (§15) is a manual action and is unchanged.
+
 ---
 
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*

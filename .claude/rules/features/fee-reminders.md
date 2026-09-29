@@ -162,6 +162,14 @@ under-reminding a real unpaid fee).
 | `src/components/ui/GlobalFeeReminderModal.tsx` | Mounts the modal once per session, gated `isAdmin` |
 | `src/app/layout.tsx` | Renders `GlobalFeeReminderModal` once, alongside `GlobalMilestoneModal`/`GlobalBirthdayModal` |
 
+## 8. Pre-Oct-2026 games are never reminded (added September 2026)
+
+`resolvePendingFee()` skips any booking with `game_date` before 1 Oct 2026
+(`src/lib/repullCutoff.ts`), and `syncMatchStatsForBooking()` skips the push
+for them. Re-pulling old scorecards to capture newer stats therefore never
+prompts admins to apply fees. See `post-match-scorecard.md` §18.
+
+
 ---
 
 *Maintained by: Spartans CC BLR*

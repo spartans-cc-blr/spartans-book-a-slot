@@ -22,6 +22,7 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { notifyAdmins } from '@/lib/webpush'
+import { isBeforePromptCutoff } from '@/lib/repullCutoff'
 
 export interface PendingFeeBooking {
   booking_id:      string
@@ -70,6 +71,8 @@ async function resolvePendingFee(
 
   const results: PendingFeeBooking[] = []
   for (const b of bookings as any[]) {
+    // Pre-Oct-2026 games never need fees applied (post-match-scorecard.md §18)
+    if (isBeforePromptCutoff(b.game_date)) continue
     const fee: number | null = b.match_fee_override ?? b.tournament?.match_fee ?? null
     const squadCount = squadCounts.get(b.id) ?? 0
     if (!fee || squadCount === 0) continue

@@ -12,6 +12,7 @@ import { detectAndLogMilestones, detectAndLogMatchPerformances } from '@/lib/mil
 import { resolveSquadMatch, type SquadRef } from '@/lib/matchTopPerformers'
 import { autoResolveMatch } from '@/lib/playerIdentityResolution'
 import { notifyFeeReminderIfPending } from '@/lib/feeReminders'
+import { isBeforePromptCutoff } from '@/lib/repullCutoff'
 import { chargeMembershipFeeIfDue } from '@/lib/membershipFee'
 
 export interface SyncMatchStatsResult {
@@ -174,9 +175,13 @@ export async function syncMatchStatsForBooking(
   // that tournament. See features/practice-games.md.
   const isPractice = !!(tournamentRow as any)?.is_practice || !!(booking as any).is_practice
 
+  // Re-pulls of games before the Oct 2026 cutoff never trigger milestone /
+  // performer recognition or fee reminders (features/post-match-scorecard.md §18).
+  const historic = isBeforePromptCutoff(String(booking.game_date))
+
   await Promise.all([
-    detectAndLogMilestones(bookingId, year, playerIds),
-    detectAndLogMatchPerformances(bookingId, batting.data ?? [], bowling.data ?? [], fielding.data ?? [], squad, isPractice),
+    historic ? Promise.resolve() : detectAndLogMilestones(bookingId, year, playerIds),
+    historic ? Promise.resolve() : detectAndLogMatchPerformances(bookingId, batting.data ?? [], bowling.data ?? [], fielding.data ?? [], squad, isPractice),
     // Quarterly membership fee — best-effort, same never-fail-the-sync
     // posture as the two calls above. See src/lib/membershipFee.ts.
     chargeMembershipFeeIfDue(bookingId, String(booking.game_date), batting.data ?? [], bowling.data ?? [], fielding.data ?? [], squad, isPractice),
@@ -187,7 +192,7 @@ export async function syncMatchStatsForBooking(
   // sync leaves the booking fee-pending (fee configured, squad announced,
   // not yet applied); no-ops silently otherwise (no fee set, no squad yet,
   // already applied, or externally reconciled). See features/fee-reminders.md.
-  await notifyFeeReminderIfPending(bookingId).catch(err => console.error('[fee-reminder]', err))
+  if (!historic) await notifyFeeReminderIfPending(bookingId).catch(err => console.error('[fee-reminder]', err))
 
   return { ok: true }
 }
