@@ -2242,7 +2242,9 @@ colours still come from the `--scorecard-*`/`--fx-*` tokens):
   under each name showing that bowler's share of all wickets taken by
   Spartans bowlers (sum of `wickets` across the bowling rows; run-outs
   aren't bowler wickets so they're excluded).
-- Fielding and Partnerships tables are unchanged.
+- The Fielding table uses the same alignment (left-aligned names, right-aligned
+  Ct / St / RO / Total) but deliberately has no contribution bar.
+- Partnerships table is unchanged.
 
 ## 18. Re-pulling older scorecards — no fee, milestone or performer prompts (added September 2026)
 

@@ -437,18 +437,18 @@ export function ScorecardTables({
           <div className="overflow-x-auto">
             <table className="w-full table-fixed text-xs font-rajdhani">
               <colgroup>
-                <col className="w-[50.4%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13.6%]" />
+                <col className="w-[38%]" />
+                <col className="w-[15.5%]" />
+                <col className="w-[15.5%]" />
+                <col className="w-[15.5%]" />
+                <col className="w-[15.5%]" />
               </colgroup>
               <thead>
                 <tr className="text-[var(--scorecard-text-faint)] border-b border-[var(--scorecard-table-border)]">
-                  <th className="text-center py-1 pr-2">Player</th>
-                  <th className="text-center px-1">Ct</th>
-                  <th className="text-center px-1">St</th>
-                  <th className="text-center px-1">RO</th>
+                  <th className="text-left py-1 pr-2">Player</th>
+                  <th className="text-right px-1">Ct</th>
+                  <th className="text-right px-1">St</th>
+                  <th className="text-right px-1">RO</th>
                   <th className="text-right pl-1">Total</th>
                 </tr>
               </thead>
@@ -462,14 +462,14 @@ export function ScorecardTables({
                   const isTop = topFieldingTotal > 0 && total === topFieldingTotal
                   return (
                     <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
-                      <td className="text-right py-1 pr-2">
+                      <td className="text-left py-1.5 pr-2 align-middle">
                         <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                         <RoleTag member={findSquadMember(row, name, squad)} />
                       </td>
-                      <td className="text-center px-1">{catches}</td>
-                      <td className="text-center px-1">{stumpings}</td>
-                      <td className="text-center px-1">{runOuts}</td>
-                      <td className="text-right pl-1">{total}</td>
+                      <td className="text-right px-1 align-middle tabular-nums">{catches}</td>
+                      <td className="text-right px-1 align-middle tabular-nums">{stumpings}</td>
+                      <td className="text-right px-1 align-middle tabular-nums">{runOuts}</td>
+                      <td className="text-right pl-1 align-middle tabular-nums">{total}</td>
                     </tr>
                   )
                 })}
