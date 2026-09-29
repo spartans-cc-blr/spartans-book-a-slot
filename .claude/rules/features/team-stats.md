@@ -989,6 +989,43 @@ path — most rows link in one tap via the suggestions, and Team Record is
 fully usable meanwhile (unlinked opponents group by exact spelling and
 show an "unlinked" hint).
 
+### Incident (29 Sep 2026) — a mismatched alias silently merged two unrelated opponents
+
+Investigating a "list every match against a team with 'Phoenix' in the
+name" query surfaced a real reconciliation bug: the opponent record whose
+canonical name is **"Rising Phoenix Cricket Club"** also carried
+**"Hcc Mars Hunters Cricket Club"** as an alias — a completely unrelated
+team, from an unrelated upcoming booking (10 Oct 2026), wrongly merged
+into it. Team Record's opponent filter and head-to-head record for Rising
+Phoenix Cricket Club would have silently pulled in that Mars Hunters match
+the moment it synced.
+
+Separately, **"Phoenix Legion"** (10 May 2026 booking) had never been
+reconciled at all — `bookings.opponent_id` was `NULL`, correctly *not*
+merged with either Rising Phoenix spelling, but with no opponent record of
+its own either, so it had no head-to-head record or reachable filter
+value. **"Rising Phoenix"** (13 Sep 2026, a third, genuinely different
+spelling/team) was already correctly its own standalone opponent record —
+not part of this incident, just confirmed clean while investigating.
+
+**Fixed via direct SQL against the live DB** (Supabase MCP, same one-off
+"documented here, not a migration" convention this doc's other data fixes
+already use — §"Corrected the same day" below is a sibling example):
+
+1. Deleted the wrong `hcc mars hunters cricket club` alias off the Rising
+   Phoenix Cricket Club opponent row.
+2. Created a new opponent row for "Hcc Mars Hunters Cricket Club" with its
+   own alias, and repointed its one booking's `opponent_id` to it.
+3. Created a new opponent row for "Phoenix Legion" with its own alias, and
+   pointed its one booking's `opponent_id` to it (previously `NULL`).
+
+Result: four correctly-separate opponent records — Rising Phoenix, Rising
+Phoenix Cricket Club, Phoenix Legion, and Hcc Mars Hunters Cricket Club —
+each with exactly one alias and its own booking(s) correctly linked.
+No code change was needed; this was purely a bad reconciliation entered
+at some earlier point via `/opponents` (or a stale manual link), not a bug
+in `resolveOpponentIdByName()`/`linkSpellingToOpponent()` itself.
+
 ---
 
 ## 6. Pitch Type — `tournaments.pitch_type` (migration 079, added September 2026; moved off `grounds` the same day)
