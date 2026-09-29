@@ -2263,6 +2263,16 @@ the stacked toss line + score line + `MatchResultBadge` + top-bat/bowl line;
 - Bottom row (divider above): 🪙 toss line, 🏏 top scorer (`69 (43)`), and the
   ball icon (`BallIcon`, matches the booking's ball type) for the best bowler
   (`1/29 (4 ov)`), labelled "Top Scorer" / "Best Bowler".
+- Polish (same week): the "vs opponent" line under the tournament name is
+  hidden once stats exist (the hero names both teams; it still shows for
+  matches with no synced stats). The bottom row is three equal columns —
+  toss left, top scorer centred, best bowler right — separated by vertical
+  rules in the batting-scorecard row-divider colour
+  (`--scorecard-table-divider`, also used for the rule above the row).
+  Top scorer / best bowler names use the squad-selection matrix
+  convention ("Kushal V." — first name + last initial). The team / margin /
+  team row is capped at 380px and centred so it doesn't spread out on
+  desktop.
 - All data was already fetched; `buildTossLine()`/`buildResultLine()` are
   reused. `buildOrderedScoreLine()` is no longer used by the UI.
 

@@ -772,9 +772,12 @@ function MatchHistoryCard({
             match.tournament_name ?? 'Unassigned'
           )}
         </div>
-        <div style={{ fontSize: '12px', color: 'var(--scorecard-text-muted)' }}>
-          vs <span style={{ color: 'var(--scorecard-text-2)', fontWeight: 500 }}>{match.opponent_name || 'TBD'}</span>
-        </div>
+        {/* The hero summary below already names the opponent once stats exist. */}
+        {!match.stats && (
+          <div style={{ fontSize: '12px', color: 'var(--scorecard-text-muted)' }}>
+            vs <span style={{ color: 'var(--scorecard-text-2)', fontWeight: 500 }}>{match.opponent_name || 'TBD'}</span>
+          </div>
+        )}
         {/* Ground link mirrors FixturesCard: hyperlinked when the tournament
             has a maps_url, falling back to the booking's free-text venue
             when no ground record is attached. */}
