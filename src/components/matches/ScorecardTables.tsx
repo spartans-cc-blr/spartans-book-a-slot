@@ -176,7 +176,6 @@ export function ScorecardTables({
     ? teamTotal
     : battingRows.reduce((sum, r) => sum + num(r, ['runs', 'total_runs']), 0)
   const topBowlWkts = bowlingRows.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
-  const topPartnershipRuns = partnerships.reduce((max, p) => Math.max(max, p.runs), 0)
   const totalBowlWkts = bowlingRows.reduce((sum, r) => sum + num(r, ['wickets', 'wickets_taken']), 0)
   const topFieldingTotal = fieldingRows.reduce((max, r) => Math.max(max, fieldingTotal(r)), 0)
 
@@ -186,6 +185,7 @@ export function ScorecardTables({
   // yet" [] case just below it.
   const finalScore = teamTotal != null && teamOvers != null ? { total: teamTotal, overs: teamOvers, wickets: teamWickets ?? null } : null
   const partnerships = computePartnerships(batting, fallOfWickets ?? [], finalScore) ?? []
+  const topPartnershipRuns = partnerships.reduce((max, p) => Math.max(max, p.runs), 0)
 
   // The batting table filters out players who didn't bat, so on its own it
   // can't answer "who else was in the squad that day" — team_list (the full
