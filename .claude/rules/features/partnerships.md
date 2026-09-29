@@ -1324,8 +1324,10 @@ end of the bar, `*` for unbroken):
    ordering for each wicket number. A wicket with no data is simply absent.
 3. **Top 5 batting pairs** by aggregate runs across every innings in the
    filter, whichever wicket — pair identity is order-independent (A & B =
-   B & A). Tie on runs → fewer innings first. Caption: innings count and
-   best single stand.
+   B & A). Tie on runs → fewer innings first. Caption: innings count,
+   average (aggregate runs ÷ innings together, `toFixed(2)` — same "Avg
+   X.XX" convention the Detailed Bat table and the Milestones/Monthly Best
+   Average card already use), and best single stand.
 
 **Full names, not first names** (unlike §6.6) — club-wide, two players
 sharing a first name are ambiguous in a way they never are within one

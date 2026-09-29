@@ -160,7 +160,7 @@ export function PartnershipLeadersView({ leaders }: { leaders: PartnershipLeader
               players={p.players}
               pct={pctOf(p.runs, pairMax)}
               value={`${p.runs}`}
-              caption={`${p.innings} inn · best ${runsLabel(p.best, p.bestUnbroken)}`}
+              caption={`${p.innings} inn · avg ${(p.runs / p.innings).toFixed(2)} · best ${runsLabel(p.best, p.bestUnbroken)}`}
             />
           ))}
         </Card>
