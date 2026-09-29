@@ -48,14 +48,14 @@ also the match cited in `partnerships.md` §3's line-wrap incident write-up).
 | Squad/Player — Wicketkeeper | ❌ not captured anywhere, at any level. The raw `"( WK )"`/`"(wk)"` annotation is sitting in the text, same shape `extract_batting_style()` already reads |
 | Squad/Player — Batting hand | ✅ Spartans + dismissed opponent batters (`partnerships.md` §12). ❌ still missing for a not-out opponent batter |
 | Batting — Runs/Balls/Minutes/4s/6s/SR/Not-out | ✅ fully captured |
-| Batting — Bowler who dismissed the batter | ✅ opponent batters (`partnerships.md` §11). ❌ Spartans' own batters — `BattingStatsWriter` parses `DismissalParser.parse_batting_dismissal(status)` and keeps only `['method']`, discards `['bowler']`/`['fielder']` |
-| Batting — Fielder | ❌ missing both directions |
+| Batting — Bowler who dismissed the batter | ✅ opponent batters (`partnerships.md` §11). ❌ Spartans' own batters — `BattingStatsWriter` parses `DismissalParser.parse_batting_dismissal(status)` and keeps only `['method']`, discards `['bowler']` (and `['fielder']`, see the row below) |
+| Batting — Fielder | ⚪ Not a gap — `['fielder']` is discarded the same way, but no plan metric needs it kept past the aggregate. See §3.1 |
 | Bowling — Overs/Maidens/Runs/Wickets/Dots/4s/6s/Wides/No-balls/Economy | ✅ fully captured, no gaps |
 | Fall of Wickets — Wicket #/Score/Batter/Over | ✅ both sides |
 | Fall of Wickets — Bowler | ✅ opponent's FOW only. ❌ Spartans' own `fall_of_wickets` has no bowler credit at all |
 | Fall of Wickets — Dismissal type | ❌ not stored directly on either FOW table |
 | Fielding — aggregate catches/stumpings/run-outs | ✅ (Spartans only, per-match totals) |
-| Fielding — per-dismissal-event linkage (fielder ↔ specific batter/bowler) | ❌ only half-built (bowler side exists via opponent FOW; no fielder equivalent) |
+| Fielding — per-dismissal-event linkage (fielder ↔ specific batter/bowler) | ⚪ Bowler-side linkage exists via opponent FOW (§ above) and is real planned follow-on work (Working Order #3/#4). A fielder-side equivalent was considered and dropped — see §3.1 |
 | **Extras** — byes/leg byes/wides/no-balls/total | ❌ **not captured at all** — see §4, the first item picked off this list |
 | Toss — raw fields | ✅ captured; derived metrics already live Hub-side (Team Record) |
 
@@ -70,12 +70,53 @@ Each capture gets its own dated section below.
 |---|---|---|
 | 1 | Extras (byes/leg byes/wides/no-balls/total conceded while Spartans bowl) | ✅ Done — see §4 |
 | 2 | Wicketkeeper annotation | ⏳ Not started |
-| 3 | Bowler/fielder who dismissed a Spartans batter (own `batting_stats`) | ⏳ Not started |
+| 3 | Bowler who dismissed a Spartans batter (own `batting_stats`) | ⏳ Not started |
 | 4 | Bowler credit + dismissal type on Spartans' own `fall_of_wickets` | ⏳ Not started |
 | 5 | Dismissal type on `opponent_fall_of_wickets` | ⏳ Not started |
 | 6 | Match header: Format, Ball type, Edition, League name (split from `tournament_name`/`match_type`) | ⏳ Not started |
 | 7 | Winning margin/type (raw text) | ⏳ Not started |
 | 8 | Per-player Captain/WK boolean flags on `team_list` (vs. today's match-level name string) | ⏳ Not started |
+
+Item #3 originally read "Bowler/fielder who dismissed a Spartans batter" —
+narrowed to bowler-only; see §3.1 for why fielder identity was descoped.
+
+---
+
+## 3.1 Correction — fielder identity descoped, no metric needs it (September 2026)
+
+The original audit (§2) framed "Fielder" (on `batting_stats`) and
+"per-dismissal-event fielder linkage" (on `fielding_stats`/FOW) as gaps
+symmetric with the bowler-credit ones — on the theory that since
+`DismissalParser.parse_batting_dismissal()` already returns `['fielder']`
+alongside `['bowler']` and `['method']`, and the bowler side was worth
+capturing, the fielder side probably was too. That symmetry was wrong, and
+was caught by a direct question rather than by re-reading the plan first:
+*"I am unable to think of a reason why we need to have a fielder name
+along with bowler name for opponent FOW. Does the plan indicate the need
+for any metric?"*
+
+Re-reading the plan document's own §5 (Fielding) confirms it doesn't. The
+plan's raw-field list there is *"Extract from dismissal descriptions:
+Fielder, Dismissal type, Bowler, Wicketkeeper, Batter dismissed"*, but
+every metric it actually builds on top of that — *"Catches, Stumpings,
+Run-outs, Caught & Bowled, Fielding Dismissal Involvement,
+Dismissals/Match"* — is a per-match, per-player **aggregate**. None of
+them needs to know *which specific wicket* a fielder's catch/run-out/
+stumping belonged to, or who the bowler or batter was for that one event
+— they only need a count. That's exactly what the existing
+`fielding_stats` table (built from `DismissalParser.extract_fielder_dismissals()`)
+already provides in full.
+
+`bowler_name`, by contrast, has real justification and stays a genuine
+gap: the original ask that motivated `partnerships.md` §11 ("which
+Spartans bowler broke this opponent partnership") is a per-event linkage a
+bare aggregate can't answer, and the plan's bowling "Wicket impact"-style
+metrics need a bowler tied to a specific wicket, not just a season total.
+
+**Net effect of this correction:** `['fielder']` stays discarded exactly
+as it is today — no code change, since nothing was ever built for it. The
+§2 audit table and Working Order #3 above are updated to reflect this as
+an intentional scope decision, not an open item.
 
 ---
 
