@@ -10,26 +10,13 @@ import { computeTopPerformers, summarizeTopPerformance } from '@/lib/matchTopPer
 import { MatchVerifyBlock } from '@/components/matches/MatchVerifyBlock'
 import { NotifyIcon, VerifiedStatusLine } from '@/components/matches/ScorecardVerifyPanel'
 import { BallIcon } from '@/components/matches/BallIcon'
-import { MatchResultBadge } from '@/components/matches/MatchResultBadge'
+import { MatchHeroSummary } from '@/components/matches/MatchHeroSummary'
 import {
-  deriveBattedFirst, buildTossLine, buildOrderedScoreLine, computeMatchMargin, buildResultLine,
+  deriveBattedFirst, buildTossLine, computeMatchMargin, buildResultLine,
   normaliseMatchResultKind,
 } from '@/lib/matchResultDisplay'
 
 export const revalidate = 0
-
-// Orders the two innings by who actually batted first — see
-// matchResultDisplay.ts.
-function scoreLine(stats: {
-  team_total: number | null; team_wickets: number | null; team_overs: number | null
-  opponent_total: number | null; opponent_wickets: number | null; opponent_overs: number | null
-}, battedFirst: boolean | null): string {
-  return buildOrderedScoreLine(
-    battedFirst,
-    stats.team_total, stats.team_wickets, stats.team_overs,
-    stats.opponent_total, stats.opponent_wickets, stats.opponent_overs,
-  )
-}
 
 function formatDate(dateStr: string): string {
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-IN', {
@@ -225,25 +212,18 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
           )}
 
           {stats && (
-            <div className="flex flex-col gap-1 mb-1">
-              {tossLine && (
-                <span className="text-[10px]" style={{ color: 'var(--scorecard-text-faint)' }}>{tossLine}</span>
-              )}
-              <span className="text-xs" style={{ color: 'var(--scorecard-text-muted)' }}>{scoreLine(stats, battedFirst)}</span>
-              <MatchResultBadge line={resultLine} />
-              {topPerformance && (topPerformance.top_bat || topPerformance.top_bowl) && (
-                <div className="flex flex-wrap gap-2.5 text-[10px]" style={{ color: 'var(--scorecard-text-faint)' }}>
-                  {topPerformance.top_bat && (
-                    <span>🏏 <span style={{ color: 'var(--fx-accent)' }}>{topPerformance.top_bat.name}</span> — {topPerformance.top_bat.runs} ({topPerformance.top_bat.balls})</span>
-                  )}
-                  {topPerformance.top_bowl && (
-                    <span className="inline-flex items-center gap-1">
-                      <BallIcon type={ballType} size={12} />
-                      <span style={{ color: 'var(--fx-accent)' }}>{topPerformance.top_bowl.name}</span> — {topPerformance.top_bowl.wickets}/{topPerformance.top_bowl.runs} ({topPerformance.top_bowl.overs} ov)
-                    </span>
-                  )}
-                </div>
-              )}
+            <div className="mb-1">
+              <MatchHeroSummary
+                battedFirst={battedFirst}
+                opponentName={booking.opponent_name}
+                own={{ total: stats.team_total, wickets: stats.team_wickets, overs: stats.team_overs }}
+                opp={{ total: stats.opponent_total, wickets: stats.opponent_wickets, overs: stats.opponent_overs }}
+                resultLine={resultLine}
+                tossLine={tossLine}
+                topBat={topPerformance?.top_bat}
+                topBowl={topPerformance?.top_bowl}
+                ballType={ballType}
+              />
             </div>
           )}
 

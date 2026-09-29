@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { ScorecardUploadButton, type ScorecardStatus } from '@/components/matches/ScorecardUploadButton'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
-import { MatchResultBadge } from '@/components/matches/MatchResultBadge'
+import { MatchHeroSummary } from '@/components/matches/MatchHeroSummary'
 import {
   CricHeroesIcon, CricHeroesInlineLink, VerifiedStatusLine, ReconciliationControls, NotifyIcon,
 } from '@/components/matches/ScorecardVerifyPanel'
@@ -15,7 +15,7 @@ import { BallIcon, type BallType } from '@/components/matches/BallIcon'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
 import { groupDatesIntoChips } from '@/lib/dateChipGroups'
 import {
-  deriveBattedFirst, buildTossLine, buildOrderedScoreLine, computeMatchMargin, buildResultLine,
+  deriveBattedFirst, buildTossLine, computeMatchMargin, buildResultLine,
   normaliseMatchResultKind,
 } from '@/lib/matchResultDisplay'
 
@@ -167,15 +167,8 @@ function slotLabel(slot: string): string {
 // a "verify this scorecard" action looks like. See that file for the
 // original doc comments on each.
 
-// Result rendering used to come from the shared <ResultBadge> (same
-// component TournamentPlannerClient and TournamentShareCard use), shown
-// next to the score line, with a separate "Won by 30 runs" margin line
-// underneath — the two were saying the same thing twice. Replaced with
-// <MatchResultBadge>, which folds the margin into the result line itself
-// ("WON BY 30 RUNS") — see matchResultDisplay.ts's buildResultLine() and
-// MatchResultBadge.tsx's own header comment for why this isn't just
-// <ResultBadge> extended in place (its other callers don't have a margin
-// to fold in).
+// The result strip is rendered by <MatchHeroSummary> (see
+// features/post-match-scorecard.md §17.8).
 
 // Passive, read-only checkpoint for the one scorecard_uploads state that
 // isn't already covered by the verification row below (ReconciliationControls
@@ -195,17 +188,6 @@ function ScorecardSyncIndicator({ status }: { status: ScorecardStatus }) {
       <span style={{ fontSize: '15px', lineHeight: 1, color: cfg.color }}>{cfg.icon}</span>
       <span style={{ fontSize: '9px', color: 'var(--scorecard-text-faint)', whiteSpace: 'nowrap' }}>{cfg.label}</span>
     </div>
-  )
-}
-
-// Orders the two innings by who actually batted first (see
-// matchResultDisplay.ts) rather than always leading with our own score.
-function scoreLine(stats: StatsSummary): string {
-  const battedFirst = deriveBattedFirst(stats.toss_won, stats.toss_decision)
-  return buildOrderedScoreLine(
-    battedFirst,
-    stats.team_total, stats.team_wickets, stats.team_overs,
-    stats.opponent_total, stats.opponent_wickets, stats.opponent_overs,
   )
 }
 
@@ -846,26 +828,17 @@ function MatchHistoryCard({
         )
         const resultLine = buildResultLine(match.stats.match_result, margin)
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {tossLine && (
-              <span style={{ fontSize: '10px', color: 'var(--scorecard-text-faint)' }}>{tossLine}</span>
-            )}
-            <span style={{ fontSize: '11px', color: 'var(--scorecard-text-muted)' }}>{scoreLine(match.stats)}</span>
-            <MatchResultBadge line={resultLine} />
-            {(match.stats.top_bat || match.stats.top_bowl) && (
-              <div style={{ fontSize: '10px', color: 'var(--scorecard-text-faint)', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                {match.stats.top_bat && (
-                  <span>🏏 <span style={{ color: 'var(--fx-accent)' }}>{match.stats.top_bat.name}</span> — {match.stats.top_bat.runs} ({match.stats.top_bat.balls})</span>
-                )}
-                {match.stats.top_bowl && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <BallIcon type={ballType} size={12} />
-                    <span style={{ color: 'var(--fx-accent)' }}>{match.stats.top_bowl.name}</span> — {match.stats.top_bowl.wickets}/{match.stats.top_bowl.runs} ({match.stats.top_bowl.overs} ov)
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+          <MatchHeroSummary
+            battedFirst={battedFirst}
+            opponentName={match.opponent_name}
+            own={{ total: match.stats.team_total, wickets: match.stats.team_wickets, overs: match.stats.team_overs }}
+            opp={{ total: match.stats.opponent_total, wickets: match.stats.opponent_wickets, overs: match.stats.opponent_overs }}
+            resultLine={resultLine}
+            tossLine={tossLine}
+            topBat={match.stats.top_bat}
+            topBowl={match.stats.top_bowl}
+            ballType={ballType}
+          />
         )
       })()}
 
