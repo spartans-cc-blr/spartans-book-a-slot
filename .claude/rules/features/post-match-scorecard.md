@@ -2223,6 +2223,21 @@ spot where the old separate margin line used to sit.
 | `src/components/matches/MatchResultBadge.tsx` | Renders the result word as a pill (win) or plain coloured text (otherwise), with the margin phrase alongside it in the original plain, muted margin-line style — never inside the pill (§17.6) |
 | `src/components/matches/ScorecardTables.tsx` | `SquadRef.is_captain`/`is_vc`/`is_wk`, `findSquadMember()`, `roleLabel()`, `RoleTag` — rendered next to a name in Batting/Bowling/Fielding/Did-not-bat, deliberately omitted from the Partnerships bar (§17.4) |
 
+## 17.7 Batting table layout — left-aligned names, right-aligned numbers, contribution bar (added September 2026)
+
+`ScorecardTables.tsx`'s Batting table was reworked to match a reference
+layout the club coordinator shared, **without changing the theme** (all
+colours still come from the `--scorecard-*`/`--fx-*` tokens):
+
+- Player column is left-aligned (header included); R / B / 4s / 6s / SR are
+  right-aligned, with column widths 38/10/10/10/10/22%.
+- A thin bar under each name shows that batter's share of the team score
+  (`runs / teamTotal`, falling back to the sum of batters' runs when
+  `teamTotal` isn't synced). Track uses `--scorecard-divider`, fill uses
+  `--fx-accent`; the share % is in the bar's `title` tooltip. Purely
+  derived from data already passed in — no new fetch.
+- Bowling, Fielding and Partnerships tables are unchanged.
+
 ## 18. Re-pulling older scorecards — no fee, milestone or performer prompts (added September 2026)
 
 **Why.** New stats are being added to the CricHeroes extraction, so older
