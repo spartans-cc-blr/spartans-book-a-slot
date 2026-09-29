@@ -120,6 +120,12 @@ function oversToBalls(over: number | string): number {
   return whole * 6 + ball
 }
 
+// Always two decimals so right-aligned SR / Eco columns line up neatly.
+function formatStrikeRate(v: unknown): string {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''))
+  return Number.isFinite(n) ? n.toFixed(2) : '—'
+}
+
 export function ScorecardTables({
   batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, teamWickets, squad,
 }: {
@@ -170,6 +176,7 @@ export function ScorecardTables({
     ? teamTotal
     : battingRows.reduce((sum, r) => sum + num(r, ['runs', 'total_runs']), 0)
   const topBowlWkts = bowlingRows.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
+  const totalBowlWkts = bowlingRows.reduce((sum, r) => sum + num(r, ['wickets', 'wickets_taken']), 0)
   const topFieldingTotal = fieldingRows.reduce((max, r) => Math.max(max, fieldingTotal(r)), 0)
 
   // computePartnerships() logs its own [partnerships] error and returns
@@ -178,7 +185,6 @@ export function ScorecardTables({
   // yet" [] case just below it.
   const finalScore = teamTotal != null && teamOvers != null ? { total: teamTotal, overs: teamOvers, wickets: teamWickets ?? null } : null
   const partnerships = computePartnerships(batting, fallOfWickets ?? [], finalScore) ?? []
-  const topPartnershipRuns = partnerships.reduce((max, p) => Math.max(max, p.runs), 0)
 
   // The batting table filters out players who didn't bat, so on its own it
   // can't answer "who else was in the squad that day" — team_list (the full
@@ -249,7 +255,7 @@ export function ScorecardTables({
                     <td className="text-right px-1 align-middle">{num(row, ['balls', 'balls_faced'])}</td>
                     <td className="text-right px-1 align-middle">{num(row, ['fours', '4s'])}</td>
                     <td className="text-right px-1 align-middle">{num(row, ['sixes', '6s'])}</td>
-                    <td className="text-right pl-1 align-middle">{pickField(row, ['strike_rate', 'sr']) ?? '—'}</td>
+                    <td className="text-right pl-1 align-middle tabular-nums">{formatStrikeRate(pickField(row, ['strike_rate', 'sr']))}</td>
                   </tr>
                 )
               })}
@@ -279,88 +285,47 @@ export function ScorecardTables({
       {partnerships.length > 0 && (
         <div>
           <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Partnerships</p>
-          <div className="space-y-1.5">
-            {partnerships.map(p => {
-              // Bar length already encodes rank, same reasoning
-              // BattingPositionLeaders.tsx (the leaderboard's identical
-              // single-series magnitude-per-category chart) uses — no
-              // separate "biggest stand" highlight needed on top of it.
-              // Floored at 6% so a 0-run stand still renders a visible bar
-              // (and guards divide-by-zero on the rare innings where every
-              // partnership is 0 runs, e.g. a string of wickets in one over).
-              const pct = topPartnershipRuns > 0 ? Math.max((p.runs / topPartnershipRuns) * 100, 6) : 6
-              return (
-                <div key={p.wicketNumber} className="flex items-center gap-2">
-                  <span className="font-cinzel text-xs text-[var(--scorecard-text-faint)] w-5 flex-shrink-0 text-right">{p.wicketNumber}</span>
-                  <div className="flex-1 relative h-7 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">
-                    <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
-                    <div className="absolute inset-0 flex items-center justify-end px-2.5">
-                      <span className="font-rajdhani text-xs font-semibold text-[var(--scorecard-heading-text)] truncate text-right">
-                        {p.players.map((player, i) => {
-                          // player.playerId already comes straight from
-                          // batting_stats.player_id — the authoritative,
-                          // already-reconciled identity (see
-                          // src/lib/partnerships.ts's own header comment).
-                          // Used directly rather than routed through
-                          // findPlayerId(), which would incorrectly discard
-                          // an already-good id if `squad` hasn't loaded yet
-                          // (a real, non-hypothetical race here: scorecard
-                          // and squad detail fetch in parallel above).
-                          // findCricHeroesUrl() is still used for the
-                          // fallback link when there's no playerId at all.
-                          // First name only, not the full name — a bar this
-                          // narrow can't fit two full names plus an "(out)"
-                          // tag legibly (see the truncated "Shivashankara
-                          // G..." this replaced). The link target and the
-                          // CricHeroes lookup below both still use the full
-                          // player_name — only the visible label shortens.
-                          // No separate "(out)" marker either: the next row
-                          // down already carries the survivor forward, so
-                          // which of this row's two names was dismissed is
-                          // readable from the sequence itself. Same reason
-                          // the C/VC/WK role tag shown next to a name in
-                          // every other table (RoleTag, above) is
-                          // deliberately left off here — two names already
-                          // squeeze into this bar; a role tag on top would
-                          // push it back into the same truncation problem
-                          // this first-name-only change fixed.
-                          return (
-                            <span key={i}>
-                              {i > 0 && ' & '}
-                              <PlayerNameLink
-                                name={firstName(player.playerName)}
-                                playerId={player.playerId}
-                                cricHeroesUrl={findCricHeroesUrl({ player_id: player.playerId }, player.playerName, squad)}
-                              />
-                            </span>
-                          )
-                        })}
-                      </span>
+          {/* Timeline: a vertical rail with a numbered ring per wicket,
+              names + ball span beside it, runs at the right edge. The
+              row's first-name-only labels, links and "ret."/"*" markers
+              are unchanged from the previous bar layout. */}
+          <div className="relative">
+            <div className="absolute left-4 top-3 bottom-3 w-0.5 -translate-x-1/2 bg-[var(--scorecard-divider)]" aria-hidden />
+            <ol className="space-y-3">
+              {partnerships.map(p => {
+                const balls = oversToBalls(p.overTo) - oversToBalls(p.overFrom)
+                return (
+                  <li key={p.wicketNumber} className="relative flex items-center gap-3">
+                    <span className="relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-[var(--fx-accent)] bg-[var(--scorecard-table-bg)] font-rajdhani text-xs font-bold text-[var(--fx-accent)]">
+                      {p.wicketNumber}
+                    </span>
+                    <div className="min-w-0 flex-1 leading-tight">
+                      <p className="font-rajdhani text-sm font-semibold text-[var(--scorecard-heading-text)] truncate">
+                        {p.players.map((player, i) => (
+                          <span key={i}>
+                            {i > 0 && ' & '}
+                            {/* playerId comes straight from batting_stats.player_id (already reconciled) —
+                                deliberately not routed through findPlayerId(), which needs `squad` loaded. */}
+                            <PlayerNameLink
+                              name={firstName(player.playerName)}
+                              playerId={player.playerId}
+                              cricHeroesUrl={findCricHeroesUrl({ player_id: player.playerId }, player.playerName, squad)}
+                            />
+                          </span>
+                        ))}
+                      </p>
+                      <p className="font-rajdhani text-xs text-[var(--scorecard-text-faint)]">
+                        Partnership · {balls} balls
+                        {p.isRetirement && <span> · ret.</span>}
+                      </p>
                     </div>
-                  </div>
-                  {/* Outside the bar, not overlaid — a short bar (a quick
-                      dismissal) used to squeeze this text down to nothing.
-                      Fixed-width column keeps every row's runs/balls
-                      right-aligned to the same edge regardless of bar
-                      length. isRetirement gets its own small "ret." marker
-                      — unlike a genuine dismissal, the departing player can
-                      (and, if returning_player_name is set on a later row,
-                      does) reappear in a different row further down, and
-                      the usual "no (out) marker, the next row already
-                      implies who left" reasoning breaks for exactly that
-                      case: without this, the same name resurfacing with no
-                      explanation reads like the duplicate-row bug this
-                      feature has already had to fix twice, not a real
-                      retire-and-return. See src/lib/partnerships.ts's
-                      retired-hurt-and-return note. */}
-                  <span className="font-rajdhani text-xs font-bold text-gold w-20 flex-shrink-0 text-right">
-                    {p.runs}{p.outPlayer == null && '*'}
-                    {p.isRetirement && <span className="text-[var(--scorecard-text-faint)] font-normal"> ret.</span>}
-                    {' '}<span className="text-[var(--scorecard-text-faint)] font-normal">({oversToBalls(p.overTo) - oversToBalls(p.overFrom)})</span>
-                  </span>
-                </div>
-              )
-            })}
+                    <span className="font-rajdhani text-base font-bold text-gold flex-shrink-0 text-right tabular-nums">
+                      {p.runs}{p.outPlayer == null && '*'}
+                    </span>
+                  </li>
+                )
+              })}
+            </ol>
           </div>
         </div>
       )}
@@ -370,20 +335,20 @@ export function ScorecardTables({
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-xs font-rajdhani">
             <colgroup>
-              <col className="w-[50.4%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[13.6%]" />
+              <col className="w-[38%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[10%]" />
+              <col className="w-[19%]" />
             </colgroup>
             <thead>
               <tr className="text-[var(--scorecard-text-faint)] border-b border-[var(--scorecard-table-border)]">
-                <th className="text-center py-1 pr-2">Player</th>
-                <th className="text-center px-1">O</th>
-                <th className="text-center px-1">Dots</th>
-                <th className="text-center px-1">R</th>
-                <th className="text-center px-1">W</th>
+                <th className="text-left py-1 pr-2">Player</th>
+                <th className="text-right px-1">O</th>
+                <th className="text-right px-1">Dots</th>
+                <th className="text-right px-1">R</th>
+                <th className="text-right px-1">W</th>
                 <th className="text-right pl-1">Eco</th>
               </tr>
             </thead>
@@ -392,17 +357,27 @@ export function ScorecardTables({
                 const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
                 const wkts = num(row, ['wickets', 'wickets_taken'])
                 const isTop = topBowlWkts > 0 && wkts === topBowlWkts
+                // Contribution bar: share of all wickets taken by Spartans bowlers.
+                const share = totalBowlWkts > 0 ? (wkts / totalBowlWkts) * 100 : 0
                 return (
                   <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
-                    <td className="text-right py-1 pr-2">
-                      <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
-                      <RoleTag member={findSquadMember(row, name, squad)} />
+                    <td className="text-left py-1.5 pr-2 align-middle">
+                      <div className="leading-tight">
+                        <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                        <RoleTag member={findSquadMember(row, name, squad)} />
+                      </div>
+                      <div
+                        className="mt-1 h-1 w-full rounded-full bg-[var(--scorecard-divider)] overflow-hidden"
+                        title={`${share.toFixed(0)}% of team wickets`}
+                      >
+                        <div className="h-full rounded-full bg-[var(--fx-accent)]" style={{ width: `${share}%`, minWidth: wkts > 0 ? 2 : 0 }} />
+                      </div>
                     </td>
-                    <td className="text-center px-1">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
-                    <td className="text-center px-1">{num(row, ['dots'])}</td>
-                    <td className="text-center px-1">{num(row, ['runs', 'runs_conceded'])}</td>
-                    <td className="text-center px-1">{wkts}</td>
-                    <td className="text-right pl-1">{pickField(row, ['economy', 'eco']) ?? '—'}</td>
+                    <td className="text-right px-1 align-middle tabular-nums">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
+                    <td className="text-right px-1 align-middle tabular-nums">{num(row, ['dots'])}</td>
+                    <td className="text-right px-1 align-middle tabular-nums">{num(row, ['runs', 'runs_conceded'])}</td>
+                    <td className="text-right px-1 align-middle tabular-nums">{wkts}</td>
+                    <td className="text-right pl-1 align-middle tabular-nums">{formatStrikeRate(pickField(row, ['economy', 'eco']))}</td>
                   </tr>
                 )
               })}
@@ -420,18 +395,18 @@ export function ScorecardTables({
           <div className="overflow-x-auto">
             <table className="w-full table-fixed text-xs font-rajdhani">
               <colgroup>
-                <col className="w-[50.4%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13.6%]" />
+                <col className="w-[38%]" />
+                <col className="w-[15.5%]" />
+                <col className="w-[15.5%]" />
+                <col className="w-[15.5%]" />
+                <col className="w-[15.5%]" />
               </colgroup>
               <thead>
                 <tr className="text-[var(--scorecard-text-faint)] border-b border-[var(--scorecard-table-border)]">
-                  <th className="text-center py-1 pr-2">Player</th>
-                  <th className="text-center px-1">Ct</th>
-                  <th className="text-center px-1">St</th>
-                  <th className="text-center px-1">RO</th>
+                  <th className="text-left py-1 pr-2">Player</th>
+                  <th className="text-right px-1">Ct</th>
+                  <th className="text-right px-1">St</th>
+                  <th className="text-right px-1">RO</th>
                   <th className="text-right pl-1">Total</th>
                 </tr>
               </thead>
@@ -445,14 +420,14 @@ export function ScorecardTables({
                   const isTop = topFieldingTotal > 0 && total === topFieldingTotal
                   return (
                     <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
-                      <td className="text-right py-1 pr-2">
+                      <td className="text-left py-1.5 pr-2 align-middle">
                         <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                         <RoleTag member={findSquadMember(row, name, squad)} />
                       </td>
-                      <td className="text-center px-1">{catches}</td>
-                      <td className="text-center px-1">{stumpings}</td>
-                      <td className="text-center px-1">{runOuts}</td>
-                      <td className="text-right pl-1">{total}</td>
+                      <td className="text-right px-1 align-middle tabular-nums">{catches}</td>
+                      <td className="text-right px-1 align-middle tabular-nums">{stumpings}</td>
+                      <td className="text-right px-1 align-middle tabular-nums">{runOuts}</td>
+                      <td className="text-right pl-1 align-middle tabular-nums">{total}</td>
                     </tr>
                   )
                 })}

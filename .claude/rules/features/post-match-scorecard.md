@@ -2236,7 +2236,20 @@ colours still come from the `--scorecard-*`/`--fx-*` tokens):
   `teamTotal` isn't synced). Track uses `--scorecard-divider`, fill uses
   `--fx-accent`; the share % is in the bar's `title` tooltip. Purely
   derived from data already passed in — no new fetch.
-- Bowling, Fielding and Partnerships tables are unchanged.
+- SR is always shown with two decimals (`formatStrikeRate()`, `tabular-nums`) so the right-aligned column lines up.
+- The Bowling table follows the same layout: left-aligned bowler names,
+  right-aligned O / Dots / R / W / Eco, Eco always two decimals, and a bar
+  under each name showing that bowler's share of all wickets taken by
+  Spartans bowlers (sum of `wickets` across the bowling rows; run-outs
+  aren't bowler wickets so they're excluded).
+- The Fielding table uses the same alignment (left-aligned names, right-aligned
+  Ct / St / RO / Total) but deliberately has no contribution bar.
+- Partnerships are now a timeline (vertical rail, a numbered ring per
+  wicket, names + "Partnership · N balls" beside it, runs right-aligned)
+  instead of horizontal bars. Names stay first-name-only and linked; `*`
+  still marks an unbroken stand and "ret." a retirement (now in the
+  subtitle). The bar-length encoding is gone, so `topPartnershipRuns` is
+  no longer used for layout.
 
 ## 18. Re-pulling older scorecards — no fee, milestone or performer prompts (added September 2026)
 
