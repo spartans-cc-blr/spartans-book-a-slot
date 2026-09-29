@@ -166,6 +166,9 @@ export function ScorecardTables({
   const fieldingRows = (fielding ?? []).filter(row => fieldingTotal(row) > 0)
 
   const topBatRuns  = battingRows.reduce((max, r) => Math.max(max, num(r, ['runs', 'total_runs'])), 0)
+  const battingTeamRuns = teamTotal != null && teamTotal > 0
+    ? teamTotal
+    : battingRows.reduce((sum, r) => sum + num(r, ['runs', 'total_runs']), 0)
   const topBowlWkts = bowlingRows.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
   const topFieldingTotal = fieldingRows.reduce((max, r) => Math.max(max, fieldingTotal(r)), 0)
 
@@ -202,20 +205,20 @@ export function ScorecardTables({
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-xs font-rajdhani">
             <colgroup>
-              <col className="w-[50.4%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[13.6%]" />
+              <col className="w-[38%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[22%]" />
             </colgroup>
             <thead>
               <tr className="text-[var(--scorecard-text-faint)] border-b border-[var(--scorecard-table-border)]">
-                <th className="text-center py-1 pr-2">Player</th>
-                <th className="text-center px-1">R</th>
-                <th className="text-center px-1">B</th>
-                <th className="text-center px-1">4s</th>
-                <th className="text-center px-1">6s</th>
+                <th className="text-left py-1 pr-2">Player</th>
+                <th className="text-right px-1">R</th>
+                <th className="text-right px-1">B</th>
+                <th className="text-right px-1">4s</th>
+                <th className="text-right px-1">6s</th>
                 <th className="text-right pl-1">SR</th>
               </tr>
             </thead>
@@ -224,17 +227,29 @@ export function ScorecardTables({
                 const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
                 const runs = num(row, ['runs', 'total_runs'])
                 const isTop = topBatRuns > 0 && runs === topBatRuns
+                // Contribution bar: this batter's share of the team total
+                // (falls back to the sum of batters' runs when the synced
+                // total isn't available, e.g. extras excluded).
+                const share = battingTeamRuns > 0 ? Math.min(100, (runs / battingTeamRuns) * 100) : 0
                 return (
                   <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
-                    <td className="text-right py-1 pr-2">
-                      <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
-                      <RoleTag member={findSquadMember(row, name, squad)} />
+                    <td className="text-left py-1.5 pr-2 align-middle">
+                      <div className="leading-tight">
+                        <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                        <RoleTag member={findSquadMember(row, name, squad)} />
+                      </div>
+                      <div
+                        className="mt-1 h-1 w-full rounded-full bg-[var(--scorecard-divider)] overflow-hidden"
+                        title={`${share.toFixed(0)}% of team score`}
+                      >
+                        <div className="h-full rounded-full bg-[var(--fx-accent)]" style={{ width: `${share}%`, minWidth: runs > 0 ? 2 : 0 }} />
+                      </div>
                     </td>
-                    <td className="text-center px-1">{runs}</td>
-                    <td className="text-center px-1">{num(row, ['balls', 'balls_faced'])}</td>
-                    <td className="text-center px-1">{num(row, ['fours', '4s'])}</td>
-                    <td className="text-center px-1">{num(row, ['sixes', '6s'])}</td>
-                    <td className="text-right pl-1">{pickField(row, ['strike_rate', 'sr']) ?? '—'}</td>
+                    <td className="text-right px-1 align-middle">{runs}</td>
+                    <td className="text-right px-1 align-middle">{num(row, ['balls', 'balls_faced'])}</td>
+                    <td className="text-right px-1 align-middle">{num(row, ['fours', '4s'])}</td>
+                    <td className="text-right px-1 align-middle">{num(row, ['sixes', '6s'])}</td>
+                    <td className="text-right pl-1 align-middle">{pickField(row, ['strike_rate', 'sr']) ?? '—'}</td>
                   </tr>
                 )
               })}
