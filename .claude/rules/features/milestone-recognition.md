@@ -411,6 +411,14 @@ if a captain reports a specific missed practice-game highlight.
   gone for that player permanently (matches the "seen" framing; there's no
   history page for past recognitions today).
 
+## 10. Pre-Oct-2026 games are never detected (added September 2026)
+
+`syncMatchStatsForBooking()` skips both `detectAndLogMilestones()` and
+`detectAndLogMatchPerformances()` for a game with `game_date` before 1 Oct
+2026 (`src/lib/repullCutoff.ts`), so re-pulling old scorecards never queues
+recognition for the modal. See `post-match-scorecard.md` §18.
+
+
 ---
 
 *Maintained by: Spartans CC BLR*
