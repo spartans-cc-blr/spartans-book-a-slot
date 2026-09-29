@@ -120,6 +120,12 @@ function oversToBalls(over: number | string): number {
   return whole * 6 + ball
 }
 
+// Always two decimals so the right-aligned SR column lines up neatly.
+function formatStrikeRate(v: unknown): string {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''))
+  return Number.isFinite(n) ? n.toFixed(2) : '—'
+}
+
 export function ScorecardTables({
   batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, teamWickets, squad,
 }: {
@@ -249,7 +255,7 @@ export function ScorecardTables({
                     <td className="text-right px-1 align-middle">{num(row, ['balls', 'balls_faced'])}</td>
                     <td className="text-right px-1 align-middle">{num(row, ['fours', '4s'])}</td>
                     <td className="text-right px-1 align-middle">{num(row, ['sixes', '6s'])}</td>
-                    <td className="text-right pl-1 align-middle">{pickField(row, ['strike_rate', 'sr']) ?? '—'}</td>
+                    <td className="text-right pl-1 align-middle tabular-nums">{formatStrikeRate(pickField(row, ['strike_rate', 'sr']))}</td>
                   </tr>
                 )
               })}
