@@ -2249,6 +2249,23 @@ colours still come from the `--scorecard-*`/`--fx-*` tokens):
   changes are that the wicket number now sits in a ring on a vertical
   timeline rail, and player names inside the bar are left-aligned.
 
+## 17.8 Match hero summary — batting-order sides, result pill, toss / top scorer / best bowler (added September 2026)
+
+The result strip on `MatchHistoryCard` and the standalone
+`/matches/history/[bookingId]` page is now `MatchHeroSummary.tsx` (replacing
+the stacked toss line + score line + `MatchResultBadge` + top-bat/bowl line;
+`MatchResultBadge.tsx` was deleted):
+
+- Top row: the team that **batted first on the left**, the team that batted
+  second on the right (Spartans on the left when toss data is missing), each
+  with name, score (`223/3`) and overs. Between them a **WON / LOST / TIED
+  pill** (emerald / red / amber) with the margin ("by 47 runs") under it.
+- Bottom row (divider above): 🪙 toss line, 🏏 top scorer (`69 (43)`), and the
+  ball icon (`BallIcon`, matches the booking's ball type) for the best bowler
+  (`1/29 (4 ov)`), labelled "Top Scorer" / "Best Bowler".
+- All data was already fetched; `buildTossLine()`/`buildResultLine()` are
+  reused. `buildOrderedScoreLine()` is no longer used by the UI.
+
 ## 18. Re-pulling older scorecards — no fee, milestone or performer prompts (added September 2026)
 
 **Why.** New stats are being added to the CricHeroes extraction, so older

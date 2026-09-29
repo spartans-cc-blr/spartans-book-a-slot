@@ -105,7 +105,7 @@ export function computeMatchMargin(
 export interface ResultLine {
   kind:  MatchResultKind
   // Just the result word ("WON"/"LOST"/"MATCH TIED"/a raw fallback) — this
-  // is the only part MatchResultBadge.tsx renders as a pill/coloured text,
+  // is the only part MatchHeroSummary.tsx renders as a pill/coloured text,
   // matching src/components/shared/ResultBadge.tsx's own win/loss weighting
   // (win = celebratory pill, everything else = plain coloured text).
   word: string
@@ -117,7 +117,7 @@ export interface ResultLine {
 }
 
 // Word + margin for the result strip — kept as two separate fields rather
-// than one combined string so MatchResultBadge.tsx can style them
+// than one combined string so MatchHeroSummary.tsx can style them
 // differently: the word alone gets the pill/coloured-text treatment, the
 // margin stays the original plain muted text next to it. See
 // features/post-match-scorecard.md §17.6.
