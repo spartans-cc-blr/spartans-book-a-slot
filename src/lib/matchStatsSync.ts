@@ -125,6 +125,17 @@ export async function syncMatchStatsForBooking(
 
   if (cacheErr) return { ok: false, error: cacheErr.message }
 
+  // match_stats_cache is keyed on match_id, so a booking whose match_id was
+  // synced wrongly first (or later corrected) would otherwise keep an orphan
+  // row here — often an empty "NR" one — that the NR filter and result
+  // lookups pick up. One booking, one cache row: drop any other.
+  const { error: staleErr } = await supabase
+    .from('match_stats_cache')
+    .delete()
+    .eq('booking_id', bookingId)
+    .neq('match_id', mid)
+  if (staleErr) console.error('[matchStatsSync] stale cache cleanup failed:', staleErr.message)
+
   // Status is forward-only (pending_parse → parsed → synced → fees_applied
   // — see architecture.md §6). A re-sync (e.g. to pick up a player_name
   // reconciled after the first sync — see player-identity-resolution.md

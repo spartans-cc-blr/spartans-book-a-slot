@@ -1096,6 +1096,27 @@ same two-step shape the list route already used. `GET /api/matches/history`
 itself was only touched to import the now-shared `isPastMatch()` instead of
 defining its own; its behaviour is unchanged.
 
+**Incident (2026-09-29) — orphan `match_stats_cache` rows showed real
+matches under the "NR" filter, and the CricHeroes link didn't resolve.**
+`match_stats_cache` is keyed on `match_id`, but `/matches/history`'s result
+filter reads it by `booking_id`. Two bookings (28 Jun Trumphate vs Rising
+Phoenix, 11 Jul PSG vs Republic Of Whitefield) had been synced once against
+a wrong CricHeroes ID (taken from the pasted `bookings.cricheroes_url`,
+24169717 / 23783143), producing an empty `NR` cache row with null scores.
+When `bookings.match_id` was corrected and re-synced, the real row was
+upserted under the right `match_id` and the empty one stayed behind, so each
+booking had two cache rows. The hero banner showed the real result while the
+NR filter matched the orphan. The stale ID in the URL is also why the
+CricHeroes link 404'd. A third booking (6 Jun, `25099213`) had the same kind
+of orphan.
+
+**Fixed** by (1) deleting the three orphan rows and rewriting the two URLs to
+the booking's verified `match_id` (direct SQL, data only); and (2) making
+`syncMatchStatsForBooking()` delete every other `match_stats_cache` row for
+the booking after a successful upsert, so one booking always has one cache
+row. Take-away: when a booking's `match_id` changes, the `cricheroes_url`
+must be corrected too — the two are entered separately and can disagree.
+
 **Incident (2026-09-13) — `/admin/scorecard-backfill` carried the identical
 bug, missed by the 2026-08-23 pass above because nobody had reason to look
 at it that day.** Reported when today's own Mario Turner Flash 5 match
