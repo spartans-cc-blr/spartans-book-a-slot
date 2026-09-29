@@ -48,14 +48,14 @@ also the match cited in `partnerships.md` §3's line-wrap incident write-up).
 | Squad/Player — Wicketkeeper | ❌ not captured anywhere, at any level. The raw `"( WK )"`/`"(wk)"` annotation is sitting in the text, same shape `extract_batting_style()` already reads |
 | Squad/Player — Batting hand | ✅ Spartans + dismissed opponent batters (`partnerships.md` §12). ❌ still missing for a not-out opponent batter |
 | Batting — Runs/Balls/Minutes/4s/6s/SR/Not-out | ✅ fully captured |
-| Batting — Bowler who dismissed the batter | ✅ opponent batters (`partnerships.md` §11). ❌ Spartans' own batters — `BattingStatsWriter` parses `DismissalParser.parse_batting_dismissal(status)` and keeps only `['method']`, discards `['bowler']` (and `['fielder']`, see the row below) |
-| Batting — Fielder | ⚪ Not a gap — `['fielder']` is discarded the same way, but no plan metric needs it kept past the aggregate. See §3.1 |
+| Batting — Bowler who dismissed the batter | ✅ Both sides, at the FOW grain — `fall_of_wickets.bowler_name` (Spartans' own wicket) and `opponent_fall_of_wickets.bowler_name` (opponent's wicket), see §5. `batting_stats.bowler_name` (a second copy, per-player) deliberately **not** added — see §5's redundancy note |
+| Batting — Fielder | ✅ Same FOW-grain capture as Bowler above, see §5. Originally descoped (§3.1) as unneeded for any plan metric; captured anyway per an explicit later request to preserve raw data for future need |
 | Bowling — Overs/Maidens/Runs/Wickets/Dots/4s/6s/Wides/No-balls/Economy | ✅ fully captured, no gaps |
 | Fall of Wickets — Wicket #/Score/Batter/Over | ✅ both sides |
-| Fall of Wickets — Bowler | ✅ opponent's FOW only. ❌ Spartans' own `fall_of_wickets` has no bowler credit at all |
-| Fall of Wickets — Dismissal type | ❌ not stored directly on either FOW table |
+| Fall of Wickets — Bowler | ✅ both sides — see §5 |
+| Fall of Wickets — Dismissal type | ✅ both sides — see §5 |
 | Fielding — aggregate catches/stumpings/run-outs | ✅ (Spartans only, per-match totals) |
-| Fielding — per-dismissal-event linkage (fielder ↔ specific batter/bowler) | ⚪ Bowler-side linkage exists via opponent FOW (§ above) and is real planned follow-on work (Working Order #3/#4). A fielder-side equivalent was considered and dropped — see §3.1 |
+| Fielding — per-dismissal-event linkage (fielder ↔ specific batter/bowler) | ✅ via both FOW tables' new `bowler_name`/`fielder_name`/`dismissal_type` (§5) — no plan metric needs this (§3.1), captured as raw data anyway |
 | **Extras** — byes/leg byes/wides/no-balls/total | ❌ **not captured at all** — see §4, the first item picked off this list |
 | Toss — raw fields | ✅ captured; derived metrics already live Hub-side (Team Record) |
 
@@ -70,15 +70,20 @@ Each capture gets its own dated section below.
 |---|---|---|
 | 1 | Extras (byes/leg byes/wides/no-balls/total conceded while Spartans bowl) | ✅ Done — see §4 |
 | 2 | Wicketkeeper annotation | ⏳ Not started |
-| 3 | Bowler who dismissed a Spartans batter (own `batting_stats`) | ⏳ Not started |
-| 4 | Bowler credit + dismissal type on Spartans' own `fall_of_wickets` | ⏳ Not started |
-| 5 | Dismissal type on `opponent_fall_of_wickets` | ⏳ Not started |
+| 3 | Bowler who dismissed a Spartans batter (own `batting_stats`) | ✅ Superseded — see §5's redundancy note. Captured at the FOW grain instead of a duplicate `batting_stats` column |
+| 4 | Bowler credit + dismissal type on Spartans' own `fall_of_wickets` | ✅ Done — see §5 |
+| 5 | Dismissal type on `opponent_fall_of_wickets` | ✅ Done — see §5 |
 | 6 | Match header: Format, Ball type, Edition, League name (split from `tournament_name`/`match_type`) | ⏳ Not started |
 | 7 | Winning margin/type (raw text) | ⏳ Not started |
 | 8 | Per-player Captain/WK boolean flags on `team_list` (vs. today's match-level name string) | ⏳ Not started |
+| 9 | Batting hand for a not-out opponent batter | ⏳ Not started — needs a new opponent-side roster table (`opponent_team_list`), since `opponent_fall_of_wickets` only ever has a row per *wicket*; a batter never dismissed has no row anywhere to carry it. See `partnerships.md` §12's "Not captured" note |
 
 Item #3 originally read "Bowler/fielder who dismissed a Spartans batter" —
-narrowed to bowler-only; see §3.1 for why fielder identity was descoped.
+narrowed to bowler-only (§3.1), then closed out entirely once §5 shipped
+fielder too, on the FOW tables rather than `batting_stats`. Item #9 (not
+in the original 8-item list) was added once the fielder-descope
+correction (§3.1) prompted a full re-read of the plan document, which
+surfaced this genuinely still-open gap.
 
 ---
 
@@ -255,6 +260,145 @@ columns follow the same RLS posture already in place (`match_stats`/
 |---|---|
 | Extras Spartans received while batting | Not captured — deliberately out of scope for this pass (see "Why" above). `extract_extras()` already returns both sides symmetrically; a future pass would just need `CSVWriterFactory.write_all()` to also pick the Spartans-batting-side dict and a second set of columns. |
 | Historical backfill | Every match synced before this shipped has `extras_*: NULL` on both tables — only a re-sync (manual "Sync Stats" or the next `backfill-scorecards` cron run) populates them, same posture as every prior column added to these tables. |
+| No derivation or UI | Not built — same explicit scope as every other item in this doc. |
+
+---
+
+## 5. Fall of Wickets — dismissal type, bowler, fielder on both sides (added September 2026)
+
+### Why
+
+Per an explicit request to capture what's available from the scorecard
+even without a current UI use — *"not to lose data for any future
+needs"* — rather than the narrower, metric-justified scope §3.1's
+correction argued for. This closes Working Order items #3/#4/#5 in one
+pass, and goes one field further than the plan document's own Fall of
+Wickets ask (`"Wicket number, Score, Batter dismissed, Over, Bowler,
+Dismissal type"` — no Fielder) by also keeping Fielder, since it's the
+same already-parsed value and the cost of keeping it is one more nullable
+column.
+
+No new PDF parsing. Both `fall_of_wickets` (Spartans' own innings) and
+`opponent_fall_of_wickets` already receive each wicket's dismissed
+batter's raw "how out" text (`batting.status`) indirectly — the opponent
+writer already re-parsed it with `DismissalParser.parse_batting_dismissal()`
+to get `bowler_name` (`partnerships.md` §11); the Spartans writer never
+ran that lookup at all. Both now do, and both keep all three of the
+parser's return values instead of one or two of them.
+
+### What was added
+
+- **`FallOfWicketsWriter.write()`** (`spartans-python/utils/csv_writers.py`)
+  — signature widened to take `player_stats` (the same Spartans
+  `player_statistics` dict `BattingStatsWriter` already reads), so it can
+  look each wicket's `player_name` up and re-parse their `batting.status`.
+  Three new columns: `dismissal_type`, `bowler_name`, `fielder_name`.
+- **`OpponentFallOfWicketsWriter.write()`** — already had `opponent_stats`
+  and already ran `DismissalParser.parse_batting_dismissal()` for
+  `bowler_name`; now also keeps `['method']` as `dismissal_type` and
+  `['fielder']` as `fielder_name` from that same call, instead of
+  discarding them.
+- **`CSVWriterFactory.write_all()`** — one-line change, passes the
+  already-in-scope `spartans_stats` into `fall_of_wickets_writer.write()`.
+- **`fall_of_wickets.dismissal_type` / `.bowler_name` / `.fielder_name`**
+  and **`opponent_fall_of_wickets.dismissal_type` / `.fielder_name`** —
+  five new nullable `text` columns across the two tables
+  (`analytics-db/migrations/010_fow_dismissal_detail.sql`, applied live).
+  `fielder_name` is the parser's raw, unsplit output — for a run out this
+  can be a `"Thrower/Collector"` combined string, the same shape
+  `DismissalParser.parse_fielders_from_runout()` already knows how to
+  split further on the read side; this migration is raw capture only, no
+  derivation.
+- **No Hub-side change at all.** Unlike Extras (§4), which needed an
+  explicit `matchStatsSync.ts` line because `match_stats` is destructured
+  field-by-field into `match_stats_cache`, both FOW tables are already
+  stored wholesale as `jsonb` arrays (`fall_of_wickets: fallOfWickets.data
+  ?? []` / `opponent_fall_of_wickets: opponentFallOfWickets.data ?? []` in
+  `syncMatchStatsForBooking()`, both fetched via a bare `select('*')`) — a
+  new column on either table rides into `match_stats_cache` automatically,
+  the same "zero TypeScript touched" story `partnerships.md` §12
+  documents for `batting_style`.
+
+### Redundancy note — `batting_stats.bowler_name`/`.fielder_name` deliberately not added
+
+The original audit (§2, before this pass) framed "Bowler who dismissed the
+batter" and "Fielder" as gaps on **`batting_stats`** (Working Order #3) —
+a *second*, separate capture from the FOW one (#4/#5), since they're
+different tables at different grains (one row per player vs. one row per
+wicket).
+
+Once `fall_of_wickets` carries `bowler_name`/`fielder_name`/`dismissal_type`
+keyed by `(match_id, player_name)` — the identical key `batting_stats`
+already uses — adding the same three facts a second time onto
+`batting_stats` would be pure duplication with no new information: every
+Spartans batter who was actually dismissed has exactly one row in each
+table, joinable on that key, and a batter who wasn't dismissed (not-out,
+or didn't bat) has no bowler/fielder to record in either table anyway. So
+item #3 is treated as satisfied by #4, not built separately —
+`BattingStatsWriter` is unchanged, still keeping only `dismissal_method`
+per player.
+
+### Verification
+
+1. **Full production pipeline run against the real scorecard PDF** (Hub
+   match `14114256`), using the real `PDFTextExtractor`/`api.py` page
+   selection (pages 3 & 4 — see the note below on why a naive
+   `get_scorecard_pages()`-based test script initially came up with an
+   empty opponent side) → `ScorecardExtractor` → `CSVWriterFactory.write_all()`
+   end-to-end. Both FOW tables populated correctly for all 8 Spartans and
+   8 opponent wickets, with dismissal types, bowlers, and fielders that
+   match the printed scorecard and read as cricket-sensible (every
+   `bowled`/`lbw` row has no fielder; every `caught_behind` row credits
+   the same wicketkeeper name across multiple wickets; `stumping` credits
+   a keeper as fielder and a bowler; a `caught` row credits a specific,
+   varying fielder).
+2. **Regression** — `smoke_test_opponent_fow.py` (from the earlier
+   opponent-bowler-credit pass) updated to assert the two new columns'
+   values (was asserting the pre-this-pass column set, including a
+   `fall_of_wickets.csv` "unchanged shape" check that's now intentionally
+   stale) and re-run clean, plus `smoke_test_batting_style.py` and
+   `smoke_test_extras.py` re-run unchanged as regression checks on the
+   shared `csv_writers.py`/`import_to_supabase.py` files — all pass.
+3. `python3 -m py_compile` on both touched files.
+
+**Diagnostic aside, not a code fix:** the first verification attempt used
+`main.py`'s `PDFLayoutConfig.get_scorecard_pages()` team-name lookup to
+pick scorecard pages, which fell back to a stale default (`[2, 3]`) for
+this match's modern team name and produced zero opponent-side FOW
+entries. Confirmed this is a quirk of `main.py` (the legacy, no-longer-
+live Google Drive batch script) rather than a live production bug — the
+real production path, `api.py`, never calls `get_scorecard_pages()` at
+all and hardcodes pages 3 & 4 directly. Re-running with `api.py`'s own
+page selection produced the correct 8/8 wicket counts on both sides. Not
+fixed here — out of scope for this pass, and `main.py` isn't the live
+path — but worth knowing if `main.py` is ever revived.
+
+### Security (vibe-security)
+
+Read-only PDF parsing, no new client-reachable input, no new write path
+beyond the existing service-role-only sync pipeline. Both tables' new
+columns follow the same RLS posture already in place — no anon/
+authenticated policies, service role only.
+
+### File map
+
+| File | Role |
+|---|---|
+| `analytics-db/migrations/010_fow_dismissal_detail.sql` | The 5 new columns across both FOW tables |
+| `spartans-python/utils/csv_writers.py` | `FallOfWicketsWriter` now takes `player_stats` and re-parses each wicket's dismissal; `OpponentFallOfWicketsWriter` keeps `dismissal_type`/`fielder_name` alongside its existing `bowler_name`; `write_all()` passes `spartans_stats` through |
+| `spartans-python/scripts/import_to_supabase.py` | `COLUMN_TYPES` widened for both `fall_of_wickets` and `opponent_fall_of_wickets` |
+
+No `field_config.py`, `field_extractors.py`, `api.py`, or `main.py` changes
+— `DismissalParser` and `extract_fall_of_wickets()` were already sufficient;
+this pass only stopped two writers from discarding part of what they
+already had in hand.
+
+### Pending
+
+| Item | Notes |
+|---|---|
+| Historical backfill | Every match synced before this shipped has these five columns `NULL` — only a re-sync populates them, same posture as every prior column added to these tables. |
+| Batting hand for a not-out opponent batter (Working Order #9) | Still open — a genuinely separate gap needing a new table, not something this pass's FOW-grain approach can reach (see §3, item #9). |
 | No derivation or UI | Not built — same explicit scope as every other item in this doc. |
 
 ---
