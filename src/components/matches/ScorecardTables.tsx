@@ -120,7 +120,7 @@ function oversToBalls(over: number | string): number {
   return whole * 6 + ball
 }
 
-// Always two decimals so the right-aligned SR column lines up neatly.
+// Always two decimals so right-aligned SR / Eco columns line up neatly.
 function formatStrikeRate(v: unknown): string {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''))
   return Number.isFinite(n) ? n.toFixed(2) : '—'
@@ -176,6 +176,7 @@ export function ScorecardTables({
     ? teamTotal
     : battingRows.reduce((sum, r) => sum + num(r, ['runs', 'total_runs']), 0)
   const topBowlWkts = bowlingRows.reduce((max, r) => Math.max(max, num(r, ['wickets', 'wickets_taken'])), 0)
+  const totalBowlWkts = bowlingRows.reduce((sum, r) => sum + num(r, ['wickets', 'wickets_taken']), 0)
   const topFieldingTotal = fieldingRows.reduce((max, r) => Math.max(max, fieldingTotal(r)), 0)
 
   // computePartnerships() logs its own [partnerships] error and returns
@@ -376,20 +377,20 @@ export function ScorecardTables({
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-xs font-rajdhani">
             <colgroup>
-              <col className="w-[50.4%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[13.6%]" />
+              <col className="w-[38%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[10%]" />
+              <col className="w-[19%]" />
             </colgroup>
             <thead>
               <tr className="text-[var(--scorecard-text-faint)] border-b border-[var(--scorecard-table-border)]">
-                <th className="text-center py-1 pr-2">Player</th>
-                <th className="text-center px-1">O</th>
-                <th className="text-center px-1">Dots</th>
-                <th className="text-center px-1">R</th>
-                <th className="text-center px-1">W</th>
+                <th className="text-left py-1 pr-2">Player</th>
+                <th className="text-right px-1">O</th>
+                <th className="text-right px-1">Dots</th>
+                <th className="text-right px-1">R</th>
+                <th className="text-right px-1">W</th>
                 <th className="text-right pl-1">Eco</th>
               </tr>
             </thead>
@@ -398,17 +399,27 @@ export function ScorecardTables({
                 const name = pickField(row, ['player_name', 'name']) ?? 'Unknown'
                 const wkts = num(row, ['wickets', 'wickets_taken'])
                 const isTop = topBowlWkts > 0 && wkts === topBowlWkts
+                // Contribution bar: share of all wickets taken by Spartans bowlers.
+                const share = totalBowlWkts > 0 ? (wkts / totalBowlWkts) * 100 : 0
                 return (
                   <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
-                    <td className="text-right py-1 pr-2">
-                      <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
-                      <RoleTag member={findSquadMember(row, name, squad)} />
+                    <td className="text-left py-1.5 pr-2 align-middle">
+                      <div className="leading-tight">
+                        <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                        <RoleTag member={findSquadMember(row, name, squad)} />
+                      </div>
+                      <div
+                        className="mt-1 h-1 w-full rounded-full bg-[var(--scorecard-divider)] overflow-hidden"
+                        title={`${share.toFixed(0)}% of team wickets`}
+                      >
+                        <div className="h-full rounded-full bg-[var(--fx-accent)]" style={{ width: `${share}%`, minWidth: wkts > 0 ? 2 : 0 }} />
+                      </div>
                     </td>
-                    <td className="text-center px-1">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
-                    <td className="text-center px-1">{num(row, ['dots'])}</td>
-                    <td className="text-center px-1">{num(row, ['runs', 'runs_conceded'])}</td>
-                    <td className="text-center px-1">{wkts}</td>
-                    <td className="text-right pl-1">{pickField(row, ['economy', 'eco']) ?? '—'}</td>
+                    <td className="text-right px-1 align-middle tabular-nums">{pickField(row, ['overs', 'overs_bowled']) ?? '—'}</td>
+                    <td className="text-right px-1 align-middle tabular-nums">{num(row, ['dots'])}</td>
+                    <td className="text-right px-1 align-middle tabular-nums">{num(row, ['runs', 'runs_conceded'])}</td>
+                    <td className="text-right px-1 align-middle tabular-nums">{wkts}</td>
+                    <td className="text-right pl-1 align-middle tabular-nums">{formatStrikeRate(pickField(row, ['economy', 'eco']))}</td>
                   </tr>
                 )
               })}

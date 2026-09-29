@@ -2237,7 +2237,12 @@ colours still come from the `--scorecard-*`/`--fx-*` tokens):
   `--fx-accent`; the share % is in the bar's `title` tooltip. Purely
   derived from data already passed in — no new fetch.
 - SR is always shown with two decimals (`formatStrikeRate()`, `tabular-nums`) so the right-aligned column lines up.
-- Bowling, Fielding and Partnerships tables are unchanged.
+- The Bowling table follows the same layout: left-aligned bowler names,
+  right-aligned O / Dots / R / W / Eco, Eco always two decimals, and a bar
+  under each name showing that bowler's share of all wickets taken by
+  Spartans bowlers (sum of `wickets` across the bowling rows; run-outs
+  aren't bowler wickets so they're excluded).
+- Fielding and Partnerships tables are unchanged.
 
 ## 18. Re-pulling older scorecards — no fee, milestone or performer prompts (added September 2026)
 
