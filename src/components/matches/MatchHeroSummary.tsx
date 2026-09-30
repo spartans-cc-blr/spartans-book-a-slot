@@ -63,6 +63,27 @@ function CenterResult({ line }: { line: ResultLine | null }) {
 
 // Equal-width column; toss sits left, top scorer centred, best bowler right,
 // with the batting-scorecard row-divider colour as the vertical separator.
+// Indian ₹1 coin: stainless-steel silver disc, raised rim, inner ring and
+// the ₹ / "1" reverse motif. Purely decorative, replaces the 🪙 emoji.
+function RupeeCoin({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <radialGradient id="rc-steel" cx="35%" cy="30%" r="80%">
+          <stop offset="0%" stopColor="#F4F6F8" />
+          <stop offset="55%" stopColor="#C3C9D0" />
+          <stop offset="100%" stopColor="#8E969F" />
+        </radialGradient>
+      </defs>
+      <circle cx="12" cy="12" r="11.5" fill="url(#rc-steel)" stroke="#6B737C" strokeWidth="0.8" />
+      <circle cx="12" cy="12" r="9.6" fill="none" stroke="#7A828B" strokeWidth="0.7" strokeDasharray="0.9 0.9" />
+      <circle cx="12" cy="12" r="8" fill="none" stroke="#9AA2AB" strokeWidth="0.5" />
+      <text x="12" y="10.6" textAnchor="middle" fontSize="6.4" fontWeight="700" fill="#4A525B" fontFamily="system-ui, sans-serif">₹</text>
+      <text x="12" y="18" textAnchor="middle" fontSize="8" fontWeight="800" fill="#4A525B" fontFamily="system-ui, sans-serif">1</text>
+    </svg>
+  )
+}
+
 function Cell({ icon, children, label, align, divider }: {
   icon: React.ReactNode; children: React.ReactNode; label?: string
   align: 'left' | 'center' | 'right'; divider?: boolean
@@ -118,7 +139,7 @@ export function MatchHeroSummary({
 
       {hasBottom && (
         <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid var(--scorecard-table-divider)', paddingTop: '8px' }}>
-          <Cell icon="🪙" align="left">{tossLine}</Cell>
+          <Cell icon={<RupeeCoin />} align="left">{tossLine}</Cell>
           <Cell icon="🏏" label="Top Scorer" align="center" divider>
             {topBat && (<>
               <div style={{ color: 'var(--fx-accent)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortName(topBat.name)}</div>
