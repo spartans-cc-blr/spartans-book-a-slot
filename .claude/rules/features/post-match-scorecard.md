@@ -2297,6 +2297,8 @@ the stacked toss line + score line + `MatchResultBadge` + top-bat/bowl line;
 - All data was already fetched; `buildTossLine()`/`buildResultLine()` are
   reused. `buildOrderedScoreLine()` is no longer used by the UI.
 
+- Batters who remained not out (`not_out = 'Y'`) carry a `*` right after their name in the Batting table.
+
 ## 18. Re-pulling older scorecards — no fee, milestone or performer prompts (added September 2026)
 
 **Why.** New stats are being added to the CricHeroes extraction, so older
