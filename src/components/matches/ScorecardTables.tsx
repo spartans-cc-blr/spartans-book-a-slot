@@ -243,6 +243,7 @@ export function ScorecardTables({
                     <td className="text-left py-1.5 pr-2 align-middle">
                       <div className="leading-tight">
                         <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                        {String(pickField(row, ['not_out']) ?? '').toUpperCase() === 'Y' && <span title="Not out">*</span>}
                         <RoleTag member={findSquadMember(row, name, squad)} />
                       </div>
                       <div
