@@ -10,8 +10,9 @@
 `(match_id, player_id)` for every reconciled Spartans player in a match's Playing XI
 (`team_list`). It flattens match context, participation, batting, bowling and fielding
 facts, plus derived rates (boundary %, team run share, dot-ball %, bowling average and
-strike rate, wickets per over, win/loss margin). Migration:
-`analytics-db/migrations/013_player_match_performance_view.sql`.
+strike rate, wickets per over, win/loss margin). Migrations:
+`analytics-db/migrations/013_player_match_performance_view.sql`, extended by
+`014_player_match_performance_extras_boundaries.sql` (DROP + CREATE, both applied).
 
 ## 2. Why the analytics DB
 
@@ -31,6 +32,7 @@ are deliberately left out (§4).
   honours the base tables' blanket-deny RLS instead of running as owner.
 - **Margin** is derived from toss + totals (same logic as `computeMatchMargin()`),
   `margin_type` is `runs`/`wickets`, NULL for NR or missing toss.
+- **Bowler extras and boundaries (migration `014`, view recreated with 47 columns).** `bowler_extras_conceded` = `wides + no_balls` (bowler-charged only; excludes byes and leg byes, which are match-level `match_stats.extras_*`, populated only for matches re-synced since Jun 2026). `boundary_runs_conceded` = `fours_conceded*4 + sixes_conceded*6` (scorecard 4s/6s only). Both NULL when `bowled` is false; `wides` and `no_balls` stay as separate columns.
 - `fielded_dismissal` is "had a catch/stumping/run out", not "took the field".
 
 ## 4. Not in the view (Hub-only)
