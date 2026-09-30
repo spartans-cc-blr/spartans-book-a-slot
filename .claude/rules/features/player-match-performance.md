@@ -1,6 +1,6 @@
 # Player Match Performance View (analytics DB)
 
-**Spartans Hub · Drafted: September 2026 · Status: migration written, NOT yet applied**
+**Spartans Hub · Added: September 2026 · Status: applied to the analytics DB (2026-09-30)**
 
 ---
 
@@ -50,8 +50,8 @@ data, so their margin is NULL.
 
 ## 6. Pending
 
-- Apply the migration to the analytics project (`bpkaapmbgbwxsmjkfjii`).
-- Decide on the `match_dimensions` mirror for format / opponent_id / venue.
+- ~~Apply the migration~~ Done (2026-09-30, project `bpkaapmbgbwxsmjkfjii`).
+- Decided: format, `opponent_id`, venue and practice flag come from the Hub DB, joined in app code on `match_id` (no mirror table).
 - Unreconciled names (`player_id IS NULL`) and pre-Hub matches carry no Hub identity.
 
 ---
