@@ -169,6 +169,11 @@ export function groupOvers(balls: BallRow[]): OverGroup[] {
     })
 }
 
+/** The most wickets that fell in any single over (at least 1), used to reserve space for one dot per wicket. */
+export function maxWicketsInOver(overs: { wickets: number }[]): number {
+  return Math.max(1, ...overs.map(o => o.wickets))
+}
+
 // ── Phase split ────────────────────────────────────────────────────────────
 
 export interface PhaseLine {

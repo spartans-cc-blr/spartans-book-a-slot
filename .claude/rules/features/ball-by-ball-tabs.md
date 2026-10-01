@@ -47,7 +47,7 @@ analytics read is logged and treated as "not available", never an error page.
 "Spartans batting" is the innings where Spartans bat (`batting_side = 'spartans'`);
 "Spartans bowling" is the opposition innings (`'opponent'`).
 
-- **Batting**: over-by-over runs (red dot = a wicket fell), runs/wickets/run-rate/dot% by
+- **Batting**: over-by-over runs (one red dot per wicket that fell in that over, so a two-wicket over shows two dots; every column reserves room for the busiest over so the bars share a baseline), runs/wickets/run-rate/dot% by
   phase, a batters table (R, B, SR, 4s, 6s, how out), and dot% and runs (balls) by phase.
 - **Bowling**: the same bars and phase split for the opposition innings, a bowlers table
   (O, M, R, W, Econ, Dot%), boundaries and extras conceded, and each bowler's spell in

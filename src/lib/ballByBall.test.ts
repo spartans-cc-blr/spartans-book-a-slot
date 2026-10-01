@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, formatOvers, ballChip,
   groupOvers, phaseSplit, summariseBatters, summariseBowlers, summariseFielders, wicketRows,
-  bowlerRuns, isBowlerWicket, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText,
+  bowlerRuns, isBowlerWicket, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver,
 } from './ballByBall'
 
 let seq = 0
@@ -260,5 +260,23 @@ describe('fielderFromText', () => {
       dismissal_text: 'Abhishek st †Muthukumar R b Shabarinath (1r 2b 0x4s 0x6s SR: 50.00)' })]
     expect(summariseFielders(rows)[0]).toMatchObject({ name: 'Muthukumar R', stumpings: 1, total: 1 })
     expect(wicketRows(rows)[0].fielder).toBe('Muthukumar R')
+  })
+})
+
+describe('maxWicketsInOver', () => {
+  it('is the busiest over, and at least 1 so an over with no wickets still reserves a row', () => {
+    expect(maxWicketsInOver([{ wickets: 0 }, { wickets: 2 }, { wickets: 1 }])).toBe(2)
+    expect(maxWicketsInOver([{ wickets: 0 }])).toBe(1)
+    expect(maxWicketsInOver([])).toBe(1)
+  })
+  it('matches what groupOvers reports for an over with two wickets', () => {
+    resetSeq()
+    const rows = [
+      ball({ over_no: 5, ball_in_over: 5, is_wicket: true }),
+      ball({ over_no: 5, ball_in_over: 6, is_wicket: true }),
+      ball({ over_no: 6, ball_in_over: 1 }),
+    ]
+    expect(groupOvers(rows).map(o => o.wickets)).toEqual([2, 0])
+    expect(maxWicketsInOver(groupOvers(rows))).toBe(2)
   })
 })
