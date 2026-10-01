@@ -68,9 +68,11 @@ dots, 4s, 6s, wides) and all 7 batters (runs, balls, 4s, 6s).
 - Bowler runs: bat runs + wides + no-balls; byes and leg-byes are not charged.
 - Bowler dot: a legal ball with no runs at all. Maiden: a completed over with nothing charged.
 - Bowler wickets exclude run-outs, retirements, obstructing, handled-ball and timed-out.
-- Phases: powerplay is the first 30% of the innings capped at 6 overs (T20/T25/T30: 1–6,
-  T10: 1–3); death is the last 4 overs (the last 2 in a short game). Total overs come from
-  the booking's format.
+- Phases follow the club's per-format definition (`PHASE_PLANS` in `ballByBall.ts`; overs are
+  1-based and inclusive): **T20** powerplay 1–6, middle 7–15, death 16–20; **T30** powerplay
+  1–8, middle 9–23, death 24–30. Total overs come from the booking's format. Any other length
+  (T10, T25, ...) has no club definition, so it is scaled from the T20 proportions (powerplay 6/20,
+  death 5/20) and the phase table says so. To change a format's phases, edit `PHASE_PLANS`.
 - A stumping carries no separate fielder field, so the fielder is read from the dismissal
   line ("st †Name b Bowler") when the field is empty. Run-outs recorded "A / B" credit both.
 

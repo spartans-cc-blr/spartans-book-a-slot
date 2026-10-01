@@ -11,7 +11,7 @@ import { useMemo, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import {
   type BallRow, type InningsSide, type OverGroup, PHASE_KEYS, PHASE_LABEL,
-  ballChip, ballLabel, ballsForSide, economy, formatOvers, groupOvers, howOut, maxWicketsInOver, overSegments, phaseRangeLabel, phaseSplit,
+  ballChip, ballLabel, ballsForSide, economy, formatOvers, groupOvers, hasDefinedPhases, howOut, maxWicketsInOver, overSegments, phaseRangeLabel, phaseSplit,
   summariseBatters, summariseBowlers, summariseFielders, wicketRows,
 } from '@/lib/ballByBall'
 
@@ -133,6 +133,11 @@ function PhaseTable({ balls, totalOvers, bowling }: { balls: BallRow[]; totalOve
           </tbody>
         </table>
       </div>
+      {!hasDefinedPhases(totalOvers) && (
+        <p className="text-[10px] font-rajdhani text-[var(--scorecard-text-faint)] mt-1">
+          Phases for a {totalOvers}-over game are scaled from the T20 phases.
+        </p>
+      )}
     </div>
   )
 }

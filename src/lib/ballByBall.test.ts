@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, formatOvers, ballChip,
+  type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, hasDefinedPhases, formatOvers, ballChip,
   groupOvers, phaseSplit, summariseBatters, summariseBowlers, summariseFielders, wicketRows,
   bowlerRuns, isBowlerWicket, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver, overSegments,
 } from './ballByBall'
@@ -20,16 +20,44 @@ function ball(over: Partial<BallRow> = {}): BallRow {
 const resetSeq = () => { seq = 0 }
 
 describe('phases', () => {
-  it('T20: powerplay 1-6, middle 7-16, death 17-20', () => {
-    expect(phaseBounds(20)).toEqual({ ppEnd: 6, deathStart: 17 })
-    expect([1, 6, 7, 16, 17, 20].map(o => phaseOf(o, 20))).toEqual(['pp', 'pp', 'mid', 'mid', 'death', 'death'])
+  const overs = (total: number) => Array.from({ length: total }, (_, i) => phaseOf(i + 1, total))
+  const range = (total: number, phase: string) => {
+    const hit = overs(total).map((p, i) => [p, i + 1] as const).filter(([p]) => p === phase).map(([, o]) => o)
+    return hit.length ? [hit[0], hit[hit.length - 1]] : null
+  }
+  it('T20: powerplay 1–6, middle 7–15, death 16–20', () => {
+    expect(phaseBounds(20)).toEqual({ ppEnd: 6, deathStart: 16 })
+    expect([range(20, 'pp'), range(20, 'mid'), range(20, 'death')]).toEqual([[1, 6], [7, 15], [16, 20]])
     expect(phaseRangeLabel('pp', 20)).toBe('Overs 1–6')
-    expect(phaseRangeLabel('mid', 20)).toBe('Overs 7–16')
-    expect(phaseRangeLabel('death', 20)).toBe('Overs 17–20')
+    expect(phaseRangeLabel('mid', 20)).toBe('Overs 7–15')
+    expect(phaseRangeLabel('death', 20)).toBe('Overs 16–20')
   })
-  it('T30 caps the powerplay at 6; T10 scales down', () => {
-    expect(phaseBounds(30)).toEqual({ ppEnd: 6, deathStart: 27 })
-    expect(phaseBounds(10)).toEqual({ ppEnd: 3, deathStart: 9 })
+  it('T30: powerplay 1–8, middle 9–23, death 24–30 (not the T20 phases)', () => {
+    expect(phaseBounds(30)).toEqual({ ppEnd: 8, deathStart: 24 })
+    expect([range(30, 'pp'), range(30, 'mid'), range(30, 'death')]).toEqual([[1, 8], [9, 23], [24, 30]])
+    expect(phaseRangeLabel('pp', 30)).toBe('Overs 1–8')
+    expect(phaseRangeLabel('mid', 30)).toBe('Overs 9–23')
+    expect(phaseRangeLabel('death', 30)).toBe('Overs 24–30')
+  })
+  it('the same over lands in different phases in a T20 and a T30', () => {
+    expect(phaseOf(7, 20)).toBe('mid')
+    expect(phaseOf(7, 30)).toBe('pp')
+    expect(phaseOf(16, 20)).toBe('death')
+    expect(phaseOf(16, 30)).toBe('mid')
+  })
+  it('other lengths are scaled from the T20 plan and flagged as such', () => {
+    expect(hasDefinedPhases(20)).toBe(true)
+    expect(hasDefinedPhases(30)).toBe(true)
+    expect(hasDefinedPhases(25)).toBe(false)
+    expect(hasDefinedPhases(10)).toBe(false)
+    expect(phaseBounds(10)).toEqual({ ppEnd: 3, deathStart: 8 })
+    expect(phaseBounds(25)).toEqual({ ppEnd: 8, deathStart: 20 })
+    // every over belongs to exactly one phase for any length, and each phase is non-empty
+    for (const total of [5, 8, 10, 12, 15, 25, 40, 50]) {
+      const ps = overs(total)
+      expect(ps).toHaveLength(total)
+      expect(new Set(ps).size).toBe(total >= 3 ? 3 : new Set(ps).size)
+    }
   })
   it('reads total overs from the format, else the longest over seen', () => {
     expect(oversForFormat('T20', [])).toBe(20)
