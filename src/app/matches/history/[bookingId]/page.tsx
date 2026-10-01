@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 import { isPastMatch } from '@/lib/matchStatus'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { ScorecardTables } from '@/components/matches/ScorecardTables'
+import { MatchTabs } from '@/components/matches/MatchTabs'
 import { computeTopPerformers, summarizeTopPerformance } from '@/lib/matchTopPerformers'
 import { MatchVerifyBlock } from '@/components/matches/MatchVerifyBlock'
 import { NotifyIcon, VerifiedStatusLine } from '@/components/matches/ScorecardVerifyPanel'
@@ -267,7 +267,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
         <div className="mt-5">
           {stats ? (
-            <ScorecardTables batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} fallOfWickets={stats.fall_of_wickets ?? []} teamTotal={stats.team_total} teamOvers={stats.team_overs} teamWickets={stats.team_wickets} squad={squad} />
+            <MatchTabs bookingId={booking.id} format={booking.format} batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} fallOfWickets={stats.fall_of_wickets ?? []} teamTotal={stats.team_total} teamOvers={stats.team_overs} teamWickets={stats.team_wickets} squad={squad} />
           ) : (
             <p className="font-rajdhani text-sm" style={{ color: 'var(--scorecard-text-faint)' }}>
               Scorecard not yet synced to Hub for this match.
