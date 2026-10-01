@@ -301,6 +301,11 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     📍 Grounds
                   </Link>
+                  <Link href="/wrangler/commentary"
+                    onClick={() => setWranglerOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
+                    📊 Commentary
+                  </Link>
                   <Link href="/opponents"
                     onClick={() => setWranglerOpen(false)}
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors">

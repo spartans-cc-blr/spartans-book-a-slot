@@ -166,6 +166,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
                     <SectionLabel t={t}>Wrangler</SectionLabel>
                     <SheetLink t={t} href="/wrangler/backfill-squad" icon={<WrenchIcon />} label="Squad Backfill" active={false} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/wrangler/grounds" icon={<PinIcon />} label="Grounds" active={activePage === 'wrangler'} onNavigate={() => setMoreOpen(false)} />
+                    <SheetLink t={t} href="/wrangler/commentary" icon={<WrenchIcon />} label="Commentary" active={false} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/opponents" icon={<SwordsIcon />} label="Opponents" active={activePage === 'opponents'} onNavigate={() => setMoreOpen(false)} />
                   </>
                 )}
