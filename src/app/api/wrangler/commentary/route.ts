@@ -104,6 +104,17 @@ export async function POST(req: NextRequest) {
   // Microservice 4xx messages are written for humans (unknown match, bad PDF…)
   // and safe to show. Anything else is an upstream fault.
   const detail = typeof body?.detail === 'string' ? body.detail : null
+
+  // FastAPI's own bare "Not Found" means the route itself is missing, i.e. the
+  // microservice is running a build without /parse-commentary. Say so instead
+  // of showing the wrangler an unexplained "Not Found".
+  if (res.status === 404 && detail === 'Not Found') {
+    console.error('[wrangler/commentary] microservice has no /parse-commentary route (not deployed yet?)')
+    return NextResponse.json(
+      { error: 'The analytics service does not support commentary uploads yet. It needs redeploying; tell an admin.' },
+      { status: 502 },
+    )
+  }
   if (res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 403 && detail) {
     return NextResponse.json({ error: detail }, { status: res.status })
   }
