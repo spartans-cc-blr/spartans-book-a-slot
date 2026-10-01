@@ -11,7 +11,7 @@ import { useMemo, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import {
   type BallRow, type InningsSide, type OverGroup, PHASE_KEYS, PHASE_LABEL,
-  ballChip, ballLabel, ballsForSide, economy, formatOvers, groupOvers, hasDefinedPhases, howOut, maxWicketsInOver, overSegments, phaseRangeLabel, phaseSplit,
+  ballChip, ballLabel, ballsForSide, economy, formatOvers, groupOvers, hasDefinedPhases, howOut, maxWicketsInOver, phaseRangeLabel, phaseSplit,
   summariseBatters, summariseBowlers, summariseFielders, wicketRows,
 } from '@/lib/ballByBall'
 
@@ -44,17 +44,10 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 // ── shared pieces ──────────────────────────────────────────────────────────
 
-// Bar segments reuse the chip colours for the scoring balls that stand out; plain runs keep the
-// bar's usual gold so a quiet over still reads as one calm column.
-const SEGMENT_COLOR: Record<string, string> = {
-  four: '#E8A23B', six: '#8FB82B', wide: '#C98379', noball: '#C98379', bye: '#C98379', wicket: '#DC2626',
-}
-
-/** Runs per over as bars. Each bar is stacked ball by ball (first ball at the bottom, a block per
- *  scoring ball, tall in proportion to its runs), and there is one red dot under it for each wicket. */
+/** Runs per over as plain bars, with one red dot under the bar for each wicket in that over.
+ *  (The full ball-by-ball detail of an over lives on the Commentary tab.) */
 function OverBars({ overs }: { overs: OverGroup[] }) {
   const max = Math.max(1, ...overs.map(o => o.runs))
-  const unit = 62 / max                                   // px per run, so the busiest over is 62px
   // A dot is 6px with a 2px gap. Every column reserves room for the busiest over's dots, so the
   // bars stay on one baseline and the chart grows only as much as it needs to.
   const DOT_PITCH = 8
@@ -64,41 +57,23 @@ function OverBars({ overs }: { overs: OverGroup[] }) {
       <p className={HEAD}>Over by over</p>
       <div className="flex items-end gap-[3px]" style={{ height: `${96 + (maxW - 1) * DOT_PITCH}px` }} role="img"
         aria-label={`Runs per over: ${overs.map(o => `over ${o.over_no} ${o.runs}${o.wickets ? `, ${o.wickets} wicket${o.wickets > 1 ? 's' : ''}` : ''}`).join('; ')}`}>
-        {overs.map(o => {
-          const segments = overSegments(o)
-          return (
-            <div key={o.over_no} className="flex-1 min-w-0 flex flex-col items-center justify-end h-full"
-              title={`Over ${o.over_no}: ${o.runs} runs${o.wickets ? `, ${o.wickets} wkt${o.wickets > 1 ? 's' : ''}` : ''}`}>
-              <span className="text-[9px] font-rajdhani text-[var(--scorecard-text-faint)] leading-none mb-0.5">{o.runs}</span>
-              {segments.length === 0 ? (
-                <div className="w-full rounded-t bg-gold/30" style={{ height: '3px' }} />
-              ) : (
-                <div className="w-full flex flex-col-reverse overflow-hidden rounded-t">
-                  {segments.map((seg, i) => (
-                    <div key={seg.seq} title={seg.title}
-                      className={SEGMENT_COLOR[seg.kind] ? undefined : 'bg-gold/50'}
-                      style={{
-                        height: `${Math.max(seg.runs * unit, 2)}px`,
-                        background: SEGMENT_COLOR[seg.kind],
-                        // a thin card-coloured line above each block keeps neighbours distinct
-                        boxShadow: i > 0 ? '0 1px 0 var(--scorecard-card-bg)' : undefined,
-                      }} />
-                  ))}
-                </div>
-              )}
-              <div className="flex flex-col items-center gap-[2px] pt-px" style={{ height: `${maxW * DOT_PITCH}px` }}>
-                {Array.from({ length: o.wickets }, (_, i) => (
-                  <span key={i} className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--fx-danger-text)' }} />
-                ))}
-              </div>
-              <span className="text-[9px] font-rajdhani text-[var(--scorecard-text-faint)] leading-none">{o.over_no}</span>
+        {overs.map(o => (
+          <div key={o.over_no} className="flex-1 min-w-0 flex flex-col items-center justify-end h-full"
+            title={`Over ${o.over_no}: ${o.runs} runs${o.wickets ? `, ${o.wickets} wkt${o.wickets > 1 ? 's' : ''}` : ''}`}>
+            <span className="text-[9px] font-rajdhani text-[var(--scorecard-text-faint)] leading-none mb-0.5">{o.runs}</span>
+            <div className="w-full rounded-t bg-gold/50"
+              style={{ height: `${Math.max((o.runs / max) * 62, 3)}px` }} />
+            <div className="flex flex-col items-center gap-[2px] pt-px" style={{ height: `${maxW * DOT_PITCH}px` }}>
+              {Array.from({ length: o.wickets }, (_, i) => (
+                <span key={i} className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--fx-danger-text)' }} />
+              ))}
             </div>
-          )
-        })}
+            <span className="text-[9px] font-rajdhani text-[var(--scorecard-text-faint)] leading-none">{o.over_no}</span>
+          </div>
+        ))}
       </div>
       <p className="text-[10px] font-rajdhani text-[var(--scorecard-text-faint)] mt-1">
-        Each block is a scoring ball, first ball at the bottom: amber four, green six, rose extra, gold other runs.
-        Red dots are wickets. Hover a block for the ball.
+        Each red dot is a wicket.
       </p>
     </div>
   )
