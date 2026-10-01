@@ -78,6 +78,13 @@ Nav: 📊 Commentary in **Wrangler ⚒** (see `navigation.md`).
 
 ## 6. Deploy order
 
+(If the microservice has not been redeployed with `/parse-commentary`, FastAPI
+answers a bare `404 Not Found`. The route turns that into "The analytics service
+does not support commentary uploads yet" (502) rather than echoing it, so a
+missing deploy is not mistaken for a missing match. A genuine "match not in
+match_stats" 404 carries its own message and is shown as is.)
+
+
 Merge and deploy `spartans-python` first (it adds `/parse-commentary`), then
 this change. The tables already exist in the analytics DB.
 

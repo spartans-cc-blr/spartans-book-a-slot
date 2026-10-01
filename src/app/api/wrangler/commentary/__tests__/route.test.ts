@@ -128,6 +128,15 @@ describe('forwarding', () => {
     expect((await res.json()).error).toMatch(/not in match_stats/)
   })
 
+  it('explains a bare FastAPI "Not Found" (route not deployed) instead of echoing it', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ detail: 'Not Found' }), { status: 404 }))
+    const res = await POST(request(good()))
+    expect(res.status).toBe(502)
+    const msg = (await res.json()).error
+    expect(msg).toMatch(/does not support commentary uploads yet/)
+    expect(msg).not.toBe('Not Found')
+  })
+
   it('hides upstream 5xx details and maps timeouts to 504', async () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'boom: secret stack' }), { status: 500 }))
     const res = await POST(request(good()))
