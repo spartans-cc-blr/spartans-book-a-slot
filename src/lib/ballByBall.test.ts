@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, formatOvers, ballChip,
+  type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, hasDefinedPhases, formatOvers, ballChip,
   groupOvers, phaseSplit, summariseBatters, summariseBowlers, summariseFielders, wicketRows,
-  bowlerRuns, isBowlerWicket, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText,
+  bowlerRuns, isBowlerWicket, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver, overSegments,
 } from './ballByBall'
 
 let seq = 0
@@ -20,16 +20,44 @@ function ball(over: Partial<BallRow> = {}): BallRow {
 const resetSeq = () => { seq = 0 }
 
 describe('phases', () => {
-  it('T20: powerplay 1-6, middle 7-16, death 17-20', () => {
-    expect(phaseBounds(20)).toEqual({ ppEnd: 6, deathStart: 17 })
-    expect([1, 6, 7, 16, 17, 20].map(o => phaseOf(o, 20))).toEqual(['pp', 'pp', 'mid', 'mid', 'death', 'death'])
+  const overs = (total: number) => Array.from({ length: total }, (_, i) => phaseOf(i + 1, total))
+  const range = (total: number, phase: string) => {
+    const hit = overs(total).map((p, i) => [p, i + 1] as const).filter(([p]) => p === phase).map(([, o]) => o)
+    return hit.length ? [hit[0], hit[hit.length - 1]] : null
+  }
+  it('T20: powerplay 1–6, middle 7–15, death 16–20', () => {
+    expect(phaseBounds(20)).toEqual({ ppEnd: 6, deathStart: 16 })
+    expect([range(20, 'pp'), range(20, 'mid'), range(20, 'death')]).toEqual([[1, 6], [7, 15], [16, 20]])
     expect(phaseRangeLabel('pp', 20)).toBe('Overs 1–6')
-    expect(phaseRangeLabel('mid', 20)).toBe('Overs 7–16')
-    expect(phaseRangeLabel('death', 20)).toBe('Overs 17–20')
+    expect(phaseRangeLabel('mid', 20)).toBe('Overs 7–15')
+    expect(phaseRangeLabel('death', 20)).toBe('Overs 16–20')
   })
-  it('T30 caps the powerplay at 6; T10 scales down', () => {
-    expect(phaseBounds(30)).toEqual({ ppEnd: 6, deathStart: 27 })
-    expect(phaseBounds(10)).toEqual({ ppEnd: 3, deathStart: 9 })
+  it('T30: powerplay 1–8, middle 9–23, death 24–30 (not the T20 phases)', () => {
+    expect(phaseBounds(30)).toEqual({ ppEnd: 8, deathStart: 24 })
+    expect([range(30, 'pp'), range(30, 'mid'), range(30, 'death')]).toEqual([[1, 8], [9, 23], [24, 30]])
+    expect(phaseRangeLabel('pp', 30)).toBe('Overs 1–8')
+    expect(phaseRangeLabel('mid', 30)).toBe('Overs 9–23')
+    expect(phaseRangeLabel('death', 30)).toBe('Overs 24–30')
+  })
+  it('the same over lands in different phases in a T20 and a T30', () => {
+    expect(phaseOf(7, 20)).toBe('mid')
+    expect(phaseOf(7, 30)).toBe('pp')
+    expect(phaseOf(16, 20)).toBe('death')
+    expect(phaseOf(16, 30)).toBe('mid')
+  })
+  it('other lengths are scaled from the T20 plan and flagged as such', () => {
+    expect(hasDefinedPhases(20)).toBe(true)
+    expect(hasDefinedPhases(30)).toBe(true)
+    expect(hasDefinedPhases(25)).toBe(false)
+    expect(hasDefinedPhases(10)).toBe(false)
+    expect(phaseBounds(10)).toEqual({ ppEnd: 3, deathStart: 8 })
+    expect(phaseBounds(25)).toEqual({ ppEnd: 8, deathStart: 20 })
+    // every over belongs to exactly one phase for any length, and each phase is non-empty
+    for (const total of [5, 8, 10, 12, 15, 25, 40, 50]) {
+      const ps = overs(total)
+      expect(ps).toHaveLength(total)
+      expect(new Set(ps).size).toBe(total >= 3 ? 3 : new Set(ps).size)
+    }
   })
   it('reads total overs from the format, else the longest over seen', () => {
     expect(oversForFormat('T20', [])).toBe(20)
@@ -260,5 +288,44 @@ describe('fielderFromText', () => {
       dismissal_text: 'Abhishek st †Muthukumar R b Shabarinath (1r 2b 0x4s 0x6s SR: 50.00)' })]
     expect(summariseFielders(rows)[0]).toMatchObject({ name: 'Muthukumar R', stumpings: 1, total: 1 })
     expect(wicketRows(rows)[0].fielder).toBe('Muthukumar R')
+  })
+})
+
+describe('maxWicketsInOver', () => {
+  it('is the busiest over, and at least 1 so an over with no wickets still reserves a row', () => {
+    expect(maxWicketsInOver([{ wickets: 0 }, { wickets: 2 }, { wickets: 1 }])).toBe(2)
+    expect(maxWicketsInOver([{ wickets: 0 }])).toBe(1)
+    expect(maxWicketsInOver([])).toBe(1)
+  })
+  it('matches what groupOvers reports for an over with two wickets', () => {
+    resetSeq()
+    const rows = [
+      ball({ over_no: 5, ball_in_over: 5, is_wicket: true }),
+      ball({ over_no: 5, ball_in_over: 6, is_wicket: true }),
+      ball({ over_no: 6, ball_in_over: 1 }),
+    ]
+    expect(groupOvers(rows).map(o => o.wickets)).toEqual([2, 0])
+    expect(maxWicketsInOver(groupOvers(rows))).toBe(2)
+  })
+})
+
+describe('overSegments', () => {
+  it('stacks the scoring balls of an over in bowling order and adds up to the over', () => {
+    const overs = groupOvers(innings())
+    const second = overSegments(overs[1])
+    // over 2: wide(1), four, six, single, run-out single, bye(2); the final dot is left out
+    expect(second.map(s => [s.runs, s.kind])).toEqual([
+      [1, 'wide'], [4, 'four'], [6, 'six'], [1, 'run'], [1, 'wicket'], [2, 'bye'],
+    ])
+    expect(second.reduce((t, s) => t + s.runs, 0)).toBe(overs[1].runs)
+    expect(second[0].seq).toBeLessThan(second[1].seq)
+  })
+  it('a maiden over has no segments', () => {
+    expect(overSegments(groupOvers(innings())[0])).toEqual([])
+  })
+  it('labels each segment with the ball', () => {
+    const seg = overSegments(groupOvers(innings())[1])[1]
+    expect(seg.title).toContain('B to Y')
+    expect(seg.title).toMatch(/^1\.1/)    // CricHeroes label: over 2, ball 1
   })
 })

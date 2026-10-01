@@ -58,14 +58,28 @@ export type PhaseKey = 'pp' | 'mid' | 'death'
 export const PHASE_KEYS: PhaseKey[] = ['pp', 'mid', 'death']
 export const PHASE_LABEL: Record<PhaseKey, string> = { pp: 'Powerplay', mid: 'Middle', death: 'Death' }
 
-/** Powerplay is the first 30% of the innings capped at 6 overs (T20/T25/T30: overs 1–6,
- *  T10: 1–3); death is the last 4 overs (the last 2 in a short game). */
+// Phases per format, as the club defines them. Overs are 1-based and inclusive.
+//   T20: powerplay 1–6,  middle 7–15,  death 16–20
+//   T30: powerplay 1–8,  middle 9–23,  death 24–30
+const PHASE_PLANS: Record<number, { ppEnd: number; deathStart: number }> = {
+  20: { ppEnd: 6, deathStart: 16 },
+  30: { ppEnd: 8, deathStart: 24 },
+}
+
+/** True when the club has defined the phases for this many overs (T20, T30). Any other length
+ *  (T10, T25, ...) is scaled from the T20 plan and the UI says so. */
+export function hasDefinedPhases(totalOvers: number): boolean {
+  return Math.floor(totalOvers) in PHASE_PLANS
+}
+
 export function phaseBounds(totalOvers: number): { ppEnd: number; deathStart: number } {
   const total = Math.max(1, Math.floor(totalOvers))
-  const ppEnd = Math.min(6, Math.max(1, Math.ceil(total * 0.3)))
-  const deathLen = total >= 15 ? 4 : 2
-  const deathStart = Math.max(ppEnd + 1, total - deathLen + 1)
-  return { ppEnd, deathStart }
+  const plan = PHASE_PLANS[total]
+  if (plan) return plan
+  // Not a format the club has defined: keep the T20 proportions (powerplay 6/20, death 5/20).
+  const ppEnd = Math.min(Math.max(1, Math.round((total * 6) / 20)), Math.max(1, total - 1))
+  const deathLen = Math.max(1, Math.round((total * 5) / 20))
+  return { ppEnd, deathStart: Math.max(ppEnd + 1, total - deathLen + 1) }
 }
 
 export function phaseOf(overNo: number, totalOvers: number): PhaseKey {
@@ -167,6 +181,31 @@ export function groupOvers(balls: BallRow[]): OverGroup[] {
         balls: list,
       }
     })
+}
+
+export interface OverSegment {
+  seq: number
+  runs: number
+  kind: ChipKind
+  title: string
+}
+
+/** The scoring balls of an over, in bowling order, for stacking inside its bar. Dot balls have no
+ *  height so they are left out; the segment runs always add up to the over's runs. */
+export function overSegments(over: OverGroup): OverSegment[] {
+  return over.balls
+    .filter(b => b.runs_total > 0)
+    .map(b => ({
+      seq: b.seq,
+      runs: b.runs_total,
+      kind: ballChip(b).kind,
+      title: `${ballLabel(b)}  ${b.bowler} to ${b.batter}: ${b.outcome ?? ballChip(b).label}`,
+    }))
+}
+
+/** The most wickets that fell in any single over (at least 1), used to reserve space for one dot per wicket. */
+export function maxWicketsInOver(overs: { wickets: number }[]): number {
+  return Math.max(1, ...overs.map(o => o.wickets))
 }
 
 // ── Phase split ────────────────────────────────────────────────────────────

@@ -47,7 +47,7 @@ analytics read is logged and treated as "not available", never an error page.
 "Spartans batting" is the innings where Spartans bat (`batting_side = 'spartans'`);
 "Spartans bowling" is the opposition innings (`'opponent'`).
 
-- **Batting**: over-by-over runs (red dot = a wicket fell), runs/wickets/run-rate/dot% by
+- **Batting**: over-by-over runs, each bar stacked ball by ball (a block per scoring ball, first ball at the bottom, amber four / green six / rose extra / gold other runs, hover for the ball; dot balls have no height) with one red dot per wicket that fell in that over, so a two-wicket over shows two dots; every column reserves room for the busiest over so the bars share a baseline), runs/wickets/run-rate/dot% by
   phase, a batters table (R, B, SR, 4s, 6s, how out), and dot% and runs (balls) by phase.
 - **Bowling**: the same bars and phase split for the opposition innings, a bowlers table
   (O, M, R, W, Econ, Dot%), boundaries and extras conceded, and each bowler's spell in
@@ -68,9 +68,11 @@ dots, 4s, 6s, wides) and all 7 batters (runs, balls, 4s, 6s).
 - Bowler runs: bat runs + wides + no-balls; byes and leg-byes are not charged.
 - Bowler dot: a legal ball with no runs at all. Maiden: a completed over with nothing charged.
 - Bowler wickets exclude run-outs, retirements, obstructing, handled-ball and timed-out.
-- Phases: powerplay is the first 30% of the innings capped at 6 overs (T20/T25/T30: 1–6,
-  T10: 1–3); death is the last 4 overs (the last 2 in a short game). Total overs come from
-  the booking's format.
+- Phases follow the club's per-format definition (`PHASE_PLANS` in `ballByBall.ts`; overs are
+  1-based and inclusive): **T20** powerplay 1–6, middle 7–15, death 16–20; **T30** powerplay
+  1–8, middle 9–23, death 24–30. Total overs come from the booking's format. Any other length
+  (T10, T25, ...) has no club definition, so it is scaled from the T20 proportions (powerplay 6/20,
+  death 5/20) and the phase table says so. To change a format's phases, edit `PHASE_PLANS`.
 - A stumping carries no separate fielder field, so the fielder is read from the dismissal
   line ("st †Name b Bowler") when the field is empty. Run-outs recorded "A / B" credit both.
 
