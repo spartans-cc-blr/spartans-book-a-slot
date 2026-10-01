@@ -33,6 +33,8 @@ analytics DB already has the `match_stats` row), and the microservice only
 
 Nav: 📊 Commentary in **Wrangler ⚒** (see `navigation.md`).
 
+The uploaded data is shown to every signed-in member on the match scorecard tabs: see `ball-by-ball-tabs.md`.
+
 ---
 
 ## 3. Flow

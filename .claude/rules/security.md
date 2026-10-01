@@ -98,6 +98,7 @@ Every API route enforces auth server-side via `getServerSession(authOptions)`. N
 | `/api/tournaments` | Public | Admin | Admin | — |
 | `/api/grounds` | Public | GC or Admin | Wrangler or Admin | — |
 | `/api/wrangler/commentary` | — | Wrangler or Admin | — | — |
+| `/api/matches/history/[bookingId]/commentary` | Signed-in, not expelled | — | — | — |
 | `/api/players` | Admin | Admin | Admin | — |
 | `/api/players/[id]` | Own or Admin | — | Own (limited fields) or Admin | — |
 | `/api/player-availability` | Own player | Own player | — | Own player |

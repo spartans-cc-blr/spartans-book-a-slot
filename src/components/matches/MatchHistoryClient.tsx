@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { ScorecardUploadButton, type ScorecardStatus } from '@/components/matches/ScorecardUploadButton'
-import { ScorecardTables } from '@/components/matches/ScorecardTables'
+import { MatchTabs } from '@/components/matches/MatchTabs'
 import { MatchHeroSummary } from '@/components/matches/MatchHeroSummary'
 import {
   CricHeroesIcon, CricHeroesInlineLink, VerifiedStatusLine, ReconciliationControls, NotifyIcon,
@@ -1003,7 +1003,9 @@ function MatchHistoryCard({
               {scorecardLoading && <p className="font-rajdhani text-sm" style={{ color: 'var(--scorecard-text-faint)' }}>Loading scorecard…</p>}
               {scorecardError && <p className="font-rajdhani text-sm" style={{ color: 'var(--fx-danger-text)' }}>{scorecardError}</p>}
               {scorecard && (
-                <ScorecardTables
+                <MatchTabs
+                  bookingId={match.booking_id}
+                  format={match.format}
                   batting={scorecard.batting}
                   bowling={scorecard.bowling}
                   fielding={scorecard.fielding}
