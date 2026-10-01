@@ -877,7 +877,7 @@ there. Full audit, design and per-page fallbacks in
 | Player | Home (logo) · Matches ▾ · Stats ▾ (Yours Statistically, Team Record, Players) · The Dugout · My Profile |
 | Captain | Home (logo) · Matches ▾ · Captains' Corner ▾ (Squad Selection, Unavailable Dates, My Players, Opponents) · Stats ▾ · The Dugout · Tournaments · My Profile |
 | GC | Home (logo) · Matches ▾ · Stats ▾ · The Dugout · Tournaments · My Profile · Council ⚖ (Squad Review, Captaincy Records, … Grounds, Opponents) |
-| Wrangler | + Wrangler ⚒ dropdown (Squad Backfill, Grounds, Opponents) |
+| Wrangler | + Wrangler ⚒ dropdown (Squad Backfill, Grounds, Commentary, Opponents) |
 | Admin | All of the above · Schedule · Admin ⚙ |
 | Expelled | Home (logo) only — every other link/dropdown is gated on `!isExpelled` |
 
@@ -961,7 +961,7 @@ A `fixed inset-x-0 bottom-16` panel (rounded top corners, scrollable, capped `ma
 - **Logged in** — The Dugout (moved here from its own tab slot, September 2026 — see above; `ShieldIcon` at its sheet-row `size={16}`), Leaderboard (the club Honour Board, `/leaderboard` — added back September 2026 once "My Stats" stopped pointing here, see above), Team Record (`/team-stats`, September 2026 — see `features/team-stats.md`), My Profile and My Wallet (both hidden together with the rest of the "logged in" content if `playerId` is null, in favour of "Complete Registration" → `/join`; My Wallet added September 2026, `RupeeIcon` — see `features/wallet-ledger.md`), Tournament Planner (captain/GC/admin), then role-gated sections mirroring the desktop dropdowns 1:1:
   - **Captains' Corner** (`isCaptain || isAdmin`) — Squad Selection, Unavailable Dates, My Players, Opponents
   - **Council** (`isGC`) — Squad Review, Captaincy Records, Feedback, Players, Store Orders, Grounds, Opponents, `GenerateInviteItem`
-  - **Wrangler** (`isWrangler`) — Squad Backfill, Grounds, Opponents
+  - **Wrangler** (`isWrangler`) — Squad Backfill, Grounds, Commentary, Opponents
   - **Admin** (`isAdmin`) — Schedule, Admin Panel (crimson row)
   - Club Site (muted, external) and Sign Out always last.
 - **Logged out** — Club Site + Sign In only.
@@ -1207,3 +1207,11 @@ Displays the player's Google profile photo (from `player.photoUrl ?? player.imag
 sits in Captains' Corner ▾ after Unavailable Dates, and the same page appears
 in Council ⚖ as "📈 Captaincy Records" so a GC member who isn't a captain can
 reach it. The mobile More sheet mirrors both. See `features/captaincy-stats.md`.
+
+### Commentary in Wrangler ⚒ (added October 2026)
+
+📊 Commentary (→ `/wrangler/commentary`, `activePage="wrangler"`) sits between
+Grounds and Opponents in the desktop **Wrangler ⚒** dropdown, and as a
+"Commentary" row in the same position of the mobile "More" sheet's Wrangler
+section. Visible whenever `isWrangler` (which already includes `isAdmin`). See
+`features/commentary-upload.md`.

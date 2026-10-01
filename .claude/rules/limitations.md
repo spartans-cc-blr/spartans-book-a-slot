@@ -198,6 +198,19 @@ audit conclusion above for the rest of the app.
 
 ---
 
+## Vercel Hobby — 4.5MB request body
+
+Hobby rejects any request body over ~4.5MB before the route runs, so a PDF
+can never be larger than that when it is posted *through* the Hub. The
+commentary upload (`/wrangler/commentary`) therefore caps files at 4MB and
+tells the wrangler how to shrink one (print from a phone, or untick
+"Background graphics"): a mobile-Chrome print of a commentary page is
+~0.7MB, a desktop print can be 7MB+. The scorecard PDFs are far smaller and
+unaffected. Raising the limit would mean uploading straight to the
+microservice from the browser, which would expose its secret, so don't.
+
+---
+
 ## Supabase Free Tier — Storage Cap
 
 50MB storage limit. Approximately 100+ players at up to 5MB Google
