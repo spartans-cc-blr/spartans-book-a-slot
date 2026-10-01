@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, formatOvers, ballChip,
   groupOvers, phaseSplit, summariseBatters, summariseBowlers, summariseFielders, wicketRows,
-  bowlerRuns, isBowlerWicket, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver,
+  bowlerRuns, isBowlerWicket, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver, overSegments,
 } from './ballByBall'
 
 let seq = 0
@@ -278,5 +278,26 @@ describe('maxWicketsInOver', () => {
     ]
     expect(groupOvers(rows).map(o => o.wickets)).toEqual([2, 0])
     expect(maxWicketsInOver(groupOvers(rows))).toBe(2)
+  })
+})
+
+describe('overSegments', () => {
+  it('stacks the scoring balls of an over in bowling order and adds up to the over', () => {
+    const overs = groupOvers(innings())
+    const second = overSegments(overs[1])
+    // over 2: wide(1), four, six, single, run-out single, bye(2); the final dot is left out
+    expect(second.map(s => [s.runs, s.kind])).toEqual([
+      [1, 'wide'], [4, 'four'], [6, 'six'], [1, 'run'], [1, 'wicket'], [2, 'bye'],
+    ])
+    expect(second.reduce((t, s) => t + s.runs, 0)).toBe(overs[1].runs)
+    expect(second[0].seq).toBeLessThan(second[1].seq)
+  })
+  it('a maiden over has no segments', () => {
+    expect(overSegments(groupOvers(innings())[0])).toEqual([])
+  })
+  it('labels each segment with the ball', () => {
+    const seg = overSegments(groupOvers(innings())[1])[1]
+    expect(seg.title).toContain('B to Y')
+    expect(seg.title).toMatch(/^1\.1/)    // CricHeroes label: over 2, ball 1
   })
 })

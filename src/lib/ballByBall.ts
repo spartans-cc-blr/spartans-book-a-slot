@@ -169,6 +169,26 @@ export function groupOvers(balls: BallRow[]): OverGroup[] {
     })
 }
 
+export interface OverSegment {
+  seq: number
+  runs: number
+  kind: ChipKind
+  title: string
+}
+
+/** The scoring balls of an over, in bowling order, for stacking inside its bar. Dot balls have no
+ *  height so they are left out; the segment runs always add up to the over's runs. */
+export function overSegments(over: OverGroup): OverSegment[] {
+  return over.balls
+    .filter(b => b.runs_total > 0)
+    .map(b => ({
+      seq: b.seq,
+      runs: b.runs_total,
+      kind: ballChip(b).kind,
+      title: `${ballLabel(b)}  ${b.bowler} to ${b.batter}: ${b.outcome ?? ballChip(b).label}`,
+    }))
+}
+
 /** The most wickets that fell in any single over (at least 1), used to reserve space for one dot per wicket. */
 export function maxWicketsInOver(overs: { wickets: number }[]): number {
   return Math.max(1, ...overs.map(o => o.wickets))
