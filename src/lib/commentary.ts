@@ -86,6 +86,3 @@ export interface CommentaryMatchOption {
   opponent_name: string | null
 }
 
-/** Statuses of scorecard_uploads where the scorecard is already in the
- *  analytics DB's match_stats, which is what ball_by_ball hangs off. */
-export const SCORECARD_IMPORTED_STATUSES = ['parsed', 'synced', 'fees_applied'] as const

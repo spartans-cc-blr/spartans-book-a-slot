@@ -13,10 +13,13 @@ microservice parses them into one row per delivery (bowler, striker, runs,
 extras, shot/direction, dismissal and fielder) in the analytics DB's
 `ball_by_ball` table.
 
-Nothing refetches a scorecard. The page only lists bookings whose
-`scorecard_uploads.status` is `parsed`/`synced`/`fees_applied` (so the
-analytics DB already has the `match_stats` row), and the microservice only
-*reads* that row and writes the two new tables.
+Nothing refetches a scorecard. The page lists every finished, confirmed
+booking that has a `match_stats_cache` row (the table the match history reads, so the two
+lists agree; the analytics DB therefore already has the `match_stats` row), newest first, with
+no row cap. A date-chip slider (same `DateChipSlider` as the history) narrows the dropdown.
+It previously required a `scorecard_uploads` row and read only the newest 80 bookings, which
+hid older and backfilled matches. The microservice only *reads* the `match_stats` row and
+writes the two new tables.
 
 ---
 
