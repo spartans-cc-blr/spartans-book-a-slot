@@ -144,7 +144,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
                     <SheetLink t={t} href="/captains-corner" icon={<ClipboardIcon />} label="Squad Selection" active={activePage === 'captains'} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/captains-corner/unavailable-dates" icon={<CalendarXIcon />} label="Unavailable Dates" active={activePage === 'captains-unavailable'} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/captains-corner/my-players" icon={<TrophyIcon />} label="My Players" active={activePage === 'captains-players'} onNavigate={() => setMoreOpen(false)} />
-                    <SheetLink t={t} href="/captains-corner/opponent-scouting" icon={<SwordsIcon />} label="Opponent Scouting" active={activePage === 'captains-scouting'} onNavigate={() => setMoreOpen(false)} />
+                    <SheetLink t={t} href="/captains-corner/match-planning" icon={<SwordsIcon />} label="Match Planning" active={activePage === 'captains-planning'} onNavigate={() => setMoreOpen(false)} />
                     <SheetLink t={t} href="/opponents" icon={<SwordsIcon />} label="Opponents" active={activePage === 'opponents'} onNavigate={() => setMoreOpen(false)} />
                   </>
                 )}
@@ -268,7 +268,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
 // live in the sheet only (Dugout lost its tab slot to My Stats; Leaderboard
 // never had one — see navigation.md §4.1), so both are listed here.
 function isAdminOrGcHighlighted(activePage?: string) {
-  return ['dugout', 'leaderboard', 'team-stats', 'opponents', 'profile', 'wallet', 'planner', 'captains', 'captains-unavailable', 'captains-players', 'captains-scouting', 'gc', 'players', 'wrangler', 'schedule'].includes(activePage ?? '')
+  return ['dugout', 'leaderboard', 'team-stats', 'opponents', 'profile', 'wallet', 'planner', 'captains', 'captains-unavailable', 'captains-players', 'captains-planning', 'gc', 'players', 'wrangler', 'schedule'].includes(activePage ?? '')
 }
 
 function Tab({ t, href, icon, label, active }: { t: Tokens; href: string; icon: React.ReactNode; label: string; active?: boolean }) {

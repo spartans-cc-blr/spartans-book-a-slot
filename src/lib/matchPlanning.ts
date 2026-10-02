@@ -1,7 +1,7 @@
-// Opponent scouting — pure aggregation over the ball-by-ball rows of every
-// past meeting with one opponent. No I/O and no React (client-safe), so it is
-// unit-tested in opponentScouting.test.ts. The fetch lives in
-// opponentScoutingData.ts. See features/opponent-scouting.md.
+// Match planning — pure aggregation over the ball-by-ball rows of every past
+// match in one scope (an opponent, a ground or a tournament). No I/O and no React (client-safe), so it is
+// unit-tested in matchPlanning.test.ts. The fetch lives in
+// matchPlanningData.ts. See features/match-planning.md.
 //
 // Perspective: `side` follows ballByBall.ts —
 //   'spartans' = Spartans batting, 'opponent' = Spartans bowling.
@@ -21,6 +21,7 @@ import {
 export interface ScoutMatchInput {
   bookingId: string
   matchId: string
+  opponentName?: string
   gameDate: string
   format: string | null
   result: 'won' | 'lost' | 'tied' | 'nr' | null
@@ -48,6 +49,7 @@ export function dismissalGroup(kind: string | null): DismissalGroup {
 
 export interface MatchDigest {
   bookingId: string
+  opponentName: string
   gameDate: string
   format: string | null
   result: ScoutMatchInput['result']
@@ -216,7 +218,7 @@ export function scoutTeam(matches: ScoutMatchInput[]): TeamScout {
     }
 
     digests.push({
-      bookingId: m.bookingId, gameDate: m.gameDate, format: m.format, result: m.result,
+      bookingId: m.bookingId, opponentName: m.opponentName ?? '', gameDate: m.gameDate, format: m.format, result: m.result,
       scoreLine: `${m.teamTotal ?? '?'}/${m.teamWickets ?? '?'} v ${m.oppTotal ?? '?'}/${m.oppWickets ?? '?'}`,
       totalOvers: total, batting: mBat, bowling: mBowl,
       topBat: tb ? { name: tb.name, runs: tb.runs, balls: tb.balls } : null,
@@ -252,7 +254,7 @@ export function teamInsights(t: TeamScout): string[] {
   const out: string[] = []
   const n = t.matches.length
   if (n === 0) return out
-  if (n === 1) out.push('Only one match with ball-by-ball data against this side, so treat these as hints, not trends.')
+  if (n === 1) out.push('Only one match with ball-by-ball data here, so treat these as hints, not trends.')
 
   // Our batting: the phase that lags our own overall run rate the most.
   const bTot = sumTallies(t.batting)
@@ -301,7 +303,7 @@ export function teamInsights(t: TeamScout): string[] {
 
   const threat = t.threats[0]
   if (threat && threat.runs >= 40) {
-    out.push(`Their key batter: ${threat.name} — ${threat.runs} runs off ${threat.balls} (SR ${f1(threat.strikeRate)}) in ${threat.innings} inn${threat.dismissals ? `; got out ${threat.dismissals}×${threat.dismissedBy.length ? ` (${Array.from(new Set(threat.dismissedBy)).join(', ')})` : ''}` : '; never dismissed'}.`)
+    out.push(`Opposition batter to watch: ${threat.name} — ${threat.runs} runs off ${threat.balls} (SR ${f1(threat.strikeRate)}) in ${threat.innings} inn${threat.dismissals ? `; got out ${threat.dismissals}×${threat.dismissedBy.length ? ` (${Array.from(new Set(threat.dismissedBy)).join(', ')})` : ''}` : '; never dismissed'}.`)
   }
   return out
 }

@@ -144,7 +144,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
               onMouseLeave={() => setCaptainsOpen(false)}>
               <button
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
-                  ${activePage === 'captains' || activePage === 'captains-unavailable' || activePage === 'captains-players' || activePage === 'captains-scouting'
+                  ${activePage === 'captains' || activePage === 'captains-unavailable' || activePage === 'captains-players' || activePage === 'captains-planning'
                     ? 'text-gold border-crimson'
                     : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
                 Captains' Corner <span className="text-[8px] mt-0.5">▾</span>
@@ -169,11 +169,11 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
                       ${activePage === 'captains-players' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
                     📈 My Players
                   </Link>
-                  <Link href="/captains-corner/opponent-scouting"
+                  <Link href="/captains-corner/match-planning"
                     onClick={() => setCaptainsOpen(false)}
                     className={`block px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors border-t border-[#D4C9B0] dark:border-ink-5
-                      ${activePage === 'captains-scouting' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
-                    🔍 Opponent Scouting
+                      ${activePage === 'captains-planning' ? 'text-gold bg-[#FEF3C7] dark:bg-ink-3' : 'text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3'}`}>
+                    🧭 Match Planning
                   </Link>
                   <Link href="/opponents"
                     onClick={() => setCaptainsOpen(false)}

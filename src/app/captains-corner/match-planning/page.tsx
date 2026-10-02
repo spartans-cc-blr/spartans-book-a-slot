@@ -1,10 +1,11 @@
-// app/captains-corner/opponent-scouting/page.tsx
+// app/captains-corner/match-planning/page.tsx
 //
-// Pre-match scouting for captains: what happened every time we met the
-// opponent of an upcoming game (from ball-by-ball data), and how each player
-// who has said Y/O/E for it did against them — batting position, phases,
-// how they got out, bowling by phase — with data-derived pointers.
-// See .claude/rules/features/opponent-scouting.md.
+// Match planning for captains: for an upcoming game, what happened in past
+// matches against the same OPPONENT, at the same GROUND, or in the same
+// TOURNAMENT (three independent lenses, from ball-by-ball data), and how each
+// player who has said Y/O/E for it did in that scope — batting position,
+// phases, how they got out, bowling by phase — with data-derived pointers.
+// See .claude/rules/features/match-planning.md.
 //
 // Access: captains, GC and admin. Read-only; no write path.
 
@@ -14,13 +15,13 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { PlayerNameLink } from '@/lib/playerLink'
-import { getScoutingContext } from '@/lib/opponentScoutingData'
-import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/opponentScouting'
+import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
+import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
 import { PHASE_KEYS, PHASE_LABEL } from '@/lib/ballByBall'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = { title: 'Opponent Scouting — Captains’ Corner' }
+export const metadata: Metadata = { title: 'Match Planning — Captains’ Corner' }
 
 const card = 'bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-4 md:p-5'
 const h2 = 'font-cinzel text-sm font-bold tracking-wide text-[var(--stats-text)] mb-3'
@@ -76,7 +77,7 @@ function PlayerCard({ p, url, response }: { p: PlayerScout; url: string | null; 
 
       {b && (
         <div className="mb-3">
-          <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted}`}>Batting v them</p>
+          <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted}`}>Batting</p>
           <p className="font-rajdhani text-sm text-[var(--stats-text)]">
             {b.innings} inn · <b>{b.runs}</b> runs off {b.balls} · SR {b.strikeRate != null ? Math.round(b.strikeRate) : '—'}
             {b.average != null && <> · avg {f1(b.average)}</>}
@@ -101,7 +102,7 @@ function PlayerCard({ p, url, response }: { p: PlayerScout; url: string | null; 
 
       {w && (
         <div className="mb-3">
-          <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted}`}>Bowling v them</p>
+          <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted}`}>Bowling</p>
           <p className="font-rajdhani text-sm text-[var(--stats-text)]">
             {Math.floor(w.legalBalls / 6)}.{w.legalBalls % 6} ov · {w.runs} runs · <b>{w.wickets}</b> wkts · econ {f1(w.economy)}
           </p>
@@ -121,14 +122,19 @@ function PlayerCard({ p, url, response }: { p: PlayerScout; url: string | null; 
   )
 }
 
-export default async function OpponentScoutingPage({ searchParams }: { searchParams: { booking?: string } }) {
+export default async function MatchPlanningPage({ searchParams }: { searchParams: { booking?: string; lens?: string } }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
   if (!session) redirect('/login')
   if (user?.playerStatus === 'expelled') redirect('/')
   if (!user?.isCaptain && !user?.isGC && !user?.isAdmin) redirect('/fixtures')
 
-  const ctx = await getScoutingContext(searchParams.booking)
+  const lens: Lens = (LENSES as string[]).includes(searchParams.lens ?? '') ? (searchParams.lens as Lens) : 'opponent'
+  const ctx = await getPlanningContext(searchParams.booking, lens)
+  const LENS_LABEL: Record<Lens, string> = { opponent: 'Opponent', ground: 'Ground', tournament: 'Tournament' }
+  const href = (b: string | undefined, l: Lens) =>
+    `/captains-corner/match-planning?${new URLSearchParams({ ...(b ? { booking: b } : {}), lens: l }).toString()}`
+  const scope = ctx.scopeLabel ?? 'this scope'
   const sel = ctx.selected
   const team = ctx.scored.length ? scoutTeam(ctx.scored) : null
   const players = ctx.scored.length
@@ -142,24 +148,36 @@ export default async function OpponentScoutingPage({ searchParams }: { searchPar
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--stats-shell-bg)' }}>
-      <SiteNav activePage="captains-scouting" back={{ fallbackHref: '/captains-corner', label: 'Squad Selection' }} />
+      <SiteNav activePage="captains-planning" back={{ fallbackHref: '/captains-corner', label: 'Squad Selection' }} />
 
       <div className="bg-[var(--stats-card-bg)] border-b border-[var(--stats-card-border)] px-5 md:px-8 lg:px-10 py-7">
         <div className="max-w-4xl mx-auto">
           <p className="text-[var(--stats-accent)] text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-1">Captains&rsquo; Corner</p>
-          <h1 className="font-cinzel text-xl md:text-2xl font-bold text-[var(--stats-text)] tracking-wide">Opponent Scouting</h1>
+          <h1 className="font-cinzel text-xl md:text-2xl font-bold text-[var(--stats-text)] tracking-wide">Match Planning</h1>
           <p className={`font-rajdhani text-sm ${muted} mt-1 max-w-xl`}>
-            What happened when we last met them, and how the players available for the next game did against them.
-            Practice games are not counted.
+            For an upcoming game: how we have done against the opponent, at the ground and in the tournament, and how
+            the players available did in each. Pick a view below; they are independent. Practice games are not counted.
           </p>
           {ctx.upcoming.length > 0 && (
             <div className="flex gap-2 flex-wrap mt-3">
               {ctx.upcoming.map(u => (
-                <Link key={u.id} href={`/captains-corner/opponent-scouting?booking=${u.id}`} replace scroll={false}
+                <Link key={u.id} href={href(u.id, lens)} replace scroll={false}
                   className={`font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full border transition-colors
                     ${u.id === sel?.id ? 'bg-[var(--stats-accent)] border-[var(--stats-accent)] text-white dark:text-ink'
                       : 'border-[var(--stats-card-border)] text-[var(--stats-text-muted)] hover:text-[var(--stats-text)]'}`}>
                   {fmtDate(u.gameDate)} · {u.opponentName}
+                </Link>
+              ))}
+            </div>
+          )}
+          {sel && (
+            <div className="flex gap-1 mt-4 border-b border-[var(--stats-card-border)]">
+              {LENSES.map(l => (
+                <Link key={l} href={href(sel.id, l)} replace scroll={false}
+                  className={`font-rajdhani text-sm font-bold px-4 py-2 -mb-px border-b-2 transition-colors
+                    ${l === lens ? 'border-[var(--stats-accent)] text-[var(--stats-text)]'
+                      : 'border-transparent text-[var(--stats-text-muted)] hover:text-[var(--stats-text)]'}`}>
+                  {LENS_LABEL[l]}
                 </Link>
               ))}
             </div>
@@ -174,14 +192,17 @@ export default async function OpponentScoutingPage({ searchParams }: { searchPar
           <>
             <div className={card}>
               <p className="font-cinzel text-lg font-bold text-[var(--stats-text)]">vs {sel.opponentName}</p>
+              <p className={`font-rajdhani text-xs uppercase tracking-wide ${muted}`}>Viewing by {LENS_LABEL[lens].toLowerCase()}: <b className="text-[var(--stats-text)]">{scope}</b></p>
               <p className={`font-rajdhani text-sm ${muted}`}>
                 {fmtDate(sel.gameDate)} · {sel.slotTime}{sel.format ? ` · ${sel.format}` : ''}{sel.tournamentName ? ` · ${sel.tournamentName}` : ''}
               </p>
               <p className="font-rajdhani text-sm text-[var(--stats-text)] mt-2">
-                Met {ctx.history.length} {ctx.history.length === 1 ? 'time' : 'times'} · won {won}, lost {lost}
+                {ctx.history.length} past {ctx.history.length === 1 ? 'match' : 'matches'} · won {won}, lost {lost}
                 {' · '}{ctx.scored.length} with ball-by-ball data
               </p>
-              {ctx.history.length === 0 && <p className={`font-rajdhani text-sm ${muted} mt-1`}>We have no synced past match against this side (check the opponent is linked on /opponents).</p>}
+              {ctx.history.length === 0 && <p className={`font-rajdhani text-sm ${muted} mt-1`}>{lens === 'opponent' ? 'We have no synced past match against this side (check the opponent is linked on /opponents).'
+                : lens === 'ground' ? 'No synced past match at this ground (the booking or its tournament needs a ground set).'
+                : 'No synced past match in this tournament yet.'}</p>}
               {ctx.history.length > 0 && ctx.scored.length === 0 && <p className={`font-rajdhani text-sm ${muted} mt-1`}>No commentary has been uploaded for those matches yet, so there is nothing to break down.</p>}
             </div>
 
@@ -198,13 +219,13 @@ export default async function OpponentScoutingPage({ searchParams }: { searchPar
                 )}
 
                 <div className={card}>
-                  <h2 className={h2}>Every meeting</h2>
+                  <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
                   <ul className="space-y-2">
                     {team.matches.map(m => (
                       <li key={m.bookingId} className="font-rajdhani text-sm">
                         <Link href={`/matches/history/${m.bookingId}`} className="font-bold text-[var(--stats-text)] underline decoration-dotted">{fmtDate(m.gameDate)}</Link>
                         {' '}<span className={`font-bold uppercase ${RESULT_CLS[m.result ?? 'nr']}`}>{m.result ?? '—'}</span>
-                        <span className={muted}> · {m.scoreLine}{m.format ? ` · ${m.format}` : ''}</span>
+                        <span className={muted}>{lens !== 'opponent' && m.opponentName ? ` · v ${m.opponentName}` : ''} · {m.scoreLine}{m.format ? ` · ${m.format}` : ''}</span>
                         <div className={`text-xs ${muted}`}>
                           {m.topBat && <>Our top: {m.topBat.name} {m.topBat.runs}({m.topBat.balls}). </>}
                           {m.topOppBat && <>Their top: {m.topOppBat.name} {m.topOppBat.runs}({m.topOppBat.balls}).</>}
@@ -215,13 +236,13 @@ export default async function OpponentScoutingPage({ searchParams }: { searchPar
                 </div>
 
                 <div className={`${card} grid gap-5 md:grid-cols-2`}>
-                  <PhaseTable title="Our batting by phase (all meetings)" t={team.batting} wicketLabel="Lost" />
-                  <PhaseTable title="Our bowling by phase (all meetings)" t={team.bowling} wicketLabel="Taken" />
+                  <PhaseTable title="Our batting by phase (all matches in view)" t={team.batting} wicketLabel="Lost" />
+                  <PhaseTable title="Our bowling by phase (all matches in view)" t={team.bowling} wicketLabel="Taken" />
                 </div>
 
                 <div className={`${card} grid gap-5 md:grid-cols-2`}>
                   <div>
-                    <h2 className={h2}>Their batters to watch</h2>
+                    <h2 className={h2}>{lens === 'opponent' ? 'Their batters to watch' : 'Opposition batters who did best'}</h2>
                     <ul className="space-y-1">
                       {team.threats.map(t => (
                         <li key={t.name} className="font-rajdhani text-sm text-[var(--stats-text)]">
@@ -240,7 +261,7 @@ export default async function OpponentScoutingPage({ searchParams }: { searchPar
                     </p>
                     {team.oppBowlersWhoGotUs.length > 0 && (
                       <p className={`font-rajdhani text-xs ${muted} mt-1`}>
-                        Their wicket-takers: {team.oppBowlersWhoGotUs.map(b => `${b.name} (${b.wickets})`).join(', ')}
+                        {lens === 'opponent' ? 'Their' : 'Opposition'} wicket-takers: {team.oppBowlersWhoGotUs.map(b => `${b.name} (${b.wickets})`).join(', ')}
                       </p>
                     )}
                   </div>
@@ -250,13 +271,13 @@ export default async function OpponentScoutingPage({ searchParams }: { searchPar
 
             <div>
               <h2 className="font-cinzel text-base font-bold text-[var(--stats-text)] mb-1">Available for this game ({ctx.available.length})</h2>
-              <p className={`font-rajdhani text-xs ${muted} mb-3`}>Players who marked Y, O or E, and how they did against {sel.opponentName}.</p>
+              <p className={`font-rajdhani text-xs ${muted} mb-3`}>Players who marked Y, O or E, and how they did {lens === 'opponent' ? `against ${sel.opponentName}` : lens === 'ground' ? `at ${scope}` : `in ${scope}`}.</p>
               <div className="grid gap-3 md:grid-cols-2">
                 {players.map(p => <PlayerCard key={p.playerId} p={p} url={meta.get(p.playerId)?.cricHeroesUrl ?? null} response={meta.get(p.playerId)?.response ?? ''} />)}
               </div>
               {noHistory.length > 0 && team && (
                 <p className={`font-rajdhani text-xs ${muted} mt-3`}>
-                  No ball-by-ball history against them: {noHistory.map(a => a.name).join(', ')}.
+                  No ball-by-ball history in this view: {noHistory.map(a => a.name).join(', ')}.
                 </p>
               )}
               {ctx.available.length === 0 && <p className={`font-rajdhani text-sm ${muted}`}>Nobody has marked availability yet.</p>}

@@ -1,10 +1,10 @@
-// Server-only fetch behind /captains-corner/opponent-scouting. Resolves an
-// upcoming booking to its opponent, finds every past non-practice meeting
-// (same matching as the "Opponent → Team Record" link: master id or
-// normalised spelling), loads their ball-by-ball rows from the analytics DB
+// Server-only fetch behind /captains-corner/match-planning. Resolves an
+// upcoming booking to one of three lenses — its opponent (master id or
+// normalised spelling, as the "Opponent → Team Record" link), its ground, or
+// its tournament — and finds every past non-practice match in that scope, loads their ball-by-ball rows from the analytics DB
 // view `ball_by_ball_linked`, and lists who has said Y/O/E for the booking.
-// The aggregation itself is pure: see opponentScouting.ts. See
-// features/opponent-scouting.md. Never import into a 'use client' file.
+// The aggregation itself is pure: see matchPlanning.ts. See
+// features/match-planning.md. Never import into a 'use client' file.
 
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
@@ -12,7 +12,7 @@ import { fetchAllRows } from '@/lib/playerStats'
 import { getTeamMatches, type TeamMatch } from '@/lib/teamStats'
 import { normaliseOpponentName } from '@/lib/opponents'
 import type { BallRow } from '@/lib/ballByBall'
-import type { ScoutMatchInput } from '@/lib/opponentScouting'
+import type { ScoutMatchInput } from '@/lib/matchPlanning'
 
 const BALL_COLUMNS = [
   'match_id', 'batting_side', 'seq', 'over_no', 'ball_in_over', 'is_legal', 'bowler', 'batter', 'outcome',
@@ -21,6 +21,9 @@ const BALL_COLUMNS = [
   'bowler_player_id', 'batter_player_id', 'dismissed_player_id', 'fielder_player_id',
 ].join(', ')
 
+export type Lens = 'opponent' | 'ground' | 'tournament'
+export const LENSES: Lens[] = ['opponent', 'ground', 'tournament']
+
 export interface UpcomingOption {
   id: string
   gameDate: string
@@ -28,6 +31,7 @@ export interface UpcomingOption {
   format: string | null
   opponentName: string
   tournamentName: string | null
+  groundName: string | null
 }
 
 export interface AvailablePlayer {
@@ -37,9 +41,12 @@ export interface AvailablePlayer {
   cricHeroesUrl: string | null
 }
 
-export interface ScoutingContext {
+export interface PlanningContext {
   upcoming: UpcomingOption[]
-  selected: (UpcomingOption & { opponentId: string | null }) | null
+  lens: Lens
+  /** what the history is scoped to, e.g. "Howzzat", "Blendin Cricket Ground" */
+  scopeLabel: string | null
+  selected: (UpcomingOption & { opponentId: string | null; groundId: string | null; tournamentId: string | null }) | null
   /** every past, non-practice meeting with a synced scorecard (with or without commentary) */
   history: TeamMatch[]
   /** the subset of `history` that has ball-by-ball data */
@@ -49,13 +56,13 @@ export interface ScoutingContext {
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null))
 
-export async function getScoutingContext(bookingId?: string | null): Promise<ScoutingContext> {
+export async function getPlanningContext(bookingId?: string | null, lens: Lens = 'opponent'): Promise<PlanningContext> {
   const hub = createServiceClient()
   const today = new Date().toISOString().split('T')[0]
 
   const { data: ups } = await hub
     .from('bookings')
-    .select('id, game_date, slot_time, format, opponent_name, opponent_id, is_practice, tournament:tournaments!bookings_tournament_id_fkey(name)')
+    .select('id, game_date, slot_time, format, opponent_name, opponent_id, is_practice, tournament_id, ground_id, ground:grounds!bookings_ground_id_fkey(id, name), tournament:tournaments!bookings_tournament_id_fkey(name, ground_id, ground:grounds(id, name))')
     .eq('status', 'confirmed')
     .gte('game_date', today)
     .not('opponent_name', 'is', null)
@@ -64,20 +71,38 @@ export async function getScoutingContext(bookingId?: string | null): Promise<Sco
     .limit(15)
 
   const upRows = ((ups ?? []) as any[]).filter(b => b.opponent_name && String(b.opponent_name).trim())
+  // A booking's own ground wins over its tournament's default (bookings.ground_id, migration 066).
+  const groundOf = (b: any): { id: string | null; name: string | null } => {
+    const own = one<any>(b.ground)
+    if (own) return { id: own.id ?? null, name: own.name ?? null }
+    const t = one<any>(b.tournament)
+    const tg = one<any>(t?.ground)
+    return { id: tg?.id ?? t?.ground_id ?? null, name: tg?.name ?? null }
+  }
   const upcoming: UpcomingOption[] = upRows.map(b => ({
     id: b.id, gameDate: b.game_date, slotTime: b.slot_time, format: b.format ?? null,
     opponentName: String(b.opponent_name).trim(), tournamentName: one<any>(b.tournament)?.name ?? null,
+    groundName: groundOf(b).name,
   }))
   const pick = upRows.find(b => b.id === bookingId) ?? upRows[0]
-  if (!pick) return { upcoming, selected: null, history: [], scored: [], available: [] }
+  if (!pick) return { upcoming, lens, scopeLabel: null, selected: null, history: [], scored: [], available: [] }
 
-  const selected = { ...upcoming.find(u => u.id === pick.id)!, opponentId: (pick.opponent_id as string | null) ?? null }
+  const selected = {
+    ...upcoming.find(u => u.id === pick.id)!,
+    opponentId: (pick.opponent_id as string | null) ?? null,
+    groundId: groundOf(pick).id,
+    tournamentId: (pick.tournament_id as string | null) ?? null,
+  }
   const norm = normaliseOpponentName(selected.opponentName)
 
   const all = await getTeamMatches()
   const history = all
     .filter(m => !m.isPractice)
-    .filter(m => (selected.opponentId && m.opponentId === selected.opponentId) || normaliseOpponentName(m.opponentName) === norm)
+    .filter(m => {
+      if (lens === 'ground') return !!selected.groundId && m.groundId === selected.groundId
+      if (lens === 'tournament') return !!selected.tournamentId && m.tournamentId === selected.tournamentId
+      return (!!selected.opponentId && m.opponentId === selected.opponentId) || normaliseOpponentName(m.opponentName) === norm
+    })
     .sort((a, b) => b.gameDate.localeCompare(a.gameDate))
 
   const analytics = createAnalyticsClient()
@@ -97,7 +122,7 @@ export async function getScoutingContext(bookingId?: string | null): Promise<Sco
       const balls = byMatch.get(m.matchId)
       if (!balls || balls.length === 0) continue
       scored.push({
-        bookingId: m.bookingId, matchId: m.matchId, gameDate: m.gameDate, format: m.format, result: m.result,
+        bookingId: m.bookingId, matchId: m.matchId, opponentName: m.opponentLabel, gameDate: m.gameDate, format: m.format, result: m.result,
         teamTotal: m.teamTotal, teamWickets: m.teamWickets, oppTotal: m.oppTotal, oppWickets: m.oppWickets, balls,
       })
     }
@@ -114,5 +139,6 @@ export async function getScoutingContext(bookingId?: string | null): Promise<Sco
     .map(x => ({ id: x.p.id, name: x.p.name, response: x.r.response, cricHeroesUrl: x.p.cricheroes_url ?? null }))
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  return { upcoming, selected, history, scored, available }
+  const scopeLabel = lens === 'ground' ? selected.groundName : lens === 'tournament' ? selected.tournamentName : selected.opponentName
+  return { upcoming, lens, scopeLabel, selected, history, scored, available }
 }

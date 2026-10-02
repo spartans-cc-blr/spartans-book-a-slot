@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { BallRow } from './ballByBall'
-import { scoutTeam, scoutPlayers, dismissalGroup, type ScoutMatchInput } from './opponentScouting'
+import { scoutTeam, scoutPlayers, dismissalGroup, type ScoutMatchInput } from './matchPlanning'
 
 let seq = 0
 function ball(o: Partial<BallRow>): BallRow {

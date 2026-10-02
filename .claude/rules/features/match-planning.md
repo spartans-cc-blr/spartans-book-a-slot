@@ -1,4 +1,4 @@
-# Opponent Scouting — `/captains-corner/opponent-scouting`
+# Match Planning — `/captains-corner/match-planning`
 
 **Spartans Hub · Added: October 2026**
 
@@ -6,9 +6,20 @@
 
 ## 1. Overview
 
-A pre-match page for captains. Pick an upcoming game and it shows what
-happened every time we met that opponent, and how each player who has
-marked **Y / O / E** for the game did against them.
+A pre-match page for captains. Pick an upcoming game and it shows how we did
+in past matches and how each player who has marked **Y / O / E** for the game
+did, through three independent lenses (tabs, `?lens=`, default `opponent`):
+
+| Lens | History is every past non-practice synced match… |
+|---|---|
+| **Opponent** | against the same opponent (master `opponent_id`, else normalised spelling) |
+| **Ground** | at the booking's ground (`bookings.ground_id`, falling back to the tournament's ground) |
+| **Tournament** | in the booking's tournament |
+
+The lenses do not combine; each is its own view of the same upcoming game and
+available players. (Combining, e.g. opponent *at* this ground, is possible later
+by intersecting the filters.) The Opponent lens keeps the old wording; Ground
+and Tournament list each match's opponent and show "opposition" batters/bowlers.
 
 Built on ball-by-ball commentary (`commentary-upload.md`, `ball-by-ball-tabs.md`),
 so only past meetings that have commentary uploaded can be broken down.
@@ -17,8 +28,8 @@ Meetings without it still count in the "met N times, won/lost" line.
 **Access:** `isCaptain || isGC || isAdmin` (hard redirect otherwise, same gate
 as `/captains-corner`). Read-only, no write path, no migration.
 
-**Nav:** 🔍 Opponent Scouting in **Captains' Corner ▾** (desktop) and the
-Captains' Corner section of the mobile More sheet (`activePage="captains-scouting"`).
+**Nav:** 🧭 Match Planning in **Captains' Corner ▾** (desktop) and the
+Captains' Corner section of the mobile More sheet (`activePage="captains-planning"`).
 
 ---
 
@@ -48,11 +59,11 @@ Captains' Corner section of the mobile More sheet (`activePage="captains-scoutin
 
 ## 3. Data
 
-`src/lib/opponentScoutingData.ts` (server-only) `getScoutingContext()`:
+`src/lib/matchPlanningData.ts` (server-only) `getPlanningContext(bookingId, lens)`:
 
 1. Upcoming confirmed bookings with an `opponent_name` (picker + selection).
-2. History: `getTeamMatches()` filtered to the same opponent, matched by master
-   `opponent_id` **or** normalised spelling (the same rule as the Captains'
+2. History: `getTeamMatches()` filtered by the chosen lens (Opponent uses master
+   `opponent_id` **or** normalised spelling, the same rule as the Captains'
    Corner → Team Record link), practice games excluded.
 3. Ball rows for those `match_id`s from the analytics view
    `ball_by_ball_linked`, paged with `fetchAllRows()` (PostgREST caps a
@@ -60,7 +71,7 @@ Captains' Corner section of the mobile More sheet (`activePage="captains-scoutin
 4. `availability` rows with `response IN ('Y','O','E')` for the booking,
    expelled players dropped.
 
-`src/lib/opponentScouting.ts` (pure, client-safe, `opponentScouting.test.ts`)
+`src/lib/matchPlanning.ts` (pure, client-safe, `matchPlanning.test.ts`)
 does the aggregation by reusing `phaseSplit()`, `summariseBatters()` and
 `summariseBowlers()` from `ballByBall.ts`.
 
@@ -75,7 +86,7 @@ which are resolved only for Spartans players; opponents are matched by name.
 ## 4. Pointers are rules, not opinion
 
 Every line quotes the numbers it came from, and thresholds are constants in
-`opponentScouting.ts`:
+`matchPlanning.ts`:
 
 | Pointer | Fires when |
 |---|---|
@@ -112,10 +123,10 @@ thresholds, change the constants and the table above.
 
 | File | Role |
 |---|---|
-| `src/app/captains-corner/opponent-scouting/page.tsx` | The page |
-| `src/lib/opponentScoutingData.ts` | Server fetch (§3) |
-| `src/lib/opponentScouting.ts` (+ `.test.ts`) | Pure aggregation and pointers |
-| `src/components/ui/SiteNav.tsx`, `src/components/ui/MobileTabBar.tsx` | Nav entries, `captains-scouting` added to the highlight list |
+| `src/app/captains-corner/match-planning/page.tsx` | The page |
+| `src/lib/matchPlanningData.ts` | Server fetch (§3) |
+| `src/lib/matchPlanning.ts` (+ `.test.ts`) | Pure aggregation and pointers |
+| `src/components/ui/SiteNav.tsx`, `src/components/ui/MobileTabBar.tsx` | Nav entries, `captains-planning` added to the highlight list |
 
 ## 7. Not built (ideas)
 
