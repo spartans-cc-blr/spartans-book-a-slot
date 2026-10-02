@@ -100,3 +100,8 @@ this change. The tables already exist in the analytics DB.
   use *Save anyway*.
 - No-ball, bye and leg-bye wording hasn't been seen in a real PDF yet; the
   parser flags unrecognised outcomes instead of guessing.
+
+
+## Theme
+
+The page and `CommentaryClient` follow the Light/Dark/System toggle: Warm Light colours with `dark:` variants (same pairs as `/admin/scorecard-backfill`), instead of the dark-only ink classes the other wrangler pages still use. The date chips use `DateChipSlider`'s default `auto` theme.

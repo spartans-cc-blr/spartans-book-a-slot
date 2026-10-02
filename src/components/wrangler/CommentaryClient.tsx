@@ -101,7 +101,7 @@ export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[]
 
   if (matches.length === 0) {
     return (
-      <p className="font-rajdhani text-sm text-zinc-500 bg-ink-3 border border-ink-5 rounded p-4">
+      <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4">
         No finished matches with an imported scorecard yet. Upload the match scorecard first, then come back here.
       </p>
     )
@@ -110,22 +110,22 @@ export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[]
   return (
     <div className="space-y-5">
       {dateChipGroups.length > 0 && (
-        <div className="bg-ink-4 border border-ink-5 rounded-xl p-3">
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-xl p-3">
           <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={changeDay} />
         </div>
       )}
 
-      <div className="bg-ink-3 border border-ink-5 rounded p-4">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4">
         <label className="form-label" htmlFor="commentary-match">
-          Match <span className="text-zinc-500 font-normal">({visibleMatches.length}{dayFilter ? ` of ${matches.length}` : ''})</span>
+          Match <span className="text-[#78716C] dark:text-zinc-500 font-normal">({visibleMatches.length}{dayFilter ? ` of ${matches.length}` : ''})</span>
         </label>
-        <select id="commentary-match" className="form-input" value={bookingId}
+        <select id="commentary-match" className="form-input bg-white dark:bg-zinc-900 border-[#D4C9B0] dark:border-zinc-700 text-[#1C1917] dark:text-zinc-100" value={bookingId}
           onChange={e => changeMatch(e.target.value)}>
           {visibleMatches.map(m => (
             <option key={m.booking_id} value={m.booking_id}>{matchLabel(m)}</option>
           ))}
         </select>
-        <p className="font-rajdhani text-xs text-zinc-500 mt-2">
+        <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-2">
           On the CricHeroes commentary page, pick the team in the dropdown, scroll until every over has
           loaded, then print the page to PDF. Do that once per team. Printing from your phone keeps the
           file small; files over 4MB can’t be uploaded.
@@ -167,22 +167,22 @@ function SideCard({ side, state, bookingKey, onFile, onToggleAnyway, onSave }: {
   }, [r])
 
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded p-4 space-y-3">
+    <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-rajdhani text-sm font-bold tracking-wide uppercase text-zinc-300">{SIDE_LABEL[side]}</h2>
-        {state.savedAt && <span className="font-rajdhani text-xs text-emerald-400">Saved {state.savedAt}</span>}
+        <h2 className="font-rajdhani text-sm font-bold tracking-wide uppercase text-[#1C1917] dark:text-zinc-300">{SIDE_LABEL[side]}</h2>
+        {state.savedAt && <span className="font-rajdhani text-xs text-emerald-700 dark:text-emerald-400">Saved {state.savedAt}</span>}
       </div>
 
       <input
         key={`${bookingKey}-${side}`}
         type="file" accept="application/pdf,.pdf"
         onChange={e => onFile(e.target.files?.[0] ?? null)}
-        className="block w-full font-rajdhani text-xs text-zinc-400 file:mr-3 file:rounded file:border-0 file:bg-ink-5 file:px-3 file:py-2 file:text-zinc-200"
+        className="block w-full font-rajdhani text-xs text-[#57534E] dark:text-zinc-400 file:mr-3 file:rounded file:border-0 file:bg-[#EEEAE2] dark:file:bg-ink-5 file:px-3 file:py-2 file:text-[#1C1917] dark:file:text-zinc-200"
       />
 
-      {state.checking && <p className="font-rajdhani text-xs text-zinc-500">Checking… (the first request can take up to 30s)</p>}
+      {state.checking && <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">Checking… (the first request can take up to 30s)</p>}
       {state.error && (
-        <p className="font-rajdhani text-xs px-3 py-2 rounded border bg-red-950/40 border-red-800 text-red-400">{state.error}</p>
+        <p className="font-rajdhani text-xs px-3 py-2 rounded border bg-red-100 border-red-300 text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-400">{state.error}</p>
       )}
 
       {r && (
@@ -195,12 +195,12 @@ function SideCard({ side, state, bookingKey, onFile, onToggleAnyway, onSave }: {
           </div>
 
           {errors.map((i, n) => (
-            <p key={n} className="font-rajdhani text-xs px-3 py-2 rounded border bg-red-950/40 border-red-800 text-red-400">
+            <p key={n} className="font-rajdhani text-xs px-3 py-2 rounded border bg-red-100 border-red-300 text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-400">
               {i.over ? `Over ${i.over}: ` : ''}{i.message}
             </p>
           ))}
           {warnings.length > 0 && (
-            <details className="font-rajdhani text-xs text-zinc-400">
+            <details className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
               <summary className="cursor-pointer">{warnings.length} warning{warnings.length === 1 ? '' : 's'}</summary>
               <ul className="mt-1 space-y-1 list-disc pl-5">
                 {warnings.map((i, n) => <li key={n}>{i.over ? `Over ${i.over}: ` : ''}{i.message}</li>)}
@@ -208,10 +208,10 @@ function SideCard({ side, state, bookingKey, onFile, onToggleAnyway, onSave }: {
             </details>
           )}
           {overs.length > 0 && (
-            <details className="font-rajdhani text-xs text-zinc-400">
+            <details className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
               <summary className="cursor-pointer">Over by over</summary>
               <table className="mt-2 w-full text-left">
-                <thead><tr className="text-zinc-500"><th className="pr-3">Over</th><th className="pr-3">Bowler</th><th className="pr-3">Runs</th><th>Wkts</th></tr></thead>
+                <thead><tr className="text-[#78716C] dark:text-zinc-500"><th className="pr-3">Over</th><th className="pr-3">Bowler</th><th className="pr-3">Runs</th><th>Wkts</th></tr></thead>
                 <tbody>
                   {overs.map(([o, row]) => (
                     <tr key={o}><td className="pr-3">{o}</td><td className="pr-3">{row.bowler}</td><td className="pr-3">{row.runs}</td><td>{row.wkts}</td></tr>
@@ -222,13 +222,13 @@ function SideCard({ side, state, bookingKey, onFile, onToggleAnyway, onSave }: {
           )}
 
           {r.replaces_existing && !state.savedAt && (
-            <p className="font-rajdhani text-xs text-amber-400">Ball-by-ball is already saved for this innings; saving will replace it.</p>
+            <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400">Ball-by-ball is already saved for this innings; saving will replace it.</p>
           )}
 
           {!state.savedAt && (
             <div className="flex flex-wrap items-center gap-4">
               {!r.ok && (
-                <label className="flex items-center gap-2 font-rajdhani text-xs text-zinc-400">
+                <label className="flex items-center gap-2 font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
                   <input type="checkbox" checked={state.saveAnyway} onChange={e => onToggleAnyway(e.target.checked)} />
                   Save anyway (failed checks are recorded)
                 </label>
@@ -248,8 +248,8 @@ function SideCard({ side, state, bookingKey, onFile, onToggleAnyway, onSave }: {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className="text-sm text-zinc-200 break-words">{value}</div>
+      <div className="text-[10px] uppercase tracking-wide text-[#78716C] dark:text-zinc-500">{label}</div>
+      <div className="text-sm text-[#1C1917] dark:text-zinc-200 break-words">{value}</div>
     </div>
   )
 }
