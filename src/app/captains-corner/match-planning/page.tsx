@@ -206,6 +206,45 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
               {ctx.history.length > 0 && ctx.scored.length === 0 && <p className={`font-rajdhani text-sm ${muted} mt-1`}>No commentary has been uploaded for those matches yet, so there is nothing to break down.</p>}
             </div>
 
+            {ctx.missing.length > 0 && (
+              <div className={card}>
+                <h2 className={h2}>Commentary missing for {ctx.missing.length} {ctx.missing.length === 1 ? 'match' : 'matches'}</h2>
+                <p className={`font-rajdhani text-xs ${muted} mb-2`}>
+                  These {lens === 'opponent' ? `past matches against ${scope}` : lens === 'ground' ? `past matches at ${scope}` : `matches in ${scope}`} are
+                  not in the analysis above because no ball-by-ball commentary has been uploaded. The picture gets fuller once a
+                  wrangler uploads it (Wrangler &rarr; Commentary).
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm font-rajdhani">
+                    <thead>
+                      <tr className={`text-xs ${muted}`}>
+                        <th className="text-left font-semibold py-1">Match date</th>
+                        <th className="text-left font-semibold">Match ID</th>
+                        {lens !== 'opponent' && <th className="text-left font-semibold">Opponent</th>}
+                        <th className="text-left font-semibold">CricHeroes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-[var(--stats-text)]">
+                      {ctx.missing.map(m => (
+                        <tr key={m.bookingId} className="border-t border-[var(--stats-divider)]">
+                          <td className="py-1.5">
+                            <Link href={`/matches/history/${m.bookingId}`} className="underline decoration-dotted">{fmtDate(m.gameDate)}</Link>
+                          </td>
+                          <td>{m.matchId}</td>
+                          {lens !== 'opponent' && <td>{m.opponentName}</td>}
+                          <td>
+                            {m.cricheroesUrl
+                              ? <a href={m.cricheroesUrl} target="_blank" rel="noopener noreferrer" className="underline decoration-dotted">Open &#8599;</a>
+                              : <span className={muted}>no link on booking</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {team && (
               <>
                 {team.insights.length > 0 && (

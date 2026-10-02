@@ -41,6 +41,14 @@ export interface AvailablePlayer {
   cricHeroesUrl: string | null
 }
 
+export interface MissingCommentary {
+  bookingId: string
+  matchId: string
+  gameDate: string
+  opponentName: string
+  cricheroesUrl: string | null
+}
+
 export interface PlanningContext {
   upcoming: UpcomingOption[]
   lens: Lens
@@ -51,6 +59,8 @@ export interface PlanningContext {
   history: TeamMatch[]
   /** the subset of `history` that has ball-by-ball data */
   scored: ScoutMatchInput[]
+  /** matches in the lens with no ball-by-ball commentary uploaded, newest first */
+  missing: MissingCommentary[]
   available: AvailablePlayer[]
 }
 
@@ -85,7 +95,7 @@ export async function getPlanningContext(bookingId?: string | null, lens: Lens =
     groundName: groundOf(b).name,
   }))
   const pick = upRows.find(b => b.id === bookingId) ?? upRows[0]
-  if (!pick) return { upcoming, lens, scopeLabel: null, selected: null, history: [], scored: [], available: [] }
+  if (!pick) return { upcoming, lens, scopeLabel: null, selected: null, history: [], scored: [], missing: [], available: [] }
 
   const selected = {
     ...upcoming.find(u => u.id === pick.id)!,
@@ -128,6 +138,18 @@ export async function getPlanningContext(bookingId?: string | null, lens: Lens =
     }
   }
 
+  const scoredIds = new Set(scored.map(m => m.bookingId))
+  const missingRows = history.filter(m => !scoredIds.has(m.bookingId))
+  const urlByBooking = new Map<string, string | null>()
+  if (missingRows.length > 0) {
+    const { data: urls } = await hub.from('bookings').select('id, cricheroes_url').in('id', missingRows.map(m => m.bookingId))
+    for (const u of (urls ?? []) as any[]) urlByBooking.set(u.id, u.cricheroes_url ?? null)
+  }
+  const missing: MissingCommentary[] = missingRows.map(m => ({
+    bookingId: m.bookingId, matchId: m.matchId, gameDate: m.gameDate,
+    opponentName: m.opponentLabel, cricheroesUrl: urlByBooking.get(m.bookingId) ?? null,
+  }))
+
   const { data: av } = await hub
     .from('availability')
     .select('response, players(id, name, status, cricheroes_url)')
@@ -140,5 +162,5 @@ export async function getPlanningContext(bookingId?: string | null, lens: Lens =
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const scopeLabel = lens === 'ground' ? selected.groundName : lens === 'tournament' ? selected.tournamentName : selected.opponentName
-  return { upcoming, lens, scopeLabel, selected, history, scored, available }
+  return { upcoming, lens, scopeLabel, selected, history, scored, missing, available }
 }

@@ -49,6 +49,12 @@ Captains' Corner section of the mobile More sheet (`activePage="captains-plannin
   strike rate and times out.
 - **How wickets fell** — wickets lost/taken by type, and which of their
   bowlers took our wickets.
+- **Commentary missing** — for the matches in the current lens that have no
+  ball-by-ball data, a table of match date (links to the match), match ID and
+  CricHeroes link (`bookings.cricheroes_url`, "no link on booking" when unset),
+  plus the opponent in the Ground/Tournament lenses. It tells captains the
+  analysis would be fuller once a wrangler uploads those commentaries. Shown
+  even when no match has commentary at all.
 - **Available players** — one card per Y/O/E player with history against them:
   batting (innings, runs, SR, average, positions used with runs at each, runs by
   phase, an innings log with how out) and bowling (overs, runs, wickets, economy,
