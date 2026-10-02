@@ -60,8 +60,9 @@ analytics read is logged and treated as "not available", never an error page.
   `derivePartnerships()` from the balls alone): per stand, both batters' runs (balls), the
   stand total with balls (extras included, `*` = unbroken), and a bar growing out from the
   centre for each batter (red left, teal right) scaled to the biggest single contribution.
-  Each stand is a tap target (`aria-expanded`, closed by default) that opens to show the score and overs where it started and ended; nothing else shows them. The survivor
-  of the previous stand is always on the left. A partner who never faced a ball is named from
+  Each stand is a tap target (`aria-expanded`, closed by default) that opens to show the score and overs where it started and ended; nothing else shows them. A batter keeps
+  the side he first appeared on for the whole innings (openers left/right in order of
+  appearance); a new batter takes the side the dismissed one vacated. A partner who never faced a ball is named from
   the scorecard's batting order (`restOfOrder`). Matches without Spartans-batting commentary
   keep the original bars untouched (`ScorecardTables` `partnershipsSlot` prop).
 - **Commentary**: a dropdown under the tab picks **Spartans batting** or **Spartans

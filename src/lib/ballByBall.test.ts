@@ -355,10 +355,10 @@ describe('derivePartnerships', () => {
     expect(s).toHaveLength(3)
     expect(s[0]).toMatchObject({ wicket: 1, runs: 8, balls: 4, startScore: 0, endScore: 8, endWkts: 1, outBatter: 'B' })
     expect(s[0].batters.map(x => x && [x.name, x.runs, x.balls])).toEqual([['A', 5, 2], ['B', 2, 2]])
-    expect(s[1].batters.map(x => x && x.name)).toEqual(['A', 'C'])
+    expect(s[1].batters.map(x => x && x.name)).toEqual(['A', 'C'])   // C takes the side B vacated
     expect(s[1]).toMatchObject({ runs: 7, startScore: 8, startWkts: 1, startBalls: 4, endScore: 15, endWkts: 2, outBatter: 'A' })
-    // the survivor C leads the last stand and it is unbroken
-    expect(s[2].batters.map(x => x && x.name)).toEqual(['C', 'D'])
+    // A went out, so D takes A's left side and C stays right; the stand is unbroken
+    expect(s[2].batters.map(x => x && x.name)).toEqual(['D', 'C'])
     expect(s[2]).toMatchObject({ runs: 4, outBatter: null, endBalls: 9 })
     // every run is in exactly one stand
     expect(s.reduce((n, x) => n + x.runs, 0)).toBe(rows.reduce((n, r) => n + r.runs_total, 0))
