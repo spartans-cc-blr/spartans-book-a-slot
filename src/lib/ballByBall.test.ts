@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, hasDefinedPhases, formatOvers, ballChip,
   groupOvers, phaseSplit, summariseBatters, summariseBowlers, summariseFielders, wicketRows,
-  bowlerRuns, isBowlerWicket, isDotForBowler, isDotForBatters, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver,
+  bowlerRuns, isBowlerWicket, isDotForBowler, isDotForBatters, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver, derivePartnerships,
 } from './ballByBall'
 
 let seq = 0
@@ -336,5 +336,42 @@ describe('dot balls', () => {
     expect(pp('bat')).toMatchObject({ legalBalls: 3, dots: 2 })
     // a no-ball with 2 off the bat: charged to the bowler, but it is not a legal ball either way
     expect(isDotForBowler(ball({ extra_type: 'noball', extras: 1, runs_bat: 2, runs_total: 3, is_legal: false }))).toBe(false)
+  })
+})
+
+describe('derivePartnerships', () => {
+  const b = (batter: string, runs: number, extra: Partial<BallRow> = {}) =>
+    ball({ batting_side: 'spartans', batter, runs_bat: runs, runs_total: runs, ...extra })
+
+  it('splits an innings into stands, carrying the survivor forward', () => {
+    resetSeq()
+    const rows = [
+      b('A', 4), b('A', 1), b('B', 2), b('B', 0, { extras: 1, extra_type: 'wide', runs_total: 1, is_legal: false }),
+      b('B', 0, { is_wicket: true, dismissed_batter: 'B', dismissal_kind: 'bowled' }),   // B out
+      b('A', 6), b('C', 1), b('C', 0, { is_wicket: true, dismissed_batter: 'A', dismissal_kind: 'caught' }),  // A out
+      b('C', 3), b('D', 1),
+    ]
+    const s = derivePartnerships(rows)
+    expect(s).toHaveLength(3)
+    expect(s[0]).toMatchObject({ wicket: 1, runs: 8, balls: 4, startScore: 0, endScore: 8, endWkts: 1, outBatter: 'B' })
+    expect(s[0].batters.map(x => x && [x.name, x.runs, x.balls])).toEqual([['A', 5, 2], ['B', 2, 2]])
+    expect(s[1].batters.map(x => x && x.name)).toEqual(['A', 'C'])
+    expect(s[1]).toMatchObject({ runs: 7, startScore: 8, startWkts: 1, startBalls: 4, endScore: 15, endWkts: 2, outBatter: 'A' })
+    // the survivor C leads the last stand and it is unbroken
+    expect(s[2].batters.map(x => x && x.name)).toEqual(['C', 'D'])
+    expect(s[2]).toMatchObject({ runs: 4, outBatter: null, endBalls: 9 })
+    // every run is in exactly one stand
+    expect(s.reduce((n, x) => n + x.runs, 0)).toBe(rows.reduce((n, r) => n + r.runs_total, 0))
+  })
+
+  it('names a partner who never faced from the rest of the order', () => {
+    resetSeq()
+    const rows = [b('A', 2), b('A', 1)]
+    const s = derivePartnerships(rows, ['Z'])
+    expect(s[0].batters[1]).toMatchObject({ name: 'Z', runs: 0, balls: 0 })
+  })
+
+  it('returns nothing for an empty innings', () => {
+    expect(derivePartnerships([])).toEqual([])
   })
 })

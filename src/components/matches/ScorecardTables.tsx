@@ -127,7 +127,7 @@ function formatStrikeRate(v: unknown): string {
 }
 
 export function ScorecardTables({
-  batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, teamWickets, squad,
+  batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, teamWickets, squad, partnershipsSlot,
 }: {
   batting: any[]
   bowling: any[]
@@ -144,6 +144,9 @@ export function ScorecardTables({
   teamOvers?: number | null
   teamWickets?: number | null
   squad?: SquadRef[]
+  // Replaces the Fall-of-Wickets partnership bars when the match has ball-by-ball
+  // commentary (see BallPartnerships). Omitted = the bars below, exactly as before.
+  partnershipsSlot?: React.ReactNode
 }) {
   // Players who didn't bat/bowl get a zero-filled row (dismissal_method:
   // 'did_not_bat' for batting; every bowling field 0 for a player who never
@@ -284,7 +287,9 @@ export function ScorecardTables({
         )}
       </div>
 
-      {partnerships.length > 0 && (
+      {partnershipsSlot}
+
+      {!partnershipsSlot && partnerships.length > 0 && (
         <div>
           <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Partnerships</p>
           <div className="relative">
