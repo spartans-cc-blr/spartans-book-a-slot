@@ -22,7 +22,7 @@ const BALL_COLUMNS = [
 ].join(', ')
 
 export type Lens = 'opponent' | 'ground' | 'tournament'
-export const LENSES: Lens[] = ['opponent', 'ground', 'tournament']
+export const LENSES: Lens[] = ['opponent', 'tournament', 'ground']
 
 export interface UpcomingOption {
   id: string
