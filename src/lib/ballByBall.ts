@@ -443,3 +443,96 @@ export function howOut(name: string, text: string | null, kind: string | null): 
   if (t.toLowerCase().startsWith(name.trim().toLowerCase())) t = t.slice(name.trim().length).trim()
   return t || (kind ?? 'out')
 }
+
+// ── Partnerships ───────────────────────────────────────────────────────────
+
+export interface StandBatter {
+  name:  string
+  id:    string | null
+  runs:  number    // off the bat while this stand lasted
+  balls: number    // balls faced (wides excluded)
+}
+
+export interface Stand {
+  wicket:      number          // 1 = opening stand; the Nth stand follows the (N-1)th wicket
+  batters:     [StandBatter, StandBatter | null]   // earlier-in first (the survivor of the previous stand)
+  runs:        number          // everything scored in the stand, extras included
+  balls:       number          // legal deliveries
+  startScore:  number
+  startWkts:   number
+  startBalls:  number          // legal balls bowled before the stand
+  endScore:    number
+  endWkts:     number
+  endBalls:    number
+  outBatter:   string | null   // null = never separated (innings ended first)
+}
+
+/** Partnerships of one batting innings, rebuilt from the ball rows alone (no Fall of Wickets needed).
+ *  `restOfOrder` lists batters who never faced a ball, in batting order: a partner who was at the
+ *  other end the whole stand (a 0(0) not-out) is only knowable from the scorecard. */
+export function derivePartnerships(inningsBalls: BallRow[], restOfOrder: string[] = []): Stand[] {
+  const balls = [...inningsBalls].sort((a, b) => a.seq - b.seq)
+  const key = (n: string) => n.trim().toLowerCase()
+
+  // Order batters first appear in (a non-striker run out before facing is named by the dismissal).
+  const order: string[] = []
+  const idOf = new Map<string, string | null>()
+  const note = (name: string | null, id: string | null) => {
+    if (!name) return
+    const k = key(name)
+    if (!idOf.has(k)) { idOf.set(k, id); order.push(name) }
+    else if (id && !idOf.get(k)) idOf.set(k, id)
+  }
+  for (const b of balls) { note(b.batter, b.batter_player_id); note(b.dismissed_batter, b.dismissed_player_id) }
+  for (const n of restOfOrder) note(n, null)
+
+  const entered = new Set<string>()
+  const stands: Stand[] = []
+  let pair: string[] = []
+  let cur: { runs: Record<string, number>; faced: Record<string, number>; total: number; legal: number } | null = null
+  let score = 0, wkts = 0, legalSoFar = 0
+  let start = { score: 0, wkts: 0, balls: 0 }
+
+  const open = () => { cur = { runs: {}, faced: {}, total: 0, legal: 0 }; start = { score, wkts, balls: legalSoFar } }
+  const fillPartner = () => {
+    if (pair.length >= 2) return
+    const next = order.find(n => !entered.has(key(n)))
+    if (next) { pair.push(next); entered.add(key(next)) }
+  }
+  const close = (out: string | null) => {
+    if (!cur) return
+    fillPartner()
+    const mk = (n: string): StandBatter => ({
+      name: n, id: idOf.get(key(n)) ?? null, runs: cur!.runs[key(n)] ?? 0, balls: cur!.faced[key(n)] ?? 0,
+    })
+    if (pair.length > 0) {
+      stands.push({
+        wicket: stands.length + 1,
+        batters: [mk(pair[0]), pair[1] ? mk(pair[1]) : null],
+        runs: cur.total, balls: cur.legal,
+        startScore: start.score, startWkts: start.wkts, startBalls: start.balls,
+        endScore: score, endWkts: wkts, endBalls: legalSoFar, outBatter: out,
+      })
+    }
+    cur = null
+  }
+
+  for (const b of balls) {
+    if (!cur) open()
+    const k = key(b.batter)
+    if (!pair.some(p => key(p) === k)) { pair.push(order.find(n => key(n) === k) ?? b.batter); entered.add(k) }
+    cur!.total += b.runs_total
+    cur!.runs[k] = (cur!.runs[k] ?? 0) + b.runs_bat
+    if (ballsFaced(b)) cur!.faced[k] = (cur!.faced[k] ?? 0) + 1
+    if (b.is_legal) { cur!.legal++; legalSoFar++ }
+    score += b.runs_total
+    if (b.is_wicket) {
+      wkts++
+      const outName = (b.dismissed_batter && pair.find(p => key(p) === key(b.dismissed_batter!))) || pair.find(p => key(p) === k) || b.batter
+      close(outName)
+      pair = pair.filter(p => key(p) !== key(outName))   // the survivor carries into the next stand
+    }
+  }
+  if (cur) close(null)
+  return stands
+}

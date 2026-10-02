@@ -31,6 +31,7 @@ scorecard itself.
 | Piece | Location |
 |---|---|
 | Tab shell (fetches lazily, hides itself when there is no data) | `src/components/matches/MatchTabs.tsx` |
+| Partnerships view (replaces the FoW bars when commentary exists) | `src/components/matches/BallPartnerships.tsx` |
 | The four views | `src/components/matches/BallByBallViews.tsx` |
 | Pure aggregation, unit-tested | `src/lib/ballByBall.ts`, `ballByBall.test.ts` |
 | Data route | `GET /api/matches/history/[bookingId]/commentary` |
@@ -54,6 +55,15 @@ analytics read is logged and treated as "not available", never an error page.
   each phase (overs-runs-wickets).
 - **Fielding**: catches, caught-behind, stumpings and run-outs per Spartans fielder, plus
   every wicket (over, batter, how out, score).
+- **Full Scorecard → Partnerships**: when the match has Spartans-batting commentary, the
+  Fall-of-Wickets partnership bars are replaced by `BallPartnerships` (derived by
+  `derivePartnerships()` from the balls alone): per stand, both batters' runs (balls), the
+  stand total with balls (extras included, `*` = unbroken), and a bar growing out from the
+  centre for each batter (red left, teal right) scaled to the biggest single contribution.
+  The two biggest stands also show the score/overs where they started and ended. The survivor
+  of the previous stand is always on the left. A partner who never faced a ball is named from
+  the scorecard's batting order (`restOfOrder`). Matches without Spartans-batting commentary
+  keep the original bars untouched (`ScorecardTables` `partnershipsSlot` prop).
 - **Commentary**: a dropdown under the tab picks **Spartans batting** or **Spartans
   bowling**, then each over newest-first (like CricHeroes): bowler to batters, runs and
   wickets, the score after the over, a coloured chip per delivery (dot grey, 4 amber,

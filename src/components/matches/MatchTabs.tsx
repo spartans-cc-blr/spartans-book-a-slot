@@ -12,7 +12,8 @@
 import { useEffect, useRef, useState, type ComponentProps, type KeyboardEvent } from 'react'
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { BattingView, BowlingView, CommentaryView, FieldingView } from '@/components/matches/BallByBallViews'
-import { oversForFormat, type BallRow } from '@/lib/ballByBall'
+import { BallPartnerships } from '@/components/matches/BallPartnerships'
+import { ballsForSide, oversForFormat, type BallRow } from '@/lib/ballByBall'
 
 type ScorecardProps = ComponentProps<typeof ScorecardTables>
 
@@ -42,6 +43,18 @@ export function MatchTabs({ bookingId, format, ...scorecard }: { bookingId: stri
   if (!balls) return <ScorecardTables {...scorecard} />
 
   const totalOvers = oversForFormat(format, balls)
+
+  // Partnerships from the Spartans innings replace the Fall-of-Wickets bars on this tab; matches
+  // without Spartans-batting commentary keep the original bars.
+  const spartansBalls = ballsForSide(balls, 'spartans')
+  const restOfOrder = (scorecard.batting ?? [])
+    .filter(r => r?.dismissal_method !== 'did_not_bat')
+    .sort((a, b) => Number(a?.batting_order ?? 0) - Number(b?.batting_order ?? 0))
+    .map(r => String(r?.player_name ?? r?.name ?? '').trim())
+    .filter(Boolean)
+  const partnershipsSlot = spartansBalls.length > 0
+    ? <BallPartnerships balls={spartansBalls} restOfOrder={restOfOrder} />
+    : undefined
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const i = TABS.findIndex(t => t.key === tab)
@@ -80,7 +93,7 @@ export function MatchTabs({ bookingId, format, ...scorecard }: { bookingId: stri
       </div>
 
       <div role="tabpanel" id={`match-panel-${bookingId}`} aria-labelledby={`match-tab-${bookingId}-${tab}`}>
-        {tab === 'scorecard' && <ScorecardTables {...scorecard} />}
+        {tab === 'scorecard' && <ScorecardTables {...scorecard} partnershipsSlot={partnershipsSlot} />}
         {tab === 'batting' && <BattingView balls={balls} totalOvers={totalOvers} />}
         {tab === 'bowling' && <BowlingView balls={balls} totalOvers={totalOvers} />}
         {tab === 'fielding' && <FieldingView balls={balls} />}
