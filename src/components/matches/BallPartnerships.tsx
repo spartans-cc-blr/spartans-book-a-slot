@@ -1,22 +1,21 @@
 'use client'
 
 // Partnerships for a Spartans innings rebuilt from ball-by-ball: each stand shows both
-// batters' runs (balls), the stand total, and a bar split between the two. The biggest two
-// stands open up to show the score and overs where they began and ended.
+// batters' runs (balls), the stand total, and a bar split between the two. Tapping a stand
+// opens it to show the score and overs where it began and ended; closed by default.
 // Shown in place of the Fall-of-Wickets partnership bars only on matches with commentary.
 
-import { PlayerNameLink } from '@/lib/playerLink'
+import { useState } from 'react'
 import { derivePartnerships, formatOvers, type BallRow, type Stand, type StandBatter } from '@/lib/ballByBall'
 
 const ORDINAL = ['', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th']
-const HIGHLIGHT_COUNT = 2
 
 function BatterSide({ b, align }: { b: StandBatter | null; align: 'left' | 'right' }) {
   const cls = align === 'left' ? 'text-left' : 'text-right'
   if (!b) return <div className={`${cls} min-w-0 text-[var(--scorecard-text-faint)]`}>—</div>
   return (
     <div className={`${cls} min-w-0`}>
-      <div className="truncate text-[var(--scorecard-heading-text)] font-semibold"><PlayerNameLink name={b.name} playerId={b.id} /></div>
+      <div className="truncate text-[var(--scorecard-heading-text)] font-semibold">{b.name}</div>
       <div className="tabular-nums text-[var(--scorecard-text-2)]">
         <span className="text-sm font-bold">{b.runs}</span>
         <span className="text-[var(--scorecard-text-faint)]"> ({b.balls})</span>
@@ -47,22 +46,27 @@ function Point({ label, score, wkts, balls, align }: { label: string; score: num
   )
 }
 
-function StandRow({ s, max, highlight }: { s: Stand; max: number; highlight: boolean }) {
+function StandRow({ s, max, bookingKey }: { s: Stand; max: number; bookingKey: string }) {
+  const [open, setOpen] = useState(false)
   const [a, b] = s.batters
+  const panelId = `stand-${bookingKey}-${s.wicket}`
   return (
-    <li className={highlight ? 'rounded-lg bg-[var(--scorecard-divider)]/40 p-3' : 'px-1'}>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <BatterSide b={a} align="left" />
-        <div className="text-center tabular-nums">
-          <div className="text-[10px] uppercase tracking-wide text-[var(--scorecard-text-faint)]">{ORDINAL[s.wicket] ?? `${s.wicket}th`} wkt</div>
-          <div className="text-lg font-bold text-[var(--scorecard-heading-text)] leading-none">{s.runs}{s.outBatter == null && '*'}</div>
-          <div className="text-[var(--scorecard-text-faint)]">({s.balls})</div>
+    <li>
+      <button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(o => !o)}
+        className={`w-full text-left rounded-lg px-2 py-2 transition-colors hover:bg-[var(--scorecard-divider)]/30 ${open ? 'bg-[var(--scorecard-divider)]/40' : ''}`}>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <BatterSide b={a} align="left" />
+          <div className="text-center tabular-nums">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--scorecard-text-faint)]">{ORDINAL[s.wicket] ?? `${s.wicket}th`} wkt</div>
+            <div className="text-lg font-bold text-[var(--scorecard-heading-text)] leading-none">{s.runs}{s.outBatter == null && '*'}</div>
+            <div className="text-[var(--scorecard-text-faint)]">({s.balls})</div>
+          </div>
+          <BatterSide b={b} align="right" />
         </div>
-        <BatterSide b={b} align="right" />
-      </div>
-      <SplitBar a={a.runs} b={b?.runs ?? 0} max={max} />
-      {highlight && (
-        <div className="mt-3 flex items-center gap-2">
+        <SplitBar a={a.runs} b={b?.runs ?? 0} max={max} />
+      </button>
+      {open && (
+        <div id={panelId} className="mt-2 px-2 flex items-center gap-2">
           <Point label="Start" score={s.startScore} wkts={s.startWkts} balls={s.startBalls} align="left" />
           <span aria-hidden className="text-[var(--scorecard-text-faint)]">›</span>
           <Point label="End" score={s.endScore} wkts={s.endWkts} balls={s.endBalls} align="right" />
@@ -73,20 +77,17 @@ function StandRow({ s, max, highlight }: { s: Stand; max: number; highlight: boo
 }
 
 /** `restOfOrder`: batters in batting order, so a partner who never faced a ball can still be named. */
-export function BallPartnerships({ balls, restOfOrder }: { balls: BallRow[]; restOfOrder: string[] }) {
+export function BallPartnerships({ balls, restOfOrder, bookingKey = '' }: { balls: BallRow[]; restOfOrder: string[]; bookingKey?: string }) {
   const stands = derivePartnerships(balls, restOfOrder)
   if (stands.length === 0) return null
 
   const max = stands.reduce((m, s) => Math.max(m, s.batters[0].runs, s.batters[1]?.runs ?? 0), 0)
-  const top = new Set(
-    [...stands].filter(s => s.runs > 0).sort((x, y) => y.runs - x.runs).slice(0, HIGHLIGHT_COUNT).map(s => s.wicket),
-  )
 
   return (
     <div>
       <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Partnerships</p>
-      <ul className="space-y-4 font-rajdhani text-xs">
-        {stands.map(s => <StandRow key={s.wicket} s={s} max={max} highlight={top.has(s.wicket)} />)}
+      <ul className="space-y-1 font-rajdhani text-xs">
+        {stands.map(s => <StandRow key={s.wicket} s={s} max={max} bookingKey={bookingKey} />)}
       </ul>
     </div>
   )

@@ -53,7 +53,7 @@ export function MatchTabs({ bookingId, format, ...scorecard }: { bookingId: stri
     .map(r => String(r?.player_name ?? r?.name ?? '').trim())
     .filter(Boolean)
   const partnershipsSlot = spartansBalls.length > 0
-    ? <BallPartnerships balls={spartansBalls} restOfOrder={restOfOrder} />
+    ? <BallPartnerships balls={spartansBalls} restOfOrder={restOfOrder} bookingKey={bookingId} />
     : undefined
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
