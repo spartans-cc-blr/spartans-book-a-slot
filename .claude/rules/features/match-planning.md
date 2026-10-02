@@ -36,11 +36,11 @@ Captains' Corner section of the mobile More sheet (`activePage="captains-plannin
 ## 2. What it shows
 
 - **Header** — the opponent, date/slot/format/tournament, record, and how many
-  meetings have ball-by-ball data. A pill row switches between the next 15
+  meetings have ball-by-ball data. A dropdown (`MatchPlanningPicker`, client component) switches between the next 15
   upcoming confirmed games that have an opponent set (`?booking=<id>`,
   defaults to the soonest).
 - **What stood out** — rule-based pointers (§4).
-- **Every meeting / match** — a collapsed dropdown (`<details>`, count in the header): date (links to the match), result, scores, our top
+- **Every meeting / match** — date (links to the match), result, scores, our top
   scorer and theirs.
 - **Phase tables** — our batting and our bowling by Powerplay / Middle / Death,
   summed over all meetings (runs, balls, RPO, wickets, dot %). Phases use the
@@ -133,6 +133,7 @@ thresholds, change the constants and the table above.
 | File | Role |
 |---|---|
 | `src/app/captains-corner/match-planning/page.tsx` | The page |
+| `src/components/captains/MatchPlanningPicker.tsx` | Upcoming-game dropdown |
 | `src/lib/matchPlanningData.ts` | Server fetch (§3) |
 | `src/lib/matchPlanning.ts` (+ `.test.ts`) | Pure aggregation and pointers |
 | `src/components/ui/SiteNav.tsx`, `src/components/ui/MobileTabBar.tsx` | Nav entries, `captains-planning` added to the highlight list |
