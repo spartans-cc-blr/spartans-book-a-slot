@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { DateChipSlider } from '@/components/ui/DateChipSlider'
+import { groupDatesIntoChips } from '@/lib/dateChipGroups'
 import {
   COMMENTARY_SIDES, SIDE_LABEL, validateCommentaryPdf,
   type CommentaryMatchOption, type CommentaryResult, type CommentarySide,
@@ -26,12 +28,28 @@ function matchLabel(m: CommentaryMatchOption) {
 
 export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[] }) {
   const [bookingId, setBookingId] = useState(matches[0]?.booking_id ?? '')
+  const [dayFilter, setDayFilter] = useState<string | null>(null)
   const [sides, setSides] = useState<Record<CommentarySide, SideState>>({
     spartans: EMPTY, opponent: EMPTY,
   })
 
   function patch(side: CommentarySide, next: Partial<SideState>) {
     setSides(prev => ({ ...prev, [side]: { ...prev[side], ...next } }))
+  }
+
+  // Date chips, same picker as the match history: narrows the dropdown to those dates.
+  const dateChipGroups = useMemo(
+    () => groupDatesIntoChips(Array.from(new Set(matches.map(m => m.game_date))).sort()).reverse(),
+    [matches],
+  )
+  const selectedGroup = dayFilter ? dateChipGroups.find(g => g.key === dayFilter) : undefined
+  const visibleMatches = selectedGroup ? matches.filter(m => selectedGroup.dates.includes(m.game_date)) : matches
+
+  function changeDay(key: string | null) {
+    setDayFilter(key)
+    const group = key ? dateChipGroups.find(g => g.key === key) : undefined
+    const next = group ? matches.filter(m => group.dates.includes(m.game_date)) : matches
+    if (!next.some(m => m.booking_id === bookingId) && next[0]) changeMatch(next[0].booking_id)
   }
 
   function changeMatch(id: string) {
@@ -91,11 +109,19 @@ export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[]
 
   return (
     <div className="space-y-5">
+      {dateChipGroups.length > 0 && (
+        <div className="bg-ink-4 border border-ink-5 rounded-xl p-3">
+          <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={changeDay} />
+        </div>
+      )}
+
       <div className="bg-ink-3 border border-ink-5 rounded p-4">
-        <label className="form-label" htmlFor="commentary-match">Match</label>
+        <label className="form-label" htmlFor="commentary-match">
+          Match <span className="text-zinc-500 font-normal">({visibleMatches.length}{dayFilter ? ` of ${matches.length}` : ''})</span>
+        </label>
         <select id="commentary-match" className="form-input" value={bookingId}
           onChange={e => changeMatch(e.target.value)}>
-          {matches.map(m => (
+          {visibleMatches.map(m => (
             <option key={m.booking_id} value={m.booking_id}>{matchLabel(m)}</option>
           ))}
         </select>

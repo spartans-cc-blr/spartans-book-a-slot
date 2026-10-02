@@ -3,7 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase'
 import { hasMatchEnded } from '@/lib/matchStatus'
-import { SCORECARD_IMPORTED_STATUSES, type CommentaryMatchOption } from '@/lib/commentary'
+import type { CommentaryMatchOption } from '@/lib/commentary'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { CommentaryClient } from '@/components/wrangler/CommentaryClient'
 import type { Metadata } from 'next'
@@ -21,30 +21,26 @@ export default async function CommentaryPage() {
 
   const supabase = createServiceClient()
 
-  // Only matches that have finished AND whose scorecard is already imported:
-  // ball-by-ball attaches to the existing match_stats row, so there is nothing
-  // to attach to until then. Nothing here refetches a scorecard.
+  // Every finished match whose scorecard is already in: ball-by-ball attaches to the existing
+  // match_stats row, so there is nothing to attach to until then. "Scorecard is in" is decided by
+  // match_stats_cache, the same table the match history reads, so this list matches the history.
+  // (It used to be capped to the newest 80 bookings and to ones with a scorecard_uploads row, which
+  // hid older and backfilled matches.) Nothing here refetches a scorecard.
+  const { data: cached } = await supabase
+    .from('match_stats_cache')
+    .select('booking_id')
+    .not('booking_id', 'is', null)
+  const inCache = new Set((cached ?? []).map(c => c.booking_id as string))
+
   const { data: bookings } = await supabase
     .from('bookings')
     .select('id, game_date, slot_time, format, opponent_name, match_id')
     .eq('status', 'confirmed')
     .not('match_id', 'is', null)
     .order('game_date', { ascending: false })
-    .limit(80)
 
-  const ended = (bookings ?? []).filter(b => hasMatchEnded(b.game_date, b.slot_time, b.format))
-
-  const { data: uploads } = ended.length
-    ? await supabase
-        .from('scorecard_uploads')
-        .select('booking_id')
-        .in('booking_id', ended.map(b => b.id))
-        .in('status', [...SCORECARD_IMPORTED_STATUSES])
-    : { data: [] as { booking_id: string }[] }
-
-  const imported = new Set((uploads ?? []).map(u => u.booking_id))
-  const matches: CommentaryMatchOption[] = ended
-    .filter(b => imported.has(b.id))
+  const matches: CommentaryMatchOption[] = (bookings ?? [])
+    .filter(b => inCache.has(b.id) && hasMatchEnded(b.game_date, b.slot_time, b.format))
     .map(b => ({
       booking_id:    b.id,
       match_id:      String(b.match_id),
