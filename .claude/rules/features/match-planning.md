@@ -8,7 +8,7 @@
 
 A pre-match page for captains. Pick an upcoming game and it shows how we did
 in past matches and how each player who has marked **Y / O / E** for the game
-did, through three independent lenses (tabs, `?lens=`, default `opponent`):
+did, through three independent lenses (tabs in the order Opponent, Tournament, Ground; `?lens=`, default `opponent`):
 
 | Lens | History is every past non-practice synced match… |
 |---|---|
