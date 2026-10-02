@@ -156,6 +156,7 @@ export interface OverGroup {
   over_no: number
   bowlers: string[]
   batters: string[]
+  batterScores: { name: string; runs: number; balls: number }[]   // what each batter scored in this over, in order of facing
   runs: number
   wickets: number
   legalBalls: number
@@ -178,6 +179,10 @@ export function groupOvers(balls: BallRow[]): OverGroup[] {
         over_no,
         bowlers: uniq(list.map(b => b.bowler)),
         batters: uniq(list.map(b => b.batter)),
+        batterScores: uniq(list.map(b => b.batter)).map(name => {
+          const faced = list.filter(b => b.batter === name)
+          return { name, runs: faced.reduce((n, b) => n + b.runs_bat, 0), balls: faced.filter(ballsFaced).length }
+        }),
         runs: list.reduce((s, b) => s + b.runs_total, 0),
         wickets: list.filter(b => b.is_wicket).length,
         legalBalls: list.filter(b => b.is_legal).length,

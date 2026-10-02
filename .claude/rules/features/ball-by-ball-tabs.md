@@ -68,7 +68,7 @@ analytics read is logged and treated as "not available", never an error page.
 - **Commentary**: a dropdown under the tab picks **Spartans batting** or **Spartans
   bowling**, then each over newest-first (like CricHeroes): bowler to batters, runs and
   wickets, the score after the over, a coloured chip per delivery (dot grey, 4 amber,
-  6 green, wide/no-ball rose, wicket red), and the dismissal line under any over with a wicket.
+  6 green, wide/no-ball rose, wicket red), and the dismissal line under any over with a wicket. On **Spartans batting** each over also lists what every batter scored in it, `Name runs (balls)` in the order they faced (wides not counted as balls faced); the bowling innings doesn't show this.
 
 ### Definitions (checked against the stored CricHeroes scorecard)
 

@@ -375,3 +375,18 @@ describe('derivePartnerships', () => {
     expect(derivePartnerships([])).toEqual([])
   })
 })
+
+describe('batterScores per over', () => {
+  it('sums what each batter scored in the over, wides not counted as faced', () => {
+    resetSeq()
+    const rows = [
+      ball({ batting_side: 'spartans', batter: 'A', runs_bat: 4, runs_total: 4 }),
+      ball({ batting_side: 'spartans', batter: 'A', extra_type: 'wide', is_legal: false, extras: 1, runs_total: 1 }),
+      ball({ batting_side: 'spartans', batter: 'B', runs_bat: 1, runs_total: 1 }),
+      ball({ batting_side: 'spartans', batter: 'A', runs_bat: 2, runs_total: 2 }),
+    ]
+    expect(groupOvers(rows)[0].batterScores).toEqual([
+      { name: 'A', runs: 6, balls: 2 }, { name: 'B', runs: 1, balls: 1 },
+    ])
+  })
+})

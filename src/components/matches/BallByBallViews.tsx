@@ -427,6 +427,17 @@ export function CommentaryView({ balls }: { balls: BallRow[] }) {
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {o.balls.map(b => <Chip key={b.seq} ball={b} />)}
               </div>
+              {side === 'spartans' && (
+                <p className="font-rajdhani text-xs mt-1 text-[var(--scorecard-text-2)]">
+                  {o.batterScores.map((s, i) => (
+                    <span key={s.name}>
+                      {i > 0 && <span className="text-[var(--scorecard-text-faint)]"> · </span>}
+                      {s.name} <span className="font-semibold tabular-nums">{s.runs}</span>
+                      <span className="text-[var(--scorecard-text-faint)] tabular-nums"> ({s.balls})</span>
+                    </span>
+                  ))}
+                </p>
+              )}
               {wickets.map(w => (
                 <p key={w.seq} className="font-rajdhani text-xs mt-1" style={{ color: 'var(--fx-danger-text)' }}>
                   {w.dismissed_batter ?? w.batter} {howOut(w.dismissed_batter ?? w.batter, w.dismissal_text, w.dismissal_kind)}
