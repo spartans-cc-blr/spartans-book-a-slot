@@ -1215,3 +1215,11 @@ Grounds and Opponents in the desktop **Wrangler ⚒** dropdown, and as a
 "Commentary" row in the same position of the mobile "More" sheet's Wrangler
 section. Visible whenever `isWrangler` (which already includes `isAdmin`). See
 `features/commentary-upload.md`.
+
+### Opponent Scouting in Captains' Corner ▾ (added October 2026)
+
+🔍 Opponent Scouting (→ `/captains-corner/opponent-scouting`,
+`activePage="captains-scouting"`) is the last item of the desktop **Captains'
+Corner ▾** dropdown and of the mobile More sheet's Captains' Corner section;
+`captains-scouting` also highlights the dropdown and the More tab. See
+`features/opponent-scouting.md`.
