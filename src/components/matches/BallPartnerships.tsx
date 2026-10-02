@@ -63,7 +63,7 @@ function StandRow({ s, max, bookingKey }: { s: Stand; max: number; bookingKey: s
           </div>
           <BatterSide b={b} align="right" />
         </div>
-        <SplitBar a={a.runs} b={b?.runs ?? 0} max={max} />
+        <SplitBar a={a?.runs ?? 0} b={b?.runs ?? 0} max={max} />
       </button>
       {open && (
         <div id={panelId} className="mt-2 px-2 flex items-center gap-2">
@@ -81,7 +81,7 @@ export function BallPartnerships({ balls, restOfOrder, bookingKey = '' }: { ball
   const stands = derivePartnerships(balls, restOfOrder)
   if (stands.length === 0) return null
 
-  const max = stands.reduce((m, s) => Math.max(m, s.batters[0].runs, s.batters[1]?.runs ?? 0), 0)
+  const max = stands.reduce((m, s) => Math.max(m, s.batters[0]?.runs ?? 0, s.batters[1]?.runs ?? 0), 0)
 
   return (
     <div>

@@ -455,7 +455,7 @@ export interface StandBatter {
 
 export interface Stand {
   wicket:      number          // 1 = opening stand; the Nth stand follows the (N-1)th wicket
-  batters:     [StandBatter, StandBatter | null]   // earlier-in first (the survivor of the previous stand)
+  batters:     [StandBatter | null, StandBatter | null]   // [left, right]: each batter keeps the side he first appeared on
   runs:        number          // everything scored in the stand, extras included
   balls:       number          // legal deliveries
   startScore:  number
@@ -488,16 +488,18 @@ export function derivePartnerships(inningsBalls: BallRow[], restOfOrder: string[
 
   const entered = new Set<string>()
   const stands: Stand[] = []
-  let pair: string[] = []
+  // [left, right]: a batter keeps his side for the whole innings; a newcomer takes the vacated one.
+  let pair: (string | null)[] = [null, null]
+  const has = (n: string) => pair.some(p => p != null && key(p) === key(n))
+  const seat = (n: string) => { const i = pair.indexOf(null); if (i >= 0) { pair[i] = n; entered.add(key(n)) } }
   let cur: { runs: Record<string, number>; faced: Record<string, number>; total: number; legal: number } | null = null
   let score = 0, wkts = 0, legalSoFar = 0
   let start = { score: 0, wkts: 0, balls: 0 }
 
   const open = () => { cur = { runs: {}, faced: {}, total: 0, legal: 0 }; start = { score, wkts, balls: legalSoFar } }
   const fillPartner = () => {
-    if (pair.length >= 2) return
     const next = order.find(n => !entered.has(key(n)))
-    if (next) { pair.push(next); entered.add(key(next)) }
+    if (next) seat(next)
   }
   const close = (out: string | null) => {
     if (!cur) return
@@ -505,10 +507,10 @@ export function derivePartnerships(inningsBalls: BallRow[], restOfOrder: string[
     const mk = (n: string): StandBatter => ({
       name: n, id: idOf.get(key(n)) ?? null, runs: cur!.runs[key(n)] ?? 0, balls: cur!.faced[key(n)] ?? 0,
     })
-    if (pair.length > 0) {
+    if (pair[0] != null || pair[1] != null) {
       stands.push({
         wicket: stands.length + 1,
-        batters: [mk(pair[0]), pair[1] ? mk(pair[1]) : null],
+        batters: [pair[0] != null ? mk(pair[0]) : null, pair[1] != null ? mk(pair[1]) : null],
         runs: cur.total, balls: cur.legal,
         startScore: start.score, startWkts: start.wkts, startBalls: start.balls,
         endScore: score, endWkts: wkts, endBalls: legalSoFar, outBatter: out,
@@ -520,7 +522,7 @@ export function derivePartnerships(inningsBalls: BallRow[], restOfOrder: string[
   for (const b of balls) {
     if (!cur) open()
     const k = key(b.batter)
-    if (!pair.some(p => key(p) === k)) { pair.push(order.find(n => key(n) === k) ?? b.batter); entered.add(k) }
+    if (!has(b.batter)) seat(order.find(n => key(n) === k) ?? b.batter)
     cur!.total += b.runs_total
     cur!.runs[k] = (cur!.runs[k] ?? 0) + b.runs_bat
     if (ballsFaced(b)) cur!.faced[k] = (cur!.faced[k] ?? 0) + 1
@@ -528,9 +530,9 @@ export function derivePartnerships(inningsBalls: BallRow[], restOfOrder: string[
     score += b.runs_total
     if (b.is_wicket) {
       wkts++
-      const outName = (b.dismissed_batter && pair.find(p => key(p) === key(b.dismissed_batter!))) || pair.find(p => key(p) === k) || b.batter
+      const outName = (b.dismissed_batter && has(b.dismissed_batter) ? b.dismissed_batter : null) ?? b.batter
       close(outName)
-      pair = pair.filter(p => key(p) !== key(outName))   // the survivor carries into the next stand
+      pair = pair.map(p => (p != null && key(p) === key(outName) ? null : p))   // the survivor stays put
     }
   }
   if (cur) close(null)
