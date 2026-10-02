@@ -150,16 +150,28 @@ export async function getPlanningContext(bookingId?: string | null, lens: Lens =
     opponentName: m.opponentLabel, cricheroesUrl: urlByBooking.get(m.bookingId) ?? null,
   }))
 
-  const { data: av } = await hub
+  // availability has two FKs to players (player_id and updated_by), so embedding
+  // players(...) is ambiguous in PostgREST and errors. Fetch the two separately.
+  const { data: av, error: avErr } = await hub
     .from('availability')
-    .select('response, players(id, name, status, cricheroes_url)')
+    .select('player_id, response')
     .eq('booking_id', pick.id)
     .in('response', ['Y', 'O', 'E'])
-  const available: AvailablePlayer[] = ((av ?? []) as any[])
-    .map(r => ({ r, p: one<any>(r.players) }))
-    .filter(x => x.p && x.p.status !== 'expelled')
-    .map(x => ({ id: x.p.id, name: x.p.name, response: x.r.response, cricHeroesUrl: x.p.cricheroes_url ?? null }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  if (avErr) console.error('[match-planning] availability read failed:', avErr.message)
+  const respByPlayer = new Map<string, 'Y' | 'O' | 'E'>(
+    ((av ?? []) as any[]).map(r => [r.player_id as string, r.response as 'Y' | 'O' | 'E']))
+  let available: AvailablePlayer[] = []
+  if (respByPlayer.size > 0) {
+    const { data: ps, error: pErr } = await hub
+      .from('players')
+      .select('id, name, status, cricheroes_url')
+      .in('id', Array.from(respByPlayer.keys()))
+    if (pErr) console.error('[match-planning] players read failed:', pErr.message)
+    available = ((ps ?? []) as any[])
+      .filter(p => p.status !== 'expelled')
+      .map(p => ({ id: p.id, name: p.name, response: respByPlayer.get(p.id)!, cricHeroesUrl: p.cricheroes_url ?? null }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
 
   const scopeLabel = lens === 'ground' ? selected.groundName : lens === 'tournament' ? selected.tournamentName : selected.opponentName
   return { upcoming, lens, scopeLabel, selected, history, scored, missing, available }
