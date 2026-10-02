@@ -64,7 +64,7 @@ function CenterResult({ line }: { line: ResultLine | null }) {
 // Equal-width column; toss sits left, top scorer centred, best bowler right,
 // with the batting-scorecard row-divider colour as the vertical separator.
 // Indian ₹1 coin: stainless-steel silver disc, raised rim, inner ring and
-// the ₹ / "1" reverse motif. Purely decorative, replaces the 🪙 emoji.
+// the ₹ motif. Purely decorative, replaces the 🪙 emoji.
 function RupeeCoin({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
@@ -78,8 +78,7 @@ function RupeeCoin({ size = 20 }: { size?: number }) {
       <circle cx="12" cy="12" r="11.5" fill="url(#rc-steel)" stroke="#6B737C" strokeWidth="0.8" />
       <circle cx="12" cy="12" r="9.6" fill="none" stroke="#7A828B" strokeWidth="0.7" strokeDasharray="0.9 0.9" />
       <circle cx="12" cy="12" r="8" fill="none" stroke="#9AA2AB" strokeWidth="0.5" />
-      <text x="12" y="10.6" textAnchor="middle" fontSize="6.4" fontWeight="700" fill="#4A525B" fontFamily="system-ui, sans-serif">₹</text>
-      <text x="12" y="18" textAnchor="middle" fontSize="8" fontWeight="800" fill="#4A525B" fontFamily="system-ui, sans-serif">1</text>
+      <text x="12" y="16.2" textAnchor="middle" fontSize="12" fontWeight="700" fill="#4A525B" fontFamily="system-ui, sans-serif">₹</text>
     </svg>
   )
 }

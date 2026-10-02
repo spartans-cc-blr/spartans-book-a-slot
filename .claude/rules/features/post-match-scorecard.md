@@ -2299,7 +2299,7 @@ the stacked toss line + score line + `MatchResultBadge` + top-bat/bowl line;
 
 - Batters who remained not out (`not_out = 'Y'`) carry a `*` right after their name in the Batting table.
 
-- The toss cell's icon is `RupeeCoin` (inline SVG of an Indian ₹1 coin: steel disc, dotted rim, ₹ and 1) instead of the 🪙 emoji.
+- The toss cell's icon is `RupeeCoin` (inline SVG of an Indian ₹1 coin: steel disc, dotted rim, a single ₹) instead of the 🪙 emoji.
 
 ## 18. Re-pulling older scorecards — no fee, milestone or performer prompts (added September 2026)
 
