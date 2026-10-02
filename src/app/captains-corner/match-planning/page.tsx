@@ -257,9 +257,11 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                   </div>
                 )}
 
-                <div className={card}>
-                  <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
-                  <ul className="space-y-2">
+                <details className={card}>
+                  <summary className="cursor-pointer select-none font-cinzel text-sm font-bold tracking-wide text-[var(--stats-text)]">
+                    {lens === 'opponent' ? 'Every meeting' : 'Every match'} ({team.matches.length}) <span className={`font-rajdhani text-xs font-normal ${muted}`}>tap to expand</span>
+                  </summary>
+                  <ul className="space-y-2 mt-3">
                     {team.matches.map(m => (
                       <li key={m.bookingId} className="font-rajdhani text-sm">
                         <Link href={`/matches/history/${m.bookingId}`} className="font-bold text-[var(--stats-text)] underline decoration-dotted">{fmtDate(m.gameDate)}</Link>
@@ -272,7 +274,7 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                       </li>
                     ))}
                   </ul>
-                </div>
+                </details>
 
                 <div className={`${card} grid gap-5 md:grid-cols-2`}>
                   <PhaseTable title="Our batting by phase (all matches in view)" t={team.batting} wicketLabel="Lost" />

@@ -40,7 +40,7 @@ Captains' Corner section of the mobile More sheet (`activePage="captains-plannin
   upcoming confirmed games that have an opponent set (`?booking=<id>`,
   defaults to the soonest).
 - **What stood out** — rule-based pointers (§4).
-- **Every meeting** — date (links to the match), result, scores, our top
+- **Every meeting / match** — a collapsed dropdown (`<details>`, count in the header): date (links to the match), result, scores, our top
   scorer and theirs.
 - **Phase tables** — our batting and our bowling by Powerplay / Middle / Death,
   summed over all meetings (runs, balls, RPO, wickets, dot %). Phases use the
@@ -74,8 +74,11 @@ Captains' Corner section of the mobile More sheet (`activePage="captains-plannin
 3. Ball rows for those `match_id`s from the analytics view
    `ball_by_ball_linked`, paged with `fetchAllRows()` (PostgREST caps a
    response at 1000 rows, and several matches exceed that).
-4. `availability` rows with `response IN ('Y','O','E')` for the booking,
-   expelled players dropped.
+4. `availability` rows with `response IN ('Y','O','E')` for the booking, then the
+   players in a second query (expelled dropped). **Do not embed `players(...)`
+   in the availability select:** `availability` has two FKs to `players`
+   (`player_id`, `updated_by`), PostgREST rejects the ambiguous embed, and the
+   page then showed nobody available. Errors are logged, not swallowed.
 
 `src/lib/matchPlanning.ts` (pure, client-safe, `matchPlanning.test.ts`)
 does the aggregation by reusing `phaseSplit()`, `summariseBatters()` and
