@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
+import { MatchPlanningPicker } from '@/components/captains/MatchPlanningPicker'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
 import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
@@ -158,17 +159,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
             For an upcoming game: how we have done against the opponent, at the ground and in the tournament, and how
             the players available did in each. Pick a view below; they are independent. Practice games are not counted.
           </p>
-          {ctx.upcoming.length > 0 && (
-            <div className="flex gap-2 flex-wrap mt-3">
-              {ctx.upcoming.map(u => (
-                <Link key={u.id} href={href(u.id, lens)} replace scroll={false}
-                  className={`font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full border transition-colors
-                    ${u.id === sel?.id ? 'bg-[var(--stats-accent)] border-[var(--stats-accent)] text-white dark:text-ink'
-                      : 'border-[var(--stats-card-border)] text-[var(--stats-text-muted)] hover:text-[var(--stats-text)]'}`}>
-                  {fmtDate(u.gameDate)} · {u.opponentName}
-                </Link>
-              ))}
-            </div>
+          {ctx.upcoming.length > 0 && sel && (
+            <MatchPlanningPicker selectedId={sel.id} lens={lens}
+              options={ctx.upcoming.map(u => ({ id: u.id, label: `${fmtDate(u.gameDate)} · ${u.slotTime} · ${u.opponentName}` }))} />
           )}
           {sel && (
             <div className="flex gap-1 mt-4 border-b border-[var(--stats-card-border)]">
@@ -257,11 +250,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                   </div>
                 )}
 
-                <details className={card}>
-                  <summary className="cursor-pointer select-none font-cinzel text-sm font-bold tracking-wide text-[var(--stats-text)]">
-                    {lens === 'opponent' ? 'Every meeting' : 'Every match'} ({team.matches.length}) <span className={`font-rajdhani text-xs font-normal ${muted}`}>tap to expand</span>
-                  </summary>
-                  <ul className="space-y-2 mt-3">
+                <div className={card}>
+                  <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
+                  <ul className="space-y-2">
                     {team.matches.map(m => (
                       <li key={m.bookingId} className="font-rajdhani text-sm">
                         <Link href={`/matches/history/${m.bookingId}`} className="font-bold text-[var(--stats-text)] underline decoration-dotted">{fmtDate(m.gameDate)}</Link>
@@ -274,7 +265,7 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                       </li>
                     ))}
                   </ul>
-                </details>
+                </div>
 
                 <div className={`${card} grid gap-5 md:grid-cols-2`}>
                   <PhaseTable title="Our batting by phase (all matches in view)" t={team.batting} wicketLabel="Lost" />
