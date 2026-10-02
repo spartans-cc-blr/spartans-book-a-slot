@@ -52,10 +52,10 @@ export default async function CommentaryPage() {
   return (
     <>
       <SiteNav activePage="wrangler" />
-      <main className="min-h-screen bg-ink-1 px-4 md:px-8 py-8 max-w-3xl mx-auto">
+      <main className="min-h-screen bg-[#F8F4EE] dark:bg-ink-1 px-4 md:px-8 py-8 max-w-3xl mx-auto">
         <div className="mb-6">
           <h1 className="font-cinzel text-xl font-bold text-gold">Ball-by-ball Commentary</h1>
-          <p className="font-rajdhani text-sm text-zinc-500 mt-1">
+          <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 mt-1">
             Attach ball-by-ball data to a match whose scorecard is already in. Upload the printed
             CricHeroes commentary PDF for each innings — Spartans batting and the opponent batting.
           </p>
