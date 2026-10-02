@@ -628,6 +628,31 @@ export function MatchHistoryClient({
   )
 }
 
+// Share the standalone match page (/matches/history/[bookingId], visible to any
+// signed-in member). Native share sheet where available, else copies the link.
+function MatchShareButton({ bookingId }: { bookingId: string }) {
+  const [copied, setCopied] = useState(false)
+  async function share() {
+    const url = `${window.location.origin}/matches/history/${bookingId}`
+    try {
+      if (navigator.share) { await navigator.share({ title: 'Spartans Match', url }); return }
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* user cancelled the share sheet */ }
+  }
+  return (
+    <button type="button" onClick={share} title="Share this match" aria-label="Share this match"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--scorecard-text-muted)', fontSize: '10px', fontWeight: 600 }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+        <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" /><line x1="15.4" y1="6.5" x2="8.6" y2="10.5" />
+      </svg>
+      {copied && <span>Link copied</span>}
+    </button>
+  )
+}
+
 function MatchHistoryCard({
   match, canEditRoles, canEditTournament, isWrangler, onScorecardStatusChange, onMatchPatch,
 }: {
@@ -742,11 +767,14 @@ function MatchHistoryCard({
             ? match.match_time.slice(0, 5).replace(/^0/, '') + ' ' + (parseInt(match.match_time) < 12 ? 'AM' : 'PM')
             : slotLabel(match.slot_time)}
         </span>
-        {match.format && (
-          <span style={{ background: '#1E3A5F', color: '#93C5FD', fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', letterSpacing: '0.08em' }}>
-            {match.format}
-          </span>
-        )}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+          {match.format && (
+            <span style={{ background: '#1E3A5F', color: '#93C5FD', fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', letterSpacing: '0.08em' }}>
+              {match.format}
+            </span>
+          )}
+          <MatchShareButton bookingId={match.booking_id} />
+        </span>
       </div>
 
       {/* Tournament + opponent */}

@@ -2336,6 +2336,17 @@ one by hand from `/admin/bookings/[id]`; it just isn't nagged. To move the
 cutoff, change the one constant. The wrangler's "Request top performer to
 verify" share button (§15) is a manual action and is unchanged.
 
+## 19. Share button on Past Matches cards (added October 2026)
+
+Each `MatchHistoryCard` on `/matches/history` has a share icon beside the
+format pill (`MatchShareButton`, `MatchHistoryClient.tsx`). It shares
+`<origin>/matches/history/<bookingId>`, the standalone match page any signed-in
+member can open (§9, §15): the native share sheet where available, else it
+copies the link and shows "Link copied" for two seconds. The upcoming-fixture
+cards already had an equivalent (`FixtureShareButton`, pointing at
+`/fixtures/<id>`); past matches had none. Viewers who aren't signed in are sent
+to login by that page, same as any direct link.
+
 ---
 
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*
