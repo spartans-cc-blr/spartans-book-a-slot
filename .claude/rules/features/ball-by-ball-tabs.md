@@ -66,7 +66,9 @@ dots, 4s, 6s, wides) and all 7 batters (runs, balls, 4s, 6s).
 
 - Balls faced: every delivery except a wide (a no-ball counts).
 - Bowler runs: bat runs + wides + no-balls; byes and leg-byes are not charged.
-- Bowler dot: a legal ball with no runs at all. Maiden: a completed over with nothing charged.
+- Bowler dot: a legal ball with nothing charged to the bowler, so a bye or leg-bye is a dot (verified
+  on Trumphate v Spartans, 1 Aug 2026, which has one of each; the scorecard counts them that way).
+  The Batting tab's dot% counts legal balls with nothing off the bat. Maiden: a completed over with nothing charged.
 - Bowler wickets exclude run-outs, retirements, obstructing, handled-ball and timed-out.
 - Phases follow the club's per-format definition (`PHASE_PLANS` in `ballByBall.ts`; overs are
   1-based and inclusive): **T20** powerplay 1–6, middle 7–15, death 16–20; **T30** powerplay

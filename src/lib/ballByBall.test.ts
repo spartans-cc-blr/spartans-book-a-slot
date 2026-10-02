@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, hasDefinedPhases, formatOvers, ballChip,
   groupOvers, phaseSplit, summariseBatters, summariseBowlers, summariseFielders, wicketRows,
-  bowlerRuns, isBowlerWicket, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver,
+  bowlerRuns, isBowlerWicket, isDotForBowler, isDotForBatters, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver,
 } from './ballByBall'
 
 let seq = 0
@@ -191,7 +191,7 @@ describe('bowlers', () => {
     const b = lines.find(l => l.name === 'B')!
     // bat runs 4+6+1+1, wide 1 charged, bye 2 not charged
     expect(b).toMatchObject({ legalBalls: 6, runs: 13, wickets: 0, wides: 1, fours: 1, sixes: 1, maidens: 0 })
-    expect(b.dots).toBe(1)           // only the final 0; the bye ball is not a dot
+    expect(b.dots).toBe(2)           // the final 0, and the bye: nothing was charged to the bowler
     expect(b.economy).toBeCloseTo(13, 5)
   })
   it('splits by phase and keeps first-bowled order', () => {
@@ -309,3 +309,32 @@ describe('maxWicketsInOver', () => {
   })
 })
 
+describe('dot balls', () => {
+  const bye = ball({ extra_type: 'bye', extras: 2, runs_total: 2 })
+  const legBye = ball({ extra_type: 'legbye', extras: 1, runs_total: 1 })
+  const wide = ball({ extra_type: 'wide', extras: 1, runs_total: 1, is_legal: false })
+  const single = ball({ runs_bat: 1, runs_total: 1 })
+  const dot = ball()
+
+  it('a bye or leg-bye is a dot for the bowler (nothing charged) and for the batters (nothing off the bat)', () => {
+    for (const b of [bye, legBye]) {
+      expect(isDotForBowler(b)).toBe(true)
+      expect(isDotForBatters(b)).toBe(true)
+    }
+  })
+  it('a wide is never a dot, and runs off the bat are not', () => {
+    expect(isDotForBowler(wide)).toBe(false)
+    expect(isDotForBatters(wide)).toBe(false)
+    expect(isDotForBowler(single)).toBe(false)
+    expect(isDotForBatters(single)).toBe(false)
+    expect(isDotForBowler(dot)).toBe(true)
+  })
+  it('the phase split counts dots from the perspective of the tab', () => {
+    const rows = [bye, dot, single, wide]
+    const pp = (perspective: 'bat' | 'bowl') => phaseSplit(rows, 20, perspective)[0]
+    expect(pp('bowl')).toMatchObject({ legalBalls: 3, dots: 2 })
+    expect(pp('bat')).toMatchObject({ legalBalls: 3, dots: 2 })
+    // a no-ball with 2 off the bat: charged to the bowler, but it is not a legal ball either way
+    expect(isDotForBowler(ball({ extra_type: 'noball', extras: 1, runs_bat: 2, runs_total: 3, is_legal: false }))).toBe(false)
+  })
+})

@@ -80,7 +80,7 @@ function OverBars({ overs }: { overs: OverGroup[] }) {
 }
 
 function PhaseTable({ balls, totalOvers, bowling }: { balls: BallRow[]; totalOvers: number; bowling?: boolean }) {
-  const lines = phaseSplit(balls, totalOvers)
+  const lines = phaseSplit(balls, totalOvers, bowling ? 'bowl' : 'bat')
   return (
     <div>
       <p className={HEAD}>By phase</p>

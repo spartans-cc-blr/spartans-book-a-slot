@@ -11,7 +11,8 @@
 // runs/balls/4s/6s), so these tabs agree with the Full Scorecard tab:
 //   balls faced   = every delivery except a wide (a no-ball counts as faced)
 //   bowler runs   = bat runs + wides + no-balls  (byes/leg-byes are not charged)
-//   dot (bowler)  = a legal ball with no runs at all
+//   dot (bowler)  = a legal ball with nothing charged to the bowler, so a bye or leg-bye is a dot
+//                   (checked on a match with one of each: it is how the scorecard counts them)
 //   bowler wicket = any dismissal except run out / retired / obstructing /
 //                   handled the ball / timed out
 
@@ -113,7 +114,9 @@ export function formatOvers(legalBalls: number): string {
 export const ballsFaced = (b: BallRow) => b.extra_type !== 'wide'
 export const bowlerRuns = (b: BallRow) =>
   b.runs_bat + (b.extra_type === 'wide' || b.extra_type === 'noball' ? b.extras : 0)
-export const isDotForBowler = (b: BallRow) => b.is_legal && b.runs_total === 0
+export const isDotForBowler = (b: BallRow) => b.is_legal && bowlerRuns(b) === 0
+/** A dot for the batters: a legal ball with nothing off the bat (a bye still leaves the batters scoreless). */
+export const isDotForBatters = (b: BallRow) => b.is_legal && b.runs_bat === 0
 
 export function isBowlerWicket(b: BallRow): boolean {
   return b.is_wicket && !/run\s*out|retire|obstruct|handled|timed/i.test(b.dismissal_kind ?? '')
@@ -199,7 +202,10 @@ export interface PhaseLine {
   runRate: number | null
 }
 
-export function phaseSplit(balls: BallRow[], totalOvers: number): PhaseLine[] {
+/** `perspective` decides what a dot is: 'bowl' (the default, nothing charged to the bowler) for the
+ *  Bowling tab, 'bat' (nothing off the bat) for the Batting tab. They only differ on byes and leg-byes. */
+export function phaseSplit(balls: BallRow[], totalOvers: number, perspective: 'bat' | 'bowl' = 'bowl'): PhaseLine[] {
+  const isDot = perspective === 'bat' ? isDotForBatters : isDotForBowler
   return PHASE_KEYS.map(phase => {
     const inPhase = balls.filter(b => phaseOf(b.over_no, totalOvers) === phase)
     const legal = inPhase.filter(b => b.is_legal).length
@@ -209,7 +215,7 @@ export function phaseSplit(balls: BallRow[], totalOvers: number): PhaseLine[] {
       runs,
       wickets: inPhase.filter(b => b.is_wicket).length,
       legalBalls: legal,
-      dots: inPhase.filter(isDotForBowler).length,
+      dots: inPhase.filter(isDot).length,
       runRate: economy(runs, legal),
     }
   })
