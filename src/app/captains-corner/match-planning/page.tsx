@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
+import { MatchPlanningPicker } from '@/components/captains/MatchPlanningPicker'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
 import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
@@ -158,17 +159,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
             For an upcoming game: how we have done against the opponent, at the ground and in the tournament, and how
             the players available did in each. Pick a view below; they are independent. Practice games are not counted.
           </p>
-          {ctx.upcoming.length > 0 && (
-            <div className="flex gap-2 flex-wrap mt-3">
-              {ctx.upcoming.map(u => (
-                <Link key={u.id} href={href(u.id, lens)} replace scroll={false}
-                  className={`font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full border transition-colors
-                    ${u.id === sel?.id ? 'bg-[var(--stats-accent)] border-[var(--stats-accent)] text-white dark:text-ink'
-                      : 'border-[var(--stats-card-border)] text-[var(--stats-text-muted)] hover:text-[var(--stats-text)]'}`}>
-                  {fmtDate(u.gameDate)} · {u.opponentName}
-                </Link>
-              ))}
-            </div>
+          {ctx.upcoming.length > 0 && sel && (
+            <MatchPlanningPicker selectedId={sel.id} lens={lens}
+              options={ctx.upcoming.map(u => ({ id: u.id, label: `${fmtDate(u.gameDate)} · ${u.slotTime} · ${u.opponentName}` }))} />
           )}
           {sel && (
             <div className="flex gap-1 mt-4 border-b border-[var(--stats-card-border)]">
