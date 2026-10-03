@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { resolveOpponentIdByName } from '@/lib/opponents'
+import { resolveOrCreateOpponentIdByName } from '@/lib/opponents'
 import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
 import { ORGANISER_SELF_SERVICE_REASON } from '@/types'
 
@@ -150,7 +150,7 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
   // of this save. An unknown spelling resolves to null (shows as "unlinked"
   // on Team Record until someone links it on /opponents).
   if ('opponent_name' in safeUpdates) {
-    safeUpdates.opponent_id = await resolveOpponentIdByName(supabase, safeUpdates.opponent_name)
+    safeUpdates.opponent_id = await resolveOrCreateOpponentIdByName(supabase, safeUpdates.opponent_name)
   }
 
   const { data, error } = await supabase

@@ -26,7 +26,9 @@ interface OpponentRow {
   notes: string | null
   aliases: string[]
   matches: number
+  auto_created: boolean
 }
+type MasterView = 'reviewed' | 'auto' | 'all'
 interface NamedRef { id: string; name: string }
 interface Unlinked {
   name: string
@@ -64,6 +66,11 @@ export function OpponentsClient() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm,  setEditForm]  = useState({ name: '', cricheroes_team_url: '', notes: '' })
   const [search,    setSearch]    = useState('')
+  // Auto-created opponents (one per unrecognised booking spelling) are hidden by default so the
+  // reviewed master list stays readable; a search always looks across all of them.
+  const [view,       setView]       = useState<MasterView>('reviewed')
+  const [mergingId,  setMergingId]  = useState<string | null>(null)
+  const [mergeTo,    setMergeTo]    = useState('')
 
   const [uSearch,     setUSearch]     = useState('')
   const [uSort,        setUSort]      = useState<UnlinkedSort>('name')
@@ -140,7 +147,22 @@ export function OpponentsClient() {
     if (await call('/api/opponents', 'PATCH', body, `edit:${id}`)) { setEditingId(null); await load() }
   }
 
-  const visible = opponents.filter(o => !search || o.name.toLowerCase().includes(search.toLowerCase()) || o.aliases.some(a => a.includes(search.toLowerCase())))
+  async function merge(o: OpponentRow) {
+    const target = opponents.find(x => x.id === mergeTo)
+    if (!target) return
+    if (!window.confirm(`Merge "${o.name}" into "${target.name}"? Its ${o.matches} match${o.matches === 1 ? '' : 'es'} and spellings move over, and "${o.name}" is deleted. This can't be undone.`)) return
+    if (await call('/api/opponents/merge', 'POST', { source_id: o.id, target_id: target.id }, `merge:${o.id}`)) {
+      setMergingId(null); setMergeTo(''); await load()
+    }
+  }
+
+  const autoCount = opponents.filter(o => o.auto_created).length
+  const reviewedCount = opponents.length - autoCount
+  const q = search.toLowerCase()
+  const visible = opponents.filter(o => {
+    if (search) return o.name.toLowerCase().includes(q) || o.aliases.some(a => a.includes(q))
+    return view === 'all' || (view === 'auto' ? o.auto_created : !o.auto_created)
+  })
 
   if (loading) return <p className="font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">Loading…</p>
 
@@ -245,6 +267,14 @@ export function OpponentsClient() {
           <h2 className="font-rajdhani text-xs font-bold tracking-[3px] uppercase text-[var(--stats-text-muted)] dark:text-zinc-500">
             Master list <span className="text-[var(--stats-accent)] dark:text-gold">({opponents.length})</span>
           </h2>
+          <div className="flex gap-1" role="tablist" aria-label="Master list view">
+            {([['reviewed', `Reviewed (${reviewedCount})`], ['auto', `Auto-created (${autoCount})`], ['all', 'All']] as [MasterView, string][]).map(([k, label]) => (
+              <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)}
+                className={`${BTN} ${view === k && !search ? 'bg-[var(--stats-badge-bg)] dark:bg-gold/20 border-[var(--stats-accent-dim)] dark:border-gold-dim text-[var(--stats-accent)] dark:text-gold' : 'border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-muted)] dark:text-zinc-400'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" className={`${INPUT} w-40 ml-auto`} />
           <button onClick={() => setShowAdd(v => !v)} className={BTN_GOLD}>{showAdd ? 'Cancel' : '＋ Add opponent'}</button>
         </div>
@@ -290,6 +320,7 @@ export function OpponentsClient() {
                       <p className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment flex items-center gap-2 flex-wrap">
                         <a href={`/team-stats?by=opponent&opponent=id:${o.id}`} className="hover:text-[var(--stats-accent)] dark:hover:text-gold underline decoration-dotted underline-offset-2">{o.name}</a>
                         <span className="font-normal text-[11px] text-[var(--stats-text-faint)] dark:text-zinc-600">{o.matches} match{o.matches === 1 ? '' : 'es'}</span>
+                        {o.auto_created && <span className={CHIP} title="Created automatically from a booking spelling — edit or merge it to mark it reviewed">auto</span>}
                         {o.cricheroes_team_url && (
                           <a href={o.cricheroes_team_url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-[var(--stats-accent)] dark:text-gold">CricHeroes ↗</a>
                         )}
@@ -301,7 +332,19 @@ export function OpponentsClient() {
                       )}
                       {o.notes && <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mt-0.5">{o.notes}</p>}
                     </div>
-                    <button onClick={() => startEdit(o)} className={BTN_PLAIN}>Edit</button>
+                    <div className="flex flex-col gap-1 items-end">
+                      <button onClick={() => startEdit(o)} className={BTN_PLAIN}>Edit</button>
+                      <button onClick={() => { setMergingId(mergingId === o.id ? null : o.id); setMergeTo('') }} className={BTN_PLAIN}>Merge</button>
+                    </div>
+                  </div>
+                )}
+                {mergingId === o.id && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <select className={`${INPUT} flex-1 min-w-[160px] py-1`} value={mergeTo} onChange={e => setMergeTo(e.target.value)}>
+                      <option value="">Merge into…</option>
+                      {opponents.filter(x => x.id !== o.id).map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    </select>
+                    <button disabled={busy !== null || !mergeTo} onClick={() => merge(o)} className={BTN_GOLD}>Merge</button>
                   </div>
                 )}
               </li>

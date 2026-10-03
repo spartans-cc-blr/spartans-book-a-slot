@@ -433,3 +433,9 @@ export const opponentLinkSchema = z.object({
 export const quickAddPlayerSchema = z.object({
   name: z.string().trim().min(2, 'Name is too short').max(120, 'Name is too long'),
 }).strict()
+
+// ── OPPONENT MERGE (/api/opponents/merge) — opponent-identity.md ──
+export const opponentMergeSchema = z.object({
+  source_id: z.string().uuid(),
+  target_id: z.string().uuid(),
+}).strict()

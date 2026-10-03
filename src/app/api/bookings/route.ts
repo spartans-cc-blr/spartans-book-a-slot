@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { resolveOpponentIdByName } from '@/lib/opponents'
+import { resolveOrCreateOpponentIdByName } from '@/lib/opponents'
 import { validateBooking } from '@/lib/validation'
 import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
 import type { CreateBookingRequest } from '@/types'
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
       match_fee_override: match_fee_override ?? null,
       // Canonical opponent, resolved server-side from the typed spelling via
       // opponent_aliases — never taken from the client (features/team-stats.md §5)
-      opponent_id:        await resolveOpponentIdByName(supabase, opponent_name),
+      opponent_id:        await resolveOrCreateOpponentIdByName(supabase, opponent_name),
     })
     .select(`
       *,

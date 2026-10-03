@@ -1196,3 +1196,7 @@ implementation of the filter logic itself.
 ---
 
 *Maintained by: Spartans CC BLR*
+
+> **Update (October 2026):** the "start empty, reconcile via the queue" approach in §5's data-state note
+> was superseded: every spelling is now an auto-created opponent (merge on `/opponents`). See
+> `opponent-identity.md`.
