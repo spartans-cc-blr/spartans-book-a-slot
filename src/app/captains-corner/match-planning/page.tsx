@@ -137,7 +137,7 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
     `/captains-corner/match-planning?${new URLSearchParams({ ...(b ? { booking: b } : {}), lens: l }).toString()}`
   const scope = ctx.scopeLabel ?? 'this scope'
   const sel = ctx.selected
-  const team = ctx.scored.length ? scoutTeam(ctx.scored) : null
+  const team = ctx.scored.length ? scoutTeam(ctx.scored, lens === 'opponent') : null
   const players = ctx.scored.length
     ? scoutPlayers(ctx.scored, ctx.available.map(a => ({ id: a.id, name: a.name })))
     : []
@@ -272,9 +272,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                   <PhaseTable title="Our bowling by phase (all matches in view)" t={team.bowling} wicketLabel="Taken" />
                 </div>
 
-                <div className={`${card} grid gap-5 md:grid-cols-2`}>
-                  <div>
-                    <h2 className={h2}>{lens === 'opponent' ? 'Their batters to watch' : 'Opposition batters who did best'}</h2>
+                <div className={`${card} grid gap-5 ${lens === 'opponent' ? 'md:grid-cols-2' : ''}`}>
+                  {lens === 'opponent' && <div>
+                    <h2 className={h2}>Their batters to watch</h2>
                     <ul className="space-y-1">
                       {team.threats.map(t => (
                         <li key={t.name} className="font-rajdhani text-sm text-[var(--stats-text)]">
@@ -282,7 +282,7 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </div>}
                   <div>
                     <h2 className={h2}>How wickets fell</h2>
                     <p className="font-rajdhani text-sm text-[var(--stats-text)]">
@@ -291,9 +291,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                     <p className="font-rajdhani text-sm text-[var(--stats-text)]">
                       Took: {Object.entries(team.wicketsTaken).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k}`).join(', ') || '—'}
                     </p>
-                    {team.oppBowlersWhoGotUs.length > 0 && (
+                    {lens === 'opponent' && team.oppBowlersWhoGotUs.length > 0 && (
                       <p className={`font-rajdhani text-xs ${muted} mt-1`}>
-                        {lens === 'opponent' ? 'Their' : 'Opposition'} wicket-takers: {team.oppBowlersWhoGotUs.map(b => `${b.name} (${b.wickets})`).join(', ')}
+                        Their wicket-takers: {team.oppBowlersWhoGotUs.map(b => `${b.name} (${b.wickets})`).join(', ')}
                       </p>
                     )}
                   </div>

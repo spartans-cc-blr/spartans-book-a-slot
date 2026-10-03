@@ -157,7 +157,7 @@ const matchesLabel = (n: number) => `${n} ${n === 1 ? 'match' : 'matches'}`
 
 // ── Team view ──────────────────────────────────────────────────────────────
 
-export function scoutTeam(matches: ScoutMatchInput[]): TeamScout {
+export function scoutTeam(matches: ScoutMatchInput[], sameOpponent = true): TeamScout {
   const digests: MatchDigest[] = []
   const batting = emptyTallies()
   const bowling = emptyTallies()
@@ -236,7 +236,7 @@ export function scoutTeam(matches: ScoutMatchInput[]): TeamScout {
     oppBowlersWhoGotUs: Array.from(oppBowlers.values()).sort((a, b) => b.wickets - a.wickets).slice(0, 4),
     insights: [],
   }
-  team.insights = teamInsights(team)
+  team.insights = teamInsights(team, sameOpponent)
   return team
 }
 
@@ -250,7 +250,9 @@ const sumTallies = (t: PhaseTallies): PhaseTally => ({
 /** Minimum balls in a phase before we compare it to the rest of the innings. */
 const MIN_PHASE_BALLS = 30
 
-export function teamInsights(t: TeamScout): string[] {
+/** `sameOpponent` is false for the ground/tournament views, where the "opposition" is many different sides, so pointers about
+ *  specific opposition batters/bowlers would not apply to the next opponent and are left out. */
+export function teamInsights(t: TeamScout, sameOpponent = true): string[] {
   const out: string[] = []
   const n = t.matches.length
   if (n === 0) return out
@@ -298,10 +300,10 @@ export function teamInsights(t: TeamScout): string[] {
   if (lostTotal >= 6 && topLost && pct(topLost[1], lostTotal) >= 50 && topLost[0] !== 'other') {
     out.push(`We were ${topLost[0] === 'caught' ? 'caught' : topLost[0]} ${topLost[1]} times out of ${lostTotal} dismissals (${pct(topLost[1], lostTotal)}%).`)
   }
-  const repeat = t.oppBowlersWhoGotUs[0]
+  const repeat = sameOpponent ? t.oppBowlersWhoGotUs[0] : undefined
   if (repeat && repeat.wickets >= 3) out.push(`${repeat.name} took ${repeat.wickets} of our wickets across ${matchesLabel(n)} — plan for them.`)
 
-  const threat = t.threats[0]
+  const threat = sameOpponent ? t.threats[0] : undefined
   if (threat && threat.runs >= 40) {
     out.push(`Opposition batter to watch: ${threat.name} — ${threat.runs} runs off ${threat.balls} (SR ${f1(threat.strikeRate)}) in ${threat.innings} inn${threat.dismissals ? `; got out ${threat.dismissals}×${threat.dismissedBy.length ? ` (${Array.from(new Set(threat.dismissedBy)).join(', ')})` : ''}` : '; never dismissed'}.`)
   }

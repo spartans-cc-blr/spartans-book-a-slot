@@ -156,3 +156,11 @@ Phase lines no longer show a bare economy in brackets (it read as overs or balls
 is now `Powerplay 0/23 in 2.0 ov (econ 11.5)`, using `formatOvers()` (6 balls an over, so 15 balls is
 2.3 ov), and batting by phase is `Powerplay 33 off 21`. The overall bowling line and the "most
 economical / most expensive" pointer also say "econ".
+
+## 9. Opposition hints only on the Opponent tab (October 2026)
+
+On the Ground and Tournament tabs the "opposition" is many different sides, so pointers about specific
+opposition players would not apply to the next opponent. Those views no longer show the "Opposition
+batters who did best" panel, the opposition wicket-takers line, or the "opposition batter to watch" and
+"plan for them" (repeat bowler) pointers (`scoutTeam(..., sameOpponent)`). Our own batting/bowling
+phases, how wickets fell, the match list (with each match's opponent) and the player cards stay.
