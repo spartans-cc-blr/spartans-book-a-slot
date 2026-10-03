@@ -179,10 +179,9 @@ phases, how wickets fell, the match list (with each match's opponent) and the pl
 Replaced rows in §4's table: "Repeated dismissal type" → "Bowled/lbw share" and "Run-outs"; new: "Dot balls (bowling)",
 "Extras", "Top wicket-taker", "Costly bowler".
 
-## 11. Link to Past Matches (October 2026)
+## 11. Link to Team Record (October 2026)
 
-On the Ground and Tournament tabs, "Every match" has an "Open in Past Matches →" link to
-`/matches/history?ground=<id>` or `?tournament=<id>`, with `month=all` and `role=all` so nothing is hidden.
-`MatchHistoryClient` seeds its ground, tournament and role filters from those params once at mount (like the
-existing `?month=all`). The Opponent tab has no link: Past Matches cannot filter by opponent. Each match's date
-already links to that match.
+"Every match" / "Every meeting" has an "Open in Team Record →" link to `/team-stats` for the current view, all
+time (`year=all`; practice games stay excluded there too): `ground=<id>` or `tournament=<id>` (both opened split
+by opponent), or `opponent=id:<opponent id>` on the Opponent tab. Team Record already filters by all three, so it
+gives the record and lets you expand to the matches. (Past Matches could not filter by opponent, so it was not used.)

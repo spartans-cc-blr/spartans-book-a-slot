@@ -217,7 +217,7 @@ export function MatchHistoryClient({
   // one, and the role-filter chips themselves aren't even rendered for
   // that viewer (see the viewerPlayerId-gated block below) — 'all' is the
   // only filter such a viewer can actually reach anyway.
-  const [roleFilter, setRoleFilter]     = useState<RoleFilter>(() => searchParams.get('role') === 'all' || !viewerPlayerId ? 'all' : 'played')
+  const [roleFilter, setRoleFilter]     = useState<RoleFilter>(viewerPlayerId ? 'played' : 'all')
   const [resultFilter, setResultFilter] = useState('')
   // Defaults to the current month rather than all-time — the unfiltered
   // view was slow to load, and most visits are for "what happened
@@ -225,12 +225,11 @@ export function MatchHistoryClient({
   // everything. `?month=all` overrides this to start on the all-time view.
   const [monthFilter, setMonthFilter]   = useState(() => searchParams.get('month') === 'all' ? '' : currentMonthStr())
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
-  // `?tournament=<id>` / `?ground=<id>` seed those filters once at mount (Match Planning links here).
-  const [tournamentId, setTournamentId] = useState(() => searchParams.get('tournament') ?? '')
+  const [tournamentId, setTournamentId] = useState('')
   // Encodes the selected ground option: 'g:<ground_id>' for a resolved
   // grounds-table entry, 'v:<venue text>' for a raw fallback venue with no
   // grounds row (a genuine one-off away venue) — see buildParams().
-  const [groundSelection, setGroundSelection] = useState(() => searchParams.get('ground') ? `g:${searchParams.get('ground')}` : '')
+  const [groundSelection, setGroundSelection] = useState('')
   const [format, setFormat]             = useState('')
   // Day-level refinement on top of everything else above — purely
   // client-side, narrowing whatever's already been fetched for the current

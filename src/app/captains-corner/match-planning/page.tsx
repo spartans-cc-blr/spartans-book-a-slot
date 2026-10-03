@@ -16,6 +16,7 @@ import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { MatchPlanningPicker } from '@/components/captains/MatchPlanningPicker'
 import { PlayerNameLink } from '@/lib/playerLink'
+import { normaliseOpponentName } from '@/lib/opponents'
 import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
 import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
 import { PHASE_KEYS, PHASE_LABEL, formatOvers } from '@/lib/ballByBall'
@@ -137,12 +138,15 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
     `/captains-corner/match-planning?${new URLSearchParams({ ...(b ? { booking: b } : {}), lens: l }).toString()}`
   const scope = ctx.scopeLabel ?? 'this scope'
   const sel = ctx.selected
-  // Past Matches can filter by ground or tournament (not by opponent), all time and all roles.
-  const pastHref = sel && lens === 'ground' && sel.groundId
-    ? `/matches/history?${new URLSearchParams({ ground: sel.groundId, month: 'all', role: 'all' })}`
-    : sel && lens === 'tournament' && sel.tournamentId
-      ? `/matches/history?${new URLSearchParams({ tournament: sel.tournamentId, month: 'all', role: 'all' })}`
-      : null
+  // Team Record can filter by ground, tournament and opponent. All time; practice games stay excluded there too.
+  // On the ground/tournament views it opens split by opponent, which is the useful cut there.
+  const recordParams: Record<string, string> | null = sel
+    ? lens === 'ground' && sel.groundId ? { ground: sel.groundId, by: 'opponent' }
+    : lens === 'tournament' && sel.tournamentId ? { tournament: sel.tournamentId, by: 'opponent' }
+    : lens === 'opponent' ? { opponent: sel.opponentId ? `id:${sel.opponentId}` : `name:${normaliseOpponentName(sel.opponentName)}` }
+    : null
+    : null
+  const pastHref = recordParams ? `/team-stats?${new URLSearchParams({ year: 'all', ...recordParams })}` : null
   const team = ctx.scored.length ? scoutTeam(ctx.scored, lens === 'opponent') : null
   const players = ctx.scored.length
     ? scoutPlayers(ctx.scored, ctx.available.map(a => ({ id: a.id, name: a.name })))
@@ -261,7 +265,7 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                     <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
                     {pastHref && (
                       <Link href={pastHref} className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] underline decoration-dotted whitespace-nowrap">
-                        Open in Past Matches &rarr;
+                        Open in Team Record &rarr;
                       </Link>
                     )}
                   </div>
