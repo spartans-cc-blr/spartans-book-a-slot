@@ -149,3 +149,10 @@ thresholds, change the constants and the table above.
 ---
 
 *Maintained by: Spartans CC BLR*
+
+## 8. Display of overs and phase figures (October 2026)
+
+Phase lines no longer show a bare economy in brackets (it read as overs or balls). Bowling by phase
+is now `Powerplay 0/23 in 2.0 ov (econ 11.5)`, using `formatOvers()` (6 balls an over, so 15 balls is
+2.3 ov), and batting by phase is `Powerplay 33 off 21`. The overall bowling line and the "most
+economical / most expensive" pointer also say "econ".

@@ -445,7 +445,7 @@ export function playerInsights(p: PlayerScout): string[] {
         .map(k => ({ k, eco: economy(w.byPhase[k].runs, w.byPhase[k].legalBalls)! }))
         .sort((a, c) => a.eco - c.eco)
       if (ph.length >= 2 && ph[ph.length - 1].eco - ph[0].eco >= 2) {
-        out.push(`Most economical in the ${PHASE_LABEL[ph[0].k]} (${f1(ph[0].eco)}), most expensive in the ${PHASE_LABEL[ph[ph.length - 1].k]} (${f1(ph[ph.length - 1].eco)}) — use accordingly.`)
+        out.push(`Most economical in the ${PHASE_LABEL[ph[0].k]} (econ ${f1(ph[0].eco)}), most expensive in the ${PHASE_LABEL[ph[ph.length - 1].k]} (econ ${f1(ph[ph.length - 1].eco)}) — use accordingly.`)
       }
       if (w.wickets === 0 && w.economy != null && w.economy > 8) out.push(`Wicketless at ${f1(w.economy)} an over — consider a shorter or different role.`)
     }

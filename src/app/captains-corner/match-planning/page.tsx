@@ -18,7 +18,7 @@ import { MatchPlanningPicker } from '@/components/captains/MatchPlanningPicker'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
 import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
-import { PHASE_KEYS, PHASE_LABEL } from '@/lib/ballByBall'
+import { PHASE_KEYS, PHASE_LABEL, formatOvers } from '@/lib/ballByBall'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -88,7 +88,7 @@ function PlayerCard({ p, url, response }: { p: PlayerScout; url: string | null; 
           </p>
           <p className={`font-rajdhani text-xs ${muted}`}>
             By phase: {PHASE_KEYS.filter(k => b.byPhase[k].balls > 0)
-              .map(k => `${PHASE_LABEL[k]} ${b.byPhase[k].runs}(${b.byPhase[k].balls})`).join(' · ') || '—'}
+              .map(k => `${PHASE_LABEL[k]} ${b.byPhase[k].runs} off ${b.byPhase[k].balls}`).join(' · ') || '—'}
           </p>
           <ul className="mt-1 space-y-0.5">
             {b.log.map(e => (
@@ -105,11 +105,11 @@ function PlayerCard({ p, url, response }: { p: PlayerScout; url: string | null; 
         <div className="mb-3">
           <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted}`}>Bowling</p>
           <p className="font-rajdhani text-sm text-[var(--stats-text)]">
-            {Math.floor(w.legalBalls / 6)}.{w.legalBalls % 6} ov · {w.runs} runs · <b>{w.wickets}</b> wkts · econ {f1(w.economy)}
+            {formatOvers(w.legalBalls)} ov · {w.runs} runs · <b>{w.wickets}</b> wkts · econ {f1(w.economy)}
           </p>
           <p className={`font-rajdhani text-xs ${muted}`}>
             By phase: {PHASE_KEYS.filter(k => w.byPhase[k].legalBalls > 0)
-              .map(k => `${PHASE_LABEL[k]} ${w.byPhase[k].wickets}/${w.byPhase[k].runs} (${f1(rpo(w.byPhase[k].runs, w.byPhase[k].legalBalls))})`).join(' · ')}
+              .map(k => `${PHASE_LABEL[k]} ${w.byPhase[k].wickets}/${w.byPhase[k].runs} in ${formatOvers(w.byPhase[k].legalBalls)} ov (econ ${f1(rpo(w.byPhase[k].runs, w.byPhase[k].legalBalls))})`).join(' · ')}
           </p>
         </div>
       )}
