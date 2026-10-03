@@ -14,6 +14,7 @@ import { autoResolveMatch } from '@/lib/playerIdentityResolution'
 import { notifyFeeReminderIfPending } from '@/lib/feeReminders'
 import { isBeforePromptCutoff } from '@/lib/repullCutoff'
 import { chargeMembershipFeeIfDue } from '@/lib/membershipFee'
+import { mirrorOpponent } from '@/lib/opponentMirror'
 
 export interface SyncMatchStatsResult {
   ok:    boolean
@@ -144,6 +145,8 @@ export async function syncMatchStatsForBooking(
       synced_at:     new Date().toISOString(),
     }, { onConflict: 'match_id' })
     if (dimErr) console.error('[matchStatsSync] match_dimensions upsert failed:', dimErr.message)
+    // Keep the canonical opponent (name, marquee, auto_created) in analytics opponents_ref too.
+    await mirrorOpponent(supabase, analyticsSupabase, booking.opponent_id)
   } catch (e) {
     console.error('[matchStatsSync] match_dimensions upsert threw:', e)
   }

@@ -101,3 +101,115 @@ export async function linkSpellingToOpponent(
   return ids.length
 }
 
+
+// ── Auto-created opponents & merge (opponent-identity.md) ─────────────────
+
+// Display name for an opponent created from a raw spelling: trimmed, whitespace collapsed,
+// original casing kept.
+export function displayOpponentName(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ')
+}
+
+// Resolves a spelling to an opponent, creating one flagged auto_created when nothing matches,
+// so a booking never stays without an opponent_id. Reuses linkSpellingToOpponent() so the alias
+// is written and any other unlinked booking with the same spelling is back-filled. Never throws
+// and never blocks the caller: on any failure it returns null (the booking just stays unlinked
+// and shows in the /opponents queue as before).
+export async function resolveOrCreateOpponentIdByName(
+  supabase: SupabaseClient,
+  rawName: string | null | undefined,
+  createdBy: string | null = null
+): Promise<string | null> {
+  try {
+    const existing = await resolveOpponentIdByName(supabase, rawName)
+    if (existing) return existing
+    if (!rawName || !rawName.trim()) return null
+
+    const { data, error } = await supabase
+      .from('opponents')
+      .insert({ name: displayOpponentName(rawName), auto_created: true, created_by: createdBy })
+      .select('id')
+      .single()
+    if (error) {
+      // 23505: a concurrent request (or a differently-cased twin) created it first.
+      if (error.code === '23505') return await resolveOpponentIdByName(supabase, rawName)
+      console.error('[opponents] auto-create failed:', error.message)
+      return null
+    }
+    try {
+      await linkSpellingToOpponent(supabase, data.id, rawName, createdBy)
+    } catch (e) {
+      console.error('[opponents] auto-create alias failed:', e)
+    }
+    return data.id
+  } catch (e) {
+    console.error('[opponents] resolveOrCreate failed:', e)
+    return null
+  }
+}
+
+export interface OpponentFields {
+  is_marquee: boolean
+  cricheroes_team_url: string | null
+  notes: string | null
+  auto_created: boolean
+}
+
+// Fields the surviving opponent ends up with after a merge: nothing a manager set is lost.
+// Marquee if either was; the target's URL wins, else the source's; notes are joined; the result
+// counts as reviewed (not auto_created) if either side was reviewed.
+export function mergeOpponentFields(target: OpponentFields, source: OpponentFields): OpponentFields {
+  const notes = [target.notes, source.notes]
+    .map(n => n?.trim())
+    .filter((n, i, a): n is string => !!n && a.indexOf(n) === i)
+  return {
+    is_marquee: target.is_marquee || source.is_marquee,
+    cricheroes_team_url: target.cricheroes_team_url ?? source.cricheroes_team_url,
+    notes: notes.length ? notes.join(' · ') : null,
+    auto_created: target.auto_created && source.auto_created,
+  }
+}
+
+export class OpponentMergeError extends Error {}
+
+// Folds `sourceId` into `targetId`: every alias and booking moves to the target, the source's own
+// name stays resolvable as an alias, the target keeps the union of manager-set fields, and the
+// source row is deleted. Steps are ordered so a failure part-way leaves nothing orphaned and a
+// retry finishes the job. Returns counts for the UI.
+export async function mergeOpponents(
+  supabase: SupabaseClient,
+  sourceId: string,
+  targetId: string,
+  actedBy: string | null = null
+): Promise<{ aliases_moved: number; bookings_moved: number }> {
+  if (sourceId === targetId) throw new OpponentMergeError('Pick a different opponent to merge into')
+
+  const cols = 'id, name, is_marquee, cricheroes_team_url, notes, auto_created'
+  const [{ data: source }, { data: target }] = await Promise.all([
+    supabase.from('opponents').select(cols).eq('id', sourceId).maybeSingle(),
+    supabase.from('opponents').select(cols).eq('id', targetId).maybeSingle(),
+  ])
+  if (!source) throw new OpponentMergeError('Opponent to merge was not found')
+  if (!target) throw new OpponentMergeError('Merge target was not found')
+
+  const { data: movedAliases, error: aErr } = await supabase
+    .from('opponent_aliases').update({ opponent_id: targetId }).eq('opponent_id', sourceId).select('id')
+  if (aErr) throw new Error(aErr.message)
+
+  const { data: movedBookings, error: bErr } = await supabase
+    .from('bookings').update({ opponent_id: targetId }).eq('opponent_id', sourceId).select('id')
+  if (bErr) throw new Error(bErr.message)
+
+  // The source's own name must keep resolving (to the target now).
+  await linkSpellingToOpponent(supabase, targetId, source.name, actedBy)
+
+  const merged = mergeOpponentFields(target as OpponentFields, source as OpponentFields)
+  const { error: uErr } = await supabase
+    .from('opponents').update({ ...merged, updated_at: new Date().toISOString() }).eq('id', targetId)
+  if (uErr) throw new Error(uErr.message)
+
+  const { error: dErr } = await supabase.from('opponents').delete().eq('id', sourceId)
+  if (dErr) throw new Error(dErr.message)
+
+  return { aliases_moved: movedAliases?.length ?? 0, bookings_moved: movedBookings?.length ?? 0 }
+}

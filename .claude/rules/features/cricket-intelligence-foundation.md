@@ -112,3 +112,10 @@ write uses the existing server-side analytics client.
 ---
 
 *Maintained by: Spartans CC BLR*
+
+## 10. Opponent identity (added October 2026)
+
+`match_dimensions.opponent_id` is now filled for all 141 synced matches, `opponents_ref` mirrors the
+Hub opponent master, and `match_coverage` exposes `opponent_canonical` (migration `017`). Every
+unlinked opponent spelling became its own auto-created opponent, to be merged later. See
+`opponent-identity.md`.

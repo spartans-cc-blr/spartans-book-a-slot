@@ -16,6 +16,8 @@ import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 import { opponentCreateSchema, opponentUpdateSchema } from '@/lib/schemas'
 import { normaliseOpponentName, linkSpellingToOpponent } from '@/lib/opponents'
 import { suggestPlayers } from '@/lib/nameMatch'
+import { mirrorOpponent } from '@/lib/opponentMirror'
+import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 
 async function requireManager() {
   const session = await getServerSession(authOptions)
@@ -38,7 +40,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
   const [{ data: opponents, error: oErr }, { data: aliases, error: aErr }, { data: bookings, error: bErr }] = await Promise.all([
-    supabase.from('opponents').select('id, name, is_marquee, cricheroes_team_url, notes, created_at, updated_at').order('name'),
+    supabase.from('opponents').select('id, name, is_marquee, cricheroes_team_url, notes, auto_created, created_at, updated_at').order('name'),
     supabase.from('opponent_aliases').select('opponent_id, alias'),
     // Ground/tournament are fetched here purely so the unlinked queue can be
     // filtered by them client-side — see OpponentsClient's filter bar. A
@@ -167,6 +169,7 @@ export async function POST(req: NextRequest) {
     ? await linkSpellingToOpponent(supabase, opponent.id, link_name, user.playerId ?? null)
     : 0
 
+  await mirrorOpponent(supabase, createAnalyticsClient(), opponent.id)
   return NextResponse.json({ opponent, linked_bookings: linked + linkedRaw })
 }
 
@@ -184,9 +187,10 @@ export async function PATCH(req: NextRequest) {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('opponents')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    // A manager editing/starring an opponent has reviewed it, so it is no longer "auto-created".
+    .update({ ...updates, auto_created: false, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .select('id, name, is_marquee, cricheroes_team_url, notes, created_at, updated_at')
+    .select('id, name, is_marquee, cricheroes_team_url, notes, auto_created, created_at, updated_at')
     .single()
   if (error) {
     if (error.code === '23505') return NextResponse.json({ error: 'An opponent with that name already exists' }, { status: 409 })
@@ -194,5 +198,6 @@ export async function PATCH(req: NextRequest) {
   }
   // A renamed opponent's new name should resolve on future bookings too.
   if (updates.name) await linkSpellingToOpponent(supabase, id, updates.name, user.playerId ?? null)
+  await mirrorOpponent(supabase, createAnalyticsClient(), id)
   return NextResponse.json({ opponent: data })
 }

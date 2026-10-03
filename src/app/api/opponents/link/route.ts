@@ -16,6 +16,8 @@ import { createServiceClient } from '@/lib/supabase'
 import { rateLimit, RATE_LIMITS } from '@/lib/rateLimit'
 import { opponentLinkSchema } from '@/lib/schemas'
 import { linkSpellingToOpponent, AliasConflictError } from '@/lib/opponents'
+import { mirrorOpponent } from '@/lib/opponentMirror'
+import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -37,6 +39,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const linked = await linkSpellingToOpponent(supabase, parsed.data.opponent_id, parsed.data.name, user.playerId ?? null)
+    await mirrorOpponent(supabase, createAnalyticsClient(), parsed.data.opponent_id)
     return NextResponse.json({ ok: true, linked_bookings: linked })
   } catch (e: any) {
     if (e instanceof AliasConflictError) return NextResponse.json({ error: e.message }, { status: 409 })
