@@ -119,3 +119,8 @@ innings and the id is taken from whichever row carries it.
 - A fielder recorded as "A / B" (assisted run-out) is not linked to a profile.
 - Matches uploaded before the parser filled in stumping fielders rely on the text fallback
   above (fine for display; the keeper's Hub link comes from their other rows).
+
+
+## 7. SQL-side state
+
+A per-delivery `match_state` view, `ball_by_ball_validation` and `match_coverage` now exist in the analytics DB — see `cricket-intelligence-foundation.md`. Phase boundaries are duplicated in `phase_definitions`; change `PHASE_PLANS` and that table together.
