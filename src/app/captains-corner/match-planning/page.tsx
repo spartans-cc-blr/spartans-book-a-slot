@@ -17,6 +17,8 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import { MatchPlanningPicker } from '@/components/captains/MatchPlanningPicker'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { normaliseOpponentName } from '@/lib/opponents'
+import { FormPills } from '@/components/team/TeamSplitTable'
+import { recentForm } from '@/lib/teamStatsCore'
 import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
 import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
 import { PHASE_KEYS, PHASE_LABEL, formatOvers } from '@/lib/ballByBall'
@@ -33,10 +35,6 @@ function fmtDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 const f1 = (n: number | null) => (n == null ? '—' : n.toFixed(1))
-const RESULT_CLS: Record<string, string> = {
-  won: 'text-emerald-700 dark:text-emerald-400', lost: 'text-red-700 dark:text-red-400',
-  tied: 'text-amber-700 dark:text-amber-400', nr: 'text-[var(--stats-text-muted)]',
-}
 
 function PhaseTable({ title, t, wicketLabel }: { title: string; t: PhaseTallies; wicketLabel: string }) {
   return (
@@ -66,9 +64,7 @@ function PhaseTable({ title, t, wicketLabel }: { title: string; t: PhaseTallies;
   )
 }
 
-function PlayerCard({ p, url, response }: { p: PlayerScout; url: string | null; response: string }) {
-  const b = p.batting
-  const w = p.bowling
+function PlayerCard({ p, url, response, href, linkLabel }: { p: PlayerScout; url: string | null; response: string; href: string; linkLabel: string }) {
   return (
     <div className={card}>
       <div className="flex items-center gap-2 mb-2">
@@ -76,50 +72,14 @@ function PlayerCard({ p, url, response }: { p: PlayerScout; url: string | null; 
           className="font-rajdhani font-bold text-base text-[var(--stats-text)]" />
         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--stats-badge-bg)] text-[var(--stats-badge-text)] border border-[var(--stats-badge-border)]">{response}</span>
       </div>
-
-      {b && (
-        <div className="mb-3">
-          <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted}`}>Batting</p>
-          <p className="font-rajdhani text-sm text-[var(--stats-text)]">
-            {b.innings} inn · <b>{b.runs}</b> runs off {b.balls} · SR {b.strikeRate != null ? Math.round(b.strikeRate) : '—'}
-            {b.average != null && <> · avg {f1(b.average)}</>}
-          </p>
-          <p className={`font-rajdhani text-xs ${muted}`}>
-            Positions: {b.positions.map(x => `No. ${x.position} (${x.runs} in ${x.innings})`).join(', ')}
-          </p>
-          <p className={`font-rajdhani text-xs ${muted}`}>
-            By phase: {PHASE_KEYS.filter(k => b.byPhase[k].balls > 0)
-              .map(k => `${PHASE_LABEL[k]} ${b.byPhase[k].runs} off ${b.byPhase[k].balls}`).join(' · ') || '—'}
-          </p>
-          <ul className="mt-1 space-y-0.5">
-            {b.log.map(e => (
-              <li key={e.bookingId} className="font-rajdhani text-xs text-[var(--stats-text-2)]">
-                <Link href={`/matches/history/${e.bookingId}`} className="underline decoration-dotted">{fmtDate(e.gameDate)}</Link>
-                {' '}No. {e.position}: {e.runs}{e.out ? '' : '*'} ({e.balls}) — {e.out ?? 'not out'}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {w && (
-        <div className="mb-3">
-          <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted}`}>Bowling</p>
-          <p className="font-rajdhani text-sm text-[var(--stats-text)]">
-            {formatOvers(w.legalBalls)} ov · {w.runs} runs · <b>{w.wickets}</b> wkts · econ {f1(w.economy)}
-          </p>
-          <p className={`font-rajdhani text-xs ${muted}`}>
-            By phase: {PHASE_KEYS.filter(k => w.byPhase[k].legalBalls > 0)
-              .map(k => `${PHASE_LABEL[k]} ${w.byPhase[k].wickets}/${w.byPhase[k].runs} in ${formatOvers(w.byPhase[k].legalBalls)} ov (econ ${f1(rpo(w.byPhase[k].runs, w.byPhase[k].legalBalls))})`).join(' · ')}
-          </p>
-        </div>
-      )}
-
-      {p.insights.length > 0 && (
+      {p.insights.length > 0 ? (
         <ul className="list-disc pl-4 space-y-0.5">
-          {p.insights.map((t, i) => <li key={i} className="font-rajdhani text-xs text-[var(--stats-text-2)]">{t}</li>)}
+          {p.insights.map((t, i) => <li key={i} className="font-rajdhani text-sm text-[var(--stats-text-2)]">{t}</li>)}
         </ul>
+      ) : (
+        <p className={`font-rajdhani text-sm ${muted}`}>Nothing stands out in this view.</p>
       )}
+      <Link href={href} className="inline-block mt-2 font-rajdhani text-xs font-bold text-[var(--stats-accent)] underline decoration-dotted">{linkLabel} &rarr;</Link>
     </div>
   )
 }
@@ -146,6 +106,11 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
     : lens === 'opponent' ? { opponent: sel.opponentId ? `id:${sel.opponentId}` : `name:${normaliseOpponentName(sel.opponentName)}` }
     : null
     : null
+  // Each card keeps only the callouts; the detail lives behind a link scoped to the current view.
+  const playerLink = (id: string): { href: string; linkLabel: string } =>
+    lens === 'ground' && sel?.groundId ? { href: `/players/${id}/stats?ground=${sel.groundId}`, linkLabel: 'Full stats at this ground' }
+    : lens === 'tournament' && sel?.tournamentId ? { href: `/leaderboard?${new URLSearchParams({ category: 'mvp', tournament: sel.tournamentId, year: 'all' })}`, linkLabel: 'Tournament MVP table' }
+    : { href: `/players/${id}/stats`, linkLabel: 'Full stats' }
   const pastHref = recordParams ? `/team-stats?${new URLSearchParams({ year: 'all', ...recordParams })}` : null
   const team = ctx.scored.length ? scoutTeam(ctx.scored, lens === 'opponent') : null
   const players = ctx.scored.length
@@ -209,6 +174,22 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
               {ctx.history.length > 0 && ctx.scored.length === 0 && <p className={`font-rajdhani text-sm ${muted} mt-1`}>No commentary has been uploaded for those matches yet, so there is nothing to break down.</p>}
             </div>
 
+            {ctx.history.length > 0 && (
+              <div className={card}>
+                <h2 className={h2}>Last {Math.min(5, ctx.history.length)} {lens === 'opponent' ? 'meetings' : 'matches'}</h2>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <FormPills form={recentForm(ctx.history, 5)} size="lg" />
+                  <span className={`font-rajdhani text-xs ${muted}`}>newest first</span>
+                </div>
+                {pastHref && (
+                  <p className={`font-rajdhani text-sm ${muted} mt-3`}>
+                    For our entire performance {lens === 'ground' ? 'at this ground' : lens === 'tournament' ? 'in this tournament' : `against ${scope}`},{' '}
+                    <Link href={pastHref} className="font-bold text-[var(--stats-accent)] underline decoration-dotted">open Team Record &rarr;</Link>
+                  </p>
+                )}
+              </div>
+            )}
+
             {ctx.missing.length > 0 && (
               <div className={card}>
                 <h2 className={h2}>Commentary missing for {ctx.missing.length} {ctx.missing.length === 1 ? 'match' : 'matches'}</h2>
@@ -260,30 +241,6 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                   </div>
                 )}
 
-                <div className={card}>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
-                    {pastHref && (
-                      <Link href={pastHref} className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] underline decoration-dotted whitespace-nowrap">
-                        Open in Team Record &rarr;
-                      </Link>
-                    )}
-                  </div>
-                  <ul className="space-y-2">
-                    {team.matches.map(m => (
-                      <li key={m.bookingId} className="font-rajdhani text-sm">
-                        <Link href={`/matches/history/${m.bookingId}`} className="font-bold text-[var(--stats-text)] underline decoration-dotted">{fmtDate(m.gameDate)}</Link>
-                        {' '}<span className={`font-bold uppercase ${RESULT_CLS[m.result ?? 'nr']}`}>{m.result ?? '—'}</span>
-                        <span className={muted}>{lens !== 'opponent' && m.opponentName ? ` · v ${m.opponentName}` : ''} · {m.scoreLine}{m.format ? ` · ${m.format}` : ''}</span>
-                        <div className={`text-xs ${muted}`}>
-                          {m.topBat && <>Our top: {m.topBat.name} {m.topBat.runs}({m.topBat.balls}). </>}
-                          {m.topOppBat && <>Their top: {m.topOppBat.name} {m.topOppBat.runs}({m.topOppBat.balls}).</>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
                 <div className={`${card} grid gap-5 md:grid-cols-2`}>
                   <PhaseTable title="Our batting by phase (all matches in view)" t={team.batting} wicketLabel="Lost" />
                   <PhaseTable title="Our bowling by phase (all matches in view)" t={team.bowling} wicketLabel="Taken" />
@@ -322,7 +279,8 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
               <h2 className="font-cinzel text-base font-bold text-[var(--stats-text)] mb-1">Available for this game ({ctx.available.length})</h2>
               <p className={`font-rajdhani text-xs ${muted} mb-3`}>Players who marked Y, O or E, and how they did {lens === 'opponent' ? `against ${sel.opponentName}` : lens === 'ground' ? `at ${scope}` : `in ${scope}`}.</p>
               <div className="grid gap-3 md:grid-cols-2">
-                {players.map(p => <PlayerCard key={p.playerId} p={p} url={meta.get(p.playerId)?.cricHeroesUrl ?? null} response={meta.get(p.playerId)?.response ?? ''} />)}
+                {players.map(p => <PlayerCard key={p.playerId} p={p} url={meta.get(p.playerId)?.cricHeroesUrl ?? null} response={meta.get(p.playerId)?.response ?? ''}
+                  {...playerLink(p.playerId)} />)}
               </div>
               {noHistory.length > 0 && team && (
                 <p className={`font-rajdhani text-xs ${muted} mt-3`}>
