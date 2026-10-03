@@ -16,9 +16,10 @@ import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { MatchPlanningPicker } from '@/components/captains/MatchPlanningPicker'
 import { PlayerNameLink } from '@/lib/playerLink'
+import { normaliseOpponentName } from '@/lib/opponents'
 import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
 import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
-import { PHASE_KEYS, PHASE_LABEL } from '@/lib/ballByBall'
+import { PHASE_KEYS, PHASE_LABEL, formatOvers } from '@/lib/ballByBall'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -88,7 +89,7 @@ function PlayerCard({ p, url, response }: { p: PlayerScout; url: string | null; 
           </p>
           <p className={`font-rajdhani text-xs ${muted}`}>
             By phase: {PHASE_KEYS.filter(k => b.byPhase[k].balls > 0)
-              .map(k => `${PHASE_LABEL[k]} ${b.byPhase[k].runs}(${b.byPhase[k].balls})`).join(' · ') || '—'}
+              .map(k => `${PHASE_LABEL[k]} ${b.byPhase[k].runs} off ${b.byPhase[k].balls}`).join(' · ') || '—'}
           </p>
           <ul className="mt-1 space-y-0.5">
             {b.log.map(e => (
@@ -105,11 +106,11 @@ function PlayerCard({ p, url, response }: { p: PlayerScout; url: string | null; 
         <div className="mb-3">
           <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted}`}>Bowling</p>
           <p className="font-rajdhani text-sm text-[var(--stats-text)]">
-            {Math.floor(w.legalBalls / 6)}.{w.legalBalls % 6} ov · {w.runs} runs · <b>{w.wickets}</b> wkts · econ {f1(w.economy)}
+            {formatOvers(w.legalBalls)} ov · {w.runs} runs · <b>{w.wickets}</b> wkts · econ {f1(w.economy)}
           </p>
           <p className={`font-rajdhani text-xs ${muted}`}>
             By phase: {PHASE_KEYS.filter(k => w.byPhase[k].legalBalls > 0)
-              .map(k => `${PHASE_LABEL[k]} ${w.byPhase[k].wickets}/${w.byPhase[k].runs} (${f1(rpo(w.byPhase[k].runs, w.byPhase[k].legalBalls))})`).join(' · ')}
+              .map(k => `${PHASE_LABEL[k]} ${w.byPhase[k].wickets}/${w.byPhase[k].runs} in ${formatOvers(w.byPhase[k].legalBalls)} ov (econ ${f1(rpo(w.byPhase[k].runs, w.byPhase[k].legalBalls))})`).join(' · ')}
           </p>
         </div>
       )}
@@ -137,7 +138,16 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
     `/captains-corner/match-planning?${new URLSearchParams({ ...(b ? { booking: b } : {}), lens: l }).toString()}`
   const scope = ctx.scopeLabel ?? 'this scope'
   const sel = ctx.selected
-  const team = ctx.scored.length ? scoutTeam(ctx.scored) : null
+  // Team Record can filter by ground, tournament and opponent. All time; practice games stay excluded there too.
+  // On the ground/tournament views it opens split by opponent, which is the useful cut there.
+  const recordParams: Record<string, string> | null = sel
+    ? lens === 'ground' && sel.groundId ? { ground: sel.groundId, by: 'opponent' }
+    : lens === 'tournament' && sel.tournamentId ? { tournament: sel.tournamentId, by: 'opponent' }
+    : lens === 'opponent' ? { opponent: sel.opponentId ? `id:${sel.opponentId}` : `name:${normaliseOpponentName(sel.opponentName)}` }
+    : null
+    : null
+  const pastHref = recordParams ? `/team-stats?${new URLSearchParams({ year: 'all', ...recordParams })}` : null
+  const team = ctx.scored.length ? scoutTeam(ctx.scored, lens === 'opponent') : null
   const players = ctx.scored.length
     ? scoutPlayers(ctx.scored, ctx.available.map(a => ({ id: a.id, name: a.name })))
     : []
@@ -251,7 +261,14 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                 )}
 
                 <div className={card}>
-                  <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
+                    {pastHref && (
+                      <Link href={pastHref} className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] underline decoration-dotted whitespace-nowrap">
+                        Open in Team Record &rarr;
+                      </Link>
+                    )}
+                  </div>
                   <ul className="space-y-2">
                     {team.matches.map(m => (
                       <li key={m.bookingId} className="font-rajdhani text-sm">
@@ -272,9 +289,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                   <PhaseTable title="Our bowling by phase (all matches in view)" t={team.bowling} wicketLabel="Taken" />
                 </div>
 
-                <div className={`${card} grid gap-5 md:grid-cols-2`}>
-                  <div>
-                    <h2 className={h2}>{lens === 'opponent' ? 'Their batters to watch' : 'Opposition batters who did best'}</h2>
+                <div className={`${card} grid gap-5 ${lens === 'opponent' ? 'md:grid-cols-2' : ''}`}>
+                  {lens === 'opponent' && <div>
+                    <h2 className={h2}>Their batters to watch</h2>
                     <ul className="space-y-1">
                       {team.threats.map(t => (
                         <li key={t.name} className="font-rajdhani text-sm text-[var(--stats-text)]">
@@ -282,7 +299,7 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </div>}
                   <div>
                     <h2 className={h2}>How wickets fell</h2>
                     <p className="font-rajdhani text-sm text-[var(--stats-text)]">
@@ -291,9 +308,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                     <p className="font-rajdhani text-sm text-[var(--stats-text)]">
                       Took: {Object.entries(team.wicketsTaken).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k}`).join(', ') || '—'}
                     </p>
-                    {team.oppBowlersWhoGotUs.length > 0 && (
+                    {lens === 'opponent' && team.oppBowlersWhoGotUs.length > 0 && (
                       <p className={`font-rajdhani text-xs ${muted} mt-1`}>
-                        {lens === 'opponent' ? 'Their' : 'Opposition'} wicket-takers: {team.oppBowlersWhoGotUs.map(b => `${b.name} (${b.wickets})`).join(', ')}
+                        Their wicket-takers: {team.oppBowlersWhoGotUs.map(b => `${b.name} (${b.wickets})`).join(', ')}
                       </p>
                     )}
                   </div>

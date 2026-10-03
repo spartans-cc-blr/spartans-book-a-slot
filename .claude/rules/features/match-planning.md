@@ -149,3 +149,39 @@ thresholds, change the constants and the table above.
 ---
 
 *Maintained by: Spartans CC BLR*
+
+## 8. Display of overs and phase figures (October 2026)
+
+Phase lines no longer show a bare economy in brackets (it read as overs or balls). Bowling by phase
+is now `Powerplay 0/23 in 2.0 ov (econ 11.5)`, using `formatOvers()` (6 balls an over, so 15 balls is
+2.3 ov), and batting by phase is `Powerplay 33 off 21`. The overall bowling line and the "most
+economical / most expensive" pointer also say "econ".
+
+## 9. Opposition hints only on the Opponent tab (October 2026)
+
+On the Ground and Tournament tabs the "opposition" is many different sides, so pointers about specific
+opposition players would not apply to the next opponent. Those views no longer show the "Opposition
+batters who did best" panel, the opposition wicket-takers line, or the "opposition batter to watch" and
+"plan for them" (repeat bowler) pointers (`scoutTeam(..., sameOpponent)`). Our own batting/bowling
+phases, how wickets fell, the match list (with each match's opponent) and the player cards stay.
+
+## 10. "What stood out" revisions (October 2026)
+
+- **Team-level "we were caught N times" pointer removed.** Caught is the norm everywhere (about two in three
+  dismissals), so a team share says nothing, and shot selection is individual. Team level now flags only
+  bowled + lbw ≥35% of ≥6 dismissals, and ≥3 run-outs (≥10%). The per-player line treats "caught" as a pattern
+  only when ≥4 dismissals and ≥80% (other ways still ≥60%).
+- **More bowling pointers** (from our bowlers across the matches in view; `TeamScout.ourBowlers`): dot-ball share
+  (≥120 balls; ≥45% good, ≤35% loose), wides + no-balls (≥8 and ≥5 a match), the top wicket-taker (≥24 balls,
+  ≥3 wickets, with economy and overs), and a regular who went ≥2 an over above our overall economy.
+- Opposition batter/bowler pointers stay Opponent-tab only (§9).
+
+Replaced rows in §4's table: "Repeated dismissal type" → "Bowled/lbw share" and "Run-outs"; new: "Dot balls (bowling)",
+"Extras", "Top wicket-taker", "Costly bowler".
+
+## 11. Link to Team Record (October 2026)
+
+"Every match" / "Every meeting" has an "Open in Team Record →" link to `/team-stats` for the current view, all
+time (`year=all`; practice games stay excluded there too): `ground=<id>` or `tournament=<id>` (both opened split
+by opponent), or `opponent=id:<opponent id>` on the Opponent tab. Team Record already filters by all three, so it
+gives the record and lets you expand to the matches. (Past Matches could not filter by opponent, so it was not used.)
