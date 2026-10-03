@@ -137,6 +137,12 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
     `/captains-corner/match-planning?${new URLSearchParams({ ...(b ? { booking: b } : {}), lens: l }).toString()}`
   const scope = ctx.scopeLabel ?? 'this scope'
   const sel = ctx.selected
+  // Past Matches can filter by ground or tournament (not by opponent), all time and all roles.
+  const pastHref = sel && lens === 'ground' && sel.groundId
+    ? `/matches/history?${new URLSearchParams({ ground: sel.groundId, month: 'all', role: 'all' })}`
+    : sel && lens === 'tournament' && sel.tournamentId
+      ? `/matches/history?${new URLSearchParams({ tournament: sel.tournamentId, month: 'all', role: 'all' })}`
+      : null
   const team = ctx.scored.length ? scoutTeam(ctx.scored, lens === 'opponent') : null
   const players = ctx.scored.length
     ? scoutPlayers(ctx.scored, ctx.available.map(a => ({ id: a.id, name: a.name })))
@@ -251,7 +257,14 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                 )}
 
                 <div className={card}>
-                  <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
+                    {pastHref && (
+                      <Link href={pastHref} className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] underline decoration-dotted whitespace-nowrap">
+                        Open in Past Matches &rarr;
+                      </Link>
+                    )}
+                  </div>
                   <ul className="space-y-2">
                     {team.matches.map(m => (
                       <li key={m.bookingId} className="font-rajdhani text-sm">
