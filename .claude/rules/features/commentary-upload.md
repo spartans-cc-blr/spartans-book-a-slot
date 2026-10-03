@@ -105,3 +105,8 @@ this change. The tables already exist in the analytics DB.
 ## Theme
 
 The page and `CommentaryClient` follow the Light/Dark/System toggle: Warm Light colours with `dark:` variants (same pairs as `/admin/scorecard-backfill`), instead of the dark-only ink classes the other wrangler pages still use. The date chips use `DateChipSlider`'s default `auto` theme.
+
+
+## Commentary needed panel
+
+The page shows which matches still lack commentary (from the analytics `match_coverage` view) with CricHeroes links and an Upload shortcut. See `cricket-intelligence-foundation.md` §6.

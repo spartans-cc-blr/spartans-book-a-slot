@@ -3,7 +3,8 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase'
 import { hasMatchEnded } from '@/lib/matchStatus'
-import type { CommentaryMatchOption } from '@/lib/commentary'
+import type { BbbStatus, CommentaryMatchOption } from '@/lib/commentary'
+import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { CommentaryClient } from '@/components/wrangler/CommentaryClient'
 import type { Metadata } from 'next'
@@ -34,10 +35,24 @@ export default async function CommentaryPage() {
 
   const { data: bookings } = await supabase
     .from('bookings')
-    .select('id, game_date, slot_time, format, opponent_name, match_id')
+    .select('id, game_date, slot_time, format, opponent_name, match_id, cricheroes_url')
     .eq('status', 'confirmed')
     .not('match_id', 'is', null)
     .order('game_date', { ascending: false })
+
+  // Ball-by-ball status per match from the analytics DB's match_coverage view (see
+  // cricket-intelligence-foundation.md). Best-effort: if it can't be read the page still works,
+  // it just shows no status and no "needs commentary" panel.
+  const coverage = new Map<string, BbbStatus>()
+  const analytics = createAnalyticsClient()
+  if (analytics) {
+    const { data: cov, error: covErr } = await analytics
+      .from('match_coverage')
+      .select('match_id, bbb_status')
+      .limit(1000)
+    if (covErr) console.error('[commentary] match_coverage read failed:', covErr.message)
+    for (const c of cov ?? []) coverage.set(String(c.match_id), c.bbb_status as BbbStatus)
+  }
 
   const matches: CommentaryMatchOption[] = (bookings ?? [])
     .filter(b => inCache.has(b.id) && hasMatchEnded(b.game_date, b.slot_time, b.format))
@@ -47,6 +62,8 @@ export default async function CommentaryPage() {
       game_date:     b.game_date,
       format:        b.format,
       opponent_name: b.opponent_name,
+      cricheroes_url: b.cricheroes_url ?? null,
+      bbb_status:    coverage.get(String(b.match_id)),
     }))
 
   return (

@@ -1,6 +1,6 @@
 # Cricket Intelligence Foundation — match context, validation & match state
 
-**Spartans Hub · Added: October 2026 · Status: foundation layer built (SQL only, no UI, no AI)**
+**Spartans Hub · Added: October 2026 · Status: foundation layer + `player_match_context` built; commentary-needed panel live on `/wrangler/commentary`; no AI**
 
 ---
 
@@ -52,28 +52,60 @@ Apply `015_cricket_intelligence_foundation.sql` to the analytics project. It was
 The file is the source of truth and is safe to re-run (`CREATE ... IF NOT EXISTS`, `DROP VIEW IF
 EXISTS`); a re-run of the views needs `DROP VIEW` first if their column lists change.
 
-## 5. Not built yet (next steps from the roadmap)
+## 5. `player_match_context` (migration `016_player_match_context.sql`)
 
-- `player_match_context` (entry/exit state per batter, from `match_state`).
+One row per batter per innings with ball-by-ball: the innings state at **entry** (before the
+first ball faced) and **exit**, plus runs, balls, fours, sixes, strike rate, how out, and
+`team_runs_while_in` / `team_wickets_while_in`. Built on `match_state` and `ball_by_ball_linked`,
+so `player_id` is filled for Spartans batters. Entry/exit have phase, required rate (innings 2)
+and balls; `position_by_appearance` is order of first ball faced, not the scorecard number.
+
+Definitions and known limits:
+- **Entry is the first ball faced, not the walk-in.** A batter who comes in at a wicket but
+  faces a few balls later shows the later score (e.g. wicket at 32/3, next batter's entry 37/3).
+  Non-strikers who never face a ball do not appear.
+- **Exit** is the dismissal delivery (matched on `dismissed_batter`), else the end of the innings.
+- **Boundaries** count only outcomes the commentary marks FOUR/SIX; a ball run for 4 is not one.
+- **Bye guard:** the commentary parser can record "(no ball) bye, 4 runs" as 4 bat runs; the view
+  counts any outcome mentioning a bye as 0 bat runs. The parser itself (spartans-python) should be
+  fixed so `ball_by_ball.runs_bat` is right at source; the innings totals are unaffected.
+- Required rate near the last ball is huge (e.g. 129.00 with 1 ball left); consumers should cap
+  or ignore it.
+
+**Verified** against `batting_stats` for every Spartans batter with ball-by-ball (54 of 54): runs,
+balls faced, fours, sixes and out/not-out all match. Opponent rows have names only (no ids).
+
+## 6. "Commentary needed" panel
+
+`/wrangler/commentary` now reads `match_coverage` (best-effort; if unreadable the page works as
+before without status). A collapsible panel lists matches that are not complete (none / one
+innings / needs re-upload) with a CricHeroes link from the booking and an Upload button that
+selects the match in the form; the dropdown marks complete matches with a tick. Logic:
+`matchesNeedingCommentary()` in `src/lib/commentary.ts` (unit-tested).
+
+## 7. Not built yet (next steps from the roadmap)
+
 - Situation definitions and `player_situation_stats`, with minimum-sample rules. With 7 matches
   these will mostly be below threshold; start with phase and wickets-down bands.
-- A Hub screen over `match_coverage` (or a "commentary missing" count on `/wrangler/commentary`).
 - Opponent player identity (opponents are names only), and an automatic `match_dimensions`
   refresh when an opponent is linked later.
 - No live-match data exists: ball-by-ball arrives post-match from uploaded PDFs, so live captain
   context is out of reach until a live source exists.
 
-## 6. Security
+## 8. Security
 
 Read-only analytics objects in the analytics DB, service-role access only (same blanket-deny
 posture as the other analytics tables). No new API route, no client-reachable input. The Hub
 write uses the existing server-side analytics client.
 
-## 7. File map
+## 9. File map
 
 | File | Role |
 |---|---|
 | `analytics-db/migrations/015_cricket_intelligence_foundation.sql` | Tables and views above |
+| `analytics-db/migrations/016_player_match_context.sql` | `player_match_context` view |
+| `src/app/wrangler/commentary/page.tsx`, `src/components/wrangler/CommentaryClient.tsx` | Coverage read and the "Commentary needed" panel |
+| `src/lib/commentary.ts` (+ `.test.ts`) | `BbbStatus`, `matchesNeedingCommentary()` |
 | `src/lib/matchStatsSync.ts` | Upserts `match_dimensions` on every sync |
 | `src/lib/ballByBall.ts` | `PHASE_PLANS` (TS copy of `phase_definitions`) |
 

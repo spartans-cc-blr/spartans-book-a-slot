@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
 import { groupDatesIntoChips } from '@/lib/dateChipGroups'
 import {
-  COMMENTARY_SIDES, SIDE_LABEL, validateCommentaryPdf,
+  COMMENTARY_SIDES, SIDE_LABEL, validateCommentaryPdf, matchesNeedingCommentary,
   type CommentaryMatchOption, type CommentaryResult, type CommentarySide,
 } from '@/lib/commentary'
 
@@ -23,7 +23,12 @@ const EMPTY: SideState = {
 }
 
 function matchLabel(m: CommentaryMatchOption) {
-  return `${m.game_date} · ${m.format} · vs ${m.opponent_name ?? 'Unknown'}`
+  const mark = m.bbb_status === 'complete' ? '✓ ' : ''
+  return `${mark}${m.game_date} · ${m.format} · vs ${m.opponent_name ?? 'Unknown'}`
+}
+
+const STATUS_TEXT: Record<string, string> = {
+  none: 'No commentary', partial: 'One innings', mismatch: 'Needs re-upload',
 }
 
 export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[] }) {
@@ -107,8 +112,51 @@ export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[]
     )
   }
 
+  const needing = matchesNeedingCommentary(matches)
+  const known = matches.filter(m => m.bbb_status !== undefined).length
+
+  function pickFromList(id: string) {
+    setDayFilter(null)
+    changeMatch(id)
+    document.getElementById('commentary-match')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
   return (
     <div className="space-y-5">
+      {known > 0 && (
+        <details open={needing.length > 0}
+          className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4">
+          <summary className="cursor-pointer font-rajdhani text-sm font-bold tracking-wide uppercase text-[#1C1917] dark:text-zinc-300">
+            Commentary needed ({needing.length} of {known} matches)
+          </summary>
+          {needing.length === 0 ? (
+            <p className="font-rajdhani text-xs text-emerald-700 dark:text-emerald-400 mt-2">Every match has both innings loaded.</p>
+          ) : (
+            <ul className="mt-3 max-h-72 overflow-y-auto divide-y divide-[#E2DACE] dark:divide-ink-5">
+              {needing.map(m => (
+                <li key={m.booking_id} className="flex items-center gap-3 py-2 font-rajdhani text-sm">
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate text-[#1C1917] dark:text-zinc-200">
+                      {m.game_date} · {m.format} · vs {m.opponent_name ?? 'Unknown'}
+                    </div>
+                    <div className="text-xs text-[#78716C] dark:text-zinc-500">
+                      {STATUS_TEXT[m.bbb_status as string] ?? m.bbb_status}
+                      {m.cricheroes_url
+                        ? <> · <a href={m.cricheroes_url} target="_blank" rel="noopener noreferrer" className="underline">CricHeroes ↗</a></>
+                        : ' · no CricHeroes link on booking'}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => pickFromList(m.booking_id)}
+                    className="shrink-0 rounded border border-[#D4C9B0] dark:border-ink-5 px-3 py-1 text-xs font-bold text-[#B45309] dark:text-gold hover:bg-[#FEF3C7] dark:hover:bg-ink-4">
+                    Upload
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </details>
+      )}
+
       {dateChipGroups.length > 0 && (
         <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-xl p-3">
           <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={changeDay} />

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isCommentarySide, validateCommentaryPdf, MAX_COMMENTARY_BYTES } from './commentary'
+import { isCommentarySide, validateCommentaryPdf, matchesNeedingCommentary, MAX_COMMENTARY_BYTES } from './commentary'
 
 const PDF = Buffer.from('%PDF-1.4 rest')
 
@@ -32,5 +32,19 @@ describe('validateCommentaryPdf', () => {
 
   it('checks magic bytes, not the file name or content type', () => {
     expect(validateCommentaryPdf(1000, Buffer.from('<html>'))).toMatch(/valid PDF/)
+  })
+})
+
+describe('matchesNeedingCommentary', () => {
+  const base = { booking_id: 'b', match_id: 'm', game_date: '2026-09-01', format: 'T20', opponent_name: 'X' }
+  it('keeps none/partial/mismatch, drops complete and unknown status', () => {
+    const list = [
+      { ...base, booking_id: '1', bbb_status: 'none' as const },
+      { ...base, booking_id: '2', bbb_status: 'partial' as const },
+      { ...base, booking_id: '3', bbb_status: 'mismatch' as const },
+      { ...base, booking_id: '4', bbb_status: 'complete' as const },
+      { ...base, booking_id: '5' },
+    ]
+    expect(matchesNeedingCommentary(list).map(m => m.booking_id)).toEqual(['1', '2', '3'])
   })
 })

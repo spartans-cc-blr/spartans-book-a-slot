@@ -78,11 +78,22 @@ export interface CommentaryResult {
   detail?: string
 }
 
+/** Ball-by-ball status of a match, from the analytics `match_coverage` view. */
+export type BbbStatus = 'none' | 'partial' | 'complete' | 'mismatch'
+
 export interface CommentaryMatchOption {
   booking_id: string
   match_id: string
   game_date: string
   format: string
   opponent_name: string | null
+  cricheroes_url?: string | null
+  /** Undefined when the analytics DB couldn't be read, so no status is shown. */
+  bbb_status?: BbbStatus
+}
+
+/** Matches that still need commentary (anything but complete), newest first as given. */
+export function matchesNeedingCommentary(matches: CommentaryMatchOption[]): CommentaryMatchOption[] {
+  return matches.filter(m => m.bbb_status !== undefined && m.bbb_status !== 'complete')
 }
 
