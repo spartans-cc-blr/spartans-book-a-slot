@@ -40,8 +40,8 @@ Captains' Corner section of the mobile More sheet (`activePage="captains-plannin
   upcoming confirmed games that have an opponent set (`?booking=<id>`,
   defaults to the soonest).
 - **What stood out** — rule-based pointers (§4).
-- **Every meeting / match** — date (links to the match), result, scores, our top
-  scorer and theirs.
+- **Last 5 meetings / matches** — W/L/T pills (newest first) from all synced matches in the view (not only those
+  with commentary), plus a line and link to Team Record for the full performance (§11).
 - **Phase tables** — our batting and our bowling by Powerplay / Middle / Death,
   summed over all meetings (runs, balls, RPO, wickets, dot %). Phases use the
   club's per-format definition (`PHASE_PLANS` in `ballByBall.ts`).
@@ -179,9 +179,11 @@ phases, how wickets fell, the match list (with each match's opponent) and the pl
 Replaced rows in §4's table: "Repeated dismissal type" → "Bowled/lbw share" and "Run-outs"; new: "Dot balls (bowling)",
 "Extras", "Top wicket-taker", "Costly bowler".
 
-## 11. Link to Team Record (October 2026)
+## 11. Last-5 form and the Team Record link (October 2026)
 
-"Every match" / "Every meeting" has an "Open in Team Record →" link to `/team-stats` for the current view, all
-time (`year=all`; practice games stay excluded there too): `ground=<id>` or `tournament=<id>` (both opened split
-by opponent), or `opponent=id:<opponent id>` on the Opponent tab. Team Record already filters by all three, so it
-gives the record and lets you expand to the matches. (Past Matches could not filter by opponent, so it was not used.)
+The long "Every match" list was replaced by a compact **Last 5** form strip (`FormPills`, `recentForm()` over the
+whole `ctx.history`), with the line "For our entire performance at this ground / in this tournament / against X,
+open Team Record →". The link goes to `/team-stats` all time (`year=all`; practice games stay excluded there too):
+`ground=<id>` or `tournament=<id>` (both split by opponent), or `opponent=id:<opponent id>` on the Opponent tab.
+Team Record already filters by all three and lets you expand to the matches. (Past Matches cannot filter by
+opponent, so it is not used.) Individual match links remain in the Commentary-missing table and the player cards.

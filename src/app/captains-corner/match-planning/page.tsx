@@ -17,6 +17,8 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import { MatchPlanningPicker } from '@/components/captains/MatchPlanningPicker'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { normaliseOpponentName } from '@/lib/opponents'
+import { FormPills } from '@/components/team/TeamSplitTable'
+import { recentForm } from '@/lib/teamStatsCore'
 import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
 import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
 import { PHASE_KEYS, PHASE_LABEL, formatOvers } from '@/lib/ballByBall'
@@ -33,10 +35,6 @@ function fmtDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 const f1 = (n: number | null) => (n == null ? '—' : n.toFixed(1))
-const RESULT_CLS: Record<string, string> = {
-  won: 'text-emerald-700 dark:text-emerald-400', lost: 'text-red-700 dark:text-red-400',
-  tied: 'text-amber-700 dark:text-amber-400', nr: 'text-[var(--stats-text-muted)]',
-}
 
 function PhaseTable({ title, t, wicketLabel }: { title: string; t: PhaseTallies; wicketLabel: string }) {
   return (
@@ -209,6 +207,22 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
               {ctx.history.length > 0 && ctx.scored.length === 0 && <p className={`font-rajdhani text-sm ${muted} mt-1`}>No commentary has been uploaded for those matches yet, so there is nothing to break down.</p>}
             </div>
 
+            {ctx.history.length > 0 && (
+              <div className={card}>
+                <h2 className={h2}>Last {Math.min(5, ctx.history.length)} {lens === 'opponent' ? 'meetings' : 'matches'}</h2>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <FormPills form={recentForm(ctx.history, 5)} size="lg" />
+                  <span className={`font-rajdhani text-xs ${muted}`}>newest first</span>
+                </div>
+                {pastHref && (
+                  <p className={`font-rajdhani text-sm ${muted} mt-3`}>
+                    For our entire performance {lens === 'ground' ? 'at this ground' : lens === 'tournament' ? 'in this tournament' : `against ${scope}`},{' '}
+                    <Link href={pastHref} className="font-bold text-[var(--stats-accent)] underline decoration-dotted">open Team Record &rarr;</Link>
+                  </p>
+                )}
+              </div>
+            )}
+
             {ctx.missing.length > 0 && (
               <div className={card}>
                 <h2 className={h2}>Commentary missing for {ctx.missing.length} {ctx.missing.length === 1 ? 'match' : 'matches'}</h2>
@@ -259,30 +273,6 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                     <p className={`font-rajdhani text-[11px] ${muted} mt-2`}>Pointers are rule-based from the numbers below, not opinion.</p>
                   </div>
                 )}
-
-                <div className={card}>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <h2 className={h2}>{lens === 'opponent' ? 'Every meeting' : 'Every match'}</h2>
-                    {pastHref && (
-                      <Link href={pastHref} className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] underline decoration-dotted whitespace-nowrap">
-                        Open in Team Record &rarr;
-                      </Link>
-                    )}
-                  </div>
-                  <ul className="space-y-2">
-                    {team.matches.map(m => (
-                      <li key={m.bookingId} className="font-rajdhani text-sm">
-                        <Link href={`/matches/history/${m.bookingId}`} className="font-bold text-[var(--stats-text)] underline decoration-dotted">{fmtDate(m.gameDate)}</Link>
-                        {' '}<span className={`font-bold uppercase ${RESULT_CLS[m.result ?? 'nr']}`}>{m.result ?? '—'}</span>
-                        <span className={muted}>{lens !== 'opponent' && m.opponentName ? ` · v ${m.opponentName}` : ''} · {m.scoreLine}{m.format ? ` · ${m.format}` : ''}</span>
-                        <div className={`text-xs ${muted}`}>
-                          {m.topBat && <>Our top: {m.topBat.name} {m.topBat.runs}({m.topBat.balls}). </>}
-                          {m.topOppBat && <>Their top: {m.topOppBat.name} {m.topOppBat.runs}({m.topOppBat.balls}).</>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
 
                 <div className={`${card} grid gap-5 md:grid-cols-2`}>
                   <PhaseTable title="Our batting by phase (all matches in view)" t={team.batting} wicketLabel="Lost" />
