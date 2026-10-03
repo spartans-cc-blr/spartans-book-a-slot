@@ -64,7 +64,7 @@ function PhaseTable({ title, t, wicketLabel }: { title: string; t: PhaseTallies;
   )
 }
 
-function PlayerCard({ p, url, response, href, linkLabel }: { p: PlayerScout; url: string | null; response: string; href: string; linkLabel: string }) {
+function PlayerCard({ p, url, response, href, linkLabel }: { p: PlayerScout; url: string | null; response: string; href: string | null; linkLabel: string }) {
   return (
     <div className={card}>
       <div className="flex items-center gap-2 mb-2">
@@ -79,7 +79,7 @@ function PlayerCard({ p, url, response, href, linkLabel }: { p: PlayerScout; url
       ) : (
         <p className={`font-rajdhani text-sm ${muted}`}>Nothing stands out in this view.</p>
       )}
-      <Link href={href} className="inline-block mt-2 font-rajdhani text-xs font-bold text-[var(--stats-accent)] underline decoration-dotted">{linkLabel} &rarr;</Link>
+      {href && <Link href={href} className="inline-block mt-2 font-rajdhani text-xs font-bold text-[var(--stats-accent)] underline decoration-dotted">{linkLabel} &rarr;</Link>}
     </div>
   )
 }
@@ -107,9 +107,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
     : null
     : null
   // Each card keeps only the callouts; the detail lives behind a link scoped to the current view.
-  const playerLink = (id: string): { href: string; linkLabel: string } =>
+  const playerLink = (id: string): { href: string | null; linkLabel: string } =>
     lens === 'ground' && sel?.groundId ? { href: `/players/${id}/stats?ground=${sel.groundId}`, linkLabel: 'Full stats at this ground' }
-    : lens === 'tournament' && sel?.tournamentId ? { href: `/leaderboard?${new URLSearchParams({ category: 'mvp', tournament: sel.tournamentId, year: 'all' })}`, linkLabel: 'Tournament MVP table' }
+    : lens === 'tournament' ? { href: null, linkLabel: '' }
     : { href: `/players/${id}/stats`, linkLabel: 'Full stats' }
   const pastHref = recordParams ? `/team-stats?${new URLSearchParams({ year: 'all', ...recordParams })}` : null
   const team = ctx.scored.length ? scoutTeam(ctx.scored, lens === 'opponent') : null
@@ -185,6 +185,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                   <p className={`font-rajdhani text-sm ${muted} mt-3`}>
                     For our entire performance {lens === 'ground' ? 'at this ground' : lens === 'tournament' ? 'in this tournament' : `against ${scope}`},{' '}
                     <Link href={pastHref} className="font-bold text-[var(--stats-accent)] underline decoration-dotted">open Team Record &rarr;</Link>
+                    {lens === 'tournament' && sel?.tournamentId && (
+                      <>{' '}·{' '}<Link href={`/leaderboard?${new URLSearchParams({ category: 'mvp', tournament: sel.tournamentId, year: 'all' })}`} className="font-bold text-[var(--stats-accent)] underline decoration-dotted">Tournament MVP table &rarr;</Link></>
+                    )}
                   </p>
                 )}
               </div>

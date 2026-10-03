@@ -192,3 +192,7 @@ callouts ("Nothing stands out in this view" when none fire). Each card links to 
 Ground tab → `/players/<id>/stats?ground=<groundId>` (the player stats page reads `?ground=` and pre-selects its
 Ground filter, validated against the grounds list); Tournament tab → `/leaderboard?category=mvp&tournament=<id>&year=all`
 (Detailed → MVP for that tournament); Opponent tab → `/players/<id>/stats` (no opponent filter exists there).
+
+## 13. Tournament MVP link moved (October 2026)
+
+On the Tournament tab the "Tournament MVP table →" link (`/leaderboard?category=mvp&tournament=<id>&year=all`) now sits once, next to "open Team Record →" in the Last-5 card, instead of under every player card. Tournament-tab player cards show callouts only.
