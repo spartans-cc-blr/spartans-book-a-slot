@@ -13,7 +13,7 @@
 import {
   type BallRow, type PhaseKey, PHASE_KEYS, PHASE_LABEL,
   ballsForSide, oversForFormat, phaseSplit, summariseBatters, summariseBowlers,
-  strikeRate, economy, howOut,
+  strikeRate, economy, howOut, formatOvers,
 } from './ballByBall'
 
 // ── Inputs / outputs ───────────────────────────────────────────────────────
@@ -124,6 +124,8 @@ export interface TeamScout {
   threats: OppThreat[]
   /** opponent bowlers who took our wickets, most first */
   oppBowlersWhoGotUs: { name: string; wickets: number }[]
+  /** our own bowlers across the matches in view */
+  ourBowlers: { name: string; legalBalls: number; runs: number; wickets: number; wides: number; noBalls: number }[]
   insights: string[]
 }
 
@@ -165,6 +167,7 @@ export function scoutTeam(matches: ScoutMatchInput[], sameOpponent = true): Team
   const wicketsTaken = emptyGroups()
   const threatMap = new Map<string, OppThreat>()
   const oppBowlers = new Map<string, { name: string; wickets: number }>()
+  const ours_ = new Map<string, TeamScout['ourBowlers'][number]>()
 
   const ordered = [...matches].sort((a, b) => b.gameDate.localeCompare(a.gameDate)) // newest first
 
@@ -195,6 +198,13 @@ export function scoutTeam(matches: ScoutMatchInput[], sameOpponent = true): Team
       }
     }
     for (const b of theirs) if (b.is_wicket) wicketsTaken[dismissalGroup(b.dismissal_kind)] += 1
+
+    for (const l of summariseBowlers(theirs, total)) {
+      const k = l.playerId ?? keyOf(l.name)
+      const cur = ours_.get(k) ?? { name: l.name, legalBalls: 0, runs: 0, wickets: 0, wides: 0, noBalls: 0 }
+      cur.legalBalls += l.legalBalls; cur.runs += l.runs; cur.wickets += l.wickets; cur.wides += l.wides; cur.noBalls += l.noBalls
+      ours_.set(k, cur)
+    }
 
     const ourBat = summariseBatters(ours, total)
     const theirBat = summariseBatters(theirs, total)
@@ -234,6 +244,7 @@ export function scoutTeam(matches: ScoutMatchInput[], sameOpponent = true): Team
   const team: TeamScout = {
     matches: digests, batting, bowling, wicketsLost, wicketsTaken, threats,
     oppBowlersWhoGotUs: Array.from(oppBowlers.values()).sort((a, b) => b.wickets - a.wickets).slice(0, 4),
+    ourBowlers: Array.from(ours_.values()).sort((a, b) => b.wickets - a.wickets || b.legalBalls - a.legalBalls),
     insights: [],
   }
   team.insights = teamInsights(team, sameOpponent)
@@ -294,12 +305,38 @@ export function teamInsights(t: TeamScout, sameOpponent = true): string[] {
     }
   }
 
-  // Repeated ways of getting out.
+  // Ways of getting out. "Caught" is the norm in cricket (roughly two in three dismissals everywhere), so a
+  // team-level caught share says little and is not flagged; shot selection is per batter (see the player cards).
+  // Bowled/lbw and run-outs are the ones worth a mention at team level.
   const lostTotal = Object.values(t.wicketsLost).reduce((s, v) => s + v, 0)
-  const topLost = (Object.entries(t.wicketsLost) as [DismissalGroup, number][]).sort((a, b) => b[1] - a[1])[0]
-  if (lostTotal >= 6 && topLost && pct(topLost[1], lostTotal) >= 50 && topLost[0] !== 'other') {
-    out.push(`We were ${topLost[0] === 'caught' ? 'caught' : topLost[0]} ${topLost[1]} times out of ${lostTotal} dismissals (${pct(topLost[1], lostTotal)}%).`)
+  const beaten = t.wicketsLost.bowled + t.wicketsLost.lbw
+  if (lostTotal >= 6 && pct(beaten, lostTotal) >= 35) {
+    out.push(`${beaten} of our ${lostTotal} dismissals (${pct(beaten, lostTotal)}%) were bowled or lbw — beaten by straight deliveries.`)
   }
+  if (t.wicketsLost['run out'] >= 3 && pct(t.wicketsLost['run out'], lostTotal) >= 10) {
+    out.push(`${t.wicketsLost['run out']} run-outs in ${matchesLabel(n)} — tighten up the running between wickets.`)
+  }
+  // More from our bowling: control (dots), extras, and who did the work.
+  if (wTot.balls >= 120) {
+    const dp = pct(wTot.dots, wTot.balls)
+    if (dp >= 45) out.push(`Bowling: ${dp}% of our balls were dots — squeezing them works.`)
+    else if (dp <= 35) out.push(`Bowling: only ${dp}% of our balls were dots — too many scoring balls; look for tighter lines.`)
+  }
+  const extras = t.ourBowlers.reduce((s, b) => s + b.wides + b.noBalls, 0)
+  if (extras >= 8 && extras / n >= 5) {
+    out.push(`Bowling: ${extras} wides and no-balls in ${matchesLabel(n)} (${f1(extras / n)} a match) — free runs to cut out.`)
+  }
+  const regulars = t.ourBowlers.filter(b => b.legalBalls >= 24)
+  const topWk = [...regulars].sort((a, b) => b.wickets - a.wickets || (economy(a.runs, a.legalBalls) ?? 99) - (economy(b.runs, b.legalBalls) ?? 99))[0]
+  if (topWk && topWk.wickets >= 3) {
+    out.push(`Bowling: ${topWk.name} has done the most damage here — ${topWk.wickets} wickets at econ ${f1(economy(topWk.runs, topWk.legalBalls))} (${formatOvers(topWk.legalBalls)} ov).`)
+  }
+  if (wAll != null) {
+    const costly = [...regulars].map(b => ({ b, eco: economy(b.runs, b.legalBalls)! }))
+      .filter(x => x.eco >= wAll + 2).sort((a, b) => b.eco - a.eco)[0]
+    if (costly) out.push(`Bowling: ${costly.b.name} went at econ ${f1(costly.eco)} over ${formatOvers(costly.b.legalBalls)} ov (our overall ${f1(wAll)}) — consider shorter spells.`)
+  }
+
   const repeat = sameOpponent ? t.oppBowlersWhoGotUs[0] : undefined
   if (repeat && repeat.wickets >= 3) out.push(`${repeat.name} took ${repeat.wickets} of our wickets across ${matchesLabel(n)} — plan for them.`)
 
@@ -430,7 +467,9 @@ export function playerInsights(p: PlayerScout): string[] {
     const byGroup = new Map<DismissalGroup, number>()
     for (const e of b.log) if (e.group) byGroup.set(e.group, (byGroup.get(e.group) ?? 0) + 1)
     const way = Array.from(byGroup.entries()).sort((x, y) => y[1] - x[1])[0]
-    if (way && way[1] >= 2 && b.dismissals >= 3 && way[1] / b.dismissals >= 0.6) {
+    // 'Caught' is the common way to get out, so it only counts as a pattern when it is overwhelming.
+    const share = way ? way[1] / b.dismissals : 0
+    if (way && way[1] >= 2 && b.dismissals >= 3 && (way[0] === 'caught' ? b.dismissals >= 4 && share >= 0.8 : share >= 0.6)) {
       out.push(`Out ${way[0]} in ${way[1]} of ${b.dismissals} dismissals.`)
     }
     const best = [...b.positions].sort((x, y) => y.runs - x.runs)[0]

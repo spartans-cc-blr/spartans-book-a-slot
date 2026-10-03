@@ -164,3 +164,17 @@ opposition players would not apply to the next opponent. Those views no longer s
 batters who did best" panel, the opposition wicket-takers line, or the "opposition batter to watch" and
 "plan for them" (repeat bowler) pointers (`scoutTeam(..., sameOpponent)`). Our own batting/bowling
 phases, how wickets fell, the match list (with each match's opponent) and the player cards stay.
+
+## 10. "What stood out" revisions (October 2026)
+
+- **Team-level "we were caught N times" pointer removed.** Caught is the norm everywhere (about two in three
+  dismissals), so a team share says nothing, and shot selection is individual. Team level now flags only
+  bowled + lbw ≥35% of ≥6 dismissals, and ≥3 run-outs (≥10%). The per-player line treats "caught" as a pattern
+  only when ≥4 dismissals and ≥80% (other ways still ≥60%).
+- **More bowling pointers** (from our bowlers across the matches in view; `TeamScout.ourBowlers`): dot-ball share
+  (≥120 balls; ≥45% good, ≤35% loose), wides + no-balls (≥8 and ≥5 a match), the top wicket-taker (≥24 balls,
+  ≥3 wickets, with economy and overs), and a regular who went ≥2 an over above our overall economy.
+- Opposition batter/bowler pointers stay Opponent-tab only (§9).
+
+Replaced rows in §4's table: "Repeated dismissal type" → "Bowled/lbw share" and "Run-outs"; new: "Dot balls (bowling)",
+"Extras", "Top wicket-taker", "Costly bowler".
