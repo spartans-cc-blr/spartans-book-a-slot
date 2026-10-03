@@ -28,7 +28,7 @@ export async function syncMatchStatsForBooking(
 
   const { data: booking, error: bookingErr } = await supabase
     .from('bookings')
-    .select('match_id, game_date, is_practice, tournament:tournaments(is_practice)')
+    .select('match_id, game_date, format, stage_type, is_practice, tournament_id, ground_id, opponent_id, tournament:tournaments(is_practice, ground_id)')
     .eq('id', bookingId)
     .single()
 
@@ -124,6 +124,29 @@ export async function syncMatchStatsForBooking(
   }, { onConflict: 'match_id' })
 
   if (cacheErr) return { ok: false, error: cacheErr.message }
+
+  // Mirror the Hub-side match context into the analytics DB so SQL (match_state's
+  // phase / total overs, match_coverage) never needs a cross-project join. Best-effort —
+  // see features/cricket-intelligence-foundation.md. Never fails the sync.
+  try {
+    const tn = Array.isArray(booking.tournament) ? booking.tournament[0] : booking.tournament
+    const overs = /^T(\d+)$/i.exec(booking.format ?? '')
+    const { error: dimErr } = await analyticsSupabase.from('match_dimensions').upsert({
+      match_id:      mid,
+      booking_id:    bookingId,
+      format:        booking.format ?? null,
+      total_overs:   overs ? Number(overs[1]) : null,
+      stage_type:    booking.stage_type ?? null,
+      is_practice:   !!booking.is_practice || !!tn?.is_practice,
+      tournament_id: booking.tournament_id ?? null,
+      ground_id:     booking.ground_id ?? tn?.ground_id ?? null,
+      opponent_id:   booking.opponent_id ?? null,
+      synced_at:     new Date().toISOString(),
+    }, { onConflict: 'match_id' })
+    if (dimErr) console.error('[matchStatsSync] match_dimensions upsert failed:', dimErr.message)
+  } catch (e) {
+    console.error('[matchStatsSync] match_dimensions upsert threw:', e)
+  }
 
   // match_stats_cache is keyed on match_id, so a booking whose match_id was
   // synced wrongly first (or later corrected) would otherwise keep an orphan
