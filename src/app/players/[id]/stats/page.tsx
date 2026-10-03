@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 // (not pre-aggregated here) so the section can respond to the same
 // Year/Format/As-Captain/Innings filters the rest of the page already
 // tracks client-side — see filterCaptaincyInnings() in captaincyStatsCore.ts.
-export default async function PlayerStatsPage({ params }: { params: { id: string } }) {
+export default async function PlayerStatsPage({ params, searchParams }: { params: { id: string }; searchParams?: { ground?: string } }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
 
@@ -66,6 +66,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
       <PlayerStatsClient
         player={player}
         grounds={grounds ?? []}
+        initialGroundId={(grounds ?? []).some(g => g.id === searchParams?.ground) ? searchParams!.ground : undefined}
         initialCareer={career}
         initialMatches={matches}
         captaincyRows={captaincyRows}

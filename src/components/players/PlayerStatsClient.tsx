@@ -79,10 +79,12 @@ const PITCH_TABS: { key: PitchType | 'all'; label: string }[] = [
 ]
 
 export function PlayerStatsClient({
-  player, grounds, initialCareer, initialMatches, captaincyRows, showCaptaincy, isOwnStats,
+  player, grounds, initialGroundId, initialCareer, initialMatches, captaincyRows, showCaptaincy, isOwnStats,
 }: {
   player: PlayerInfo
   grounds: { id: string; name: string }[]
+  /** Pre-selects the Ground filter (from `?ground=<id>`, e.g. the Match Planning link). */
+  initialGroundId?: string
   initialCareer: PlayerStatsTotals
   initialMatches: PlayerMatchHistoryRow[]
   // "Under each captain" — raw, unaggregated rows (see captaincyStatsCore.ts).
@@ -94,7 +96,7 @@ export function PlayerStatsClient({
   isOwnStats: boolean
 }) {
   const [year, setYear] = useState<number | 'all'>('all')
-  const [groundId, setGroundId] = useState<string>('all')
+  const [groundId, setGroundId] = useState<string>(initialGroundId ?? 'all')
   const [formats, setFormats] = useState<Set<Format>>(new Set<Format>(['T20', 'T30']))
   const [asCaptain, setAsCaptain] = useState(false)
   // Practice games (the "Practice games" umbrella tournament) are excluded

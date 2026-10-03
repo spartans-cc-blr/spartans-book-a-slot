@@ -55,11 +55,8 @@ Captains' Corner section of the mobile More sheet (`activePage="captains-plannin
   plus the opponent in the Ground/Tournament lenses. It tells captains the
   analysis would be fuller once a wrangler uploads those commentaries. Shown
   even when no match has commentary at all.
-- **Available players** — one card per Y/O/E player with history against them:
-  batting (innings, runs, SR, average, positions used with runs at each, runs by
-  phase, an innings log with how out) and bowling (overs, runs, wickets, economy,
-  by phase), plus pointers. Players with no ball-by-ball history against the
-  opponent are listed by name.
+- **Available players** — one card per Y/O/E player with history in the view, showing only the pointer
+  callouts (§12) and a link to the detail. Players with no ball-by-ball history are listed by name.
 
 ---
 
@@ -187,3 +184,11 @@ open Team Record →". The link goes to `/team-stats` all time (`year=all`; prac
 `ground=<id>` or `tournament=<id>` (both split by opponent), or `opponent=id:<opponent id>` on the Opponent tab.
 Team Record already filters by all three and lets you expand to the matches. (Past Matches cannot filter by
 opponent, so it is not used.) Individual match links remain in the Commentary-missing table and the player cards.
+
+## 12. Player cards: callouts and a link only (October 2026)
+
+Cards no longer show batting/bowling figures, positions, phase lines or innings logs; only the rule-based
+callouts ("Nothing stands out in this view" when none fire). Each card links to the detail for the current view:
+Ground tab → `/players/<id>/stats?ground=<groundId>` (the player stats page reads `?ground=` and pre-selects its
+Ground filter, validated against the grounds list); Tournament tab → `/leaderboard?category=mvp&tournament=<id>&year=all`
+(Detailed → MVP for that tournament); Opponent tab → `/players/<id>/stats` (no opponent filter exists there).
