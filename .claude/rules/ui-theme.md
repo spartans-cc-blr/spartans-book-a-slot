@@ -163,6 +163,12 @@ Everything else keeps rendering exactly as it always has, in the single dark-ink
 
 ---
 
+## Page Content Width (added October 2026)
+
+`/fixtures` sets the reference: content in a left-aligned `px-5 md:px-8 lg:px-10 max-w-2xl` column, with the page background on a full-width wrapper (not on the width-capped element, or the colour stops at the column edge). Card-style pages now match it: Home's player dashboard, `/matches/history` and `/matches/history/[bookingId]`, `/players/[id]/stats`, `/wallet` and `/profile`. Previously these were a mix of `max-w-3xl`/`4xl`, centred (`mx-auto`) or left-aligned, and `px-4` or `px-5` padding, so the column moved when switching tabs on an iPad. Data-dense pages (`/leaderboard`, `/team-stats`, `/players`) deliberately stay wide because of their tables and filter panel. New card-style pages should use the same container.
+
+---
+
 ## Design Principles
 
 1. **Daylight-first** — primary users are on mobile outdoors. Every colour decision

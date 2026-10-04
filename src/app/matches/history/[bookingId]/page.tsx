@@ -159,7 +159,8 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
   return (
     <>
       <SiteNav activePage="matches" back={{ fallbackHref: '/matches/history', label: 'Past Matches' }} />
-      <main className="min-h-screen px-4 md:px-8 py-8 max-w-2xl mx-auto" style={{ background: 'var(--scorecard-page-bg)' }}>
+      <div className="min-h-screen" style={{ background: 'var(--scorecard-page-bg)' }}>
+      <main className="px-5 md:px-8 lg:px-10 py-8 max-w-2xl">
         <div className="mt-4 relative overflow-hidden rounded-xl p-5"
           style={{ background: 'var(--scorecard-card-bg)', border: '1px solid var(--scorecard-card-border)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
           <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: 'var(--scorecard-accent-gradient)' }} />
@@ -282,6 +283,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
           )}
         </div>
       </main>
+      </div>
     </>
   )
 }
