@@ -183,8 +183,11 @@ export function ScheduleGrid({ playerView = false, adminMode = false }: { player
       {/* ── MOBILE: Day cards ── */}
       <div className="flex flex-col gap-2.5 md:hidden">
         {week?.days.map((day, di) => {
-          const openCount  = day.slots.filter(s => s.status === 'open').length
-          const takenCount = day.slots.filter(s => s.status !== 'open').length
+          // Open = anything still bookable (incl. T20-only). Booked = a real
+          // booking or reservation. 'Play in progress' (clash) and past
+          // slots are neither, so they are not counted as taken games.
+          const openCount  = day.slots.filter(s => s.status === 'open' || s.status === 't20only').length
+          const takenCount = day.slots.filter(s => s.status === 'booked' || s.status === 'soft_block').length
           const expanded   = expandedDays[day.date] ?? false
           const [dayName, dayNum, mon] = day.label.split(' ')
 
@@ -202,7 +205,7 @@ export function ScheduleGrid({ playerView = false, adminMode = false }: { player
                   <p className="font-rajdhani font-bold text-base text-[#1C1917] dark:text-parchment">{day.label}</p>
                   <div className="flex gap-1.5 mt-1 flex-wrap">
                     {openCount  > 0 && !week?.weekendFull && <span className="slot-open text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border">{openCount} open</span>}
-                    {takenCount > 0 && <span className="slot-booked text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border">{takenCount} taken</span>}
+                    {takenCount > 0 && <span className="slot-booked text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border">{takenCount} booked</span>}
                     {week?.weekendFull && <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border border-[#D4C9B0] dark:border-zinc-700 text-[#78716C] dark:text-zinc-500">Weekend Full</span>}
                   </div>
                 </div>
@@ -452,17 +455,19 @@ function AdminSlot({ date, slot, weekendFull, variant }: {
       : 'bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-900 text-red-700 dark:text-red-400'
     const inner = (
       <>
-        <span className="font-rajdhani text-[11px] font-bold tracking-wide truncate w-full">{title}</span>
-        <span className="font-rajdhani text-[10px] opacity-75 truncate w-full">
-          {reserved ? (slot.organiser_name ?? 'Reserved') : (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked')}
-          {slot.format ? ` · ${slot.format}` : ''}
+        <span className="flex flex-col min-w-0 flex-1 gap-0.5">
+          <span className="font-rajdhani text-[11px] font-bold tracking-wide truncate">{title}</span>
+          <span className="font-rajdhani text-[10px] opacity-75 truncate">
+            {reserved ? (slot.organiser_name ?? 'Reserved') : (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked')}
+            {slot.format ? ` · ${slot.format}` : ''}
+          </span>
         </span>
-        <span className="font-rajdhani text-[9px] font-bold uppercase tracking-wider opacity-60">Edit ›</span>
+        <span className="font-rajdhani text-[9px] font-bold uppercase tracking-wider opacity-60 shrink-0">Edit ›</span>
       </>
     )
     return slot.booking_id
-      ? <Link href={`/admin/bookings/${slot.booking_id}?from=calendar`} className={`${base} ${cls} hover:brightness-95 px-1.5`} title="Edit this booking">{inner}</Link>
-      : <div className={`${base} ${cls} px-1.5`}>{inner}</div>
+      ? <Link href={`/admin/bookings/${slot.booking_id}?from=calendar`} className={`flex ${variant === 'grid' ? 'h-16' : 'min-h-[2.75rem] py-1.5'} flex-row items-center gap-2 min-w-0 rounded border w-full text-left ${cls} hover:brightness-95 px-2`} title="Edit this booking">{inner}</Link>
+      : <div className={`flex ${variant === 'grid' ? 'h-16' : 'min-h-[2.75rem] py-1.5'} flex-row items-center gap-2 min-w-0 rounded border w-full text-left ${cls} px-2`}>{inner}</div>
   }
 
   if (slot.status === 'open' || slot.status === 't20only') {
