@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
+import { repairDismissedBatters, type BallRow } from '@/lib/ballByBall'
 
 // One match is ~250-500 deliveries; PostgREST caps a response at 1000 rows by default.
 const MAX_ROWS = 1000
@@ -60,6 +61,6 @@ export async function GET(
     return NextResponse.json(empty)
   }
 
-  const balls = data ?? []
+  const balls = repairDismissedBatters((data ?? []) as unknown as BallRow[])
   return NextResponse.json({ available: balls.length > 0, balls })
 }

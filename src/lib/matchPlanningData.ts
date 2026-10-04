@@ -11,7 +11,7 @@ import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 import { fetchAllRows } from '@/lib/playerStats'
 import { getTeamMatches, type TeamMatch } from '@/lib/teamStats'
 import { normaliseOpponentName } from '@/lib/opponents'
-import type { BallRow } from '@/lib/ballByBall'
+import { repairDismissedBatters, type BallRow } from '@/lib/ballByBall'
 import type { ScoutMatchInput } from '@/lib/matchPlanning'
 
 const BALL_COLUMNS = [
@@ -129,8 +129,9 @@ export async function getPlanningContext(bookingId?: string | null, lens: Lens =
       byMatch.set(String(r.match_id), arr)
     }
     for (const m of history) {
-      const balls = byMatch.get(m.matchId)
-      if (!balls || balls.length === 0) continue
+      const raw = byMatch.get(m.matchId)
+      if (!raw || raw.length === 0) continue
+      const balls = repairDismissedBatters(raw)
       scored.push({
         bookingId: m.bookingId, matchId: m.matchId, opponentName: m.opponentLabel, gameDate: m.gameDate, format: m.format, result: m.result,
         teamTotal: m.teamTotal, teamWickets: m.teamWickets, oppTotal: m.oppTotal, oppWickets: m.oppWickets, balls,

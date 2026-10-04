@@ -48,6 +48,49 @@ export interface BallRow {
   fielder_player_id: string | null
 }
 
+// ── Repairing glued dismissed_batter values ────────────────────────────────
+
+// The commentary parser sometimes leaves the whole ball line in `dismissed_batter` for run-outs
+// and hit-wickets ("Abhishek Yadav to Santosh, 1 run, OUT Run out, Throw ... Muthukumar R").
+// Left alone it creates a phantom batter row and makes partnership derivation blame the striker.
+// This is the Hub-side guard until the parser (spartans-python) is fixed at source.
+function looksLikeCommentaryLine(s: string): boolean {
+  return s.length > 40 || (/ to /i.test(s) && /\bOUT\b|,/i.test(s))
+}
+
+function escapeRe(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+
+/** Replaces a commentary-line `dismissed_batter` with the real batter of that innings: the known
+ *  batter name appearing latest in the line (longest wins a tie), else the striker on the ball. Rows
+ *  that already hold a plain name are returned untouched. Pure; never mutates its input. */
+export function repairDismissedBatters(balls: BallRow[]): BallRow[] {
+  if (!balls.some(b => b.is_wicket && b.dismissed_batter && looksLikeCommentaryLine(b.dismissed_batter))) return balls
+
+  const known = new Map<InningsSide, Map<string, string | null>>()
+  for (const b of balls) {
+    const m = known.get(b.batting_side) ?? new Map<string, string | null>()
+    if (b.batter && !looksLikeCommentaryLine(b.batter) && (!m.has(b.batter) || (!m.get(b.batter) && b.batter_player_id))) {
+      m.set(b.batter, b.batter_player_id)
+    }
+    known.set(b.batting_side, m)
+  }
+
+  return balls.map(b => {
+    if (!b.is_wicket || !b.dismissed_batter || !looksLikeCommentaryLine(b.dismissed_batter)) return b
+    const names = known.get(b.batting_side) ?? new Map<string, string | null>()
+    let best: { name: string; at: number } | null = null
+    for (const name of Array.from(names.keys())) {
+      const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(name)}(?![\\p{L}\\p{N}])`, 'giu')
+      let last = -1, m: RegExpExecArray | null
+      while ((m = re.exec(b.dismissed_batter)) !== null) last = m.index + m[1].length
+      if (last < 0) continue
+      if (!best || last > best.at || (last === best.at && name.length > best.name.length)) best = { name, at: last }
+    }
+    const name = best?.name ?? b.batter
+    return { ...b, dismissed_batter: name, dismissed_player_id: names.get(name) ?? b.dismissed_player_id }
+  })
+}
+
 export interface BallByBallPayload {
   available: boolean
   balls: BallRow[]

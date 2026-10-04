@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, hasDefinedPhases, formatOvers, ballChip,
   groupOvers, phaseSplit, summariseBatters, summariseBowlers, summariseFielders, wicketRows,
-  bowlerRuns, isBowlerWicket, isDotForBowler, isDotForBatters, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver, derivePartnerships,
+  bowlerRuns, isBowlerWicket, isDotForBowler, isDotForBatters, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver, derivePartnerships, repairDismissedBatters,
 } from './ballByBall'
 
 let seq = 0
@@ -396,5 +396,45 @@ describe('batterScores per over', () => {
     expect(groupOvers(rows)[0].batterScores).toEqual([
       { name: 'A', runs: 6, balls: 2 }, { name: 'B', runs: 1, balls: 1 },
     ])
+  })
+})
+
+describe('repairDismissedBatters', () => {
+  const side = { batting_side: 'spartans' as const }
+  const glued = 'Abhishek Yadav to Santosh, 1 run, OUT Run out, Throw from Deep point by Ajay Baliyan Muthukumar R'
+
+  it('replaces a glued run-out line with the known batter named last in it', () => {
+    const rows = [
+      ball({ ...side, batter: 'Santosh', batter_player_id: 'ps' }),
+      ball({ ...side, batter: 'Muthukumar R', batter_player_id: 'pm' }),
+      ball({ ...side, batter: 'Santosh', is_wicket: true, dismissal_kind: 'Run out', dismissed_batter: glued }),
+    ]
+    const fixed = repairDismissedBatters(rows)
+    expect(fixed[2].dismissed_batter).toBe('Muthukumar R')
+    expect(fixed[2].dismissed_player_id).toBe('pm')
+  })
+
+  it('handles a hit-wicket line and falls back to the striker when no known name appears', () => {
+    const rows = [
+      ball({ ...side, batter: 'Kiran Spartans', is_wicket: true, dismissed_batter: 'Aj Reddy to Kiran Spartans, OUT Hit wicket Kiran Spartans hit wkt' }),
+      ball({ ...side, batter: 'Zed', is_wicket: true, dismissed_batter: 'Someone to Nobody, OUT Run out, unknown text here' }),
+    ]
+    const fixed = repairDismissedBatters(rows)
+    expect(fixed[0].dismissed_batter).toBe('Kiran Spartans')
+    expect(fixed[1].dismissed_batter).toBe('Zed')
+  })
+
+  it('leaves plain names alone and returns the same array when nothing needs repair', () => {
+    const rows = [ball({ ...side, batter: 'A', is_wicket: true, dismissed_batter: 'B' })]
+    expect(repairDismissedBatters(rows)).toBe(rows)
+  })
+
+  it('does not match a name inside a longer word, and keeps the two sides separate', () => {
+    const rows = [
+      ball({ ...side, batter: 'Ajay' }),
+      ball({ batting_side: 'opponent', batter: 'Sam' }),
+      ball({ ...side, batter: 'Ajay', is_wicket: true, dismissed_batter: 'Bob to Ajay, OUT Run out, Throw by Samuel' }),
+    ]
+    expect(repairDismissedBatters(rows)[2].dismissed_batter).toBe('Ajay')
   })
 })

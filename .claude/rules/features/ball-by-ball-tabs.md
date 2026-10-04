@@ -129,3 +129,10 @@ A per-delivery `match_state` view, `ball_by_ball_validation` and `match_coverage
 ## Partnership partner order and glued dismissal lines (October 2026)
 
 A partner who has not yet faced a ball is now chosen by the **scorecard batting order** (`restOfOrder`), with first appearance in the commentary only as a tie-break; before, an opener who first faced after wicket 1 was replaced by whoever faced next (a match showed one batter as everyone's partner). The microservice also now drops ball text glued in front of a dismissal line ("X to Y, OUT LBW Z lbw b X"), which had made the wrong batter leave the crease.
+
+
+## Glued `dismissed_batter` repair (October 2026)
+
+A comparison of ball-by-ball against `fall_of_wickets` / `opponent_fall_of_wickets` (20 matches with both) found scores and wicket counts agree everywhere except one run-out (match `11985431`, FOW 109 vs ball-by-ball 108), plus a parser artifact: for some run-outs and hit-wickets the commentary parser stores the whole ball line in `ball_by_ball.dismissed_batter` (e.g. `Abhishek Yadav to Santosh, 1 run, OUT Run out ... Muthukumar R` in match `19946624`, a hit-wicket line in `7635509`). Left alone, that creates a phantom batter row on the Batting tab and makes `derivePartnerships()` blame the striker.
+
+`repairDismissedBatters()` (`src/lib/ballByBall.ts`, unit-tested) is the Hub-side guard: a value that looks like a commentary line is replaced by the known batter of that innings named latest in it (longest wins a tie, word-boundary match), else the striker on the ball; `dismissed_player_id` is taken from that batter. Plain names, and arrays with nothing to repair, are returned untouched. It runs in the commentary route and in `getPlanningContext()`. Limit: a non-striker run out who never faced a ball isn't a known batter, so the striker is used. The proper fix is in the parser (`spartans-python`), not yet made.
