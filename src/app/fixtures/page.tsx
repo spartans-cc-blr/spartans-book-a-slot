@@ -342,7 +342,7 @@ export default async function FixturesPage() {
         </div>
       )}
 
-      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
+      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-5xl">
         {weekendOrder.length === 0 ? (
           <p className="font-rajdhani text-sm" style={{ color: 'var(--fx-text-muted)' }}>No upcoming fixtures confirmed yet. Check back soon.</p>
         ) : (

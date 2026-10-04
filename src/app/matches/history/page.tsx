@@ -28,7 +28,7 @@ export default async function MatchHistoryPage() {
     <>
       <SiteNav activePage="matches" />
       <div className="min-h-screen" style={{ background: 'var(--fx-shell-bg)' }}>
-      <main className="px-5 md:px-8 lg:px-10 py-8 max-w-2xl">
+      <main className="px-5 md:px-8 lg:px-10 py-8 max-w-5xl">
         <div className="mb-6">
           <h1 className="font-cinzel text-xl font-bold mb-1" style={{ color: 'var(--fx-accent-dim)' }}>Matches</h1>
           <p className="font-rajdhani text-sm mb-4" style={{ color: 'var(--fx-text-muted)' }}>
