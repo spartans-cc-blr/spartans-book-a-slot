@@ -124,3 +124,8 @@ innings and the id is taken from whichever row carries it.
 ## 7. SQL-side state
 
 A per-delivery `match_state` view, `ball_by_ball_validation` and `match_coverage` now exist in the analytics DB — see `cricket-intelligence-foundation.md`. Phase boundaries are duplicated in `phase_definitions`; change `PHASE_PLANS` and that table together.
+
+
+## Partnership partner order and glued dismissal lines (October 2026)
+
+A partner who has not yet faced a ball is now chosen by the **scorecard batting order** (`restOfOrder`), with first appearance in the commentary only as a tie-break; before, an opener who first faced after wicket 1 was replaced by whoever faced next (a match showed one batter as everyone's partner). The microservice also now drops ball text glued in front of a dismissal line ("X to Y, OUT LBW Z lbw b X"), which had made the wrong batter leave the crease.

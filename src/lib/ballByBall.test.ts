@@ -364,6 +364,14 @@ describe('derivePartnerships', () => {
     expect(s.reduce((n, x) => n + x.runs, 0)).toBe(rows.reduce((n, r) => n + r.runs_total, 0))
   })
 
+  it('uses the scorecard order for an opener who has not faced yet', () => {
+    resetSeq()
+    // A out first ball; B (the other opener) first faces only in the next stand, after C walks in
+    const rows = [b('A', 0, { is_wicket: true, dismissed_batter: 'A', dismissal_kind: 'bowled' }), b('C', 1), b('B', 2)]
+    const s = derivePartnerships(rows, ['A', 'B', 'C'])
+    expect(s[0].batters.map(x => x && x.name)).toEqual(['A', 'B'])
+  })
+
   it('names a partner who never faced from the rest of the order', () => {
     resetSeq()
     const rows = [b('A', 2), b('A', 1)]
