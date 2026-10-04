@@ -581,6 +581,7 @@ export function MatchHistoryClient({
                 <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--fx-accent-dim)' }}>
                   ⚠ Needs Reconciliation
                 </h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3 items-start">
                 {flagged.map(m => (
                   <MatchHistoryCard
                     key={m.booking_id}
@@ -592,6 +593,7 @@ export function MatchHistoryClient({
                     onMatchPatch={patchMatch}
                   />
                 ))}
+                </div>
               </div>
             )}
             <div className="space-y-3">
@@ -600,6 +602,7 @@ export function MatchHistoryClient({
                   All Matches
                 </h2>
               )}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3 items-start">
               {rest.map(m => (
                 <MatchHistoryCard
                   key={m.booking_id}
@@ -611,6 +614,7 @@ export function MatchHistoryClient({
                   onMatchPatch={patchMatch}
                 />
               ))}
+              </div>
             </div>
           </>
         )

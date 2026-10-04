@@ -139,7 +139,7 @@ export function FixturesWeekendGroup({
   }
 
   return (
-    <>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 items-start">
       {bookings.map(b => (
         <div key={b.id} className="mb-4">
           <FixturesCard booking={{ ...b.cardData, squad: b.squad, yCount: yCountMap[b.id] ?? b.cardData?.yCount ?? 0 }} />
@@ -177,6 +177,6 @@ export function FixturesWeekendGroup({
 )}
         </div>
       ))}
-    </>
+    </div>
   )
 }
