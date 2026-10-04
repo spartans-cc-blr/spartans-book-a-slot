@@ -488,7 +488,7 @@ export default async function HomePage() {
       {/* ── PLAYER DASHBOARD — Warm Light, self-contained ── */}
       {isPlayer && playerData && (
         <div style={{ background: 'var(--home-shell-bg)' }} className="px-5 md:px-8 lg:px-10 py-6">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-2xl">
             <WeekendAvailabilityGreeting
               playerId={player.playerId}
               firstName={firstName}

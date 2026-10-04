@@ -383,7 +383,7 @@ export function PlayerStatsClient({
         </div>
       </div>
 
-      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-3xl mx-auto">
+      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
         {/* Filters */}
         <div className="flex flex-col gap-2 mb-5">
           {/* Pitch Type — the top-most filter (moved here September 2026;
