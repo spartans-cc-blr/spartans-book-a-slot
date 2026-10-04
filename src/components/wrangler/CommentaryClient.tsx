@@ -259,11 +259,14 @@ function SideCard({ side, state, bookingKey, onFile, onToggleAnyway, onSave }: {
             <details className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
               <summary className="cursor-pointer">Over by over</summary>
               <table className="mt-2 w-full text-left">
-                <thead><tr className="text-[#78716C] dark:text-zinc-500"><th className="pr-3">Over</th><th className="pr-3">Bowler</th><th className="pr-3">Runs</th><th>Wkts</th></tr></thead>
+                <thead><tr className="text-[#78716C] dark:text-zinc-500"><th className="pr-3">Over</th>{side === 'opponent' && <th className="pr-3">Bowler</th>}<th className="pr-3">Runs</th><th className="pr-3">Wkts</th>{side === 'spartans' && <th>Score</th>}</tr></thead>
                 <tbody>
-                  {overs.map(([o, row]) => (
-                    <tr key={o}><td className="pr-3">{o}</td><td className="pr-3">{row.bowler}</td><td className="pr-3">{row.runs}</td><td>{row.wkts}</td></tr>
-                  ))}
+                  {overs.map(([o, row], i) => {
+                    const cum = overs.slice(0, i + 1).reduce((a, [, r2]) => ({ runs: a.runs + r2.runs, wkts: a.wkts + r2.wkts }), { runs: 0, wkts: 0 })
+                    return (
+                      <tr key={o}><td className="pr-3">{o}</td>{side === 'opponent' && <td className="pr-3">{row.bowler}</td>}<td className="pr-3">{row.runs}</td><td className="pr-3">{row.wkts}</td>{side === 'spartans' && <td>{cum.runs}/{cum.wkts}</td>}</tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </details>
