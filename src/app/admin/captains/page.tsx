@@ -41,9 +41,9 @@ type Player = {
 
 function InfoCallout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex gap-3 p-4 rounded-lg border border-amber-800/60 bg-amber-950/20 mb-4">
-      <span className="text-amber-400 text-base flex-shrink-0">⚠️</span>
-      <div className="font-rajdhani text-sm text-amber-200/80 leading-relaxed">
+    <div className="flex gap-3 p-4 rounded-lg border border-amber-300/60 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 mb-4">
+      <span className="text-amber-700 dark:text-amber-400 text-base flex-shrink-0">⚠️</span>
+      <div className="font-rajdhani text-sm text-amber-800/80 dark:text-amber-200/80 leading-relaxed">
         {children}
       </div>
     </div>
@@ -145,40 +145,40 @@ export default function AdminCaptainsPage() {
       return (
         <a href={url} target="_blank" rel="noopener noreferrer"
            onClick={e => e.stopPropagation()}
-           className="font-rajdhani font-semibold text-sm text-parchment hover:text-gold underline underline-offset-2 transition-colors">
+           className="font-rajdhani font-semibold text-sm text-[#1C1917] dark:text-parchment hover:text-amber-700 dark:hover:text-gold underline underline-offset-2 transition-colors">
           {captain.name}
         </a>
       )
     }
-    return <span className="font-rajdhani font-semibold text-sm text-parchment">{captain.name}</span>
+    return <span className="font-rajdhani font-semibold text-sm text-[#1C1917] dark:text-parchment">{captain.name}</span>
   }
 
   function ActiveCaptainsTable() {
     if (activeCaptains.length === 0) {
       return (
-        <div className="bg-ink-3 border border-ink-5 rounded p-6 text-center font-rajdhani text-zinc-600 text-sm">
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-6 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">
           No active captains.
         </div>
       )
     }
     return (
-      <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-ink-5 bg-ink-4">
+              <tr className="border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
                 {['Name', 'Captain Since', ''].map(h => (
-                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
+                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {activeCaptains.map(captain => (
-                <tr key={captain.id} className="border-b border-ink-4 last:border-0 hover:bg-ink-4 transition-colors">
+                <tr key={captain.id} className="border-b border-[#E2DACE] dark:border-ink-4 last:border-0 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors">
                   <td className="px-4 py-3">
                     <CaptainName captain={captain} />
                   </td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">
                     {formatDate(captain.captain_since)}
                   </td>
                   <td className="px-4 py-3">
@@ -187,13 +187,13 @@ export default function AdminCaptainsPage() {
                         type="date"
                         value={inactiveDate[captain.id] || today()}
                         onChange={e => setInactiveDate(prev => ({ ...prev, [captain.id]: e.target.value }))}
-                        className="font-rajdhani text-xs bg-ink-4 border border-ink-5 rounded px-2 py-1 text-zinc-400 focus:border-zinc-600 focus:outline-none"
+                        className="font-rajdhani text-xs bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1 text-[#57534E] dark:text-zinc-400 focus:border-[#D4C9B0] dark:focus:border-zinc-600 focus:outline-none"
                         title="Inactive since date"
                       />
                       <button
                         onClick={() => markInactive(captain)}
                         disabled={saving === captain.id}
-                        className="font-rajdhani text-xs text-zinc-500 hover:text-red-400 border border-ink-5 hover:border-red-900 px-2 py-1 rounded transition-colors disabled:opacity-50 whitespace-nowrap"
+                        className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-red-700 dark:hover:text-red-400 border border-[#D4C9B0] dark:border-ink-5 hover:border-red-300 dark:hover:border-red-900 px-2 py-1 rounded transition-colors disabled:opacity-50 whitespace-nowrap"
                       >
                         {saving === captain.id ? '…' : 'Mark Inactive'}
                       </button>
@@ -210,33 +210,33 @@ export default function AdminCaptainsPage() {
 
   function InactiveCaptainsTable() {
     return (
-      <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden opacity-70">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden opacity-70">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-ink-5 bg-ink-4">
+              <tr className="border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
                 {['Name', 'Captain Since', 'Inactive Since', ''].map(h => (
-                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
+                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {inactiveCaptains.map(captain => (
-                <tr key={captain.id} className="border-b border-ink-4 last:border-0 hover:bg-ink-4 transition-colors">
+                <tr key={captain.id} className="border-b border-[#E2DACE] dark:border-ink-4 last:border-0 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors">
                   <td className="px-4 py-3">
                     <CaptainName captain={captain} />
                   </td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-500">
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">
                     {formatDate(captain.captain_since)}
                   </td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-500">
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">
                     {formatDate(captain.inactive_since)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => reactivate(captain)}
                       disabled={saving === captain.id}
-                      className="font-rajdhani text-xs text-zinc-500 hover:text-emerald-400 border border-ink-5 hover:border-emerald-800 px-2 py-1 rounded transition-colors disabled:opacity-50"
+                      className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-emerald-700 dark:hover:text-emerald-400 border border-[#D4C9B0] dark:border-ink-5 hover:border-emerald-300 dark:hover:border-emerald-800 px-2 py-1 rounded transition-colors disabled:opacity-50"
                     >
                       {saving === captain.id ? '…' : 'Reactivate'}
                     </button>
@@ -253,26 +253,26 @@ export default function AdminCaptainsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-gold">Captains</h1>
-        <p className="font-rajdhani text-zinc-500 text-sm mt-1">
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Captains</h1>
+        <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">
           Manage captains — track promotion dates, activate and deactivate.
         </p>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded border border-red-900 bg-red-950/20 font-rajdhani text-sm text-red-400 flex items-center justify-between">
+        <div className="mb-4 p-3 rounded border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/20 font-rajdhani text-sm text-red-700 dark:text-red-400 flex items-center justify-between">
           {error}
-          <button onClick={() => setError('')} className="ml-3 text-zinc-500 hover:text-zinc-300 transition-colors">✕</button>
+          <button onClick={() => setError('')} className="ml-3 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 transition-colors">✕</button>
         </div>
       )}
 
       {loading ? (
-        <p className="font-rajdhani text-zinc-600 text-sm">Loading…</p>
+        <p className="font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">Loading…</p>
       ) : (
         <>
           {/* ── 1. Active Captains ── */}
           <div className="mb-8">
-            <h2 className="font-cinzel text-sm font-semibold text-gold mb-3 tracking-wide">
+            <h2 className="font-cinzel text-sm font-semibold text-amber-700 dark:text-gold mb-3 tracking-wide">
               Active Captains
             </h2>
             <ActiveCaptainsTable />
@@ -281,7 +281,7 @@ export default function AdminCaptainsPage() {
           {/* ── 2. Promote to Captain ── */}
           {unlinkedCaptainPlayers.length > 0 && (
             <div className="mb-8">
-              <h2 className="font-cinzel text-sm font-semibold text-amber-400 mb-3 tracking-wide">
+              <h2 className="font-cinzel text-sm font-semibold text-amber-700 dark:text-amber-400 mb-3 tracking-wide">
                 Promote to Captain
               </h2>
               <InfoCallout>
@@ -292,31 +292,31 @@ export default function AdminCaptainsPage() {
                 Tournament Planner. Set the date they became captain — defaults to today.
               </InfoCallout>
               {unlinkedCaptainPlayers.map(player => (
-                <div key={player.id} className="flex items-center justify-between p-3 bg-ink-3 border border-ink-5 rounded mb-2">
+                <div key={player.id} className="flex items-center justify-between p-3 bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded mb-2">
                   <div className="flex items-center gap-2">
                     {player.cricheroes_url ? (
                       <a href={player.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                         className="font-rajdhani font-semibold text-parchment hover:text-gold underline underline-offset-2 transition-colors">
+                         className="font-rajdhani font-semibold text-[#1C1917] dark:text-parchment hover:text-amber-700 dark:hover:text-gold underline underline-offset-2 transition-colors">
                         {player.name}
                       </a>
                     ) : (
-                      <span className="font-rajdhani font-semibold text-parchment">{player.name}</span>
+                      <span className="font-rajdhani font-semibold text-[#1C1917] dark:text-parchment">{player.name}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex flex-col items-end gap-0.5">
-                      <label className="font-rajdhani text-[10px] text-zinc-600 uppercase tracking-wide">Captain since</label>
+                      <label className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 uppercase tracking-wide">Captain since</label>
                       <input
                         type="date"
                         value={promoteDate[player.id] || today()}
                         onChange={e => setPromoteDate(prev => ({ ...prev, [player.id]: e.target.value }))}
-                        className="font-rajdhani text-xs bg-ink-4 border border-ink-5 rounded px-2 py-1 text-zinc-400 focus:border-zinc-600 focus:outline-none"
+                        className="font-rajdhani text-xs bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1 text-[#57534E] dark:text-zinc-400 focus:border-[#D4C9B0] dark:focus:border-zinc-600 focus:outline-none"
                       />
                     </div>
                     <button
                       onClick={() => addAsCaptain(player)}
                       disabled={saving === player.id}
-                      className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-50 whitespace-nowrap">
+                      className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/20 transition-colors disabled:opacity-50 whitespace-nowrap">
                       {saving === player.id ? 'Adding…' : '+ Add as Captain'}
                     </button>
                   </div>
@@ -330,7 +330,7 @@ export default function AdminCaptainsPage() {
             <div>
               <button
                 onClick={() => setShowInactive(v => !v)}
-                className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 transition-colors mb-3 flex items-center gap-1"
+                className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 transition-colors mb-3 flex items-center gap-1"
               >
                 <span>{showInactive ? '▾' : '▸'}</span>
                 {showInactive

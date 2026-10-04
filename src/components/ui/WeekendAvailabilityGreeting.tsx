@@ -60,21 +60,21 @@ export function WeekendAvailabilityGreeting({ playerId, firstName, bookings }: W
         <>
           <button
             onClick={() => setOpen(false)}
-            className="font-rajdhani text-xs font-semibold text-zinc-500 hover:text-parchment px-4 py-2 rounded transition-colors"
+            className="font-rajdhani text-xs font-semibold text-[#78716C] dark:text-zinc-500 hover:text-[#1C1917] dark:hover:text-parchment px-4 py-2 rounded transition-colors"
           >
             Later
           </button>
           <Link
             href="/fixtures"
             onClick={() => setOpen(false)}
-            className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 px-4 py-2 rounded transition-colors"
+            className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/20 px-4 py-2 rounded transition-colors"
           >
             Mark Availability →
           </Link>
         </>
       }
     >
-      <p className="font-rajdhani text-sm text-zinc-400 mb-3">
+      <p className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400 mb-3">
         {bookings.length === 1
           ? "You haven't marked your availability for this weekend's match yet:"
           : "You haven't marked your availability for these weekend matches yet:"}
@@ -83,7 +83,7 @@ export function WeekendAvailabilityGreeting({ playerId, firstName, bookings }: W
         {bookings.map(b => (
           <li
             key={b.id}
-            className="font-rajdhani text-sm text-parchment bg-ink-3 border border-ink-5 rounded px-3 py-2"
+            className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2"
           >
             {formatBookingLine(b)}
           </li>

@@ -170,8 +170,8 @@ export default function AdminTournamentsPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-cinzel text-xl font-bold text-gold">Tournaments</h1>
-          <p className="font-rajdhani text-zinc-500 text-sm mt-1">Manage tournaments — ball type, ground, organiser details.</p>
+          <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Tournaments</h1>
+          <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">Manage tournaments — ball type, ground, organiser details.</p>
         </div>
         <button onClick={() => { setShowAdd(v => !v); setError('') }}
           className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark text-white px-3 py-1.5 rounded transition-colors">
@@ -181,8 +181,8 @@ export default function AdminTournamentsPage() {
 
       {/* Add form */}
       {showAdd && (
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-6 space-y-4">
-          <h2 className="font-cinzel text-sm text-gold font-semibold">New Tournament</h2>
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-6 space-y-4">
+          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold">New Tournament</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">Tournament Name <span className="text-crimson">*</span></label>
@@ -195,7 +195,7 @@ export default function AdminTournamentsPage() {
                 <option value="">Select captain...</option>
                 {captains.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                 The captain who owns this tournament. Auto-fills on new bookings.
               </p>
             </div>
@@ -218,7 +218,7 @@ export default function AdminTournamentsPage() {
                 placeholder="https://cricheroes.in/tournament/..."
                 className="form-input"
               />
-              <p className="text-xs text-zinc-500 mt-1">
+              <p className="text-xs text-[#78716C] dark:text-zinc-500 mt-1">
                 Players will see this as a link on the fixture card tournament name.
               </p>
             </div>
@@ -231,7 +231,7 @@ export default function AdminTournamentsPage() {
                 placeholder="e.g. 9"
                 className="form-input w-24"
               />
-              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                 League games only — knockouts added separately if Spartans qualify.
               </p>
             </div>
@@ -242,12 +242,12 @@ export default function AdminTournamentsPage() {
                   <button key={fmt} type="button"
                     onClick={() => setAddForm(f => ({ ...f, intended_formats: toggleFormatIn(f.intended_formats, fmt) }))}
                     className={`flex-1 py-2 rounded border font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
-                      ${addForm.intended_formats.includes(fmt) ? 'border-gold bg-gold/10 text-gold' : 'border-ink-5 bg-ink-4 text-zinc-500 hover:border-gold-dim'}`}>
+                      ${addForm.intended_formats.includes(fmt) ? 'border-gold bg-gold/10 text-amber-700 dark:text-gold' : 'border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4 text-[#78716C] dark:text-zinc-500 hover:border-gold-dim'}`}>
                     {fmt}
                   </button>
                 ))}
               </div>
-              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                 Optional — declares the format up front so slot targets/suggestions
                 don&apos;t fall back to both T20 and T30 before the first game is booked.
                 Ignored once a real booking exists (its own format wins then).
@@ -261,7 +261,7 @@ export default function AdminTournamentsPage() {
                 onChange={e => setAddForm(f => ({ ...f, tentative_start_date: e.target.value }))}
                 className="form-input"
               />
-              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                 Optional — a future date anchors suggested slots to start from
                 there instead of today, and (with Total League Games set) extends
                 the suggestion window to roughly games ÷ 2 months out. Ignored
@@ -274,7 +274,7 @@ export default function AdminTournamentsPage() {
                 <option value="">Not set</option>
                 {PITCH_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
-              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                 Optional — this tournament's own playing surface, for the Team
                 Record filter/split. Not meaningful for a practice tournament.
               </p>
@@ -288,7 +288,7 @@ export default function AdminTournamentsPage() {
                 placeholder="e.g. 1500"
                 className="form-input w-32"
               />
-              <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                 Total fee paid to organiser per match. Divided by non-exempt squad members.
               </p>
             </div>
@@ -305,14 +305,14 @@ export default function AdminTournamentsPage() {
                 {(['red', 'white', 'pink'] as const).map(b => (
                   <button key={b} onClick={() => setAddForm(f => ({ ...f, ball_type: b }))}
                     className={`flex-1 py-2 rounded border font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
-                      ${addForm.ball_type === b ? 'border-gold bg-gold/10 text-gold' : 'border-ink-5 bg-ink-4 text-zinc-500 hover:border-gold-dim'}`}>
+                      ${addForm.ball_type === b ? 'border-gold bg-gold/10 text-amber-700 dark:text-gold' : 'border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4 text-[#78716C] dark:text-zinc-500 hover:border-gold-dim'}`}>
                     {BALL_LABELS[b]}
                   </button>
                 ))}
               </div>
             </div>
           </div>
-          {error && <p className="font-rajdhani text-xs text-red-400">{error}</p>}
+          {error && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">{error}</p>}
           <button onClick={handleAdd} disabled={!addForm.name.trim() || saving}
             className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
             {saving ? 'Adding...' : '＋ Add Tournament'}
@@ -321,25 +321,25 @@ export default function AdminTournamentsPage() {
       )}
 
       {/* Table */}
-      <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-ink-5 bg-ink-4">
+              <tr className="border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
                 {['Tournament', 'Captain', 'Organiser', 'Ball', 'Ground', 'Status', ''].map(h => (
-                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
+                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">Loading...</td></tr>
               )}
               {!loading && tournaments.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No tournaments yet.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">No tournaments yet.</td></tr>
               )}
               {tournaments.map(t => (
-                <tr key={t.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
+                <tr key={t.id} className="border-b border-[#E2DACE] dark:border-ink-4 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors">
                   {editingId === t.id ? (
                     <td colSpan={7} className="px-4 py-4">
                       <div className="grid sm:grid-cols-2 gap-3">
@@ -383,7 +383,7 @@ export default function AdminTournamentsPage() {
                             checked={editForm.organiser_self_service ?? false}
                             onChange={e => setEditForm(f => ({ ...f, organiser_self_service: e.target.checked }))}
                           />
-                          <label htmlFor={`self-service-${t.id}`} className="font-rajdhani text-sm text-zinc-400">
+                          <label htmlFor={`self-service-${t.id}`} className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">
                             Allow organiser self-service reservations on the public share page
                           </label>
                         </div>
@@ -404,12 +404,12 @@ export default function AdminTournamentsPage() {
                               <button key={fmt} type="button"
                                 onClick={() => setEditForm(f => ({ ...f, intended_formats: toggleFormatIn(f.intended_formats ?? [], fmt) }))}
                                 className={`flex-1 py-2 rounded border font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
-                                  ${(editForm.intended_formats ?? []).includes(fmt) ? 'border-gold bg-gold/10 text-gold' : 'border-ink-5 bg-ink-4 text-zinc-500 hover:border-gold-dim'}`}>
+                                  ${(editForm.intended_formats ?? []).includes(fmt) ? 'border-gold bg-gold/10 text-amber-700 dark:text-gold' : 'border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4 text-[#78716C] dark:text-zinc-500 hover:border-gold-dim'}`}>
                                 {fmt}
                               </button>
                             ))}
                           </div>
-                          <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                             Only matters while this tournament has zero confirmed bookings.
                           </p>
                         </div>
@@ -421,7 +421,7 @@ export default function AdminTournamentsPage() {
                             onChange={e => setEditForm(f => ({ ...f, tentative_start_date: e.target.value }))}
                             className="form-input"
                           />
-                          <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                             Only matters while this tournament has zero confirmed bookings.
                           </p>
                         </div>
@@ -431,7 +431,7 @@ export default function AdminTournamentsPage() {
                             <option value="">Not set</option>
                             {PITCH_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
                           </select>
-                          <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                             This tournament's own playing surface, for the Team Record filter/split.
                           </p>
                         </div>
@@ -444,7 +444,7 @@ export default function AdminTournamentsPage() {
                             placeholder="e.g. 1500"
                             className="form-input w-32"
                           />
-                          <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                             Total fee paid to organiser per match. Divided by non-exempt squad members.
                           </p>
                         </div>
@@ -461,48 +461,48 @@ export default function AdminTournamentsPage() {
                             {(['red', 'white', 'pink'] as const).map(b => (
                               <button key={b} onClick={() => setEditForm(f => ({ ...f, ball_type: b }))}
                                 className={`flex-1 py-2 rounded border font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
-                                  ${editForm.ball_type === b ? 'border-gold bg-gold/10 text-gold' : 'border-ink-5 bg-ink-4 text-zinc-500 hover:border-gold-dim'}`}>
+                                  ${editForm.ball_type === b ? 'border-gold bg-gold/10 text-amber-700 dark:text-gold' : 'border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4 text-[#78716C] dark:text-zinc-500 hover:border-gold-dim'}`}>
                                 {BALL_LABELS[b]}
                               </button>
                             ))}
                           </div>
                         </div>
                       </div>
-                      {error && <p className="font-rajdhani text-xs text-red-400 mt-2">{error}</p>}
+                      {error && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{error}</p>}
                       <div className="flex gap-2 mt-3">
                         <button onClick={() => saveEdit(t.id)} disabled={saving}
                           className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-1.5 rounded transition-colors">
                           {saving ? 'Saving...' : '✓ Save'}
                         </button>
                         <button onClick={() => setEditingId(null)}
-                          className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 border border-ink-5 px-4 py-1.5 rounded transition-colors">
+                          className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 border border-[#D4C9B0] dark:border-ink-5 px-4 py-1.5 rounded transition-colors">
                           Cancel
                         </button>
                       </div>
                     </td>
                   ) : (
                     <>
-                      <td className="px-4 py-3 font-rajdhani font-semibold text-sm text-parchment max-w-[180px] truncate">{t.name}</td>
-                      <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">
-                        {t.captains?.name ?? <span className="text-zinc-600">—</span>}
+                      <td className="px-4 py-3 font-rajdhani font-semibold text-sm text-[#1C1917] dark:text-parchment max-w-[180px] truncate">{t.name}</td>
+                      <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">
+                        {t.captains?.name ?? <span className="text-[#78716C] dark:text-zinc-600">—</span>}
                       </td>
-                      <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{t.organiser_name ?? '—'}</td>
-                      <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{BALL_LABELS[t.ball_type as 'red' | 'white' | 'pink'] ?? '—'}</td>
-                      <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{groundName(t.ground_id)}</td>
+                      <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{t.organiser_name ?? '—'}</td>
+                      <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{BALL_LABELS[t.ball_type as 'red' | 'white' | 'pink'] ?? '—'}</td>
+                      <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{groundName(t.ground_id)}</td>
                       <td className="px-4 py-3">
                         <span className={`font-rajdhani text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm border
-                          ${t.active ? 'bg-emerald-950 border-emerald-800 text-emerald-400' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>
+                          ${t.active ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' : 'bg-white dark:bg-zinc-900 border-[#D4C9B0] dark:border-zinc-700 text-[#78716C] dark:text-zinc-500'}`}>
                           {t.active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
                           <button onClick={() => startEdit(t)}
-                            className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
+                            className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
                             Edit
                           </button>
                           <button onClick={() => toggleActive(t)}
-                            className="font-rajdhani text-xs text-zinc-600 hover:text-zinc-300 border border-ink-5 px-2 py-1 rounded transition-colors">
+                            className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-[#44403C] dark:hover:text-zinc-300 border border-[#D4C9B0] dark:border-ink-5 px-2 py-1 rounded transition-colors">
                             {t.active ? 'Deactivate' : 'Activate'}
                           </button>
                         </div>

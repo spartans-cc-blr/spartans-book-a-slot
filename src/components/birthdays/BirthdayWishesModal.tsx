@@ -84,18 +84,18 @@ export function BirthdayWishesModal() {
           <div key={p.id} className="flex items-center gap-3">
             <PlayerAvatar photoUrl={p.photo_url} name={p.name} />
             <div>
-              <p className="font-rajdhani text-sm text-parchment leading-snug">
+              <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment leading-snug">
                 <a
                   href={buildWishUrl(p.name)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-bold text-gold underline decoration-dotted underline-offset-2 hover:text-gold-light transition-colors"
+                  className="font-bold text-amber-700 dark:text-gold underline decoration-dotted underline-offset-2 hover:text-amber-600 dark:hover:text-gold-light transition-colors"
                 >
                   {p.name}
                 </a>{' '}
                 is celebrating a birthday today! 🎂
               </p>
-              <p className="font-rajdhani text-[11px] text-emerald-400 mt-0.5">
+              <p className="font-rajdhani text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
                 🎈 Tap the name to send wishes on WhatsApp
               </p>
             </div>

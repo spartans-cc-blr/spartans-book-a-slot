@@ -16,11 +16,11 @@ export default async function WalletPage() {
   if (!player?.playerId) redirect('/')
 
   return (
-    <div className="min-h-screen bg-ink grain">
+    <div className="min-h-screen bg-parchment dark:bg-ink grain">
       <SiteNav activePage="wallet" back={{ fallbackHref: '/', label: 'Home' }} />
       <div className="px-5 md:px-8 lg:px-10 py-8 max-w-2xl">
-        <h1 className="font-cinzel text-xl font-bold text-gold mb-1">My Wallet</h1>
-        <p className="font-rajdhani text-zinc-500 text-sm mb-6">
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold mb-1">My Wallet</h1>
+        <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mb-6">
           Every payment and match fee, newest first.
         </p>
         <WalletStatementClient />

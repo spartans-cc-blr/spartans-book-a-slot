@@ -14,13 +14,13 @@ type GearType = 'for_sale' | 'wanted'
 function TypeBadge({ type }: { type: GearType }) {
   if (type === 'for_sale') {
     return (
-      <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded bg-stone-100 text-stone-700 border border-stone-200">
+      <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded bg-stone-100 dark:bg-ink-4 text-stone-700 dark:text-zinc-300 border border-stone-200 dark:border-ink-5">
         For Sale
       </span>
     )
   }
   return (
-    <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">
+    <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
       Wanted
     </span>
   )
@@ -28,9 +28,9 @@ function TypeBadge({ type }: { type: GearType }) {
 
 function ConditionBadge({ condition }: { condition: GearCondition }) {
   const styles: Record<GearCondition, string> = {
-    new: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-    good: 'bg-blue-50 text-blue-700 border border-blue-200',
-    fair: 'bg-amber-50 text-amber-700 border border-amber-200',
+    new: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
+    good: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
+    fair: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
   }
   return (
     <span className={`font-rajdhani text-xs font-semibold px-2 py-0.5 rounded ${styles[condition]}`}>
@@ -46,13 +46,13 @@ function PlayerLink({ name, cricHeroesUrl }: { name: string; cricHeroesUrl: stri
         href={cricHeroesUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-rajdhani text-sm text-amber-700 font-semibold hover:underline underline-offset-2"
+        className="font-rajdhani text-sm text-amber-700 dark:text-amber-400 font-semibold hover:underline underline-offset-2"
       >
         {name}
       </a>
     )
   }
-  return <span className="font-rajdhani text-sm text-stone-700 font-semibold">{name}</span>
+  return <span className="font-rajdhani text-sm text-stone-700 dark:text-zinc-300 font-semibold">{name}</span>
 }
 
 function formatDate(iso: string): string {
@@ -98,25 +98,25 @@ export default async function GearDetailPage({
   }
 
   return (
-    <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-parchment dark:bg-ink">
       <SiteNav activePage="dugout" back={{ fallbackHref: '/dugout/gear', label: 'Gear Exchange' }} />
-      <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
+      <main className="px-4 py-8 bg-parchment dark:bg-ink">
         <div className="max-w-2xl mx-auto">
 
           {notFound || !listing ? (
-            <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-6 text-center">
-              <p className="font-rajdhani text-stone-700 text-sm mb-3">
+            <div className="bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-6 text-center">
+              <p className="font-rajdhani text-stone-700 dark:text-zinc-300 text-sm mb-3">
                 This listing is no longer available.
               </p>
               <Link
                 href="/dugout/gear"
-                className="font-rajdhani text-sm text-amber-700 hover:underline underline-offset-2"
+                className="font-rajdhani text-sm text-amber-700 dark:text-amber-400 hover:underline underline-offset-2"
               >
                 Browse all listings
               </Link>
             </div>
           ) : (
-            <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-6 flex flex-col gap-4">
+            <div className="bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-6 flex flex-col gap-4">
               <div className="flex flex-wrap gap-2 items-center">
                 <TypeBadge type={listing.type} />
                 {listing.type === 'for_sale' && listing.condition && (
@@ -124,15 +124,15 @@ export default async function GearDetailPage({
                 )}
               </div>
 
-              <h1 className="font-cinzel font-bold text-xl text-stone-900 leading-snug">
+              <h1 className="font-cinzel font-bold text-xl text-stone-900 dark:text-parchment leading-snug">
                 {listing.title}
               </h1>
 
-              <p className="font-rajdhani text-sm text-stone-700 whitespace-pre-wrap">
+              <p className="font-rajdhani text-sm text-stone-700 dark:text-zinc-300 whitespace-pre-wrap">
                 {listing.description}
               </p>
 
-              <div className="flex items-center gap-1 text-xs text-stone-500 font-rajdhani">
+              <div className="flex items-center gap-1 text-xs text-stone-500 dark:text-zinc-400 font-rajdhani">
                 <span>Posted by</span>
                 {listing.players ? (
                   <PlayerLink
@@ -140,10 +140,10 @@ export default async function GearDetailPage({
                     cricHeroesUrl={listing.poster_cricheroes_url ?? null}
                   />
                 ) : (
-                  <span className="font-rajdhani text-sm text-stone-700 font-semibold">Unknown</span>
+                  <span className="font-rajdhani text-sm text-stone-700 dark:text-zinc-300 font-semibold">Unknown</span>
                 )}
                 <span className="mx-1">·</span>
-                <span className="text-stone-400">{formatDate(listing.created_at)}</span>
+                <span className="text-stone-400 dark:text-zinc-500">{formatDate(listing.created_at)}</span>
               </div>
 
               <GearDetailShare listingId={listing.id} />

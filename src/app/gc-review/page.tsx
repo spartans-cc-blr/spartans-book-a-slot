@@ -164,20 +164,20 @@ export default async function GCReviewPage() {
   const weekendOrder = Object.keys(weekendMap).sort()
 
   return (
-    <div className="min-h-screen bg-ink flex flex-col">
+    <div className="min-h-screen bg-parchment dark:bg-ink flex flex-col">
       <SiteNav activePage="gc" />
       <div className="flex flex-1">
         <AdminSidebar />
         <main className="flex-1 px-5 md:px-8 lg:px-10 py-8 max-w-5xl">
           <div className="mb-6">
-            <h1 className="font-cinzel text-xl font-bold text-gold">GC Review</h1>
-            <p className="font-rajdhani text-sm text-zinc-500 mt-1">
+            <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">GC Review</h1>
+            <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 mt-1">
               Review squad fairness and approve or return each slot before captains announce.
             </p>
           </div>
           <InviteLinkButton />
           {weekendOrder.length === 0 ? (
-            <p className="font-rajdhani text-zinc-500 text-sm mt-4">No confirmed upcoming fixtures found.</p>
+            <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-4">No confirmed upcoming fixtures found.</p>
           ) : (
             <div className="flex flex-col gap-10 mt-4">
               {weekendOrder.map(wk => {

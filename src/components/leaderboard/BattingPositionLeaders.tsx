@@ -93,8 +93,8 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
             {active.topThree.map(entry => (
               <div key={entry.rank} className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2.5">
-                  <span className="font-cinzel text-sm font-bold text-gold w-5 flex-shrink-0">{entry.rank}</span>
-                  <div className="font-rajdhani text-sm text-parchment leading-relaxed">
+                  <span className="font-cinzel text-sm font-bold text-amber-700 dark:text-gold w-5 flex-shrink-0">{entry.rank}</span>
+                  <div className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment leading-relaxed">
                     {entry.players.map(p => (
                       <div key={p.playerId}>
                         <PlayerNameLink name={p.playerName} playerId={p.playerId} cricHeroesUrl={p.cricheroesUrl} />
@@ -102,7 +102,7 @@ export function BattingPositionLeaders({ leaders }: { leaders: BattingPositionLe
                     ))}
                   </div>
                 </div>
-                <span className="font-rajdhani text-sm text-zinc-400 flex-shrink-0 text-right whitespace-nowrap">
+                <span className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400 flex-shrink-0 text-right whitespace-nowrap">
                   {entry.runs} runs · {entry.innings} inn
                 </span>
               </div>

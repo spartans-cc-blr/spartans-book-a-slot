@@ -51,7 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             correct instead of flashing dark-then-light or vice versa. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="bg-ink text-parchment font-rajdhani antialiased">
+      <body className="bg-parchment text-[#1C1917] dark:bg-ink dark:text-parchment font-rajdhani antialiased">
         <Providers>
           <ThemeProvider>
             <ChunkErrorBoundary>

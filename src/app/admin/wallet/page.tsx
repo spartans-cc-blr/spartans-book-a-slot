@@ -103,38 +103,38 @@ export default function AdminWalletPage() {
   return (
     <div>
       <div className="flex items-start justify-between gap-3 mb-1">
-        <h1 className="font-cinzel text-xl font-bold text-gold">Wallet</h1>
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Wallet</h1>
         <WalletExportMenu />
       </div>
-      <p className="font-rajdhani text-zinc-500 text-sm mb-6">
+      <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mb-6">
         Player payments, match fee debits, and corrections — all in one place.
       </p>
 
       {/* ── Pending Fee Applications ── */}
       <section className="mb-8">
-        <h2 className="font-cinzel text-sm text-gold font-semibold mb-3">
+        <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-3">
           ⚠ Pending Fee Applications {pending && pending.length > 0 && `(${pending.length})`}
         </h2>
         {pending === null && (
-          <p className="font-rajdhani text-sm text-zinc-600">Loading...</p>
+          <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">Loading...</p>
         )}
         {pending?.length === 0 && (
-          <p className="font-rajdhani text-sm text-zinc-600">Nothing pending — every synced match's fees are applied or not applicable.</p>
+          <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">Nothing pending — every synced match's fees are applied or not applicable.</p>
         )}
         {pending && pending.length > 0 && (
-          <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden divide-y divide-ink-4">
+          <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden divide-y divide-[#E2DACE] dark:divide-ink-4">
             {pending.map(b => (
               <Link key={b.booking_id} href={`/admin/bookings/${b.booking_id}`}
-                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-ink-4 transition-colors">
+                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors">
                 <div className="min-w-0">
-                  <p className="font-rajdhani text-sm text-parchment truncate">
+                  <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment truncate">
                     vs {b.opponent_name ?? 'TBD'} {b.tournament_name ? `· ${b.tournament_name}` : ''}
                   </p>
-                  <p className="font-rajdhani text-xs text-zinc-500">
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
                     {formatDate(b.game_date)} · {b.slot_time} · {b.squad_count} in squad
                   </p>
                 </div>
-                <span className="font-rajdhani text-sm font-bold text-amber-400 flex-shrink-0">₹{b.fee} →</span>
+                <span className="font-rajdhani text-sm font-bold text-amber-700 dark:text-amber-400 flex-shrink-0">₹{b.fee} →</span>
               </Link>
             ))}
           </div>
@@ -143,7 +143,7 @@ export default function AdminWalletPage() {
 
       {/* ── Player Wallet — search, view/correct statement, quick top-up ── */}
       <section className="mb-8">
-        <h2 className="font-cinzel text-sm text-gold font-semibold mb-3">Player Wallet</h2>
+        <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-3">Player Wallet</h2>
 
         {!selectedPlayer ? (
           <div className="relative max-w-sm">
@@ -151,12 +151,12 @@ export default function AdminWalletPage() {
               placeholder="Search a player by name..."
               className="form-input" />
             {filtered.length > 0 && (
-              <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-ink-3 border border-ink-5 rounded shadow-xl overflow-hidden">
+              <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded shadow-xl overflow-hidden">
                 {filtered.map(p => (
                   <button key={p.id} onClick={() => selectPlayer(p)}
-                    className="w-full text-left px-4 py-2.5 font-rajdhani text-sm text-zinc-300 hover:bg-ink-4 hover:text-gold transition-colors flex items-center justify-between">
+                    className="w-full text-left px-4 py-2.5 font-rajdhani text-sm text-[#44403C] dark:text-zinc-300 hover:bg-parchment-2 dark:hover:bg-ink-4 hover:text-amber-700 dark:hover:text-gold transition-colors flex items-center justify-between">
                     <span>{p.name}</span>
-                    <span className={p.wallet_balance < 0 ? 'text-amber-400' : 'text-zinc-500'}>₹{p.wallet_balance}</span>
+                    <span className={p.wallet_balance < 0 ? 'text-amber-700 dark:text-amber-400' : 'text-[#78716C] dark:text-zinc-500'}>₹{p.wallet_balance}</span>
                   </button>
                 ))}
               </div>
@@ -165,7 +165,7 @@ export default function AdminWalletPage() {
         ) : (
           <div>
             <button onClick={() => setSelectedPlayer(null)}
-              className="font-rajdhani text-xs text-gold-dim hover:text-gold mb-3 transition-colors">
+              className="font-rajdhani text-xs text-gold-dim hover:text-amber-700 dark:hover:text-gold mb-3 transition-colors">
               ← Search a different player
             </button>
             <WalletStatementClient playerId={selectedPlayer.id} admin />
@@ -175,13 +175,13 @@ export default function AdminWalletPage() {
 
       {/* ── Club-wide Recent Transactions ── */}
       <section>
-        <h2 className="font-cinzel text-sm text-gold font-semibold mb-3">Recent Transactions</h2>
-        {ledgerLoading && <p className="font-rajdhani text-sm text-zinc-600">Loading...</p>}
+        <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-3">Recent Transactions</h2>
+        {ledgerLoading && <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">Loading...</p>}
         {!ledgerLoading && ledger.length === 0 && (
-          <p className="font-rajdhani text-sm text-zinc-600">No transactions recorded yet.</p>
+          <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">No transactions recorded yet.</p>
         )}
         {ledger.length > 0 && (
-          <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden divide-y divide-ink-4">
+          <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden divide-y divide-[#E2DACE] dark:divide-ink-4">
             {ledger.map(t => {
               const player = players.find(p => p.id === t.player_id)
               return (
@@ -195,31 +195,31 @@ export default function AdminWalletPage() {
                       player ? selectPlayer(player) : setSelectedPlayer({ id: t.player_id, name: t.player_name ?? 'Unknown', wallet_balance: 0 })
                     }
                   }}
-                  className="w-full text-left flex items-center justify-between gap-3 px-4 py-3 hover:bg-ink-4 transition-colors cursor-pointer">
+                  className="w-full text-left flex items-center justify-between gap-3 px-4 py-3 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors cursor-pointer">
                   <div className="min-w-0">
-                    <p className="font-rajdhani text-sm text-parchment truncate">
-                      {t.player_name ?? 'Unknown'} <span className="text-zinc-500">· {t.reason}</span>
+                    <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment truncate">
+                      {t.player_name ?? 'Unknown'} <span className="text-[#78716C] dark:text-zinc-500">· {t.reason}</span>
                       {t.edited_at && (
-                        <span className="ml-2 font-rajdhani text-[10px] font-bold uppercase tracking-wide text-sky-500 border border-sky-800 rounded px-1.5 py-0.5">
+                        <span className="ml-2 font-rajdhani text-[10px] font-bold uppercase tracking-wide text-sky-500 border border-sky-300 dark:border-sky-800 rounded px-1.5 py-0.5">
                           edited
                         </span>
                       )}
                     </p>
-                    <p className="font-rajdhani text-xs text-zinc-600">
+                    <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">
                       {formatDate(t.created_at)}
                       {t.booking_id && (
                         <>
                           {' · '}
                           <Link href={`/matches/history/${t.booking_id}`}
                             onClick={e => e.stopPropagation()}
-                            className="text-gold-dim hover:text-gold transition-colors">
+                            className="text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors">
                             📊 View Scorecard
                           </Link>
                         </>
                       )}
                     </p>
                   </div>
-                  <span className={`font-rajdhani text-sm font-bold flex-shrink-0 ${t.type === 'credit' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <span className={`font-rajdhani text-sm font-bold flex-shrink-0 ${t.type === 'credit' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
                     {t.type === 'credit' ? '+' : '-'}₹{Number(t.amount).toLocaleString('en-IN')}
                   </span>
                 </div>
@@ -229,7 +229,7 @@ export default function AdminWalletPage() {
         )}
         {ledgerHasMore && (
           <button onClick={() => loadLedger(ledgerCursor)} disabled={ledgerLoadingMore}
-            className="mt-3 w-full font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-40 px-4 py-2.5 rounded transition-colors">
+            className="mt-3 w-full font-rajdhani text-xs font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim text-[#57534E] dark:text-zinc-400 hover:text-amber-700 dark:hover:text-gold disabled:opacity-40 px-4 py-2.5 rounded transition-colors">
             {ledgerLoadingMore ? 'Loading...' : 'Load Older Transactions'}
           </button>
         )}

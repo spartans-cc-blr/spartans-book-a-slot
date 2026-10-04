@@ -46,7 +46,7 @@ const DELAY_BETWEEN_MS = 1500
 
 function MatchList({ matches }: { matches: MatchRef[] }) {
   return (
-    <p className="font-rajdhani text-xs text-zinc-500 mt-1">
+    <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-1">
       {matches.length} match{matches.length === 1 ? '' : 'es'}:{' '}
       {matches.slice(0, 4).map((m, i) => (
         <span key={m.match_id}>
@@ -69,7 +69,7 @@ function SearchPicker({
   const [search, setSearch] = useState('')
   const filtered = roster.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 20)
   return (
-    <div className="mt-2 bg-ink border border-ink-5 rounded p-2">
+    <div className="mt-2 bg-parchment dark:bg-ink border border-[#D4C9B0] dark:border-ink-5 rounded p-2">
       <div className="flex items-center justify-between mb-1.5">
         <input
           autoFocus
@@ -77,9 +77,9 @@ function SearchPicker({
           placeholder="Search roster…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="flex-1 font-rajdhani text-xs bg-ink-3 border border-ink-5 rounded px-2 py-1 text-zinc-300 placeholder:text-zinc-700 outline-none"
+          className="flex-1 font-rajdhani text-xs bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1 text-[#44403C] dark:text-zinc-300 placeholder:text-[#78716C] dark:placeholder:text-zinc-700 outline-none"
         />
-        <button onClick={onCancel} className="ml-2 font-rajdhani text-[11px] text-zinc-600 hover:text-zinc-400">✕</button>
+        <button onClick={onCancel} className="ml-2 font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-600 hover:text-[#57534E] dark:hover:text-zinc-400">✕</button>
       </div>
       <div className="flex flex-col gap-0.5 max-h-36 overflow-y-auto">
         {filtered.map(p => (
@@ -87,7 +87,7 @@ function SearchPicker({
             <button
               onClick={() => onPick(p)}
               title={p.cricheroes_player_id ? undefined : 'No linked CricHeroes profile ID on this player’s Hub profile'}
-              className="flex-1 text-left px-2 py-1 rounded hover:bg-ink-4 font-rajdhani text-xs text-zinc-300">
+              className="flex-1 text-left px-2 py-1 rounded hover:bg-parchment-2 dark:hover:bg-ink-4 font-rajdhani text-xs text-[#44403C] dark:text-zinc-300">
               {p.name}{p.jersey_number != null ? ` · #${p.jersey_number}` : ''}
               {!p.cricheroes_player_id && <span className="text-amber-500/80"> ⚠</span>}
             </button>
@@ -97,13 +97,13 @@ function SearchPicker({
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Open this player's CricHeroes profile"
-                className="font-rajdhani text-xs text-zinc-600 hover:text-gold px-1.5 flex-shrink-0">
+                className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-amber-700 dark:hover:text-gold px-1.5 flex-shrink-0">
                 ↗
               </a>
             )}
           </div>
         ))}
-        {filtered.length === 0 && <p className="font-rajdhani text-xs text-zinc-600 px-2 py-1">No matches.</p>}
+        {filtered.length === 0 && <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 px-2 py-1">No matches.</p>}
       </div>
     </div>
   )
@@ -218,46 +218,46 @@ export default function PlayerReconciliationPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-gold">Player Reconciliation</h1>
-        <p className="font-rajdhani text-sm text-zinc-500 mt-1">
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Player Reconciliation</h1>
+        <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 mt-1">
           Resolves analytics-DB scorecard player names to Hub player profiles, so stats, leaderboards, and CricHeroes
           links survive a name change and never merge two same-named members together. See{' '}
-          <code className="text-zinc-400">.claude/rules/features/player-identity-resolution.md</code>.
+          <code className="text-[#57534E] dark:text-zinc-400">.claude/rules/features/player-identity-resolution.md</code>.
         </p>
       </div>
 
-      {loading && <p className="font-rajdhani text-sm text-zinc-600">Loading…</p>}
-      {error && <p className="font-rajdhani text-sm text-red-400 mb-3">{error}</p>}
-      {confirmNote && <p className="font-rajdhani text-sm text-emerald-400 mb-3">{confirmNote}</p>}
+      {loading && <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">Loading…</p>}
+      {error && <p className="font-rajdhani text-sm text-red-700 dark:text-red-400 mb-3">{error}</p>}
+      {confirmNote && <p className="font-rajdhani text-sm text-emerald-700 dark:text-emerald-400 mb-3">{confirmNote}</p>}
 
       {!loading && data && (
         <>
-          <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-5 flex items-center justify-between flex-wrap gap-3">
-            <p className="font-rajdhani text-sm text-zinc-400">
+          <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 mb-5 flex items-center justify-between flex-wrap gap-3">
+            <p className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">
               {totalPending === 0
                 ? 'Nothing pending — every scorecard name is resolved or ignored.'
                 : <>
-                    <span className="text-gold font-semibold">{data.auto_resolved.length}</span> ready to backfill ·{' '}
-                    <span className="text-amber-400 font-semibold">{data.suggested.length}</span> need a decision ·{' '}
-                    <span className="text-zinc-500 font-semibold">{data.no_match.length}</span> no suggestion
+                    <span className="text-amber-700 dark:text-gold font-semibold">{data.auto_resolved.length}</span> ready to backfill ·{' '}
+                    <span className="text-amber-700 dark:text-amber-400 font-semibold">{data.suggested.length}</span> need a decision ·{' '}
+                    <span className="text-[#78716C] dark:text-zinc-500 font-semibold">{data.no_match.length}</span> no suggestion
                   </>}
             </p>
             <button
               onClick={runPass}
               disabled={running || totalPending === 0}
-              className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
+              className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/20 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
               {running ? 'Running…' : 'Run Reconciliation Pass'}
             </button>
           </div>
 
           {Object.keys(passResults).length > 0 && (
-            <div className="bg-ink-3 border border-ink-5 rounded p-3 mb-5">
-              <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-1.5">Last pass</p>
+            <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-3 mb-5">
+              <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500 mb-1.5">Last pass</p>
               <div className="space-y-0.5">
                 {Object.entries(passResults).map(([name, r]) => (
-                  <p key={name} className="font-rajdhani text-xs text-zinc-400">
+                  <p key={name} className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
                     {name}: {r.error
-                      ? <span className="text-red-400">{r.error}</span>
+                      ? <span className="text-red-700 dark:text-red-400">{r.error}</span>
                       : `${r.updated} row(s) updated`
                         + (r.resynced ? `, ${r.resynced} match(es) re-synced` : '')
                         + (r.resyncSkipped ? ` (${r.resyncSkipped} already re-synced this pass)` : '')}
@@ -269,21 +269,21 @@ export default function PlayerReconciliationPage() {
 
           {data.suggested.length > 0 && (
             <div className="mb-6">
-              <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">
+              <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500 mb-2">
                 Needs a decision
               </h2>
               <div className="space-y-2">
                 {data.suggested.map(entry => (
-                  <div key={entry.scorecard_name} className="bg-ink-3 border border-ink-5 rounded px-4 py-3">
+                  <div key={entry.scorecard_name} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="font-rajdhani text-sm font-semibold text-parchment">{entry.scorecard_name}</p>
+                        <p className="font-rajdhani text-sm font-semibold text-[#1C1917] dark:text-parchment">{entry.scorecard_name}</p>
                         <MatchList matches={entry.matches} />
                       </div>
                       <button
                         onClick={() => ignore(entry.scorecard_name)}
                         disabled={busyName === entry.scorecard_name}
-                        className="font-rajdhani text-[11px] text-zinc-600 hover:text-red-400 disabled:opacity-40 flex-shrink-0">
+                        className="font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-600 hover:text-red-700 dark:hover:text-red-400 disabled:opacity-40 flex-shrink-0">
                         Ignore (not a member)
                       </button>
                     </div>
@@ -294,7 +294,7 @@ export default function PlayerReconciliationPage() {
                             onClick={() => confirmGlobal(entry.scorecard_name, s)}
                             disabled={busyName === entry.scorecard_name}
                             title={s.cricheroes_player_id ? undefined : 'No linked CricHeroes profile ID on this player’s Hub profile'}
-                            className={`font-rajdhani text-xs bg-ink-4 border border-ink-5 hover:border-gold-dim hover:text-gold text-zinc-300 px-2.5 py-1 disabled:opacity-40 transition-colors ${s.cricheroes_url ? 'rounded-l' : 'rounded'}`}>
+                            className={`font-rajdhani text-xs bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim hover:text-amber-700 dark:hover:text-gold text-[#44403C] dark:text-zinc-300 px-2.5 py-1 disabled:opacity-40 transition-colors ${s.cricheroes_url ? 'rounded-l' : 'rounded'}`}>
                             {s.name}{s.jersey_number != null ? ` #${s.jersey_number}` : ''}
                             {!s.cricheroes_player_id && <span className="text-amber-500/80"> ⚠</span>}
                           </button>
@@ -304,7 +304,7 @@ export default function PlayerReconciliationPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Open this player's CricHeroes profile — cross-check before confirming"
-                              className="font-rajdhani text-xs bg-ink-4 border border-l-0 border-ink-5 hover:border-gold-dim hover:text-gold text-zinc-500 px-2 py-1 rounded-r transition-colors">
+                              className="font-rajdhani text-xs bg-parchment-2 dark:bg-ink-4 border border-l-0 border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim hover:text-amber-700 dark:hover:text-gold text-[#78716C] dark:text-zinc-500 px-2 py-1 rounded-r transition-colors">
                               ↗
                             </a>
                           )}
@@ -312,7 +312,7 @@ export default function PlayerReconciliationPage() {
                       ))}
                       <button
                         onClick={() => setPickerFor(pickerFor === entry.scorecard_name ? null : entry.scorecard_name)}
-                        className="font-rajdhani text-xs text-zinc-600 hover:text-zinc-400 px-2.5 py-1">
+                        className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-[#57534E] dark:hover:text-zinc-400 px-2.5 py-1">
                         Search roster…
                       </button>
                     </div>
@@ -338,27 +338,27 @@ export default function PlayerReconciliationPage() {
 
           {data.no_match.length > 0 && (
             <div className="mb-6">
-              <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">
+              <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500 mb-2">
                 No suggestion (likely opponents)
               </h2>
               <div className="space-y-2">
                 {data.no_match.map(entry => (
-                  <div key={entry.scorecard_name} className="bg-ink-3 border border-ink-5 rounded px-4 py-3">
+                  <div key={entry.scorecard_name} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="font-rajdhani text-sm font-semibold text-parchment">{entry.scorecard_name}</p>
+                        <p className="font-rajdhani text-sm font-semibold text-[#1C1917] dark:text-parchment">{entry.scorecard_name}</p>
                         <MatchList matches={entry.matches} />
                       </div>
                       <button
                         onClick={() => ignore(entry.scorecard_name)}
                         disabled={busyName === entry.scorecard_name}
-                        className="font-rajdhani text-[11px] text-zinc-600 hover:text-red-400 disabled:opacity-40 flex-shrink-0">
+                        className="font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-600 hover:text-red-700 dark:hover:text-red-400 disabled:opacity-40 flex-shrink-0">
                         Ignore
                       </button>
                     </div>
                     <button
                       onClick={() => setPickerFor(pickerFor === entry.scorecard_name ? null : entry.scorecard_name)}
-                      className="font-rajdhani text-xs text-zinc-600 hover:text-zinc-400 mt-2">
+                      className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-[#57534E] dark:hover:text-zinc-400 mt-2">
                       Search roster…
                     </button>
                     {pickerFor === entry.scorecard_name && (
@@ -376,13 +376,13 @@ export default function PlayerReconciliationPage() {
 
           {data.auto_resolved.length > 0 && (
             <div>
-              <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500 mb-2">
+              <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500 mb-2">
                 Already resolved — pending backfill
               </h2>
               <div className="space-y-1.5">
                 {data.auto_resolved.map(entry => (
-                  <div key={entry.scorecard_name} className="bg-ink-3 border border-ink-5 rounded px-4 py-2.5">
-                    <p className="font-rajdhani text-sm text-zinc-300">{entry.scorecard_name}</p>
+                  <div key={entry.scorecard_name} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-4 py-2.5">
+                    <p className="font-rajdhani text-sm text-[#44403C] dark:text-zinc-300">{entry.scorecard_name}</p>
                     <MatchList matches={entry.matches} />
                   </div>
                 ))}

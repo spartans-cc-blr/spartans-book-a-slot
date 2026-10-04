@@ -70,10 +70,10 @@ function slotLabel(s: string) {
 
 // ── Action pill colours ────────────────────────────────────────────────────────
 const ACTION_STYLE: Record<string, string> = {
-  book:    'bg-emerald-900/60 text-emerald-400 border-emerald-800',
-  reserve: 'bg-amber-900/60  text-amber-400  border-amber-800',
-  modify:  'bg-blue-900/60   text-blue-400   border-blue-800',
-  cancel:  'bg-red-900/60    text-red-400    border-red-800',
+  book:    'bg-emerald-50 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800',
+  reserve: 'bg-amber-50 dark:bg-amber-900/60  text-amber-700 dark:text-amber-400  border-amber-300 dark:border-amber-800',
+  modify:  'bg-blue-50 dark:bg-blue-900/60   text-blue-700 dark:text-blue-400   border-blue-300 dark:border-blue-800',
+  cancel:  'bg-red-50 dark:bg-red-900/60    text-red-700 dark:text-red-400    border-red-300 dark:border-red-800',
 }
 
 const ACTION_ICON: Record<string, string> = {
@@ -84,7 +84,7 @@ const ACTION_ICON: Record<string, string> = {
 function ConfidenceDot({ confidence }: { confidence: string }) {
   const colour = confidence === 'high' ? 'bg-emerald-400' : confidence === 'medium' ? 'bg-amber-400' : 'bg-red-400'
   return (
-    <span className="flex items-center gap-1.5 font-rajdhani text-xs text-zinc-500">
+    <span className="flex items-center gap-1.5 font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
       <span className={`inline-block w-1.5 h-1.5 rounded-full ${colour}`} />
       {confidence} confidence
     </span>
@@ -326,9 +326,9 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
   // ── Render: target booking match (for modify/cancel) ──────────────────────
   function TargetBookingRow({ bookingId }: { bookingId: string }) {
     const bk = upcomingBookings.find(b => b.id === bookingId)
-    if (!bk) return <span className="text-zinc-500 text-xs">{bookingId.slice(0, 8)}…</span>
+    if (!bk) return <span className="text-[#78716C] dark:text-zinc-500 text-xs">{bookingId.slice(0, 8)}…</span>
     return (
-      <span className="font-rajdhani text-xs text-zinc-300">
+      <span className="font-rajdhani text-xs text-[#44403C] dark:text-zinc-300">
         {fmtDate(bk.game_date)} · {slotLabel(bk.slot_time)} {bk.format ?? ''} {bk.captain_name ? `— ${bk.captain_name}` : ''}
       </span>
     )
@@ -337,18 +337,18 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
   // ── Parsed result card ────────────────────────────────────────────────────
   function ParsedCard() {
     if (!parsed) return null
-    const actionStyle = ACTION_STYLE[parsed.action ?? ''] ?? 'bg-zinc-800 text-zinc-400 border-zinc-700'
+    const actionStyle = ACTION_STYLE[parsed.action ?? ''] ?? 'bg-parchment-2 dark:bg-zinc-800 text-[#57534E] dark:text-zinc-400 border-[#D4C9B0] dark:border-zinc-700'
     const hasErrors   = parsed.issues.filter(i => i.toLowerCase().includes('invalid') || i.toLowerCase().includes('error')).length > 0
     const isLowConf   = parsed.confidence === 'low'
 
     return (
-      <div className="border border-ink-5 rounded-lg bg-ink-3 overflow-hidden mt-3 animate-in fade-in slide-in-from-top-1 duration-200">
+      <div className="border border-[#D4C9B0] dark:border-ink-5 rounded-lg bg-white dark:bg-ink-3 overflow-hidden mt-3 animate-in fade-in slide-in-from-top-1 duration-200">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-ink-5 bg-ink-4">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-rajdhani font-bold tracking-wide ${actionStyle}`}>
             {ACTION_ICON[parsed.action ?? '']} {(parsed.action ?? '').toUpperCase()}
           </span>
-          <span className="font-rajdhani text-sm text-parchment flex-1">{parsed.summary}</span>
+          <span className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment flex-1">{parsed.summary}</span>
           <ConfidenceDot confidence={parsed.confidence} />
         </div>
 
@@ -356,7 +356,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
         <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2">
           {(parsed.action === 'modify' || parsed.action === 'cancel') && parsed.booking_id && (
             <div className="col-span-2 sm:col-span-3">
-              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-0.5">Target Booking</p>
+              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-[#78716C] dark:text-zinc-600 mb-0.5">Target Booking</p>
               <TargetBookingRow bookingId={parsed.booking_id} />
             </div>
           )}
@@ -394,7 +394,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
         {parsed.issues.length > 0 && (
           <div className="px-4 pb-3">
             {parsed.issues.map((iss, i) => (
-              <p key={i} className="font-rajdhani text-xs text-amber-400 flex items-start gap-1.5 mt-1">
+              <p key={i} className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5 mt-1">
                 <span className="mt-0.5">⚠</span> {iss}
               </p>
             ))}
@@ -404,22 +404,22 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
         {/* Exec error */}
         {execError && (
           <div className="px-4 pb-3">
-            <p className="font-rajdhani text-xs text-red-400 flex items-start gap-1.5">
+            <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 flex items-start gap-1.5">
               <span>✕</span> {execError}
             </p>
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-ink-5 bg-ink-4">
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
           {isLowConf ? (
             <>
-              <span className="font-rajdhani text-xs text-zinc-500 flex-1">
+              <span className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 flex-1">
                 Low confidence — open form with fields pre-filled instead?
               </span>
               <button
                 onClick={() => { router.push(buildFormURL(parsed)); setOpen(false); reset() }}
-                className="font-rajdhani text-xs font-bold bg-gold/10 border border-gold-dim text-gold px-3 py-1.5 rounded hover:bg-gold/20 transition-colors">
+                className="font-rajdhani text-xs font-bold bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold px-3 py-1.5 rounded hover:bg-gold/20 transition-colors">
                 Open Form →
               </button>
             </>
@@ -427,7 +427,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
             <>
               <button
                 onClick={() => { router.push(buildFormURL(parsed)); setOpen(false); reset() }}
-                className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1.5 rounded border border-transparent hover:border-ink-5 transition-colors">
+                className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 px-2 py-1.5 rounded border border-transparent hover:border-[#D4C9B0] dark:hover:border-ink-5 transition-colors">
                 Edit in form
               </button>
               <span className="flex-1" />
@@ -456,12 +456,12 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
       {/* Trigger pill */}
       <button
         onClick={() => setOpen(true)}
-        className="group flex items-center gap-2.5 w-full bg-ink-3 hover:bg-ink-4 border border-ink-5 hover:border-gold-dim rounded-lg px-4 py-3 transition-all text-left">
-        <span className="text-zinc-600 group-hover:text-gold transition-colors text-base">⌘</span>
-        <span className="font-rajdhani text-sm text-zinc-500 group-hover:text-zinc-300 transition-colors flex-1">
-          Quick command… <span className="text-zinc-700 italic">{EXAMPLES[hintIdx]}</span>
+        className="group flex items-center gap-2.5 w-full bg-white dark:bg-ink-3 hover:bg-parchment-2 dark:hover:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim rounded-lg px-4 py-3 transition-all text-left">
+        <span className="text-[#78716C] dark:text-zinc-600 group-hover:text-amber-700 dark:group-hover:text-gold transition-colors text-base">⌘</span>
+        <span className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 group-hover:text-[#44403C] dark:group-hover:text-zinc-300 transition-colors flex-1">
+          Quick command… <span className="text-[#78716C] dark:text-zinc-700 italic">{EXAMPLES[hintIdx]}</span>
         </span>
-        <kbd className="font-rajdhani text-[10px] text-zinc-700 border border-zinc-800 rounded px-1.5 py-0.5 hidden sm:inline">⌘K</kbd>
+        <kbd className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-700 border border-[#D4C9B0] dark:border-zinc-800 rounded px-1.5 py-0.5 hidden sm:inline">⌘K</kbd>
       </button>
 
       {/* Modal overlay */}
@@ -473,10 +473,10 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
           {/* Panel */}
-          <div className="relative w-full max-w-xl bg-ink-2 border border-ink-5 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="relative w-full max-w-xl bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
             {/* Input row */}
-            <div className="flex items-start gap-3 p-4 border-b border-ink-5">
-              <span className="text-gold text-lg mt-1 flex-shrink-0">⌘</span>
+            <div className="flex items-start gap-3 p-4 border-b border-[#D4C9B0] dark:border-ink-5">
+              <span className="text-amber-700 dark:text-gold text-lg mt-1 flex-shrink-0">⌘</span>
               <textarea
                 ref={inputRef}
                 value={text}
@@ -484,7 +484,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
                 onKeyDown={handleKeyDown}
                 placeholder={EXAMPLES[hintIdx]}
                 rows={2}
-                className="flex-1 bg-transparent font-rajdhani text-parchment text-sm placeholder:text-zinc-700 resize-none outline-none leading-relaxed"
+                className="flex-1 bg-transparent font-rajdhani text-[#1C1917] dark:text-parchment text-sm placeholder:text-[#78716C] dark:placeholder:text-zinc-700 resize-none outline-none leading-relaxed"
               />
               <button
                 onClick={handleParse}
@@ -501,18 +501,18 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
                   <button
                     key={i}
                     onClick={() => setText(ex)}
-                    className="font-rajdhani text-[11px] text-zinc-600 hover:text-zinc-300 bg-ink-4 hover:bg-ink-5 border border-ink-5 rounded px-2 py-0.5 transition-colors">
+                    className="font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-600 hover:text-[#44403C] dark:hover:text-zinc-300 bg-parchment-2 dark:bg-ink-4 hover:bg-parchment-3 dark:hover:bg-ink-5 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-0.5 transition-colors">
                     {ex}
                   </button>
                 ))}
-                <span className="font-rajdhani text-[10px] text-zinc-700 ml-auto self-center">⌃↵ to parse</span>
+                <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-700 ml-auto self-center">⌃↵ to parse</span>
               </div>
             )}
 
             {/* Parse error */}
             {parseError && (
               <div className="px-4 py-2.5">
-                <p className="font-rajdhani text-xs text-red-400">✕ {parseError}</p>
+                <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">✕ {parseError}</p>
               </div>
             )}
 
@@ -524,13 +524,13 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
             )}
 
             {/* Footer */}
-            <div className="px-4 py-2 border-t border-ink-5 bg-ink-3 flex items-center justify-between">
-              <span className="font-rajdhani text-[10px] text-zinc-700">
+            <div className="px-4 py-2 border-t border-[#D4C9B0] dark:border-ink-5 bg-white dark:bg-ink-3 flex items-center justify-between">
+              <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-700">
                 Supports: book · reserve · modify · cancel
               </span>
               <button
                 onClick={() => { setOpen(false); reset() }}
-                className="font-rajdhani text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">
+                className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 hover:text-[#57534E] dark:hover:text-zinc-400 transition-colors">
                 ESC to close
               </button>
             </div>
@@ -545,8 +545,8 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="font-rajdhani text-[10px] uppercase tracking-widest text-zinc-600 mb-0.5">{label}</p>
-      <p className="font-rajdhani text-sm text-parchment">{value}</p>
+      <p className="font-rajdhani text-[10px] uppercase tracking-widest text-[#78716C] dark:text-zinc-600 mb-0.5">{label}</p>
+      <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment">{value}</p>
     </div>
   )
 }

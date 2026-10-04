@@ -106,8 +106,8 @@ const SKILLS = [
   // ── Loading ───────────────────────────────────────────────────────────────
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-ink-1 flex items-center justify-center">
-        <p className="font-rajdhani text-zinc-600 text-sm">Loading…</p>
+      <div className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center">
+        <p className="font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">Loading…</p>
       </div>
     )
   }
@@ -115,13 +115,13 @@ const SKILLS = [
   // ── Success state ─────────────────────────────────────────────────────────
   if (success) {
     return (
-      <main className="min-h-screen bg-ink-1 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-ink-2 border border-ink-5 rounded-lg p-8 text-center space-y-5">
+      <main className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-8 text-center space-y-5">
           <div className="text-4xl">🏏</div>
-          <h1 className="font-cinzel font-bold text-gold text-xl tracking-widest uppercase">
+          <h1 className="font-cinzel font-bold text-amber-700 dark:text-gold text-xl tracking-widest uppercase">
             Welcome to Spartans!
           </h1>
-          <p className="font-rajdhani text-zinc-300 text-sm leading-relaxed">
+          <p className="font-rajdhani text-[#44403C] dark:text-zinc-300 text-sm leading-relaxed">
             Thank you for your interest in joining Spartans CC — we're thrilled to have you on board! Your account has been created.
           </p>
           {whatsappGroupUrl && (
@@ -134,7 +134,7 @@ const SKILLS = [
               📱 Join our WhatsApp Group ↗
             </a>
           )}
-          <p className="font-rajdhani text-zinc-400 text-sm leading-relaxed">
+          <p className="font-rajdhani text-[#57534E] dark:text-zinc-400 text-sm leading-relaxed">
             Sign out and sign back in with Google to activate your full access.
           </p>
           <button
@@ -151,21 +151,21 @@ const SKILLS = [
   // ── Not signed in ─────────────────────────────────────────────────────────
   if (!session) {
     return (
-      <main className="min-h-screen bg-ink-1 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-ink-2 border border-ink-5 rounded-lg p-8 text-center space-y-6">
+      <main className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-8 text-center space-y-6">
           <img src="/Transparent High Resolution.png" alt="Spartans CC"
             className="w-16 h-16 object-contain mx-auto opacity-80" />
           <div className="space-y-2">
-            <h1 className="font-cinzel font-bold text-gold text-xl tracking-widest uppercase">
+            <h1 className="font-cinzel font-bold text-amber-700 dark:text-gold text-xl tracking-widest uppercase">
               Sign in first
             </h1>
-            <p className="font-rajdhani text-zinc-400 text-sm leading-relaxed">
+            <p className="font-rajdhani text-[#57534E] dark:text-zinc-400 text-sm leading-relaxed">
               Sign in with the Google account you want to use for Spartans Hub, then your registration form will appear.
             </p>
           </div>
           <button
             onClick={() => signIn('google', { callbackUrl: `/join?token=${token}` })}
-            className="inline-flex items-center justify-center gap-2 w-full font-rajdhani font-bold text-sm tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 px-6 py-3 rounded transition-colors"
+            className="inline-flex items-center justify-center gap-2 w-full font-rajdhani font-bold text-sm tracking-widest uppercase border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/10 px-6 py-3 rounded transition-colors"
           >
             <GoogleIcon /> Sign in with Google
           </button>
@@ -177,14 +177,14 @@ const SKILLS = [
   // ── No token ──────────────────────────────────────────────────────────────
   if (!token) {
     return (
-      <main className="min-h-screen bg-ink-1 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-ink-2 border border-ink-5 rounded-lg p-8 text-center space-y-5">
+      <main className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-8 text-center space-y-5">
           <img src="/Transparent High Resolution.png" alt="Spartans CC"
             className="w-16 h-16 object-contain mx-auto opacity-80" />
-          <h1 className="font-cinzel font-bold text-gold text-xl tracking-widest uppercase">
+          <h1 className="font-cinzel font-bold text-amber-700 dark:text-gold text-xl tracking-widest uppercase">
             Invite link required
           </h1>
-          <p className="font-rajdhani text-zinc-400 text-sm leading-relaxed">
+          <p className="font-rajdhani text-[#57534E] dark:text-zinc-400 text-sm leading-relaxed">
             You need a valid invite link to register. Ask a Spartans GC member or coordinator to generate one for you.
           </p>
         </div>
@@ -196,22 +196,22 @@ const SKILLS = [
   return (
     <>
       <SiteNav activePage="home" />
-      <main className="min-h-screen bg-ink-1 pt-16 pb-12 px-4">
+      <main className="min-h-screen bg-parchment dark:bg-ink-1 pt-16 pb-12 px-4">
         <div className="max-w-lg mx-auto">
 
           {/* Header */}
           <div className="text-center mb-8">
             <img src="/Transparent High Resolution.png" alt="Spartans CC"
               className="w-14 h-14 object-contain mx-auto opacity-80 mb-4" />
-            <h1 className="font-cinzel font-bold text-gold text-xl tracking-widest uppercase mb-1">
+            <h1 className="font-cinzel font-bold text-amber-700 dark:text-gold text-xl tracking-widest uppercase mb-1">
               Join Spartans CC
             </h1>
-            <p className="font-rajdhani text-zinc-500 text-xs">
-              Signing up as <span className="text-zinc-300">{player?.email}</span>
+            <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-xs">
+              Signing up as <span className="text-[#44403C] dark:text-zinc-300">{player?.email}</span>
             </p>
           </div>
 
-          <div className="bg-ink-2 border border-ink-5 rounded-lg p-6 space-y-5">
+          <div className="bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-6 space-y-5">
 
             {/* Name */}
             <div>
@@ -236,7 +236,7 @@ const SKILLS = [
                 placeholder="91XXXXXXXXXX (with country code)"
                 className="form-input"
               />
-              <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
+              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">
                 Include country code e.g. 919876543210
               </p>
             </div>
@@ -285,14 +285,14 @@ const SKILLS = [
             <div>
               <label className="form-label">Date of Birth</label>
               <DobInput value={form.dob} onChange={v => set('dob', v)} />
-              <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
+              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">
                 Year is optional — day and month are enough for birthday wishes 🎂
               </p>
             </div>
 
             {/* Error */}
             {error && (
-              <div className="bg-red-950 border border-red-800 text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
+              <div className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
                 {error}
               </div>
             )}
@@ -306,7 +306,7 @@ const SKILLS = [
               {saving ? 'Creating account…' : 'Complete Registration'}
             </button>
 
-            <p className="font-rajdhani text-[10px] text-zinc-600 text-center leading-relaxed">
+            <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 text-center leading-relaxed">
               You can update all these details later from your profile page. Only your name is required now.
             </p>
           </div>
@@ -319,8 +319,8 @@ const SKILLS = [
 export default function JoinPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-ink-1 flex items-center justify-center">
-        <p className="font-rajdhani text-zinc-600 text-sm">Loading…</p>
+      <div className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center">
+        <p className="font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">Loading…</p>
       </div>
     }>
       <JoinPageInner />

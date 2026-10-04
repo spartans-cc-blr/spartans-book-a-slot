@@ -56,12 +56,12 @@ export function PushSubscribePrompt() {
       aria-modal="true"
       aria-label="Subscribe to notifications"
     >
-      <div className="bg-ink-2 border border-ink-4 rounded-lg max-w-sm w-full p-5 shadow-xl">
+      <div className="bg-white dark:bg-ink-2 border border-[#E2DACE] dark:border-ink-4 rounded-lg max-w-sm w-full p-5 shadow-xl">
         <p className="text-2xl mb-2">🔔</p>
-        <h2 className="font-cinzel text-base font-bold text-parchment mb-1.5">
+        <h2 className="font-cinzel text-base font-bold text-[#1C1917] dark:text-parchment mb-1.5">
           Never miss a squad announcement
         </h2>
-        <p className="font-rajdhani text-sm text-zinc-400 mb-4">
+        <p className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400 mb-4">
           Turn on notifications and we'll ping you the moment you're picked for a match.
         </p>
         {error && <p className="font-rajdhani text-xs text-crimson mb-3">{error}</p>}
@@ -69,7 +69,7 @@ export function PushSubscribePrompt() {
           <button
             onClick={dismiss}
             disabled={loading}
-            className="font-rajdhani text-xs font-bold text-zinc-500 hover:text-zinc-300 px-3 py-2 disabled:opacity-50"
+            className="font-rajdhani text-xs font-bold text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 px-3 py-2 disabled:opacity-50"
           >
             Maybe later
           </button>

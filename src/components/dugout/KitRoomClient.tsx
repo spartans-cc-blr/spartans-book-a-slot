@@ -42,11 +42,11 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
 }
 
 const STATUS_BADGE: Record<OrderStatus, string> = {
-  pending:   'bg-amber-50 text-amber-700 border border-amber-200',
-  submitted: 'bg-blue-50 text-blue-700 border border-blue-200',
-  delivered: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  received:  'bg-stone-100 text-stone-500 border border-stone-200',
-  cancelled: 'bg-stone-100 text-stone-400 border border-stone-200',
+  pending:   'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
+  submitted: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
+  delivered: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
+  received:  'bg-stone-100 dark:bg-ink-4 text-stone-500 dark:text-zinc-400 border border-stone-200 dark:border-ink-5',
+  cancelled: 'bg-stone-100 dark:bg-ink-4 text-stone-400 dark:text-zinc-500 border border-stone-200 dark:border-ink-5',
 }
 
 function formatDate(dateStr: string): string {
@@ -66,17 +66,17 @@ function QtyCounter({
       <button
         type="button"
         onClick={() => onChange(Math.max(1, value - 1))}
-        className="font-rajdhani text-sm font-bold text-stone-600 border border-[#D4C9B0] rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] hover:text-stone-900 transition-colors"
+        className="font-rajdhani text-sm font-bold text-stone-600 dark:text-zinc-400 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] hover:text-stone-900 dark:hover:text-parchment transition-colors"
       >
         −
       </button>
-      <span className="font-rajdhani text-sm font-bold text-stone-800 w-4 text-center">
+      <span className="font-rajdhani text-sm font-bold text-stone-800 dark:text-zinc-300 w-4 text-center">
         {value}
       </span>
       <button
         type="button"
         onClick={() => onChange(Math.min(3, value + 1))}
-        className="font-rajdhani text-sm font-bold text-stone-600 border border-[#D4C9B0] rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] hover:text-stone-900 transition-colors"
+        className="font-rajdhani text-sm font-bold text-stone-600 dark:text-zinc-400 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-0.5 leading-none hover:bg-[#D4C9B0] hover:text-stone-900 dark:hover:text-parchment transition-colors"
       >
         +
       </button>
@@ -89,9 +89,9 @@ function OrderItems({ order }: { order: Order }) {
 
   if (isLegacy) {
     return (
-      <p className="font-rajdhani text-stone-700 text-sm">
+      <p className="font-rajdhani text-stone-700 dark:text-zinc-300 text-sm">
         Jersey: <span className="font-semibold">{order.jersey_size}</span>{' '}
-        <span className="text-stone-400">(legacy)</span>
+        <span className="text-stone-400 dark:text-zinc-500">(legacy)</span>
       </p>
     )
   }
@@ -99,7 +99,7 @@ function OrderItems({ order }: { order: Order }) {
   return (
     <div className="flex flex-col gap-0.5">
       {order.jersey_half_sleeve_size && (
-        <p className="font-rajdhani text-stone-700 text-sm">
+        <p className="font-rajdhani text-stone-700 dark:text-zinc-300 text-sm">
           Half Sleeve:{' '}
           <span className="font-semibold">
             {order.jersey_half_sleeve_size}
@@ -108,7 +108,7 @@ function OrderItems({ order }: { order: Order }) {
         </p>
       )}
       {order.jersey_full_sleeve_size && (
-        <p className="font-rajdhani text-stone-700 text-sm">
+        <p className="font-rajdhani text-stone-700 dark:text-zinc-300 text-sm">
           Full Sleeve:{' '}
           <span className="font-semibold">
             {order.jersey_full_sleeve_size}
@@ -117,7 +117,7 @@ function OrderItems({ order }: { order: Order }) {
         </p>
       )}
       {order.tracks_size && (
-        <p className="font-rajdhani text-stone-700 text-sm">
+        <p className="font-rajdhani text-stone-700 dark:text-zinc-300 text-sm">
           Tracks:{' '}
           <span className="font-semibold">
             {order.tracks_size}
@@ -372,15 +372,15 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
       {/* Batch date notice */}
       {batchDate && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-700 font-rajdhani text-sm rounded px-4 py-2">
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 font-rajdhani text-sm rounded px-4 py-2">
           Next order tentatively submits around {formatDate(batchDate)}
         </div>
       )}
 
       {/* Expelled message */}
       {isExpelled && (
-        <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4">
-          <p className="font-rajdhani text-stone-700 text-sm">
+        <div className="bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-4">
+          <p className="font-rajdhani text-stone-700 dark:text-zinc-300 text-sm">
             Your account is suspended. You cannot place kit orders.
           </p>
         </div>
@@ -388,8 +388,8 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
       {/* Active order status card */}
       {activeOrder && (
-        <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4 flex flex-col gap-3">
-          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+        <div className="bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-4 flex flex-col gap-3">
+          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">
             Your Current Order
           </p>
 
@@ -399,8 +399,8 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
               {/* Jersey Name input */}
               <div className="flex flex-col gap-1">
-                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 flex items-center gap-1">
-                  Jersey Name <span className="text-stone-400 normal-case font-normal tracking-normal">✏️</span>
+                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 flex items-center gap-1">
+                  Jersey Name <span className="text-stone-400 dark:text-zinc-500 normal-case font-normal tracking-normal">✏️</span>
                 </label>
                 <input
                   type="text"
@@ -412,13 +412,13 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                     }
                   }}
                   maxLength={10}
-                  className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
+                  className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
                 />
-                <span className="font-rajdhani text-xs text-stone-400">
+                <span className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                   {editName.length}/10
                 </span>
                 {editNameChanged && (
-                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer mt-0.5">
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer mt-0.5">
                     <input
                       type="checkbox"
                       checked={editUpdateProfile}
@@ -432,8 +432,8 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
               {/* Jersey Number input */}
               <div className="flex flex-col gap-1">
-                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 flex items-center gap-1">
-                  Jersey Number <span className="text-stone-400 normal-case font-normal tracking-normal">✏️</span>
+                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 flex items-center gap-1">
+                  Jersey Number <span className="text-stone-400 dark:text-zinc-500 normal-case font-normal tracking-normal">✏️</span>
                 </label>
                 <input
                   type="text"
@@ -448,13 +448,13 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                   pattern="[0-9]{1,3}"
                   maxLength={3}
                   inputMode="numeric"
-                  className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none w-28"
+                  className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none w-28"
                 />
-                <span className="font-rajdhani text-xs text-stone-400">
+                <span className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                   1–3 digits, leading zeros allowed (e.g. 07)
                 </span>
                 {editNumberChanged && (
-                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer mt-0.5">
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer mt-0.5">
                     <input
                       type="checkbox"
                       checked={editUpdateProfileNumber}
@@ -469,19 +469,19 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
               {/* Apparel selection */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                  <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">
                     Apparel Selection
                   </span>
                   <button
                     type="button"
                     onClick={() => window.open('https://www.tyka.com/sizechart', '_blank', 'noopener,noreferrer')}
-                    className="font-rajdhani text-xs text-amber-600 hover:text-amber-700 hover:underline underline-offset-2"
+                    className="font-rajdhani text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-400 hover:underline underline-offset-2"
                   >
                     Size guide ↗
                   </button>
                 </div>
                 <div className="flex items-center gap-1">
-                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer">
                     <input type="checkbox" checked={editHalf}
                       onChange={e => {
                         setEditHalf(e.target.checked)
@@ -494,7 +494,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                   )}
                 </div>
                 <div className="flex items-center gap-1">
-                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer">
                     <input type="checkbox" checked={editFull}
                       onChange={e => {
                         setEditFull(e.target.checked)
@@ -507,7 +507,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                   )}
                 </div>
                 <div className="flex items-center gap-1">
-                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                  <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer">
                     <input type="checkbox" checked={editTracks}
                       onChange={e => {
                         setEditTracks(e.target.checked)
@@ -521,22 +521,22 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                 </div>
                 {editAnySleeveChecked && (
                   <div className="flex flex-col gap-1 mt-1">
-                    <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                    <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">
                       Jersey Size
                     </label>
                     <select value={editSleeveSize} onChange={e => setEditSleeveSize(e.target.value)}
-                      className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
+                      className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
                       {JERSEY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                 )}
                 {editTracks && (
                   <div className="flex flex-col gap-1 mt-1">
-                    <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                    <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">
                       Tracks Size
                     </label>
                     <select value={editTracksSize} onChange={e => setEditTracksSize(e.target.value)}
-                      className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
+                      className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
                       {JERSEY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
@@ -545,7 +545,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
               {/* Notes */}
               <div className="flex flex-col gap-1">
-                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">
                   Notes <span className="normal-case font-normal">(optional)</span>
                 </label>
                 <textarea
@@ -554,12 +554,12 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                   maxLength={500}
                   rows={3}
                   placeholder="Any special requests…"
-                  className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none resize-none placeholder:text-stone-400"
+                  className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none resize-none placeholder:text-stone-400 dark:placeholder:text-zinc-500"
                 />
               </div>
 
               {editError && (
-                <p className="font-rajdhani text-sm text-red-600">{editError}</p>
+                <p className="font-rajdhani text-sm text-red-600 dark:text-red-400">{editError}</p>
               )}
 
               <div className="flex items-center gap-4">
@@ -573,7 +573,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                 <button
                   type="button"
                   onClick={() => setEditMode(false)}
-                  className="font-rajdhani text-xs text-stone-500 hover:text-stone-700 hover:underline"
+                  className="font-rajdhani text-xs text-stone-500 dark:text-zinc-400 hover:text-stone-700 dark:hover:text-zinc-300 hover:underline"
                 >
                   Cancel Edit
                 </button>
@@ -584,16 +584,16 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
             <>
               <div className="flex flex-col gap-1">
                 <div className="flex items-baseline gap-2">
-                  <span className="font-cinzel font-bold text-lg text-stone-900">
+                  <span className="font-cinzel font-bold text-lg text-stone-900 dark:text-parchment">
                     {activeOrder.jersey_name_override ?? activeOrder.jersey_name}
                   </span>
-                  <span className="font-rajdhani text-stone-500 text-sm">
+                  <span className="font-rajdhani text-stone-500 dark:text-zinc-400 text-sm">
                     #{activeOrder.jersey_number_override ?? activeOrder.jersey_number}
                   </span>
                 </div>
                 <OrderItems order={activeOrder} />
                 {activeOrder.notes && (
-                  <p className="font-rajdhani text-stone-500 text-sm">
+                  <p className="font-rajdhani text-stone-500 dark:text-zinc-400 text-sm">
                     Notes: {activeOrder.notes}
                   </p>
                 )}
@@ -613,17 +613,17 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                 )}
               </div>
               {activeOrder.status === 'pending' && (
-                <p className="font-rajdhani text-xs text-stone-400">
+                <p className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                   Your order has been received. The coordinator will review and submit it in the next batch.
                 </p>
               )}
               {activeOrder.status === 'submitted' && (
-                <p className="font-rajdhani text-xs text-stone-400">
+                <p className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                   Your order has been submitted to the vendor. We'll notify you once it's ready for collection.
                 </p>
               )}
               {activeOrder.status === 'delivered' && (
-                <p className="font-rajdhani text-xs text-stone-400">
+                <p className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                   Your kit has arrived! Please confirm receipt once you've collected it.
                 </p>
               )}
@@ -632,22 +632,22 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                 <div className="flex items-center gap-4">
                   <button
                     onClick={openEdit}
-                    className="font-rajdhani text-xs text-amber-600 hover:text-amber-700 hover:underline"
+                    className="font-rajdhani text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-400 hover:underline"
                   >
                     Edit order
                   </button>
                   {confirmCancel ? (
-                    <span className="font-rajdhani text-xs text-stone-600">
+                    <span className="font-rajdhani text-xs text-stone-600 dark:text-zinc-400">
                       Are you sure?{' '}
                       <button
                         onClick={() => handleCancelOrder(activeOrder.id)}
-                        className="text-red-600 font-semibold hover:underline"
+                        className="text-red-600 dark:text-red-400 font-semibold hover:underline"
                       >
                         Yes, cancel
                       </button>
                       <button
                         onClick={() => setConfirmCancel(false)}
-                        className="text-stone-500 hover:underline ml-3"
+                        className="text-stone-500 dark:text-zinc-400 hover:underline ml-3"
                       >
                         Keep order
                       </button>
@@ -655,7 +655,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                   ) : (
                     <button
                       onClick={() => setConfirmCancel(true)}
-                      className="font-rajdhani text-xs text-red-500 hover:text-red-700 hover:underline"
+                      className="font-rajdhani text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:underline"
                     >
                       Cancel order
                     </button>
@@ -671,25 +671,25 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
       {!isExpelled && !activeOrder && (
         <>
           {(!jerseyName || !jerseyNumber || jerseyNumber.trim() === '') ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <p className="font-rajdhani text-stone-700 text-sm">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+              <p className="font-rajdhani text-stone-700 dark:text-zinc-300 text-sm">
                 Complete your jersey details on your profile before placing an order.{' '}
-                <a href="/profile" className="text-amber-600 font-semibold hover:text-amber-700">
+                <a href="/profile" className="text-amber-600 dark:text-amber-400 font-semibold hover:text-amber-700 dark:hover:text-amber-400">
                   Go to profile
                 </a>
               </p>
             </div>
           ) : (
-            <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4">
-              <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-4">
+            <div className="bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-4">
+              <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-4">
                 Place an Order
               </p>
               <form onSubmit={handleSubmitOrder} className="flex flex-col gap-4">
 
                 {/* Jersey Name input */}
                 <div className="flex flex-col gap-1">
-                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 flex items-center gap-1">
-                    Jersey Name <span className="text-stone-400 normal-case font-normal tracking-normal">✏️</span>
+                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 flex items-center gap-1">
+                    Jersey Name <span className="text-stone-400 dark:text-zinc-500 normal-case font-normal tracking-normal">✏️</span>
                   </label>
                   <input
                     type="text"
@@ -701,13 +701,13 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                       }
                     }}
                     maxLength={10}
-                    className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
+                    className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
                   />
-                  <span className="font-rajdhani text-xs text-stone-400">
+                  <span className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                     {nameInput.length}/10
                   </span>
                   {nameChanged && (
-                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer mt-0.5">
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer mt-0.5">
                       <input
                         type="checkbox"
                         checked={updateProfileName}
@@ -721,8 +721,8 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
 
                 {/* Jersey Number input */}
                 <div className="flex flex-col gap-1">
-                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 flex items-center gap-1">
-                    Jersey Number <span className="text-stone-400 normal-case font-normal tracking-normal">✏️</span>
+                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 flex items-center gap-1">
+                    Jersey Number <span className="text-stone-400 dark:text-zinc-500 normal-case font-normal tracking-normal">✏️</span>
                   </label>
                   <input
                     type="text"
@@ -737,13 +737,13 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                     pattern="[0-9]{1,3}"
                     maxLength={3}
                     inputMode="numeric"
-                    className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none w-28"
+                    className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none w-28"
                   />
-                  <span className="font-rajdhani text-xs text-stone-400">
+                  <span className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                     1–3 digits, leading zeros allowed (e.g. 07)
                   </span>
                   {numberChanged && (
-                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer mt-0.5">
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer mt-0.5">
                       <input
                         type="checkbox"
                         checked={updateProfileNumber}
@@ -758,19 +758,19 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                 {/* Apparel selection */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                    <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">
                       Apparel Selection
                     </span>
                     <button
                       type="button"
                       onClick={() => window.open('https://www.tyka.com/sizechart', '_blank', 'noopener,noreferrer')}
-                      className="font-rajdhani text-xs text-amber-600 hover:text-amber-700 hover:underline underline-offset-2"
+                      className="font-rajdhani text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-400 hover:underline underline-offset-2"
                     >
                       Size guide ↗
                     </button>
                   </div>
                   <div className="flex items-center gap-1">
-                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer">
                       <input type="checkbox" checked={halfSleeve}
                         onChange={e => {
                           setHalfSleeve(e.target.checked)
@@ -783,7 +783,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                     )}
                   </div>
                   <div className="flex items-center gap-1">
-                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer">
                       <input type="checkbox" checked={fullSleeve}
                         onChange={e => {
                           setFullSleeve(e.target.checked)
@@ -796,7 +796,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                     )}
                   </div>
                   <div className="flex items-center gap-1">
-                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 cursor-pointer">
+                    <label className="flex items-center gap-2 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 cursor-pointer">
                       <input type="checkbox" checked={addTracks}
                         onChange={e => {
                           setAddTracks(e.target.checked)
@@ -810,22 +810,22 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                   </div>
                   {anySleeveChecked && (
                     <div className="flex flex-col gap-1 mt-1">
-                      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">
                         Jersey Size
                       </label>
                       <select value={sleeveSize} onChange={e => setSleeveSize(e.target.value)}
-                        className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
+                        className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
                         {JERSEY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                   )}
                   {addTracks && (
                     <div className="flex flex-col gap-1 mt-1">
-                      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                      <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">
                         Tracks Size
                       </label>
                       <select value={tracksSize} onChange={e => setTracksSize(e.target.value)}
-                        className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
+                        className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none">
                         {JERSEY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
@@ -833,7 +833,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                 </div>
                 {/* Notes */}
                 <div className="flex flex-col gap-1">
-                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500">
+                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">
                     Notes <span className="normal-case font-normal">(optional)</span>
                   </label>
                   <textarea
@@ -842,12 +842,12 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
                     maxLength={500}
                     rows={3}
                     placeholder="Any special requests…"
-                    className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none resize-none placeholder:text-stone-400"
+                    className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none resize-none placeholder:text-stone-400 dark:placeholder:text-zinc-500"
                   />
                 </div>
 
                 {formError && (
-                  <p className="font-rajdhani text-sm text-red-600">{formError}</p>
+                  <p className="font-rajdhani text-sm text-red-600 dark:text-red-400">{formError}</p>
                 )}
 
                 <button
@@ -868,7 +868,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
         <div>
           <button
             onClick={() => setPastOpen(v => !v)}
-            className="text-amber-600 text-sm font-rajdhani hover:text-amber-700 transition-colors"
+            className="text-amber-600 dark:text-amber-400 text-sm font-rajdhani hover:text-amber-700 dark:hover:text-amber-400 transition-colors"
           >
             {pastOpen ? 'Hide past orders' : `View past orders (${pastOrders.length})`}
           </button>
@@ -876,7 +876,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
             <div className="mt-3 flex flex-col gap-2">
               {pastOrders.map(o => (
                 <div key={o.id} className="flex flex-col gap-0.5">
-                  <p className="font-rajdhani text-stone-600 text-sm font-semibold">
+                  <p className="font-rajdhani text-stone-600 dark:text-zinc-400 text-sm font-semibold">
                     {o.jersey_name_override ?? o.jersey_name} · #{o.jersey_number_override ?? o.jersey_number} · {formatDate(o.created_at)}
                   </p>
                   <OrderItems order={o} />
@@ -892,7 +892,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
         <div>
           <button
             onClick={() => setCancelledOpen(v => !v)}
-            className="text-red-400 text-sm font-rajdhani hover:text-red-600 transition-colors"
+            className="text-red-400 text-sm font-rajdhani hover:text-red-600 dark:hover:text-red-400 transition-colors"
           >
             {cancelledOpen ? 'Hide cancelled orders' : `View cancelled orders (${cancelledOrders.length})`}
           </button>
@@ -901,7 +901,7 @@ export function KitRoomClient({ orders, batchDate, jerseyName, jerseyNumber, isE
               {cancelledOrders.map(o => (
                 <div key={o.id} className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-rajdhani text-stone-500 text-sm">
+                    <p className="font-rajdhani text-stone-500 dark:text-zinc-400 text-sm">
                       {o.jersey_name_override ?? o.jersey_name} · #{o.jersey_number_override ?? o.jersey_number} · {formatDate(o.created_at)}
                     </p>
                     <span className={`font-rajdhani text-xs font-semibold px-2.5 py-0.5 rounded ${STATUS_BADGE.cancelled}`}>

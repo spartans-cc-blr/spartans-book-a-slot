@@ -47,17 +47,17 @@ export function Dialog({ open, onClose, title, children, actions, closeOnOverlay
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'dialog-title' : undefined}
-        className="relative bg-ink-2 border border-gold-dim rounded-lg shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto"
+        className="relative bg-white dark:bg-ink-2 border border-gold-dim rounded-lg shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto"
       >
         {title && (
-          <div className="px-5 py-4 border-b border-ink-5 flex items-start justify-between gap-4">
-            <h2 id="dialog-title" className="font-cinzel text-base font-semibold text-parchment">
+          <div className="px-5 py-4 border-b border-[#D4C9B0] dark:border-ink-5 flex items-start justify-between gap-4">
+            <h2 id="dialog-title" className="font-cinzel text-base font-semibold text-[#1C1917] dark:text-parchment">
               {title}
             </h2>
             <button
               onClick={onClose}
               aria-label="Close"
-              className="text-zinc-500 hover:text-parchment transition-colors text-xl leading-none -mt-0.5"
+              className="text-[#78716C] dark:text-zinc-500 hover:text-[#1C1917] dark:hover:text-parchment transition-colors text-xl leading-none -mt-0.5"
             >
               ×
             </button>
@@ -65,7 +65,7 @@ export function Dialog({ open, onClose, title, children, actions, closeOnOverlay
         )}
         <div className="px-5 py-5">{children}</div>
         {actions && (
-          <div className="px-5 py-4 border-t border-ink-5 flex items-center justify-end gap-3">
+          <div className="px-5 py-4 border-t border-[#D4C9B0] dark:border-ink-5 flex items-center justify-end gap-3">
             {actions}
           </div>
         )}

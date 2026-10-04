@@ -16,7 +16,7 @@ export function GearDetailShare({ listingId }: { listingId: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="border border-[#D4C9B0] text-stone-600 font-rajdhani text-xs px-3 py-1 rounded hover:bg-parchment-3 self-start"
+      className="border border-[#D4C9B0] dark:border-ink-5 text-stone-600 dark:text-zinc-400 font-rajdhani text-xs px-3 py-1 rounded hover:bg-parchment-3 dark:hover:bg-ink-4 self-start"
     >
       {copied ? 'Copied!' : 'Copy Link'}
     </button>

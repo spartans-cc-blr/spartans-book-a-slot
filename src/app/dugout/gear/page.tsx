@@ -38,11 +38,11 @@ export default async function GearExchangePage() {
   }
 
   return (
-    <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-parchment dark:bg-ink">
       <SiteNav activePage="dugout" />
-      <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
+      <main className="px-4 py-8 bg-parchment dark:bg-ink">
         <div className="max-w-3xl mx-auto">
-          <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Gear Exchange</h1>
+          <h1 className="font-cinzel font-bold text-2xl text-stone-900 dark:text-parchment mb-6">Gear Exchange</h1>
           <GearExchangeClient
             listings={listings}
             playerId={String(player.playerId)}

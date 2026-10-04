@@ -172,17 +172,17 @@ export default function BookingBackfillPage() {
   return (
     <div className="max-w-xl">
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-gold">Booking Backfill</h1>
-        <p className="font-rajdhani text-sm text-zinc-500 mt-1">
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Booking Backfill</h1>
+        <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 mt-1">
           For a match that was actually played but never got a Hub booking at all — not the same as
           &ldquo;Scorecard Backfill&rdquo;, which only re-syncs an already-existing booking. Enter the
           CricHeroes match_id to preview what would be created before anything is written.
         </p>
       </div>
 
-      <div className="bg-ink-3 border border-ink-5 rounded p-4 space-y-3">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 space-y-3">
         <div>
-          <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">
+          <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
             CricHeroes match_id
           </label>
           <div className="flex gap-2 mt-1">
@@ -190,33 +190,33 @@ export default function BookingBackfillPage() {
               value={matchId}
               onChange={e => setMatchId(e.target.value)}
               placeholder="e.g. 22422538"
-              className="flex-1 bg-ink-4 border border-ink-5 rounded px-3 py-2 font-rajdhani text-sm text-zinc-200"
+              className="flex-1 bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200"
             />
             <button
               onClick={runPreview}
               disabled={previewing || !matchId.trim()}
-              className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-4 py-2 rounded transition-colors">
+              className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/20 disabled:opacity-40 px-4 py-2 rounded transition-colors">
               {previewing ? 'Fetching…' : 'Preview'}
             </button>
           </div>
         </div>
 
-        {error && <p className="font-rajdhani text-sm text-red-400">{error}</p>}
-        {success && <p className="font-rajdhani text-sm text-emerald-400">{success}</p>}
+        {error && <p className="font-rajdhani text-sm text-red-700 dark:text-red-400">{error}</p>}
+        {success && <p className="font-rajdhani text-sm text-emerald-700 dark:text-emerald-400">{success}</p>}
 
         {preview && (
-          <div className="bg-ink-4 border border-ink-5 rounded p-3 space-y-2">
-            <p className="font-rajdhani text-sm text-zinc-300">
-              <span className="text-zinc-500">Date:</span> {preview.game_date ?? '⚠ could not parse'} ·{' '}
-              <span className="text-zinc-500">vs</span> {preview.opponent_name ?? 'unknown'}
+          <div className="bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded p-3 space-y-2">
+            <p className="font-rajdhani text-sm text-[#44403C] dark:text-zinc-300">
+              <span className="text-[#78716C] dark:text-zinc-500">Date:</span> {preview.game_date ?? '⚠ could not parse'} ·{' '}
+              <span className="text-[#78716C] dark:text-zinc-500">vs</span> {preview.opponent_name ?? 'unknown'}
             </p>
-            <p className="font-rajdhani text-sm text-zinc-400">
+            <p className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">
               {preview.ground && <>Ground: {preview.ground} · </>}
               {preview.match_type && <>Type: {preview.match_type} · </>}
               Result: {preview.match_result ?? 'unknown'}
             </p>
             {preview.tournament_name && (
-              <p className="font-rajdhani text-xs text-zinc-600">CricHeroes tournament tag: {preview.tournament_name}</p>
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">CricHeroes tournament tag: {preview.tournament_name}</p>
             )}
 
             {(() => {
@@ -226,13 +226,13 @@ export default function BookingBackfillPage() {
               return (
                 <>
                   {likelyBugs.length > 0 && (
-                    <p className="font-rajdhani text-xs text-red-400">
+                    <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">
                       ⚠ Credited with a wicket in the opponent&apos;s dismissals but their own bowling row is empty —
                       near-certain extraction bug: {likelyBugs.map(f => f.player).join(', ')}
                     </p>
                   )}
                   {probablyFine.length > 0 && (
-                    <p className="font-rajdhani text-xs text-zinc-600">
+                    <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">
                       On the roster with no bowling figures and not credited with any wicket — most likely just
                       didn&apos;t bowl this match, not flagged as a bug: {probablyFine.map(f => f.player).join(', ')}
                     </p>
@@ -242,28 +242,28 @@ export default function BookingBackfillPage() {
             })()}
 
             {(preview.player_stats || preview.team_lists) && (
-              <details className="font-rajdhani text-xs text-zinc-500">
-                <summary className="cursor-pointer hover:text-zinc-300">Raw player_stats / team_lists (debug)</summary>
-                <pre className="mt-1 max-h-64 overflow-auto bg-ink-3 border border-ink-5 rounded p-2 text-[11px] leading-snug whitespace-pre-wrap">
+              <details className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
+                <summary className="cursor-pointer hover:text-[#44403C] dark:hover:text-zinc-300">Raw player_stats / team_lists (debug)</summary>
+                <pre className="mt-1 max-h-64 overflow-auto bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-2 text-[11px] leading-snug whitespace-pre-wrap">
                   {JSON.stringify({ team_lists: preview.team_lists, player_stats: preview.player_stats }, null, 2)}
                 </pre>
               </details>
             )}
 
             {!preview.game_date ? (
-              <p className="font-rajdhani text-xs text-amber-400">
+              <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400">
                 No parseable date — this match can&apos;t be backfilled from here.
               </p>
             ) : (
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div>
-                  <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-zinc-500">
+                  <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
                     Tournament
                   </label>
                   <select
                     value={tournamentId}
                     onChange={e => setTournamentId(e.target.value)}
-                    className="w-full bg-ink-3 border border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-zinc-200 mt-1">
+                    className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
                     <option value="">Select…</option>
                     {tournaments.map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
@@ -271,24 +271,24 @@ export default function BookingBackfillPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-zinc-500">
+                  <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
                     Format
                   </label>
                   <select
                     value={format}
                     onChange={e => setFormat(e.target.value as typeof FORMATS[number])}
-                    className="w-full bg-ink-3 border border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-zinc-200 mt-1">
+                    className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
                     {FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-zinc-500">
-                    Slot label <span className="text-zinc-700">(display only — not a real reservation)</span>
+                  <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                    Slot label <span className="text-[#78716C] dark:text-zinc-700">(display only — not a real reservation)</span>
                   </label>
                   <select
                     value={slotTime}
                     onChange={e => setSlotTime(e.target.value as typeof SLOT_TIMES[number])}
-                    className="w-full bg-ink-3 border border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-zinc-200 mt-1">
+                    className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
                     {SLOT_TIMES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
@@ -298,7 +298,7 @@ export default function BookingBackfillPage() {
             <button
               onClick={confirmBackfill}
               disabled={confirming || !tournamentId || !preview.game_date}
-              className="w-full mt-2 font-rajdhani text-sm font-bold tracking-widest uppercase bg-emerald-950/40 border border-emerald-800 text-emerald-400 hover:bg-emerald-950/60 disabled:opacity-40 px-4 py-2 rounded transition-colors">
+              className="w-full mt-2 font-rajdhani text-sm font-bold tracking-widest uppercase bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 disabled:opacity-40 px-4 py-2 rounded transition-colors">
               {confirming ? 'Creating…' : 'Create Booking & Sync'}
             </button>
           </div>

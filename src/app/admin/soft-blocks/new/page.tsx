@@ -122,24 +122,24 @@ export default function NewSoftBlockPage() {
   return (
     <div className="max-w-lg">
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-gold">Soft Block Slots</h1>
-        <p className="font-rajdhani text-zinc-500 text-sm mt-1">
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Soft Block Slots</h1>
+        <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">
           Reserve one or more slots for internal use. Organisers will see them as unavailable.
         </p>
       </div>
 
       {created ? (
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 space-y-4">
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 space-y-4">
           {conflict ? (
             <div className="bg-gold/5 border border-gold-dim rounded px-4 py-4 space-y-3">
-              <p className="font-rajdhani text-sm font-bold text-gold">
+              <p className="font-rajdhani text-sm font-bold text-amber-700 dark:text-gold">
                 ⚠️ Earlier slot already taken that day
               </p>
-              <div className="bg-ink-4 border border-ink-5 rounded px-3 py-2 font-rajdhani text-sm text-zinc-300">
+              <div className="bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 font-rajdhani text-sm text-[#44403C] dark:text-zinc-300">
                 {conflict.slot_time} · {conflict.tournament_name ?? 'Another booking'}
                 {conflict.opponent_name ? ` vs ${conflict.opponent_name}` : ''}
               </div>
-              <p className="font-rajdhani text-xs text-zinc-500">
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
                 The knockout hold was still created — but knockouts take precedence, so it's worth asking
                 this match's organiser to move it later the same day rather than leaving both in place.
               </p>
@@ -150,8 +150,8 @@ export default function NewSoftBlockPage() {
               </a>
             </div>
           ) : (
-            <div className="bg-emerald-950/40 border border-emerald-800 rounded px-4 py-4">
-              <p className="font-rajdhani text-sm font-bold text-emerald-400">
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded px-4 py-4">
+              <p className="font-rajdhani text-sm font-bold text-emerald-700 dark:text-emerald-400">
                 ✅ Knockout hold reserved — day protected from this slot onward.
               </p>
             </div>
@@ -164,7 +164,7 @@ export default function NewSoftBlockPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 space-y-4">
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 space-y-4">
 
           {/* Date */}
           <div>
@@ -178,7 +178,7 @@ export default function NewSoftBlockPage() {
               <label className="form-label mb-0">Time Slot{isKnockout ? '' : 's'}</label>
               {!isKnockout && (
                 <button onClick={toggleAll}
-                  className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors">
+                  className="font-rajdhani text-xs text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors">
                   {allSelected ? '✕ Deselect All' : '✓ Select All'}
                 </button>
               )}
@@ -190,10 +190,10 @@ export default function NewSoftBlockPage() {
                   <button key={t} onClick={() => toggleSlot(t)}
                     className={`flex items-center gap-3 px-4 py-3 rounded border text-left transition-all
                       ${selected
-                        ? 'border-crimson bg-crimson/10 text-parchment'
-                        : 'border-ink-5 bg-ink-4 text-zinc-500 hover:border-zinc-600'}`}>
+                        ? 'border-crimson bg-crimson/10 text-[#1C1917] dark:text-parchment'
+                        : 'border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4 text-[#78716C] dark:text-zinc-500 hover:border-[#D4C9B0] dark:hover:border-zinc-600'}`}>
                     <span className={`w-4 h-4 rounded-sm border flex-shrink-0 flex items-center justify-center text-[10px] font-bold
-                      ${selected ? 'bg-crimson border-crimson text-white' : 'border-zinc-600'}`}>
+                      ${selected ? 'bg-crimson border-crimson text-white' : 'border-[#D4C9B0] dark:border-zinc-600'}`}>
                       {selected ? '✓' : ''}
                     </span>
                     <div>
@@ -204,12 +204,12 @@ export default function NewSoftBlockPage() {
               })}
             </div>
             {slotTimes.length > 0 && (
-              <p className="font-rajdhani text-xs text-zinc-600 mt-2">
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-2">
                 {slotTimes.length} slot{slotTimes.length > 1 ? 's' : ''} selected — {slotTimes.sort().join(', ')}
               </p>
             )}
             {isKnockout && (
-              <p className="font-rajdhani text-xs text-zinc-600 mt-2">
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-2">
                 A knockout hold is one specific game — pick a single slot.
               </p>
             )}
@@ -217,7 +217,7 @@ export default function NewSoftBlockPage() {
 
           {/* Reason */}
           <div>
-            <label className="form-label">Reason <span className="text-zinc-700">(internal only)</span></label>
+            <label className="form-label">Reason <span className="text-[#78716C] dark:text-zinc-700">(internal only)</span></label>
             <select value={blockReason} onChange={e => handleReasonChange(e.target.value)} className="form-input">
               {BLOCK_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
@@ -244,7 +244,7 @@ export default function NewSoftBlockPage() {
                 </select>
               </div>
               {tournamentName && (
-                <p className="col-span-2 font-rajdhani text-xs text-zinc-600">
+                <p className="col-span-2 font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">
                   Will be tagged and linked to <span className="text-gold-dim font-semibold">{tournamentName}</span>.
                 </p>
               )}
@@ -261,22 +261,22 @@ export default function NewSoftBlockPage() {
 
           {/* What organisers see */}
           <div className="bg-gold/5 border border-gold-dim rounded px-4 py-3">
-            <p className="font-rajdhani text-xs font-bold text-gold mb-1">What organisers will see</p>
-            <p className="font-rajdhani text-xs text-zinc-500">
-              Selected slots will show as <span className="text-red-400 font-bold">Unavailable</span> on
+            <p className="font-rajdhani text-xs font-bold text-amber-700 dark:text-gold mb-1">What organisers will see</p>
+            <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
+              Selected slots will show as <span className="text-red-700 dark:text-red-400 font-bold">Unavailable</span> on
               the public schedule. No reason is displayed. You can release them anytime from the dashboard.
             </p>
           </div>
 
           {error && (
-            <div className="bg-red-950 border border-red-800 text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
+            <div className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
               {error}
             </div>
           )}
 
           <div className="flex gap-3 justify-end pt-1">
             <button onClick={() => router.push('/admin')}
-              className="font-rajdhani text-sm font-bold border border-ink-5 text-zinc-500 hover:text-zinc-300 px-5 py-2.5 rounded transition-colors">
+              className="font-rajdhani text-sm font-bold border border-[#D4C9B0] dark:border-ink-5 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 px-5 py-2.5 rounded transition-colors">
               Cancel
             </button>
             <button onClick={handleSubmit}

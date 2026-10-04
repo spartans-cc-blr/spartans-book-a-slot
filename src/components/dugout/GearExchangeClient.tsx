@@ -32,13 +32,13 @@ function PlayerLink({ name, cricHeroesUrl }: { name: string; cricHeroesUrl: stri
         href={cricHeroesUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-rajdhani text-sm text-amber-700 font-semibold hover:underline underline-offset-2"
+        className="font-rajdhani text-sm text-amber-700 dark:text-amber-400 font-semibold hover:underline underline-offset-2"
       >
         {name}
       </a>
     )
   }
-  return <span className="font-rajdhani text-sm text-stone-700 font-semibold">{name}</span>
+  return <span className="font-rajdhani text-sm text-stone-700 dark:text-zinc-300 font-semibold">{name}</span>
 }
 
 function formatDate(iso: string): string {
@@ -49,13 +49,13 @@ function formatDate(iso: string): string {
 function TypeBadge({ type }: { type: GearType }) {
   if (type === 'for_sale') {
     return (
-      <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded bg-stone-100 text-stone-700 border border-stone-200">
+      <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded bg-stone-100 dark:bg-ink-4 text-stone-700 dark:text-zinc-300 border border-stone-200 dark:border-ink-5">
         For Sale
       </span>
     )
   }
   return (
-    <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">
+    <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
       Wanted
     </span>
   )
@@ -63,9 +63,9 @@ function TypeBadge({ type }: { type: GearType }) {
 
 function ConditionBadge({ condition }: { condition: GearCondition }) {
   const styles: Record<GearCondition, string> = {
-    new: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-    good: 'bg-blue-50 text-blue-700 border border-blue-200',
-    fair: 'bg-amber-50 text-amber-700 border border-amber-200',
+    new: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
+    good: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
+    fair: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
   }
   return (
     <span className={`font-rajdhani text-xs font-semibold px-2 py-0.5 rounded ${styles[condition]}`}>
@@ -88,7 +88,7 @@ function ShareButton({ listingId }: { listingId: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="border border-[#D4C9B0] text-stone-600 font-rajdhani text-xs px-3 py-1 rounded hover:bg-parchment-3"
+      className="border border-[#D4C9B0] dark:border-ink-5 text-stone-600 dark:text-zinc-400 font-rajdhani text-xs px-3 py-1 rounded hover:bg-parchment-3 dark:hover:bg-ink-4"
     >
       {copied ? 'Copied!' : 'Copy Link'}
     </button>
@@ -109,7 +109,7 @@ function GearCard({
   const canRemove = isAdmin || (listing.poster_id != null && listing.poster_id === playerId)
 
   return (
-    <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4 flex flex-col gap-2">
+    <div className="bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-4 flex flex-col gap-2">
       <div className="flex flex-wrap gap-2 items-center">
         <TypeBadge type={listing.type} />
         {listing.type === 'for_sale' && listing.condition && (
@@ -117,20 +117,20 @@ function GearCard({
         )}
       </div>
 
-      <h3 className="font-cinzel font-semibold text-stone-900 text-base leading-snug">
+      <h3 className="font-cinzel font-semibold text-stone-900 dark:text-parchment text-base leading-snug">
         {listing.title}
       </h3>
 
-      <p className="font-rajdhani text-sm text-stone-700">{listing.description}</p>
+      <p className="font-rajdhani text-sm text-stone-700 dark:text-zinc-300">{listing.description}</p>
 
-      <div className="flex items-center gap-1 text-xs text-stone-500 font-rajdhani">
+      <div className="flex items-center gap-1 text-xs text-stone-500 dark:text-zinc-400 font-rajdhani">
         <span>Posted by</span>
        <PlayerLink 
         name={listing.poster_name || 'Unknown'} 
         cricHeroesUrl={listing.poster_cricheroes_url} 
         />
         <span className="mx-1">·</span>
-        <span className="text-stone-400">{formatDate(listing.created_at)}</span>
+        <span className="text-stone-400 dark:text-zinc-500">{formatDate(listing.created_at)}</span>
       </div>
 
       <div className="flex items-center gap-3 mt-1">
@@ -138,7 +138,7 @@ function GearCard({
         {canRemove && (
           <button
             onClick={() => onDeactivate(listing.id)}
-            className="text-red-600 font-rajdhani text-xs hover:underline"
+            className="text-red-600 dark:text-red-400 font-rajdhani text-xs hover:underline"
           >
             Remove
           </button>
@@ -241,16 +241,16 @@ export function GearExchangeClient({ listings, playerId, isExpelled, isAdmin }: 
           {showForm && (
             <form
               onSubmit={handleSubmit}
-              className="mt-4 bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4 flex flex-col gap-4"
+              className="mt-4 bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-4 flex flex-col gap-4"
             >
               {/* Type */}
               <div>
-                <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-2">
+                <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-2">
                   Type
                 </p>
                 <div className="flex gap-4">
                   {(['for_sale', 'wanted'] as GearType[]).map((t) => (
-                    <label key={t} className="flex items-center gap-2 cursor-pointer font-rajdhani text-sm text-stone-700">
+                    <label key={t} className="flex items-center gap-2 cursor-pointer font-rajdhani text-sm text-stone-700 dark:text-zinc-300">
                       <input
                         type="radio"
                         name="type"
@@ -271,13 +271,13 @@ export function GearExchangeClient({ listings, playerId, isExpelled, isAdmin }: 
               {/* Condition — only for for_sale */}
               {formType === 'for_sale' && (
                 <div>
-                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-1 block">
+                  <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-1 block">
                     Condition
                   </label>
                   <select
                     value={formCondition}
                     onChange={(e) => setFormCondition(e.target.value as GearCondition)}
-                    className="font-rajdhani text-sm text-stone-900 bg-parchment border border-[#D4C9B0] rounded px-3 py-2 w-full"
+                    className="font-rajdhani text-sm text-stone-900 dark:text-parchment bg-parchment dark:bg-ink border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 w-full"
                   >
                     <option value="new">New</option>
                     <option value="good">Good</option>
@@ -288,7 +288,7 @@ export function GearExchangeClient({ listings, playerId, isExpelled, isAdmin }: 
 
               {/* Title */}
               <div>
-                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-1 block">
+                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-1 block">
                   Title
                 </label>
                 <input
@@ -299,13 +299,13 @@ export function GearExchangeClient({ listings, playerId, isExpelled, isAdmin }: 
                   maxLength={100}
                   required
                   placeholder="e.g. Kookaburra bat, size 6"
-                  className="font-rajdhani text-sm text-stone-900 bg-parchment border border-[#D4C9B0] rounded px-3 py-2 w-full placeholder:text-stone-400"
+                  className="font-rajdhani text-sm text-stone-900 dark:text-parchment bg-parchment dark:bg-ink border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 w-full placeholder:text-stone-400 dark:placeholder:text-zinc-500"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-1 block">
+                <label className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-1 block">
                   Description
                 </label>
                 <textarea
@@ -316,12 +316,12 @@ export function GearExchangeClient({ listings, playerId, isExpelled, isAdmin }: 
                   required
                   rows={4}
                   placeholder="Add details — size, price, pickup location, etc."
-                  className="font-rajdhani text-sm text-stone-900 bg-parchment border border-[#D4C9B0] rounded px-3 py-2 w-full resize-none placeholder:text-stone-400"
+                  className="font-rajdhani text-sm text-stone-900 dark:text-parchment bg-parchment dark:bg-ink border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 w-full resize-none placeholder:text-stone-400 dark:placeholder:text-zinc-500"
                 />
               </div>
 
               {formError && (
-                <p className="font-rajdhani text-sm text-red-600">{formError}</p>
+                <p className="font-rajdhani text-sm text-red-600 dark:text-red-400">{formError}</p>
               )}
 
               <button
@@ -345,7 +345,7 @@ export function GearExchangeClient({ listings, playerId, isExpelled, isAdmin }: 
             className={`font-rajdhani font-semibold text-sm px-4 py-1.5 rounded transition-colors ${
               activeTab === tab.value
                 ? 'bg-amber-600 text-white'
-                : 'bg-parchment-3 text-stone-700 hover:bg-[#D4C9B0]'
+                : 'bg-parchment-3 dark:bg-ink-4 text-stone-700 dark:text-zinc-300 hover:bg-[#D4C9B0] dark:hover:bg-ink-5'
             }`}
           >
             {tab.label}
@@ -355,7 +355,7 @@ export function GearExchangeClient({ listings, playerId, isExpelled, isAdmin }: 
 
       {/* Section C — Listings grid */}
       {filteredListings.length === 0 ? (
-        <p className="font-rajdhani text-stone-500 text-sm text-center py-8">
+        <p className="font-rajdhani text-stone-500 dark:text-zinc-400 text-sm text-center py-8">
           No listings yet. Be the first to post one.
         </p>
       ) : (

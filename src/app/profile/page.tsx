@@ -260,10 +260,10 @@ export default function ProfilePage() {
 
   if (sessionStatus === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-ink grain">
+      <div className="min-h-screen bg-parchment dark:bg-ink grain">
         <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
         <div className="px-5 py-8 space-y-3 animate-pulse max-w-2xl mx-auto mt-8">
-          {[0, 1, 2].map(i => <div key={i} className="h-16 bg-ink-3 rounded border border-ink-5" />)}
+          {[0, 1, 2].map(i => <div key={i} className="h-16 bg-white dark:bg-ink-3 rounded border border-[#D4C9B0] dark:border-ink-5" />)}
         </div>
       </div>
     )
@@ -271,9 +271,9 @@ export default function ProfilePage() {
 
   if (!player?.playerId || player?.playerStatus === 'expelled') {
     return (
-      <div className="min-h-screen bg-ink grain">
+      <div className="min-h-screen bg-parchment dark:bg-ink grain">
         <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
-        <div className="px-5 py-12 text-center font-rajdhani text-zinc-500">
+        <div className="px-5 py-12 text-center font-rajdhani text-[#78716C] dark:text-zinc-500">
           {player?.playerStatus === 'expelled' ? 'Account suspended.' : 'Profile not available.'}
         </div>
       </div>
@@ -283,11 +283,11 @@ export default function ProfilePage() {
   const hasDues = profile && profile.wallet_balance < 0
 
   return (
-    <div className="min-h-screen bg-ink grain">
+    <div className="min-h-screen bg-parchment dark:bg-ink grain">
       <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
       {/* ── Dashboard Stats ── */}
               {dashboard && (
-                <section aria-labelledby="dashboard-heading" className="bg-ink-1 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-5">
+                <section aria-labelledby="dashboard-heading" className="bg-parchment dark:bg-ink-1 border-b border-[#E2DACE] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-5">
                   <h2 id="dashboard-heading" className="sr-only">Your dashboard</h2>
                   <div className="max-w-2xl space-y-3">
 
@@ -296,16 +296,16 @@ export default function ProfilePage() {
                       <Link href="/wallet"
                         aria-label="View full wallet statement"
                         className={`rounded-lg border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
-                        (profile?.wallet_balance ?? 0) < 0 ? 'bg-amber-950/30 border-amber-800/60 hover:border-amber-600' : 'bg-ink-2 border-ink-5 hover:border-gold-dim'
+                        (profile?.wallet_balance ?? 0) < 0 ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300/60 dark:border-amber-800/60 hover:border-amber-600' : 'bg-white dark:bg-ink-2 border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim'
                       }`}>
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="text-base leading-none" aria-hidden="true">💰</span>
-                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500">Wallet</p>
+                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500">Wallet</p>
                         </div>
-                        <p className={`font-cinzel text-lg font-bold ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        <p className={`font-cinzel text-lg font-bold ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
                           ₹{profile?.wallet_balance ?? 0}
                         </p>
-                        <p className={`font-rajdhani text-xs mt-0.5 ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-500' : 'text-zinc-500'}`}>
+                        <p className={`font-rajdhani text-xs mt-0.5 ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-500' : 'text-[#78716C] dark:text-zinc-500'}`}>
                           {(profile?.wallet_balance ?? 0) < 0 ? 'Dues outstanding' : 'Balance'}
                         </p>
                       </Link>
@@ -317,17 +317,17 @@ export default function ProfilePage() {
                           : 'All matches marked — go to Fixtures'}
                         className={`rounded-lg border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
                           dashboard.pendingCount > 0
-                            ? 'bg-amber-950/30 border-amber-800/60 hover:border-amber-600'
-                            : 'bg-ink-2 border-ink-5 hover:border-gold-dim'
+                            ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300/60 dark:border-amber-800/60 hover:border-amber-600'
+                            : 'bg-white dark:bg-ink-2 border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim'
                         }`}>
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="text-base leading-none" aria-hidden="true">{dashboard.pendingCount > 0 ? '⚠️' : '✅'}</span>
-                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500">Pending</p>
+                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500">Pending</p>
                         </div>
-                        <p className={`font-cinzel text-lg font-bold ${dashboard.pendingCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        <p className={`font-cinzel text-lg font-bold ${dashboard.pendingCount > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
                           {dashboard.pendingCount}
                         </p>
-                        <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">
+                        <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-0.5">
                           {dashboard.pendingCount > 0 ? 'Need response' : 'All marked ✓'}
                         </p>
                       </Link>
@@ -335,13 +335,13 @@ export default function ProfilePage() {
                       {/* Upcoming fixtures */}
                       <Link href="/fixtures"
                         aria-label={`${dashboard.upcomingCount} upcoming confirmed matches — go to Fixtures`}
-                        className="rounded-lg border bg-ink-2 border-ink-5 px-4 py-3 transition-colors hover:border-gold-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+                        className="rounded-lg border bg-white dark:bg-ink-2 border-[#D4C9B0] dark:border-ink-5 px-4 py-3 transition-colors hover:border-gold-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="text-base leading-none" aria-hidden="true">🏏</span>
-                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500">Fixtures</p>
+                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500">Fixtures</p>
                         </div>
-                        <p className="font-cinzel text-lg font-bold text-parchment">{dashboard.upcomingCount}</p>
-                        <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">Upcoming</p>
+                        <p className="font-cinzel text-lg font-bold text-[#1C1917] dark:text-parchment">{dashboard.upcomingCount}</p>
+                        <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-0.5">Upcoming</p>
                       </Link>
                     </div>
 
@@ -349,18 +349,18 @@ export default function ProfilePage() {
                     {dashboard.nextMatch && (
                       <Link href={`/fixtures/${dashboard.nextMatch.id}`}
                         aria-label={`Next match: ${dashboard.nextMatch.opponent_name ? `versus ${dashboard.nextMatch.opponent_name}` : dashboard.nextMatch.tournament?.name ?? 'TBD'} on ${new Date(dashboard.nextMatch.game_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} at ${dashboard.nextMatch.slot_time}. ${dashboard.nextMatchResponse ? `Your response: ${dashboard.nextMatchResponse}` : 'Response not yet marked'}`}
-                        className="block rounded-lg border border-ink-5 bg-ink-2 px-4 py-3 hover:border-gold/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+                        className="block rounded-lg border border-[#D4C9B0] dark:border-ink-5 bg-white dark:bg-ink-2 px-4 py-3 hover:border-gold/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500 mb-0.5 flex items-center gap-1.5">
+                            <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500 mb-0.5 flex items-center gap-1.5">
                               <span aria-hidden="true">📅</span> Next Match
                             </p>
-                            <p className="font-rajdhani text-sm font-semibold text-parchment truncate">
+                            <p className="font-rajdhani text-sm font-semibold text-[#1C1917] dark:text-parchment truncate">
                               {dashboard.nextMatch.opponent_name
                                 ? `vs ${dashboard.nextMatch.opponent_name}`
                                 : dashboard.nextMatch.tournament?.name ?? 'TBD'}
                             </p>
-                            <p className="font-rajdhani text-xs text-zinc-500">
+                            <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
                               {new Date(dashboard.nextMatch.game_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                               {' · '}{dashboard.nextMatch.slot_time}
                             </p>
@@ -368,16 +368,16 @@ export default function ProfilePage() {
                           <div className="flex-shrink-0">
                             {dashboard.nextMatchResponse ? (
                               <span className={`font-rajdhani text-xs font-bold px-2.5 py-1 rounded border ${
-                                dashboard.nextMatchResponse === 'Y' ? 'bg-emerald-950/50 border-emerald-700 text-emerald-400' :
-                                dashboard.nextMatchResponse === 'N' ? 'bg-red-950/50 border-red-800 text-red-400' :
-                                dashboard.nextMatchResponse === 'O' ? 'bg-blue-950/50 border-blue-800 text-blue-400' :
-                                dashboard.nextMatchResponse === 'E' ? 'bg-purple-950/50 border-purple-800 text-purple-400' :
-                                'bg-zinc-900 border-zinc-700 text-zinc-400'
+                                dashboard.nextMatchResponse === 'Y' ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400' :
+                                dashboard.nextMatchResponse === 'N' ? 'bg-red-50 dark:bg-red-950/50 border-red-300 dark:border-red-800 text-red-700 dark:text-red-400' :
+                                dashboard.nextMatchResponse === 'O' ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-400' :
+                                dashboard.nextMatchResponse === 'E' ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-400' :
+                                'bg-white dark:bg-zinc-900 border-[#D4C9B0] dark:border-zinc-700 text-[#57534E] dark:text-zinc-400'
                               }`}>
                                 {dashboard.nextMatchResponse}
                               </span>
                             ) : (
-                              <span className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded border bg-amber-950/40 border-amber-700 text-amber-400">
+                              <span className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded border bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400">
                                 Mark →
                               </span>
                             )}
@@ -390,29 +390,29 @@ export default function ProfilePage() {
                 </section>
               )}
       {/* Hero */}
-      <div className="bg-ink-2 border-b border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
+      <div className="bg-white dark:bg-ink-2 border-b border-[#E2DACE] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
-        <p className="text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
+        <p className="text-amber-700 dark:text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
           <span className="w-4 h-px bg-gold inline-block" />
           My Profile
         </p>
-        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-parchment mb-1 tracking-wide">
+        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-[#1C1917] dark:text-parchment mb-1 tracking-wide">
           {profile?.name ?? player.playerName}
         </h1>
         <div className="flex items-center gap-2 mt-1">
           {profile?.is_captain && (
-            <span className="font-rajdhani text-[10px] font-bold bg-gold/10 border border-gold-dim text-gold px-2 py-0.5 rounded">
+            <span className="font-rajdhani text-[10px] font-bold bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold px-2 py-0.5 rounded">
               CAPTAIN
             </span>
           )}
           {profile?.status === 'active' && (
-            <span className="font-rajdhani text-[10px] font-bold bg-emerald-950 border border-emerald-800 text-emerald-400 px-2 py-0.5 rounded">
+            <span className="font-rajdhani text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">
               ACTIVE
             </span>
           )}
           {profile?.inducted_on && (
-            <span className="font-rajdhani text-xs text-zinc-600">
+            <span className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">
               Member since {new Date(profile.inducted_on).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
             </span>
           )}
@@ -420,13 +420,13 @@ export default function ProfilePage() {
         <div className="flex items-center flex-wrap gap-3 mt-3">
           {player?.playerId && (
             <Link href={`/players/${player.playerId}/stats`}
-              className="inline-flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold hover:text-ink px-3 py-1.5 rounded transition-colors">
+              className="inline-flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold hover:text-ink px-3 py-1.5 rounded transition-colors">
               📊 View Full Stats
             </Link>
           )}
           {profile?.cricheroes_url && (
             <a href={profile.cricheroes_url} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 font-rajdhani text-xs text-zinc-500 hover:text-gold underline decoration-dotted underline-offset-2 transition-colors">
+              className="inline-flex items-center gap-1.5 font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold underline decoration-dotted underline-offset-2 transition-colors">
               View on CricHeroes ↗
             </a>
           )}
@@ -436,8 +436,8 @@ export default function ProfilePage() {
       <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
 
         {/* ── PHOTO ── */}
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">Profile Photo</h2>
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
+          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Profile Photo</h2>
           <div className="flex items-center gap-5">
             <div className="relative flex-shrink-0">
               <Link href={player?.playerId ? `/players/${player.playerId}/stats` : '#'}>
@@ -455,10 +455,10 @@ export default function ProfilePage() {
             </div>
             <div>
               <button onClick={() => fileInputRef.current?.click()}
-                className="font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold px-4 py-2 rounded transition-colors mb-2 block">
+                className="font-rajdhani text-xs font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim text-[#57534E] dark:text-zinc-400 hover:text-amber-700 dark:hover:text-gold px-4 py-2 rounded transition-colors mb-2 block">
                 {photoFile ? '✓ Photo selected — save to upload' : 'Choose Photo'}
               </button>
-              <p className="font-rajdhani text-[10px] text-zinc-600">
+              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600">
                 JPG, PNG or WebP · Max 5MB · Square crop recommended
               </p>
               <input
@@ -473,18 +473,18 @@ export default function ProfilePage() {
         </div>
 
         {/* ── READ-ONLY INFO ── */}
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">Club Details</h2>
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
+          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Club Details</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <ReadOnlyField label="Full Name" value={profile?.name} />
             <ReadOnlyField label="Club Gmail" value={profile?.gmail_id} />
             <div>
               <label className="form-label">Wallet Balance</label>
-              <p className={`font-rajdhani font-bold text-sm ${hasDues ? 'text-amber-400' : 'text-parchment'}`}>
+              <p className={`font-rajdhani font-bold text-sm ${hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-[#1C1917] dark:text-parchment'}`}>
                 ₹{profile?.wallet_balance ?? 0}
                 {hasDues && <span className="font-normal text-amber-600 ml-2">(dues outstanding)</span>}
               </p>
-              <Link href="/wallet" className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors inline-block mt-1">
+              <Link href="/wallet" className="font-rajdhani text-xs text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors inline-block mt-1">
                 💰 View Full Statement →
               </Link>
             </div>
@@ -497,7 +497,7 @@ export default function ProfilePage() {
               <button
                 onClick={subscribeToPush}
                 disabled={pushSubscribed || pushLoading}
-                className="font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded transition-colors"
+                className="font-rajdhani text-xs font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim text-[#57534E] dark:text-zinc-400 hover:text-amber-700 dark:hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded transition-colors"
               >
                 {pushLoading
                   ? (pushSubscribed ? 'Disabling...' : 'Enabling...')
@@ -511,43 +511,43 @@ export default function ProfilePage() {
                 <button
                   onClick={unsubscribeFromPush}
                   disabled={pushLoading}
-                  className="font-rajdhani text-xs font-bold text-zinc-500 hover:text-crimson underline disabled:opacity-50"
+                  className="font-rajdhani text-xs font-bold text-[#78716C] dark:text-zinc-500 hover:text-crimson underline disabled:opacity-50"
                 >
                   Unsubscribe
                 </button>
               )}
             </div>
             {!pushSubscribed && pushServerSubscribed && !pushLoading && (
-              <p className="font-rajdhani text-[11px] text-amber-400 mt-1.5">
+              <p className="font-rajdhani text-[11px] text-amber-700 dark:text-amber-400 mt-1.5">
                 We have a notification subscription on file for you, but this device/browser has lost it
                 (common on iPhone if the Hub icon hasn't been opened in a while) — tap above to refresh it.
               </p>
             )}
             {pushSuccess && (
-              <p className="font-rajdhani text-[11px] text-emerald-400 mt-1.5">You'll be notified when you're selected in a squad.</p>
+              <p className="font-rajdhani text-[11px] text-emerald-700 dark:text-emerald-400 mt-1.5">You'll be notified when you're selected in a squad.</p>
             )}
             {pushError && (
               <p className="font-rajdhani text-[11px] text-crimson mt-1.5">{pushError}</p>
             )}
           </div>
-          <p className="font-rajdhani text-[10px] text-zinc-700 mt-3 italic">
+          <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-700 mt-3 italic">
             Name, email and wallet balance are managed by the admin. Contact Muthu to update these.
           </p>
         </div>
 
         {/* ── MY STATS ── */}
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-cinzel text-sm text-gold font-semibold">My Stats</h2>
+            <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold">My Stats</h2>
             {player?.playerId && (
               <Link href={`/players/${player.playerId}/stats`}
-                className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold hover:bg-gold hover:text-ink px-3 py-1.5 rounded transition-colors">
+                className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold hover:text-ink px-3 py-1.5 rounded transition-colors">
                 Full Stats →
               </Link>
             )}
           </div>
           {!stats || stats.career.matches === 0 ? (
-            <p className="font-rajdhani text-sm text-zinc-500">No stats yet.</p>
+            <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">No stats yet.</p>
           ) : (
             <div className="grid sm:grid-cols-2 gap-4">
               <StatsColumn title="Career" totals={stats.career} />
@@ -557,8 +557,8 @@ export default function ProfilePage() {
         </div>
 
         {/* ── EDITABLE FIELDS ── */}
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">Personal Details</h2>
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
+          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Personal Details</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">WhatsApp Number</label>
@@ -569,12 +569,12 @@ export default function ProfilePage() {
                 placeholder="e.g. 919876543210"
                 className="form-input"
               />
-              <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">Include country code</p>
+              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">Include country code</p>
             </div>
             <div>
               <label className="form-label">Date of Birth</label>
               <DobInput value={dob} onChange={setDob} />
-              <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
+              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">
                 Year is optional — day and month are enough for birthday wishes 🎂
               </p>
             </div>
@@ -589,8 +589,8 @@ export default function ProfilePage() {
         </div>
 
         {/* ── JERSEY ── */}
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">Jersey</h2>
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
+          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Jersey</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">Jersey Name</label>
@@ -601,7 +601,7 @@ export default function ProfilePage() {
                 placeholder="e.g. MUTHU"
                 className="form-input uppercase"
               />
-              <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">Name printed on the back</p>
+              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">Name printed on the back</p>
             </div>
             <div>
               <label className="form-label">Jersey Number</label>
@@ -633,8 +633,8 @@ export default function ProfilePage() {
           </div>
         )}
         {/* ── SKILLS ── */}
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">Playing Skills</h2>
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
+          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Playing Skills</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">Primary Skill</label>
@@ -654,8 +654,8 @@ export default function ProfilePage() {
         </div>
 
         {/* ── CRICHEROES ── */}
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-6">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">CricHeroes</h2>
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-6">
+          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">CricHeroes</h2>
           <div>
             <label className="form-label">CricHeroes Profile URL</label>
             <input
@@ -665,13 +665,13 @@ export default function ProfilePage() {
               placeholder="https://chshare.link/..."
               className="form-input"
             />
-            <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
+            <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">
               Open your CricHeroes profile → Share → paste the link here
             </p>
           </div>
           {cricheroes && (
             <a href={cricheroes} target="_blank" rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1.5 font-rajdhani text-xs text-zinc-500 hover:text-gold transition-colors">
+              className="mt-2 inline-flex items-center gap-1.5 font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold transition-colors">
               Test link ↗
             </a>
           )}
@@ -679,12 +679,12 @@ export default function ProfilePage() {
 
         {/* ── ERROR / SUCCESS ── */}
         {error && (
-          <div className="bg-red-950 border border-red-800 text-red-400 font-rajdhani text-sm px-4 py-3 rounded mb-4">
+          <div className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 font-rajdhani text-sm px-4 py-3 rounded mb-4">
             {error}
           </div>
         )}
         {success && (
-          <div className="bg-emerald-950 border border-emerald-800 text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded mb-4">
+          <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded mb-4">
             ✓ Profile updated successfully.
           </div>
         )}
@@ -692,7 +692,7 @@ export default function ProfilePage() {
         {/* ── SAVE ── */}
         <div className="flex gap-3 justify-between items-center">
           <BackButton fallbackHref="/" fallbackLabel="Home"
-            className="!text-zinc-500 hover:!text-zinc-300 border border-ink-5 px-4 py-2.5 rounded font-normal" />
+            className="!text-zinc-500 hover:!text-zinc-300 border border-[#D4C9B0] dark:border-ink-5 px-4 py-2.5 rounded font-normal" />
           <button
             onClick={handleSave}
             disabled={saving || uploadingPhoto}
@@ -703,7 +703,7 @@ export default function ProfilePage() {
 
       </div>
 
-      <footer className="border-t border-ink-4 py-5 text-center font-rajdhani text-xs text-zinc-600 mt-8">
+      <footer className="border-t border-[#E2DACE] dark:border-ink-4 py-5 text-center font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-8">
         © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
       </footer>
     </div>
@@ -714,7 +714,7 @@ function ReadOnlyField({ label, value }: { label: string; value: string | null |
   return (
     <div>
       <label className="form-label">{label}</label>
-      <p className="font-rajdhani text-sm text-zinc-400">{value ?? '—'}</p>
+      <p className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{value ?? '—'}</p>
     </div>
   )
 }
@@ -723,8 +723,8 @@ function StatsColumn({ title, totals }: { title: string; totals: PlayerStatsTota
   if (totals.matches === 0) {
     return (
       <div>
-        <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">{title}</p>
-        <p className="font-rajdhani text-xs text-zinc-600">No matches.</p>
+        <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-600 mb-2">{title}</p>
+        <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">No matches.</p>
       </div>
     )
   }
@@ -739,12 +739,12 @@ function StatsColumn({ title, totals }: { title: string; totals: PlayerStatsTota
   ]
   return (
     <div>
-      <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">{title}</p>
+      <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-600 mb-2">{title}</p>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between border-b border-ink-5 pb-1">
-            <span className="font-rajdhani text-xs text-zinc-500">{label}</span>
-            <span className="font-cinzel text-sm font-bold text-parchment">{value}</span>
+          <div key={label} className="flex items-baseline justify-between border-b border-[#D4C9B0] dark:border-ink-5 pb-1">
+            <span className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">{label}</span>
+            <span className="font-cinzel text-sm font-bold text-[#1C1917] dark:text-parchment">{value}</span>
           </div>
         ))}
       </div>
