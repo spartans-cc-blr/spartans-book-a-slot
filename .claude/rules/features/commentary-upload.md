@@ -110,3 +110,10 @@ The page and `CommentaryClient` follow the Light/Dark/System toggle: Warm Light 
 ## Commentary needed panel
 
 The page shows which matches still lack commentary (from the analytics `match_coverage` view) with CricHeroes links and an Upload shortcut. See `cricket-intelligence-foundation.md` §6.
+
+
+## Over-by-over preview and "Spartans" in opponent names (October 2026)
+
+The "Over by over" preview on the upload form shows the bowler only for the **opponent batting** innings (our bowlers). For **Spartans batting** it shows the runs and wickets of each over by our batters together, plus the running score, since the opposition bowler per over isn't useful there.
+
+The microservice's side check (`is_spartans()` in `spartans-python/utils/commentary_store.py`) used to match any team containing "spartans", so an opponent called "CG Spartans" was rejected as "Spartans batting". It now requires the name to start with "spartans" and not to closely match the booked opponent.
