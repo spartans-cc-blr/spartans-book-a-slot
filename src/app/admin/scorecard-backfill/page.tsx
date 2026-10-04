@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
+import { MonthStepper, distinctMonths, monthOfDate } from '@/components/ui/MonthStepper'
 import { groupDatesIntoChips } from '@/lib/dateChipGroups'
 
 interface Booking {
@@ -101,6 +102,7 @@ export default function ScorecardBackfillPage() {
 
   const [matchIdQuery, setMatchIdQuery] = useState('')
   const [dayFilter, setDayFilter] = useState<string | null>(null)
+  const [monthFilter, setMonthFilter] = useState('')
 
   function load() {
     setLoading(true)
@@ -140,18 +142,32 @@ export default function ScorecardBackfillPage() {
   // page works with (no cursor/"Load Older" needed here). Reverse-
   // chronological so the most recently played matches — the ones most
   // likely to need a backfill/re-run — lead the row.
+  // The month stepper narrows the list (and so the chip row) to one month
+  // first; '' = All time. A stale month (one the Match ID search has since
+  // emptied) falls back to All time rather than showing nothing.
+  const months = useMemo(() => distinctMonths(matchIdFiltered.map(b => b.game_date)), [matchIdFiltered])
+  const activeMonth = months.includes(monthFilter) ? monthFilter : ''
+  const monthFiltered = useMemo(
+    () => activeMonth ? matchIdFiltered.filter(b => monthOfDate(b.game_date) === activeMonth) : matchIdFiltered,
+    [matchIdFiltered, activeMonth]
+  )
   const distinctDates = useMemo(
-    () => Array.from(new Set(matchIdFiltered.map(b => b.game_date))).sort(),
-    [matchIdFiltered]
+    () => Array.from(new Set(monthFiltered.map(b => b.game_date))).sort(),
+    [monthFiltered]
   )
   const dateChipGroups = useMemo(() => groupDatesIntoChips(distinctDates).reverse(), [distinctDates])
   const selectedGroup = dayFilter ? dateChipGroups.find(g => g.key === dayFilter) : undefined
 
   const filtered = useMemo(() => {
-    if (!dayFilter || !selectedGroup) return matchIdFiltered
+    if (!dayFilter || !selectedGroup) return monthFiltered
     const dateSet = new Set(selectedGroup.dates)
-    return matchIdFiltered.filter(b => dateSet.has(b.game_date))
-  }, [matchIdFiltered, dayFilter, selectedGroup])
+    return monthFiltered.filter(b => dateSet.has(b.game_date))
+  }, [monthFiltered, dayFilter, selectedGroup])
+
+  function changeMonth(month: string) {
+    setMonthFilter(month)
+    setDayFilter(null) // a chip from the previous month can't still be selected
+  }
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -305,6 +321,7 @@ export default function ScorecardBackfillPage() {
 
           {dateChipGroups.length > 0 && (
             <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-xl p-3 mb-4">
+              <MonthStepper months={months} value={activeMonth} onChange={changeMonth} />
               <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={setDayFilter} />
             </div>
           )}

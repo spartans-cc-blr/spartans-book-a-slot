@@ -640,6 +640,26 @@ same as `FixturesCard` did before its own later conversion — see
 
 ---
 
+## 10.1.1 Month stepper above every date-chip slider (added October 2026)
+
+Rule: **wherever a `DateChipSlider` is shown, a month stepper sits directly
+above it.** `/matches/history` and the admin dashboard's Past tab already had
+one (server-scoped month fetch, `MatchHistoryClient.tsx` /
+`DashboardBookingsTabs.tsx`). The other three slider surfaces now share a new
+controlled component, `src/components/ui/MonthStepper.tsx` (‹ month ▾ › plus a
+year-grouped picker, `--fx-*` tokens so it follows Light/Dark/System; helpers
+`distinctMonths()` / `monthOfDate()`):
+
+| Surface | How the month narrows it |
+|---|---|
+| `/fixtures` (`FixturesDateFilterBar.tsx`) | Chip row filtered to groups with any date in the month; list hidden via `[data-dates]:not([data-dates*="YYYY-MM-"])` (a Sat/Sun weekend straddling a month boundary shows under both). Picking a chip uses the existing per-date rule instead. |
+| `/admin/scorecard-backfill` | Client-side filter between the Match ID search and the chip row; a month the search has emptied falls back to All time. |
+| `/wrangler/commentary` (`CommentaryClient.tsx`) | Narrows chips and the match dropdown; switching month re-selects a visible match; "Upload" from the needed list resets month and day. |
+
+All three default to **All time** (no behaviour change until used), changing
+month clears the selected chip, and ‹ / › are disabled while All time is
+selected, matching `/matches/history`.
+
 ## 10.2 "Matches" — Fixtures + Match History merged into one bottom tab (added September 2026)
 
 The mobile bottom tab bar originally shipped with "Fixtures" and "Matches"
@@ -746,6 +766,7 @@ itself (out of scope here — shared with Match History) was not touched.
 |---|---|
 | `src/app/fixtures/page.tsx` | Server component — fetches bookings, availability, squads; groups by `validationGroupKey`; renders `FixturesWeekendGroup` per group, each wrapped in a `data-dates` div for §10.1's date-chip filter; theme-aware via `--fx-*` CSS vars (§10.3) |
 | `src/components/fixtures/FixturesDateFilterBar.tsx` | Date-chip quick filter (§10.1) — wraps the weekend-group list, toggles visibility via a CSS attribute-substring rule; never touches `FixturesWeekendGroup`'s own state; wrapper panel theme-aware via `--fx-*` CSS vars (§10.3) |
+| `src/components/ui/MonthStepper.tsx` | Shared month stepper shown above every date-chip slider (§10.1.1) |
 | `src/components/ui/DateChipSlider.tsx` | Shared Warm Light date-chip row — controlled component, also used by `/matches/history` (`features/post-match-scorecard.md` §16) |
 | `src/components/matches/MatchesSegmentedTabs.tsx` | Shared "Upcoming / Past Matches" pill control (§10.2) — plain server component, rendered on both `/fixtures` and `/matches/history` |
 | `src/app/fixtures/[id]/page.tsx` | Single match share page — same squad fetch pattern as fixtures page |
