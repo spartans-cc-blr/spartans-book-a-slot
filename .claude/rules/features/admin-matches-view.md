@@ -20,8 +20,15 @@ it stays Sat/Sun only. Weekday games are visible in the List view.
 Tabs: **Upcoming**, **Needs action**, **Past**.
 
 - **Needs action** (`GET /api/admin/bookings/needs-action`, admin-only): past
-  confirmed games from the last 60 days (`NEEDS_ACTION_DAYS`) that still have
-  a scorecard, sync or fee step. The tab label shows the count.
+  confirmed games from the last 14 days (`NEEDS_ACTION_DAYS`) that still have
+  a scorecard, sync or fee step. The tab label shows the count. Fees are
+  applied within a week, so older items are data problems, not to-dos: use
+  Scorecard Backfill or the Past tab search.
+- **Past tab search** (`?q=` on `/api/admin/bookings/past`): matches opponent,
+  match ID, tournament name or captain across **all months** (the month
+  stepper is ignored while searching; PostgREST-significant characters are
+  stripped from the term). Rows of confirmed games with no CricHeroes URL show
+  a small "no link" marker; fix it via Edit. No opponent column (declined).
 - Every row shows a **Next** chip from `computeNextStep()`
   (`src/lib/matchNextStep.ts`), shared by the Past tab and Needs action so
   they cannot disagree: `Flagged` (stats discrepancy) → `Scorecard missing` /

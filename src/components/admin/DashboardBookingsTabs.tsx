@@ -22,6 +22,8 @@ export interface DashboardBookingRow {
   apply_fee_eligible?: boolean
   // What this past match needs next (scorecard / sync / fee) — null when nothing.
   next_step?: NextStep | null
+  // Confirmed game with no CricHeroes URL on the booking (Past / Needs action).
+  missing_link?: boolean
 }
 
 // A single malformed game_date (e.g. a mistyped year) must never crash the
@@ -82,6 +84,12 @@ function BookingsTable({ bookings, emptyLabel }: { bookings: DashboardBookingRow
                   {b.status === 'soft_block'
                     ? (b.tournament_name ? `${b.block_reason} — ${b.tournament_name}` : b.block_reason)
                     : b.tournament_name ?? '—'}
+                  {b.missing_link && (
+                    <span title="No CricHeroes link on this booking — open Edit to add it"
+                      className="ml-1.5 font-rajdhani text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-500">
+                      no link
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={b.status} />
@@ -163,13 +171,24 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
   const [truncated, setTruncated]   = useState(false)
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState('')
+  // Search spans all months (opponent, match ID, tournament, captain); while
+  // it is active the month stepper is ignored by the server. Debounced.
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch]           = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim().length >= 2 ? searchInput.trim() : ''), 350)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError('')
     setDayFilter(null) // a new month/all-time selection can't still contain the previously-picked date
-    const qs = monthFilter ? `?month=${monthFilter}` : ''
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    else if (monthFilter) params.set('month', monthFilter)
+    const qs = params.toString() ? `?${params}` : ''
     fetch(`/api/admin/bookings/past${qs}`)
       .then(res => res.json())
       .then(data => {
@@ -184,7 +203,7 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthFilter])
+  }, [monthFilter, search])
 
   // months is sorted most-recent-first, so index 0 is newest. "Older" moves
   // toward the end of the array, "newer" moves toward index 0. Both arrows
@@ -219,7 +238,23 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
 
   return (
     <div className="space-y-3">
-      {months.length > 0 && (
+      <div className="relative">
+        <input
+          type="search"
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          placeholder="Search all past matches — opponent, tournament, captain or match ID"
+          aria-label="Search past matches"
+          className="w-full font-rajdhani text-sm bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 text-[#1C1917] dark:text-parchment placeholder:text-[#A8A29E] dark:placeholder:text-zinc-600 focus:outline-none focus:border-gold-dim"
+        />
+      </div>
+      {search && (
+        <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
+          Showing matches for “{search}” across all months.{' '}
+          <button onClick={() => setSearchInput('')} className="text-amber-700 dark:text-gold underline">Clear search</button>
+        </p>
+      )}
+      {months.length > 0 && !search && (
         <div>
           <div className="flex items-center gap-2 bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded-full px-2 py-1.5">
             <button
@@ -289,7 +324,7 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
       )}
       {!loading && !error && bookings.length === 0 && (
         <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600 text-center py-6">
-          {monthFilter ? (
+          {search ? `No past matches found for “${search}”.` : monthFilter ? (
             <>
               No past bookings for {monthChipLabel(monthFilter)}.{' '}
               <button onClick={() => setMonthFilter('')} className="text-amber-700 dark:text-gold underline">
@@ -355,13 +390,13 @@ export function DashboardBookingsTabs({
   const [needs, setNeeds] = useState<DashboardBookingRow[]>([])
   const [needsLoading, setNeedsLoading] = useState(true)
   const [needsError, setNeedsError] = useState('')
-  const [needsWindow, setNeedsWindow] = useState(60)
+  const [needsWindow, setNeedsWindow] = useState(14)
   useEffect(() => {
     fetch('/api/admin/bookings/needs-action')
       .then(r => r.json())
       .then(d => {
         if (d.error) setNeedsError(d.error)
-        else { setNeeds(d.bookings ?? []); setNeedsWindow(d.windowDays ?? 60) }
+        else { setNeeds(d.bookings ?? []); setNeedsWindow(d.windowDays ?? 14) }
       })
       .catch(() => setNeedsError('Network error'))
       .finally(() => setNeedsLoading(false))

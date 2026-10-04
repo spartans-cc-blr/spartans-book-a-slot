@@ -38,6 +38,7 @@ export function computeNextStep(b: NextStepInput): NextStep | null {
   return { kind: 'no_scorecard', label: 'Scorecard missing' }
 }
 
-// How far back "Needs action" looks. Older history is the scorecard-backfill
-// page's job; listing months of backlog here would bury what's recent.
-export const NEEDS_ACTION_DAYS = 60
+// How far back "Needs action" looks. Match fees are applied within a week,
+// so anything older is a scorecard/data issue (Scorecard Backfill, or the
+// Past tab's search), not a to-do; listing it here would bury what's recent.
+export const NEEDS_ACTION_DAYS = 14

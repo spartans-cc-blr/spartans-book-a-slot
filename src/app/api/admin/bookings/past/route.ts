@@ -52,7 +52,7 @@ async function requireAdmin() {
 }
 
 const tournamentSelect = `
-  id, game_date, slot_time, format, status, block_reason, tournament_id, match_id, is_practice,
+  id, game_date, slot_time, format, status, block_reason, tournament_id, match_id, is_practice, cricheroes_url, opponent_name,
   tournament:tournaments!bookings_tournament_id_fkey(
     id, name, is_practice, captains!tournaments_captain_id_fkey(id, name)
   )
@@ -83,6 +83,28 @@ export async function GET(req: NextRequest) {
   const months = Array.from(monthSet).sort((a, b) => b.localeCompare(a)) // most recent first
   const totalCount = monthRows?.length ?? 0
 
+  // ?q= searches opponent, match ID, tournament name or captain across ALL
+  // months (the month stepper is ignored while searching). Characters that
+  // are significant in a PostgREST filter string are stripped, never passed on.
+  const q = (req.nextUrl.searchParams.get('q') ?? '').replace(/[,()%*\\]/g, ' ').trim().slice(0, 60)
+  let searchFilter: string | null = null
+  if (q.length >= 2) {
+    const [{ data: tByName }, { data: cByName }] = await Promise.all([
+      supabase.from('tournaments').select('id').ilike('name', `%${q}%`).limit(100),
+      supabase.from('captains').select('id').ilike('name', `%${q}%`).limit(50),
+    ])
+    const capIds = (cByName ?? []).map((c: any) => c.id)
+    const { data: tByCap } = capIds.length
+      ? await supabase.from('tournaments').select('id').in('captain_id', capIds).limit(100)
+      : { data: [] as { id: string }[] }
+    const tIds = Array.from(new Set([...(tByName ?? []), ...(tByCap ?? [])].map((t: any) => t.id)))
+    searchFilter = [
+      `opponent_name.ilike.%${q}%`,
+      `match_id.ilike.%${q}%`,
+      ...(tIds.length ? [`tournament_id.in.(${tIds.join(',')})`] : []),
+    ].join(',')
+  }
+
   let query = supabase
     .from('bookings')
     .select(tournamentSelect)
@@ -92,7 +114,9 @@ export async function GET(req: NextRequest) {
     .order('slot_time', { ascending: false })
     .limit(MONTH_LIMIT)
 
-  if (monthMatch) {
+  if (searchFilter) {
+    query = query.or(searchFilter)
+  } else if (monthMatch) {
     query = query
       .gte('game_date', `${monthMatch[0]}-01`)
       .lt('game_date', `${nextMonthStr(monthMatch[0])}-01`)
@@ -129,13 +153,14 @@ export async function GET(req: NextRequest) {
     tournament_name:    b.tournament?.name ?? null,
     apply_fee_eligible: next?.kind === 'fee_due',
     next_step:          next,
+    missing_link:       b.status === 'confirmed' && !b.cricheroes_url,
   }})
 
   // Only "All time" (no month picked) can realistically hit MONTH_LIMIT —
   // any single calendar month is nowhere near it. Surfaced explicitly
   // rather than silently returning a short list, so this can never repeat
   // the original "(100)" bug's mistake of an invisible cap.
-  const truncated = !monthMatch && rows.length === MONTH_LIMIT
+  const truncated = (!monthMatch || !!searchFilter) && rows.length === MONTH_LIMIT
 
-  return NextResponse.json({ bookings: rows, months, totalCount, truncated })
+  return NextResponse.json({ bookings: rows, months, totalCount, truncated, searched: !!searchFilter })
 }

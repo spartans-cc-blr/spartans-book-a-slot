@@ -23,7 +23,7 @@ export async function GET() {
   const { data: bookings, error } = await supabase
     .from('bookings')
     .select(`
-      id, game_date, slot_time, format, status, block_reason, match_id, is_practice,
+      id, game_date, slot_time, format, status, block_reason, match_id, is_practice, cricheroes_url,
       tournament:tournaments!bookings_tournament_id_fkey(
         id, name, is_practice, captains!tournaments_captain_id_fkey(id, name)
       )
@@ -61,6 +61,7 @@ export async function GET() {
       tournament_name: b.tournament?.name ?? null,
       apply_fee_eligible: next.kind === 'fee_due',
       next_step: next,
+      missing_link: !b.cricheroes_url,
     })
   }
   return NextResponse.json({ bookings: rows, windowDays: NEEDS_ACTION_DAYS })
