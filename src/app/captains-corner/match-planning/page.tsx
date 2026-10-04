@@ -127,7 +127,7 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
       <SiteNav activePage="captains-planning" back={{ fallbackHref: '/captains-corner', label: 'Squad Selection' }} />
 
       <div className="bg-[var(--stats-card-bg)] border-b border-[var(--stats-card-border)] px-5 md:px-8 lg:px-10 py-7">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl">
           <p className="text-[var(--stats-accent)] text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-1">Captains&rsquo; Corner</p>
           <h1 className="font-cinzel text-xl md:text-2xl font-bold text-[var(--stats-text)] tracking-wide">Match Planning</h1>
           <p className={`font-rajdhani text-sm ${muted} mt-1 max-w-xl`}>
@@ -153,7 +153,7 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
         </div>
       </div>
 
-      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-4xl mx-auto space-y-4">
+      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-4xl space-y-4">
         {!sel ? (
           <div className={`${card} text-center`}><p className={`font-rajdhani text-sm ${muted}`}>No upcoming confirmed game with an opponent set.</p></div>
         ) : (

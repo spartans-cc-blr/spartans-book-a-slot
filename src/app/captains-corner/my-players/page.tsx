@@ -75,7 +75,7 @@ export default async function MyPlayersPage({
       <SiteNav activePage="captains-players" back={{ fallbackHref: '/captains-corner', label: 'Squad Selection' }} />
 
       <div className="bg-[var(--stats-card-bg)] border-b border-[var(--stats-card-border)] px-5 md:px-8 lg:px-10 py-7">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl">
           <p className="text-[var(--stats-accent)] text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-1 flex items-center gap-2">
             <span className="w-4 h-px bg-[var(--stats-accent)] inline-block" />
             Captains&rsquo; Corner
@@ -93,7 +93,7 @@ export default async function MyPlayersPage({
         </div>
       </div>
 
-      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-3xl mx-auto">
+      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-3xl">
         {!captainId || allRows.length === 0 ? (
           <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-6 text-center">
             <p className="font-rajdhani text-sm text-[var(--stats-text-muted)]">

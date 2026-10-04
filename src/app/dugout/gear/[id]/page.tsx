@@ -100,8 +100,8 @@ export default async function GearDetailPage({
   return (
     <div className="min-h-screen bg-parchment dark:bg-ink">
       <SiteNav activePage="dugout" back={{ fallbackHref: '/dugout/gear', label: 'Gear Exchange' }} />
-      <main className="px-4 py-8 bg-parchment dark:bg-ink">
-        <div className="max-w-2xl mx-auto">
+      <main className="px-5 md:px-8 lg:px-10 py-8 bg-parchment dark:bg-ink">
+        <div className="max-w-2xl">
 
           {notFound || !listing ? (
             <div className="bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-6 text-center">

@@ -40,8 +40,8 @@ export default async function GearExchangePage() {
   return (
     <div className="min-h-screen bg-parchment dark:bg-ink">
       <SiteNav activePage="dugout" />
-      <main className="px-4 py-8 bg-parchment dark:bg-ink">
-        <div className="max-w-3xl mx-auto">
+      <main className="px-5 md:px-8 lg:px-10 py-8 bg-parchment dark:bg-ink">
+        <div className="max-w-2xl">
           <h1 className="font-cinzel font-bold text-2xl text-stone-900 dark:text-parchment mb-6">Gear Exchange</h1>
           <GearExchangeClient
             listings={listings}
