@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
+import { MonthStepper, distinctMonths, monthOfDate } from '@/components/ui/MonthStepper'
 import { groupDatesIntoChips } from '@/lib/dateChipGroups'
 import {
   COMMENTARY_SIDES, SIDE_LABEL, validateCommentaryPdf, matchesNeedingCommentary,
@@ -34,6 +35,7 @@ const STATUS_TEXT: Record<string, string> = {
 export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[] }) {
   const [bookingId, setBookingId] = useState(matches[0]?.booking_id ?? '')
   const [dayFilter, setDayFilter] = useState<string | null>(null)
+  const [monthFilter, setMonthFilter] = useState('')
   const [sides, setSides] = useState<Record<CommentarySide, SideState>>({
     spartans: EMPTY, opponent: EMPTY,
   })
@@ -43,17 +45,30 @@ export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[]
   }
 
   // Date chips, same picker as the match history: narrows the dropdown to those dates.
+  // A month stepper sits above the chips and narrows both to one month ('' = All time).
+  const months = useMemo(() => distinctMonths(matches.map(m => m.game_date)), [matches])
+  const monthMatches = useMemo(
+    () => monthFilter ? matches.filter(m => monthOfDate(m.game_date) === monthFilter) : matches,
+    [matches, monthFilter],
+  )
   const dateChipGroups = useMemo(
-    () => groupDatesIntoChips(Array.from(new Set(matches.map(m => m.game_date))).sort()).reverse(),
-    [matches],
+    () => groupDatesIntoChips(Array.from(new Set(monthMatches.map(m => m.game_date))).sort()).reverse(),
+    [monthMatches],
   )
   const selectedGroup = dayFilter ? dateChipGroups.find(g => g.key === dayFilter) : undefined
-  const visibleMatches = selectedGroup ? matches.filter(m => selectedGroup.dates.includes(m.game_date)) : matches
+  const visibleMatches = selectedGroup ? monthMatches.filter(m => selectedGroup.dates.includes(m.game_date)) : monthMatches
 
   function changeDay(key: string | null) {
     setDayFilter(key)
     const group = key ? dateChipGroups.find(g => g.key === key) : undefined
-    const next = group ? matches.filter(m => group.dates.includes(m.game_date)) : matches
+    const next = group ? monthMatches.filter(m => group.dates.includes(m.game_date)) : monthMatches
+    if (!next.some(m => m.booking_id === bookingId) && next[0]) changeMatch(next[0].booking_id)
+  }
+
+  function changeMonth(month: string) {
+    setMonthFilter(month)
+    setDayFilter(null)
+    const next = month ? matches.filter(m => monthOfDate(m.game_date) === month) : matches
     if (!next.some(m => m.booking_id === bookingId) && next[0]) changeMatch(next[0].booking_id)
   }
 
@@ -117,6 +132,7 @@ export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[]
 
   function pickFromList(id: string) {
     setDayFilter(null)
+    setMonthFilter('')
     changeMatch(id)
     document.getElementById('commentary-match')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
@@ -159,13 +175,14 @@ export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[]
 
       {dateChipGroups.length > 0 && (
         <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-xl p-3">
+          <MonthStepper months={months} value={monthFilter} onChange={changeMonth} />
           <DateChipSlider groups={dateChipGroups} selected={dayFilter} onSelect={changeDay} />
         </div>
       )}
 
       <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4">
         <label className="form-label" htmlFor="commentary-match">
-          Match <span className="text-[#78716C] dark:text-zinc-500 font-normal">({visibleMatches.length}{dayFilter ? ` of ${matches.length}` : ''})</span>
+          Match <span className="text-[#78716C] dark:text-zinc-500 font-normal">({visibleMatches.length}{dayFilter || monthFilter ? ` of ${matches.length}` : ''})</span>
         </label>
         <select id="commentary-match" className="form-input bg-white dark:bg-zinc-900 border-[#D4C9B0] dark:border-zinc-700 text-[#1C1917] dark:text-zinc-100" value={bookingId}
           onChange={e => changeMatch(e.target.value)}>
