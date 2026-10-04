@@ -353,8 +353,13 @@ export default async function FixturesPage() {
                 return { key: dates[0], dates }
               })}
             />
-            {weekendOrder.map(wk => (
-              <div key={wk} data-dates={Array.from(new Set(weekendMap[wk].map(b => b.game_date))).sort().join(',')}>
+            {weekendOrder.map((wk, idx) => (
+              <div
+                key={wk}
+                data-dates={Array.from(new Set(weekendMap[wk].map(b => b.game_date))).sort().join(',')}
+                className={idx > 0 ? 'mt-2 pt-6 border-t' : undefined}
+                style={idx > 0 ? { borderColor: 'var(--fx-border)' } : undefined}
+              >
                 <FixturesWeekendGroup
                   isPlayer={isPlayer}
                   isCaptain={isCaptain}
