@@ -156,6 +156,9 @@ export interface SlotInfo {
   cricheroes_url?:  string | null
   tournament_name?: string | null
   format?: GameFormat | null
+  // Admin calendar only (/api/availability?admin=1, session-checked)
+  booking_id?:      string
+  block_reason?:    string | null
 }
 
 export interface DayAvailability {

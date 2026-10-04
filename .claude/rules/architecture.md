@@ -101,7 +101,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
  
 | Route | Purpose |
 |---|---|
-| `/admin` | Booking dashboard — all confirmed + soft_block |
+| `/admin` | Matches — merged List / Calendar view (`?view=calendar`), Upcoming / Needs action / Past tabs, click-to-book calendar; `/admin/schedule` redirects here — see `features/admin-matches-view.md` |
 | `/admin/bookings/new` | Create confirmed booking or reservation |
 | `/admin/bookings/[id]` | Edit, confirm, cancel + WhatsApp notify; Post-Match panel (scorecard upload status, Sync Stats, Apply Fees) |
 | `/admin/players` | Full player directory management |

@@ -171,6 +171,9 @@ function BookingDetailPageInner() {
   // and Cancel Booking is already disabled for one — see the Post-Match /
   // sidebar-nav overhaul this followed).
   const searchParams = useSearchParams()
+  // Opened from the Matches calendar → return there after save/cancel.
+  const listHref = searchParams.get('from') === 'calendar' ? '/admin?view=calendar' : '/admin'
+  const savedHref = `${listHref}${listHref.includes('?') ? '&' : '?'}saved=1`
   const feesMode = searchParams.get('action') === 'fees'
 
   const [booking,      setBooking]      = useState<Booking | null>(null)
@@ -680,7 +683,7 @@ function BookingDetailPageInner() {
         setLoggedOverrides(prev => ({ ...prev, ...Object.fromEntries(overridesToLog) }))
       }
       setSaveSuccess(true)
-      if (redirectAfter) setTimeout(() => router.push('/admin?saved=1'), 1500)
+      if (redirectAfter) setTimeout(() => router.push(savedHref), 1500)
       setSaving(false)
       return true
     }
@@ -716,7 +719,7 @@ function BookingDetailPageInner() {
     if (isPostMatchEligible) return
     if (!confirm('Are you sure you want to cancel this booking?')) return
     const res = await fetch(`/api/bookings/${id}`, { method: 'DELETE' })
-    if (res.ok) router.push('/admin')
+    if (res.ok) router.push(listHref)
   }
 
   function buildOrganiserWhatsApp() {
@@ -789,7 +792,7 @@ function BookingDetailPageInner() {
             {booking.format ? ` · ${booking.format}` : ''}
           </p>
         </div>
-        <BackButton fallbackHref="/admin" fallbackLabel="Matches"
+        <BackButton fallbackHref={listHref} fallbackLabel="Matches"
           className="!text-zinc-500 hover:!text-zinc-300 border border-[#D4C9B0] dark:border-ink-5 px-3 py-1.5 rounded font-normal" />
       </div>
 
@@ -1448,7 +1451,7 @@ function BookingDetailPageInner() {
                 Messages open pre-filled in WhatsApp for your review before sending.
               </p>
               {justConfirmed && (
-                <button onClick={() => router.push('/admin?saved=1')}
+                <button onClick={() => router.push(savedHref)}
                   className="w-full font-rajdhani text-sm font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-zinc-200 hover:border-gold-dim px-4 py-2.5 rounded transition-colors">
                   Done — Back to Matches
                 </button>

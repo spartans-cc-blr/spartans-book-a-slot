@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tournament, SlotTime, GameFormat, ValidationResult, RuleCheckItem } from '@/types'
 import { StageTypeToggle } from '@/components/admin/StageTypeToggle'
 import { PracticeToggle } from '@/components/admin/PracticeToggle'
@@ -33,14 +33,22 @@ const RULES: { rule: string; label: string }[] = [
   { rule: 'R8', label: 'Captain unavailable for this slot' },
 ]
 
-export default function NewBookingPage() {
+function NewBookingForm() {
   const router = useRouter()
+  // Calendar click-to-book (/admin?view=calendar) pre-fills date, slot and
+  // mode via ?date=&slot=&mode=, and ?from=calendar sends the admin back to
+  // the same view afterwards. Values are validated, never trusted as-is.
+  const qp = useSearchParams()
+  const qpDate = /^\d{4}-\d{2}-\d{2}$/.test(qp.get('date') ?? '') ? qp.get('date')! : ''
+  const qpSlot = (SLOT_TIMES as readonly string[]).includes(qp.get('slot') ?? '') ? (qp.get('slot') as SlotTime) : ''
+  const backHref = qp.get('from') === 'calendar' ? '/admin?view=calendar' : '/admin'
+  const doneHref = (flag: string) => `${backHref}${backHref.includes('?') ? '&' : '?'}${flag}=1`
 
-  const [mode, setMode] = useState<BookingMode>('confirmed')
+  const [mode, setMode] = useState<BookingMode>(qp.get('mode') === 'reserved' ? 'reserved' : 'confirmed')
 
   // Shared fields
-  const [gameDate,      setGameDate]      = useState('')
-  const [slotTime,      setSlotTime]      = useState<SlotTime | ''>('')
+  const [gameDate,      setGameDate]      = useState(qpDate)
+  const [slotTime,      setSlotTime]      = useState<SlotTime | ''>(qpSlot)
   const [format,        setFormat]        = useState<GameFormat | ''>('')
   const [notes,         setNotes]         = useState('')
 
@@ -281,7 +289,7 @@ export default function NewBookingPage() {
         }),
       })
       if (res.ok) {
-        router.push('/admin?booked=1')
+        router.push(doneHref('booked'))
       } else {
         const d = await res.json()
         setSubmitError(d.errors?.[0]?.message ?? d.error ?? 'Something went wrong.')
@@ -302,7 +310,7 @@ export default function NewBookingPage() {
         }),
       })
       if (res.ok) {
-        router.push('/admin?reserved=1')
+        router.push(doneHref('reserved'))
       } else {
         const d = await res.json()
         setSubmitError(d.error ?? 'Something went wrong.')
@@ -632,7 +640,7 @@ export default function NewBookingPage() {
           )}
 
           <div className="flex gap-3 justify-end">
-            <button onClick={() => router.push('/admin')}
+            <button onClick={() => router.push(backHref)}
               className="font-rajdhani text-sm font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 px-5 py-2.5 rounded transition-colors">
               Cancel
             </button>
@@ -688,5 +696,14 @@ function FormCard({ step, title, children }: { step: number; title: string; chil
       </div>
       {children}
     </div>
+  )
+}
+
+// useSearchParams() (calendar prefill) needs a Suspense boundary at build time.
+export default function NewBookingPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewBookingForm />
+    </Suspense>
   )
 }

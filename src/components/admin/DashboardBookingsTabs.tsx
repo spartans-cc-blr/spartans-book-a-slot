@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
 import { groupDatesIntoChips } from '@/lib/dateChipGroups'
+import type { NextStep } from '@/lib/matchNextStep'
 
 export interface DashboardBookingRow {
   id:               string
@@ -19,6 +20,10 @@ export interface DashboardBookingRow {
   // applied, and not already reconciled outside the Hub via the legacy
   // spreadsheet. Drives the "Apply Match Fee" shortcut below.
   apply_fee_eligible?: boolean
+  // What this past match needs next (scorecard / sync / fee) — null when nothing.
+  next_step?: NextStep | null
+  // Confirmed game with no CricHeroes URL on the booking (Past / Needs action).
+  missing_link?: boolean
 }
 
 // A single malformed game_date (e.g. a mistyped year) must never crash the
@@ -52,7 +57,7 @@ function BookingsTable({ bookings, emptyLabel }: { bookings: DashboardBookingRow
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
-              {['Date', 'Slot', 'Format', 'Captain', 'Tournament', 'Status', ''].map(h => (
+              {['Date', 'Slot', 'Format', 'Captain', 'Tournament', 'Status', 'Next', ''].map(h => (
                 <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">
                   {h}
                 </th>
@@ -61,7 +66,7 @@ function BookingsTable({ bookings, emptyLabel }: { bookings: DashboardBookingRow
           </thead>
           <tbody>
             {bookings.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">{emptyLabel}</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">{emptyLabel}</td></tr>
             )}
             {bookings.map(b => (
               <tr key={b.id} className="border-b border-[#E2DACE] dark:border-ink-4 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors">
@@ -79,27 +84,33 @@ function BookingsTable({ bookings, emptyLabel }: { bookings: DashboardBookingRow
                   {b.status === 'soft_block'
                     ? (b.tournament_name ? `${b.block_reason} — ${b.tournament_name}` : b.block_reason)
                     : b.tournament_name ?? '—'}
+                  {b.missing_link && (
+                    <span title="No CricHeroes link on this booking — open Edit to add it"
+                      className="ml-1.5 font-rajdhani text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-500">
+                      no link
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={b.status} />
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <Link href={`/admin/bookings/${b.id}`}
-                      className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
-                      Edit
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {b.next_step ? (
+                    <Link href={b.next_step.kind === 'fee_due' ? `/admin/bookings/${b.id}?action=fees` : `/admin/bookings/${b.id}`}
+                      className={`font-rajdhani text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm border transition-colors ${
+                        b.next_step.kind === 'fee_due'
+                          ? 'border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/10'
+                          : 'border-[#D4C9B0] dark:border-ink-5 text-[#57534E] dark:text-zinc-400 hover:border-gold-dim'
+                      }`}>
+                      {b.next_step.label} ›
                     </Link>
-                    {/* Shown only once the scorecard is synced but fees haven't
-                        been applied yet — a shortcut straight to the fee-only
-                        view of the same page, so applying a fee doesn't
-                        require going through the full booking-edit flow. */}
-                    {b.apply_fee_eligible && (
-                      <Link href={`/admin/bookings/${b.id}?action=fees`}
-                        className="font-rajdhani text-xs text-amber-700 dark:text-gold hover:text-amber-600 dark:hover:text-gold-light border border-gold-dim hover:bg-gold/10 px-2 py-1 rounded transition-colors">
-                        Apply Match Fee
-                      </Link>
-                    )}
-                  </div>
+                  ) : <span className="text-[#A8A29E] dark:text-zinc-700">—</span>}
+                </td>
+                <td className="px-4 py-3">
+                  <Link href={`/admin/bookings/${b.id}`}
+                    className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
+                    Edit
+                  </Link>
                 </td>
               </tr>
             ))}
@@ -160,13 +171,24 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
   const [truncated, setTruncated]   = useState(false)
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState('')
+  // Search spans all months (opponent, match ID, tournament, captain); while
+  // it is active the month stepper is ignored by the server. Debounced.
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch]           = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim().length >= 2 ? searchInput.trim() : ''), 350)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError('')
     setDayFilter(null) // a new month/all-time selection can't still contain the previously-picked date
-    const qs = monthFilter ? `?month=${monthFilter}` : ''
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    else if (monthFilter) params.set('month', monthFilter)
+    const qs = params.toString() ? `?${params}` : ''
     fetch(`/api/admin/bookings/past${qs}`)
       .then(res => res.json())
       .then(data => {
@@ -181,7 +203,7 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthFilter])
+  }, [monthFilter, search])
 
   // months is sorted most-recent-first, so index 0 is newest. "Older" moves
   // toward the end of the array, "newer" moves toward index 0. Both arrows
@@ -216,7 +238,23 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
 
   return (
     <div className="space-y-3">
-      {months.length > 0 && (
+      <div className="relative">
+        <input
+          type="search"
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          placeholder="Search all past matches — opponent, tournament, captain or match ID"
+          aria-label="Search past matches"
+          className="w-full font-rajdhani text-sm bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 text-[#1C1917] dark:text-parchment placeholder:text-[#A8A29E] dark:placeholder:text-zinc-600 focus:outline-none focus:border-gold-dim"
+        />
+      </div>
+      {search && (
+        <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
+          Showing matches for “{search}” across all months.{' '}
+          <button onClick={() => setSearchInput('')} className="text-amber-700 dark:text-gold underline">Clear search</button>
+        </p>
+      )}
+      {months.length > 0 && !search && (
         <div>
           <div className="flex items-center gap-2 bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded-full px-2 py-1.5">
             <button
@@ -286,7 +324,7 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
       )}
       {!loading && !error && bookings.length === 0 && (
         <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600 text-center py-6">
-          {monthFilter ? (
+          {search ? `No past matches found for “${search}”.` : monthFilter ? (
             <>
               No past bookings for {monthChipLabel(monthFilter)}.{' '}
               <button onClick={() => setMonthFilter('')} className="text-amber-700 dark:text-gold underline">
@@ -324,29 +362,60 @@ function AdminPastMatchesPanel({ onTotalCountChange }: { onTotalCountChange: (n:
   )
 }
 
+function NeedsActionPanel({ rows, loading, error, windowDays }: {
+  rows: DashboardBookingRow[]; loading: boolean; error: string; windowDays: number
+}) {
+  if (loading) return <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600 text-center py-6">Loading…</p>
+  if (error) return <p className="font-rajdhani text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded px-4 py-2.5">{error}</p>
+  return (
+    <div className="space-y-3">
+      <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
+        Played in the last {windowDays} days with a scorecard, sync or fee still to do. Older history: Utilities → Scorecard Backfill.
+      </p>
+      <BookingsTable bookings={rows} emptyLabel="All caught up — nothing needs action." />
+    </div>
+  )
+}
+
 export function DashboardBookingsTabs({
   upcoming,
 }: {
   upcoming: DashboardBookingRow[]
 }) {
-  const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming')
+  const [tab, setTab] = useState<'upcoming' | 'needs' | 'past'>('upcoming')
   // Lifted out of AdminPastMatchesPanel so the tab label stays accurate —
   // populated as soon as that panel's first fetch resolves.
   const [pastTotal, setPastTotal] = useState<number | null>(null)
+  // Fetched on mount so the tab label can show how much is waiting.
+  const [needs, setNeeds] = useState<DashboardBookingRow[]>([])
+  const [needsLoading, setNeedsLoading] = useState(true)
+  const [needsError, setNeedsError] = useState('')
+  const [needsWindow, setNeedsWindow] = useState(14)
+  useEffect(() => {
+    fetch('/api/admin/bookings/needs-action')
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) setNeedsError(d.error)
+        else { setNeeds(d.bookings ?? []); setNeedsWindow(d.windowDays ?? 14) }
+      })
+      .catch(() => setNeedsError('Network error'))
+      .finally(() => setNeedsLoading(false))
+  }, [])
+
+  const tabCls = (t: string) =>
+    `font-rajdhani text-xs font-bold tracking-widest uppercase px-4 py-2 rounded-t border-b-2 transition-colors ${
+      tab === t ? 'text-amber-700 dark:text-gold border-gold bg-white dark:bg-ink-3' : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-[#44403C] dark:hover:text-zinc-300'}`
 
   return (
     <div>
-      <div className="flex items-center gap-1 mb-3">
-        <button
-          onClick={() => setTab('upcoming')}
-          className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-4 py-2 rounded-t border-b-2 transition-colors
-            ${tab === 'upcoming' ? 'text-amber-700 dark:text-gold border-gold bg-white dark:bg-ink-3' : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-[#44403C] dark:hover:text-zinc-300'}`}>
+      <div className="flex items-center gap-1 mb-3 overflow-x-auto">
+        <button onClick={() => setTab('upcoming')} className={tabCls('upcoming')}>
           {`Upcoming (${upcoming.length})`}
         </button>
-        <button
-          onClick={() => setTab('past')}
-          className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-4 py-2 rounded-t border-b-2 transition-colors
-            ${tab === 'past' ? 'text-amber-700 dark:text-gold border-gold bg-white dark:bg-ink-3' : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-[#44403C] dark:hover:text-zinc-300'}`}>
+        <button onClick={() => setTab('needs')} className={tabCls('needs')}>
+          {needsLoading ? 'Needs action' : `Needs action (${needs.length})`}
+        </button>
+        <button onClick={() => setTab('past')} className={tabCls('past')}>
           {pastTotal === null ? 'Past' : `Past (${pastTotal})`}
         </button>
       </div>
@@ -356,6 +425,9 @@ export function DashboardBookingsTabs({
           tab-label count doesn't have to be refetched every time. */}
       <div className={tab === 'upcoming' ? '' : 'hidden'}>
         <BookingsTable bookings={upcoming} emptyLabel="No upcoming bookings." />
+      </div>
+      <div className={tab === 'needs' ? '' : 'hidden'}>
+        <NeedsActionPanel rows={needs} loading={needsLoading} error={needsError} windowDays={needsWindow} />
       </div>
       <div className={tab === 'past' ? '' : 'hidden'}>
         <AdminPastMatchesPanel onTotalCountChange={setPastTotal} />

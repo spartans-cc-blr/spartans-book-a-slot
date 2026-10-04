@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { computeSlotStatus } from '@/lib/validation'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { addDays, format, parseISO, formatDistanceToNow } from 'date-fns'
@@ -25,6 +27,12 @@ function formatExpiryLabel(reserved_until: string): string {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
+  // ?admin=1 adds booking ids and full booking details to booked/reserved
+  // slots so the admin calendar can link straight to Edit. Re-derived from
+  // the session on every call — the flag alone grants nothing, and a
+  // non-admin asking for it just gets the normal public payload.
+  const adminView = searchParams.get('admin') === '1' &&
+    !!((await getServerSession(authOptions))?.user as any)?.isAdmin
   const fromParam = searchParams.get('from')
   // If ?weeks is passed use it; otherwise auto-extend to cover last booked game's month
   let weeksParam = parseInt(searchParams.get('weeks') ?? '0')
@@ -139,6 +147,11 @@ export async function GET(req: NextRequest) {
             (b: any) => b.game_date === dateStr && b.slot_time === time && b.status === 'soft_block'
           )
           if (booking) {
+            if (adminView) {
+              slotInfo.booking_id    = booking.id
+              slotInfo.block_reason  = booking.block_reason ?? null
+              slotInfo.opponent_name = booking.opponent_name ?? null
+            }
             slotInfo.reserved_until  = booking.reserved_until ?? null
             slotInfo.organiser_name  = booking.organiser_name ?? null
             slotInfo.tournament_name = booking.tournament?.name ?? null
@@ -149,6 +162,12 @@ export async function GET(req: NextRequest) {
           const booking = (bookings ?? []).find(
             (b: any) => b.game_date === dateStr && b.slot_time === time && b.status === 'confirmed'
           )
+          if (adminView && booking) {
+            slotInfo.booking_id      = booking.id
+            slotInfo.tournament_name = booking.tournament?.name ?? null
+            slotInfo.opponent_name   = booking.opponent_name ?? null
+            slotInfo.format          = booking.format ?? null
+          }
           if (booking?.cricheroes_url) {
             slotInfo.cricheroes_url  = booking.cricheroes_url
             slotInfo.tournament_name = booking.tournament?.name ?? null
