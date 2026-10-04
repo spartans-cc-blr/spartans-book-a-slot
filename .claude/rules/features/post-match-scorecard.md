@@ -1903,6 +1903,14 @@ stayed permanently dark, exactly as this note originally described — only
 the page shell around them changed. **That gap was closed a few days
 later — see §16.2.**
 
+**Month stepper works from a month with no matches (fixed October 2026).**
+The page defaults to the current month, which isn't in
+`filterOptions.months` until a match is played in it. The ‹ › arrows used
+`months.indexOf(monthFilter)`, got -1, and both stayed disabled, so a
+viewer early in a month couldn't step back. `MatchHistoryClient.tsx` now
+finds the nearest older/newer month by comparing `YYYY-MM` strings instead
+of by index.
+
 ## 16.1 Deep-link support — `?month=all` (added September 2026)
 
 Every filter on this page is local `useState`, not driven by the URL — with

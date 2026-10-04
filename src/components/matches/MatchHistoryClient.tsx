@@ -320,12 +320,15 @@ export function MatchHistoryClient({
   // index 0 is newest. "Older" moves toward the end of the array, "newer"
   // moves toward index 0. Both arrows are disabled once monthFilter is ''
   // (All time) — stepping only makes sense from a specific month.
-  const monthIndex  = filterOptions.months.indexOf(monthFilter)
-  const hasMonth    = monthIndex !== -1
-  const canGoNewer  = hasMonth && monthIndex > 0
-  const canGoOlder  = hasMonth && monthIndex < filterOptions.months.length - 1
-  function goNewerMonth() { if (canGoNewer) setMonthFilter(filterOptions.months[monthIndex - 1]) }
-  function goOlderMonth() { if (canGoOlder) setMonthFilter(filterOptions.months[monthIndex + 1]) }
+  // The selected month may not be in the list at all (the default current
+  // month before any match is played), so step relative to its position
+  // ('YYYY-MM' strings compare chronologically) rather than by indexOf.
+  const olderMonth  = monthFilter ? filterOptions.months.find(m => m < monthFilter) : undefined
+  const newerMonth  = monthFilter ? [...filterOptions.months].reverse().find(m => m > monthFilter) : undefined
+  const canGoNewer  = !!newerMonth
+  const canGoOlder  = !!olderMonth
+  function goNewerMonth() { if (newerMonth) setMonthFilter(newerMonth) }
+  function goOlderMonth() { if (olderMonth) setMonthFilter(olderMonth) }
   function selectMonth(month: string) {
     setMonthFilter(prev => prev === month ? '' : month)
     setMonthPickerOpen(false)
