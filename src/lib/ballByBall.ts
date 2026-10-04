@@ -502,8 +502,12 @@ export function derivePartnerships(inningsBalls: BallRow[], restOfOrder: string[
   let start = { score: 0, wkts: 0, balls: 0 }
 
   const open = () => { cur = { runs: {}, faced: {}, total: 0, legal: 0 }; start = { score, wkts, balls: legalSoFar } }
+  // The scorecard's batting order decides who walks in; first appearance in the commentary only
+  // breaks ties (a non-striker can face his first ball several overs after coming in).
+  const rank = new Map(restOfOrder.map((n, i) => [key(n), i] as const))
   const fillPartner = () => {
-    const next = order.find(n => !entered.has(key(n)))
+    const waiting = order.filter(n => !entered.has(key(n)))
+    const next = [...waiting].sort((a, b) => (rank.get(key(a)) ?? 1e6) - (rank.get(key(b)) ?? 1e6))[0]
     if (next) seat(next)
   }
   const close = (out: string | null) => {
