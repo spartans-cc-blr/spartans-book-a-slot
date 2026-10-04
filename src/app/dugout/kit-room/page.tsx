@@ -44,8 +44,8 @@ export default async function KitRoomPage() {
   return (
     <div className="min-h-screen bg-parchment dark:bg-ink">
       <SiteNav activePage="dugout" />
-      <main className="px-4 py-8 bg-parchment dark:bg-ink">
-        <div className="max-w-2xl mx-auto">
+      <main className="px-5 md:px-8 lg:px-10 py-8 bg-parchment dark:bg-ink">
+        <div className="max-w-2xl">
           {/* Jersey collage hero */}
           <div className="w-full rounded-xl mb-6 overflow-hidden" style={{ height: '220px' }}>
             <Image

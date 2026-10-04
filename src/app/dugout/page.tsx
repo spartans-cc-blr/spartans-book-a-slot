@@ -17,8 +17,8 @@ export default async function DugoutPage() {
   return (
     <div className="min-h-screen bg-parchment dark:bg-ink">
       <SiteNav activePage="dugout" />
-      <main className="px-4 py-8 bg-parchment dark:bg-ink">
-        <div className="max-w-3xl mx-auto">
+      <main className="px-5 md:px-8 lg:px-10 py-8 bg-parchment dark:bg-ink">
+        <div className="max-w-2xl">
           <h1 className="font-cinzel font-bold text-3xl text-stone-900 dark:text-parchment mb-1">The Dugout</h1>
           <p className="font-rajdhani text-stone-500 dark:text-zinc-400 mb-8">Your club utility space.</p>
 
