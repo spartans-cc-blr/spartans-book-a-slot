@@ -353,6 +353,8 @@
     background-color: #F8F4EE;
     color: #1C1917;
   }
+  :root { color-scheme: light; }
+  [data-theme="dark"] { color-scheme: dark; }
   [data-theme="dark"] body {
     background-color: #080808;
     color: #F0E8D0;
@@ -369,14 +371,15 @@
 
   /* Scrollbar */
   ::-webkit-scrollbar       { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: #111; }
+  ::-webkit-scrollbar-track { background: #EEEAE2; }
+  [data-theme="dark"] ::-webkit-scrollbar-track { background: #111; }
   ::-webkit-scrollbar-thumb { background: #7A6030; border-radius: 2px; }
 }
 
 @layer components {
   /* Form inputs */
-  .form-label { @apply font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500 mb-1.5 block; }
-  .form-input { @apply w-full bg-zinc-900 border border-zinc-700 text-zinc-100 font-rajdhani text-sm px-3 py-2.5 rounded focus:outline-none focus:border-yellow-700 transition-colors placeholder:text-zinc-600; }
+  .form-label { @apply font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500 mb-1.5 block; }
+  .form-input { @apply w-full bg-white dark:bg-zinc-900 border border-[#D4C9B0] dark:border-zinc-700 text-[#1C1917] dark:text-zinc-100 font-rajdhani text-sm px-3 py-2.5 rounded focus:outline-none focus:border-amber-600 dark:focus:border-yellow-700 transition-colors placeholder:text-[#A8A29E] dark:placeholder:text-zinc-600; }
 }
 
 @layer utilities {
