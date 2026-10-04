@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { WeekAvailability, SlotTime } from '@/types'
+import Link from 'next/link'
+import type { WeekAvailability, SlotTime, SlotInfo } from '@/types'
 import { buildGenericWhatsAppLink } from '@/lib/whatsapp'
 import { getClashSource } from '@/lib/validation'
 import { getArrowDirection, ArrowIcon } from '@/components/schedule/ClashArrow'
@@ -35,14 +36,17 @@ function formatExpiryLabel(reserved_until: string): string {
   return `Expires ${day} ${h}:${mins}${ampm}`
 }
 
-export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
+// adminMode (the /admin Matches → Calendar view): open slots are clickable to
+// book / reserve / soft-block with the date and slot pre-filled, and booked
+// or reserved slots link straight to the booking's Edit page.
+export function ScheduleGrid({ playerView = false, adminMode = false }: { playerView?: boolean; adminMode?: boolean }) {
   const [weeks, setWeeks]               = useState<WeekAvailability[]>([])
   const [currentWeek, setCurrentWeek]   = useState(0)
   const [loading, setLoading]           = useState(true)
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    fetch('/api/availability?weeks=15')
+    fetch(adminMode ? '/api/availability?weeks=15&admin=1' : '/api/availability?weeks=15')
       .then(r => r.json())
       .then(d => {
         const fetchedWeeks = d.weeks ?? []
@@ -223,7 +227,9 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                         </div>
                         <div className="flex-1">
                           {/* Capacity full locked — just lock icon, no text */}
-                          {isLocked ? (
+                          {adminMode ? (
+                            <AdminSlot date={day.date} slot={slot} weekendFull={!!week?.weekendFull} variant="row" />
+                          ) : isLocked ? (
                             <div className="flex items-center justify-center h-8 rounded bg-white dark:bg-zinc-900 border border-[#D4C9B0] dark:border-zinc-800">
                               <span className="text-[#78716C] dark:text-zinc-700 text-sm">🔒</span>
                             </div>
@@ -272,7 +278,7 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                             </div>
                           )}
                         </div>
-                        {slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView && (
+                        {slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView && !adminMode && (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 bg-[#128C7E] hover:bg-[#0d7a6e] text-white text-xs font-bold tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap">
                             <WAIcon /> Book
@@ -320,7 +326,9 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                     return (
                       <td key={slot.time} className="p-1.5 border-b border-[#E2DACE] dark:border-ink-4 w-1/4">
                         {/* Capacity full locked — just lock icon */}
-                        {isLocked ? (
+                        {adminMode ? (
+                          <AdminSlot date={day.date} slot={slot} weekendFull={!!week?.weekendFull} variant="grid" />
+                        ) : isLocked ? (
                           <div className="flex items-center justify-center h-16 rounded bg-white dark:bg-zinc-900 border border-[#D4C9B0] dark:border-zinc-800">
                             <span className="text-[#78716C] dark:text-zinc-700 text-lg">🔒</span>
                           </div>
@@ -400,7 +408,7 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
       </div>
 
       {/* CTA — organiser schedule only */}
-      {!playerView && (
+      {!playerView && !adminMode && (
         <div className="mt-7 bg-gradient-to-br from-ink-3 to-ink-2 border border-gold-dim rounded p-5 lg:flex lg:items-center lg:gap-6 relative overflow-hidden">
           <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none"
             style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
@@ -424,6 +432,79 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function AdminSlot({ date, slot, weekendFull, variant }: {
+  date: string; slot: SlotInfo; weekendFull: boolean; variant: 'grid' | 'row'
+}) {
+  const [menu, setMenu] = useState(false)
+  const box = variant === 'grid' ? 'h-16 flex-col justify-center' : 'min-h-[2.5rem] flex-row items-center justify-between px-3 py-1.5'
+  const base = `flex ${box} gap-0.5 rounded border w-full text-left`
+  const qs = `date=${date}&slot=${slot.time}&from=calendar`
+
+  if (slot.status === 'booked' || slot.status === 'soft_block') {
+    const reserved = slot.status === 'soft_block'
+    const title = slot.tournament_name ?? (reserved ? (slot.block_reason ?? 'Reserved') : 'Booked')
+    const cls = reserved
+      ? 'bg-yellow-50 dark:bg-yellow-950 border-yellow-300 dark:border-yellow-800 text-yellow-700 dark:text-yellow-500'
+      : 'bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-900 text-red-700 dark:text-red-400'
+    const inner = (
+      <>
+        <span className="font-rajdhani text-[11px] font-bold tracking-wide truncate w-full">{title}</span>
+        <span className="font-rajdhani text-[10px] opacity-75 truncate w-full">
+          {reserved ? (slot.organiser_name ?? 'Reserved') : (slot.opponent_name ? `vs ${slot.opponent_name}` : 'Booked')}
+          {slot.format ? ` · ${slot.format}` : ''}
+        </span>
+        <span className="font-rajdhani text-[9px] font-bold uppercase tracking-wider opacity-60">Edit ›</span>
+      </>
+    )
+    return slot.booking_id
+      ? <Link href={`/admin/bookings/${slot.booking_id}?from=calendar`} className={`${base} ${cls} hover:brightness-95 px-1.5`} title="Edit this booking">{inner}</Link>
+      : <div className={`${base} ${cls} px-1.5`}>{inner}</div>
+  }
+
+  if (slot.status === 'open' || slot.status === 't20only') {
+    return (
+      <div className="relative">
+        <button onClick={() => setMenu(m => !m)}
+          className={`${base} items-center bg-emerald-50 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 hover:border-emerald-500 transition-colors`}
+          aria-expanded={menu} title="Book, reserve or block this slot">
+          <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-700 dark:text-emerald-400">
+            {slot.status === 't20only' ? 'Open · T20 only' : 'Open'}
+          </span>
+          <span className="font-rajdhani text-[9px] font-bold uppercase tracking-wider text-emerald-700/70 dark:text-emerald-400/70">＋ Book</span>
+        </button>
+        {menu && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
+            <div className="absolute z-20 left-0 top-full mt-1 w-52 bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded shadow-lg p-1 text-left">
+              <p className="font-rajdhani text-[10px] font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500 px-2 py-1">{date} · {slot.time}</p>
+              {weekendFull && (
+                <p className="font-rajdhani text-[10px] text-amber-700 dark:text-amber-400 px-2 pb-1">Weekend already has 3 games — booking needs an R1 override.</p>
+              )}
+              {[
+                { href: `/admin/bookings/new?${qs}`, label: '🏏 Book game' },
+                { href: `/admin/bookings/new?${qs}&mode=reserved`, label: '⏳ Reserve slot (48h)' },
+                { href: `/admin/soft-blocks/new?${qs}`, label: '🔒 Soft block' },
+              ].map(a => (
+                <Link key={a.href} href={a.href}
+                  className="block font-rajdhani text-sm font-semibold text-[#1C1917] dark:text-parchment px-2 py-1.5 rounded hover:bg-parchment-2 dark:hover:bg-ink-4">
+                  {a.label}
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  const note = slot.status === 'clash' ? 'Play in progress' : '—'
+  return (
+    <div className={`${base} items-center bg-white dark:bg-ink-3 border-[#D4C9B0] dark:border-ink-5 opacity-70`}>
+      <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 text-center w-full">{note}</span>
     </div>
   )
 }

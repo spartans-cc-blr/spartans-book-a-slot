@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { format, addDays } from 'date-fns'
 import type { Booking } from '@/types'
 import NLPBookingBar from '@/components/admin/NLPBookingBar'
+import { ScheduleGrid } from '@/components/schedule/ScheduleGrid'
 import { DashboardBookingsTabs, type DashboardBookingRow } from '@/components/admin/DashboardBookingsTabs'
 
 export const revalidate = 0  // Always fresh for admin
@@ -26,9 +27,10 @@ function toDashboardRow(b: any, applyFeeEligible?: boolean): DashboardBookingRow
 export default async function AdminDashboard({
   searchParams,
 }: {
-  searchParams?: { saved?: string; booked?: string; reserved?: string; blocked?: string }
+  searchParams?: { view?: string; saved?: string; booked?: string; reserved?: string; blocked?: string }
 }) {
   const session  = await getServerSession(authOptions)
+  const view     = searchParams?.view === 'calendar' ? 'calendar' : 'list'
   const supabase = createServiceClient()
   const today    = format(new Date(), 'yyyy-MM-dd')
 
@@ -73,7 +75,7 @@ export default async function AdminDashboard({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Matches - List View</h1>
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Matches</h1>
         <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">
           Welcome back, {session?.user?.name?.split(' ')[0]}. Here's your weekend at a glance.
         </p>
@@ -128,7 +130,16 @@ export default async function AdminDashboard({
         />
       </div>
 
-      <div className="flex items-center justify-end mb-3">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div className="inline-flex rounded-full border border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4 p-0.5">
+          {([['list', '📋 List', '/admin'], ['calendar', '📅 Calendar', '/admin?view=calendar']] as const).map(([key, label, href]) => (
+            <Link key={key} href={href} replace
+              className={`font-rajdhani text-xs font-bold tracking-wide px-4 py-1.5 rounded-full transition-colors ${
+                view === key ? 'bg-gold/20 text-amber-700 dark:text-gold border border-gold-dim' : 'text-[#78716C] dark:text-zinc-500 border border-transparent'}`}>
+              {label}
+            </Link>
+          ))}
+        </div>
         <div className="flex gap-2">
           <Link href="/admin/soft-blocks/new"
             className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-amber-700 dark:text-gold px-3 py-1.5 rounded hover:bg-gold/10 transition-colors">
@@ -141,9 +152,13 @@ export default async function AdminDashboard({
         </div>
       </div>
 
-      <DashboardBookingsTabs
-        upcoming={(bookings ?? []).map(b => toDashboardRow(b))}
-      />
+      {view === 'calendar' ? (
+        <ScheduleGrid adminMode />
+      ) : (
+        <DashboardBookingsTabs
+          upcoming={(bookings ?? []).map(b => toDashboardRow(b))}
+        />
+      )}
     </div>
   )
 }

@@ -4,9 +4,8 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
 const NAV = [
-  { href: '/admin',                  label: 'Matches - List View',      icon: '📋', exact: true },
+  { href: '/admin',                  label: 'Matches',      icon: '📋', exact: true },
   // After the Matches entry:
-  { href: '/admin/schedule',         label: 'Fixtures - Calendar View', icon: '📅' },
   { href: '/admin/bookings/new',     label: 'New Booking',      icon: '➕' },
   { href: '/admin/soft-blocks/new',  label: 'Soft Blocks',      icon: '🔒' },
   { href: '/admin/captains',         label: 'Captains',         icon: '👥', section: 'Master Data' },

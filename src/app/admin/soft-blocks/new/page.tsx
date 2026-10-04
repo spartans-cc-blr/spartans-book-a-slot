@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { SLOT_TIMES, SLOT_FORMATS, BLOCK_REASONS, KNOCKOUT_HOLD_REASON } from '@/types'
 import type { GameFormat } from '@/types'
 import type { KnockoutConflict } from '@/app/api/soft-blocks/route'
@@ -20,10 +20,16 @@ function buildWaLink(conflict: KnockoutConflict, gameDate: string): string {
     : `https://wa.me/?text=${encodeURIComponent(message)}`
 }
 
-export default function NewSoftBlockPage() {
+function NewSoftBlockForm() {
   const router = useRouter()
-  const [gameDate,    setGameDate]    = useState('')
-  const [slotTimes,   setSlotTimes]   = useState<string[]>([])
+  // Pre-fill from the admin calendar's click-to-block (see bookings/new).
+  const qp = useSearchParams()
+  const qpDate = /^\d{4}-\d{2}-\d{2}$/.test(qp.get('date') ?? '') ? qp.get('date')! : ''
+  const qpSlot = (SLOT_TIMES as readonly string[]).includes(qp.get('slot') ?? '') ? qp.get('slot')! : ''
+  const backHref = qp.get('from') === 'calendar' ? '/admin?view=calendar' : '/admin'
+  const doneHref = `${backHref}${backHref.includes('?') ? '&' : '?'}blocked=1`
+  const [gameDate,    setGameDate]    = useState(qpDate)
+  const [slotTimes,   setSlotTimes]   = useState<string[]>(qpSlot ? [qpSlot] : [])
   const [blockReason, setBlockReason] = useState<string>(BLOCK_REASONS[0])
   const [notes,       setNotes]       = useState('')
   const [submitting,  setSubmitting]  = useState(false)
@@ -114,7 +120,7 @@ export default function NewSoftBlockPage() {
       return
     }
 
-    router.push('/admin?blocked=1')
+    router.push(doneHref)
   }
 
   const tournamentName = tournaments.find(t => t.id === tournamentId)?.name ?? null
@@ -157,7 +163,7 @@ export default function NewSoftBlockPage() {
             </div>
           )}
           <div className="flex justify-end pt-1">
-            <button onClick={() => router.push('/admin?blocked=1')}
+            <button onClick={() => router.push(doneHref)}
               className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark text-white px-5 py-2.5 rounded transition-colors">
               Continue to Matches
             </button>
@@ -275,7 +281,7 @@ export default function NewSoftBlockPage() {
           )}
 
           <div className="flex gap-3 justify-end pt-1">
-            <button onClick={() => router.push('/admin')}
+            <button onClick={() => router.push(backHref)}
               className="font-rajdhani text-sm font-bold border border-[#D4C9B0] dark:border-ink-5 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 px-5 py-2.5 rounded transition-colors">
               Cancel
             </button>
@@ -292,5 +298,14 @@ export default function NewSoftBlockPage() {
         </div>
       )}
     </div>
+  )
+}
+
+// useSearchParams() (calendar prefill) needs a Suspense boundary at build time.
+export default function NewSoftBlockPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewSoftBlockForm />
+    </Suspense>
   )
 }
