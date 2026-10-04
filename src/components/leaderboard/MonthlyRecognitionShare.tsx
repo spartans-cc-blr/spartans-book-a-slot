@@ -41,7 +41,7 @@ export function MonthlyRecognitionShare({ month, monthLabel, syncStatus }: {
       onClick={openWhatsApp}
       title={`Share ${monthLabel} Recognition on WhatsApp`}
       aria-label={`Share ${monthLabel} Recognition on WhatsApp`}
-      className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-emerald-600 text-emerald-400 rounded-full hover:bg-emerald-600/20 transition-colors">
+      className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-emerald-600 text-emerald-700 dark:text-emerald-400 rounded-full hover:bg-emerald-600/20 transition-colors">
       {WA_ICON}
     </button>
   )

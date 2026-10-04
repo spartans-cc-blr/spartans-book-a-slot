@@ -193,6 +193,7 @@ How it was done, so future edits stay consistent:
   `--fx-shell-bg`; the GC review Y/O/E chips reuse `--captains-resp-*`.
 - `.slot-open/.slot-booked/.slot-softblock/.slot-clash` component classes now
   carry light colours with `dark:` variants.
+- **Global component classes in `globals.css`** (`.form-input`, `.form-label`, the scrollbar track) are themed too — they are used ~120 times across admin forms and are invisible to a per-file class audit, so check `globals.css` `@layer components` first when an input looks wrong. `color-scheme` is also set per theme so native date pickers/selects match.
 - Left as literals in both themes on purpose: Google logo colours, brand/jersey/
   ball SVG icons, solid status buttons, and small status chips.
 - **New work:** use `bg-parchment dark:bg-ink`-style pairs (or the `--app-*`

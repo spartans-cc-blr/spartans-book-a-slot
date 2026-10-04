@@ -50,7 +50,7 @@ export function TournamentShareButton({ tournamentId, className, iconClassName, 
       // header's own click-to-expand row, and must not also toggle it.
       onClick={e => { e.stopPropagation(); handleShare() }}
       title={copied ? 'Link copied!' : 'Share tournament card'}
-      className={className ?? 'inline-flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors'}>
+      className={className ?? 'inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors'}>
       {label ? (
         <>
           <span className={iconClassName}>{icon}</span>
