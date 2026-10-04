@@ -15,10 +15,10 @@ import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
 type ScorecardUploadStatus = 'pending_parse' | 'parsed' | 'synced' | 'fees_applied'
 
 const UPLOAD_STATUS_CONFIG: Record<ScorecardUploadStatus, { label: string; className: string }> = {
-  pending_parse: { label: 'Pending Parse',       className: 'bg-ink-4 border-ink-5 text-zinc-400' },
-  parsed:        { label: 'Parsed',              className: 'bg-amber-950/40 border-amber-800 text-amber-400' },
-  synced:        { label: 'Synced ✓',            className: 'bg-emerald-950/40 border-emerald-800 text-emerald-400' },
-  fees_applied:  { label: 'Fees Applied ✓',      className: 'bg-emerald-950/40 border-emerald-800 text-emerald-400' },
+  pending_parse: { label: 'Pending Parse',       className: 'bg-parchment-2 dark:bg-ink-4 border-[#D4C9B0] dark:border-ink-5 text-[#57534E] dark:text-zinc-400' },
+  parsed:        { label: 'Parsed',              className: 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400' },
+  synced:        { label: 'Synced ✓',            className: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' },
+  fees_applied:  { label: 'Fees Applied ✓',      className: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' },
 }
 
 interface PostMatchUpload {
@@ -153,7 +153,7 @@ export default function BookingDetailPage() {
   return (
     <Suspense fallback={
       <div className="space-y-3 animate-pulse">
-        {[0,1,2].map(i => <div key={i} className="h-16 bg-ink-3 rounded border border-ink-5" />)}
+        {[0,1,2].map(i => <div key={i} className="h-16 bg-white dark:bg-ink-3 rounded border border-[#D4C9B0] dark:border-ink-5" />)}
       </div>
     }>
       <BookingDetailPageInner />
@@ -747,12 +747,12 @@ function BookingDetailPageInner() {
 
   if (loading) return (
     <div className="space-y-3 animate-pulse">
-      {[0,1,2].map(i => <div key={i} className="h-16 bg-ink-3 rounded border border-ink-5" />)}
+      {[0,1,2].map(i => <div key={i} className="h-16 bg-white dark:bg-ink-3 rounded border border-[#D4C9B0] dark:border-ink-5" />)}
     </div>
   )
 
   if (!booking) return (
-    <div className="text-center py-12 font-rajdhani text-zinc-500">Booking not found.</div>
+    <div className="text-center py-12 font-rajdhani text-[#78716C] dark:text-zinc-500">Booking not found.</div>
   )
 
   const isReservation = booking.status === 'soft_block'
@@ -776,26 +776,26 @@ function BookingDetailPageInner() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-cinzel text-xl font-bold text-gold flex items-center gap-2">
+          <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold flex items-center gap-2">
             {displayConfirmed ? '✓ Confirmed Booking' : '🟡 Reservation'}
             {feesMode && (
-              <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold px-2 py-0.5 rounded-sm">
+              <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold px-2 py-0.5 rounded-sm">
                 Apply Match Fee
               </span>
             )}
           </h1>
-          <p className="font-rajdhani text-zinc-500 text-sm mt-1">
+          <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">
             {booking.game_date} · {booking.slot_time}
             {booking.format ? ` · ${booking.format}` : ''}
           </p>
         </div>
         <BackButton fallbackHref="/admin" fallbackLabel="Matches"
-          className="!text-zinc-500 hover:!text-zinc-300 border border-ink-5 px-3 py-1.5 rounded font-normal" />
+          className="!text-zinc-500 hover:!text-zinc-300 border border-[#D4C9B0] dark:border-ink-5 px-3 py-1.5 rounded font-normal" />
       </div>
 
       {/* Reservation expiry warning */}
       {isReservation && booking.reserved_until && (
-        <div className="bg-amber-950/40 border border-amber-800 rounded px-4 py-3 mb-5 font-rajdhani text-sm text-amber-300 flex items-center gap-3">
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded px-4 py-3 mb-5 font-rajdhani text-sm text-amber-700 dark:text-amber-300 flex items-center gap-3">
           <span className="text-xl">⏱</span>
           <span>This slot is reserved for <strong>{organiserName || 'organiser'}</strong>.
           Expires <strong>{new Date(booking.reserved_until).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}</strong>.
@@ -832,17 +832,17 @@ function BookingDetailPageInner() {
               </div>
               <div>
                 <label className="form-label">Format</label>
-                <div className="flex border border-ink-5 rounded overflow-hidden">
+                <div className="flex border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
                   {(['T20', 'T30', 'T10', 'T25'] as GameFormat[]).map(f => (
                     <button key={f} onClick={() => setFormat(f)} disabled={feesMode}
                       className={`flex-1 py-2.5 font-cinzel text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-                        ${format === f ? 'bg-gold-dim text-gold-light' : 'bg-ink-4 text-zinc-500 hover:text-zinc-300'}`}>
+                        ${format === f ? 'bg-gold-dim text-amber-600 dark:text-gold-light' : 'bg-parchment-2 dark:bg-ink-4 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300'}`}>
                       {f}
                     </button>
                   ))}
                 </div>
                 {isInformalFormat(format) && (
-                  <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
+                  <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">
                     Informal quick game — rules aren&apos;t checked, and it won&apos;t show on the public schedule or Tournament Planner.
                   </p>
                 )}
@@ -856,9 +856,9 @@ function BookingDetailPageInner() {
               {SLOT_TIMES.map(t => (
                 <button key={t} onClick={() => setSlotTime(t)} disabled={feesMode}
                   className={`py-3 rounded border text-center transition-all disabled:opacity-50 disabled:cursor-not-allowed
-                    ${slotTime === t ? 'border-gold bg-gold/10 text-gold' : 'bg-ink-4 border-ink-5 text-parchment hover:border-gold-dim'}`}>
+                    ${slotTime === t ? 'border-gold bg-gold/10 text-amber-700 dark:text-gold' : 'bg-parchment-2 dark:bg-ink-4 border-[#D4C9B0] dark:border-ink-5 text-[#1C1917] dark:text-parchment hover:border-gold-dim'}`}>
                   <p className="font-cinzel text-sm font-semibold">{t}</p>
-                  <p className="font-rajdhani text-[10px] text-zinc-600 mt-0.5">{SLOT_FORMATS[t].join('/')}</p>
+                  <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-0.5">{SLOT_FORMATS[t].join('/')}</p>
                 </button>
               ))}
             </div>
@@ -911,13 +911,13 @@ function BookingDetailPageInner() {
                   {!feesMode && (
                     <a href="/wrangler/grounds" target="_blank" rel="noopener noreferrer"
                       onClick={() => setTimeout(refreshGrounds, 3000)}
-                      className="flex-shrink-0 font-rajdhani text-xs font-bold text-gold-dim hover:text-gold border border-ink-5 hover:border-gold-dim rounded px-3 py-2 transition-colors whitespace-nowrap">
+                      className="flex-shrink-0 font-rajdhani text-xs font-bold text-gold-dim hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim rounded px-3 py-2 transition-colors whitespace-nowrap">
                       ＋ Add ground ↗
                     </a>
                   )}
                 </div>
                 {selectedTournament?.is_practice && !groundId && (
-                  <p className="font-rajdhani text-xs text-amber-400 mt-1">
+                  <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 mt-1">
                     Practice games move between grounds — pick this game&apos;s ground.
                   </p>
                 )}
@@ -941,7 +941,7 @@ function BookingDetailPageInner() {
                   ))}
                 </select>
                 {!captainId && (
-                  <p className="font-rajdhani text-xs text-amber-400 mt-1">
+                  <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 mt-1">
                     No captain selected — WhatsApp captain notification won&apos;t be available.
                   </p>
                 )}
@@ -962,10 +962,10 @@ function BookingDetailPageInner() {
                   <label className="form-label">CricHeroes Match ID</label>
                   <input type="text" value={matchId} onChange={e => setMatchId(e.target.value)} disabled={feesMode}
                     placeholder="e.g. 12345678" className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
-                  <p className="font-rajdhani text-xs text-zinc-600 mt-1">Enter after organiser creates match in CricHeroes</p>
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">Enter after organiser creates match in CricHeroes</p>
                 </div>
                 <div>
-                  <label className="form-label">Match Stage <span className="text-zinc-600">(optional)</span></label>
+                  <label className="form-label">Match Stage <span className="text-[#78716C] dark:text-zinc-600">(optional)</span></label>
                   <input type="text" value={matchStage} onChange={e => setMatchStage(e.target.value)} disabled={feesMode}
                     placeholder="e.g. Quarter Final, Semi Final, Final, Knockout" className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
@@ -981,7 +981,7 @@ function BookingDetailPageInner() {
                   <input type="time" value={matchTime} disabled={feesMode}
                     onChange={e => { setMatchTime(e.target.value); setMatchTimeTouched(true) }}
                     className="form-input disabled:opacity-50 disabled:cursor-not-allowed" />
-                  <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                     Defaults to 15 min after slot time — edit if the organiser confirms a different start time.
                   </p>
                 </div>
@@ -995,7 +995,7 @@ function BookingDetailPageInner() {
                     placeholder="Leave blank to use tournament default"
                     className="form-input w-32 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                     {matchFeeOverride
                       ? `Override active: ₹${matchFeeOverride}`
                       : (booking.tournament as any)?.match_fee
@@ -1004,7 +1004,7 @@ function BookingDetailPageInner() {
                   </p>
                 </div>
                 <div>
-                  <label className="form-label">Internal Notes <span className="text-zinc-700">(never shown publicly)</span></label>
+                  <label className="form-label">Internal Notes <span className="text-[#78716C] dark:text-zinc-700">(never shown publicly)</span></label>
                   <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} disabled={feesMode}
                     placeholder="Any notes for your reference..." className="form-input resize-none disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
@@ -1026,7 +1026,7 @@ function BookingDetailPageInner() {
             <FormCard title="Post-Match">
               <div className="space-y-4">
                 {postMatchLoading && !postMatch && (
-                  <p className="font-rajdhani text-xs text-zinc-600">Loading…</p>
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">Loading…</p>
                 )}
 
                 {postMatch?.upload ? (
@@ -1036,18 +1036,18 @@ function BookingDetailPageInner() {
                         {UPLOAD_STATUS_CONFIG[postMatch.upload.status].label}
                       </span>
                       {postMatch.upload.uploaded_by_name && (
-                        <span className="font-rajdhani text-xs text-zinc-500">
+                        <span className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
                           uploaded by {postMatch.upload.uploaded_by_name}
                           {postMatch.upload.uploaded_at && ` · ${new Date(postMatch.upload.uploaded_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}`}
                         </span>
                       )}
                     </div>
                     {postMatch.upload.error_message && (
-                      <p className="font-rajdhani text-xs text-red-400">⚠ {postMatch.upload.error_message}</p>
+                      <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">⚠ {postMatch.upload.error_message}</p>
                     )}
                     {postMatch.upload.status === 'parsed' && (
                       <button onClick={handleSyncStats} disabled={syncLoading}
-                        className="font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
+                        className="font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/20 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
                         {syncLoading ? 'Syncing…' : 'Sync Stats from Analytics DB'}
                       </button>
                     )}
@@ -1059,46 +1059,46 @@ function BookingDetailPageInner() {
                         status, so this stays a no-op risk-free action. */}
                     {postMatch.upload.status === 'synced' && (
                       <button onClick={handleSyncStats} disabled={syncLoading}
-                        className="font-rajdhani text-xs font-semibold text-zinc-500 hover:text-gold disabled:opacity-40 underline underline-offset-2 transition-colors">
+                        className="font-rajdhani text-xs font-semibold text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold disabled:opacity-40 underline underline-offset-2 transition-colors">
                         {syncLoading ? 'Re-syncing…' : 'Re-sync Stats from Analytics DB'}
                       </button>
                     )}
-                    {syncError && <p className="font-rajdhani text-xs text-red-400">{syncError}</p>}
+                    {syncError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">{syncError}</p>}
 
                     {/* Admin override — clears a stuck/wrong upload so it can be
                         re-uploaded from scratch. Never reverses fee debits. */}
                     <button onClick={handleResetUpload} disabled={resetLoading}
-                      className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
+                      className="font-rajdhani text-xs font-bold tracking-wide border border-red-300 dark:border-red-900 text-red-500 hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-40 px-3 py-1.5 rounded transition-colors">
                       {resetLoading ? 'Resetting…' : 'Reset Upload'}
                     </button>
-                    {resetError && <p className="font-rajdhani text-xs text-red-400">{resetError}</p>}
+                    {resetError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">{resetError}</p>}
                   </div>
                 ) : (
                   !postMatchLoading && (
-                    <p className="font-rajdhani text-xs text-zinc-600">No scorecard uploaded yet.</p>
+                    <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">No scorecard uploaded yet.</p>
                   )
                 )}
 
                 {postMatch?.stats && (
-                  <div className="border-t border-ink-5 pt-3 space-y-2">
-                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Stats Preview</p>
-                    <p className="font-rajdhani text-sm text-parchment">
+                  <div className="border-t border-[#D4C9B0] dark:border-ink-5 pt-3 space-y-2">
+                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">Stats Preview</p>
+                    <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment">
                       {postMatch.stats.match_result ?? 'Result pending'}
                     </p>
-                    <p className="font-rajdhani text-xs text-zinc-400">
+                    <p className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
                       {postMatch.stats.team_total ?? '—'}/{postMatch.stats.team_wickets ?? '—'} ({postMatch.stats.team_overs ?? '—'} ov)
                       {' vs '}
                       {postMatch.stats.opponent_total ?? '—'}/{postMatch.stats.opponent_wickets ?? '—'} ({postMatch.stats.opponent_overs ?? '—'} ov)
                     </p>
 
                     <button onClick={() => setScorecardOpen(v => !v)}
-                      className="font-rajdhani text-xs font-bold text-gold hover:underline">
+                      className="font-rajdhani text-xs font-bold text-amber-700 dark:text-gold hover:underline">
                       {scorecardOpen ? '▲ Hide full scorecard' : '▼ View full scorecard'}
                     </button>
                     {scorecardOpen && (
                       <div className="pt-2">
-                        {scorecardLoading && <p className="font-rajdhani text-xs text-zinc-600">Loading…</p>}
-                        {scorecardError && <p className="font-rajdhani text-xs text-red-400">{scorecardError}</p>}
+                        {scorecardLoading && <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">Loading…</p>}
+                        {scorecardError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">{scorecardError}</p>}
                         {scorecard && (
                           <ScorecardTables batting={scorecard.batting} bowling={scorecard.bowling} fielding={scorecard.fielding} teamList={scorecard.team_list} squad={scorecardSquad} />
                         )}
@@ -1108,9 +1108,9 @@ function BookingDetailPageInner() {
                 )}
 
                 {postMatch?.upload?.status === 'fees_applied' && (
-                  <div className="border-t border-ink-5 pt-3 space-y-2">
-                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Match Fees</p>
-                    <p className="font-rajdhani text-xs text-emerald-400">
+                  <div className="border-t border-[#D4C9B0] dark:border-ink-5 pt-3 space-y-2">
+                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">Match Fees</p>
+                    <p className="font-rajdhani text-xs text-emerald-700 dark:text-emerald-400">
                       ✓ Fees already applied
                       {postMatch.upload.fees_applied_at && ` · ${new Date(postMatch.upload.fees_applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
                     </p>
@@ -1122,14 +1122,14 @@ function BookingDetailPageInner() {
                         overrides applied at the time. */}
                     {postMatch.feeBreakdown.length > 0 && (
                       <div className="space-y-0.5">
-                        <p className="font-rajdhani text-xs text-zinc-400">
+                        <p className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
                           ₹{postMatch.feeBreakdown.reduce((sum, r) => sum + r.amount, 0)} collected · {postMatch.feeBreakdown.length} players charged
                         </p>
-                        <div className="bg-ink-4 border border-ink-5 rounded p-2.5 space-y-0.5">
+                        <div className="bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded p-2.5 space-y-0.5">
                           {postMatch.feeBreakdown.map(r => (
                             <div key={r.player_id} className="flex items-center justify-between gap-2 py-0.5">
-                              <span className="font-rajdhani text-xs text-zinc-300 truncate">{r.name}</span>
-                              <span className="font-rajdhani text-xs text-parchment shrink-0">₹{r.amount}</span>
+                              <span className="font-rajdhani text-xs text-[#44403C] dark:text-zinc-300 truncate">{r.name}</span>
+                              <span className="font-rajdhani text-xs text-[#1C1917] dark:text-parchment shrink-0">₹{r.amount}</span>
                             </div>
                           ))}
                         </div>
@@ -1139,7 +1139,7 @@ function BookingDetailPageInner() {
                     {postMatch.waivers.length > 0 && (
                       <div className="mt-1 space-y-0.5">
                         {postMatch.waivers.map(w => (
-                          <p key={w.player_id} className="font-rajdhani text-xs text-amber-400">
+                          <p key={w.player_id} className="font-rajdhani text-xs text-amber-700 dark:text-amber-400">
                             ⓘ {w.name} — {w.units} share{w.units === 1 ? '' : 's'} · {w.reason}
                           </p>
                         ))}
@@ -1153,25 +1153,25 @@ function BookingDetailPageInner() {
                         features/post-match-scorecard.md §6.1. */}
                     {!correctionOpen && (
                       <button onClick={openCorrection}
-                        className="font-rajdhani text-xs font-bold text-gold hover:underline">
+                        className="font-rajdhani text-xs font-bold text-amber-700 dark:text-gold hover:underline">
                         ✏️ Correct Match Fee
                       </button>
                     )}
 
                     {correctionOpen && (
-                      <div className="space-y-2 border-t border-ink-5 pt-2 mt-1">
-                        <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">
+                      <div className="space-y-2 border-t border-[#D4C9B0] dark:border-ink-5 pt-2 mt-1">
+                        <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
                           Correct Match Fee — recalculates every squad member&apos;s share
                         </p>
-                        {correctLoading && <p className="font-rajdhani text-xs text-zinc-600">Calculating…</p>}
-                        {correctError && <p className="font-rajdhani text-xs text-red-400">{correctError}</p>}
+                        {correctLoading && <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">Calculating…</p>}
+                        {correctError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">{correctError}</p>}
                         {correctPreview && (
                           <>
-                            <p className="font-rajdhani text-xs text-zinc-400">
+                            <p className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
                               ₹{correctPreview.unit_price} per share · {correctPreview.included_count} of {correctPreview.total_squad} players included
                             </p>
-                            <div className="space-y-1 bg-ink-4 border border-ink-5 rounded p-2.5">
-                              <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">
+                            <div className="space-y-1 bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded p-2.5">
+                              <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
                                 Include player in this match&apos;s fee
                               </p>
                               {correctPreview.squad.map(row => (
@@ -1183,25 +1183,25 @@ function BookingDetailPageInner() {
                                       disabled={row.exempt}
                                       onChange={() => toggleCorrectInclude(row)}
                                       className="w-3.5 h-3.5 accent-emerald-600 shrink-0" />
-                                    <span className="font-rajdhani text-xs text-zinc-300 truncate">{row.name}</span>
+                                    <span className="font-rajdhani text-xs text-[#44403C] dark:text-zinc-300 truncate">{row.name}</span>
                                     {row.exempt && (
-                                      <span className="font-rajdhani text-[9px] font-bold text-zinc-500 shrink-0">standing exemption</span>
+                                      <span className="font-rajdhani text-[9px] font-bold text-[#78716C] dark:text-zinc-500 shrink-0">standing exemption</span>
                                     )}
                                   </label>
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button type="button" disabled={row.exempt || row.units <= 0}
                                       onClick={() => updateCorrectUnits(row.player_id, row.units - 1)}
-                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-[#D4C9B0] dark:border-ink-5 rounded text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-parchment disabled:opacity-30 disabled:hover:text-[#57534E] dark:disabled:hover:text-zinc-400 transition-colors">
                                       −
                                     </button>
-                                    <span className="font-rajdhani text-xs w-4 text-center text-parchment">{row.units}</span>
+                                    <span className="font-rajdhani text-xs w-4 text-center text-[#1C1917] dark:text-parchment">{row.units}</span>
                                     <button type="button" disabled={row.exempt || row.units >= 12}
                                       onClick={() => updateCorrectUnits(row.player_id, row.units + 1)}
-                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                      className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-[#D4C9B0] dark:border-ink-5 rounded text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-parchment disabled:opacity-30 disabled:hover:text-[#57534E] dark:disabled:hover:text-zinc-400 transition-colors">
                                       +
                                     </button>
                                   </div>
-                                  <span className={`font-rajdhani text-[10px] w-24 text-right shrink-0 ${row.fee !== row.old_fee ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
+                                  <span className={`font-rajdhani text-[10px] w-24 text-right shrink-0 ${row.fee !== row.old_fee ? 'text-amber-700 dark:text-amber-400 font-bold' : 'text-[#78716C] dark:text-zinc-500'}`}>
                                     {row.old_fee > 0 || row.fee > 0 ? `₹${row.old_fee} → ₹${row.fee}` : ''}
                                   </span>
                                 </div>
@@ -1213,14 +1213,14 @@ function BookingDetailPageInner() {
                                 refund, no checkbox/stepper since there's no
                                 squad row left to attach one to. */}
                             {correctPreview.removed_players.length > 0 && (
-                              <div className="space-y-1 bg-amber-950/20 border border-amber-800/40 rounded p-2.5">
+                              <div className="space-y-1 bg-amber-50 dark:bg-amber-950/20 border border-amber-300/40 dark:border-amber-800/40 rounded p-2.5">
                                 <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-amber-500">
                                   No longer in squad — will be refunded
                                 </p>
                                 {correctPreview.removed_players.map(p => (
                                   <div key={p.player_id} className="flex items-center justify-between gap-2 py-0.5">
-                                    <span className="font-rajdhani text-xs text-zinc-300 truncate">{p.name}</span>
-                                    <span className="font-rajdhani text-xs text-amber-400 shrink-0">₹{p.old_fee} → ₹0</span>
+                                    <span className="font-rajdhani text-xs text-[#44403C] dark:text-zinc-300 truncate">{p.name}</span>
+                                    <span className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 shrink-0">₹{p.old_fee} → ₹0</span>
                                   </div>
                                 ))}
                               </div>
@@ -1230,10 +1230,10 @@ function BookingDetailPageInner() {
                               onChange={e => setCorrectionReason(e.target.value)}
                               placeholder="Reason — e.g. Did not bat/bowl, covering a guest player, or organiser revised the ground fee"
                               className="form-input text-xs" />
-                            <p className="font-rajdhani text-xs text-zinc-400">
+                            <p className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
                               Previously collected: ₹{correctPreview.total_previously_collected} · Revised total: ₹{correctPreview.total_collectable}
                               {' · '}
-                              <span className={correctPreview.net_change > 0 ? 'text-crimson' : correctPreview.net_change < 0 ? 'text-emerald-400' : ''}>
+                              <span className={correctPreview.net_change > 0 ? 'text-crimson' : correctPreview.net_change < 0 ? 'text-emerald-700 dark:text-emerald-400' : ''}>
                                 {correctPreview.net_change > 0 ? `+₹${correctPreview.net_change} to collect` : correctPreview.net_change < 0 ? `₹${Math.abs(correctPreview.net_change)} to refund` : 'No change'}
                               </span>
                             </p>
@@ -1245,7 +1245,7 @@ function BookingDetailPageInner() {
                                   : `Apply Correction — ${correctPreview.changed_count} player${correctPreview.changed_count === 1 ? '' : 's'} affected`}
                               </button>
                               <button onClick={() => { setCorrectionOpen(false); setCorrectPreview(null) }}
-                                className="font-rajdhani text-xs text-zinc-500 hover:text-parchment">
+                                className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-[#1C1917] dark:hover:text-parchment">
                                 Cancel
                               </button>
                             </div>
@@ -1257,22 +1257,22 @@ function BookingDetailPageInner() {
                 )}
 
                 {postMatch?.upload?.status === 'synced' && postMatch.upload.fees_reconciled_externally && (
-                  <div className="border-t border-ink-5 pt-3 space-y-2">
-                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Match Fees</p>
-                    <p className="font-rajdhani text-xs text-zinc-500">
+                  <div className="border-t border-[#D4C9B0] dark:border-ink-5 pt-3 space-y-2">
+                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">Match Fees</p>
+                    <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
                       ⓘ This match's fees were already reconciled outside the Hub (legacy spreadsheet) — not applicable here.
                     </p>
                   </div>
                 )}
 
                 {postMatch?.upload?.status === 'synced' && !postMatch.upload.fees_reconciled_externally && (
-                  <div className="border-t border-ink-5 pt-3 space-y-2">
-                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-500">Match Fees</p>
-                    {feeLoading && <p className="font-rajdhani text-xs text-zinc-600">Calculating…</p>}
-                    {feeError && <p className="font-rajdhani text-xs text-red-400">{feeError}</p>}
+                  <div className="border-t border-[#D4C9B0] dark:border-ink-5 pt-3 space-y-2">
+                    <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">Match Fees</p>
+                    {feeLoading && <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">Calculating…</p>}
+                    {feeError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">{feeError}</p>}
                     {feePreview && (
                       <>
-                        <p className="font-rajdhani text-xs text-zinc-400">
+                        <p className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">
                           ₹{feePreview.unit_price} per share · {feePreview.included_count} of {feePreview.total_squad} players included
                         </p>
 
@@ -1284,8 +1284,8 @@ function BookingDetailPageInner() {
                             shares (1 = the player's own share, >1 = also covering a
                             guest riding on their account). See
                             features/post-match-scorecard.md §16. */}
-                        <div className="space-y-1 bg-ink-4 border border-ink-5 rounded p-2.5">
-                          <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-zinc-500">
+                        <div className="space-y-1 bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded p-2.5">
+                          <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
                             Include player in this match's fee
                           </p>
                           {feePreview.squad.map(row => (
@@ -1297,9 +1297,9 @@ function BookingDetailPageInner() {
                                   disabled={row.exempt}
                                   onChange={() => toggleInclude(row)}
                                   className="w-3.5 h-3.5 accent-emerald-600 shrink-0" />
-                                <span className="font-rajdhani text-xs text-zinc-300 truncate">{row.name}</span>
+                                <span className="font-rajdhani text-xs text-[#44403C] dark:text-zinc-300 truncate">{row.name}</span>
                                 {row.exempt && (
-                                  <span className="font-rajdhani text-[9px] font-bold text-zinc-500 shrink-0">standing exemption</span>
+                                  <span className="font-rajdhani text-[9px] font-bold text-[#78716C] dark:text-zinc-500 shrink-0">standing exemption</span>
                                 )}
                                 {!row.exempt && (row.batted || row.bowled) && (
                                   <span className="font-rajdhani text-[9px] text-emerald-500 shrink-0">
@@ -1313,17 +1313,17 @@ function BookingDetailPageInner() {
                               <div className="flex items-center gap-1 shrink-0">
                                 <button type="button" disabled={row.exempt || row.units <= 0}
                                   onClick={() => updateUnits(row.player_id, row.units - 1)}
-                                  className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                  className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-[#D4C9B0] dark:border-ink-5 rounded text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-parchment disabled:opacity-30 disabled:hover:text-[#57534E] dark:disabled:hover:text-zinc-400 transition-colors">
                                   −
                                 </button>
-                                <span className="font-rajdhani text-xs w-4 text-center text-parchment">{row.units}</span>
+                                <span className="font-rajdhani text-xs w-4 text-center text-[#1C1917] dark:text-parchment">{row.units}</span>
                                 <button type="button" disabled={row.exempt || row.units >= 12}
                                   onClick={() => updateUnits(row.player_id, row.units + 1)}
-                                  className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-ink-5 rounded text-zinc-400 hover:text-parchment disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors">
+                                  className="w-5 h-5 flex items-center justify-center font-rajdhani text-xs font-bold border border-[#D4C9B0] dark:border-ink-5 rounded text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-parchment disabled:opacity-30 disabled:hover:text-[#57534E] dark:disabled:hover:text-zinc-400 transition-colors">
                                   +
                                 </button>
                               </div>
-                              <span className="font-rajdhani text-[10px] text-zinc-500 w-10 text-right shrink-0">
+                              <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-500 w-10 text-right shrink-0">
                                 {row.units > 0 ? `₹${row.fee}` : ''}
                               </span>
                             </div>
@@ -1351,12 +1351,12 @@ function BookingDetailPageInner() {
           )}
 
           {saveError && (
-            <div className="bg-red-950 border border-red-800 text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
+            <div className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
               {saveError}
             </div>
           )}
           {saveSuccess && (
-            <div className="bg-emerald-950 border border-emerald-800 text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded">
+            <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded">
               ✓ Saved successfully.
             </div>
           )}
@@ -1367,13 +1367,13 @@ function BookingDetailPageInner() {
           {!feesMode && (
             <>
               {isInformalFormat(format) ? (
-                <p className="font-rajdhani text-xs text-zinc-600">Rule checks don&apos;t apply to informal formats (T10/T25).</p>
+                <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">Rule checks don&apos;t apply to informal formats (T10/T25).</p>
               ) : (
                 <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
               )}
 
               {isReservation && !justConfirmed && missingCricheroesForSelfService && (
-                <div className="bg-amber-950/40 border border-amber-800 rounded px-4 py-3 font-rajdhani text-sm text-amber-300">
+                <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded px-4 py-3 font-rajdhani text-sm text-amber-700 dark:text-amber-300">
                   🔗 This is an organiser self-service hold — it can't be confirmed until a CricHeroes
                   match link exists. Add it in Match Details below, or wait for the organiser to attach
                   one via the share page (you'll get a second notification when they do).
@@ -1383,12 +1383,12 @@ function BookingDetailPageInner() {
               <div className="flex gap-3 justify-between">
                 <button onClick={handleCancel} disabled={isPostMatchEligible}
                   title={isPostMatchEligible ? 'This match has already been played — cancel via Supabase directly if this booking truly needs to be removed.' : undefined}
-                  className="font-rajdhani text-xs font-bold tracking-wide border border-red-900 text-red-500 hover:bg-red-950 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed px-4 py-2.5 rounded transition-colors">
+                  className="font-rajdhani text-xs font-bold tracking-wide border border-red-300 dark:border-red-900 text-red-500 hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed px-4 py-2.5 rounded transition-colors">
                   Cancel Booking
                 </button>
                 <div className="flex gap-3">
                   <button onClick={() => handleSave()} disabled={saving || !allPassed}
-                    className="font-rajdhani text-sm font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
+                    className="font-rajdhani text-sm font-bold tracking-widest uppercase border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/10 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
                     {saving ? 'Saving...' : 'Save Changes'}
                   </button>
                   {isReservation && !justConfirmed && (
@@ -1411,14 +1411,14 @@ function BookingDetailPageInner() {
           {/* WhatsApp Notify buttons — edit-adjacent, not relevant while
               only applying a fee. */}
           {!feesMode && (
-          <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
-            <div className="bg-ink-4 px-4 py-3 border-b border-ink-5">
-              <p className="font-cinzel text-sm text-gold">📲 Notify via WhatsApp</p>
+          <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
+            <div className="bg-parchment-2 dark:bg-ink-4 px-4 py-3 border-b border-[#D4C9B0] dark:border-ink-5">
+              <p className="font-cinzel text-sm text-amber-700 dark:text-gold">📲 Notify via WhatsApp</p>
             </div>
             {justConfirmed && (
-              <div className="bg-emerald-950/40 border-b border-emerald-800 px-4 py-3">
-                <p className="font-rajdhani text-sm font-bold text-emerald-400">🎉 Game booked!</p>
-                <p className="font-rajdhani text-xs text-emerald-300/80 mt-0.5">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-300 dark:border-emerald-800 px-4 py-3">
+                <p className="font-rajdhani text-sm font-bold text-emerald-700 dark:text-emerald-400">🎉 Game booked!</p>
+                <p className="font-rajdhani text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
                   Notify the organiser and captain below before heading back.
                 </p>
               </div>
@@ -1430,7 +1430,7 @@ function BookingDetailPageInner() {
                   <WAIcon /> Message Organiser
                 </a>
               ) : (
-                <div className="font-rajdhani text-xs text-zinc-600 bg-ink-4 border border-ink-5 rounded px-3 py-2.5">
+                <div className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2.5">
                   Add organiser phone to enable WhatsApp notification
                 </div>
               )}
@@ -1440,16 +1440,16 @@ function BookingDetailPageInner() {
                   <WAIcon /> Message Captain ({captainName})
                 </a>
               ) : (
-                <div className="font-rajdhani text-xs text-zinc-600 bg-ink-4 border border-ink-5 rounded px-3 py-2.5">
+                <div className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2.5">
                   {tournamentId ? 'No captain selected for this booking' : 'Select a tournament to enable captain notification'}
                 </div>
               )}
-              <p className="font-rajdhani text-[10px] text-zinc-600 italic">
+              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 italic">
                 Messages open pre-filled in WhatsApp for your review before sending.
               </p>
               {justConfirmed && (
                 <button onClick={() => router.push('/admin?saved=1')}
-                  className="w-full font-rajdhani text-sm font-bold tracking-wide border border-ink-5 text-zinc-400 hover:text-zinc-200 hover:border-gold-dim px-4 py-2.5 rounded transition-colors">
+                  className="w-full font-rajdhani text-sm font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-zinc-200 hover:border-gold-dim px-4 py-2.5 rounded transition-colors">
                   Done — Back to Matches
                 </button>
               )}
@@ -1458,9 +1458,9 @@ function BookingDetailPageInner() {
           )}
 
           {/* Booking summary */}
-          <div className="bg-ink-3 border border-ink-5 rounded p-4">
-            <p className="font-cinzel text-xs text-gold mb-3">Booking Summary</p>
-            <div className="font-rajdhani text-sm text-zinc-400 space-y-1.5">
+          <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4">
+            <p className="font-cinzel text-xs text-amber-700 dark:text-gold mb-3">Booking Summary</p>
+            <div className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400 space-y-1.5">
               <p>📅 {booking.game_date}</p>
               <p>🕐 {slotTime}{format ? ` — ${format}` : ''}</p>
               {captainName        && <p>👤 {captainName}</p>}
@@ -1470,7 +1470,7 @@ function BookingDetailPageInner() {
               {matchId            && <p>🏏 Match ID: {matchId}</p>}
               {cricheroes && (
                 <a href={cricheroes} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-gold hover:underline">
+                  className="flex items-center gap-1 text-amber-700 dark:text-gold hover:underline">
                   🔗 View on CricHeroes
                 </a>
               )}
@@ -1481,7 +1481,7 @@ function BookingDetailPageInner() {
 
           {/* Status badge */}
           <div className={`rounded px-4 py-3 border font-rajdhani text-sm font-bold text-center
-            ${displayConfirmed ? 'bg-emerald-950 border-emerald-800 text-emerald-400' : 'bg-amber-950 border-amber-800 text-amber-400'}`}>
+            ${displayConfirmed ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400'}`}>
             {displayConfirmed ? '✓ Confirmed' : '🟡 Reserved — Pending Confirmation'}
           </div>
         </div>
@@ -1492,9 +1492,9 @@ function BookingDetailPageInner() {
 
 function FormCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded p-5">
-      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-ink-5">
-        <h3 className="font-cinzel text-sm text-gold font-semibold">{title}</h3>
+    <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5">
+      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#D4C9B0] dark:border-ink-5">
+        <h3 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold">{title}</h3>
       </div>
       {children}
     </div>

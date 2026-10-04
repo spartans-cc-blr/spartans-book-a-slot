@@ -190,6 +190,18 @@
   --unavail-toggle-shadow-hi: rgba(255,255,255,0.9);
   --unavail-toggle-shadow-lo: rgba(28,25,23,0.1);
   --unavail-danger: #DC2626;
+  /* Generic app surface tokens — for inline-style pages that predate the
+     per-surface sets above (schedule, tournament planner dots, etc.) */
+  --app-bg: #F8F4EE;
+  --app-surface: #EEEAE2;
+  --app-surface-deep: #E2DACE;
+  --app-border: #D4C9B0;
+  --app-text: #1C1917;
+  --app-text-2: #44403C;
+  --app-muted: #78716C;
+  --app-faint: #A8A29E;
+  --app-accent: #D97706;
+  --app-accent-dim: #B45309;
 }
 [data-theme="dark"] {
   --home-shell-bg: #111111;
@@ -324,10 +336,24 @@
   --unavail-toggle-shadow-hi: rgba(255,255,255,0.04);
   --unavail-toggle-shadow-lo: rgba(0,0,0,0.4);
   --unavail-danger: #FCA5A5;
+  --app-bg: #080808;
+  --app-surface: #111111;
+  --app-surface-deep: #1A1A1A;
+  --app-border: #2E2E2E;
+  --app-text: #F0E8D0;
+  --app-text-2: #D4D4D8;
+  --app-muted: #A1A1AA;
+  --app-faint: #71717A;
+  --app-accent: #C9A84C;
+  --app-accent-dim: #E8C97A;
 }
 
 @layer base {
   body {
+    background-color: #F8F4EE;
+    color: #1C1917;
+  }
+  [data-theme="dark"] body {
     background-color: #080808;
     color: #F0E8D0;
   }
@@ -358,10 +384,10 @@
   .font-rajdhani { font-family: var(--font-rajdhani); }
 
   /* Slot status colours */
-  .slot-open      { @apply bg-emerald-950 border border-emerald-800 text-emerald-400; }
-  .slot-booked    { @apply bg-red-950     border border-red-900     text-red-400; }
-  .slot-softblock { @apply bg-yellow-950  border border-yellow-800  text-yellow-500; }
-  .slot-clash     { @apply bg-ink-3       border border-ink-5       text-zinc-600; }
+  .slot-open      { @apply bg-emerald-50 border border-emerald-300 text-emerald-700 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-400; }
+  .slot-booked    { @apply bg-red-50 border border-red-300 text-red-700 dark:bg-red-950 dark:border-red-900 dark:text-red-400; }
+  .slot-softblock { @apply bg-yellow-50 border border-yellow-300 text-yellow-700 dark:bg-yellow-950 dark:border-yellow-800 dark:text-yellow-500; }
+  .slot-clash     { @apply bg-parchment-2 border border-[#D4C9B0] text-[#78716C] dark:bg-ink-3 dark:border-ink-5 dark:text-zinc-600; }
 
   /* Gold divider */
   .gold-divider {

@@ -94,7 +94,7 @@ export function FeeReminderModal() {
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="font-rajdhani text-sm text-parchment leading-snug">
+        <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment leading-snug">
           {bookings.length} synced match{bookings.length === 1 ? '' : 'es'} — ₹{totalPending} not yet applied.
         </p>
         <div className="flex flex-col gap-2">
@@ -102,16 +102,16 @@ export function FeeReminderModal() {
             <a
               key={b.booking_id}
               href={`/admin/bookings/${b.booking_id}`}
-              className="block bg-ink-4 border border-ink-5 rounded p-2.5 hover:border-gold-dim transition-colors"
+              className="block bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded p-2.5 hover:border-gold-dim transition-colors"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="font-rajdhani text-sm text-parchment truncate">
+                <span className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment truncate">
                   {b.opponent_name ? `vs ${b.opponent_name}` : 'Match'}
                   {b.tournament_name ? ` · ${b.tournament_name}` : ''}
                 </span>
-                <span className="font-rajdhani text-sm font-bold text-gold shrink-0">₹{b.fee}</span>
+                <span className="font-rajdhani text-sm font-bold text-amber-700 dark:text-gold shrink-0">₹{b.fee}</span>
               </div>
-              <p className="font-rajdhani text-[11px] text-zinc-500 mt-0.5">
+              <p className="font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-500 mt-0.5">
                 {formatDate(b.game_date)} · {b.slot_time} · {b.squad_count} in squad
               </p>
             </a>

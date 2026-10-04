@@ -14,11 +14,11 @@ const SLOT_HEADERS: { time: SlotTime; label: string }[] = [
 ]
 
 const STATUS_CONFIG = {
-  open:       { label: 'Open',         gridLabel: 'Open',         icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
-  t20only:    { label: 'T20 only',     gridLabel: 'T20 only',     icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-950 border border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer' },
-  booked:     { label: 'Booked',       gridLabel: 'Booked',       icon: '🔴', pill: 'slot-booked',    gridCls: 'bg-red-950 border border-red-900 cursor-default' },
-  soft_block: { label: 'Reserved',     gridLabel: 'Reserved',     icon: '🟡', pill: 'slot-softblock', gridCls: 'bg-yellow-950 border border-yellow-800 cursor-default animate-pulse' },
-  clash:      { label: 'Unavailable',  gridLabel: 'Unavailable',  icon: '⛔', pill: 'slot-clash',     gridCls: 'bg-ink-3 border border-ink-5 cursor-not-allowed' },
+  open:       { label: 'Open',         gridLabel: 'Open',         icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer animate-pulse-open' },
+  t20only:    { label: 'T20 only',     gridLabel: 'T20 only',     icon: '🟢', pill: 'slot-open',      gridCls: 'bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 hover:border-emerald-400 hover:-translate-y-0.5 transition-all cursor-pointer' },
+  booked:     { label: 'Booked',       gridLabel: 'Booked',       icon: '🔴', pill: 'slot-booked',    gridCls: 'bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-900 cursor-default' },
+  soft_block: { label: 'Reserved',     gridLabel: 'Reserved',     icon: '🟡', pill: 'slot-softblock', gridCls: 'bg-yellow-50 dark:bg-yellow-950 border border-yellow-300 dark:border-yellow-800 cursor-default animate-pulse' },
+  clash:      { label: 'Unavailable',  gridLabel: 'Unavailable',  icon: '⛔', pill: 'slot-clash',     gridCls: 'bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 cursor-not-allowed' },
   na:         { label: '',             gridLabel: '',             icon: '—',  pill: '',               gridCls: 'bg-transparent border-transparent cursor-default' },
 }
 
@@ -104,8 +104,8 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                 onClick={() => setCurrentWeek(weekIndex)}
                 className={`font-rajdhani text-xs font-semibold tracking-widest px-4 py-1.5 rounded-full border transition-all whitespace-nowrap
                   ${week && new Date(week.weekStart).getMonth() === d.getMonth() && new Date(week.weekStart).getFullYear() === d.getFullYear()
-                    ? 'border-gold text-gold bg-gold/10'
-                    : 'border-ink-5 text-zinc-600 hover:border-gold-dim hover:text-gold'}`}>
+                    ? 'border-gold text-amber-700 dark:text-gold bg-gold/10'
+                    : 'border-[#D4C9B0] dark:border-ink-5 text-[#78716C] dark:text-zinc-600 hover:border-gold-dim hover:text-amber-700 dark:hover:text-gold'}`}>
                 {monthLabel} {year}
               </button>
             )
@@ -113,32 +113,32 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
       </div>
 
       {/* Week navigator */}
-      <div className="flex items-center gap-3 bg-ink-3 border border-ink-5 rounded p-3 mb-4">
+      <div className="flex items-center gap-3 bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-3 mb-4">
         <button onClick={() => setCurrentWeek(w => Math.max(0, w - 1))}
           disabled={currentWeek === 0}
-          className="w-8 h-8 flex items-center justify-center border border-gold-dim text-gold rounded text-lg disabled:opacity-30 hover:bg-gold-dim transition-colors">
+          className="w-8 h-8 flex items-center justify-center border border-gold-dim text-amber-700 dark:text-gold rounded text-lg disabled:opacity-30 hover:bg-gold-dim transition-colors">
           ‹
         </button>
         <div className="flex-1 min-w-0">
-          <p className="font-cinzel text-sm text-gold-light truncate flex items-center gap-2">
+          <p className="font-cinzel text-sm text-amber-600 dark:text-gold-light truncate flex items-center gap-2">
             {week?.label}
             {week?.weekendFull && (
-              <span className="font-rajdhani text-[10px] font-bold tracking-wide bg-zinc-800 border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded-full whitespace-nowrap">
+              <span className="font-rajdhani text-[10px] font-bold tracking-wide bg-parchment-2 dark:bg-zinc-800 border border-[#D4C9B0] dark:border-zinc-700 text-[#57534E] dark:text-zinc-400 px-2 py-0.5 rounded-full whitespace-nowrap">
                 🔒 Capacity Full
               </span>
             )}
           </p>
-          <p className="text-xs text-zinc-600 font-rajdhani mt-0.5">Week {currentWeek + 1} of {weeks.length}</p>
+          <p className="text-xs text-[#78716C] dark:text-zinc-600 font-rajdhani mt-0.5">Week {currentWeek + 1} of {weeks.length}</p>
         </div>
         <div className="hidden sm:flex gap-1">
           {weeks.slice(0, 15).map((_, i) => (
             <button key={i} onClick={() => setCurrentWeek(i)}
-              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === currentWeek ? 'bg-gold' : 'bg-ink-5 hover:bg-gold-dim'}`} />
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === currentWeek ? 'bg-gold' : 'bg-parchment-3 dark:bg-ink-5 hover:bg-gold-dim'}`} />
           ))}
         </div>
         <button onClick={() => setCurrentWeek(w => Math.min(weeks.length - 1, w + 1))}
           disabled={currentWeek === weeks.length - 1}
-          className="w-8 h-8 flex items-center justify-center border border-gold-dim text-gold rounded text-lg disabled:opacity-30 hover:bg-gold-dim transition-colors">
+          className="w-8 h-8 flex items-center justify-center border border-gold-dim text-amber-700 dark:text-gold rounded text-lg disabled:opacity-30 hover:bg-gold-dim transition-colors">
           ›
         </button>
       </div>
@@ -148,13 +148,13 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
         {Object.entries(STATUS_CONFIG)
           .filter(([key]) => key !== 'na')
           .map(([key, cfg]) => (
-            <div key={key} className="flex items-center gap-1.5 text-xs text-zinc-500 font-rajdhani">
+            <div key={key} className="flex items-center gap-1.5 text-xs text-[#78716C] dark:text-zinc-500 font-rajdhani">
               <span className="text-sm">{cfg.icon}</span>
               {cfg.label}
             </div>
           ))}
         {week?.weekendFull && (
-          <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-rajdhani">
+          <div className="flex items-center gap-1.5 text-xs text-[#78716C] dark:text-zinc-500 font-rajdhani">
             <span className="text-sm">🔒</span>
             Capacity Full
           </div>
@@ -163,10 +163,10 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
 
       {/* Weekend capacity banner */}
       {week?.weekendFull && (
-        <div className="bg-amber-950/60 border border-amber-800 border-l-4 border-l-amber-500 rounded px-4 py-3 mb-4 flex items-start gap-3">
+        <div className="bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 border-l-4 border-l-amber-500 rounded px-4 py-3 mb-4 flex items-start gap-3">
           <span className="text-xl flex-shrink-0">🔒</span>
           <div>
-            <p className="font-rajdhani font-bold text-amber-400 text-sm">This weekend is at capacity</p>
+            <p className="font-rajdhani font-bold text-amber-700 dark:text-amber-400 text-sm">This weekend is at capacity</p>
             <p className="font-rajdhani text-amber-600 text-xs mt-0.5">
               {playerView
                 ? `${week.gamesBooked} of 3 games are scheduled this weekend.`
@@ -185,24 +185,24 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
           const [dayName, dayNum, mon] = day.label.split(' ')
 
           return (
-            <div key={day.date} className="bg-ink-3 border border-ink-5 rounded overflow-hidden animate-fade-up"
+            <div key={day.date} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden animate-fade-up"
               style={{ animationDelay: `${di * 60}ms` }}>
-              <button className="w-full flex items-center gap-3 p-3 text-left border-b border-ink-5"
+              <button className="w-full flex items-center gap-3 p-3 text-left border-b border-[#D4C9B0] dark:border-ink-5"
                 onClick={() => toggleDay(day.date)}>
-                <div className="w-11 h-11 bg-ink-4 border border-gold-dim rounded flex flex-col items-center justify-center flex-shrink-0">
-                  <span className="font-cinzel text-gold text-[8px] font-bold tracking-wider">{dayName}</span>
-                  <span className="font-cinzel text-parchment text-lg font-bold leading-none">{dayNum}</span>
+                <div className="w-11 h-11 bg-parchment-2 dark:bg-ink-4 border border-gold-dim rounded flex flex-col items-center justify-center flex-shrink-0">
+                  <span className="font-cinzel text-amber-700 dark:text-gold text-[8px] font-bold tracking-wider">{dayName}</span>
+                  <span className="font-cinzel text-[#1C1917] dark:text-parchment text-lg font-bold leading-none">{dayNum}</span>
                   <span className="text-muted text-[9px] tracking-wide">{mon}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-rajdhani font-bold text-base text-parchment">{day.label}</p>
+                  <p className="font-rajdhani font-bold text-base text-[#1C1917] dark:text-parchment">{day.label}</p>
                   <div className="flex gap-1.5 mt-1 flex-wrap">
                     {openCount  > 0 && !week?.weekendFull && <span className="slot-open text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border">{openCount} open</span>}
                     {takenCount > 0 && <span className="slot-booked text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border">{takenCount} taken</span>}
-                    {week?.weekendFull && <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border border-zinc-700 text-zinc-500">Weekend Full</span>}
+                    {week?.weekendFull && <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-sm border border-[#D4C9B0] dark:border-zinc-700 text-[#78716C] dark:text-zinc-500">Weekend Full</span>}
                   </div>
                 </div>
-                <span className={`text-zinc-600 text-xl transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>⌄</span>
+                <span className={`text-[#78716C] dark:text-zinc-600 text-xl transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>⌄</span>
               </button>
 
               {expanded && (
@@ -216,16 +216,16 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
 
                     return (
                       <div key={slot.time}
-                        className={`flex items-center gap-3 px-4 py-3 border-b border-ink-4 last:border-0 ${slot.status === 'open' && !week?.weekendFull ? 'hover:bg-emerald-950/20' : ''}`}>
+                        className={`flex items-center gap-3 px-4 py-3 border-b border-[#E2DACE] dark:border-ink-4 last:border-0 ${slot.status === 'open' && !week?.weekendFull ? 'hover:bg-emerald-50 dark:hover:bg-emerald-950/20' : ''}`}>
                         <div className="w-14 flex-shrink-0">
-                          <p className="font-cinzel text-sm font-semibold text-parchment">{slot.time}</p>
-                          <p className="text-[10px] text-zinc-600 font-rajdhani">{header.label}</p>
+                          <p className="font-cinzel text-sm font-semibold text-[#1C1917] dark:text-parchment">{slot.time}</p>
+                          <p className="text-[10px] text-[#78716C] dark:text-zinc-600 font-rajdhani">{header.label}</p>
                         </div>
                         <div className="flex-1">
                           {/* Capacity full locked — just lock icon, no text */}
                           {isLocked ? (
-                            <div className="flex items-center justify-center h-8 rounded bg-zinc-900 border border-zinc-800">
-                              <span className="text-zinc-700 text-sm">🔒</span>
+                            <div className="flex items-center justify-center h-8 rounded bg-white dark:bg-zinc-900 border border-[#D4C9B0] dark:border-zinc-800">
+                              <span className="text-[#78716C] dark:text-zinc-700 text-sm">🔒</span>
                             </div>
                           ) : slot.status === 'booked' && slot.cricheroes_url ? (
                             <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
@@ -243,11 +243,11 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                           ) : slot.status === 'clash' ? (
                             <div className={`flex items-center gap-1.5 ${cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
                               {arrowDir && (
-                                <span className="text-zinc-600 flex-shrink-0">
+                                <span className="text-[#78716C] dark:text-zinc-600 flex-shrink-0">
                                   <ArrowIcon direction={arrowDir} />
                                 </span>
                               )}
-                              <span className="text-zinc-600">Play in progress</span>
+                              <span className="text-[#78716C] dark:text-zinc-600">Play in progress</span>
                             </div>
                           ) : (
                             <div className={`flex flex-col ${cfg.pill} text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-sm border`}>
@@ -293,11 +293,11 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="text-left font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-600 py-2.5 px-4 bg-ink-3 border-b border-ink-5 w-28">Day</th>
+              <th className="text-left font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-600 py-2.5 px-4 bg-white dark:bg-ink-3 border-b border-[#D4C9B0] dark:border-ink-5 w-28">Day</th>
               {SLOT_HEADERS.map(h => (
-                <th key={h.time} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-600 py-2.5 px-2 bg-ink-3 border-b border-ink-5 text-center w-1/4">
+                <th key={h.time} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-600 py-2.5 px-2 bg-white dark:bg-ink-3 border-b border-[#D4C9B0] dark:border-ink-5 text-center w-1/4">
                   {h.time}<br />
-                  <span className="text-[9px] text-zinc-700 font-normal normal-case tracking-normal">{h.label}</span>
+                  <span className="text-[9px] text-[#78716C] dark:text-zinc-700 font-normal normal-case tracking-normal">{h.label}</span>
                 </th>
               ))}
             </tr>
@@ -307,8 +307,8 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
               const [dayName, dayNum, mon] = day.label.split(' ')
               return (
                 <tr key={day.date}>
-                  <td className="bg-ink-3 border-r border-ink-5 border-b border-ink-4 px-4 py-3">
-                    <p className="font-cinzel text-xs text-gold font-semibold">{dayName}</p>
+                  <td className="bg-white dark:bg-ink-3 border-r border-[#D4C9B0] dark:border-ink-5 border-b border-[#E2DACE] dark:border-ink-4 px-4 py-3">
+                    <p className="font-cinzel text-xs text-amber-700 dark:text-gold font-semibold">{dayName}</p>
                     <p className="font-rajdhani text-sm text-muted">{dayNum} {mon}</p>
                   </td>
                   {day.slots.map((slot) => {
@@ -318,26 +318,26 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                     const arrowDir    = slot.status === 'clash' ? getArrowDirection(slot.time as SlotTime, clashSource, false) : null
 
                     return (
-                      <td key={slot.time} className="p-1.5 border-b border-ink-4 w-1/4">
+                      <td key={slot.time} className="p-1.5 border-b border-[#E2DACE] dark:border-ink-4 w-1/4">
                         {/* Capacity full locked — just lock icon */}
                         {isLocked ? (
-                          <div className="flex items-center justify-center h-16 rounded bg-zinc-900 border border-zinc-800">
-                            <span className="text-zinc-700 text-lg">🔒</span>
+                          <div className="flex items-center justify-center h-16 rounded bg-white dark:bg-zinc-900 border border-[#D4C9B0] dark:border-zinc-800">
+                            <span className="text-[#78716C] dark:text-zinc-700 text-lg">🔒</span>
                           </div>
                         ) : slot.status === 'open' && slot.waLink && !week?.weekendFull && !playerView ? (
                           <a href={slot.waLink} target="_blank" rel="noopener noreferrer"
                             className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${cfg.gridCls} group`}
                             title="Click to WhatsApp about this slot">
                             <span className="text-lg group-hover:scale-110 transition-transform">{cfg.icon}</span>
-                            <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-400">{cfg.gridLabel}</span>
+                            <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-700 dark:text-emerald-400">{cfg.gridLabel}</span>
                           </a>
                         ) : slot.status === 'open' && playerView && !week?.weekendFull ? (
-                          <div className="flex flex-col items-center justify-center gap-1 h-16 rounded bg-ink-3 border border-ink-5">
-                            <span className="font-rajdhani text-[10px] text-zinc-600 text-center px-1">Scheduling in progress</span>
+                          <div className="flex flex-col items-center justify-center gap-1 h-16 rounded bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5">
+                            <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 text-center px-1">Scheduling in progress</span>
                           </div>
                         ) : slot.status === 'clash' ? (
                           <div className={`flex flex-col items-center justify-center gap-1 h-16 rounded ${cfg.gridCls}`}>
-                            <div className="flex items-center gap-1.5 text-zinc-600">
+                            <div className="flex items-center gap-1.5 text-[#78716C] dark:text-zinc-600">
                               {arrowDir && <ArrowIcon direction={arrowDir} />}
                               <span className="font-rajdhani text-[10px] font-bold tracking-wide text-center leading-tight">
                                 Play in<br />progress
@@ -347,21 +347,21 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                           </div>
                         ) : slot.status === 'booked' && slot.cricheroes_url ? (
                           <a href={slot.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                            className={`flex flex-col items-center justify-center gap-0.5 h-16 px-1 rounded ${cfg.gridCls} hover:border-red-700 transition-colors`}
+                            className={`flex flex-col items-center justify-center gap-0.5 h-16 px-1 rounded ${cfg.gridCls} hover:border-red-300 dark:hover:border-red-700 transition-colors`}
                             title="View match on CricHeroes">
                             <span className="text-lg">🏏</span>
                             {slot.tournament_name && (
-                              <span className="font-rajdhani text-[10px] font-bold tracking-wide text-red-400 text-center w-full px-1 truncate">
+                              <span className="font-rajdhani text-[10px] font-bold tracking-wide text-red-700 dark:text-red-400 text-center w-full px-1 truncate">
                                 {slot.tournament_name}
                               </span>
                             )}
                             {slot.opponent_name && (
-                              <span className="font-rajdhani text-[9px] text-red-300 opacity-75 text-center w-full px-1 truncate">
+                              <span className="font-rajdhani text-[9px] text-red-700 dark:text-red-300 opacity-75 text-center w-full px-1 truncate">
                                 vs {slot.opponent_name}
                               </span>
                             )}
                             {!slot.opponent_name && !slot.tournament_name && (
-                              <span className="font-rajdhani text-[10px] font-bold tracking-wide text-red-400 text-center w-full px-1">
+                              <span className="font-rajdhani text-[10px] font-bold tracking-wide text-red-700 dark:text-red-400 text-center w-full px-1">
                                 Booked
                               </span>
                             )}
@@ -373,7 +373,7 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
                               <span className={
                                 slot.status === 'booked'     ? 'text-red-500'    :
                                 slot.status === 'soft_block' ? 'text-yellow-500' :
-                                'text-zinc-700'}>
+                                'text-[#78716C] dark:text-zinc-700'}>
                                 {slot.status === 'soft_block' ? 'Reserved' : cfg.gridLabel}
                               </span>
                               {slot.status === 'soft_block' && slot.reserved_until && (
@@ -407,8 +407,8 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
           <div className="flex items-start gap-4 mb-4 lg:mb-0 lg:flex-1">
             <span className="text-3xl flex-shrink-0">🏏</span>
             <div>
-              <h3 className="font-cinzel text-gold text-sm font-semibold mb-1">Found a slot that works?</h3>
-              <p className="font-rajdhani text-zinc-500 text-sm leading-relaxed">
+              <h3 className="font-cinzel text-amber-700 dark:text-gold text-sm font-semibold mb-1">Found a slot that works?</h3>
+              <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm leading-relaxed">
                 Tap below to WhatsApp us directly. We'll confirm your game within a few hours. No forms, no email chains.
               </p>
             </div>
@@ -418,7 +418,7 @@ export function ScheduleGrid({ playerView = false }: { playerView?: boolean }) {
               className="flex items-center justify-center gap-2.5 w-full lg:w-auto bg-[#25D366] hover:bg-[#1aaa52] text-white font-rajdhani font-bold text-sm tracking-widest uppercase px-6 py-3.5 rounded transition-colors">
               <WAIcon size={18} /> WhatsApp Us to Book
             </a>
-            <p className="font-rajdhani text-xs text-zinc-700 mt-1.5 text-center lg:text-left italic">
+            <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-700 mt-1.5 text-center lg:text-left italic">
               Opens with a pre-filled message including your chosen slot
             </p>
           </div>
@@ -440,7 +440,7 @@ function ScheduleGridSkeleton() {
   return (
     <div className="space-y-3 animate-pulse">
       {[0, 1].map(i => (
-        <div key={i} className="h-20 bg-ink-3 rounded border border-ink-5" />
+        <div key={i} className="h-20 bg-white dark:bg-ink-3 rounded border border-[#D4C9B0] dark:border-ink-5" />
       ))}
     </div>
   )

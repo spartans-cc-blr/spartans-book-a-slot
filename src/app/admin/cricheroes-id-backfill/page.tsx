@@ -17,11 +17,11 @@ type RowStatus = 'idle' | 'processing' | 'resolved' | 'unresolved' | 'failed'
 const DELAY_BETWEEN_MS = 3000
 
 const STATUS_CONFIG: Record<RowStatus, { label: string; className: string }> = {
-  idle:       { label: 'Pending',    className: 'bg-ink-4 border-ink-5 text-zinc-500' },
-  processing: { label: 'Resolving…', className: 'bg-amber-950/40 border-amber-800 text-amber-400' },
-  resolved:   { label: 'Resolved ✓', className: 'bg-emerald-950/40 border-emerald-800 text-emerald-400' },
-  unresolved: { label: 'No ID found', className: 'bg-ink-4 border-ink-5 text-zinc-500' },
-  failed:     { label: 'Failed',     className: 'bg-red-950/40 border-red-800 text-red-400' },
+  idle:       { label: 'Pending',    className: 'bg-parchment-2 dark:bg-ink-4 border-[#D4C9B0] dark:border-ink-5 text-[#78716C] dark:text-zinc-500' },
+  processing: { label: 'Resolving…', className: 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400' },
+  resolved:   { label: 'Resolved ✓', className: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' },
+  unresolved: { label: 'No ID found', className: 'bg-parchment-2 dark:bg-ink-4 border-[#D4C9B0] dark:border-ink-5 text-[#78716C] dark:text-zinc-500' },
+  failed:     { label: 'Failed',     className: 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800 text-red-700 dark:text-red-400' },
 }
 
 function StatusBadge({ status }: { status: RowStatus }) {
@@ -104,34 +104,34 @@ export default function CricheroesIdBackfillPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-gold">CricHeroes ID Backfill</h1>
-        <p className="font-rajdhani text-sm text-zinc-500 mt-1">
-          Re-resolves <code className="text-zinc-400">cricheroes_player_id</code> for players who already have a{' '}
-          <code className="text-zinc-400">cricheroes_url</code> saved but no extracted ID yet — most likely because
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">CricHeroes ID Backfill</h1>
+        <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 mt-1">
+          Re-resolves <code className="text-[#57534E] dark:text-zinc-400">cricheroes_player_id</code> for players who already have a{' '}
+          <code className="text-[#57534E] dark:text-zinc-400">cricheroes_url</code> saved but no extracted ID yet — most likely because
           they saved before the resolver (or its Render fallback for chshare.link share links) existed. Doesn&apos;t
-          touch <code className="text-zinc-400">cricheroes_url</code> itself, only re-derives the ID from what&apos;s
+          touch <code className="text-[#57534E] dark:text-zinc-400">cricheroes_url</code> itself, only re-derives the ID from what&apos;s
           already there.
         </p>
       </div>
 
-      {loading && <p className="font-rajdhani text-sm text-zinc-600">Loading…</p>}
-      {loadError && <p className="font-rajdhani text-sm text-red-400">{loadError}</p>}
+      {loading && <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">Loading…</p>}
+      {loadError && <p className="font-rajdhani text-sm text-red-700 dark:text-red-400">{loadError}</p>}
 
       {!loading && !loadError && candidates.length === 0 && (
-        <p className="font-rajdhani text-sm text-zinc-600">Nothing pending — every saved CricHeroes URL already has an extracted ID.</p>
+        <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">Nothing pending — every saved CricHeroes URL already has an extracted ID.</p>
       )}
 
       {!loading && !loadError && candidates.length > 0 && (
         <>
-          <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
+          <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <button
                 onClick={toggleAll}
                 disabled={running}
-                className="font-rajdhani text-xs font-semibold text-zinc-500 hover:text-gold disabled:opacity-40 transition-colors">
+                className="font-rajdhani text-xs font-semibold text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold disabled:opacity-40 transition-colors">
                 {selected.size === candidates.length ? 'Deselect all' : 'Select all'}
               </button>
-              <p className="font-rajdhani text-sm text-zinc-400">
+              <p className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">
                 {selected.size} of {candidates.length} selected
                 {hasRun && ` · ${resolvedCount} resolved, ${unresolvedCount} no ID, ${failedCount} failed`}
               </p>
@@ -139,7 +139,7 @@ export default function CricheroesIdBackfillPage() {
             <button
               onClick={runBackfill}
               disabled={running || selected.size === 0}
-              className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
+              className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/20 disabled:opacity-40 px-5 py-2.5 rounded transition-colors">
               {running ? 'Running…' : `Run Backfill (${selected.size})`}
             </button>
           </div>
@@ -149,7 +149,7 @@ export default function CricheroesIdBackfillPage() {
               const result = results[c.id]
               const status: RowStatus = result?.status ?? 'idle'
               return (
-                <div key={c.id} className="bg-ink-3 border border-ink-5 rounded px-4 py-3 flex items-center gap-3">
+                <div key={c.id} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-4 py-3 flex items-center gap-3">
                   <input
                     type="checkbox"
                     checked={selected.has(c.id)}
@@ -158,13 +158,13 @@ export default function CricheroesIdBackfillPage() {
                     className="flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-rajdhani text-sm text-zinc-300">{c.name}</p>
-                    <p className="font-rajdhani text-xs text-zinc-600 truncate">{c.cricheroes_url}</p>
+                    <p className="font-rajdhani text-sm text-[#44403C] dark:text-zinc-300">{c.name}</p>
+                    <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 truncate">{c.cricheroes_url}</p>
                     {status === 'resolved' && result?.message && (
                       <p className="font-rajdhani text-xs text-emerald-500 mt-0.5">ID: {result.message}</p>
                     )}
                     {status === 'failed' && result?.message && (
-                      <p className="font-rajdhani text-xs text-red-400 mt-0.5">{result.message}</p>
+                      <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-0.5">{result.message}</p>
                     )}
                   </div>
                   <StatusBadge status={status} />

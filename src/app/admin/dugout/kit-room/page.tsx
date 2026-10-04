@@ -68,9 +68,9 @@ export default async function AdminKitRoomPage() {
   const batchDate = settingsResult.data?.kit_room_batch_date ?? null
 
   return (
-    <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-parchment dark:bg-ink">
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-6">Kit Room — Admin</h1>
+        <h1 className="font-cinzel font-bold text-2xl text-stone-900 dark:text-parchment mb-6">Kit Room — Admin</h1>
         <AdminKitRoomClient
           orders={orders}
           batchDate={batchDate}

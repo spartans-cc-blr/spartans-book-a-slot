@@ -84,8 +84,8 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-cinzel text-xl font-bold text-gold">Grounds</h1>
-          <p className="font-rajdhani text-zinc-500 text-sm mt-1">Manage grounds — Google Maps link and nearest hospital link.</p>
+          <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Grounds</h1>
+          <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">Manage grounds — Google Maps link and nearest hospital link.</p>
         </div>
         {canAdd && (
           <button onClick={() => { setShowAdd(v => !v); setError('') }}
@@ -97,8 +97,8 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
 
       {/* Add form */}
       {canAdd && showAdd && (
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-6 space-y-4">
-          <h2 className="font-cinzel text-sm text-gold font-semibold">New Ground</h2>
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-6 space-y-4">
+          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold">New Ground</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="form-label">Ground Name <span className="text-crimson">*</span></label>
@@ -109,16 +109,16 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
               <label className="form-label">Google Maps URL <span className="text-crimson">*</span></label>
               <input value={addForm.maps_url} onChange={e => setAddForm(f => ({ ...f, maps_url: e.target.value }))}
                 placeholder="https://maps.google.com/?q=..." className="form-input" />
-              <p className="font-rajdhani text-xs text-zinc-600 mt-1">Open the ground in Google Maps, tap Share → Copy link.</p>
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">Open the ground in Google Maps, tap Share → Copy link.</p>
             </div>
             <div>
               <label className="form-label">Nearest Hospital URL <span className="text-crimson">*</span></label>
               <input value={addForm.hospital_url} onChange={e => setAddForm(f => ({ ...f, hospital_url: e.target.value }))}
                 placeholder="https://maps.google.com/?q=..." className="form-input" />
-              <p className="font-rajdhani text-xs text-zinc-600 mt-1">Search nearest hospital on Google Maps, tap Share → Copy link.</p>
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">Search nearest hospital on Google Maps, tap Share → Copy link.</p>
             </div>
           </div>
-          {error && <p className="font-rajdhani text-xs text-red-400">{error}</p>}
+          {error && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">{error}</p>}
           <div className="flex gap-2">
             <button onClick={handleAdd} disabled={saving}
               className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
@@ -126,13 +126,13 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
             </button>
             {addForm.maps_url && (
               <a href={addForm.maps_url} target="_blank" rel="noopener noreferrer"
-                className="font-rajdhani text-xs text-zinc-500 hover:text-gold border border-ink-5 hover:border-gold-dim px-4 py-2 rounded transition-colors">
+                className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim px-4 py-2 rounded transition-colors">
                 Test Maps Link ↗
               </a>
             )}
             {addForm.hospital_url && (
               <a href={addForm.hospital_url} target="_blank" rel="noopener noreferrer"
-                className="font-rajdhani text-xs text-zinc-500 hover:text-gold border border-ink-5 hover:border-gold-dim px-4 py-2 rounded transition-colors">
+                className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim px-4 py-2 rounded transition-colors">
                 Test Hospital Link ↗
               </a>
             )}
@@ -141,25 +141,25 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
       )}
 
       {/* Table */}
-      <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-ink-5 bg-ink-4">
+              <tr className="border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
                 {['Ground', 'Maps Link', 'Hospital Link', ...(canEdit ? [''] : [])].map(h => (
-                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
+                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">Loading...</td></tr>
+                <tr><td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">Loading...</td></tr>
               )}
               {!loading && grounds.length === 0 && (
-                <tr><td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No grounds added yet.</td></tr>
+                <tr><td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">No grounds added yet.</td></tr>
               )}
               {grounds.map(g => (
-                <tr key={g.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
+                <tr key={g.id} className="border-b border-[#E2DACE] dark:border-ink-4 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors">
                   {editingId === g.id ? (
                     <td colSpan={canEdit ? 4 : 3} className="px-4 py-4">
                       <div className="grid sm:grid-cols-2 gap-3">
@@ -176,25 +176,25 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
                           <input value={editForm.hospital_url ?? ''} onChange={e => setEditForm(f => ({ ...f, hospital_url: e.target.value }))} className="form-input" />
                         </div>
                       </div>
-                      {error && <p className="font-rajdhani text-xs text-red-400 mt-2">{error}</p>}
+                      {error && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{error}</p>}
                       <div className="flex gap-2 mt-3">
                         <button onClick={() => saveEdit(g.id)} disabled={saving}
                           className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-1.5 rounded transition-colors">
                           {saving ? 'Saving...' : '✓ Save'}
                         </button>
                         <button onClick={() => setEditingId(null)}
-                          className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 border border-ink-5 px-4 py-1.5 rounded transition-colors">
+                          className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 border border-[#D4C9B0] dark:border-ink-5 px-4 py-1.5 rounded transition-colors">
                           Cancel
                         </button>
                         {editForm.maps_url && (
                           <a href={editForm.maps_url} target="_blank" rel="noopener noreferrer"
-                            className="font-rajdhani text-xs text-zinc-500 hover:text-gold border border-ink-5 hover:border-gold-dim px-3 py-1.5 rounded transition-colors">
+                            className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim px-3 py-1.5 rounded transition-colors">
                             Test Maps ↗
                           </a>
                         )}
                         {editForm.hospital_url && (
                           <a href={editForm.hospital_url} target="_blank" rel="noopener noreferrer"
-                            className="font-rajdhani text-xs text-zinc-500 hover:text-gold border border-ink-5 hover:border-gold-dim px-3 py-1.5 rounded transition-colors">
+                            className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim px-3 py-1.5 rounded transition-colors">
                             Test Hospital ↗
                           </a>
                         )}
@@ -202,16 +202,16 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
                     </td>
                   ) : (
                     <>
-                      <td className="px-4 py-3 font-rajdhani font-semibold text-sm text-parchment">{g.name}</td>
+                      <td className="px-4 py-3 font-rajdhani font-semibold text-sm text-[#1C1917] dark:text-parchment">{g.name}</td>
                       <td className="px-4 py-3">
                         {g.maps_url ? (
                           <a href={g.maps_url} target="_blank" rel="noopener noreferrer"
-                            className="font-rajdhani text-xs text-emerald-500 hover:text-emerald-400 hover:underline">
+                            className="font-rajdhani text-xs text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:underline">
                             📍 Open Maps ↗
                           </a>
                         ) : canEdit ? (
                           <button onClick={() => startEdit(g)}
-                            className="font-rajdhani text-xs text-amber-500 hover:text-amber-400 hover:underline">
+                            className="font-rajdhani text-xs text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 hover:underline">
                             ⚠ Not set — add link
                           </button>
                         ) : (
@@ -221,12 +221,12 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
                       <td className="px-4 py-3">
                         {g.hospital_url ? (
                           <a href={g.hospital_url} target="_blank" rel="noopener noreferrer"
-                            className="font-rajdhani text-xs text-red-400 hover:text-red-300 hover:underline">
+                            className="font-rajdhani text-xs text-red-700 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:underline">
                             🏥 Open Hospital ↗
                           </a>
                         ) : canEdit ? (
                           <button onClick={() => startEdit(g)}
-                            className="font-rajdhani text-xs text-amber-500 hover:text-amber-400 hover:underline">
+                            className="font-rajdhani text-xs text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 hover:underline">
                             ⚠ Not set — add link
                           </button>
                         ) : (
@@ -236,7 +236,7 @@ export function GroundsClient({ canAdd, canEdit }: GroundsClientProps) {
                       {canEdit && (
                         <td className="px-4 py-3">
                           <button onClick={() => startEdit(g)}
-                            className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
+                            className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
                             Edit
                           </button>
                         </td>

@@ -189,16 +189,16 @@ function paceSignal(
   today: string
 ): { label: string; bg: string; txt: string; waLabel: string } {
   if (weeks === null) return {
-    label: 'Not enough data', bg: 'bg-stone-100', txt: 'text-stone-600', waLabel: '',
+    label: 'Not enough data', bg: 'bg-stone-100 dark:bg-ink-4', txt: 'text-stone-600 dark:text-zinc-400', waLabel: '',
   }
   // Nearly done — no action needed regardless of gap
   if (unbooked <= 1) return {
-    label: 'Good pace', bg: 'bg-emerald-50', txt: 'text-emerald-700', waLabel: '',
+    label: 'Good pace', bg: 'bg-emerald-50 dark:bg-emerald-950/40', txt: 'text-emerald-700 dark:text-emerald-400', waLabel: '',
   }
   // Too fast
   if (weeks <= 1) return {
     label: 'Ask to slow down',
-    bg: 'bg-red-50', txt: 'text-red-700',
+    bg: 'bg-red-50 dark:bg-red-950/40', txt: 'text-red-700 dark:text-red-400',
     waLabel: `Hi! We've been playing every week for this tournament — could we space the remaining games out a bit more? Ideally 2 games a month works well for us.`,
   }
   // Nudge only if organiser has gone quiet (last game is past and >21 days ago, 2+ unbooked)
@@ -208,11 +208,11 @@ function paceSignal(
   const hasGoneQuiet = lastGameDate < today && daysSinceLastGame > 21
   if (hasGoneQuiet && unbooked >= 2) return {
     label: 'Nudge to schedule',
-    bg: 'bg-amber-50', txt: 'text-amber-700',
+    bg: 'bg-amber-50 dark:bg-amber-950/40', txt: 'text-amber-700 dark:text-amber-400',
     waLabel: `Hi! It's been a few weeks since our last game in this tournament. Could we get the next couple of fixtures on the calendar? We're targeting 2 games a month.`,
   }
   return {
-    label: 'Good pace', bg: 'bg-emerald-50', txt: 'text-emerald-700', waLabel: '',
+    label: 'Good pace', bg: 'bg-emerald-50 dark:bg-emerald-950/40', txt: 'text-emerald-700 dark:text-emerald-400', waLabel: '',
   }
 }
 
@@ -301,12 +301,12 @@ function BandwidthSection({
     return (
       <div
         key={captain.id}
-        className={`bg-white rounded-2xl border p-4 transition-opacity ${
+        className={`bg-white dark:bg-ink-3 rounded-2xl border p-4 transition-opacity ${
           isOwn
             ? 'border-gold-dim ring-1 ring-gold/20'
             : isCaptainView
-            ? `${isLowLoad ? 'border-emerald-300' : 'border-parchment-3'} opacity-60`
-            : isLowLoad ? 'border-emerald-300' : 'border-parchment-3'
+            ? `${isLowLoad ? 'border-emerald-300 dark:border-emerald-800' : 'border-parchment-3 dark:border-ink-5'} opacity-60`
+            : isLowLoad ? 'border-emerald-300 dark:border-emerald-800' : 'border-parchment-3 dark:border-ink-5'
         }`}
       >
         <div className="flex items-center gap-3 mb-3">
@@ -315,24 +315,24 @@ function BandwidthSection({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-cinzel text-sm font-bold text-ink">{captain.name}</span>
+              <span className="font-cinzel text-sm font-bold text-ink dark:text-parchment">{captain.name}</span>
               {isLowLoad && (
-                <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                   Bandwidth available — can take new tournament
                 </span>
               )}
             </div>
-            <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
-              <span className="text-ink font-semibold">{total}</span> total &nbsp;·&nbsp;
-              <span className="text-amber-700 font-semibold">{scheduled.length}</span> upcoming &nbsp;·&nbsp;
-              <span className="text-emerald-700 font-semibold">{completed.length}</span> past matches &nbsp;·&nbsp;
-              <span className="text-stone-600 font-semibold">{unbooked}</span> unbooked
+            <p className="font-rajdhani text-xs text-stone-500 dark:text-zinc-400 mt-0.5">
+              <span className="text-ink dark:text-parchment font-semibold">{total}</span> total &nbsp;·&nbsp;
+              <span className="text-amber-700 dark:text-amber-400 font-semibold">{scheduled.length}</span> upcoming &nbsp;·&nbsp;
+              <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{completed.length}</span> past matches &nbsp;·&nbsp;
+              <span className="text-stone-600 dark:text-zinc-400 font-semibold">{unbooked}</span> unbooked
             </p>
             {/* Counts are colour-coded to match the bar below (see the page-level
                 legend above), repeated per-card since that legend is easy to lose
                 track of a few cards down. Explicitly scoped to ongoing tournaments
                 only — a captain's finished tournaments don't count toward this. */}
-            <p className="font-rajdhani text-[10px] text-stone-400 mt-0.5">Ongoing tournaments only</p>
+            <p className="font-rajdhani text-[10px] text-stone-400 dark:text-zinc-500 mt-0.5">Ongoing tournaments only</p>
           </div>
         </div>
 
@@ -344,15 +344,15 @@ function BandwidthSection({
             cards (the Show filter below) using the same visual language —
             without it, these two numbers could be misread as tournament
             counts rather than match counts. */}
-        <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-400 mb-1.5">Matches</p>
+        <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-400 dark:text-zinc-500 mb-1.5">Matches</p>
         <div className="grid grid-cols-2 gap-2 mb-2">
-          <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-            <p className="font-cinzel text-lg font-bold text-amber-700 leading-tight">{scheduled.length}</p>
-            <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-amber-700/80">Upcoming</p>
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-2">
+            <p className="font-cinzel text-lg font-bold text-amber-700 dark:text-amber-400 leading-tight">{scheduled.length}</p>
+            <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-amber-700/80 dark:text-amber-400/80">Upcoming</p>
           </div>
-          <div className="rounded-lg bg-parchment-2 border border-parchment-3 px-3 py-2">
-            <p className="font-cinzel text-lg font-bold text-stone-600 leading-tight">{unbooked}</p>
-            <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500">Unbooked</p>
+          <div className="rounded-lg bg-parchment-2 dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 px-3 py-2">
+            <p className="font-cinzel text-lg font-bold text-stone-600 dark:text-zinc-400 leading-tight">{unbooked}</p>
+            <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400">Unbooked</p>
           </div>
         </div>
 
@@ -365,7 +365,7 @@ function BandwidthSection({
           const upcoming = [...scheduled].sort((a, b) => a.game_date.localeCompare(b.game_date))
           if (upcoming.length === 0) {
             return (
-              <p className="font-rajdhani text-[11px] text-emerald-700 mt-1 mb-2">
+              <p className="font-rajdhani text-[11px] text-emerald-700 dark:text-emerald-400 mt-1 mb-2">
                 ✓ Free from today — no games booked yet.
               </p>
             )
@@ -395,21 +395,21 @@ function BandwidthSection({
 
           return (
             <div className="mt-2 mb-1">
-              <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 mb-2">
+              <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 dark:text-zinc-400 mb-2">
                 Schedule — today onward
               </p>
               <div className="relative" style={{ height: 16 }}>
-                <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3" />
+                <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3 dark:bg-ink-4" />
                 {points.map((p, i) => (
                   <div key={p.key} className="absolute top-0" style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)' }}>
                     <div className={`rounded-full border-2 border-white ${p.isToday ? 'w-2.5 h-2.5 bg-stone-400' : 'w-3 h-3 bg-amber-600'}`}
-                      style={{ boxShadow: '0 0 0 1px #E2DACE' }} />
+                      style={{ boxShadow: '0 0 0 1px var(--app-surface-deep)' }} />
                   </div>
                 ))}
               </div>
               <div className="relative" style={{ height: 12 }}>
                 {gaps.map((g, i) => g.weeks > 2 && (
-                  <div key={i} className="absolute whitespace-nowrap text-[8px] font-semibold text-stone-400"
+                  <div key={i} className="absolute whitespace-nowrap text-[8px] font-semibold text-stone-400 dark:text-zinc-500"
                     style={{ left: `${g.pct}%`, transform: 'translateX(-50%)' }}>
                     {g.weeks}w
                   </div>
@@ -429,14 +429,14 @@ function BandwidthSection({
               <div className="relative mt-1" style={{ height: 54 }}>
                 {points.map((p, i) => (
                   <div key={p.key} className="absolute" style={{ left: `${pcts[i]}%`, top: dateRows[i] === 0 ? '30%' : '80%', transform: 'translate(-50%, -50%)' }}>
-                    <span className={`inline-block whitespace-nowrap text-[9px] font-semibold ${p.isToday ? 'text-stone-500' : 'text-amber-700'}`}
+                    <span className={`inline-block whitespace-nowrap text-[9px] font-semibold ${p.isToday ? 'text-stone-500 dark:text-zinc-400' : 'text-amber-700 dark:text-amber-400'}`}
                       style={{ transform: 'rotate(-45deg)' }}>
                       {p.label}
                     </span>
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-stone-400 mt-1">
+              <p className="text-[10px] text-stone-400 dark:text-zinc-500 mt-1">
                 Free beyond {format(parseISO(lastGame.game_date), 'd MMM')} unless more games get booked.
               </p>
             </div>
@@ -445,8 +445,8 @@ function BandwidthSection({
 
         {/* Per-tournament breakdown — played / outstanding / unbooked, click through to the tournament below */}
         {tournamentBreakdown.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-parchment-3">
-            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 mb-3">
+          <div className="mt-4 pt-4 border-t border-parchment-3 dark:border-ink-5">
+            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 dark:text-zinc-400 mb-3">
               By tournament
             </p>
             <div className="flex flex-col gap-2">
@@ -455,16 +455,16 @@ function BandwidthSection({
                   key={t.id}
                   type="button"
                   onClick={() => onViewTournament(t.id)}
-                  className="w-full text-left bg-parchment-2 border border-parchment-3 hover:border-gold-dim rounded-lg px-3 py-2.5 transition-colors"
+                  className="w-full text-left bg-parchment-2 dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 hover:border-gold-dim rounded-lg px-3 py-2.5 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-cinzel text-xs font-bold text-ink truncate">{t.name}</span>
-                    <span className="font-rajdhani text-[10px] text-stone-500 flex-shrink-0">↓ view</span>
+                    <span className="font-cinzel text-xs font-bold text-ink dark:text-parchment truncate">{t.name}</span>
+                    <span className="font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400 flex-shrink-0">↓ view</span>
                   </div>
-                  <p className="font-rajdhani text-[11px] text-stone-500 mt-1">
-                    <span className="text-amber-700 font-semibold">{outstanding}</span> upcoming &nbsp;·&nbsp;
-                    <span className="text-emerald-700 font-semibold">{played}</span> past matches &nbsp;·&nbsp;
-                    <span className="text-stone-600 font-semibold">{tUnbooked}</span> unbooked
+                  <p className="font-rajdhani text-[11px] text-stone-500 dark:text-zinc-400 mt-1">
+                    <span className="text-amber-700 dark:text-amber-400 font-semibold">{outstanding}</span> upcoming &nbsp;·&nbsp;
+                    <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{played}</span> past matches &nbsp;·&nbsp;
+                    <span className="text-stone-600 dark:text-zinc-400 font-semibold">{tUnbooked}</span> unbooked
                   </p>
                 </button>
               ))}
@@ -474,8 +474,8 @@ function BandwidthSection({
 
         {/* Overall slot balance — secondary to the per-tournament breakdown above */}
         {mine.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-parchment-3">
-            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 mb-3">
+          <div className="mt-4 pt-4 border-t border-parchment-3 dark:border-ink-5">
+            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 dark:text-zinc-400 mb-3">
               Overall slot balance
             </p>
             <div className="grid grid-cols-8 gap-1.5">
@@ -486,12 +486,12 @@ function BandwidthSection({
                 const isSat = s.day === 'Sat'
                 const isApplicable = s.validFor.some(f => captainActiveFormats.includes(f))
                 return (
-                  <div key={k} className="bg-parchment-2 border border-parchment-3 rounded p-1.5 flex flex-col items-center">
+                  <div key={k} className="bg-parchment-2 dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded p-1.5 flex flex-col items-center">
                     <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
-                      isSat ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
+                      isSat ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-400'
                     }`}>{s.day}</span>
-                    <span className="font-rajdhani text-[10px] text-stone-500 mb-1.5">{s.time}</span>
-                    <div className="w-full h-8 bg-parchment-3 rounded overflow-hidden flex flex-col-reverse mb-1">
+                    <span className="font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400 mb-1.5">{s.time}</span>
+                    <div className="w-full h-8 bg-parchment-3 dark:bg-ink-4 rounded overflow-hidden flex flex-col-reverse mb-1">
                       {count > 0 && isApplicable && (
                         <div
                           className="w-full rounded bg-amber-600 transition-all"
@@ -500,18 +500,18 @@ function BandwidthSection({
                       )}
                     </div>
                     <span className={`font-cinzel text-xs font-bold ${
-                      !isApplicable ? 'text-stone-300' :
-                      count > 0 ? 'text-amber-700' : 'text-stone-500'
+                      !isApplicable ? 'text-stone-300 dark:text-zinc-600' :
+                      count > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-stone-500 dark:text-zinc-400'
                     }`}>
                       {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
                     </span>
-                    <span className="font-rajdhani text-[8px] text-stone-400 mt-0.5">{s.formats}</span>
+                    <span className="font-rajdhani text-[8px] text-stone-400 dark:text-zinc-500 mt-0.5">{s.formats}</span>
                   </div>
                 )
               })}
             </div>
             {isImbalanced && (
-              <p className="font-rajdhani text-xs text-blue-700 mt-2">
+              <p className="font-rajdhani text-xs text-blue-700 dark:text-blue-400 mt-2">
                 ↗ Heavy on {dominantSlot} — route unbooked games to other slots for balance
               </p>
             )}
@@ -523,11 +523,11 @@ function BandwidthSection({
 
   return (
     <section className="mb-10">
-      <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-stone-500 mb-1">
+      <p className="font-rajdhani text-[10px] font-bold tracking-[3px] uppercase text-stone-500 dark:text-zinc-400 mb-1">
         Tournament Planner
       </p>
       <h1 className="font-cinzel text-xl font-bold text-gold-dim mb-1">Captain Bandwidth</h1>
-      <p className="font-rajdhani text-sm text-stone-500 mb-5">
+      <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400 mb-5">
         {isCaptainView
           ? 'Your tournament load — followed by other captains.'
           : 'Total tournament game load per captain — upcoming, past matches, and unbooked.'}
@@ -542,7 +542,7 @@ function BandwidthSection({
         ].map(({ color, label }) => (
           <div key={label} className="flex items-center gap-2">
             <div className={`w-3 h-3 rounded-sm ${color}`} />
-            <span className="font-rajdhani text-xs text-stone-600">{label}</span>
+            <span className="font-rajdhani text-xs text-stone-600 dark:text-zinc-400">{label}</span>
           </div>
         ))}
       </div>
@@ -550,10 +550,10 @@ function BandwidthSection({
       <div className="flex flex-col gap-4">
         {isCaptainView && myCaptain && (
           <>
-            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500">Your bandwidth</p>
+            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400">Your bandwidth</p>
             {renderCaptainCard(myCaptain, true)}
             {otherCaptains.length > 0 && (
-              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mt-2">Other captains</p>
+              <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400 mt-2">Other captains</p>
             )}
           </>
         )}
@@ -601,11 +601,11 @@ function InlineGameCountEditor({
     return (
       <button
         onClick={() => { setVal(String(currentValue ?? '')); setEditing(true) }}
-        className="group flex items-center gap-1 font-bold text-ink hover:text-gold-dim transition-colors"
+        className="group flex items-center gap-1 font-bold text-ink dark:text-parchment hover:text-gold-dim transition-colors"
         title="Edit total league games"
       >
         {currentValue ?? '?'}
-        <span className="text-stone-400 group-hover:text-gold-dim text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
+        <span className="text-stone-400 dark:text-zinc-500 group-hover:text-gold-dim text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
       </button>
     )
   }
@@ -616,15 +616,15 @@ function InlineGameCountEditor({
         type="number" min={1} max={99} value={val} autoFocus
         onChange={e => setVal(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="w-12 bg-white border border-gold text-ink text-xs font-bold text-center rounded px-1 py-0.5 focus:outline-none"
+        className="w-12 bg-white dark:bg-ink-3 border border-gold text-ink dark:text-parchment text-xs font-bold text-center rounded px-1 py-0.5 focus:outline-none"
       />
       <button onClick={handleSave} disabled={saving}
-        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 px-1 py-0.5 border border-emerald-300 rounded disabled:opacity-50">
+        className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-400 px-1 py-0.5 border border-emerald-300 dark:border-emerald-800 rounded disabled:opacity-50">
         {saving ? '…' : '✓'}
       </button>
       <button onClick={() => { setEditing(false); setError('') }}
-        className="text-[10px] text-stone-500 hover:text-stone-700 px-1 py-0.5">✕</button>
-      {error && <span className="text-[9px] text-red-700 ml-1">{error}</span>}
+        className="text-[10px] text-stone-500 dark:text-zinc-400 hover:text-stone-700 dark:hover:text-zinc-300 px-1 py-0.5">✕</button>
+      {error && <span className="text-[9px] text-red-700 dark:text-red-400 ml-1">{error}</span>}
     </div>
   )
 }
@@ -660,10 +660,10 @@ function GameTimelineCard({ sortedGames, gaps, avgGap }: {
   const pcts    = sortedGames.map(g => ((parseISO(g.game_date).getTime() - start) / totalMs) * 100)
 
   function gapColors(gap: number | null): { dot: string; text: string } {
-    if (gap === null)                            return { dot: 'bg-stone-300', text: 'text-stone-500' }
-    if (gap <= 1)                                return { dot: 'bg-red-600',    text: 'text-red-700'   }
-    if (avgGap !== null && gap > avgGap + 2)      return { dot: 'bg-amber-600', text: 'text-amber-700' }
-    return { dot: 'bg-emerald-600', text: 'text-emerald-700' }
+    if (gap === null)                            return { dot: 'bg-stone-300', text: 'text-stone-500 dark:text-zinc-400' }
+    if (gap <= 1)                                return { dot: 'bg-red-600',    text: 'text-red-700 dark:text-red-400'   }
+    if (avgGap !== null && gap > avgGap + 2)      return { dot: 'bg-amber-600', text: 'text-amber-700 dark:text-amber-400' }
+    return { dot: 'bg-emerald-600', text: 'text-emerald-700 dark:text-emerald-400' }
   }
 
   // Stagger labels that would overlap (within 9% horizontally) onto a second row
@@ -677,9 +677,9 @@ function GameTimelineCard({ sortedGames, gaps, avgGap }: {
   return (
     <div className="px-4 pt-5 pb-1">
       <div className="flex items-center justify-between gap-2 mb-3">
-        <p className="text-[15px] font-bold text-ink flex-1">Game timeline — pace view</p>
+        <p className="text-[15px] font-bold text-ink dark:text-parchment flex-1">Game timeline — pace view</p>
         <button type="button" onClick={() => setLegendOpen(v => !v)}
-          className="text-[12.5px] font-bold text-blue-700">
+          className="text-[12.5px] font-bold text-blue-700 dark:text-blue-400">
           {legendOpen ? 'Hide legend' : 'Show legend'}
         </button>
       </div>
@@ -690,18 +690,18 @@ function GameTimelineCard({ sortedGames, gaps, avgGap }: {
             { dot: 'bg-emerald-600', label: 'On pace' },
             { dot: 'bg-amber-600',   label: 'Slower' },
           ].map(({ dot, label }) => (
-            <div key={label} className="flex items-center gap-1.5 text-xs text-stone-600">
+            <div key={label} className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-zinc-400">
               <span className={`w-2 h-2 rounded-full ${dot}`} />{label}
             </div>
           ))}
         </div>
       )}
       <div className="relative" style={{ height: 16 }}>
-        <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3" />
+        <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3 dark:bg-ink-4" />
         {sortedGames.map((g, i) => (
           <div key={g.id} className="absolute top-0" style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)' }}>
             <div className={`w-3 h-3 rounded-full border-2 border-white ${gapColors(gaps[i]).dot}`}
-              style={{ boxShadow: '0 0 0 1px #E2DACE' }} />
+              style={{ boxShadow: '0 0 0 1px var(--app-surface-deep)' }} />
           </div>
         ))}
       </div>
@@ -827,13 +827,13 @@ function TournamentBlock({
   })
 
   return (
-    <div id={`tournament-block-${tournament.id}`} className="bg-white border border-parchment-3 rounded-2xl mb-4 overflow-hidden scroll-mt-24">
+    <div id={`tournament-block-${tournament.id}`} className="bg-white dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded-2xl mb-4 overflow-hidden scroll-mt-24">
 
       {/* Header — a div (not <button>) since it now contains the nested
           interactive Share button; role/tabIndex/onKeyDown keep it keyboard
           operable the same way a <button> would be. */}
       <div role="button" tabIndex={0}
-        className="w-full text-left px-4 py-3 hover:bg-parchment-2 transition-colors cursor-pointer"
+        className="w-full text-left px-4 py-3 hover:bg-parchment-2 dark:hover:bg-ink-3 transition-colors cursor-pointer"
         onClick={() => setOpen(v => !v)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(v => !v) } }}>
         <div className="flex items-start gap-3">
@@ -846,15 +846,15 @@ function TournamentBlock({
                     href={tournament.cricheroes_points_table_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-cinzel text-sm font-bold text-ink underline decoration-gold underline-offset-2"
+                    className="font-cinzel text-sm font-bold text-ink dark:text-parchment underline decoration-gold underline-offset-2"
                   >
                     {tournament.name}
                   </a>
                   ) : (
-                  <span className="font-cinzel text-sm font-bold text-ink">{tournament.name}</span>
+                  <span className="font-cinzel text-sm font-bold text-ink dark:text-parchment">{tournament.name}</span>
                 )}
                 {tournamentFormats.length > 0 && (
-                  <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                  <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400">
                     {tournamentFormats.join(' / ')}
                   </span>
                 )}
@@ -863,30 +863,30 @@ function TournamentBlock({
               {(isAdmin || isGC) && (
                 <TournamentShareButton
                   tournamentId={tournament.id}
-                  className="flex-shrink-0 text-stone-400 hover:text-emerald-700 transition-colors"
+                  className="flex-shrink-0 text-stone-400 dark:text-zinc-500 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
                 />
               )}
             </div>
-            <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
-              {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} playerId={tournament.captains.player_id} className="text-blue-700" /> &nbsp;·&nbsp;</>}
-              Avg gap: <span className="text-ink font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
+            <p className="font-rajdhani text-xs text-stone-500 dark:text-zinc-400 mt-0.5">
+              {tournament.captains && <>Captain: <PlayerNameLink name={tournament.captains.name} playerId={tournament.captains.player_id} className="text-blue-700 dark:text-blue-400" /> &nbsp;·&nbsp;</>}
+              Avg gap: <span className="text-ink dark:text-parchment font-semibold">{gap !== null ? `${gap} week${gap !== 1 ? 's' : ''}` : 'N/A'}</span>
             </p>
             <div className="flex gap-1.5 flex-wrap mt-2">
-              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">{scheduled.length} upcoming</span>
-              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{completed.length} past</span>
+              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400">{scheduled.length} upcoming</span>
+              <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">{completed.length} past</span>
               {unbooked > 0 && (
-                <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">{unbooked} unbooked</span>
+                <span className="font-rajdhani text-[10px] px-2 py-0.5 rounded-full bg-stone-100 dark:bg-ink-4 text-stone-600 dark:text-zinc-400">{unbooked} unbooked</span>
               )}
             </div>
           </div>
-          <span className="text-stone-400 flex-shrink-0">{open ? '▲' : '▼'}</span>
+          <span className="text-stone-400 dark:text-zinc-500 flex-shrink-0">{open ? '▲' : '▼'}</span>
         </div>
       </div>
 
       {/* Collapsed mini bar */}
       {!open && (
         <div className="px-4 pb-3">
-          <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-parchment-3 mt-1">
+          <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-parchment-3 dark:bg-ink-4 mt-1">
             {sortedGames.map(g => (
               <div key={g.id} className={`flex-1 ${g.game_date < today ? 'bg-emerald-600' : 'bg-amber-600'}`} />
             ))}
@@ -898,20 +898,20 @@ function TournamentBlock({
       )}
 
       {open && (
-        <div className="bg-parchment">
+        <div className="bg-parchment dark:bg-ink">
 
           {/* Admin-only, read-only knockout awareness. Never a creation UI —
               that lives on /admin/soft-blocks/new. */}
           {isAdmin && knockoutHold && (
-            <div className="mx-4 mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
-              <p className="text-xs font-semibold text-amber-800">
+            <div className="mx-4 mt-4 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5">
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-400">
                 🏆 Knockout hold reserved — {format(parseISO(knockoutHold.game_date), 'EEE d MMM')} · {knockoutHold.slot_time}
               </p>
             </div>
           )}
           {showKnockoutNudge && (
-            <div className="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5">
-              <p className="text-xs text-amber-800">
+            <div className="mx-4 mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/40 px-3 py-2.5">
+              <p className="text-xs text-amber-800 dark:text-amber-400">
                 🏆 {wins} of {totalLeague} league games won — this is starting to look like a knockout candidate.
                 Reserve a hold from <span className="font-semibold">Soft Block Slots</span> once the organiser gives a date.
               </p>
@@ -921,13 +921,13 @@ function TournamentBlock({
           {/* Matches — tabbed (Upcoming / Past Matches / Unbooked), replacing the old 4-card stat grid */}
           <div className="px-4 pt-4">
             <div className="flex items-center justify-between gap-2 mb-2.5">
-              <p className="text-[15px] font-bold text-ink">Matches</p>
+              <p className="text-[15px] font-bold text-ink dark:text-parchment">Matches</p>
               {isAdmin ? (
-                <div className="flex items-center gap-1 text-xs text-stone-500">
+                <div className="flex items-center gap-1 text-xs text-stone-500 dark:text-zinc-400">
                   <InlineGameCountEditor tournamentId={tournament.id} currentValue={totalLeagueGames} onSaved={setTotalLeagueGames} /> league games
                 </div>
               ) : (
-                <span className="text-xs text-stone-500">{totalLeague} league games</span>
+                <span className="text-xs text-stone-500 dark:text-zinc-400">{totalLeague} league games</span>
               )}
             </div>
             <MatchTabsSection
@@ -944,36 +944,36 @@ function TournamentBlock({
                 Suggest-slots WhatsApp nudge on the Unbooked tab, which covers the same need. The
                 share-tournament-card action lives in the header now (top-right, next to the title). */}
             {(gap !== null || tournament.organiser_name) && (
-              <div className="mt-2.5 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              <div className="mt-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex gap-5 flex-wrap">
                     {gap !== null && (
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Avg gap</p>
-                        <p className="font-cinzel text-xl font-extrabold text-amber-800 mt-0.5">{gap}w</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">Avg gap</p>
+                        <p className="font-cinzel text-xl font-extrabold text-amber-800 dark:text-amber-400 mt-0.5">{gap}w</p>
                       </div>
                     )}
                     {fastestGap !== null && (
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-stone-500">Fastest</p>
-                        <p className="font-cinzel text-xl font-extrabold text-red-700 mt-0.5">{fastestGap}w</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-stone-500 dark:text-zinc-400">Fastest</p>
+                        <p className="font-cinzel text-xl font-extrabold text-red-700 dark:text-red-400 mt-0.5">{fastestGap}w</p>
                       </div>
                     )}
                     {slowestGap !== null && (
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-stone-500">Slowest</p>
-                        <p className="font-cinzel text-xl font-extrabold text-amber-700 mt-0.5">{slowestGap}w</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-stone-500 dark:text-zinc-400">Slowest</p>
+                        <p className="font-cinzel text-xl font-extrabold text-amber-700 dark:text-amber-400 mt-0.5">{slowestGap}w</p>
                       </div>
                     )}
                   </div>
                   {tournament.organiser_name && (
-                    <span className="text-xs text-stone-600 flex-shrink-0">
-                      Organiser: <span className="text-stone-800 font-semibold">{tournament.organiser_name}</span>
+                    <span className="text-xs text-stone-600 dark:text-zinc-400 flex-shrink-0">
+                      Organiser: <span className="text-stone-800 dark:text-zinc-300 font-semibold">{tournament.organiser_name}</span>
                     </span>
                   )}
                 </div>
                 {gap !== null && (
-                  <p className="text-[13px] leading-relaxed text-amber-900 mt-3">
+                  <p className="text-[13px] leading-relaxed text-amber-900 dark:text-amber-400 mt-3">
                     {isUneven
                       ? `Games are unevenly spaced (${fastestGap}w–${slowestGap}w) — ask the organiser to smooth scheduling closer to the ${gap}w average.`
                       : `Games are evenly paced around the ${gap}w average — no action needed.`}
@@ -1009,28 +1009,28 @@ function TournamentBlock({
               announced squad) but still show "No stats synced" if none of
               their matches in this tournament have a scorecard reconciled
               yet — those rows always sort to the bottom. */}
-          <div className="px-4 py-4 border-t border-parchment-3 mt-2">
+          <div className="px-4 py-4 border-t border-parchment-3 dark:border-ink-5 mt-2">
             <button
               onClick={() => setPlayersOpen(v => !v)}
-              className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-stone-500 mb-2 w-full text-left"
+              className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-stone-500 dark:text-zinc-400 mb-2 w-full text-left"
             >
               <span>{playersOpen ? '▲' : '▶'}</span>
               <span>Player Stats — {players.length}</span>
             </button>
             {playersOpen && (
               players.length > 0 ? (
-                <div className="rounded-lg border border-parchment-3 bg-white overflow-x-auto">
+                <div className="rounded-lg border border-parchment-3 dark:border-ink-5 bg-white dark:bg-ink-3 overflow-x-auto">
                   <table className="w-full" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     <thead>
-                      <tr className="border-b border-parchment-3">
+                      <tr className="border-b border-parchment-3 dark:border-ink-5">
                         <th
-                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pl-3 pr-1 py-1.5 text-stone-500 whitespace-nowrap"
+                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pl-3 pr-1 py-1.5 text-stone-500 dark:text-zinc-400 whitespace-nowrap"
                         >
                           #
                         </th>
                         <th
                           onClick={() => handleStatsSort('name')}
-                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pr-2 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
+                          className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pr-2 py-1.5 cursor-pointer select-none text-stone-500 dark:text-zinc-400 hover:text-gold-dim whitespace-nowrap"
                         >
                           Player{statsSortKey === 'name' && (statsSortDir === 'asc' ? ' ▲' : ' ▼')}
                         </th>
@@ -1038,7 +1038,7 @@ function TournamentBlock({
                           <th
                             key={col.key}
                             onClick={() => handleStatsSort(col.key)}
-                            className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pr-2 py-1.5 cursor-pointer select-none text-stone-500 hover:text-gold-dim whitespace-nowrap"
+                            className="font-rajdhani text-[9px] font-bold uppercase tracking-wide text-right pr-2 py-1.5 cursor-pointer select-none text-stone-500 dark:text-zinc-400 hover:text-gold-dim whitespace-nowrap"
                           >
                             {col.label}{statsSortKey === col.key && (statsSortDir === 'asc' ? ' ▲' : ' ▼')}
                           </th>
@@ -1049,26 +1049,26 @@ function TournamentBlock({
                       {sortedPlayers.map((p, idx) => {
                         const stat = stats[p.id] ?? null
                         return (
-                          <tr key={p.id} className="border-t border-parchment-3 first:border-t-0">
-                            <td className="font-rajdhani text-[11px] text-stone-400 text-right pl-3 pr-1 py-1.5 whitespace-nowrap">
+                          <tr key={p.id} className="border-t border-parchment-3 dark:border-ink-5 first:border-t-0">
+                            <td className="font-rajdhani text-[11px] text-stone-400 dark:text-zinc-500 text-right pl-3 pr-1 py-1.5 whitespace-nowrap">
                               {idx + 1}
                             </td>
-                            <td className="font-rajdhani text-[11px] font-semibold text-ink text-right pr-2 py-1.5 whitespace-nowrap">
+                            <td className="font-rajdhani text-[11px] font-semibold text-ink dark:text-parchment text-right pr-2 py-1.5 whitespace-nowrap">
                               <span className="hidden sm:inline">
-                                <PlayerNameLink name={p.name} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                                <PlayerNameLink name={p.name} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700 dark:text-blue-400" />
                               </span>
                               <span className="sm:hidden">
-                                <PlayerNameLink name={mobileMatrixName(p.name)} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700" />
+                                <PlayerNameLink name={mobileMatrixName(p.name)} playerId={p.id} cricHeroesUrl={p.cricheroes_url} className="text-blue-700 dark:text-blue-400" />
                               </span>
                             </td>
                             {stat == null ? (
-                              <td colSpan={STAT_COLUMNS.length} className="text-[10.5px] italic text-stone-400 pr-2 py-1.5 text-right">No stats synced</td>
+                              <td colSpan={STAT_COLUMNS.length} className="text-[10.5px] italic text-stone-400 dark:text-zinc-500 pr-2 py-1.5 text-right">No stats synced</td>
                             ) : (
                               STAT_COLUMNS.map(col => {
                                 const display = statCell(col.value(stat), col.decimals).text
                                 return (
                                   <td key={col.key} className={`font-cinzel text-[11.5px] font-bold text-right pr-2 py-1.5 ${
-                                    display === '—' ? 'text-stone-400' : 'text-ink'
+                                    display === '—' ? 'text-stone-400 dark:text-zinc-500' : 'text-ink dark:text-parchment'
                                   }`}>
                                     {display}
                                   </td>
@@ -1082,10 +1082,10 @@ function TournamentBlock({
                   </table>
                 </div>
               ) : (
-                <p className="text-xs text-stone-500">No announced squads yet for this tournament.</p>
+                <p className="text-xs text-stone-500 dark:text-zinc-400">No announced squads yet for this tournament.</p>
               )
             )}
-            <p className="text-center text-[13px] font-semibold text-stone-500 mt-4">
+            <p className="text-center text-[13px] font-semibold text-stone-500 dark:text-zinc-400 mt-4">
               {players.length} player{players.length !== 1 ? 's' : ''} represented across this tournament
             </p>
           </div>
@@ -1129,10 +1129,10 @@ function MatchTabsSection({
 
   function gapColors(gapStr: string): { bg: string; text: string } {
     const n = parseInt(gapStr)
-    if (isNaN(n))  return { bg: 'bg-stone-100', text: 'text-stone-600' }
-    if (n <= 1)    return { bg: 'bg-red-50',    text: 'text-red-700'   }
-    if (n >= 3)    return { bg: 'bg-amber-50',  text: 'text-amber-700' }
-    return { bg: 'bg-emerald-50', text: 'text-emerald-700' }
+    if (isNaN(n))  return { bg: 'bg-stone-100 dark:bg-ink-4', text: 'text-stone-600 dark:text-zinc-400' }
+    if (n <= 1)    return { bg: 'bg-red-50 dark:bg-red-950/40',    text: 'text-red-700 dark:text-red-400'   }
+    if (n >= 3)    return { bg: 'bg-amber-50 dark:bg-amber-950/40',  text: 'text-amber-700 dark:text-amber-400' }
+    return { bg: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-400' }
   }
 
   const tabs: Array<{ key: TabKey; label: string; count: number }> = [
@@ -1143,7 +1143,7 @@ function MatchTabsSection({
 
   return (
     <div>
-      <div className="flex bg-parchment-2 rounded-xl p-1 gap-1">
+      <div className="flex bg-parchment-2 dark:bg-ink-3 rounded-xl p-1 gap-1">
         {tabs.map(t => {
           const disabled = t.key === 'unbooked' && t.count === 0
           return (
@@ -1151,8 +1151,8 @@ function MatchTabsSection({
               onClick={() => setActiveTab(t.key)}
               className={`flex-1 rounded-lg py-2.5 text-[12.5px] font-bold transition-colors ${
                 disabled
-                  ? 'text-stone-300 cursor-not-allowed'
-                  : activeTab === t.key ? 'bg-white text-ink shadow-sm' : 'text-stone-500'
+                  ? 'text-stone-300 dark:text-zinc-600 cursor-not-allowed'
+                  : activeTab === t.key ? 'bg-white dark:bg-ink-3 text-ink dark:text-parchment shadow-sm' : 'text-stone-500 dark:text-zinc-400'
               }`}>
               {t.label} [{t.count}]
             </button>
@@ -1163,7 +1163,7 @@ function MatchTabsSection({
       <div className="flex flex-col gap-2.5 mt-3">
         {activeTab === 'past' && (
           pastMatches.length === 0
-            ? <p className="text-xs text-stone-500 py-3">No past matches yet.</p>
+            ? <p className="text-xs text-stone-500 dark:text-zinc-400 py-3">No past matches yet.</p>
             : pastMatches.map(g => {
                 const d = parseISO(g.game_date)
                 const captain = bookingCaptainMap[g.id] ?? null
@@ -1172,19 +1172,19 @@ function MatchTabsSection({
                 const inner = (
                   <div className="flex items-center gap-3.5">
                     <div className="text-center w-11 flex-shrink-0">
-                      <p className="font-cinzel text-xl font-extrabold text-ink leading-none">{format(d, 'd')}</p>
-                      <p className="text-[11px] font-semibold text-stone-500 uppercase mt-1">{format(d, 'MMM')}</p>
+                      <p className="font-cinzel text-xl font-extrabold text-ink dark:text-parchment leading-none">{format(d, 'd')}</p>
+                      <p className="text-[11px] font-semibold text-stone-500 dark:text-zinc-400 uppercase mt-1">{format(d, 'MMM')}</p>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13.5px] font-bold text-ink">{format(d, 'EEE')} · {g.slot_time}</p>
+                      <p className="text-[13.5px] font-bold text-ink dark:text-parchment">{format(d, 'EEE')} · {g.slot_time}</p>
                       <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                         {g.match_result && <ResultBadge result={g.match_result} />}
-                        <span className="text-xs text-stone-500">vs <span className="text-ink font-semibold">{g.opponent_name || 'TBD'}</span></span>
+                        <span className="text-xs text-stone-500 dark:text-zinc-400">vs <span className="text-ink dark:text-parchment font-semibold">{g.opponent_name || 'TBD'}</span></span>
                       </div>
-                      <p className="text-xs text-stone-500 mt-0.5">
+                      <p className="text-xs text-stone-500 dark:text-zinc-400 mt-0.5">
                         {showFormatOnRow && <>{g.format} · </>}Captain{' '}
                         {captain
-                          ? <PlayerNameLink name={captain.name} playerId={captain.id} cricHeroesUrl={captain.cricheroes_url} className="text-blue-700" />
+                          ? <PlayerNameLink name={captain.name} playerId={captain.id} cricHeroesUrl={captain.cricheroes_url} className="text-blue-700 dark:text-blue-400" />
                           : 'Unassigned'}
                       </p>
                     </div>
@@ -1197,7 +1197,7 @@ function MatchTabsSection({
                 // than out to CricHeroes — keeps captains self-reliant on the Hub.
                 return (
                   <Link key={g.id} href={`/matches/history/${g.id}`}
-                    className="block bg-white border border-parchment-3 rounded-2xl px-4 py-3.5 hover:border-gold-dim transition-colors">
+                    className="block bg-white dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded-2xl px-4 py-3.5 hover:border-gold-dim transition-colors">
                     {inner}
                   </Link>
                 )
@@ -1205,7 +1205,7 @@ function MatchTabsSection({
         )}
         {activeTab === 'upcoming' && (
           upcoming.length === 0
-            ? <p className="text-xs text-stone-500 py-3">No upcoming games yet.</p>
+            ? <p className="text-xs text-stone-500 dark:text-zinc-400 py-3">No upcoming games yet.</p>
             : upcoming.map(g => {
                 const d  = parseISO(g.game_date)
                 const gs = gapLabelFor(g)
@@ -1213,13 +1213,13 @@ function MatchTabsSection({
                 const inner = (
                   <div className="flex items-center gap-3.5">
                     <div className="text-center w-11 flex-shrink-0">
-                      <p className="font-cinzel text-xl font-extrabold text-ink leading-none">{format(d, 'd')}</p>
-                      <p className="text-[11px] font-semibold text-stone-500 uppercase mt-1">{format(d, 'MMM')}</p>
+                      <p className="font-cinzel text-xl font-extrabold text-ink dark:text-parchment leading-none">{format(d, 'd')}</p>
+                      <p className="text-[11px] font-semibold text-stone-500 dark:text-zinc-400 uppercase mt-1">{format(d, 'MMM')}</p>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13.5px] font-bold text-ink">{format(d, 'EEE')} · {g.slot_time}</p>
-                      <p className="text-xs text-stone-500 mt-0.5">vs <span className="text-ink font-semibold">{g.opponent_name || 'TBD'}</span></p>
-                      {showFormatOnRow && <p className="text-xs text-stone-500 mt-0.5">{g.format}</p>}
+                      <p className="text-[13.5px] font-bold text-ink dark:text-parchment">{format(d, 'EEE')} · {g.slot_time}</p>
+                      <p className="text-xs text-stone-500 dark:text-zinc-400 mt-0.5">vs <span className="text-ink dark:text-parchment font-semibold">{g.opponent_name || 'TBD'}</span></p>
+                      {showFormatOnRow && <p className="text-xs text-stone-500 dark:text-zinc-400 mt-0.5">{g.format}</p>}
                     </div>
                     <span className={`${c.bg} ${c.text} text-[11.5px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 text-center`}>
                       {gs === '—' ? 'first' : `${gs} gap`}
@@ -1228,11 +1228,11 @@ function MatchTabsSection({
                 )
                 return g.cricheroes_url ? (
                   <a key={g.id} href={g.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                    className="block bg-white border border-parchment-3 rounded-2xl px-4 py-3.5 hover:border-gold-dim transition-colors">
+                    className="block bg-white dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded-2xl px-4 py-3.5 hover:border-gold-dim transition-colors">
                     {inner}
                   </a>
                 ) : (
-                  <div key={g.id} className="bg-white border border-parchment-3 rounded-2xl px-4 py-3.5">
+                  <div key={g.id} className="bg-white dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded-2xl px-4 py-3.5">
                     {inner}
                   </div>
                 )
@@ -1240,10 +1240,10 @@ function MatchTabsSection({
         )}
         {activeTab === 'unbooked' && (
           unbooked === 0
-            ? <p className="text-xs text-stone-500 py-3">No unbooked games — fully booked.</p>
+            ? <p className="text-xs text-stone-500 dark:text-zinc-400 py-3">No unbooked games — fully booked.</p>
             : (
-              <div className="bg-parchment-2 border border-parchment-3 rounded-2xl px-4 py-3">
-                <p className="text-xs font-semibold text-stone-600">
+              <div className="bg-parchment-2 dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded-2xl px-4 py-3">
+                <p className="text-xs font-semibold text-stone-600 dark:text-zinc-400">
                   ○ {unbooked} unbooked game{unbooked !== 1 ? 's' : ''} — date &amp; slot not yet booked.
                   See the organiser share page for suggested open dates.
                 </p>
@@ -1270,8 +1270,8 @@ function SlotBalanceByDay({
   const days: Array<'Sat' | 'Sun'> = ['Sat', 'Sun']
   return (
     <div className="px-4 pt-6 pb-2">
-      <p className="text-[15px] font-bold text-ink mb-3">Slot balance across this tournament</p>
-      <p className="text-[11.5px] text-stone-500 -mt-2 mb-3">
+      <p className="text-[15px] font-bold text-ink dark:text-parchment mb-3">Slot balance across this tournament</p>
+      <p className="text-[11.5px] text-stone-500 dark:text-zinc-400 -mt-2 mb-3">
         Target per slot is the league's total games split evenly across every valid slot.
       </p>
       <div className="flex flex-col gap-3">
@@ -1279,8 +1279,8 @@ function SlotBalanceByDay({
           // Only slots valid for this tournament's actual format(s) — cuts N/A rows to save space
           const rows = ALL_SLOTS.filter(s => s.day === day && s.validFor.some(f => activeFormats.includes(f)))
           return (
-            <div key={day} className="bg-white border border-parchment-3 rounded-2xl px-3.5 pb-1">
-              <p className="text-xs font-bold uppercase tracking-wide text-stone-500 pt-2.5 pb-1.5">{day}</p>
+            <div key={day} className="bg-white dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded-2xl px-3.5 pb-1">
+              <p className="text-xs font-bold uppercase tracking-wide text-stone-500 dark:text-zinc-400 pt-2.5 pb-1.5">{day}</p>
               {rows.map(s => {
                 const k: SlotKey = `${s.day}-${s.time}`
                 const count      = slotCounts[k]
@@ -1291,14 +1291,14 @@ function SlotBalanceByDay({
                   : (count > 0 ? Math.max(12, Math.round((count / maxSlotCount) * 100)) : 0)
                 return (
                   <div key={k} className="flex items-center gap-3 py-1.5 border-t border-parchment-2 first:border-t-0">
-                    <span className="w-[52px] flex-shrink-0 text-[12.5px] font-semibold text-stone-700">{s.time}</span>
-                    <div className="flex-1 h-2 bg-parchment-2 rounded-full overflow-hidden">
+                    <span className="w-[52px] flex-shrink-0 text-[12.5px] font-semibold text-stone-700 dark:text-zinc-300">{s.time}</span>
+                    <div className="flex-1 h-2 bg-parchment-2 dark:bg-ink-3 rounded-full overflow-hidden">
                       {count > 0 && (
                         <div className={`h-full rounded-full ${metTarget ? 'bg-emerald-600' : 'bg-amber-600'}`}
                           style={{ width: `${pct}%` }} />
                       )}
                     </div>
-                    <span className="w-[42px] flex-shrink-0 text-sm font-extrabold text-ink text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    <span className="w-[42px] flex-shrink-0 text-sm font-extrabold text-ink dark:text-parchment text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {target > 0 ? `${count}/${target}` : count}
                     </span>
                   </div>
@@ -1309,7 +1309,7 @@ function SlotBalanceByDay({
         })}
       </div>
       {isSlotImbalanced && (
-        <p className="text-xs text-blue-700 mt-2.5">
+        <p className="text-xs text-blue-700 dark:text-blue-400 mt-2.5">
           ↗ {dominantSlot} has {maxSlotCount} of {gamesLength} games — unbooked games should favour other slots
         </p>
       )}
@@ -1437,37 +1437,37 @@ export function TournamentPlannerClient({
           checkboxes. Each card still toggles show/hide for its bucket —
           same behaviour as before, just card-styled. */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <span className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500">Show:</span>
+        <span className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400">Show:</span>
         <button type="button" onClick={() => setShowUpcoming(v => !v)}
           className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
-            showUpcoming ? 'bg-amber-50 border-amber-200' : 'bg-parchment-2 border-parchment-3 opacity-50 hover:opacity-75'
+            showUpcoming ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' : 'bg-parchment-2 dark:bg-ink-3 border-parchment-3 dark:border-ink-5 opacity-50 hover:opacity-75'
           }`}>
-          <p className={`font-cinzel text-lg font-bold leading-tight ${showUpcoming ? 'text-amber-700' : 'text-stone-500'}`}>
+          <p className={`font-cinzel text-lg font-bold leading-tight ${showUpcoming ? 'text-amber-700 dark:text-amber-400' : 'text-stone-500 dark:text-zinc-400'}`}>
             {tournamentCounts.upcoming}
           </p>
-          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showUpcoming ? 'text-amber-700' : 'text-stone-500'}`}>
+          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showUpcoming ? 'text-amber-700 dark:text-amber-400' : 'text-stone-500 dark:text-zinc-400'}`}>
             Upcoming
           </p>
         </button>
         <button type="button" onClick={() => setShowOngoing(v => !v)}
           className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
-            showOngoing ? 'bg-emerald-50 border-emerald-200' : 'bg-parchment-2 border-parchment-3 opacity-50 hover:opacity-75'
+            showOngoing ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' : 'bg-parchment-2 dark:bg-ink-3 border-parchment-3 dark:border-ink-5 opacity-50 hover:opacity-75'
           }`}>
-          <p className={`font-cinzel text-lg font-bold leading-tight ${showOngoing ? 'text-emerald-700' : 'text-stone-500'}`}>
+          <p className={`font-cinzel text-lg font-bold leading-tight ${showOngoing ? 'text-emerald-700 dark:text-emerald-400' : 'text-stone-500 dark:text-zinc-400'}`}>
             {tournamentCounts.ongoing}
           </p>
-          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showOngoing ? 'text-emerald-700' : 'text-stone-500'}`}>
+          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showOngoing ? 'text-emerald-700 dark:text-emerald-400' : 'text-stone-500 dark:text-zinc-400'}`}>
             Ongoing
           </p>
         </button>
         <button type="button" onClick={() => setShowCompleted(v => !v)}
           className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
-            showCompleted ? 'bg-parchment-3 border-stone-300' : 'bg-parchment-2 border-parchment-3 opacity-50 hover:opacity-75'
+            showCompleted ? 'bg-parchment-3 dark:bg-ink-4 border-stone-300 dark:border-ink-5' : 'bg-parchment-2 dark:bg-ink-3 border-parchment-3 dark:border-ink-5 opacity-50 hover:opacity-75'
           }`}>
-          <p className={`font-cinzel text-lg font-bold leading-tight ${showCompleted ? 'text-stone-700' : 'text-stone-500'}`}>
+          <p className={`font-cinzel text-lg font-bold leading-tight ${showCompleted ? 'text-stone-700 dark:text-zinc-300' : 'text-stone-500 dark:text-zinc-400'}`}>
             {tournamentCounts.completed}
           </p>
-          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showCompleted ? 'text-stone-700' : 'text-stone-500'}`}>
+          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showCompleted ? 'text-stone-700 dark:text-zinc-300' : 'text-stone-500 dark:text-zinc-400'}`}>
             Completed
           </p>
         </button>
@@ -1475,11 +1475,11 @@ export function TournamentPlannerClient({
 
       <section>
         <h2 className="font-cinzel text-xl font-bold text-gold-dim mb-1">By Tournament</h2>
-        <p className="font-rajdhani text-sm text-stone-500 mb-5">
+        <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400 mb-5">
           Organiser pace, game scheduling frequency, and slot balance per tournament — tournaments flagged "Nudge to schedule" surface first.
         </p>
         {sortedTournaments.length === 0 ? (
-          <p className="font-rajdhani text-sm text-stone-500">
+          <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400">
             No tournaments match the selected filters.{' '}
             <button
               onClick={() => { setShowUpcoming(true); setShowOngoing(true); setShowCompleted(true) }}
@@ -1490,7 +1490,7 @@ export function TournamentPlannerClient({
           <>
             {isCaptainView && myTournaments.length > 0 && (
               <>
-                <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">Your tournaments</p>
+                <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400 mb-3">Your tournaments</p>
                 {myTournaments.map(({ tournament, games }) => (
                   <TournamentBlock key={tournament.id} tournament={tournament} games={games}
                     announcedSet={announcedSet} today={today}
@@ -1502,7 +1502,7 @@ export function TournamentPlannerClient({
                     forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
                 ))}
                 {otherTournaments.length > 0 && (
-                  <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mt-6 mb-3">Other tournaments</p>
+                  <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400 mt-6 mb-3">Other tournaments</p>
                 )}
               </>
             )}

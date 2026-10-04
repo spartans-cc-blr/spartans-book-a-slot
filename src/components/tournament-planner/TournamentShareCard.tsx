@@ -130,10 +130,10 @@ export function TournamentShareCard({
   }
 
   const gapColor = (gap: number | null) => {
-    if (!gap)       return 'text-stone-500'
-    if (gap <= 1)   return 'text-red-700'
-    if (avgGap && gap > avgGap + 2) return 'text-amber-700'
-    return 'text-emerald-700'
+    if (!gap)       return 'text-stone-500 dark:text-zinc-400'
+    if (gap <= 1)   return 'text-red-700 dark:text-red-400'
+    if (avgGap && gap > avgGap + 2) return 'text-amber-700 dark:text-amber-400'
+    return 'text-emerald-700 dark:text-emerald-400'
   }
   const gapDotColor = (gap: number | null) => {
     if (!gap)       return 'bg-stone-400'
@@ -143,15 +143,15 @@ export function TournamentShareCard({
   }
 
   return (
-    <div className="bg-white border border-parchment-3 rounded-2xl overflow-hidden">
+    <div className="bg-white dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded-2xl overflow-hidden">
 
       {/* Header */}
-      <div className="px-5 py-4 border-b border-parchment-3">
+      <div className="px-5 py-4 border-b border-parchment-3 dark:border-ink-5">
         <div className="flex items-start gap-3">
           <span className="text-amber-500 text-xl">🏆</span>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-cinzel text-base font-bold text-ink">
+              <h1 className="font-cinzel text-base font-bold text-ink dark:text-parchment">
                 {tournament.cricheroes_points_table_url ? (
                   <a href={tournament.cricheroes_points_table_url} target="_blank" rel="noopener noreferrer"
                     className="underline decoration-gold-dim underline-offset-2 hover:text-gold-dim transition-colors">
@@ -160,12 +160,12 @@ export function TournamentShareCard({
                 ) : tournament.name}
               </h1>
               {formats.length > 0 && (
-                <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                <span className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400">
                   {formats.join(' / ')}
                 </span>
               )}
             </div>
-            <p className="font-rajdhani text-xs text-stone-500 mt-0.5">
+            <p className="font-rajdhani text-xs text-stone-500 dark:text-zinc-400 mt-0.5">
               {tournament.captain && (
                 <>Captain:{' '}
                   {tournament.captain.cricheroes_url ? (
@@ -174,14 +174,14 @@ export function TournamentShareCard({
                     // organiser to a login-gated /players/[id]/stats page.
                     // Links straight to the external CricHeroes profile.
                     <a href={tournament.captain.cricheroes_url} target="_blank" rel="noopener noreferrer"
-                      className="text-ink font-semibold underline decoration-dotted underline-offset-2 hover:text-gold-dim transition-colors">
+                      className="text-ink dark:text-parchment font-semibold underline decoration-dotted underline-offset-2 hover:text-gold-dim transition-colors">
                       {tournament.captain.name}
                     </a>
                   ) : (
-                    <span className="text-ink font-semibold">{tournament.captain.name}</span>
+                    <span className="text-ink dark:text-parchment font-semibold">{tournament.captain.name}</span>
                   )} &nbsp;·&nbsp; </>
               )}
-              Avg gap: <span className="text-ink font-semibold">
+              Avg gap: <span className="text-ink dark:text-parchment font-semibold">
                 {avgGap !== null ? `${avgGap} week${avgGap !== 1 ? 's' : ''}` : 'N/A'}
               </span>
             </p>
@@ -190,17 +190,17 @@ export function TournamentShareCard({
       </div>
 
       {/* Stat bar */}
-      <div className="grid grid-cols-4 border-b border-parchment-3">
+      <div className="grid grid-cols-4 border-b border-parchment-3 dark:border-ink-5">
         {[
-          { label: 'Total',     val: totalLeague.toString(), col: 'text-ink',         sub: 'league games'   },
-          { label: 'Completed', val: completed.length.toString(),  col: 'text-emerald-700', sub: 'past date'      },
-          { label: 'Scheduled', val: scheduled.length.toString(),  col: 'text-amber-700',   sub: 'upcoming'       },
-          { label: 'Unbooked',  val: unbooked.toString(),    col: 'text-stone-500',   sub: 'not yet booked' },
+          { label: 'Total',     val: totalLeague.toString(), col: 'text-ink dark:text-parchment',         sub: 'league games'   },
+          { label: 'Completed', val: completed.length.toString(),  col: 'text-emerald-700 dark:text-emerald-400', sub: 'past date'      },
+          { label: 'Scheduled', val: scheduled.length.toString(),  col: 'text-amber-700 dark:text-amber-400',   sub: 'upcoming'       },
+          { label: 'Unbooked',  val: unbooked.toString(),    col: 'text-stone-500 dark:text-zinc-400',   sub: 'not yet booked' },
         ].map(({ label, val, col, sub }, i) => (
-          <div key={label} className={`px-3 py-2.5 text-center ${i > 0 ? 'border-l border-parchment-3' : ''}`}>
-            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-stone-500">{label}</p>
+          <div key={label} className={`px-3 py-2.5 text-center ${i > 0 ? 'border-l border-parchment-3 dark:border-ink-5' : ''}`}>
+            <p className="font-rajdhani text-[9px] uppercase tracking-widest text-stone-500 dark:text-zinc-400">{label}</p>
             <p className={`font-cinzel text-lg font-bold ${col}`}>{val}</p>
-            <p className="font-rajdhani text-[9px] text-stone-400">{sub}</p>
+            <p className="font-rajdhani text-[9px] text-stone-400 dark:text-zinc-500">{sub}</p>
           </div>
         ))}
       </div>
@@ -215,7 +215,7 @@ export function TournamentShareCard({
           WhatsApp enquiry link, mirroring /schedule's pattern. Only shown
           when there's actually something left to book. */}
       {unbooked > 0 && tournament.organiser_self_service && suggestedBuckets.length > 0 && (
-        <div className="px-4 py-3 border-b border-parchment-3">
+        <div className="px-4 py-3 border-b border-parchment-3 dark:border-ink-5">
           <OrganiserSelfService
             tournamentId={tournament.id}
             buckets={suggestedBuckets}
@@ -226,18 +226,18 @@ export function TournamentShareCard({
         </div>
       )}
       {unbooked > 0 && !tournament.organiser_self_service && suggestedDates.length > 0 && (
-        <div className="px-4 py-3 border-b border-parchment-3">
-          <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-2">
+        <div className="px-4 py-3 border-b border-parchment-3 dark:border-ink-5">
+          <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400 mb-2">
             Next available dates
           </p>
           <div className="flex flex-col gap-1.5">
             {suggestedDates.map(s => (
               <a key={s.game_date} href={suggestedDateWaLink(s)} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 hover:bg-emerald-100 transition-colors">
-                <span className="font-rajdhani text-xs font-semibold text-emerald-800">
+                className="flex items-center justify-between gap-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
+                <span className="font-rajdhani text-xs font-semibold text-emerald-800 dark:text-emerald-400">
                   {s.day} {format(parseISO(s.game_date), 'd MMM')}
                 </span>
-                <span className="flex items-center gap-1.5 text-emerald-700">
+                <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
                   {WA_ICON}
                   <span className="font-rajdhani text-[11px] font-bold">Book this date</span>
                 </span>
@@ -248,8 +248,8 @@ export function TournamentShareCard({
       )}
 
       {/* Game list */}
-      <div className="px-4 py-3 border-b border-parchment-3">
-        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">
+      <div className="px-4 py-3 border-b border-parchment-3 dark:border-ink-5">
+        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400 mb-3">
           Schedule
         </p>
         <div className="flex flex-col gap-1.5">
@@ -263,27 +263,27 @@ export function TournamentShareCard({
             // (a separate element per game), so an `auto` track sizes to that
             // row's own content only and drifted row-to-row depending on
             // whether it held "start" or "10w / from prev".
-            const rowClass = `grid grid-cols-[44px_1fr_72px] border border-parchment-3 rounded-xl overflow-hidden transition-colors ${isDone ? 'opacity-60' : ''} ${g.cricheroes_url ? 'hover:border-gold-dim' : ''}`
+            const rowClass = `grid grid-cols-[44px_1fr_72px] border border-parchment-3 dark:border-ink-5 rounded-xl overflow-hidden transition-colors ${isDone ? 'opacity-60' : ''} ${g.cricheroes_url ? 'hover:border-gold-dim' : ''}`
             const inner = (
               <>
-                <div className="bg-parchment-2 flex flex-col items-center justify-center py-2 border-r border-parchment-3">
-                  <span className="font-cinzel text-base font-bold text-ink leading-none">{format(d, 'd')}</span>
-                  <span className="font-rajdhani text-[9px] text-stone-500 uppercase">{format(d, 'MMM')}</span>
+                <div className="bg-parchment-2 dark:bg-ink-3 flex flex-col items-center justify-center py-2 border-r border-parchment-3 dark:border-ink-5">
+                  <span className="font-cinzel text-base font-bold text-ink dark:text-parchment leading-none">{format(d, 'd')}</span>
+                  <span className="font-rajdhani text-[9px] text-stone-500 dark:text-zinc-400 uppercase">{format(d, 'MMM')}</span>
                 </div>
                 <div className="px-2.5 py-2 flex flex-col items-start justify-center gap-0.5 min-w-0">
-                  <p className="font-rajdhani text-[10px] text-stone-500">{dayName} · {g.slot_time}</p>
-                  <p className="font-rajdhani text-[13px] font-semibold text-ink truncate w-full min-w-0">
+                  <p className="font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400">{dayName} · {g.slot_time}</p>
+                  <p className="font-rajdhani text-[13px] font-semibold text-ink dark:text-parchment truncate w-full min-w-0">
                     vs {g.opponent_name || 'TBD'}
-                    {formats.length > 1 && <span className="text-stone-400 font-normal"> · {g.format}</span>}
+                    {formats.length > 1 && <span className="text-stone-400 dark:text-zinc-500 font-normal"> · {g.format}</span>}
                   </p>
                   {isDone && g.match_result && <ResultBadge result={g.match_result} />}
                 </div>
-                <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-parchment-3">
+                <div className="flex flex-col items-end justify-center px-2.5 py-2 border-l border-parchment-3 dark:border-ink-5">
                   {gap !== null
                     ? <span className={`font-cinzel text-sm font-bold ${gapColor(gap)}`}>{gap}w</span>
-                    : <span className="font-rajdhani text-[9px] text-stone-500">start</span>
+                    : <span className="font-rajdhani text-[9px] text-stone-500 dark:text-zinc-400">start</span>
                   }
-                  {gap !== null && <span className="font-rajdhani text-[9px] text-stone-400">from prev</span>}
+                  {gap !== null && <span className="font-rajdhani text-[9px] text-stone-400 dark:text-zinc-500">from prev</span>}
                 </div>
               </>
             )
@@ -319,8 +319,8 @@ export function TournamentShareCard({
           return row
         })
         return (
-          <div className="px-4 py-3 border-b border-parchment-3">
-            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-3">
+          <div className="px-4 py-3 border-b border-parchment-3 dark:border-ink-5">
+            <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400 mb-3">
               Game timeline — pace view
             </p>
             <div className="flex gap-3.5 flex-wrap mb-3">
@@ -329,17 +329,17 @@ export function TournamentShareCard({
                 { dot: 'bg-emerald-600', label: 'On pace'  },
                 { dot: 'bg-amber-600',   label: 'Slower'   },
               ].map(({ dot, label }) => (
-                <div key={label} className="flex items-center gap-1.5 font-rajdhani text-[10px] text-stone-500">
+                <div key={label} className="flex items-center gap-1.5 font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400">
                   <span className={`w-2 h-2 rounded-full ${dot}`} />{label}
                 </div>
               ))}
             </div>
             <div className="relative" style={{ height: 16 }}>
-              <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3" />
+              <div className="absolute top-[5px] left-0 right-0 h-[2px] bg-parchment-3 dark:bg-ink-4" />
               {sorted.map((g, i) => (
                 <div key={g.id} className="absolute top-0" style={{ left: `${pcts[i]}%`, transform: 'translateX(-50%)' }}>
                   <div className={`w-3 h-3 rounded-full border-2 border-white ${gapDotColor(gameGaps[i])}`}
-                    style={{ boxShadow: '0 0 0 1px #E2DACE' }} />
+                    style={{ boxShadow: '0 0 0 1px var(--app-surface-deep)' }} />
                 </div>
               ))}
             </div>
@@ -360,10 +360,10 @@ export function TournamentShareCard({
           matching the internal Tournament Planner's SlotBalanceByDay
           (TournamentPlannerClient.tsx) exactly. */}
       <div className="px-4 pt-3 pb-2">
-        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-1">
+        <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400 mb-1">
           Slot balance
         </p>
-        <p className="font-rajdhani text-[11px] text-stone-500 mb-2.5">
+        <p className="font-rajdhani text-[11px] text-stone-500 dark:text-zinc-400 mb-2.5">
           Target per slot is the league's total games split evenly across every valid slot — our proposal
           is to schedule the remaining games so every slot below its target gets filled first.
         </p>
@@ -372,8 +372,8 @@ export function TournamentShareCard({
             // Only slots valid for this tournament's actual format(s) — cuts N/A rows to save space
             const rows = ALL_SLOTS.filter(s => s.day === day && s.validFor.some(f => activeFormats.includes(f)))
             return (
-              <div key={day} className="bg-white border border-parchment-3 rounded-2xl px-3.5 pb-1">
-                <p className="text-xs font-bold uppercase tracking-wide text-stone-500 pt-2.5 pb-1.5">{day}</p>
+              <div key={day} className="bg-white dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded-2xl px-3.5 pb-1">
+                <p className="text-xs font-bold uppercase tracking-wide text-stone-500 dark:text-zinc-400 pt-2.5 pb-1.5">{day}</p>
                 {rows.map(s => {
                   const k: SlotKey = `${s.day}-${s.time}`
                   const count      = slotCounts[k]
@@ -384,14 +384,14 @@ export function TournamentShareCard({
                     : (count > 0 ? Math.max(12, Math.round((count / maxSlotCount) * 100)) : 0)
                   return (
                     <div key={k} className="flex items-center gap-3 py-1.5 border-t border-parchment-2 first:border-t-0">
-                      <span className="w-[52px] flex-shrink-0 text-[12.5px] font-semibold text-stone-700">{s.time}</span>
-                      <div className="flex-1 h-2 bg-parchment-2 rounded-full overflow-hidden">
+                      <span className="w-[52px] flex-shrink-0 text-[12.5px] font-semibold text-stone-700 dark:text-zinc-300">{s.time}</span>
+                      <div className="flex-1 h-2 bg-parchment-2 dark:bg-ink-3 rounded-full overflow-hidden">
                         {count > 0 && (
                           <div className={`h-full rounded-full ${metTarget ? 'bg-emerald-600' : 'bg-amber-600'}`}
                             style={{ width: `${pct}%` }} />
                         )}
                       </div>
-                      <span className="w-[42px] flex-shrink-0 text-sm font-extrabold text-ink text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      <span className="w-[42px] flex-shrink-0 text-sm font-extrabold text-ink dark:text-parchment text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {target > 0 ? `${count}/${target}` : count}
                       </span>
                     </div>
@@ -402,7 +402,7 @@ export function TournamentShareCard({
           })}
         </div>
         {isSlotImbalanced && (
-          <p className="text-xs text-blue-700 mt-2.5">
+          <p className="text-xs text-blue-700 dark:text-blue-400 mt-2.5">
             ↗ {dominantSlot} has {maxSlotCount} of {sorted.length} games — unbooked games should favour other slots
           </p>
         )}

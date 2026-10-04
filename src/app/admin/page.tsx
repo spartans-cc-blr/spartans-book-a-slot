@@ -73,21 +73,21 @@ export default async function AdminDashboard({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-gold">Matches - List View</h1>
-        <p className="font-rajdhani text-zinc-500 text-sm mt-1">
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Matches - List View</h1>
+        <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">
           Welcome back, {session?.user?.name?.split(' ')[0]}. Here's your weekend at a glance.
         </p>
       </div>
 
       {/* Alert if weekend near capacity */}
       {weekendGames.length >= 2 && (
-        <div className="bg-red-950/50 border border-red-900 border-l-4 border-l-crimson px-4 py-3 rounded mb-5 flex items-center gap-3 font-rajdhani text-sm text-red-300">
+        <div className="bg-red-50 dark:bg-red-950/50 border border-red-300 dark:border-red-900 border-l-4 border-l-crimson px-4 py-3 rounded mb-5 flex items-center gap-3 font-rajdhani text-sm text-red-700 dark:text-red-300">
           ⚠️ <span><strong>This weekend</strong> has {weekendGames.length} of 3 game slots filled.{weekendGames.length === 3 ? ' Weekend is full.' : ' 1 slot remaining.'}</span>
         </div>
       )}
 
       {searchParams?.saved && (
-        <div className="bg-emerald-950 border border-emerald-800 text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded mb-5 flex items-center gap-3">
+        <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded mb-5 flex items-center gap-3">
           ✓ Booking saved successfully.
         </div>
       )}
@@ -100,10 +100,10 @@ export default async function AdminDashboard({
           { label: 'Soft Blocks',   value: softBlocks.length, sub: 'Active reservations',       alert: false },
           { label: 'Open Slots',    value: 3 - weekendGames.length, sub: 'This weekend',         alert: false },
         ].map(card => (
-          <div key={card.label} className={`bg-ink-3 border rounded p-4 border-t-2 ${card.alert ? 'border-t-crimson border-ink-5' : 'border-t-gold-dim border-ink-5'}`}>
-            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 mb-1">{card.label}</p>
-            <p className={`font-cinzel text-3xl font-bold ${card.alert ? 'text-crimson' : 'text-gold'}`}>{card.value}</p>
-            <p className="font-rajdhani text-xs text-zinc-600 mt-1">{card.sub}</p>
+          <div key={card.label} className={`bg-white dark:bg-ink-3 border rounded p-4 border-t-2 ${card.alert ? 'border-t-crimson border-[#D4C9B0] dark:border-ink-5' : 'border-t-gold-dim border-[#D4C9B0] dark:border-ink-5'}`}>
+            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 mb-1">{card.label}</p>
+            <p className={`font-cinzel text-3xl font-bold ${card.alert ? 'text-crimson' : 'text-amber-700 dark:text-gold'}`}>{card.value}</p>
+            <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">{card.sub}</p>
           </div>
         ))}
       </div>
@@ -131,7 +131,7 @@ export default async function AdminDashboard({
       <div className="flex items-center justify-end mb-3">
         <div className="flex gap-2">
           <Link href="/admin/soft-blocks/new"
-            className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold px-3 py-1.5 rounded hover:bg-gold/10 transition-colors">
+            className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-amber-700 dark:text-gold px-3 py-1.5 rounded hover:bg-gold/10 transition-colors">
             🔒 Soft Block
           </Link>
           <Link href="/admin/bookings/new"

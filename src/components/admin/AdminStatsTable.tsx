@@ -100,23 +100,23 @@ export function AdminStatsTable({ rows, category }: { rows: LeaderboardRow[]; ca
     <div>
       <div className="flex justify-end mb-3">
         <button onClick={exportCsv}
-          className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold px-3 py-1.5 rounded hover:bg-gold/10 transition-colors">
+          className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-amber-700 dark:text-gold px-3 py-1.5 rounded hover:bg-gold/10 transition-colors">
           ⬇ Export CSV
         </button>
       </div>
 
-      <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-ink-5 bg-ink-4">
-                <th className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">#</th>
-                <th className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">Player</th>
+              <tr className="border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
+                <th className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">#</th>
+                <th className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">Player</th>
                 {columns.map(col => (
                   <th key={col.key}
                     onClick={() => handleSort(col.key)}
                     className={`font-rajdhani text-[10px] font-bold tracking-[2px] uppercase px-4 py-2.5 text-left whitespace-nowrap cursor-pointer select-none transition-colors
-                      ${sortKey === col.key ? 'text-gold' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                      ${sortKey === col.key ? 'text-amber-700 dark:text-gold' : 'text-[#78716C] dark:text-zinc-600 hover:text-[#57534E] dark:hover:text-zinc-400'}`}>
                     {col.label}{sortKey === col.key ? (sortDesc ? ' ↓' : ' ↑') : ''}
                   </th>
                 ))}
@@ -124,24 +124,24 @@ export function AdminStatsTable({ rows, category }: { rows: LeaderboardRow[]; ca
             </thead>
             <tbody>
               {sorted.length === 0 && (
-                <tr><td colSpan={2 + columns.length} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No stats for this filter yet.</td></tr>
+                <tr><td colSpan={2 + columns.length} className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">No stats for this filter yet.</td></tr>
               )}
               {sorted.map((row, i) => (
-                <tr key={row.playerId} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
-                  <td className="px-4 py-3 font-cinzel text-sm text-zinc-500">{i + 1}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-parchment">
+                <tr key={row.playerId} className="border-b border-[#E2DACE] dark:border-ink-4 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors">
+                  <td className="px-4 py-3 font-cinzel text-sm text-[#78716C] dark:text-zinc-500">{i + 1}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#1C1917] dark:text-parchment">
                     <PlayerNameLink name={row.playerName} playerId={row.playerId} cricHeroesUrl={row.cricheroesUrl} />
                   </td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.matches}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.runs}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.battingAverage != null ? row.stats.battingAverage.toFixed(2) : '—'}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.strikeRate != null ? row.stats.strikeRate.toFixed(2) : '—'}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.wickets}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.economy != null ? row.stats.economy.toFixed(2) : '—'}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.catches}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.runOuts}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.stumpings}</td>
-                  <td className="px-4 py-3 font-rajdhani text-sm text-zinc-400">{row.stats.mvpPoints.toFixed(2)}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.matches}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.runs}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.battingAverage != null ? row.stats.battingAverage.toFixed(2) : '—'}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.strikeRate != null ? row.stats.strikeRate.toFixed(2) : '—'}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.wickets}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.economy != null ? row.stats.economy.toFixed(2) : '—'}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.catches}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.runOuts}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.stumpings}</td>
+                  <td className="px-4 py-3 font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{row.stats.mvpPoints.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

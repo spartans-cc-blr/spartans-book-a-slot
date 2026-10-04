@@ -245,7 +245,7 @@ export function BackfillSquadClient() {
   return (
     <div className="space-y-5">
       {/* Paste box */}
-      <div className="bg-ink-3 border border-ink-5 rounded p-4">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4">
         <label className="form-label">WhatsApp announcement text</label>
         <textarea
           value={text}
@@ -261,7 +261,7 @@ export function BackfillSquadClient() {
             className="font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
             {parsing ? 'Parsing…' : 'Parse'}
           </button>
-          {parseError && <p className="font-rajdhani text-xs text-red-400">{parseError}</p>}
+          {parseError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">{parseError}</p>}
         </div>
       </div>
 
@@ -269,8 +269,8 @@ export function BackfillSquadClient() {
       {toast && (
         <div className={`font-rajdhani text-sm px-4 py-2.5 rounded border ${
           toast.kind === 'success'
-            ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400'
-            : 'bg-red-950/40 border-red-800 text-red-400'
+            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400'
+            : 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800 text-red-700 dark:text-red-400'
         }`}>
           {toast.message}
         </div>
@@ -279,25 +279,25 @@ export function BackfillSquadClient() {
       {parsed && (
         <div className="space-y-4">
           {/* Booking / date context */}
-          <div className="font-rajdhani text-xs text-zinc-500 flex flex-wrap gap-x-4 gap-y-1">
+          <div className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 flex flex-wrap gap-x-4 gap-y-1">
             <span>
               Booking:{' '}
               {selectedBookingId
-                ? <span className="text-zinc-300">{selectedBookingId}</span>
-                : <span className="text-red-400">Not resolved</span>}
+                ? <span className="text-[#44403C] dark:text-zinc-300">{selectedBookingId}</span>
+                : <span className="text-red-700 dark:text-red-400">Not resolved</span>}
             </span>
-            <span className={parsed.booking_id ? 'text-emerald-400' : 'text-amber-400'}>
+            <span className={parsed.booking_id ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}>
               {RESOLVED_VIA_LABEL[parsed.resolved_via]}
             </span>
-            {parsed.date_raw   && <span>Date in text: <span className="text-zinc-300">{parsed.date_raw}</span></span>}
-            {parsed.format_raw && <span>Format in text: <span className="text-zinc-300">{parsed.format_raw}</span></span>}
-            <span>Parsed players: <span className="text-zinc-300">{rows.length}</span></span>
+            {parsed.date_raw   && <span>Date in text: <span className="text-[#44403C] dark:text-zinc-300">{parsed.date_raw}</span></span>}
+            {parsed.format_raw && <span>Format in text: <span className="text-[#44403C] dark:text-zinc-300">{parsed.format_raw}</span></span>}
+            <span>Parsed players: <span className="text-[#44403C] dark:text-zinc-300">{rows.length}</span></span>
           </div>
 
           {/* Manual booking picker — ambiguous date+format fallback */}
           {ambiguousFallback && (
-            <div className="bg-amber-950/40 border border-amber-700 rounded p-3">
-              <p className="font-rajdhani text-sm text-amber-300">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded p-3">
+              <p className="font-rajdhani text-sm text-amber-700 dark:text-amber-300">
                 {parsed.candidates?.length
                   ? `Couldn't confidently match this to one booking — ${parsed.candidates.length} bookings share this date and format. Pick the correct match:`
                   : 'No booking found matching this date and format — pick the correct match manually if you know it, or double-check the pasted text.'}
@@ -320,8 +320,8 @@ export function BackfillSquadClient() {
 
           {/* Fully unresolved — no signal to even attempt a match */}
           {unresolved && (
-            <div className="bg-red-950/40 border border-red-800 rounded p-3">
-              <p className="font-rajdhani text-sm text-red-400">
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded p-3">
+              <p className="font-rajdhani text-sm text-red-700 dark:text-red-400">
                 Couldn't resolve a booking from this message — no /fixtures link, no CricHeroes match
                 link, and no parseable date + format line. Nothing to save automatically.
               </p>
@@ -330,8 +330,8 @@ export function BackfillSquadClient() {
 
           {/* Manually selected a candidate different from the auto-resolved one — no availability/existing-squad data behind it yet */}
           {selectedBookingId && parsed.booking_id !== selectedBookingId && (
-            <div className="bg-sky-950/40 border border-sky-700 rounded p-3">
-              <p className="font-rajdhani text-sm text-sky-300">
+            <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-300 dark:border-sky-700 rounded p-3">
+              <p className="font-rajdhani text-sm text-sky-700 dark:text-sky-300">
                 Manually selected match — availability flags below are unavailable for it, and we
                 won't know if it already has a squad until you save. If one exists, saving will
                 prompt you to confirm overwrite.
@@ -341,8 +341,8 @@ export function BackfillSquadClient() {
 
           {/* Overwrite warning */}
           {needsOverwriteGate && (
-            <div className="bg-amber-950/40 border border-amber-700 rounded p-3">
-              <p className="font-rajdhani text-sm text-amber-300">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded p-3">
+              <p className="font-rajdhani text-sm text-amber-700 dark:text-amber-300">
                 ⚠️ Squad rows already exist for this booking
                 {knownExistingSquad ? ` (${parsed.existing_squad_count} row${parsed.existing_squad_count === 1 ? '' : 's'})` : ''}.
                 Saving will delete and replace them.
@@ -354,19 +354,19 @@ export function BackfillSquadClient() {
                   onChange={e => setOverwriteConfirmed(e.target.checked)}
                   className="w-4 h-4 accent-crimson"
                 />
-                <span className="font-rajdhani text-sm text-amber-200">Overwrite existing rows</span>
+                <span className="font-rajdhani text-sm text-amber-800 dark:text-amber-200">Overwrite existing rows</span>
               </label>
             </div>
           )}
 
           {/* Preview table */}
-          <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+          <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-ink-5 bg-ink-4">
+                  <tr className="border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
                     {['Name', 'Role', 'Matched Player', 'Flag'].map(h => (
-                      <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">
+                      <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">
                         {h}
                       </th>
                     ))}
@@ -389,12 +389,12 @@ export function BackfillSquadClient() {
                             : null
 
                     return (
-                      <tr key={i} className="border-b border-ink-4">
-                        <td className="px-4 py-2.5 font-rajdhani text-sm text-parchment whitespace-nowrap">{row.name}</td>
+                      <tr key={i} className="border-b border-[#E2DACE] dark:border-ink-4">
+                        <td className="px-4 py-2.5 font-rajdhani text-sm text-[#1C1917] dark:text-parchment whitespace-nowrap">{row.name}</td>
                         <td className="px-4 py-2.5">
                           <div className="flex gap-1 flex-wrap">
                             {row.roles.map(r => (
-                              <span key={r} className="font-rajdhani text-[10px] font-bold bg-gold/10 border border-gold-dim text-gold px-1.5 py-0.5 rounded">
+                              <span key={r} className="font-rajdhani text-[10px] font-bold bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold px-1.5 py-0.5 rounded">
                                 {r}
                               </span>
                             ))}
@@ -402,7 +402,7 @@ export function BackfillSquadClient() {
                         </td>
                         <td className="px-4 py-2.5">
                           {parsedEntry?.matched_player_id ? (
-                            <span className="font-rajdhani text-sm text-emerald-400">{resolvedName}</span>
+                            <span className="font-rajdhani text-sm text-emerald-700 dark:text-emerald-400">{resolvedName}</span>
                           ) : (
                             <div className="space-y-1.5">
                               <select
@@ -434,32 +434,32 @@ export function BackfillSquadClient() {
                                   <button
                                     onClick={() => handleQuickAddPlayer(i)}
                                     disabled={addPlayerBusy}
-                                    className="font-rajdhani text-[10px] font-bold bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white px-2 py-1 rounded whitespace-nowrap">
+                                    className="font-rajdhani text-[10px] font-bold bg-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-800 disabled:opacity-40 text-white px-2 py-1 rounded whitespace-nowrap">
                                     {addPlayerBusy ? '…' : 'Create'}
                                   </button>
                                   <button
                                     onClick={cancelAddPlayer}
                                     disabled={addPlayerBusy}
-                                    className="font-rajdhani text-[10px] text-zinc-500 hover:text-zinc-300 px-1">
+                                    className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 px-1">
                                     ✕
                                   </button>
                                 </div>
                               ) : (
                                 <button
                                   onClick={() => openAddPlayer(i)}
-                                  className="font-rajdhani text-[10px] text-sky-400 hover:text-sky-300 underline">
+                                  className="font-rajdhani text-[10px] text-sky-700 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 underline">
                                   ＋ New player — not in current roster
                                 </button>
                               )}
                               {addPlayerRow === i && addPlayerError && (
-                                <p className="font-rajdhani text-[10px] text-red-400">{addPlayerError}</p>
+                                <p className="font-rajdhani text-[10px] text-red-700 dark:text-red-400">{addPlayerError}</p>
                               )}
                             </div>
                           )}
                         </td>
                         <td className="px-4 py-2.5">
                           {flagLabel && (
-                            <span className="font-rajdhani text-[9px] font-bold bg-amber-950/40 border border-amber-700 text-amber-400 px-1.5 py-0.5 rounded">
+                            <span className="font-rajdhani text-[9px] font-bold bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">
                               {flagLabel}
                             </span>
                           )}
@@ -479,10 +479,10 @@ export function BackfillSquadClient() {
             {saving ? 'Saving…' : 'Confirm & Save'}
           </button>
           {!selectedBookingId && (
-            <p className="font-rajdhani text-xs text-red-400">Cannot save — no booking resolved for this announcement.</p>
+            <p className="font-rajdhani text-xs text-red-700 dark:text-red-400">Cannot save — no booking resolved for this announcement.</p>
           )}
           {selectedBookingId && !allResolved && (
-            <p className="font-rajdhani text-xs text-amber-400">Resolve every player to a roster match before saving.</p>
+            <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400">Resolve every player to a roster match before saving.</p>
           )}
         </div>
       )}

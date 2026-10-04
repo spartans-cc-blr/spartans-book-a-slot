@@ -41,8 +41,8 @@ export default async function AdminStatsPage({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-gold">Performance Report</h1>
-        <p className="font-rajdhani text-zinc-500 text-sm mt-1">
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Performance Report</h1>
+        <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">
           Career and season stats across every reconciled player — useful for AGM awards and squad selection.
         </p>
       </div>

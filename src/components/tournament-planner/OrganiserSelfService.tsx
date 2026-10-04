@@ -164,10 +164,10 @@ export function OrganiserSelfService({
 
   return (
     <div>
-      <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 mb-1">
+      <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400 mb-1">
         Reserve your next dates
       </p>
-      <p className="font-rajdhani text-[11px] text-stone-500 mb-2.5">
+      <p className="font-rajdhani text-[11px] text-stone-500 dark:text-zinc-400 mb-2.5">
         One card per slot still below its target fill — reserve whichever suits your side.
       </p>
 
@@ -175,12 +175,12 @@ export function OrganiserSelfService({
         <input
           type="text" value={name} onChange={e => setName(e.target.value)}
           placeholder="Your name"
-          className="font-rajdhani text-xs px-2.5 py-2 rounded-lg border border-parchment-3 bg-white text-ink"
+          className="font-rajdhani text-xs px-2.5 py-2 rounded-lg border border-parchment-3 dark:border-ink-5 bg-white dark:bg-ink-3 text-ink dark:text-parchment"
         />
         <input
           type="tel" value={phone} onChange={e => setPhone(e.target.value)}
           placeholder="WhatsApp number"
-          className="font-rajdhani text-xs px-2.5 py-2 rounded-lg border border-parchment-3 bg-white text-ink"
+          className="font-rajdhani text-xs px-2.5 py-2 rounded-lg border border-parchment-3 dark:border-ink-5 bg-white dark:bg-ink-3 text-ink dark:text-parchment"
         />
       </div>
 
@@ -194,26 +194,26 @@ export function OrganiserSelfService({
         {[...cards].sort((a, b) => a.game_date.localeCompare(b.game_date)).map(card => (
           <div key={card.key}>
             {card.phase === 'pick' && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-3">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3.5 py-3">
                 <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-700">
+                  <span className="font-rajdhani text-[11px] font-bold tracking-wide text-emerald-700 dark:text-emerald-400">
                     {card.day.toUpperCase()} · {card.slot_time}
                   </span>
-                  <span className="font-rajdhani text-[11px] text-emerald-700" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  <span className="font-rajdhani text-[11px] text-emerald-700 dark:text-emerald-400" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {card.current}/{card.target}
                   </span>
                 </div>
-                <p className="font-rajdhani text-sm font-bold text-emerald-800 mb-2.5">
+                <p className="font-rajdhani text-sm font-bold text-emerald-800 dark:text-emerald-400 mb-2.5">
                   {format(parseISO(card.game_date), 'EEEE d MMM')}
                 </p>
-                {card.error && <p className="font-rajdhani text-xs text-red-700 mb-2">{card.error}</p>}
+                {card.error && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mb-2">{card.error}</p>}
                 <div className="flex gap-2">
                   <button onClick={() => reserveCurrent(card)} disabled={!identityValid || card.busy}
                     className="font-rajdhani text-xs font-bold tracking-wide bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-lg transition-colors">
                     {card.busy ? 'Reserving…' : '✅ Reserve this'}
                   </button>
                   <button onClick={() => declineCurrent(card)} disabled={card.busy}
-                    className="font-rajdhani text-xs font-bold tracking-wide bg-white border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-40 px-3.5 py-2 rounded-lg transition-colors">
+                    className="font-rajdhani text-xs font-bold tracking-wide bg-white dark:bg-ink-3 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-40 px-3.5 py-2 rounded-lg transition-colors">
                     ❌ Not available
                   </button>
                 </div>
@@ -221,43 +221,43 @@ export function OrganiserSelfService({
             )}
 
             {card.phase === 'held' && card.held && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3">
-                <p className="font-rajdhani text-sm font-bold text-amber-800 mb-1">
+              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3.5 py-3">
+                <p className="font-rajdhani text-sm font-bold text-amber-800 dark:text-amber-400 mb-1">
                   🔒 Reserved — {format(parseISO(card.held.game_date), 'EEEE d MMM')} · {card.held.slot_time}
                 </p>
-                <p className="font-rajdhani text-xs text-amber-700 mb-2.5">
+                <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 mb-2.5">
                   Held for 48 hours while we finalise. Once your CricHeroes match link exists, paste it below and we’ll confirm shortly after.
                 </p>
                 <div className="flex gap-2">
                   <input
                     type="text" value={card.urlInput} onChange={e => patchCard(card.key, { urlInput: e.target.value })}
                     placeholder="https://cricheroes.in/scorecard/..."
-                    className="flex-1 font-rajdhani text-xs px-2.5 py-2 rounded-lg border border-amber-200 bg-white text-ink"
+                    className="flex-1 font-rajdhani text-xs px-2.5 py-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-white dark:bg-ink-3 text-ink dark:text-parchment"
                   />
                   <button onClick={() => submitUrl(card)} disabled={!card.urlInput.trim() || card.urlBusy}
                     className="font-rajdhani text-xs font-bold tracking-wide bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-lg transition-colors whitespace-nowrap">
                     {card.urlBusy ? 'Saving…' : 'Submit'}
                   </button>
                 </div>
-                {card.urlError && <p className="font-rajdhani text-xs text-red-700 mt-2">{card.urlError}</p>}
+                {card.urlError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{card.urlError}</p>}
               </div>
             )}
 
             {card.phase === 'done' && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-3">
-                <p className="font-rajdhani text-sm font-bold text-emerald-800">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3.5 py-3">
+                <p className="font-rajdhani text-sm font-bold text-emerald-800 dark:text-emerald-400">
                   ✅ Thanks! We’ll confirm your {card.day} {card.slot_time} slot shortly.
                 </p>
               </div>
             )}
 
             {card.phase === 'exhausted' && (
-              <div className="bg-stone-50 border border-parchment-3 rounded-xl px-3.5 py-3">
-                <p className="font-rajdhani text-sm text-stone-600 mb-2">
+              <div className="bg-stone-50 dark:bg-ink-4 border border-parchment-3 dark:border-ink-5 rounded-xl px-3.5 py-3">
+                <p className="font-rajdhani text-sm text-stone-600 dark:text-zinc-400 mb-2">
                   No open {card.day} {card.slot_time} dates left in our current window — message us directly and we’ll find one.
                 </p>
                 <a href={waFallbackLink} target="_blank" rel="noopener noreferrer"
-                  className="font-rajdhani text-xs font-bold text-emerald-700 underline">
+                  className="font-rajdhani text-xs font-bold text-emerald-700 dark:text-emerald-400 underline">
                   Message Spartans on WhatsApp →
                 </a>
               </div>

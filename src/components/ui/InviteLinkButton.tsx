@@ -63,26 +63,26 @@ export function InviteLinkButton() {
       <button
         onClick={generate}
         disabled={loading}
-        className="font-rajdhani text-xs font-bold tracking-wide px-4 py-2 rounded-sm bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+        className="font-rajdhani text-xs font-bold tracking-wide px-4 py-2 rounded-sm bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
       >
         {loading ? 'Generating…' : '🔗 Generate Invite Link'}
       </button>
 
       {/* Error */}
       {error && (
-        <p className="font-rajdhani text-[10px] text-red-400">{error}</p>
+        <p className="font-rajdhani text-[10px] text-red-700 dark:text-red-400">{error}</p>
       )}
 
       {/* Result panel */}
       {inviteUrl && (
-        <div className="bg-ink-3 border border-ink-5 rounded p-3 space-y-2 min-w-0">
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-3 space-y-2 min-w-0">
           {/* URL display */}
-          <p className="font-rajdhani text-[10px] text-zinc-500 break-all leading-relaxed">
+          <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-500 break-all leading-relaxed">
             {inviteUrl}
           </p>
 
           {/* Expiry */}
-          <p className="font-rajdhani text-[9px] text-zinc-600">
+          <p className="font-rajdhani text-[9px] text-[#78716C] dark:text-zinc-600">
             Expires: {expiryLabel} · Single use
           </p>
 
@@ -90,7 +90,7 @@ export function InviteLinkButton() {
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={copy}
-              className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-3 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 transition-colors"
+              className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-3 py-1.5 rounded-sm border border-[#D4C9B0] dark:border-zinc-700 text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-zinc-100 hover:border-zinc-500 transition-colors"
             >
               <CopyIcon />
               {copied ? '✓ Copied' : 'Copy link'}
@@ -100,7 +100,7 @@ export function InviteLinkButton() {
               href={waLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-3 py-1.5 rounded-sm bg-emerald-950/40 border border-emerald-700 text-emerald-400 hover:bg-emerald-950/70 transition-colors"
+              className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-3 py-1.5 rounded-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/70 transition-colors"
             >
               <WAIcon />
               Share on WhatsApp
@@ -108,7 +108,7 @@ export function InviteLinkButton() {
           </div>
 
           {/* Regenerate note */}
-          <p className="font-rajdhani text-[9px] text-zinc-700">
+          <p className="font-rajdhani text-[9px] text-[#78716C] dark:text-zinc-700">
             Each click generates a new link. One link = one player.
           </p>
         </div>

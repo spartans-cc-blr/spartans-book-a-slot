@@ -253,8 +253,8 @@ export default function AdminPlayersPage() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-cinzel text-xl font-bold text-gold">Players</h1>
-          <p className="font-rajdhani text-zinc-500 text-sm mt-1">
+          <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Players</h1>
+          <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">
             {players.filter(p => p.status === 'active').length} active players · {players.filter(p => isCurrentlyExempt(p.fee_exemptions)).length} currently fee-exempt
           </p>
         </div>
@@ -270,11 +270,11 @@ export default function AdminPlayersPage() {
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search name, email or phone..."
           className="form-input flex-1 min-w-[200px]" />
-        <div className="flex border border-ink-5 rounded overflow-hidden">
+        <div className="flex border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
           {(['active', 'inactive', 'expelled', 'all'] as const).map(f => (
             <button key={f} onClick={() => setFilterActive(f)}
               className={`px-3 py-1.5 font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
-                ${filterActive === f ? 'bg-gold-dim text-gold' : 'bg-ink-4 text-zinc-500 hover:text-zinc-300'}`}>
+                ${filterActive === f ? 'bg-gold-dim text-amber-700 dark:text-gold' : 'bg-parchment-2 dark:bg-ink-4 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300'}`}>
               {f}
             </button>
           ))}
@@ -283,8 +283,8 @@ export default function AdminPlayersPage() {
 
       {/* Add form */}
       {showAdd && (
-        <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-6">
-          <h2 className="font-cinzel text-sm text-gold font-semibold mb-4">New Player</h2>
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-6">
+          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">New Player</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { label: 'Full Name *', key: 'name', type: 'text' },
@@ -327,7 +327,7 @@ export default function AdminPlayersPage() {
               </select>
             </div>
           </div>
-          {error && <p className="font-rajdhani text-xs text-red-400 mt-3">{error}</p>}
+          {error && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-3">{error}</p>}
           <button onClick={handleAdd} disabled={!addForm.name.trim() || saving}
             className="mt-4 font-rajdhani text-xs font-bold tracking-wide bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
             {saving ? 'Adding...' : '＋ Add Player'}
@@ -336,22 +336,22 @@ export default function AdminPlayersPage() {
       )}
 
       {/* Players table */}
-      <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-ink-5 bg-ink-4">
+              <tr className="border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
                 {['Player', 'Contact', 'Skills', 'Blood Grp', 'Wallet', 'Status', ''].map(h => (
-                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
+                  <th key={h} className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">Loading...</td></tr>
               )}
               {!loading && filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No players found.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">No players found.</td></tr>
               )}
               {filtered.map(p => {
                 const exempt = isCurrentlyExempt(p.fee_exemptions)
@@ -359,7 +359,7 @@ export default function AdminPlayersPage() {
 
                 if (editingId === p.id) {
                   return (
-                    <tr key={p.id} className="border-b border-ink-4 bg-ink-4">
+                    <tr key={p.id} className="border-b border-[#E2DACE] dark:border-ink-4 bg-parchment-2 dark:bg-ink-4">
                       <td colSpan={7} className="px-4 py-4">
                         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                           {[
@@ -403,43 +403,43 @@ export default function AdminPlayersPage() {
                               <input type="checkbox" checked={(editForm as any)[key] ?? false}
                                 onChange={e => setEditForm(f => ({ ...f, [key]: e.target.checked }))}
                                 className="w-4 h-4 accent-gold" />
-                              <span className="font-rajdhani text-sm text-zinc-400">{label}</span>
+                              <span className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400">{label}</span>
                             </label>
                           ))}
                         </div>
-                        {error && <p className="font-rajdhani text-xs text-red-400 mt-2">{error}</p>}
+                        {error && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{error}</p>}
                         <div className="flex gap-2 mt-3">
                           <button onClick={() => saveEdit(p.id)} disabled={saving}
                             className="font-rajdhani text-xs font-bold bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-1.5 rounded transition-colors">
                             {saving ? 'Saving...' : '✓ Save'}
                           </button>
                           <button onClick={() => setEditingId(null)}
-                            className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 border border-ink-5 px-4 py-1.5 rounded transition-colors">
+                            className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 border border-[#D4C9B0] dark:border-ink-5 px-4 py-1.5 rounded transition-colors">
                             Cancel
                           </button>
                           {p.status !== 'expelled' && (
                             <button
                               onClick={() => expelPlayer(p.id, p.name)}
-                              className="font-rajdhani text-xs text-zinc-600 hover:text-red-400 border border-ink-5 hover:border-red-800 px-2 py-1.5 rounded transition-colors ml-auto">
+                              className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-red-700 dark:hover:text-red-400 border border-[#D4C9B0] dark:border-ink-5 hover:border-red-300 dark:hover:border-red-800 px-2 py-1.5 rounded transition-colors ml-auto">
                               Expel player
                             </button>
                           )}
                         </div>
 
                         {/* Wallet */}
-                        <div className="mt-4 border-t border-ink-5 pt-4">
+                        <div className="mt-4 border-t border-[#D4C9B0] dark:border-ink-5 pt-4">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="font-cinzel text-xs text-gold">
-                              Wallet · <span className={p.wallet_balance < 0 ? 'text-amber-400' : 'text-zinc-300'}>₹{p.wallet_balance}</span>
+                            <p className="font-cinzel text-xs text-amber-700 dark:text-gold">
+                              Wallet · <span className={p.wallet_balance < 0 ? 'text-amber-700 dark:text-amber-400' : 'text-[#44403C] dark:text-zinc-300'}>₹{p.wallet_balance}</span>
                             </p>
                             <button onClick={() => toggleWallet(p.id)}
-                              className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors">
+                              className="font-rajdhani text-xs text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors">
                               {showWallet === p.id ? '✕ Close' : '＋ Update Wallet'}
                             </button>
                           </div>
 
                           {showWallet === p.id && (
-                            <div className="bg-ink-4 p-3 rounded border border-ink-5">
+                            <div className="bg-parchment-2 dark:bg-ink-4 p-3 rounded border border-[#D4C9B0] dark:border-ink-5">
                               <div className="grid sm:grid-cols-3 gap-3">
                                 <div>
                                   <label className="form-label">Type</label>
@@ -464,27 +464,27 @@ export default function AdminPlayersPage() {
                                     className="form-input" />
                                 </div>
                               </div>
-                              {walletError && <p className="font-rajdhani text-xs text-red-400 mt-2">{walletError}</p>}
+                              {walletError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{walletError}</p>}
                               <button onClick={() => submitWalletTransaction(p.id)} disabled={walletSaving}
                                 className="mt-3 font-rajdhani text-xs font-bold bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
                                 {walletSaving ? 'Saving...' : '✓ Apply & Notify Player'}
                               </button>
-                              <p className="font-rajdhani text-[10px] text-zinc-600 mt-1.5">
+                              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1.5">
                                 Pushes a notification to the player if they've subscribed on their profile.
                               </p>
 
                               {/* Recent transactions */}
                               {(walletHistory[p.id] ?? []).length > 0 && (
-                                <div className="mt-3 pt-3 border-t border-ink-5 space-y-1">
+                                <div className="mt-3 pt-3 border-t border-[#D4C9B0] dark:border-ink-5 space-y-1">
                                   {walletHistory[p.id].map(t => (
-                                    <div key={t.id} className="flex items-center justify-between text-xs font-rajdhani text-zinc-500">
+                                    <div key={t.id} className="flex items-center justify-between text-xs font-rajdhani text-[#78716C] dark:text-zinc-500">
                                       <span>
-                                        <span className={t.type === 'credit' ? 'text-emerald-400' : 'text-amber-400'}>
+                                        <span className={t.type === 'credit' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}>
                                           {t.type === 'credit' ? '+' : '-'}₹{t.amount}
                                         </span>
                                         {' '}· {t.reason}
                                       </span>
-                                      <span className="text-zinc-600">{new Date(t.created_at).toLocaleDateString()}</span>
+                                      <span className="text-[#78716C] dark:text-zinc-600">{new Date(t.created_at).toLocaleDateString()}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -494,11 +494,11 @@ export default function AdminPlayersPage() {
                         </div>
 
                         {/* Fee exemptions */}
-                        <div className="mt-4 border-t border-ink-5 pt-4">
+                        <div className="mt-4 border-t border-[#D4C9B0] dark:border-ink-5 pt-4">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="font-cinzel text-xs text-gold">Fee Exemptions</p>
+                            <p className="font-cinzel text-xs text-amber-700 dark:text-gold">Fee Exemptions</p>
                             <button onClick={() => setShowExempt(showExempt === p.id ? null : p.id)}
-                              className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors">
+                              className="font-rajdhani text-xs text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors">
                               {showExempt === p.id ? '✕ Cancel' : '＋ Add Exemption'}
                             </button>
                           </div>
@@ -510,11 +510,11 @@ export default function AdminPlayersPage() {
                                 const active = e.start_date <= new Date().toISOString().split('T')[0] && (e.end_date === null || e.end_date >= new Date().toISOString().split('T')[0])
                                 return (
                                   <div key={e.id} className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-rajdhani
-                                    ${active ? 'bg-amber-950/30 border-amber-800 text-amber-300' : 'bg-ink-4 border-ink-5 text-zinc-600'}`}>
+                                    ${active ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300' : 'bg-parchment-2 dark:bg-ink-4 border-[#D4C9B0] dark:border-ink-5 text-[#78716C] dark:text-zinc-600'}`}>
                                     <span>{e.reason} · {e.start_date} → {e.end_date ?? 'ongoing'}{e.notes ? ` · ${e.notes}` : ''}</span>
                                     {active && (
                                       <button onClick={() => endExemption(p.id, e.id)}
-                                        className="ml-3 text-zinc-500 hover:text-zinc-300 transition-colors">End</button>
+                                        className="ml-3 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 transition-colors">End</button>
                                     )}
                                   </div>
                                 )
@@ -524,7 +524,7 @@ export default function AdminPlayersPage() {
 
                           {/* Add exemption form */}
                           {showExempt === p.id && (
-                            <div className="grid sm:grid-cols-2 gap-3 bg-ink-4 p-3 rounded border border-ink-5">
+                            <div className="grid sm:grid-cols-2 gap-3 bg-parchment-2 dark:bg-ink-4 p-3 rounded border border-[#D4C9B0] dark:border-ink-5">
                               <div>
                                 <label className="form-label">Reason</label>
                                 <select value={exemptForm.reason} onChange={e => setExemptForm(f => ({ ...f, reason: e.target.value }))} className="form-input">
@@ -536,7 +536,7 @@ export default function AdminPlayersPage() {
                                 <input type="date" value={exemptForm.start_date} onChange={e => setExemptForm(f => ({ ...f, start_date: e.target.value }))} className="form-input" />
                               </div>
                               <div>
-                                <label className="form-label">End Date <span className="text-zinc-600">(leave blank if ongoing)</span></label>
+                                <label className="form-label">End Date <span className="text-[#78716C] dark:text-zinc-600">(leave blank if ongoing)</span></label>
                                 <input type="date" value={exemptForm.end_date} onChange={e => setExemptForm(f => ({ ...f, end_date: e.target.value }))} className="form-input" />
                               </div>
                               <div>
@@ -559,33 +559,33 @@ export default function AdminPlayersPage() {
                 }
 
                 return (
-                  <tr key={p.id} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
+                  <tr key={p.id} className="border-b border-[#E2DACE] dark:border-ink-4 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div>
-                          <p className="font-rajdhani font-semibold text-sm text-parchment">{p.name}</p>
-                          <p className="font-rajdhani text-xs text-zinc-600">{p.jersey_name ?? ''}{p.jersey_number ? ` #${p.jersey_number}` : ''}</p>
+                          <p className="font-rajdhani font-semibold text-sm text-[#1C1917] dark:text-parchment">{p.name}</p>
+                          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">{p.jersey_name ?? ''}{p.jersey_number ? ` #${p.jersey_number}` : ''}</p>
                         </div>
-                        {p.is_captain && <span className="font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-gold px-1.5 py-0.5 rounded">CAP</span>}
-                        {p.is_gc && <span className="font-rajdhani text-[9px] font-bold bg-sky-900/40 border border-sky-700 text-sky-400 px-1.5 py-0.5 rounded">GC</span>}
-                        {p.is_wrangler && <span className="font-rajdhani text-[9px] font-bold bg-emerald-950 border border-emerald-800 text-emerald-400 px-1.5 py-0.5 rounded">WRANGLER</span>}
+                        {p.is_captain && <span className="font-rajdhani text-[9px] font-bold bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold px-1.5 py-0.5 rounded">CAP</span>}
+                        {p.is_gc && <span className="font-rajdhani text-[9px] font-bold bg-sky-50 dark:bg-sky-900/40 border border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-400 px-1.5 py-0.5 rounded">GC</span>}
+                        {p.is_wrangler && <span className="font-rajdhani text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded">WRANGLER</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-rajdhani text-xs text-zinc-400">{p.whatsapp ?? '—'}</p>
-                      <p className="font-rajdhani text-xs text-zinc-600 truncate max-w-[140px]">{p.gmail_id ?? '—'}</p>
+                      <p className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">{p.whatsapp ?? '—'}</p>
+                      <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 truncate max-w-[140px]">{p.gmail_id ?? '—'}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-rajdhani text-xs text-zinc-400 max-w-[120px] truncate">{p.primary_skill ?? '—'}</p>
-                      {p.secondary_skill && <p className="font-rajdhani text-xs text-zinc-600 max-w-[120px] truncate">{p.secondary_skill}</p>}
+                      <p className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400 max-w-[120px] truncate">{p.primary_skill ?? '—'}</p>
+                      {p.secondary_skill && <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 max-w-[120px] truncate">{p.secondary_skill}</p>}
                     </td>
-                    <td className="px-4 py-3 font-rajdhani text-xs text-zinc-400">{p.blood_group ?? '—'}</td>
+                    <td className="px-4 py-3 font-rajdhani text-xs text-[#57534E] dark:text-zinc-400">{p.blood_group ?? '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`font-rajdhani text-xs font-bold ${hasDues ? 'text-amber-400' : 'text-zinc-400'}`}>
+                      <span className={`font-rajdhani text-xs font-bold ${hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-[#57534E] dark:text-zinc-400'}`}>
                         ₹{p.wallet_balance}
                       </span>
                       {exempt && (
-                        <span className="ml-2 font-rajdhani text-[9px] font-bold bg-amber-950 border border-amber-800 text-amber-400 px-1.5 py-0.5 rounded">
+                        <span className="ml-2 font-rajdhani text-[9px] font-bold bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">
                           EXEMPT · {exempt.reason}
                         </span>
                       )}
@@ -607,8 +607,8 @@ export default function AdminPlayersPage() {
                           title={p.dues_override ? 'Remove override — player will be blocked again' : 'Allow player to self-update availability despite dues'}
                           className={`mt-1 block font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded border transition-colors ${
                             p.dues_override
-                              ? 'bg-green-950/40 border-green-700 text-green-400'
-                              : 'bg-amber-950/40 border-amber-700 text-amber-400'
+                              ? 'bg-green-50 dark:bg-green-950/40 border-green-300 dark:border-green-700 text-green-700 dark:text-green-400'
+                              : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
                           }`}>
                           {p.dues_override ? 'Self-update ✓' : 'Allow self-update'}
                         </button>
@@ -616,16 +616,16 @@ export default function AdminPlayersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`font-rajdhani text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm border
-                        ${p.status === 'expelled' ? 'bg-red-950 border-red-800 text-red-400' :
-                          p.status === 'active' ? 'bg-emerald-950 border-emerald-800 text-emerald-400' :
-                          'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>
+                        ${p.status === 'expelled' ? 'bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-800 text-red-700 dark:text-red-400' :
+                          p.status === 'active' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' :
+                          'bg-white dark:bg-zinc-900 border-[#D4C9B0] dark:border-zinc-700 text-[#78716C] dark:text-zinc-500'}`}>
                         {p.status === 'expelled' ? 'Expelled' : p.status === 'active' ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         <button onClick={() => startEdit(p)}
-                          className="font-rajdhani text-xs text-zinc-600 hover:text-gold border border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
+                          className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim px-2 py-1 rounded transition-colors">
                           Edit
                         </button>
                       </div>

@@ -17,25 +17,25 @@ function LoginForm() {
   const callbackUrl = safeCallbackUrl(searchParams.get('callbackUrl'))
 
   return (
-    <div className="min-h-screen bg-ink flex items-center justify-center px-4">
+    <div className="min-h-screen bg-parchment dark:bg-ink flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-br from-gold to-gold-dim flex items-center justify-center font-cinzel font-black text-ink text-2xl mx-auto mb-4"
             style={{ clipPath: 'polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)' }}>
             S
           </div>
-          <h1 className="font-cinzel text-xl font-bold text-gold tracking-wide">SPARTANS CC</h1>
-          <p className="font-rajdhani text-zinc-500 text-sm mt-1">Coordinator Access</p>
+          <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold tracking-wide">SPARTANS CC</h1>
+          <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">Coordinator Access</p>
         </div>
 
-        <div className="bg-ink-3 border border-ink-5 border-t-2 border-t-gold rounded p-6">
-          <h2 className="font-cinzel text-base font-semibold text-parchment mb-1">Admin Sign In</h2>
-          <p className="font-rajdhani text-zinc-500 text-sm mb-6">
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 border-t-2 border-t-gold rounded p-6">
+          <h2 className="font-cinzel text-base font-semibold text-[#1C1917] dark:text-parchment mb-1">Admin Sign In</h2>
+          <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mb-6">
             Sign in with the club Gmail to access the booking dashboard.
           </p>
 
           {error && (
-            <div className="bg-red-950 border border-red-800 text-red-400 font-rajdhani text-sm px-4 py-3 rounded mb-4">
+            <div className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 font-rajdhani text-sm px-4 py-3 rounded mb-4">
               {error === 'AccessDenied'
                 ? 'Access denied. Only the club coordinator email can sign in.'
                 : 'Sign in failed. Please try again.'}
@@ -49,13 +49,13 @@ function LoginForm() {
             Continue with Google
           </button>
 
-          <p className="font-rajdhani text-xs text-zinc-700 text-center mt-4">
+          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-700 text-center mt-4">
             Only authorised club accounts can sign in
           </p>
         </div>
 
         <p className="text-center mt-6">
-          <a href="/schedule" className="font-rajdhani text-xs text-zinc-600 hover:text-gold transition-colors">
+          <a href="/schedule" className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 hover:text-amber-700 dark:hover:text-gold transition-colors">
             ← Back to public schedule
           </a>
         </p>
@@ -77,7 +77,7 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-ink" />}>
+    <Suspense fallback={<div className="min-h-screen bg-parchment dark:bg-ink" />}>
       <LoginForm />
     </Suspense>
   )

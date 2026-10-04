@@ -42,11 +42,11 @@ const TABS: { key: FilterTab; label: string }[] = [
 ]
 
 const STATUS_BADGE: Record<OrderStatus, string> = {
-  pending:   'bg-amber-50 text-amber-700 border border-amber-200',
-  submitted: 'bg-blue-50 text-blue-700 border border-blue-200',
-  delivered: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  received:  'bg-stone-100 text-stone-500 border border-stone-200',
-  cancelled: 'bg-stone-100 text-stone-400 border border-stone-200',
+  pending:   'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
+  submitted: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
+  delivered: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
+  received:  'bg-stone-100 dark:bg-ink-4 text-stone-500 dark:text-zinc-400 border border-stone-200 dark:border-ink-5',
+  cancelled: 'bg-stone-100 dark:bg-ink-4 text-stone-400 dark:text-zinc-500 border border-stone-200 dark:border-ink-5',
 }
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -79,13 +79,13 @@ function PlayerLink({ name, cricHeroesUrl }: { name: string; cricHeroesUrl: stri
         href={cricHeroesUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-rajdhani text-sm text-amber-700 font-semibold hover:underline underline-offset-2"
+        className="font-rajdhani text-sm text-amber-700 dark:text-amber-400 font-semibold hover:underline underline-offset-2"
       >
         {name}
       </a>
     )
   }
-  return <span className="font-rajdhani text-sm text-stone-700 font-semibold">{name}</span>
+  return <span className="font-rajdhani text-sm text-stone-700 dark:text-zinc-300 font-semibold">{name}</span>
 }
 
 // Returns size×qty counts accounting for qty field
@@ -322,8 +322,8 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
 
       {/* Batch date control (admin only) */}
       {isAdmin && (
-        <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg p-4">
-          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-3">
+        <div className="bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-4">
+          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-3">
             Next Batch Date
           </p>
           <div className="flex flex-wrap items-center gap-3">
@@ -331,7 +331,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
               type="date"
               value={batchInput}
               onChange={e => setBatchInput(e.target.value)}
-              className="bg-parchment-3 border border-[#D4C9B0] text-stone-900 rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
+              className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-900 dark:text-parchment rounded px-3 py-2 font-rajdhani text-sm focus:outline-none"
             />
             <button
               onClick={handleBatchSave}
@@ -343,13 +343,13 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
             <button
               onClick={handleBatchClear}
               disabled={savingBatch}
-              className="bg-parchment-3 border border-[#D4C9B0] text-stone-700 font-rajdhani font-bold px-4 py-2 rounded text-sm disabled:opacity-60 hover:bg-[#D4C9B0] transition-colors"
+              className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-700 dark:text-zinc-300 font-rajdhani font-bold px-4 py-2 rounded text-sm disabled:opacity-60 hover:bg-[#D4C9B0] dark:hover:bg-ink-5 transition-colors"
             >
               Clear
             </button>
           </div>
           {batchError && (
-            <p className="font-rajdhani text-sm text-red-600 mt-2">{batchError}</p>
+            <p className="font-rajdhani text-sm text-red-600 dark:text-red-400 mt-2">{batchError}</p>
           )}
         </div>
       )}
@@ -366,13 +366,13 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
           </button>
           <button
             onClick={handleDownloadCsv}
-            className="bg-parchment-3 border border-[#D4C9B0] text-stone-700 font-rajdhani font-bold px-4 py-2 rounded text-sm hover:bg-[#D4C9B0] transition-colors"
+            className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-700 dark:text-zinc-300 font-rajdhani font-bold px-4 py-2 rounded text-sm hover:bg-[#D4C9B0] dark:hover:bg-ink-5 transition-colors"
           >
             Download CSV
           </button>
           <button
             onClick={handleCopySummary}
-            className="bg-parchment-3 border border-[#D4C9B0] text-stone-700 font-rajdhani font-bold px-4 py-2 rounded text-sm hover:bg-[#D4C9B0] transition-colors"
+            className="bg-parchment-3 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 text-stone-700 dark:text-zinc-300 font-rajdhani font-bold px-4 py-2 rounded text-sm hover:bg-[#D4C9B0] dark:hover:bg-ink-5 transition-colors"
           >
             {copied ? 'Copied!' : 'Copy Summary'}
           </button>
@@ -388,7 +388,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
             className={`font-rajdhani font-semibold text-sm px-3 py-1.5 rounded transition-colors ${
               activeTab === tab.key
                 ? 'bg-amber-600 text-white'
-                : 'bg-parchment-3 text-stone-700 hover:bg-[#D4C9B0]'
+                : 'bg-parchment-3 dark:bg-ink-4 text-stone-700 dark:text-zinc-300 hover:bg-[#D4C9B0] dark:hover:bg-ink-5'
             }`}
           >
             {tab.label}
@@ -397,11 +397,11 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
       </div>
 
       {/* Orders table */}
-      <div className="bg-parchment-2 border border-[#D4C9B0] rounded-lg overflow-hidden">
+      <div className="bg-parchment-2 dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px]">
             <thead>
-              <tr className="bg-parchment-3">
+              <tr className="bg-parchment-3 dark:bg-ink-4">
               {isAdmin && (
                 <th className="px-4 py-3 w-8">
                   <input
@@ -418,13 +418,13 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                   col === 'Player' ? (
                     <th
                     key={col}
-                    className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap sticky z-10 bg-parchment-3"
+                    className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 px-4 py-3 text-left whitespace-nowrap sticky z-10 bg-parchment-3 dark:bg-ink-4"
                     style={{ left: isAdmin ? '80px' : '40px' }}
                   >
                     {col}
                   </th>
                   ) : (
-                    <th key={col} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 px-4 py-3 text-left whitespace-nowrap">
+                    <th key={col} className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 px-4 py-3 text-left whitespace-nowrap">
                       {col}
                     </th>
                   )
@@ -437,7 +437,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                 <tr>
                   <td
                     colSpan={isAdmin ? 12 : 10}
-                    className="font-rajdhani text-stone-500 text-sm px-4 py-6 text-center"
+                    className="font-rajdhani text-stone-500 dark:text-zinc-400 text-sm px-4 py-6 text-center"
                   >
                     No orders found.
                   </td>
@@ -448,7 +448,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                   return (
                     <tr
                       key={order.id}
-                      className={`border-t border-[#D4C9B0] ${i % 2 === 1 ? 'bg-parchment' : 'bg-white'}`}
+                      className={`border-t border-[#D4C9B0] dark:border-ink-5 ${i % 2 === 1 ? 'bg-parchment dark:bg-ink' : 'bg-white dark:bg-ink-3'}`}
                     >
                       {isAdmin && (
                         <td className="px-4 py-3 w-8">
@@ -462,11 +462,11 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                           )}
                         </td>
                       )}
-                      <td className="px-4 py-3 font-rajdhani text-xs text-stone-400 whitespace-nowrap w-10">
+                      <td className="px-4 py-3 font-rajdhani text-xs text-stone-400 dark:text-zinc-500 whitespace-nowrap w-10">
                         {i + 1}
                       </td>
                       <td
-                        className="px-4 py-3 whitespace-nowrap sticky z-10 border-r border-[#D4C9B0]"
+                        className="px-4 py-3 whitespace-nowrap sticky z-10 border-r border-[#D4C9B0] dark:border-ink-5"
                         style={{
                           left: isAdmin ? '80px' : '40px',
                           backgroundColor: i % 2 === 1 ? '#F8F4EE' : '#ffffff',
@@ -477,34 +477,34 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                           cricHeroesUrl={order.player_cricheroes_url}
                         />
                       </td>
-                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-900 whitespace-nowrap">
+                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-900 dark:text-parchment whitespace-nowrap">
                         {order.jersey_name_override ?? order.jersey_name}
                       </td>
-                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
+                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 whitespace-nowrap">
                         {order.jersey_number_override ?? order.jersey_number}
                       </td>
                       {isLegacy ? (
                         <td
                           colSpan={3}
-                          className="px-4 py-3 font-rajdhani text-sm text-stone-500 whitespace-nowrap"
+                          className="px-4 py-3 font-rajdhani text-sm text-stone-500 dark:text-zinc-400 whitespace-nowrap"
                         >
                           {order.jersey_size}{' '}
-                          <span className="text-stone-400 text-xs">Size†</span>
+                          <span className="text-stone-400 dark:text-zinc-500 text-xs">Size†</span>
                         </td>
                       ) : (
                         <>
-                          <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
+                          <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 whitespace-nowrap">
                             {formatSizeCell(order.jersey_half_sleeve_size, order.jersey_half_sleeve_qty ?? 1)}
                           </td>
-                          <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
+                          <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 whitespace-nowrap">
                             {formatSizeCell(order.jersey_full_sleeve_size, order.jersey_full_sleeve_qty ?? 1)}
                           </td>
-                          <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 whitespace-nowrap">
+                          <td className="px-4 py-3 font-rajdhani text-sm text-stone-700 dark:text-zinc-300 whitespace-nowrap">
                             {formatSizeCell(order.tracks_size, order.tracks_qty ?? 1)}
                           </td>
                         </>
                       )}
-                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-500 max-w-[180px] truncate">
+                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-500 dark:text-zinc-400 max-w-[180px] truncate">
                         {order.notes ?? '—'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -512,7 +512,7 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                           {STATUS_LABELS[order.status]}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-500 whitespace-nowrap">
+                      <td className="px-4 py-3 font-rajdhani text-sm text-stone-500 dark:text-zinc-400 whitespace-nowrap">
                         {formatDate(order.created_at)}
                       </td>
                       {isAdmin && (
@@ -529,16 +529,16 @@ export function AdminKitRoomClient({ orders, batchDate, isAdmin }: Props) {
                             )}
                             {(order.status === 'pending' || order.status === 'submitted') && (
                               confirmCancelId === order.id ? (
-                                <span className="font-rajdhani text-xs text-stone-600">
+                                <span className="font-rajdhani text-xs text-stone-600 dark:text-zinc-400">
                                   Sure?{' '}
                                   <button onClick={() => handleStatusChange(order.id, 'cancelled')}
                                     disabled={actionLoading === order.id}
-                                    className="text-red-600 font-semibold hover:underline disabled:opacity-60">
+                                    className="text-red-600 dark:text-red-400 font-semibold hover:underline disabled:opacity-60">
                                     Yes
                                   </button>
                                   {' '}
                                   <button onClick={() => setConfirmCancelId(null)}
-                                    className="text-stone-500 hover:underline">
+                                    className="text-stone-500 dark:text-zinc-400 hover:underline">
                                     No
                                   </button>
                                 </span>

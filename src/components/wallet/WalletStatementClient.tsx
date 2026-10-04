@@ -367,13 +367,13 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
   if (loading) {
     return (
       <div className="space-y-2 animate-pulse">
-        {[0, 1, 2, 3].map(i => <div key={i} className="h-14 bg-ink-3 rounded border border-ink-5" />)}
+        {[0, 1, 2, 3].map(i => <div key={i} className="h-14 bg-white dark:bg-ink-3 rounded border border-[#D4C9B0] dark:border-ink-5" />)}
       </div>
     )
   }
 
   if (error && transactions.length === 0) {
-    return <p className="font-rajdhani text-sm text-red-400">{error}</p>
+    return <p className="font-rajdhani text-sm text-red-700 dark:text-red-400">{error}</p>
   }
 
   // Walk the accumulated list newest-first, deriving each row's post-
@@ -386,17 +386,17 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
     return { ...t, balanceAfter }
   })
 
-  const balanceTone = (currentBalance ?? 0) >= 0 ? 'text-emerald-400' : 'text-amber-400'
+  const balanceTone = (currentBalance ?? 0) >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'
 
   return (
     <div>
       {/* Header — current balance */}
-      <div className="bg-ink-3 border border-ink-5 rounded p-5 mb-4 flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4 flex items-center justify-between flex-wrap gap-3">
         <div>
           {playerName && admin && (
-            <p className="font-rajdhani text-xs text-zinc-500 mb-1">{playerName}</p>
+            <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mb-1">{playerName}</p>
           )}
-          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-zinc-500">Current Balance</p>
+          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500">Current Balance</p>
           <p className={`font-cinzel text-2xl font-bold ${balanceTone}`}>{formatSigned(currentBalance ?? 0)}</p>
         </div>
         {admin && playerId && (
@@ -406,7 +406,7 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
               {showAdd ? '✕ Cancel' : '＋ Add Entry'}
             </button>
             <button onClick={toggleSponsor}
-              className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold hover:bg-gold/10 px-3 py-1.5 rounded transition-colors">
+              className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/10 px-3 py-1.5 rounded transition-colors">
               {showSponsor ? '✕ Cancel' : '🎁 Sponsor'}
             </button>
           </div>
@@ -414,8 +414,8 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
       </div>
 
       {admin && showSponsor && (
-        <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4">
-          <p className="font-rajdhani text-xs text-zinc-500 mb-3">
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 mb-4">
+          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mb-3">
             Debits {playerName ?? 'this player'}'s wallet and credits the beneficiary's by the same amount.
           </p>
           {!sponsorBeneficiary ? (
@@ -424,13 +424,13 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
               <input value={sponsorSearch} onChange={e => setSponsorSearch(e.target.value)}
                 placeholder="Search a player to sponsor..." className="form-input" />
               {sponsorSearch.trim() && (
-                <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-ink-4 border border-ink-5 rounded shadow-xl max-h-48 overflow-y-auto">
+                <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded shadow-xl max-h-48 overflow-y-auto">
                   {sponsorCandidates
                     .filter(p => p.name.toLowerCase().includes(sponsorSearch.trim().toLowerCase()))
                     .slice(0, 8)
                     .map(p => (
                       <button key={p.id} onClick={() => { setSponsorBeneficiary(p); setSponsorSearch('') }}
-                        className="w-full text-left px-3 py-2 font-rajdhani text-sm text-zinc-300 hover:bg-ink-3 hover:text-gold transition-colors">
+                        className="w-full text-left px-3 py-2 font-rajdhani text-sm text-[#44403C] dark:text-zinc-300 hover:bg-white dark:hover:bg-ink-3 hover:text-amber-700 dark:hover:text-gold transition-colors">
                         {p.name}
                       </button>
                     ))}
@@ -439,11 +439,11 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
             </div>
           ) : (
             <div className="flex items-center justify-between mb-3">
-              <p className="font-rajdhani text-sm text-parchment">
-                Sponsoring <span className="text-gold font-bold">{sponsorBeneficiary.name}</span>
+              <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment">
+                Sponsoring <span className="text-amber-700 dark:text-gold font-bold">{sponsorBeneficiary.name}</span>
               </p>
               <button onClick={() => setSponsorBeneficiary(null)}
-                className="font-rajdhani text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 transition-colors">
                 Change
               </button>
             </div>
@@ -460,7 +460,7 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                 onChange={e => setSponsorForm(f => ({ ...f, reason: e.target.value }))} className="form-input" />
             </div>
           </div>
-          {sponsorError && <p className="font-rajdhani text-xs text-red-400 mt-2">{sponsorError}</p>}
+          {sponsorError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{sponsorError}</p>}
           <button onClick={submitSponsor} disabled={sponsorSaving}
             className="mt-3 font-rajdhani text-xs font-bold bg-gold-dim hover:bg-gold disabled:opacity-40 text-ink-2 px-4 py-2 rounded transition-colors">
             {sponsorSaving ? 'Saving...' : '✓ Record Sponsorship & Notify Both'}
@@ -469,7 +469,7 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
       )}
 
       {admin && showAdd && (
-        <div className="bg-ink-3 border border-ink-5 rounded p-4 mb-4">
+        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 mb-4">
           <div className="grid sm:grid-cols-3 gap-3">
             <div>
               <label className="form-label">Type</label>
@@ -489,7 +489,7 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                 onChange={e => setAddForm(f => ({ ...f, reason: e.target.value }))} className="form-input" />
             </div>
           </div>
-          {addError && <p className="font-rajdhani text-xs text-red-400 mt-2">{addError}</p>}
+          {addError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{addError}</p>}
           <button onClick={submitAdd} disabled={addSaving}
             className="mt-3 font-rajdhani text-xs font-bold bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white px-4 py-2 rounded transition-colors">
             {addSaving ? 'Saving...' : '✓ Apply & Notify Player'}
@@ -498,13 +498,13 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
       )}
 
       {/* Statement rows */}
-      <div className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+      <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
         {rows.length === 0 && !openingBalance && (
-          <p className="px-4 py-8 text-center font-rajdhani text-zinc-600 text-sm">No transactions yet.</p>
+          <p className="px-4 py-8 text-center font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">No transactions yet.</p>
         )}
 
         {rows.map(t => (
-          <div key={t.id} className="border-b border-ink-4 last:border-b-0">
+          <div key={t.id} className="border-b border-[#E2DACE] dark:border-ink-4 last:border-b-0">
             {/* flex-1 on the label block (not justify-between across all
                 three children) is what keeps the amount/Bal column and the
                 Edit button pinned to a consistent position row to row —
@@ -515,22 +515,22 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                 column instead of the text itself shifting Edit around. */}
             <div className="px-4 py-3 flex items-center gap-3">
               <div className="min-w-0 flex-1">
-                <p className="font-rajdhani text-sm text-parchment truncate">
+                <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment truncate">
                   {t.reason}
                   {t.edited_at && (
-                    <span className="ml-2 font-rajdhani text-[10px] font-bold uppercase tracking-wide text-sky-500 border border-sky-800 rounded px-1.5 py-0.5">
+                    <span className="ml-2 font-rajdhani text-[10px] font-bold uppercase tracking-wide text-sky-500 border border-sky-300 dark:border-sky-800 rounded px-1.5 py-0.5">
                       edited
                     </span>
                   )}
                 </p>
-                {t.notes && <p className="font-rajdhani text-xs text-zinc-500 truncate">{t.notes}</p>}
-                <p className="font-rajdhani text-[10px] text-zinc-600 mt-0.5">
+                {t.notes && <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 truncate">{t.notes}</p>}
+                <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-0.5">
                   {formatDate(t.created_at)}
                   {t.booking_id && (
                     <>
                       {' · '}
                       <Link href={`/matches/history/${t.booking_id}`}
-                        className="text-gold-dim hover:text-gold transition-colors">
+                        className="text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors">
                         📊 View Scorecard
                       </Link>
                     </>
@@ -539,10 +539,10 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 <div className="text-right min-w-[92px]">
-                  <p className={`font-rajdhani text-sm font-bold ${t.type === 'credit' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <p className={`font-rajdhani text-sm font-bold ${t.type === 'credit' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
                     {t.type === 'credit' ? '+' : '-'}₹{Number(t.amount).toLocaleString('en-IN')}
                   </p>
-                  <p className="font-rajdhani text-xs text-zinc-500">Bal {formatSigned(t.balanceAfter)}</p>
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">Bal {formatSigned(t.balanceAfter)}</p>
                 </div>
                 {admin && (
                   <button onClick={() => {
@@ -550,14 +550,14 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                       setDeletingId(null)
                       startEdit(t)
                     }}
-                    className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors w-8 text-right flex-shrink-0">
+                    className="font-rajdhani text-xs text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors w-8 text-right flex-shrink-0">
                     {editingId === t.id ? '✕' : 'Edit'}
                   </button>
                 )}
                 {admin && (
                   t.booking_id ? (
                     <span title={'A match-fee entry can’t be deleted here — use "Correct Match Fee" on the booking page.'}
-                      className="font-rajdhani text-xs text-zinc-700 w-12 text-right flex-shrink-0 cursor-not-allowed">
+                      className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-700 w-12 text-right flex-shrink-0 cursor-not-allowed">
                       Delete
                     </span>
                   ) : (
@@ -568,7 +568,7 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                         setDeleteReason('')
                         setDeleteError('')
                       }}
-                      className="font-rajdhani text-xs text-red-400 hover:text-red-300 transition-colors w-12 text-right flex-shrink-0">
+                      className="font-rajdhani text-xs text-red-700 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors w-12 text-right flex-shrink-0">
                       {deletingId === t.id ? '✕' : 'Delete'}
                     </button>
                   )
@@ -577,7 +577,7 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
             </div>
 
             {admin && editingId === t.id && (
-              <div className="bg-ink-4 mx-4 mb-3 p-3 rounded border border-ink-5">
+              <div className="bg-parchment-2 dark:bg-ink-4 mx-4 mb-3 p-3 rounded border border-[#D4C9B0] dark:border-ink-5">
                 {/* A row carrying booking_id is one player's share of a
                     match-fee split, applied via /api/fees/apply — the
                     server refuses a real amount/type change on it here
@@ -589,9 +589,9 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                     it's the only one that recalculates the whole squad's
                     shares together. */}
                 {t.booking_id && (
-                  <p className="font-rajdhani text-xs text-amber-400 mb-2">
+                  <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 mb-2">
                     ⓘ This is a match fee entry — to change the amount, use{' '}
-                    <Link href={`/admin/bookings/${t.booking_id}`} className="underline hover:text-amber-300">
+                    <Link href={`/admin/bookings/${t.booking_id}`} className="underline hover:text-amber-700 dark:hover:text-amber-300">
                       Correct Match Fee
                     </Link>{' '}on the booking page. Reason, notes, and date can still be fixed here.
                   </p>
@@ -632,7 +632,7 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                   <input type="text" value={editForm.edit_reason} placeholder="e.g. Fixed wrong amount — was 500, should be 250"
                     onChange={e => setEditForm(f => ({ ...f, edit_reason: e.target.value }))} className="form-input" />
                 </div>
-                {editError && <p className="font-rajdhani text-xs text-red-400 mt-2">{editError}</p>}
+                {editError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{editError}</p>}
                 <button onClick={() => saveEdit(t.id)} disabled={editSaving}
                   className="mt-3 font-rajdhani text-xs font-bold bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-1.5 rounded transition-colors">
                   {editSaving ? 'Saving...' : '✓ Save Correction'}
@@ -641,8 +641,8 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
             )}
 
             {admin && deletingId === t.id && (
-              <div className="bg-ink-4 mx-4 mb-3 p-3 rounded border border-red-900/50">
-                <p className="font-rajdhani text-xs text-zinc-400 mb-2">
+              <div className="bg-parchment-2 dark:bg-ink-4 mx-4 mb-3 p-3 rounded border border-red-300/50 dark:border-red-900/50">
+                <p className="font-rajdhani text-xs text-[#57534E] dark:text-zinc-400 mb-2">
                   This removes the entry from {playerName ?? 'this player'}'s statement and reverses its
                   {' '}₹{Number(t.amount).toLocaleString('en-IN')} effect on their balance. The row itself
                   is never actually erased (it stays inspectable directly if ever needed) — it just
@@ -651,7 +651,7 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                 <label className="form-label">Why are you deleting this? *</label>
                 <input type="text" value={deleteReason} placeholder="e.g. Duplicate entry — same top-up recorded twice"
                   onChange={e => setDeleteReason(e.target.value)} className="form-input" />
-                {deleteError && <p className="font-rajdhani text-xs text-red-400 mt-2">{deleteError}</p>}
+                {deleteError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{deleteError}</p>}
                 <button onClick={() => deleteTransaction(t.id)} disabled={deleteSaving}
                   className="mt-3 font-rajdhani text-xs font-bold bg-crimson hover:bg-crimson-dark disabled:opacity-40 text-white px-4 py-1.5 rounded transition-colors">
                   {deleteSaving ? 'Deleting...' : '🗑 Delete Entry'}
@@ -662,30 +662,30 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
         ))}
 
         {!hasMore && openingBalance && (
-          <div className="bg-ink-4/60">
+          <div className="bg-parchment-2/60 dark:bg-ink-4/60">
             <div className="px-4 py-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-rajdhani text-sm font-bold text-zinc-400">
+                <p className="font-rajdhani text-sm font-bold text-[#57534E] dark:text-zinc-400">
                   Brought Forward
                   {openingBalance.is_override && (
-                    <span className="ml-2 font-rajdhani text-[10px] font-bold uppercase tracking-wide text-sky-500 border border-sky-800 rounded px-1.5 py-0.5">
+                    <span className="ml-2 font-rajdhani text-[10px] font-bold uppercase tracking-wide text-sky-500 border border-sky-300 dark:border-sky-800 rounded px-1.5 py-0.5">
                       adjusted
                     </span>
                   )}
                 </p>
-                <p className="font-rajdhani text-xs text-zinc-600">
+                <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">
                   {openingBalance.is_override
                     ? (openingBalance.note || 'Manually set by an admin')
                     : 'Balance carried over from before this statement began'}
                 </p>
               </div>
               <div className="text-right flex-shrink-0 flex items-center gap-3">
-                <p className="font-rajdhani text-sm font-bold text-zinc-400">
+                <p className="font-rajdhani text-sm font-bold text-[#57534E] dark:text-zinc-400">
                   {formatSigned(openingBalance.amount)}
                 </p>
                 {admin && playerId && (
                   <button onClick={() => openingEditing ? setOpeningEditing(false) : startOpeningEdit()}
-                    className="font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors">
+                    className="font-rajdhani text-xs text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors">
                     {openingEditing ? '✕' : 'Adjust'}
                   </button>
                 )}
@@ -693,8 +693,8 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
             </div>
 
             {admin && openingEditing && (
-              <div className="bg-ink-4 mx-4 mb-3 p-3 rounded border border-ink-5">
-                <p className="font-rajdhani text-xs text-zinc-500 mb-2">
+              <div className="bg-parchment-2 dark:bg-ink-4 mx-4 mb-3 p-3 rounded border border-[#D4C9B0] dark:border-ink-5">
+                <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mb-2">
                   Computed default: {formatSigned(openingBalance.computed_amount)}. Leave amount blank to reset to this.
                 </p>
                 <div className="grid sm:grid-cols-2 gap-3">
@@ -710,7 +710,7 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
                       onChange={e => setOpeningForm(f => ({ ...f, note: e.target.value }))} className="form-input" />
                   </div>
                 </div>
-                {openingError && <p className="font-rajdhani text-xs text-red-400 mt-2">{openingError}</p>}
+                {openingError && <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{openingError}</p>}
                 <button onClick={saveOpeningBalance} disabled={openingSaving}
                   className="mt-3 font-rajdhani text-xs font-bold bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white px-4 py-1.5 rounded transition-colors">
                   {openingSaving ? 'Saving...' : '✓ Save'}
@@ -722,12 +722,12 @@ export function WalletStatementClient({ playerId, admin }: WalletStatementClient
       </div>
 
       {error && transactions.length > 0 && (
-        <p className="font-rajdhani text-xs text-red-400 mt-2">{error}</p>
+        <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">{error}</p>
       )}
 
       {hasMore && (
         <button onClick={loadMore} disabled={loadingMore}
-          className="mt-4 w-full font-rajdhani text-xs font-bold tracking-wide border border-ink-5 hover:border-gold-dim text-zinc-400 hover:text-gold disabled:opacity-40 px-4 py-2.5 rounded transition-colors">
+          className="mt-4 w-full font-rajdhani text-xs font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim text-[#57534E] dark:text-zinc-400 hover:text-amber-700 dark:hover:text-gold disabled:opacity-40 px-4 py-2.5 rounded transition-colors">
           {loadingMore ? 'Loading...' : 'Load Older Transactions'}
         </button>
       )}

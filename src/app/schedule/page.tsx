@@ -41,7 +41,7 @@ function WACell({ href, label }: { href: string; label: string }) {
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
       {WA_ICON}
-      <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12px', fontWeight: 700, color: '#44403C', textAlign: 'center', lineHeight: 1.2 }}>
+      <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '12px', fontWeight: 700, color: 'var(--app-text-2)', textAlign: 'center', lineHeight: 1.2 }}>
         {label}
       </span>
     </a>
@@ -50,12 +50,12 @@ function WACell({ href, label }: { href: string; label: string }) {
 
 function MatrixSkeleton() {
   return (
-    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px', background: '#F8F4EE' }}>
+    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--app-bg)' }}>
       {[...Array(10)].map((_, i) => (
         <div key={i} style={{ display: 'flex', gap: '4px' }}>
-          <div style={{ height: '52px', width: '96px', borderRadius: '5px', background: '#E2DACE', flexShrink: 0 }} />
+          <div style={{ height: '52px', width: '96px', borderRadius: '5px', background: 'var(--app-surface-deep)', flexShrink: 0 }} />
           {[...Array(4)].map((_, j) => (
-            <div key={j} style={{ height: '52px', flex: 1, borderRadius: '5px', background: '#E2DACE' }} />
+            <div key={j} style={{ height: '52px', flex: 1, borderRadius: '5px', background: 'var(--app-surface-deep)' }} />
           ))}
         </div>
       ))}
@@ -85,20 +85,20 @@ export default function SchedulePage() {
   [weeks])
 
   return (
-    <div style={{ height: '100dvh', background: '#F8F4EE', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ height: '100dvh', background: 'var(--app-bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <SiteNav activePage="schedule" />
 
       {/* Hero */}
-      <div style={{ background: '#EEEAE2', borderBottom: '1px solid #D4C9B0', padding: '28px 20px 24px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #D97706 0%, #F59E0B 60%, transparent 100%)' }} />
-        <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '11px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#D97706', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ display: 'inline-block', width: '20px', height: '1.5px', background: '#D97706' }} />
+      <div style={{ background: 'var(--app-surface)', borderBottom: '1px solid var(--app-border)', padding: '28px 20px 24px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, var(--app-accent) 0%, #F59E0B 60%, transparent 100%)' }} />
+        <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '11px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--app-accent)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ display: 'inline-block', width: '20px', height: '1.5px', background: 'var(--app-accent)' }} />
           Spartans Cricket Club · Bengaluru
         </p>
-        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 'clamp(20px, 5vw, 28px)', fontWeight: 700, color: '#1C1917', letterSpacing: '0.04em', marginBottom: '6px', lineHeight: 1.2 }}>
+        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 'clamp(20px, 5vw, 28px)', fontWeight: 700, color: 'var(--app-text)', letterSpacing: '0.04em', marginBottom: '6px', lineHeight: 1.2 }}>
           Available Slots
         </h1>
-        <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '14px', color: '#78716C', maxWidth: '480px', lineHeight: 1.5 }}>
+        <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '14px', color: 'var(--app-muted)', maxWidth: '480px', lineHeight: 1.5 }}>
           Tap any slot to enquire via WhatsApp. Only weekends with open slots are shown.
         </p>
       </div>
@@ -108,20 +108,20 @@ export default function SchedulePage() {
         {loading ? (
           <MatrixSkeleton />
         ) : visibleDays.length === 0 ? (
-          <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '14px', color: '#78716C', padding: '48px', textAlign: 'center' }}>
+          <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '14px', color: 'var(--app-muted)', padding: '48px', textAlign: 'center' }}>
             No open slots at the moment.
           </p>
         ) : (
           <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: '320px' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 20 }}>
               <tr>
-                <th style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '10px 14px', textAlign: 'left', minWidth: '90px' }}>
-                  <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#A8A29E' }}>Date</span>
+                <th style={{ background: 'var(--app-surface)', borderBottom: '2px solid var(--app-border)', borderRight: '1px solid var(--app-border)', padding: '10px 14px', textAlign: 'left', minWidth: '90px' }}>
+                  <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--app-faint)' }}>Date</span>
                 </th>
                 {(['07:30', '10:30', '12:30', '14:30'] as SlotTime[]).map(slot => (
-                  <th key={slot} style={{ background: '#EEEAE2', borderBottom: '2px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '10px 6px', textAlign: 'center', minWidth: '80px' }}>
-                    <span style={{ display: 'block', fontFamily: "'Cinzel',serif", fontSize: '12px', fontWeight: 700, color: '#B45309' }}>{slot}</span>
-                    <span style={{ display: 'block', fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#A8A29E', marginTop: '2px' }}>
+                  <th key={slot} style={{ background: 'var(--app-surface)', borderBottom: '2px solid var(--app-border)', borderRight: '1px solid var(--app-border)', padding: '10px 6px', textAlign: 'center', minWidth: '80px' }}>
+                    <span style={{ display: 'block', fontFamily: "'Cinzel',serif", fontSize: '12px', fontWeight: 700, color: 'var(--app-accent-dim)' }}>{slot}</span>
+                    <span style={{ display: 'block', fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: 'var(--app-faint)', marginTop: '2px' }}>
                       {ORGANISER_FORMATS[slot].join(' · ')}
                     </span>
                   </th>
@@ -134,7 +134,7 @@ export default function SchedulePage() {
                 const dayAbbr    = parts[0]?.slice(0, 3).toUpperCase() ?? ''
                 const dateStr    = parts.slice(1).join(' ')
                 const isSat      = new Date(day.date).getDay() === 6
-                const rowBg      = isSat ? '#F8F4EE' : '#EEEAE2'
+                const rowBg      = isSat ? 'var(--app-bg)' : 'var(--app-surface)'
                 const monthLabel = new Date(day.date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
                 const prevDay    = visibleDays[idx - 1]
                 const prevMonth  = prevDay ? new Date(prevDay.date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : null
@@ -147,13 +147,13 @@ export default function SchedulePage() {
                   <>
                     {showMonth && (
                       <tr key={`m-${day.date}`}>
-                        <td colSpan={5} style={{ background: '#E2DACE', borderBottom: '1px solid #D4C9B0', borderTop: idx === 0 ? 'none' : '2px solid #D4C9B0', padding: '6px 14px', fontFamily: "'DM Sans',sans-serif", fontSize: '11px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#D97706' }}>
+                        <td colSpan={5} style={{ background: 'var(--app-surface-deep)', borderBottom: '1px solid var(--app-border)', borderTop: idx === 0 ? 'none' : '2px solid var(--app-border)', padding: '6px 14px', fontFamily: "'DM Sans',sans-serif", fontSize: '11px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--app-accent)' }}>
                           {monthLabel}
                         </td>
                       </tr>
                     )}
                     <tr key={day.date} style={{ background: rowBg }}>
-                      <td style={{ borderBottom: '1px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '10px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                      <td style={{ borderBottom: '1px solid var(--app-border)', borderRight: '1px solid var(--app-border)', padding: '10px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                         <span style={{
                           display: 'inline-block', fontFamily: "'DM Sans',sans-serif",
                           fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em',
@@ -164,7 +164,7 @@ export default function SchedulePage() {
                         }}>
                           {dayAbbr}
                         </span>
-                        <span style={{ display: 'block', fontFamily: "'Cinzel',serif", fontSize: '13px', fontWeight: 700, color: '#1C1917' }}>
+                        <span style={{ display: 'block', fontFamily: "'Cinzel',serif", fontSize: '13px', fontWeight: 700, color: 'var(--app-text)' }}>
                           {dateStr}
                         </span>
                       </td>
@@ -175,7 +175,7 @@ export default function SchedulePage() {
                         const fmts      = ORGANISER_FORMATS[slot]
 
                         return (
-                          <td key={slot} style={{ borderBottom: '1px solid #D4C9B0', borderRight: '1px solid #D4C9B0', padding: '4px', textAlign: 'center', verticalAlign: 'middle', background: (isOpen || isT20Only) ? 'rgba(5,150,105,0.04)' : 'transparent' }}>
+                          <td key={slot} style={{ borderBottom: '1px solid var(--app-border)', borderRight: '1px solid var(--app-border)', padding: '4px', textAlign: 'center', verticalAlign: 'middle', background: (isOpen || isT20Only) ? 'rgba(5,150,105,0.04)' : 'transparent' }}>
                             {isOpen && fmts.length > 1 ? (
                               <WACell href={buildWALink(day.label, slot, 'T20 or T30')} label="T20 · T30" />
                             ) : isOpen && fmts.length === 1 ? (
@@ -183,7 +183,7 @@ export default function SchedulePage() {
                             ) : isT20Only ? (
                               <WACell href={buildWALink(day.label, slot, 'T20')} label="T20" />
                             ) : (
-                              <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '14px', color: '#D4C9B0' }}>—</span>
+                              <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '14px', color: 'var(--app-border)' }}>—</span>
                             )}
                           </td>
                         )

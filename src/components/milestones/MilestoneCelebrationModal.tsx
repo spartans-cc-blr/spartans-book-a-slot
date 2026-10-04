@@ -140,11 +140,11 @@ export function MilestoneCelebrationModal() {
             />
             <div>
               {a.kind === 'match' && (
-                <span className="inline-block font-rajdhani text-[10px] font-bold uppercase tracking-wide text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded px-1.5 py-0.5 mb-1">
+                <span className="inline-block font-rajdhani text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded px-1.5 py-0.5 mb-1">
                   🏅 Performer of the Match
                 </span>
               )}
-              <p className="font-rajdhani text-sm text-parchment leading-snug">
+              <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment leading-snug">
                 <span className="inline-flex items-center align-[-3px] text-lg mr-1">
                   {a.kind === 'season' ? SEASON_ICONS[a.milestone_type] : matchIcon(a.performance_type)}
                 </span>
@@ -153,10 +153,10 @@ export function MilestoneCelebrationModal() {
                     name={a.player.name}
                     playerId={a.player.id}
                     cricHeroesUrl={a.player.cricheroes_url}
-                    className="font-bold text-gold"
+                    className="font-bold text-amber-700 dark:text-gold"
                   />
                 ) : (
-                  <span className="font-bold text-gold">A player</span>
+                  <span className="font-bold text-amber-700 dark:text-gold">A player</span>
                 )}{' '}
                 {a.kind === 'season' ? (
                   <>
@@ -167,13 +167,13 @@ export function MilestoneCelebrationModal() {
                 )}
               </p>
               {a.booking?.opponent_name && (
-                <p className="font-rajdhani text-[11px] text-zinc-500 mt-0.5">
+                <p className="font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-500 mt-0.5">
                   vs {a.booking.opponent_name}
                   {a.booking.game_date ? ` · ${formatMatchDate(a.booking.game_date)}` : ''}
                 </p>
               )}
               {a.kind === 'match' && (
-                <p className="font-rajdhani text-xs text-emerald-400 mt-1">
+                <p className="font-rajdhani text-xs text-emerald-700 dark:text-emerald-400 mt-1">
                   👏 Let's celebrate this performance!
                 </p>
               )}

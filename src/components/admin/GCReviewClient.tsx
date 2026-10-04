@@ -58,9 +58,9 @@ const MATCH_ROLE_LABEL: Record<string, string> = {
 }
 
 const RESP_STYLE: Record<string, { bg: string; text: string; border: string }> = {
-  Y: { bg: '#14532d', text: '#86efac', border: '#22c55e' },
-  O: { bg: '#431407', text: '#fdba74', border: '#f97316' },
-  E: { bg: '#1e3a5f', text: '#93c5fd', border: '#3b82f6' },
+  Y: { bg: 'var(--captains-resp-y-bg)', text: 'var(--captains-resp-y-text)', border: 'var(--captains-resp-y-border)' },
+  O: { bg: 'var(--captains-resp-o-bg)', text: 'var(--captains-resp-o-text)', border: 'var(--captains-resp-o-border)' },
+  E: { bg: 'var(--captains-resp-e-bg)', text: 'var(--captains-resp-e-text)', border: 'var(--captains-resp-e-border)' },
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -97,11 +97,11 @@ function shortName(name: string): string {
 // ── Sub-components ────────────────────────────────────────────────
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, string> = {
-    draft:            'bg-zinc-900 border-zinc-700 text-zinc-500',
-    pending_approval: 'bg-amber-950/40 border-amber-700 text-amber-400',
-    approved:         'bg-emerald-950/40 border-emerald-700 text-emerald-400',
-    announced:        'bg-gold/10 border-gold-dim text-gold',
-    returned:         'bg-crimson/10 border-crimson/40 text-red-400',
+    draft:            'bg-white dark:bg-zinc-900 border-[#D4C9B0] dark:border-zinc-700 text-[#78716C] dark:text-zinc-500',
+    pending_approval: 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400',
+    approved:         'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400',
+    announced:        'bg-gold/10 border-gold-dim text-amber-700 dark:text-gold',
+    returned:         'bg-crimson/10 border-crimson/40 text-red-700 dark:text-red-400',
   }
   const labels: Record<string, string> = {
     draft:            'Not submitted',
@@ -273,29 +273,29 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
   }, [totallyUnselected])
 
   if (bookings.length === 0) {
-    return <p className="font-rajdhani text-zinc-500 text-sm">No confirmed fixtures found for this weekend.</p>
+    return <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm">No confirmed fixtures found for this weekend.</p>
   }
 
   return (
     <div className="flex flex-col gap-8">
 
       {/* ── 1. Weekend Summary Bar ───────────────────────────────── */}
-      <section className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
-        <div className="px-4 py-3 bg-ink-4 border-b border-ink-5">
-          <h2 className="font-cinzel text-sm font-semibold text-gold">{weekLabel} · Weekend Summary</h2>
+      <section className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
+        <div className="px-4 py-3 bg-parchment-2 dark:bg-ink-4 border-b border-[#D4C9B0] dark:border-ink-5">
+          <h2 className="font-cinzel text-sm font-semibold text-amber-700 dark:text-gold">{weekLabel} · Weekend Summary</h2>
         </div>
 
         {/* Slot squad counts */}
-        <div className="px-4 py-3 flex flex-wrap gap-6 border-b border-ink-5">
+        <div className="px-4 py-3 flex flex-wrap gap-6 border-b border-[#D4C9B0] dark:border-ink-5">
           {slotCounts.map(({ b, count }) => (
             <div key={b.id} className="flex items-center gap-2">
-              <span className="font-rajdhani text-[10px] text-zinc-500">
+              <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-500">
                 {formatDate(b.game_date)} · {matchDisplayTime(b.match_time)} {b.format}
               </span>
               <span className={`font-rajdhani text-xs font-bold tabular-nums px-2 py-0.5 rounded-sm border ${
-                count === 12 ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400'
-                : count > 0  ? 'bg-sky-950/40 border-sky-700 text-sky-400'
-                :              'bg-zinc-900 border-zinc-700 text-zinc-600'
+                count === 12 ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400'
+                : count > 0  ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-400'
+                :              'bg-white dark:bg-zinc-900 border-[#D4C9B0] dark:border-zinc-700 text-[#78716C] dark:text-zinc-600'
               }`}>
                 {count} / 12
               </span>
@@ -311,9 +311,9 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
             <button
               onClick={() => playingMultiple.length > 0 && setExpand(e => ({ ...e, both: !e.both }))}
               className={`flex items-center gap-2 font-rajdhani text-xs font-bold transition-colors ${
-                playingMultiple.length > 0 ? 'text-amber-400 hover:text-amber-300' : 'text-zinc-600 cursor-default'
+                playingMultiple.length > 0 ? 'text-amber-700 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300' : 'text-[#78716C] dark:text-zinc-600 cursor-default'
               }`}>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${playingMultiple.length > 0 ? 'bg-amber-400' : 'bg-zinc-700'}`} />
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${playingMultiple.length > 0 ? 'bg-amber-400' : 'bg-parchment-3 dark:bg-zinc-700'}`} />
               {playingMultiple.length} playing multiple games
               {playingMultiple.length > 0 && <span className="text-[10px] font-normal opacity-60">{expand.both ? '▴' : '▾'}</span>}
             </button>
@@ -322,13 +322,13 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                 {playingMultiple.map(r => (
                   <div key={r.pid} className="flex items-center gap-2">
                     {r.cricheroes_url
-                      ? <a href={r.cricheroes_url} target="_blank" rel="noopener noreferrer" className="font-rajdhani text-xs text-amber-300 hover:underline underline-offset-2">{r.name}</a>
-                      : <span className="font-rajdhani text-xs text-amber-300">{r.name}</span>
+                      ? <a href={r.cricheroes_url} target="_blank" rel="noopener noreferrer" className="font-rajdhani text-xs text-amber-700 dark:text-amber-300 hover:underline underline-offset-2">{r.name}</a>
+                      : <span className="font-rajdhani text-xs text-amber-700 dark:text-amber-300">{r.name}</span>
                     }
-                    <span className="font-rajdhani text-[10px] text-zinc-600">
+                    <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600">
                       {bookings.filter(b => squadMap[b.id]?.includes(r.pid)).map(b => `${matchDisplayTime(b.match_time)} ${b.format}`).join(' + ')}
                     </span>
-                    <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm bg-amber-950/40 border border-amber-700 text-amber-400">{r.games}×</span>
+                    <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400">{r.games}×</span>
                   </div>
                 ))}
               </div>
@@ -338,8 +338,8 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
           {/* Y not selected */}
              {/* Partial check warning — only show if at least one slot IS submitted */}
                 {anySubmitted && unsubmittedCount > 0 && (
-                  <div className="flex items-center gap-2 font-rajdhani text-xs font-bold text-zinc-500">
-                    <span className="w-2 h-2 rounded-full bg-zinc-500 flex-shrink-0" />
+                  <div className="flex items-center gap-2 font-rajdhani text-xs font-bold text-[#78716C] dark:text-zinc-500">
+                    <span className="w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-500 flex-shrink-0" />
                     {unsubmittedCount} slot{unsubmittedCount > 1 ? 's' : ''} not yet submitted — fairness check partial
                   </div>
                 )}
@@ -350,7 +350,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                   <button
                     onClick={() => totallyUnselected.length > 0 && setExpand(e => ({ ...e, unselected: !e.unselected }))}
                     className={`flex items-center gap-2 font-rajdhani text-xs font-bold transition-colors ${
-                      totallyUnselected.length > 0 ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 cursor-default'
+                      totallyUnselected.length > 0 ? 'text-red-700 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300' : 'text-emerald-700 dark:text-emerald-400 cursor-default'
                     }`}>
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${totallyUnselected.length > 0 ? 'bg-red-400' : 'bg-emerald-500'}`} />
                     {totallyUnselected.length === 0 ? 'All Y-available players selected ✓' : `${totallyUnselected.length} not selected for any game ⚠`}
@@ -361,12 +361,12 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                   {totallyUnselected.map(r => (
                     <div key={r.pid} className="flex items-center gap-2">
                       {r.cricheroes_url
-                        ? <a href={r.cricheroes_url} target="_blank" rel="noopener noreferrer" className="font-rajdhani text-xs text-red-300 hover:underline underline-offset-2">{r.name}</a>
-                        : <span className="font-rajdhani text-xs text-red-300">{r.name}</span>
+                        ? <a href={r.cricheroes_url} target="_blank" rel="noopener noreferrer" className="font-rajdhani text-xs text-red-700 dark:text-red-300 hover:underline underline-offset-2">{r.name}</a>
+                        : <span className="font-rajdhani text-xs text-red-700 dark:text-red-300">{r.name}</span>
                       }
                       <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm"
                         style={{ background: RESP_STYLE.Y.bg, color: RESP_STYLE.Y.text, border: `1px solid ${RESP_STYLE.Y.border}` }}>Y</span>
-                      <span className="font-rajdhani text-[10px] text-zinc-600">
+                      <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600">
                         {bookings
                           .filter(b => r.responses[b.id] === 'Y' && submittedBookingIds.has(b.id))
                           .map(b => `${matchDisplayTime(b.match_time)} ${b.format}`)
@@ -383,7 +383,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
               <div className="flex flex-col gap-1.5">
                 <button
                   onClick={() => setExpand(e => ({ ...e, leftout: !e.leftout }))}
-                  className="flex items-center gap-2 font-rajdhani text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
+                  className="flex items-center gap-2 font-rajdhani text-xs font-bold text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 transition-colors">
                   <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
                   {leftOutOfSlot.length} selected for one game, left out of another
                   <span className="text-[10px] font-normal opacity-60">{expand.leftout ? '▴' : '▾'}</span>
@@ -393,17 +393,17 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     {leftOutOfSlot.map(r => (
                       <div key={r.pid} className="flex items-center gap-2">
                         {r.cricheroes_url
-                          ? <a href={r.cricheroes_url} target="_blank" rel="noopener noreferrer" className="font-rajdhani text-xs text-amber-400 hover:underline underline-offset-2">{r.name}</a>
-                          : <span className="font-rajdhani text-xs text-amber-400">{r.name}</span>
+                          ? <a href={r.cricheroes_url} target="_blank" rel="noopener noreferrer" className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 hover:underline underline-offset-2">{r.name}</a>
+                          : <span className="font-rajdhani text-xs text-amber-700 dark:text-amber-400">{r.name}</span>
                         }
-                        <span className="font-rajdhani text-[10px] text-zinc-600">
+                        <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600">
                           {/* Show which slots they're in vs left out of */}
                           {bookings
                             .filter(b => submittedBookingIds.has(b.id) && squadMap[b.id]?.includes(r.pid))
                             .map(b => `✓ ${matchDisplayTime(b.match_time)} ${b.format}`)
                             .join(' · ')}
                         </span>
-                        <span className="font-rajdhani text-[10px] text-zinc-700">
+                        <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-700">
                           {bookings
                             .filter(b => submittedBookingIds.has(b.id) && r.responses[b.id] === 'Y' && !squadMap[b.id]?.includes(r.pid))
                             .map(b => `— ${matchDisplayTime(b.match_time)} ${b.format}`)
@@ -419,47 +419,47 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
         </section>
 
       {/* ── 2. Weekend Player Matrix ─────────────────────────────── */}
-      <section className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
-        <div className="px-4 py-3 bg-ink-4 border-b border-ink-5">
-          <h2 className="font-cinzel text-sm font-semibold text-gold">Player Matrix</h2>
-          <p className="font-rajdhani text-[10px] text-zinc-500 mt-0.5">
+      <section className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
+        <div className="px-4 py-3 bg-parchment-2 dark:bg-ink-4 border-b border-[#D4C9B0] dark:border-ink-5">
+          <h2 className="font-cinzel text-sm font-semibold text-amber-700 dark:text-gold">Player Matrix</h2>
+          <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-500 mt-0.5">
             All Y / O / E players · sorted by squad status then earliest slot · roles shown are match-assigned only
           </p>
         </div>
 
         {matrixRows.length === 0 ? (
-          <p className="px-4 py-6 font-rajdhani text-sm text-zinc-600">No availability responses this weekend.</p>
+          <p className="px-4 py-6 font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">No availability responses this weekend.</p>
         ) : (
           <>
              <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '70vh', maxWidth: '100vw' }}>
 <table className="border-collapse" style={{ minWidth: Math.max(240, bookings.length * 80 + 110) }}>
 <thead className="sticky top-0 z-20">
-                  <tr className="border-b border-ink-5 bg-ink-4">
+                  <tr className="border-b border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4">
                     {/* Frozen player name header — sticky left AND top */}
-                    <th className="px-2 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600 sticky left-0 bg-ink-4 z-30 align-bottom" style={{ minWidth: 100 }}>
+                    <th className="px-2 py-2 text-left font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600 sticky left-0 bg-parchment-2 dark:bg-ink-4 z-30 align-bottom" style={{ minWidth: 100 }}>
                       Player
                     </th>
                     {/* Slot columns — vertical headers */}
                     {bookings.map(b => (
-                      <th key={b.id} className="bg-ink-4 z-20" style={{ width: 70, minWidth: 70, padding: 0, verticalAlign: 'bottom' }}>
+                      <th key={b.id} className="bg-parchment-2 dark:bg-ink-4 z-20" style={{ width: 70, minWidth: 70, padding: 0, verticalAlign: 'bottom' }}>
                         <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, margin: '0 auto' }}>
-                          <span className="font-cinzel text-[10px] font-semibold text-gold">
+                          <span className="font-cinzel text-[10px] font-semibold text-amber-700 dark:text-gold">
                             {new Date(b.game_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                           </span>
-                          <span className="font-rajdhani text-[10px] font-bold text-zinc-400">
+                          <span className="font-rajdhani text-[10px] font-bold text-[#57534E] dark:text-zinc-400">
                             {matchDisplayTime(b.match_time)} {b.format}
                           </span>
                           {!submittedBookingIds.has(b.id) && (
-                            <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm bg-zinc-800 border border-zinc-700 text-zinc-500">draft</span>
+                            <span className="font-rajdhani text-[9px] font-bold px-1 py-px rounded-sm bg-parchment-2 dark:bg-zinc-800 border border-[#D4C9B0] dark:border-zinc-700 text-[#78716C] dark:text-zinc-500">draft</span>
                           )}
                         </div>
                       </th>
                     ))}
 
                     {/* Games column — vertical */}
-                    <th className="bg-ink-4 z-20" style={{ width: 36, minWidth: 36, padding: 0 }}>
+                    <th className="bg-parchment-2 dark:bg-ink-4 z-20" style={{ width: 36, minWidth: 36, padding: 0 }}>
                       <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap', paddingBottom: 8, paddingTop: 8, margin: '0 auto' }}>
-                        <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-zinc-600">Games</span>
+                        <span className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-600">Games</span>
                       </div>
                     </th>
                   </tr>
@@ -473,14 +473,14 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     return 4
                   })()
                   const nameColour =
-                    playerGroup === 1 ? 'text-parchment' :
-                    playerGroup === 2 ? 'text-parchment' :
-                    playerGroup === 3 ? 'text-zinc-400'  :
-                    'text-red-400'
+                    playerGroup === 1 ? 'text-[#1C1917] dark:text-parchment' :
+                    playerGroup === 2 ? 'text-[#1C1917] dark:text-parchment' :
+                    playerGroup === 3 ? 'text-[#57534E] dark:text-zinc-400'  :
+                    'text-red-700 dark:text-red-400'
 
                   return (
-                    <tr key={row.pid} className="border-b border-ink-4 hover:bg-ink-4 transition-colors">
-                     <td className="px-2 py-2 sticky left-0 bg-ink-3 z-10 text-right" style={{ minWidth: 100 }}>
+                    <tr key={row.pid} className="border-b border-[#E2DACE] dark:border-ink-4 hover:bg-parchment-2 dark:hover:bg-ink-4 transition-colors">
+                     <td className="px-2 py-2 sticky left-0 bg-white dark:bg-ink-3 z-10 text-right" style={{ minWidth: 100 }}>
                         {row.cricheroes_url
                           ? <a href={row.cricheroes_url} target="_blank" rel="noopener noreferrer" className={`font-rajdhani text-xs hover:underline underline-offset-2 ${nameColour}`}>
                               <span className="sm:hidden">{shortName(row.name)}</span>
@@ -502,7 +502,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                           // No response for this slot
                           if (!resp) return (
                             <td key={b.id} className="px-2 py-2 text-center">
-                              <span className="font-rajdhani text-[10px] text-zinc-700">—</span>
+                              <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-700">—</span>
                             </td>
                           )
  
@@ -511,14 +511,14 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                           // Selected in this slot — show green ✓
                           if (inSquad) return (
                             <td key={b.id} className="px-1 py-2 text-center">
-                              <span className="font-rajdhani text-[11px] font-bold text-emerald-400">✓</span>
+                              <span className="font-rajdhani text-[11px] font-bold text-emerald-700 dark:text-emerald-400">✓</span>
                             </td>
                           )
  
                            // Not selected — plain text, greyed out always (no box)
                            return (
                               <td key={b.id} className="px-1 py-2 text-center">
-                                <span className="font-rajdhani text-[10px] font-bold" style={{ color: '#52525b' }}>
+                                <span className="font-rajdhani text-[10px] font-bold" style={{ color: 'var(--captains-text-faint)' }}>
                                   {resp}
                                 </span>
                               </td>
@@ -526,7 +526,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                         })}
                       <td className="px-1 py-2 text-center">
                         <span className={`font-rajdhani text-[11px] font-bold tabular-nums ${
-                          row.games >= 1 ? 'text-emerald-400' : 'text-red-400'
+                          row.games >= 1 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
                         }`}>
                           {row.games}
                         </span>
@@ -540,13 +540,13 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
           
           {/* Copy unselected names button */}
           {totallyUnselected.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-ink-5 bg-ink-4 flex items-center justify-between">
-              <span className="font-rajdhani text-[10px] text-zinc-500">
+            <div className="px-4 py-2.5 border-t border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4 flex items-center justify-between">
+              <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-500">
                 {totallyUnselected.length} player{totallyUnselected.length > 1 ? 's' : ''} not selected for any game this weekend
               </span>
               <button
                 onClick={copyUnselected}
-                className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-2.5 py-1.5 rounded-sm border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 transition-colors">
+                className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-2.5 py-1.5 rounded-sm border border-[#D4C9B0] dark:border-zinc-700 text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-zinc-100 hover:border-zinc-500 transition-colors">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
                 </svg>
@@ -560,7 +560,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
 
       {/* ── 3. Per-slot Approval Panels ─────────────────────────── */}
       <section>
-        <h2 className="font-cinzel text-sm font-semibold text-gold mb-3">Squad Approvals</h2>
+        <h2 className="font-cinzel text-sm font-semibold text-amber-700 dark:text-gold mb-3">Squad Approvals</h2>
         <div className="flex flex-col gap-4">
           {bookings.map(b => {
             const slotSquads = squads
@@ -586,28 +586,28 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
             const returnMsg  = buildCaptainWaMessage(b, 'returned', notes[b.id] ?? '')
 
             return (
-              <div key={b.id} className="bg-ink-3 border border-ink-5 rounded overflow-hidden">
+              <div key={b.id} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
 
                 {/* Header */}
-                <div className="px-4 py-3 bg-ink-4 border-b border-ink-5 flex items-center justify-between gap-4 flex-wrap">
+                <div className="px-4 py-3 bg-parchment-2 dark:bg-ink-4 border-b border-[#D4C9B0] dark:border-ink-5 flex items-center justify-between gap-4 flex-wrap">
                   <div>
-                    <p className="font-cinzel text-sm font-semibold text-parchment">{label}</p>
-                    {b.opponent_name && <p className="font-rajdhani text-xs text-zinc-500 mt-0.5">vs {b.opponent_name}</p>}
+                    <p className="font-cinzel text-sm font-semibold text-[#1C1917] dark:text-parchment">{label}</p>
+                    {b.opponent_name && <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-0.5">vs {b.opponent_name}</p>}
                   </div>
                   <StatusPill status={isApproved ? 'approved' : done[b.id] === 'returned' ? 'returned' : status} />
                 </div>
 
                 {/* Squad numbered table */}
                 {slotSquads.length === 0 ? (
-                  <p className="px-4 py-4 font-rajdhani text-sm text-zinc-600">No squad submitted yet.</p>
+                  <p className="px-4 py-4 font-rajdhani text-sm text-[#78716C] dark:text-zinc-600">No squad submitted yet.</p>
                 ) : (
                   <>
                     <table className="w-full border-collapse">
                       <thead>
-                        <tr className="border-b border-ink-5">
-                          <th className="px-4 py-1.5 text-left font-rajdhani text-[9px] font-bold tracking-[2px] uppercase text-zinc-700 w-8">#</th>
-                          <th className="px-2 py-1.5 text-left font-rajdhani text-[9px] font-bold tracking-[2px] uppercase text-zinc-700">Player</th>
-                          <th className="px-3 py-1.5 text-right font-rajdhani text-[9px] font-bold tracking-[2px] uppercase text-zinc-700 w-36">Assigned Roles</th>
+                        <tr className="border-b border-[#D4C9B0] dark:border-ink-5">
+                          <th className="px-4 py-1.5 text-left font-rajdhani text-[9px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-700 w-8">#</th>
+                          <th className="px-2 py-1.5 text-left font-rajdhani text-[9px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-700">Player</th>
+                          <th className="px-3 py-1.5 text-right font-rajdhani text-[9px] font-bold tracking-[2px] uppercase text-[#78716C] dark:text-zinc-700 w-36">Assigned Roles</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -626,37 +626,37 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                           const inOtherSlot = bookings.some(ob => ob.id !== b.id && squadMap[ob.id]?.includes(s.player_id))
 
                           return (
-                            <tr key={s.player_id} className={`border-b border-ink-5 last:border-0 ${
-                              s.is_captain ? 'bg-gold/5' : inOtherSlot ? 'bg-amber-950/10' : ''
+                            <tr key={s.player_id} className={`border-b border-[#D4C9B0] dark:border-ink-5 last:border-0 ${
+                              s.is_captain ? 'bg-gold/5' : inOtherSlot ? 'bg-amber-50 dark:bg-amber-950/10' : ''
                             }`}>
-                              <td className="px-4 py-2 font-rajdhani text-[10px] text-zinc-600 tabular-nums">{i + 1}</td>
+                              <td className="px-4 py-2 font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 tabular-nums">{i + 1}</td>
                               <td className="px-2 py-2">
                                 <div className="flex items-center gap-1.5">
-                                  <span className={`font-rajdhani text-sm ${s.is_captain ? 'text-gold font-semibold' : 'text-parchment'}`}>
+                                  <span className={`font-rajdhani text-sm ${s.is_captain ? 'text-amber-700 dark:text-gold font-semibold' : 'text-[#1C1917] dark:text-parchment'}`}>
                                     {s.players?.name ?? '—'}
                                   </span>
                                   {isExempt && (
-                                     <span className="inline-flex items-center justify-center text-rose-400" title="Club solidarity — fee exempted">
+                                     <span className="inline-flex items-center justify-center text-rose-700 dark:text-rose-400" title="Club solidarity — fee exempted">
                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                                        </svg>
                                      </span>
                                    )}
                                    {inOtherSlot && (
-                                     <span className="font-rajdhani text-[8px] font-bold px-1 py-px rounded-sm bg-amber-950/60 border border-amber-800 text-amber-500">both</span>
+                                     <span className="font-rajdhani text-[8px] font-bold px-1 py-px rounded-sm bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-500">both</span>
                                   )}
                                 </div>
                               </td>
                               <td className="px-3 py-2">
                                 <div className="flex items-center justify-end gap-1 flex-wrap">
                                   {roleTags.length === 0
-                                    ? <span className="font-rajdhani text-[9px] text-zinc-700">—</span>
+                                    ? <span className="font-rajdhani text-[9px] text-[#78716C] dark:text-zinc-700">—</span>
                                     : roleTags.map(tag => (
                                         <span key={tag} className={`font-rajdhani text-[9px] font-bold px-1.5 py-px rounded-sm border ${
-                                          tag === 'C'  ? 'bg-gold/20 border-gold-dim text-gold' :
-                                          tag === 'VC' ? 'bg-gold/10 border-gold-dim text-gold' :
-                                          tag === 'WK' ? 'bg-sky-950/40 border-sky-700 text-sky-400' :
-                                                         'bg-emerald-950/40 border-emerald-700 text-emerald-400'
+                                          tag === 'C'  ? 'bg-gold/20 border-gold-dim text-amber-700 dark:text-gold' :
+                                          tag === 'VC' ? 'bg-gold/10 border-gold-dim text-amber-700 dark:text-gold' :
+                                          tag === 'WK' ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-400' :
+                                                         'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400'
                                         }`}>{tag}</span>
                                       ))
                                   }
@@ -669,20 +669,20 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                     </table>
 
                     {/* Role composition footer */}
-                    <div className="px-4 py-2 border-t border-ink-5 bg-ink-4 flex items-center gap-3 flex-wrap">
-                      <span className="font-rajdhani text-[9px] text-zinc-600 font-bold tracking-[2px] uppercase">Composition</span>
+                    <div className="px-4 py-2 border-t border-[#D4C9B0] dark:border-ink-5 bg-parchment-2 dark:bg-ink-4 flex items-center gap-3 flex-wrap">
+                      <span className="font-rajdhani text-[9px] text-[#78716C] dark:text-zinc-600 font-bold tracking-[2px] uppercase">Composition</span>
                       {Object.entries(MATCH_ROLE_LABEL).map(([key, lbl]) => {
                         const count = roleCounts[key] ?? 0
                         return (
-                          <span key={key} className={`font-rajdhani text-[10px] ${count > 0 ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                          <span key={key} className={`font-rajdhani text-[10px] ${count > 0 ? 'text-[#44403C] dark:text-zinc-300' : 'text-[#78716C] dark:text-zinc-700'}`}>
                             {lbl}: <span className="font-bold tabular-nums">{count}</span>
                           </span>
                         )
                       })}
-                      <span className="font-rajdhani text-[10px] text-zinc-600">
+                      <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600">
                         WK: <span className="font-bold">{slotSquads.filter(s => s.is_wk).length}</span>
                       </span>
-                      <span className="font-rajdhani text-[10px] text-zinc-600 ml-auto">{slotSquads.length} selected</span>
+                      <span className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 ml-auto">{slotSquads.length} selected</span>
                       {(() => {
                          const today3 = new Date().toISOString().split('T')[0]
                          const exemptCount = slotSquads.filter(s =>
@@ -691,7 +691,7 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
                            )
                          ).length
                          return exemptCount > 0 ? (
-                           <span className={`font-rajdhani text-[10px] font-bold flex items-center gap-1 ${exemptCount >= 2 ? 'text-rose-400' : 'text-zinc-500'}`}>
+                           <span className={`font-rajdhani text-[10px] font-bold flex items-center gap-1 ${exemptCount >= 2 ? 'text-rose-700 dark:text-rose-400' : 'text-[#78716C] dark:text-zinc-500'}`}>
                              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                              </svg>
@@ -705,21 +705,21 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
 
                 {/* GC actions — pending only */}
                 {isPending && !done[b.id] && (
-                  <div className="px-4 py-3 border-t border-ink-5">
+                  <div className="px-4 py-3 border-t border-[#D4C9B0] dark:border-ink-5">
                     <textarea
                       value={notes[b.id] ?? ''}
                       onChange={e => setNotes(p => ({ ...p, [b.id]: e.target.value }))}
                       placeholder="Return note for captain (optional — only needed if returning)..."
                       rows={2}
-                      className="w-full mb-3 px-3 py-2 text-xs font-rajdhani bg-ink-4 border border-ink-5 rounded text-zinc-300 placeholder-zinc-700 resize-none focus:outline-none focus:border-zinc-600"
+                      className="w-full mb-3 px-3 py-2 text-xs font-rajdhani bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded text-[#44403C] dark:text-zinc-300 placeholder-zinc-700 resize-none focus:outline-none focus:border-[#D4C9B0] dark:focus:border-zinc-600"
                     />
                     <div className="flex gap-3 flex-wrap">
                       <button onClick={() => decide(b.id, 'approved')} disabled={isSaving}
-                        className="font-rajdhani text-xs font-bold tracking-wide px-4 py-2 rounded-sm bg-emerald-950/40 border border-emerald-700 text-emerald-400 hover:bg-emerald-950/70 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                        className="font-rajdhani text-xs font-bold tracking-wide px-4 py-2 rounded-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/70 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                         {isSaving ? 'Saving…' : '✓ Approve squad'}
                       </button>
                       <button onClick={() => decide(b.id, 'returned')} disabled={isSaving}
-                        className="font-rajdhani text-xs font-bold tracking-wide px-4 py-2 rounded-sm bg-crimson/10 border border-crimson/40 text-red-400 hover:bg-crimson/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                        className="font-rajdhani text-xs font-bold tracking-wide px-4 py-2 rounded-sm bg-crimson/10 border border-crimson/40 text-red-700 dark:text-red-400 hover:bg-crimson/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                         {isSaving ? 'Saving…' : '↩ Return with note'}
                       </button>
                     </div>
@@ -728,10 +728,10 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
 
                 {/* Post-decision: approved this session */}
                 {done[b.id] === 'approved' && (
-                  <div className="px-4 py-3 border-t border-ink-5 flex items-center gap-3 flex-wrap">
-                    <span className="font-rajdhani text-xs text-emerald-400">✓ Approved — captain can now announce</span>
+                  <div className="px-4 py-3 border-t border-[#D4C9B0] dark:border-ink-5 flex items-center gap-3 flex-wrap">
+                    <span className="font-rajdhani text-xs text-emerald-700 dark:text-emerald-400">✓ Approved — captain can now announce</span>
                     <a href={buildWaLink(approveMsg)} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-3 py-1.5 rounded-sm bg-emerald-950/40 border border-emerald-700 text-emerald-400 hover:bg-emerald-950/70 transition-colors">
+                      className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-3 py-1.5 rounded-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/70 transition-colors">
                       <WAIcon size={11} /> Notify captain
                     </a>
                   </div>
@@ -739,10 +739,10 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
 
                 {/* Post-decision: returned this session */}
                 {done[b.id] === 'returned' && (
-                  <div className="px-4 py-3 border-t border-ink-5 flex items-center gap-3 flex-wrap">
-                    <span className="font-rajdhani text-xs text-amber-400">↩ Returned to captain for revision</span>
+                  <div className="px-4 py-3 border-t border-[#D4C9B0] dark:border-ink-5 flex items-center gap-3 flex-wrap">
+                    <span className="font-rajdhani text-xs text-amber-700 dark:text-amber-400">↩ Returned to captain for revision</span>
                     <a href={buildWaLink(returnMsg)} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-3 py-1.5 rounded-sm bg-amber-950/40 border border-amber-700 text-amber-400 hover:bg-amber-950/70 transition-colors">
+                      className="flex items-center gap-1.5 font-rajdhani text-[10px] font-bold px-3 py-1.5 rounded-sm bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/70 transition-colors">
                       <WAIcon size={11} /> Notify captain
                     </a>
                   </div>
@@ -750,10 +750,10 @@ export function GCReviewClient({ weekLabel, bookings, avail, squads: initialSqua
 
                 {/* Already approved from previous session — re-notify option */}
                 {isApproved && !done[b.id] && slotSquads.length > 0 && (
-                  <div className="px-4 py-2.5 border-t border-ink-5 flex items-center gap-3 flex-wrap">
-                    <span className="font-rajdhani text-[10px] text-emerald-400">GC approved — captain can announce</span>
+                  <div className="px-4 py-2.5 border-t border-[#D4C9B0] dark:border-ink-5 flex items-center gap-3 flex-wrap">
+                    <span className="font-rajdhani text-[10px] text-emerald-700 dark:text-emerald-400">GC approved — captain can announce</span>
                     <a href={buildWaLink(approveMsg)} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 font-rajdhani text-[9px] font-bold px-2 py-1 rounded-sm border border-emerald-800 text-emerald-500 hover:text-emerald-400 transition-colors">
+                      className="flex items-center gap-1.5 font-rajdhani text-[9px] font-bold px-2 py-1 rounded-sm border border-emerald-300 dark:border-emerald-800 text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors">
                       <WAIcon size={10} /> Re-notify captain
                     </a>
                   </div>

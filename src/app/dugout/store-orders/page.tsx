@@ -68,14 +68,14 @@ export default async function StoreOrdersPage() {
   const batchDate = settingsResult.data?.kit_room_batch_date ?? null
 
   return (
-    <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-parchment dark:bg-ink">
       <SiteNav activePage="dugout" />
-      <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
+      <main className="px-4 py-8 bg-parchment dark:bg-ink">
         <div className="max-w-5xl mx-auto">
-          <h1 className="font-cinzel font-bold text-2xl text-stone-900 mb-1">
+          <h1 className="font-cinzel font-bold text-2xl text-stone-900 dark:text-parchment mb-1">
             Store Orders
           </h1>
-          <p className="font-rajdhani text-sm text-stone-500 mb-6">
+          <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400 mb-6">
             All active apparel orders — pending and submitted.
           </p>
           <AdminKitRoomClient

@@ -3,11 +3,11 @@
 import type { RuleCheckItem } from '@/types'
 
 const STATUS_STYLE: Record<RuleCheckItem['status'], { icon: string; text: string; border: string }> = {
-  pass:     { icon: '✅', text: 'text-emerald-400', border: 'border-emerald-800' },
-  warn:     { icon: '⚠️', text: 'text-yellow-400',  border: 'border-yellow-800' },
-  fail:     { icon: '❌', text: 'text-red-400',     border: 'border-red-800' },
-  override: { icon: '🔓', text: 'text-purple-400',  border: 'border-purple-800' },
-  pending:  { icon: '⏳', text: 'text-zinc-600',    border: 'border-ink-5' },
+  pass:     { icon: '✅', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-300 dark:border-emerald-800' },
+  warn:     { icon: '⚠️', text: 'text-yellow-700 dark:text-yellow-400',  border: 'border-yellow-300 dark:border-yellow-800' },
+  fail:     { icon: '❌', text: 'text-red-700 dark:text-red-400',     border: 'border-red-300 dark:border-red-800' },
+  override: { icon: '🔓', text: 'text-purple-700 dark:text-purple-400',  border: 'border-purple-300 dark:border-purple-800' },
+  pending:  { icon: '⏳', text: 'text-[#78716C] dark:text-zinc-600',    border: 'border-[#D4C9B0] dark:border-ink-5' },
 }
 
 interface RuleCheckStripProps {
@@ -30,8 +30,8 @@ export function RuleCheckStrip({ checks, overrides, onToggle, onReasonChange }: 
   const overriddenRules = checks.filter(c => c.rule in overrides)
 
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded p-4 space-y-3">
-      <p className="font-cinzel text-xs text-gold">⚖ Rule Check</p>
+    <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 space-y-3">
+      <p className="font-cinzel text-xs text-amber-700 dark:text-gold">⚖ Rule Check</p>
 
       <div className="flex flex-wrap gap-2">
         {checks.map(c => {
@@ -40,13 +40,13 @@ export function RuleCheckStrip({ checks, overrides, onToggle, onReasonChange }: 
           const s = STATUS_STYLE[displayStatus]
           return (
             <div key={c.rule} title={c.message}
-              className={`flex items-center gap-1.5 border ${s.border} bg-ink-4 rounded-full pl-2.5 pr-1.5 py-1`}>
+              className={`flex items-center gap-1.5 border ${s.border} bg-parchment-2 dark:bg-ink-4 rounded-full pl-2.5 pr-1.5 py-1`}>
               <span className="text-xs leading-none">{s.icon}</span>
               <span className={`font-rajdhani text-xs font-bold ${s.text}`}>{c.rule}</span>
               {c.status === 'fail' && (
                 <button type="button" onClick={() => onToggle(c.rule)}
                   className={`font-rajdhani text-[10px] font-bold uppercase tracking-wide ml-0.5 px-1.5 py-0.5 rounded transition-colors
-                    ${overridden ? 'bg-purple-900/50 text-purple-300 hover:bg-purple-900/70' : 'bg-ink-5 text-zinc-400 hover:text-zinc-200'}`}>
+                    ${overridden ? 'bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/70' : 'bg-parchment-3 dark:bg-ink-5 text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-zinc-200'}`}>
                   {overridden ? 'Overridden ✕' : 'Override'}
                 </button>
               )}
@@ -58,7 +58,7 @@ export function RuleCheckStrip({ checks, overrides, onToggle, onReasonChange }: 
       {failing.length > 0 && (
         <div className="space-y-1">
           {failing.map(c => (
-            <p key={c.rule} className="font-rajdhani text-xs text-red-400">
+            <p key={c.rule} className="font-rajdhani text-xs text-red-700 dark:text-red-400">
               <span className="font-bold">{c.rule}:</span> {c.message}
             </p>
           ))}
@@ -66,13 +66,13 @@ export function RuleCheckStrip({ checks, overrides, onToggle, onReasonChange }: 
       )}
 
       {overriddenRules.length > 0 && (
-        <div className="space-y-2 border-t border-ink-5 pt-3">
-          <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-purple-400">
+        <div className="space-y-2 border-t border-[#D4C9B0] dark:border-ink-5 pt-3">
+          <p className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-purple-700 dark:text-purple-400">
             🔓 Admin Override — reason required, logged permanently
           </p>
           {overriddenRules.map(c => (
             <div key={c.rule}>
-              <label className="font-rajdhani text-xs text-zinc-500">{c.rule} — {c.label}</label>
+              <label className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">{c.rule} — {c.label}</label>
               <textarea
                 value={overrides[c.rule]}
                 onChange={e => onReasonChange(c.rule, e.target.value)}

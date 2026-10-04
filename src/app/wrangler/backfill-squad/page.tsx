@@ -19,10 +19,10 @@ export default async function BackfillSquadPage() {
   return (
     <>
       <SiteNav activePage="wrangler" />
-      <main className="min-h-screen bg-ink-1 px-4 md:px-8 py-8 max-w-3xl mx-auto">
+      <main className="min-h-screen bg-parchment dark:bg-ink-1 px-4 md:px-8 py-8 max-w-3xl mx-auto">
         <div className="mb-6">
-          <h1 className="font-cinzel text-xl font-bold text-gold">Squad Backfill</h1>
-          <p className="font-rajdhani text-sm text-zinc-500 mt-1">
+          <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">Squad Backfill</h1>
+          <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 mt-1">
             Paste a WhatsApp squad announcement to reconstruct the squad table for matches
             that were announced before the Hub tracked them.
           </p>

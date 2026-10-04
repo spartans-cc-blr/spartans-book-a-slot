@@ -42,9 +42,9 @@ export default async function KitRoomPage() {
   const batchDate    = settingsResult.data?.kit_room_batch_date ?? null
 
   return (
-    <div style={{ backgroundColor: '#F8F4EE', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-parchment dark:bg-ink">
       <SiteNav activePage="dugout" />
-      <main className="px-4 py-8" style={{ backgroundColor: '#F8F4EE' }}>
+      <main className="px-4 py-8 bg-parchment dark:bg-ink">
         <div className="max-w-2xl mx-auto">
           {/* Jersey collage hero */}
           <div className="w-full rounded-xl mb-6 overflow-hidden" style={{ height: '220px' }}>

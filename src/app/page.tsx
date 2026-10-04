@@ -459,8 +459,8 @@ export default async function HomePage() {
       {/* ── EXPELLED STATE ── */}
       {isExpelled && (
         <div className="px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
-          <div className="bg-red-950/40 border border-red-800 rounded p-6 text-center">
-            <p className="font-cinzel text-red-400 font-semibold mb-1">Account Suspended</p>
+          <div className="bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded p-6 text-center">
+            <p className="font-cinzel text-red-700 dark:text-red-400 font-semibold mb-1">Account Suspended</p>
             <p className="font-rajdhani text-sm text-red-600">
               Your account has been suspended. Contact the club admin for more information.
             </p>
@@ -471,10 +471,10 @@ export default async function HomePage() {
       {/* ── UNMATCHED (signed in but not a registered player) ── */}
       {isUnmatched && (
         <div className="px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
-          <div className="bg-amber-950/30 border border-amber-800/50 rounded p-5 flex items-start gap-4">
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300/50 dark:border-amber-800/50 rounded p-5 flex items-start gap-4">
             <span className="text-2xl flex-shrink-0">👋</span>
             <div>
-              <p className="font-cinzel text-sm text-amber-300 font-semibold mb-1">
+              <p className="font-cinzel text-sm text-amber-700 dark:text-amber-300 font-semibold mb-1">
                 You're signed in but not registered as a Spartans player
               </p>
               <p className="font-rajdhani text-xs text-amber-600 mb-3">
@@ -682,47 +682,47 @@ export default async function HomePage() {
           <div className="grid sm:grid-cols-2 gap-4">
 
             {/* Players path */}
-            <div className="rounded border p-6 flex flex-col bg-ink-3 border-gold-dim">
+            <div className="rounded border p-6 flex flex-col bg-white dark:bg-ink-3 border-gold-dim">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-gold/10 border border-gold-dim rounded flex items-center justify-center flex-shrink-0">
                   <span className="text-lg">🏏</span>
                 </div>
                 <div>
-                  <p className="font-cinzel text-sm font-semibold text-gold">For Players</p>
-                  <p className="font-rajdhani text-xs text-zinc-600">Spartans CC members</p>
+                  <p className="font-cinzel text-sm font-semibold text-amber-700 dark:text-gold">For Players</p>
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">Spartans CC members</p>
                 </div>
               </div>
-              <ul className="font-rajdhani text-xs text-zinc-500 space-y-1.5 mb-5 flex-1">
-                <li className="flex items-center gap-2"><span className="text-gold">·</span> View upcoming confirmed fixtures</li>
-                <li className="flex items-center gap-2"><span className="text-gold">·</span> Mark your Y/O/E/L availability</li>
-                <li className="flex items-center gap-2"><span className="text-gold">·</span> See squad announcements</li>
-                <li className="flex items-center gap-2"><span className="text-gold">·</span> Sign in with your club Gmail</li>
+              <ul className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 space-y-1.5 mb-5 flex-1">
+                <li className="flex items-center gap-2"><span className="text-amber-700 dark:text-gold">·</span> View upcoming confirmed fixtures</li>
+                <li className="flex items-center gap-2"><span className="text-amber-700 dark:text-gold">·</span> Mark your Y/O/E/L availability</li>
+                <li className="flex items-center gap-2"><span className="text-amber-700 dark:text-gold">·</span> See squad announcements</li>
+                <li className="flex items-center gap-2"><span className="text-amber-700 dark:text-gold">·</span> Sign in with your club Gmail</li>
               </ul>
               <Link href="/fixtures"
-                className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-gold hover:bg-gold/20 px-4 py-2.5 rounded text-center transition-colors">
+                className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/20 px-4 py-2.5 rounded text-center transition-colors">
                 View Fixtures →
               </Link>
             </div>
 
             {/* Organisers path */}
-            <div className="rounded border p-6 flex flex-col bg-ink-3 border-ink-5">
+            <div className="rounded border p-6 flex flex-col bg-white dark:bg-ink-3 border-[#D4C9B0] dark:border-ink-5">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-emerald-950 border border-emerald-800 rounded flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 rounded flex items-center justify-center flex-shrink-0">
                   <span className="text-lg">📅</span>
                 </div>
                 <div>
-                  <p className="font-cinzel text-sm font-semibold text-emerald-400">For Organisers</p>
-                  <p className="font-rajdhani text-xs text-zinc-600">Tournament promoters</p>
+                  <p className="font-cinzel text-sm font-semibold text-emerald-700 dark:text-emerald-400">For Organisers</p>
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">Tournament promoters</p>
                 </div>
               </div>
-              <ul className="font-rajdhani text-xs text-zinc-500 space-y-1.5 mb-5 flex-1">
+              <ul className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 space-y-1.5 mb-5 flex-1">
                 <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> Check live slot availability</li>
                 <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> 3-month rolling schedule view</li>
                 <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> WhatsApp us to book an open slot</li>
                 <li className="flex items-center gap-2"><span className="text-emerald-700">·</span> No login required</li>
               </ul>
               <Link href="/schedule"
-                className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-emerald-950 border border-emerald-800 text-emerald-400 hover:bg-emerald-900 px-4 py-2.5 rounded text-center transition-colors">
+                className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900 px-4 py-2.5 rounded text-center transition-colors">
                 View Available Slots →
               </Link>
             </div>
@@ -732,15 +732,15 @@ export default async function HomePage() {
 
         {/* ── SIGN IN PROMPT for logged-out non-admin visitors ── */}
         {!isLoggedIn && (
-          <div className="mt-6 bg-ink-3 border border-ink-5 rounded p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="mt-6 bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <p className="font-cinzel text-sm text-parchment font-semibold mb-1">Spartans player?</p>
-              <p className="font-rajdhani text-xs text-zinc-500">
+              <p className="font-cinzel text-sm text-[#1C1917] dark:text-parchment font-semibold mb-1">Spartans player?</p>
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
                 Sign in with your club Gmail to mark availability and see your personalised dashboard.
               </p>
             </div>
             <a href="/api/auth/signin"
-              className="font-rajdhani text-xs font-bold tracking-widest uppercase border border-gold-dim text-gold hover:bg-gold/10 px-5 py-2.5 rounded transition-colors whitespace-nowrap flex items-center gap-2">
+              className="font-rajdhani text-xs font-bold tracking-widest uppercase border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold/10 px-5 py-2.5 rounded transition-colors whitespace-nowrap flex items-center gap-2">
               <GoogleIcon /> Sign in with Google
             </a>
           </div>

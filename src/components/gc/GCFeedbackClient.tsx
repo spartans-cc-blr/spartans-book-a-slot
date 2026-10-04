@@ -243,7 +243,7 @@ export function GCFeedbackClient({
                 onChange={() => setAnswers(prev => ({ ...prev, [key]: opt }))}
                 className="accent-[#1D9E75]"
               />
-              <span className="font-rajdhani text-sm text-[#1C1917]">{opt}</span>
+              <span className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment">{opt}</span>
             </label>
           ))}
         </div>
@@ -262,7 +262,7 @@ export function GCFeedbackClient({
                 onChange={() => setAnswers(prev => ({ ...prev, [key]: opt }))}
                 className="accent-[#1D9E75]"
               />
-              <span className="font-rajdhani text-sm text-[#1C1917]">{opt}</span>
+              <span className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment">{opt}</span>
             </label>
           ))}
         </div>
@@ -273,23 +273,23 @@ export function GCFeedbackClient({
         rows={3}
         value={answers[key] ?? ''}
         onChange={e => setAnswers(prev => ({ ...prev, [key]: e.target.value }))}
-        className="w-full border border-[#D4C9B0] rounded px-3 py-2 font-rajdhani text-sm text-[#1C1917] bg-white resize-none focus:outline-none focus:border-[#1D9E75]"
+        className="w-full border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 font-rajdhani text-sm text-[#1C1917] dark:text-parchment bg-white dark:bg-ink-3 resize-none focus:outline-none focus:border-[#1D9E75]"
         placeholder="Enter response…"
       />
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F4EE] flex flex-col">
+    <div className="min-h-screen bg-[#F8F4EE] dark:bg-ink flex flex-col">
       <SiteNav activePage="gc" />
 
       <main className="flex-1 px-4 md:px-8 lg:px-10 py-8 max-w-4xl mx-auto w-full">
         <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-1">
+            <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-1">
               Governing Council · Internal
             </p>
-            <h1 className="font-cinzel text-xl font-bold text-[#1C1917]">GC Feedback Campaign</h1>
+            <h1 className="font-cinzel text-xl font-bold text-[#1C1917] dark:text-parchment">GC Feedback Campaign</h1>
           </div>
           <button
             onClick={() => setShowNewCampaignForm(v => !v)}
@@ -300,8 +300,8 @@ export function GCFeedbackClient({
         </div>
 
         {showNewCampaignForm && (
-          <div className="mb-6 bg-white border border-[#D4C9B0] rounded-lg p-5">
-            <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-3">
+          <div className="mb-6 bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-5">
+            <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-3">
               New Campaign
             </p>
             <input
@@ -309,9 +309,9 @@ export function GCFeedbackClient({
               value={newCampaignTitle}
               onChange={e => setNewCampaignTitle(e.target.value)}
               placeholder="Campaign title (e.g. June 2026 – Club Health Check)"
-              className="w-full border border-[#D4C9B0] rounded px-3 py-2 font-rajdhani text-sm text-[#1C1917] bg-white focus:outline-none focus:border-[#1D9E75] mb-3"
+              className="w-full border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 font-rajdhani text-sm text-[#1C1917] dark:text-parchment bg-white dark:bg-ink-3 focus:outline-none focus:border-[#1D9E75] mb-3"
             />
-            <p className="font-rajdhani text-xs text-stone-500 mb-3">
+            <p className="font-rajdhani text-xs text-stone-500 dark:text-zinc-400 mb-3">
               Will be pre-filled with the 6 standard questions.
             </p>
             <div className="flex gap-3">
@@ -324,7 +324,7 @@ export function GCFeedbackClient({
               </button>
               <button
                 onClick={() => { setShowNewCampaignForm(false); setNewCampaignTitle('') }}
-                className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 hover:text-[#1C1917] px-4 py-2 rounded transition-colors"
+                className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-parchment px-4 py-2 rounded transition-colors"
               >
                 Cancel
               </button>
@@ -334,7 +334,7 @@ export function GCFeedbackClient({
 
         {campaigns.length > 0 && (
           <div className="mb-5">
-            <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-2">
+            <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-2">
               Campaign
             </p>
             <div className="flex flex-wrap gap-2">
@@ -345,7 +345,7 @@ export function GCFeedbackClient({
                   className={`font-rajdhani text-xs font-semibold tracking-wide px-3 py-1.5 rounded border transition-colors
                     ${selectedCampaign?.id === c.id
                       ? 'bg-[#1D9E75] text-white border-[#1D9E75]'
-                      : 'bg-white text-stone-600 border-[#D4C9B0] hover:border-[#1D9E75]'}`}
+                      : 'bg-white dark:bg-ink-3 text-stone-600 dark:text-zinc-400 border-[#D4C9B0] dark:border-ink-5 hover:border-[#1D9E75]'}`}
                 >
                   {c.title}
                   {c.closed_at && <span className="ml-1.5 text-[10px] opacity-60">CLOSED</span>}
@@ -356,7 +356,7 @@ export function GCFeedbackClient({
         )}
 
         {!selectedCampaign && (
-          <div className="text-center py-20 text-stone-400 font-rajdhani text-sm">
+          <div className="text-center py-20 text-stone-400 dark:text-zinc-500 font-rajdhani text-sm">
             No campaigns yet. Create one above.
           </div>
         )}
@@ -368,28 +368,28 @@ export function GCFeedbackClient({
                 <>
                   <button
                     onClick={openQuestionEditor}
-                    className="font-rajdhani text-xs font-semibold text-[#D97706] hover:text-[#b45309] transition-colors"
+                    className="font-rajdhani text-xs font-semibold text-amber-600 hover:text-[#b45309] dark:hover:text-amber-400 transition-colors"
                   >
                     ✏ Edit questions
                   </button>
                   <button
                     onClick={closeCampaign}
-                    className="font-rajdhani text-xs font-semibold text-stone-400 hover:text-red-500 transition-colors"
+                    className="font-rajdhani text-xs font-semibold text-stone-400 dark:text-zinc-500 hover:text-red-500 transition-colors"
                   >
                     🔒 Close campaign
                   </button>
                 </>
               )}
               {selectedCampaign.closed_at && (
-                <span className="font-rajdhani text-xs text-stone-400">
+                <span className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                   Closed {new Date(selectedCampaign.closed_at).toLocaleDateString()}
                 </span>
               )}
             </div>
 
             {showQuestionEditor && !selectedCampaign.closed_at && (
-              <div className="mb-6 bg-white border border-[#D4C9B0] rounded-lg p-5">
-                <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-3">
+              <div className="mb-6 bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-5">
+                <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-3">
                   Edit Questions
                 </p>
                 {qError && (
@@ -398,7 +398,7 @@ export function GCFeedbackClient({
                 <div className="flex flex-col gap-2 mb-3">
                   {editingQuestions.map((q, i) => (
                     <div key={i} className="flex gap-2 items-start">
-                      <span className="font-rajdhani text-xs text-stone-400 mt-2 w-5 shrink-0">{i + 1}.</span>
+                      <span className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500 mt-2 w-5 shrink-0">{i + 1}.</span>
                       <textarea
                         rows={1}
                         value={q}
@@ -407,12 +407,12 @@ export function GCFeedbackClient({
                           updated[i] = e.target.value
                           setEditingQuestions(updated)
                         }}
-                        className="flex-1 border border-[#D4C9B0] rounded px-3 py-1.5 font-rajdhani text-sm text-[#1C1917] bg-white resize-none focus:outline-none focus:border-[#1D9E75]"
+                        className="flex-1 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-parchment bg-white dark:bg-ink-3 resize-none focus:outline-none focus:border-[#1D9E75]"
                       />
                       {responses.length === 0 && (
                         <button
                           onClick={() => setEditingQuestions(prev => prev.filter((_, idx) => idx !== i))}
-                          className="font-rajdhani text-xs text-stone-400 hover:text-red-500 mt-2 px-1 transition-colors"
+                          className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500 hover:text-red-500 mt-2 px-1 transition-colors"
                         >
                           ×
                         </button>
@@ -423,7 +423,7 @@ export function GCFeedbackClient({
                 <div className="flex gap-3 flex-wrap">
                   <button
                     onClick={() => setEditingQuestions(prev => [...prev, ''])}
-                    className="font-rajdhani text-xs font-semibold text-[#D97706] hover:text-[#b45309] transition-colors"
+                    className="font-rajdhani text-xs font-semibold text-amber-600 hover:text-[#b45309] dark:hover:text-amber-400 transition-colors"
                   >
                     + Add question
                   </button>
@@ -436,7 +436,7 @@ export function GCFeedbackClient({
                   </button>
                   <button
                     onClick={() => { setShowQuestionEditor(false); setQError('') }}
-                    className="font-rajdhani text-xs font-semibold text-stone-400 hover:text-[#1C1917] transition-colors"
+                    className="font-rajdhani text-xs font-semibold text-stone-400 dark:text-zinc-500 hover:text-[#1C1917] dark:hover:text-parchment transition-colors"
                   >
                     Cancel
                   </button>
@@ -444,9 +444,9 @@ export function GCFeedbackClient({
               </div>
             )}
 
-            <div className="mb-5 bg-white border border-[#D4C9B0] rounded-lg px-5 py-3">
+            <div className="mb-5 bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg px-5 py-3">
               <div className="flex items-center gap-3 mb-2">
-                <div className="flex-1 h-2 bg-[#EEEAE2] rounded-full overflow-hidden">
+                <div className="flex-1 h-2 bg-[#EEEAE2] dark:bg-ink-3 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[#1D9E75] rounded-full transition-all"
                     style={{ width: totalCount > 0 ? `${(collectedCount / totalCount) * 100}%` : '0%' }}
@@ -457,7 +457,7 @@ export function GCFeedbackClient({
                 </span>
               </div>
               {Object.keys(byCollector).length > 0 && (
-                <p className="font-rajdhani text-xs text-stone-500">
+                <p className="font-rajdhani text-xs text-stone-500 dark:text-zinc-400">
                   {Object.values(byCollector).map((v, i) => (
                     <span key={i}>
                       {i > 0 && ' · '}
@@ -484,7 +484,7 @@ export function GCFeedbackClient({
                 return (
                   <div
                     key={player.id}
-                    className={`bg-white border border-[#D4C9B0] border-l-4 ${borderColor} rounded-lg px-4 py-3 flex items-center gap-3 ${isCollected || (!selectedCampaign.closed_at) ? 'cursor-pointer hover:bg-[#EEEAE2]' : ''} transition-colors`}
+                    className={`bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 border-l-4 ${borderColor} rounded-lg px-4 py-3 flex items-center gap-3 ${isCollected || (!selectedCampaign.closed_at) ? 'cursor-pointer hover:bg-[#EEEAE2] dark:hover:bg-ink-3' : ''} transition-colors`}
                     onClick={() => {
                       if (isCollected) openView(player, (status as any).response)
                       else if (!selectedCampaign.closed_at) openCollect(player)
@@ -494,15 +494,15 @@ export function GCFeedbackClient({
                       <img
                         src={player.photo_url}
                         alt=""
-                        className="w-8 h-8 rounded-full object-cover border border-[#D4C9B0] shrink-0"
+                        className="w-8 h-8 rounded-full object-cover border border-[#D4C9B0] dark:border-ink-5 shrink-0"
                       />
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="font-rajdhani text-sm font-semibold text-[#1C1917]">
+                      <div className="font-rajdhani text-sm font-semibold text-[#1C1917] dark:text-parchment">
                         <PlayerNameLink name={player.name} playerId={player.id} cricHeroesUrl={player.cricheroes_url} />
                       </div>
                       {player.primary_skill && (
-                        <p className="font-rajdhani text-xs text-stone-400">{player.primary_skill}</p>
+                        <p className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">{player.primary_skill}</p>
                       )}
                     </div>
                     <div className="text-right shrink-0">
@@ -516,21 +516,21 @@ export function GCFeedbackClient({
                           <span className="font-rajdhani text-xs text-[#C9A84C]">You claimed this</span>
                           <button
                             onClick={e => { e.stopPropagation(); handleUnclaim(player.id) }}
-                            className="font-rajdhani text-xs text-stone-400 hover:text-red-500 transition-colors"
+                            className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500 hover:text-red-500 transition-colors"
                           >
                             Release
                           </button>
                         </div>
                       )}
                       {isClaimedByOther && (
-                        <span className="font-rajdhani text-xs text-stone-400">
+                        <span className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                           Claimed by {(status as any).claim.claimer?.name}
                         </span>
                       )}
                       {status.type === 'uncollected' && !selectedCampaign.closed_at && (
                         <button
                           onClick={e => { e.stopPropagation(); handleClaim(player.id) }}
-                          className="font-rajdhani text-xs text-stone-400 hover:text-[#C9A84C] transition-colors"
+                          className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500 hover:text-[#C9A84C] transition-colors"
                         >
                           Claim
                         </button>
@@ -546,22 +546,22 @@ export function GCFeedbackClient({
 
       {collectingFor && selectedCampaign && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center overflow-y-auto py-8 px-4">
-          <div className="bg-[#F8F4EE] border border-[#D4C9B0] rounded-xl w-full max-w-xl shadow-2xl">
-            <div className="px-6 py-4 border-b border-[#D4C9B0] flex items-start justify-between gap-4">
+          <div className="bg-[#F8F4EE] dark:bg-ink border border-[#D4C9B0] dark:border-ink-5 rounded-xl w-full max-w-xl shadow-2xl">
+            <div className="px-6 py-4 border-b border-[#D4C9B0] dark:border-ink-5 flex items-start justify-between gap-4">
               <div>
-                <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-0.5">
+                <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-0.5">
                   Collecting Feedback
                 </p>
-                <h2 className="font-cinzel text-base font-bold text-[#1C1917]">
+                <h2 className="font-cinzel text-base font-bold text-[#1C1917] dark:text-parchment">
                   <PlayerNameLink name={collectingFor.name} playerId={collectingFor.id} cricHeroesUrl={collectingFor.cricheroes_url} />
                 </h2>
                 {collectingFor.primary_skill && (
-                  <p className="font-rajdhani text-xs text-stone-400">{collectingFor.primary_skill}</p>
+                  <p className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">{collectingFor.primary_skill}</p>
                 )}
               </div>
               <button
                 onClick={closeCollect}
-                className="font-rajdhani text-stone-400 hover:text-[#1C1917] transition-colors text-xl leading-none mt-0.5"
+                className="font-rajdhani text-stone-400 dark:text-zinc-500 hover:text-[#1C1917] dark:hover:text-parchment transition-colors text-xl leading-none mt-0.5"
               >
                 ×
               </button>
@@ -569,21 +569,21 @@ export function GCFeedbackClient({
             <div className="px-6 py-5 flex flex-col gap-5">
               {selectedCampaign.questions.map((question, i) => (
                 <div key={i}>
-                  <label className="block font-rajdhani text-xs font-bold tracking-wide text-stone-600 mb-1.5">
+                  <label className="block font-rajdhani text-xs font-bold tracking-wide text-stone-600 dark:text-zinc-400 mb-1.5">
                     {i + 1}. {question}
                   </label>
                   {renderInput(i, question)}
                 </div>
               ))}
-              <div className="border-t border-[#D4C9B0] pt-4">
-                <label className="block font-rajdhani text-xs font-bold tracking-wide text-stone-500 mb-1.5">
+              <div className="border-t border-[#D4C9B0] dark:border-ink-5 pt-4">
+                <label className="block font-rajdhani text-xs font-bold tracking-wide text-stone-500 dark:text-zinc-400 mb-1.5">
                   GC Collector Notes <span className="font-normal">(internal memo — not part of player's response)</span>
                 </label>
                 <textarea
                   rows={2}
                   value={gcNotes}
                   onChange={e => setGcNotes(e.target.value)}
-                  className="w-full border border-[#D4C9B0] rounded px-3 py-2 font-rajdhani text-sm text-[#1C1917] bg-white resize-none focus:outline-none focus:border-[#1D9E75]"
+                  className="w-full border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 font-rajdhani text-sm text-[#1C1917] dark:text-parchment bg-white dark:bg-ink-3 resize-none focus:outline-none focus:border-[#1D9E75]"
                   placeholder="Any internal notes for the GC…"
                 />
               </div>
@@ -600,7 +600,7 @@ export function GCFeedbackClient({
                 </button>
                 <button
                   onClick={closeCollect}
-                  className="font-rajdhani text-xs font-semibold text-stone-400 hover:text-[#1C1917] px-4 py-2 rounded transition-colors"
+                  className="font-rajdhani text-xs font-semibold text-stone-400 dark:text-zinc-500 hover:text-[#1C1917] dark:hover:text-parchment px-4 py-2 rounded transition-colors"
                 >
                   Cancel
                 </button>
@@ -612,20 +612,20 @@ export function GCFeedbackClient({
 
       {viewingResponse && selectedCampaign && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center overflow-y-auto py-8 px-4">
-          <div className="bg-[#F8F4EE] border border-[#D4C9B0] rounded-xl w-full max-w-xl shadow-2xl">
-            <div className="px-6 py-4 border-b border-[#D4C9B0] flex items-start justify-between gap-4">
+          <div className="bg-[#F8F4EE] dark:bg-ink border border-[#D4C9B0] dark:border-ink-5 rounded-xl w-full max-w-xl shadow-2xl">
+            <div className="px-6 py-4 border-b border-[#D4C9B0] dark:border-ink-5 flex items-start justify-between gap-4">
               <div>
-                <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 mb-0.5">
+                <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-stone-500 dark:text-zinc-400 mb-0.5">
                   Submitted Response
                 </p>
-                <h2 className="font-cinzel text-base font-bold text-[#1C1917]">
+                <h2 className="font-cinzel text-base font-bold text-[#1C1917] dark:text-parchment">
                   <PlayerNameLink
                     name={viewingResponse.player.name}
                     playerId={viewingResponse.player.id}
                     cricHeroesUrl={viewingResponse.player.cricheroes_url}
                   />
                 </h2>
-                <p className="font-rajdhani text-xs text-stone-400">
+                <p className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500">
                   Collected by {viewingResponse.response.collector?.name ?? 'Unknown'}
                   {viewingResponse.response.collected_at && (
                     <> · {new Date(viewingResponse.response.collected_at).toLocaleString()}</>
@@ -634,7 +634,7 @@ export function GCFeedbackClient({
               </div>
               <button
                 onClick={closeView}
-                className="font-rajdhani text-stone-400 hover:text-[#1C1917] transition-colors text-xl leading-none mt-0.5"
+                className="font-rajdhani text-stone-400 dark:text-zinc-500 hover:text-[#1C1917] dark:hover:text-parchment transition-colors text-xl leading-none mt-0.5"
               >
                 ×
               </button>
@@ -644,25 +644,25 @@ export function GCFeedbackClient({
                 const value = viewingResponse.response.answers?.[String(i)]
                 return (
                   <div key={i}>
-                    <p className="font-rajdhani text-xs font-bold tracking-wide text-stone-600 mb-1.5">
+                    <p className="font-rajdhani text-xs font-bold tracking-wide text-stone-600 dark:text-zinc-400 mb-1.5">
                       {i + 1}. {question}
                     </p>
                     {value ? (
-                      <p className="font-rajdhani text-sm text-[#1C1917] bg-white border border-[#D4C9B0] rounded px-3 py-2 whitespace-pre-wrap">
+                      <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 whitespace-pre-wrap">
                         {value}
                       </p>
                     ) : (
-                      <p className="font-rajdhani text-sm text-stone-400 italic">No answer recorded</p>
+                      <p className="font-rajdhani text-sm text-stone-400 dark:text-zinc-500 italic">No answer recorded</p>
                     )}
                   </div>
                 )
               })}
               {viewingResponse.response.notes && (
-                <div className="border-t border-[#D4C9B0] pt-4">
-                  <p className="font-rajdhani text-xs font-bold tracking-wide text-stone-500 mb-1.5">
+                <div className="border-t border-[#D4C9B0] dark:border-ink-5 pt-4">
+                  <p className="font-rajdhani text-xs font-bold tracking-wide text-stone-500 dark:text-zinc-400 mb-1.5">
                     GC Collector Notes <span className="font-normal">(internal memo — not part of player's response)</span>
                   </p>
-                  <p className="font-rajdhani text-sm text-[#1C1917] bg-white border border-[#D4C9B0] rounded px-3 py-2 whitespace-pre-wrap">
+                  <p className="font-rajdhani text-sm text-[#1C1917] dark:text-parchment bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-3 py-2 whitespace-pre-wrap">
                     {viewingResponse.response.notes}
                   </p>
                 </div>
@@ -670,7 +670,7 @@ export function GCFeedbackClient({
               <div className="flex gap-3">
                 <button
                   onClick={closeView}
-                  className="font-rajdhani text-xs font-semibold text-stone-400 hover:text-[#1C1917] px-4 py-2 rounded transition-colors"
+                  className="font-rajdhani text-xs font-semibold text-stone-400 dark:text-zinc-500 hover:text-[#1C1917] dark:hover:text-parchment px-4 py-2 rounded transition-colors"
                 >
                   Close
                 </button>

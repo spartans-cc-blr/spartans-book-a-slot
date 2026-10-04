@@ -316,16 +316,16 @@ export default function NewBookingPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-cinzel text-xl font-bold text-gold">New Booking</h1>
-        <p className="font-rajdhani text-zinc-500 text-sm mt-1">Confirm a game or reserve a slot for an organiser.</p>
+        <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">New Booking</h1>
+        <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mt-1">Confirm a game or reserve a slot for an organiser.</p>
       </div>
 
       {/* Mode toggle */}
-      <div className="flex border border-ink-5 rounded overflow-hidden mb-6 max-w-sm">
+      <div className="flex border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden mb-6 max-w-sm">
         {(['confirmed', 'reserved'] as BookingMode[]).map(m => (
           <button key={m} onClick={() => setMode(m)}
             className={`flex-1 py-2.5 font-cinzel text-sm font-semibold transition-colors
-              ${mode === m ? 'bg-gold-dim text-gold-light' : 'bg-ink-4 text-zinc-500 hover:text-zinc-300'}`}>
+              ${mode === m ? 'bg-gold-dim text-amber-600 dark:text-gold-light' : 'bg-parchment-2 dark:bg-ink-4 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300'}`}>
             {m === 'confirmed' ? '✓ Confirm Booking' : '🟡 Reserve Slot'}
           </button>
         ))}
@@ -346,17 +346,17 @@ export default function NewBookingPage() {
               {mode === 'confirmed' && (
                 <div>
                   <label className="form-label">Format</label>
-                  <div className="flex border border-ink-5 rounded overflow-hidden">
+                  <div className="flex border border-[#D4C9B0] dark:border-ink-5 rounded overflow-hidden">
                     {(['T20', 'T30', 'T10', 'T25'] as GameFormat[]).map(f => (
                       <button key={f} onClick={() => { setFormat(f); setSlotTime('') }}
                         className={`flex-1 py-2.5 font-cinzel text-sm font-semibold transition-colors
-                          ${format === f ? 'bg-gold-dim text-gold-light' : 'bg-ink-4 text-zinc-500 hover:text-zinc-300'}`}>
+                          ${format === f ? 'bg-gold-dim text-amber-600 dark:text-gold-light' : 'bg-parchment-2 dark:bg-ink-4 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300'}`}>
                         {f}
                       </button>
                     ))}
                   </div>
                   {isInformalFormat(format) && (
-                    <p className="font-rajdhani text-[10px] text-zinc-600 mt-1">
+                    <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">
                       Informal quick game — rules aren&apos;t checked, and it won&apos;t show on the public schedule or Tournament Planner.
                     </p>
                   )}
@@ -374,17 +374,17 @@ export default function NewBookingPage() {
                 return (
                   <button key={t} disabled={disabled} onClick={() => setSlotTime(t)}
                     className={`py-3 rounded border text-center transition-all
-                      ${disabled ? 'opacity-30 cursor-not-allowed bg-ink-4 border-ink-5' :
-                        slotTime === t ? 'border-gold bg-gold/10 text-gold' :
-                        'bg-ink-4 border-ink-5 text-parchment hover:border-gold-dim'}`}>
+                      ${disabled ? 'opacity-30 cursor-not-allowed bg-parchment-2 dark:bg-ink-4 border-[#D4C9B0] dark:border-ink-5' :
+                        slotTime === t ? 'border-gold bg-gold/10 text-amber-700 dark:text-gold' :
+                        'bg-parchment-2 dark:bg-ink-4 border-[#D4C9B0] dark:border-ink-5 text-[#1C1917] dark:text-parchment hover:border-gold-dim'}`}>
                     <p className="font-cinzel text-sm font-semibold">{t}</p>
-                    <p className="font-rajdhani text-[10px] text-zinc-600 mt-0.5">{SLOT_FORMATS[t].join('/')}</p>
+                    <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-0.5">{SLOT_FORMATS[t].join('/')}</p>
                   </button>
                 )
               })}
             </div>
             {mode === 'confirmed' && !format && (
-              <p className="font-rajdhani text-xs text-zinc-600 mt-2 italic">Select a format first</p>
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-2 italic">Select a format first</p>
             )}
           </FormCard>
 
@@ -398,10 +398,10 @@ export default function NewBookingPage() {
                     placeholder="e.g. Ravi Kumar" className="form-input" />
                 </div>
                 <div>
-                  <label className="form-label">WhatsApp Number <span className="text-zinc-600">(optional)</span></label>
+                  <label className="form-label">WhatsApp Number <span className="text-[#78716C] dark:text-zinc-600">(optional)</span></label>
                   <input type="tel" value={organiserPhone} onChange={e => setOrganiserPhone(e.target.value)}
                     placeholder="e.g. 919876543210" className="form-input" />
-                  <p className="font-rajdhani text-xs text-zinc-600 mt-1">Include country code. Used for 24hr expiry warning.</p>
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">Include country code. Used for 24hr expiry warning.</p>
                 </div>
               </div>
             </FormCard>
@@ -457,12 +457,12 @@ export default function NewBookingPage() {
                       </select>
                       <a href="/wrangler/grounds" target="_blank" rel="noopener noreferrer"
                         onClick={() => setTimeout(refreshGrounds, 3000)}
-                        className="flex-shrink-0 font-rajdhani text-xs font-bold text-gold-dim hover:text-gold border border-ink-5 hover:border-gold-dim rounded px-3 py-2 transition-colors whitespace-nowrap">
+                        className="flex-shrink-0 font-rajdhani text-xs font-bold text-gold-dim hover:text-amber-700 dark:hover:text-gold border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim rounded px-3 py-2 transition-colors whitespace-nowrap">
                         ＋ Add ground ↗
                       </a>
                     </div>
                     {selectedTournament?.is_practice && !groundId && (
-                      <p className="font-rajdhani text-xs text-amber-400 mt-1">
+                      <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 mt-1">
                         Practice games move between grounds — pick this game&apos;s ground.
                       </p>
                     )}
@@ -485,7 +485,7 @@ export default function NewBookingPage() {
                       ))}
                     </select>
                     {!captainId && (
-                      <p className="font-rajdhani text-xs text-amber-400 mt-1">
+                      <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 mt-1">
                         No captain selected — WhatsApp captain notification won&apos;t be available.
                       </p>
                     )}
@@ -493,18 +493,18 @@ export default function NewBookingPage() {
                 )}
 
                 <button onClick={() => setShowAddTournament(v => !v)}
-                  className="mt-2 font-rajdhani text-xs text-gold-dim hover:text-gold transition-colors flex items-center gap-1">
+                  className="mt-2 font-rajdhani text-xs text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors flex items-center gap-1">
                   {showAddTournament ? '✕ Cancel' : '＋ Add new tournament'}
                 </button>
                 {showAddTournament && (
-                  <div className="mt-3 border border-ink-5 rounded p-3 space-y-2 bg-ink-4">
+                  <div className="mt-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-3 space-y-2 bg-parchment-2 dark:bg-ink-4">
                     <div>
                       <label className="form-label">Tournament Name <span className="text-crimson">*</span></label>
                       <input type="text" value={newTournamentName} onChange={e => setNewTournamentName(e.target.value)}
                         placeholder="e.g. Lakeview RCG Edition 11" className="form-input" />
                     </div>
                     <div>
-                      <label className="form-label">Organiser Name <span className="text-zinc-600">(optional)</span></label>
+                      <label className="form-label">Organiser Name <span className="text-[#78716C] dark:text-zinc-600">(optional)</span></label>
                       <input type="text" value={newTournamentOrg} onChange={e => setNewTournamentOrg(e.target.value)}
                         placeholder="e.g. Ravi Kumar" className="form-input" />
                     </div>
@@ -514,17 +514,17 @@ export default function NewBookingPage() {
                         {(['red', 'white', 'pink'] as const).map(b => (
                           <button key={b} onClick={() => setNewTournamentBall(b)}
                             className={`flex-1 py-2 rounded border font-rajdhani text-xs font-bold uppercase tracking-wide transition-colors
-                              ${newTournamentBall === b ? 'border-gold bg-gold/10 text-gold' : 'border-ink-5 bg-ink-3 text-zinc-500 hover:border-gold-dim'}`}>
+                              ${newTournamentBall === b ? 'border-gold bg-gold/10 text-amber-700 dark:text-gold' : 'border-[#D4C9B0] dark:border-ink-5 bg-white dark:bg-ink-3 text-[#78716C] dark:text-zinc-500 hover:border-gold-dim'}`}>
                             {b === 'red' ? '🔴' : b === 'white' ? '⚪' : '🩷'} {b}
                           </button>
                         ))}
                       </div>
-                      <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                      <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                         {newTournamentBall === 'white' ? 'White ball → Gold jersey' : 'Red/Pink ball → White jersey'}
                       </p>
                     </div>
                     <div>
-                      <label className="form-label">Ground <span className="text-zinc-600">(optional)</span></label>
+                      <label className="form-label">Ground <span className="text-[#78716C] dark:text-zinc-600">(optional)</span></label>
                       <select value={newTournamentGround} onChange={e => setNewTournamentGround(e.target.value)}
                         className="form-input">
                         <option value="">Select ground...</option>
@@ -533,7 +533,7 @@ export default function NewBookingPage() {
                         ))}
                       </select>
                     </div>
-                    <p className="font-rajdhani text-xs text-zinc-500">
+                    <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
                       Captain can be assigned after creation via the Tournaments page.
                     </p>
                     <button onClick={handleAddTournament}
@@ -562,11 +562,11 @@ export default function NewBookingPage() {
                       <label className="form-label">Match ID</label>
                       <input type="text" value={matchId} onChange={e => setMatchId(e.target.value)}
                         placeholder="e.g. 12345678" className="form-input" />
-                      <p className="font-rajdhani text-xs text-zinc-600 mt-1">Can be added later once organiser creates the match in CricHeroes.</p>
+                      <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">Can be added later once organiser creates the match in CricHeroes.</p>
                     </div>
                   </div>
                   <div>
-                    <label className="form-label">Match Stage <span className="text-zinc-600">(optional)</span></label>
+                    <label className="form-label">Match Stage <span className="text-[#78716C] dark:text-zinc-600">(optional)</span></label>
                     <input type="text" value={matchStage} onChange={e => setMatchStage(e.target.value)}
                       placeholder="e.g. Quarter Final, Semi Final, Final, Knockout" className="form-input" />
                   </div>
@@ -577,12 +577,12 @@ export default function NewBookingPage() {
                     <input type="time" value={matchTime}
                       onChange={e => { setMatchTime(e.target.value); setMatchTimeTouched(true) }}
                       className="form-input" />
-                    <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+                    <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
                       Defaults to 15 min after slot time — edit if the organiser confirms a different start time.
                     </p>
                   </div>
                   <div>
-                    <label className="form-label">Internal Notes <span className="text-zinc-700">(never shown publicly)</span></label>
+                    <label className="form-label">Internal Notes <span className="text-[#78716C] dark:text-zinc-700">(never shown publicly)</span></label>
                     <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
                       placeholder="Any notes for your reference..." className="form-input resize-none" />
                   </div>
@@ -608,7 +608,7 @@ export default function NewBookingPage() {
           )}
 
           {mode === 'reserved' && (
-            <div className="bg-amber-950/30 border border-amber-800/40 rounded p-4 font-rajdhani text-sm text-amber-300 space-y-1">
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300/40 dark:border-amber-800/40 rounded p-4 font-rajdhani text-sm text-amber-700 dark:text-amber-300 space-y-1">
               <p className="font-bold">🟡 How reservations work</p>
               <p>The slot will be marked as Reserved on the public schedule with a countdown.</p>
               <p>A 24-hour warning will be sent to the organiser if a phone number is provided.</p>
@@ -617,23 +617,23 @@ export default function NewBookingPage() {
           )}
 
           {submitError && (
-            <div className="bg-red-950 border border-red-800 text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
+            <div className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
               {submitError}
             </div>
           )}
 
           {/* Live Rule Check — horizontal, directly above the confirm button */}
           {mode === 'reserved' ? (
-            <p className="font-rajdhani text-xs text-zinc-600">Rule checks are skipped for reservations. Only date and slot are required.</p>
+            <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">Rule checks are skipped for reservations. Only date and slot are required.</p>
           ) : isInformalFormat(format) ? (
-            <p className="font-rajdhani text-xs text-zinc-600">Rule checks don&apos;t apply to informal formats (T10/T25).</p>
+            <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">Rule checks don&apos;t apply to informal formats (T10/T25).</p>
           ) : (
             <RuleCheckStrip checks={ruleChecks} overrides={overrides} onToggle={handleOverrideToggle} onReasonChange={handleOverrideReasonChange} />
           )}
 
           <div className="flex gap-3 justify-end">
             <button onClick={() => router.push('/admin')}
-              className="font-rajdhani text-sm font-bold tracking-wide border border-ink-5 text-zinc-500 hover:text-zinc-300 px-5 py-2.5 rounded transition-colors">
+              className="font-rajdhani text-sm font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300 px-5 py-2.5 rounded transition-colors">
               Cancel
             </button>
             <button onClick={handleSubmit}
@@ -648,11 +648,11 @@ export default function NewBookingPage() {
         {/* Right: Summary panel */}
         <div>
           {gameDate && slotTime && (
-            <div className="bg-ink-3 border border-ink-5 rounded p-4">
-              <p className="font-cinzel text-xs text-gold mb-3">
+            <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4">
+              <p className="font-cinzel text-xs text-amber-700 dark:text-gold mb-3">
                 {mode === 'confirmed' ? 'Booking Summary' : 'Reservation Summary'}
               </p>
-              <div className="font-rajdhani text-sm text-zinc-400 space-y-1.5 leading-relaxed">
+              <div className="font-rajdhani text-sm text-[#57534E] dark:text-zinc-400 space-y-1.5 leading-relaxed">
                 {gameDate      && <p>📅 {gameDate}</p>}
                 {slotTime  && <p>🕐 Slot: {slotTime}{format ? ` — ${format}` : ''}</p>}
                 {matchTime && <p>⏰ Match starts: {matchTime}</p>}
@@ -661,13 +661,13 @@ export default function NewBookingPage() {
                 {mode === 'confirmed' && groundId && <p>📍 {grounds.find(g => g.id === groundId)?.name}</p>}
                 {mode === 'confirmed' && opponentName && <p>⚔️ vs {opponentName}</p>}
                 {mode === 'confirmed' && cricHeroesUrl && (
-                  <a href={cricHeroesUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline flex items-center gap-1">
+                  <a href={cricHeroesUrl} target="_blank" rel="noopener noreferrer" className="text-amber-700 dark:text-gold hover:underline flex items-center gap-1">
                     🔗 CricHeroes
                   </a>
                 )}
                 {mode === 'reserved' && organiserName  && <p>🤝 {organiserName}</p>}
                 {mode === 'reserved' && organiserPhone && <p>📱 {organiserPhone}</p>}
-                {mode === 'reserved' && <p className="text-amber-400">⏱ Expires in 48 hours</p>}
+                {mode === 'reserved' && <p className="text-amber-700 dark:text-amber-400">⏱ Expires in 48 hours</p>}
               </div>
             </div>
           )}
@@ -679,12 +679,12 @@ export default function NewBookingPage() {
 
 function FormCard({ step, title, children }: { step: number; title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-ink-3 border border-ink-5 rounded p-5">
-      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-ink-5">
+    <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5">
+      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#D4C9B0] dark:border-ink-5">
         <span className="w-5 h-5 bg-crimson rounded-full flex items-center justify-center font-mono text-xs text-white font-bold flex-shrink-0">
           {step}
         </span>
-        <h3 className="font-cinzel text-sm text-gold font-semibold">{title}</h3>
+        <h3 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold">{title}</h3>
       </div>
       {children}
     </div>

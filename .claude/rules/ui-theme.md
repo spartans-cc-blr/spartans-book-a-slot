@@ -13,7 +13,7 @@ all *new* pages and components going forward.** Anything built from here
 on should use this palette directly — no need to ask before a new page
 goes Warm Light; it's the default, not an opt-in.
 
-**Existing pages are explicitly NOT to be migrated proactively.** The
+**(Superseded for theming in October 2026, see "Rollout scope" in the Light/Dark/System section: every page now follows the toggle.) Existing pages were originally not to be migrated proactively.** The
 dark-ink theme still in use across most of the app (`/captains-corner`,
 `/profile`, `/leaderboard`, `/admin/**`, and everything else that hasn't
 had its own Warm Light rebuild) stays as-is until a session is already
@@ -155,11 +155,48 @@ Reachable from every page, next to Sign Out — not a separate settings page:
 
 Either pattern is fine — match whichever the surrounding code already leans toward. Semantic/status colours (a win/loss badge, the Y/O/E/L response chip colours, a role badge like WK's blue) are deliberately **not** threaded through either mechanism — they're small, self-contained, already-saturated accent chips that read fine on both a white and a dark card, so they stay literal and unchanged in both themes. Only structural chrome (page/card background, borders, primary/secondary/muted/faint text, dividers, the gold accent) needs to actually flip.
 
-### Rollout scope (as of this pass)
+### Rollout scope — whole app converted (October 2026)
 
-Theme-aware today: **Home** (`/`, `src/app/page.tsx` + `SelectedMatchCard.tsx`), **Fixtures** (`/fixtures` shell, `FixturesCard`, `FixturesAvailability`), **Past Matches** (`/matches/history`, both the page shell/filter chrome and, as of September 2026, the scorecard family itself — `MatchHistoryCard`, `ScorecardTables.tsx`, `ScorecardVerifyPanel.tsx`, `PerformerShareButton.tsx`, `ScorecardUploadButton.tsx`, and the standalone `/matches/history/[bookingId]` page — see `features/post-match-scorecard.md` §16.2), **Player Stats** (`/players/[id]/stats`), **Leaderboard** (`/leaderboard`), **Admin Scorecard Backfill** (`/admin/scorecard-backfill`, added alongside the shared admin chrome below — see `features/post-match-scorecard.md` §8), and the pieces of shared chrome that wrap every page — **`SiteNav`**, **`MobileTabBar`** (both now genuinely dual-themed rather than hardcoded light — see §4/§4.1 corrections below), and, newly, the **`/admin/**` shell** (`src/app/admin/layout.tsx`'s top bar + `AdminSidebar.tsx`) — the first `/admin/**` surface to follow the toggle at all.
+**Every page and component now follows Light / Dark / System**, including the
+previously fixed-theme surfaces, per a direct request to apply the toggle
+everywhere (the earlier "don't migrate untouched pages" Rollout Policy above is
+superseded for the theme toggle). Decisions confirmed with the club coordinator:
+the always-light pages (`/schedule`, `/dugout/*`, `/tournament-planner` and its
+public share page), the fixed-navy shareable match page `/fixtures/[id]`, the
+whole `/admin/**` subtree, and the sign-in screens (`/login`, `/admin/login`,
+`/join`) all follow the toggle.
 
-Everything else keeps rendering exactly as it always has, in the single dark-ink look, **regardless of the visitor's Light/Dark/System choice** — this is intentional, not a bug: the Rollout Policy above (no proactive page-by-page migration) still applies to the *content* of untouched pages, only the shared nav/tab-bar chrome above them now follows the toggle everywhere. A dark-ink page body sitting under a now-theme-following nav/tab bar is the same "accepted seam" this doc already documented for the Warm Light rollout, just with the seam now able to appear or disappear depending on the visitor's own choice rather than being fixed per page. The same reasoning was applied one level down inside `/admin/**` (added September 2026): converting the shared `AdminLayout`/`AdminSidebar` chrome alongside the one admin page that was explicitly requested (`/admin/scorecard-backfill`) means every *other* `/admin/**` page's body still renders dark-only under a chrome that can now go light — the identical seam, just scoped to the admin subtree instead of the whole app.
+How it was done, so future edits stay consistent:
+
+- **`<body>`** is `bg-parchment text-[#1C1917] dark:bg-ink dark:text-parchment`
+  (and `globals.css`'s base `body` rule has a `[data-theme="dark"]` override), so
+  any page with no explicit background inherits the right one.
+- **Dark-styled files** (admin, profile, wallet, join, login, GC review, wrangler,
+  modals, `Dialog`, `ScheduleGrid`, ...) got a light base class with the original
+  class kept as the `dark:` copy, so dark is byte-identical to before. Mapping:
+  `bg-ink` to `bg-parchment`, `bg-ink-2/3` to `bg-white`, `bg-ink-4` to
+  `bg-parchment-2`, `border-ink-5` to `border-[#D4C9B0]`, `text-parchment` to
+  `text-[#1C1917]`, `text-zinc-300..600` to `#44403C/#57534E/#78716C`,
+  `text-gold` to `text-amber-700`, `*-950/900/800` tinted backgrounds to `*-50`,
+  `text-*-400` to `text-*-700`, `border-*-700/800` to `border-*-300`. A line with
+  a solid coloured background (`bg-crimson`, `bg-emerald-600`, ...) keeps its
+  `text-parchment`.
+- **Light-styled files** (dugout, GC feedback, tournament planner, share card,
+  `ResultBadge`) got the reverse: the existing Warm Light classes stay and a
+  `dark:` counterpart was added (`bg-parchment-2` to `dark:bg-ink-3`,
+  `text-stone-500` to `dark:text-zinc-400`, ...).
+- **Inline-style pages** (`/schedule`, tournament planner dots) use the new
+  generic **`--app-*` CSS variables** in `globals.css` (`--app-bg`,
+  `--app-surface`, `--app-surface-deep`, `--app-border`, `--app-text`,
+  `--app-text-2`, `--app-muted`, `--app-faint`, `--app-accent`,
+  `--app-accent-dim`), defined for both themes. `/fixtures/[id]` reuses
+  `--fx-shell-bg`; the GC review Y/O/E chips reuse `--captains-resp-*`.
+- `.slot-open/.slot-booked/.slot-softblock/.slot-clash` component classes now
+  carry light colours with `dark:` variants.
+- Left as literals in both themes on purpose: Google logo colours, brand/jersey/
+  ball SVG icons, solid status buttons, and small status chips.
+- **New work:** use `bg-parchment dark:bg-ink`-style pairs (or the `--app-*`
+  vars for inline styles) so a page never ships single-theme again.
 
 ---
 

@@ -277,7 +277,7 @@ export default async function TournamentPlannerPage() {
   return (
     <>
       <SiteNav activePage="planner" />
-      <main className="min-h-screen bg-parchment px-4 md:px-8 py-8 max-w-4xl mx-auto">
+      <main className="min-h-screen bg-parchment dark:bg-ink px-4 md:px-8 py-8 max-w-4xl mx-auto">
         <TournamentPlannerClient
           bookings={bookings}
           announcedBookingIds={announcedBookingIds}

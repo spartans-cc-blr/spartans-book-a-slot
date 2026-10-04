@@ -38,7 +38,7 @@ export function AdminStatsFilters({ years, tournaments, year, tournamentId, cate
             key={c}
             onClick={() => navigate({ category: c })}
             className={`font-rajdhani text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded border transition-colors
-              ${category === c ? 'bg-gold/20 border-gold-dim text-gold' : 'border-ink-5 text-zinc-500 hover:text-zinc-300'}`}>
+              ${category === c ? 'bg-gold/20 border-gold-dim text-amber-700 dark:text-gold' : 'border-[#D4C9B0] dark:border-ink-5 text-[#78716C] dark:text-zinc-500 hover:text-[#44403C] dark:hover:text-zinc-300'}`}>
             {c === 'mvp' ? 'MVP' : c}
           </button>
         ))}

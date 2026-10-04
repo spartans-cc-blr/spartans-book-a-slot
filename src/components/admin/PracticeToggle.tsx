@@ -21,11 +21,11 @@ export function PracticeToggle({ checked, onChange, disabled }: {
           onChange={e => onChange(e.target.checked)}
           className="w-4 h-4 accent-gold"
         />
-        <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-zinc-400">
+        <span className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#57534E] dark:text-zinc-400">
           🎯 Practice Game
         </span>
       </label>
-      <p className="font-rajdhani text-xs text-zinc-600 mt-1">
+      <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">
         Marks just this game as practice — excluded from the leaderboard, Team Record, milestone
         recognition, and the quarterly membership fee, same as a game under the &quot;Practice games&quot;
         tournament. Use this for a one-off scrimmage under a real tournament, without rebooking it

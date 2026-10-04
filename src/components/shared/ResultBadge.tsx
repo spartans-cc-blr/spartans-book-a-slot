@@ -17,10 +17,10 @@ export function ResultBadge({ result }: { result: string }) {
     return <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">WON</span>
   }
   if (r.includes('lost')) {
-    return <span className="text-red-700 text-[10px] font-bold">LOST</span>
+    return <span className="text-red-700 dark:text-red-400 text-[10px] font-bold">LOST</span>
   }
   if (r.includes('tie')) {
-    return <span className="text-amber-700 text-[10px] font-bold">TIED</span>
+    return <span className="text-amber-700 dark:text-amber-400 text-[10px] font-bold">TIED</span>
   }
-  return <span className="text-stone-400 text-[10px] font-bold">{result.toUpperCase()}</span>
+  return <span className="text-stone-400 dark:text-zinc-500 text-[10px] font-bold">{result.toUpperCase()}</span>
 }

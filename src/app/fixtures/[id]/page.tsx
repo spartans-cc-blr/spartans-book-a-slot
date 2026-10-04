@@ -119,7 +119,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
   return (
     <main style={{
       minHeight: '100dvh',
-      background: '#0D1117',
+      background: 'var(--fx-shell-bg)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -128,7 +128,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     }}>
       {/* Header */}
       <div style={{ width: '100%', maxWidth: '480px', marginBottom: '16px' }}>
-        <BackButton fallbackHref="/fixtures" fallbackLabel="All fixtures" className="!text-[#9CA3AF] hover:!text-white" />
+        <BackButton fallbackHref="/fixtures" fallbackLabel="All fixtures" className="!text-[var(--fx-text-muted)] hover:!text-[var(--fx-text)]" />
       </div>
 
       {/* Card + availability — reuses the exact same components */}

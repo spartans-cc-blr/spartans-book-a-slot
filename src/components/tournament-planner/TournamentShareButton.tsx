@@ -54,7 +54,7 @@ export function TournamentShareButton({ tournamentId, className, iconClassName, 
       {label ? (
         <>
           <span className={iconClassName}>{icon}</span>
-          <span className="text-[9px] font-semibold text-stone-500">{copied ? 'Copied!' : label}</span>
+          <span className="text-[9px] font-semibold text-stone-500 dark:text-zinc-400">{copied ? 'Copied!' : label}</span>
         </>
       ) : icon}
     </button>
