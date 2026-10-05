@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import type { LeaderboardRow, PlayerStatsTotals } from '@/types'
 import type { TableCategory } from './LeaderboardFilters'
+import { CapIcon, type CapKind } from './CapIcon'
 
 type SortKey =
   | 'matches' | 'battingInnings' | 'bowlingInnings' | 'runs' | 'battingAverage' | 'strikeRate'
@@ -42,6 +43,37 @@ const DECIMAL_KEYS = new Set<SortKey>([
 function formatStatValue(v: number | null, key: SortKey): string {
   if (v == null) return '—'
   return DECIMAL_KEYS.has(key) ? v.toFixed(2) : String(v)
+}
+
+// IPL-style caps: Orange = most runs (Bat table), Purple = most wickets (Bowl
+// table). Held by whoever leads the *current* filter scope, independent of
+// which column the viewer happens to have sorted by. Tie-breaks follow the
+// IPL: runs tie → higher strike rate; wickets tie → lower economy, then lower
+// bowling strike rate. A genuine remaining tie shares the cap. Nobody holds a
+// cap on zero runs / zero wickets.
+function capHolders(rows: LeaderboardRow[], category: TableCategory): { kind: CapKind; ids: Set<string> } | null {
+  const kind: CapKind | null = category === 'batting' ? 'orange' : category === 'bowling' ? 'purple' : null
+  if (!kind) return null
+
+  const primary = (r: LeaderboardRow) => (kind === 'orange' ? r.stats.runs : r.stats.wickets)
+  const candidates = rows.filter(r => primary(r) > 0)
+  if (candidates.length === 0) return null
+
+  // Returns >0 when `a` ranks ahead of `b`. null-safe: a missing rate loses.
+  const rank = (a: LeaderboardRow, b: LeaderboardRow): number => {
+    const dp = primary(a) - primary(b)
+    if (dp !== 0) return dp
+    if (kind === 'orange') return (a.stats.strikeRate ?? 0) - (b.stats.strikeRate ?? 0)
+    const lower = (x: number | null) => (x == null ? Infinity : x)
+    const de = lower(b.stats.economy) - lower(a.stats.economy)
+    if (de !== 0 && Number.isFinite(de)) return de
+    const ds = lower(b.stats.bowlingStrikeRate) - lower(a.stats.bowlingStrikeRate)
+    return Number.isFinite(ds) ? ds : 0
+  }
+
+  const best = candidates.reduce((top, r) => (rank(r, top) > 0 ? r : top), candidates[0])
+  const ids = new Set(candidates.filter(r => rank(r, best) === 0).map(r => r.playerId))
+  return { kind, ids }
 }
 
 const COLUMNS: Record<TableCategory, { key: SortKey; label: string }[]> = {
@@ -113,6 +145,8 @@ export function LeaderboardTable({ rows, category, tournamentFiltered }: {
   // outs/stumpings for the current filter adds nothing to this table.
   const visibleRows = category === 'fielding' ? preFilterRows.filter(r => dismissals(r.stats) >= 1) : preFilterRows
 
+  const caps = useMemo(() => capHolders(visibleRows, category), [visibleRows, category])
+
   const sorted = useMemo(() => {
     return [...visibleRows].sort((a, b) => {
       const av = statValue(a, sortKey)
@@ -157,6 +191,7 @@ export function LeaderboardTable({ rows, category, tournamentFiltered }: {
                 <td className="px-4 py-3 font-cinzel text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">{i + 1}</td>
                 <td className="px-4 py-3 font-rajdhani text-sm text-[var(--stats-text)] dark:text-parchment">
                   <PlayerNameLink name={row.playerName} playerId={row.playerId} cricHeroesUrl={row.cricheroesUrl} />
+                  {caps?.ids.has(row.playerId) && <CapIcon kind={caps.kind} />}
                 </td>
                 {columns.map(col => (
                   <td key={col.key}
