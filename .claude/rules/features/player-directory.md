@@ -58,8 +58,10 @@ are now restored here **for GC and admin viewers only**. `page.tsx` computes
 `canSeeWallet = isGC || isAdmin` server-side and adds `wallet_balance` to the
 `players` select only then; for every other viewer the column is never
 fetched and `DirectoryPlayer.wallet_balance` is `null`. `PlayerDirectoryGrid`
-takes `showWallet`, which shows the balance in the card footer (emerald if
-≥ 0, amber with "⚠ dues" if negative) and a "⚠ Dues outstanding" toggle
+takes `showWallet`, which shows the balance in its own strip above the card
+footer (neutral "Wallet ₹N" with green text if ≥ 0; an amber-tinted "⚠ Dues
+-₹N" strip if negative, so dues stand out when scanning; the footer keeps
+just matches and last played, unwrapped) and a "⚠ Dues outstanding" toggle
 beside the status pills (it composes with status, search and A–Z). Read-only;
 no write path. Wallet edits stay on `/admin/wallet`.
 
