@@ -112,48 +112,84 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/admin/player-reconciliation` | Resolves analytics-DB scorecard `player_name` strings to Hub `players.id` — suggestions, confirm/ignore, "Run Reconciliation Pass"; see `features/player-identity-resolution.md` |
 | `/admin/wallet` | Hub for pending fee applications (links to `/admin/bookings/[id]`), player search + full statement/quick top-up/correction, club-wide recent-transactions feed; see `features/wallet-ledger.md` |
  
-### `AdminSidebar` — "Hub Views" (added October 2026)
+### `AdminSidebar` — "Hub Views" (added October 2026, rebuilt as real dropdowns later the same month)
 
 `src/components/admin/AdminSidebar.tsx`'s `NAV` array (desktop sidebar +
-mobile drawer, shared) is admin-only CRUD/tooling links plus a flat,
-labeled-section list — **not** a real nested dropdown/accordion component,
-just a label row rendered before any item carrying a `section` string,
-with every subsequent item inheriting that label visually until the next
-one.
+mobile drawer, shared) is a discriminated union of two entry kinds:
+`{ kind: 'link', href, label, icon, exact?, section? }` for a plain
+top-level row, and `{ kind: 'group', key, label, icon, section?, children,
+invite? }` for a dropdown whose button never itself navigates — only its
+`children` (plain `{ href, label, icon, exact? }` rows) do. The admin-only
+CRUD/tooling items at the top of the list (Matches, New Booking, Master
+Data, Utilities) are all `kind: 'link'`, unchanged from before this
+feature.
 
-**Hub Views** is the block of this list after the Utilities section —
-every player-facing route an admin would otherwise have to leave `/admin`
-to reach, mirroring (and deduping) `SiteNav`'s own dropdowns (Matches ▾/
-Stats ▾/Captains' Corner ▾/Council ⚖/Wrangler ⚒) one destination per
-route rather than reproducing a route that appears in more than one of
-`SiteNav`'s menus (`/opponents`, `/wrangler/grounds`) multiple times —
-an admin already sees "all of the above" in one flat nav, so the
-role-scoped repetition those dropdowns use for a captain/GC/wrangler
-viewer would just be clutter here. Sub-labels (`'Hub Views · Matches'`,
-`'Hub Views · Stats'`, …) use the same single-label-per-section mechanism,
-just with a `·`-separated name, to keep the groups visually distinct
-without building a second nav component.
+**First shipped as a flat, always-expanded labeled-section list** (every
+Hub Views destination as its own row, grouped only by a `'Hub Views ·
+X'` label with no actual collapse/expand behaviour) — corrected the same
+month once the rendered sidebar was screenshotted: the ask was for the
+admin sidebar to genuinely reproduce `SiteNav`'s own desktop dropdowns
+(Matches ▾/Captains' Corner ▾/Stats ▾/Council ⚖/Wrangler ⚒), including
+their hover-to-expand interaction, not a flat list standing in for them.
+
+**Desktop — real hover flyouts.** A `kind: 'group'` entry renders as a
+`<button>` (not a `<Link>`) inside a `relative` wrapper with
+`onMouseEnter`/`onMouseLeave` toggling one shared `hoverGroup: string |
+null` state (keyed by the group's own `key`, so only one flyout is ever
+open at a time — simpler than `SiteNav`'s five independent booleans since
+a sidebar never needs two flyouts open side by side). The flyout panel
+itself is `absolute left-full top-0` — it opens to the *right* of the
+sidebar column into the main content area, rather than below the trigger
+the way `SiteNav`'s top-bar dropdowns do, since a vertical sidebar has no
+room to expand downward without shoving every row below it down the page.
+Same `bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5
+rounded shadow-xl z-50` treatment as `SiteNav`'s own panels.
+
+**Mobile — click-to-expand accordion, not hover.** Touch has no hover
+state, so the mobile drawer's `kind: 'group'` entries instead toggle a
+`mobileGroup: Record<string, boolean>` map on tap (`▸` rotates to `▾`
+when expanded), with children indented under a left border — the
+touch-native equivalent of the desktop flyout, not a separate design.
+
+**Council ⚖'s `invite` flag** renders the shared `GenerateInviteItem`
+component (imported directly, not reimplemented) at the bottom of its
+flyout/accordion, exactly where `SiteNav`'s own Council ⚖ dropdown
+renders it — same component, same `mobile` prop switching between its two
+render branches.
+
+**Deduped, not reproducing every role-gated repeat.** `SiteNav` repeats
+`/opponents` and `/wrangler/grounds` across more than one of its dropdowns
+because different viewers (captain vs GC vs wrangler) reach the same
+destination from different menus; `AdminSidebar`'s groups keep that same
+repetition verbatim (so the admin sees the identical menu shape a
+captain/GC/wrangler would) rather than deduping it away — the earlier flat
+version deliberately deduped to one row per route, but the corrected,
+true-dropdown version restores the duplication since it's now mirroring
+real menu *structure*, not just a destination list.
 
 **Replaced, not kept alongside, the old standalone "The Dugout" section**
 (`/admin/dugout/kit-room`, labeled "Store Orders") — that page and
 `/dugout/store-orders` turned out to be the exact same feature
 (`AdminKitRoomClient`, same `isAdmin || isGC` gate, same `jersey_orders`
 query) shipped twice under two different page shells, one under
-`AdminLayout` and one under `SiteNav`. Hub Views' own "Store Orders" entry
-now points at `/dugout/store-orders` instead, so nothing was lost by
+`AdminLayout` and one under `SiteNav`. Council ⚖'s own "Store Orders"
+child now points at `/dugout/store-orders` instead, so nothing was lost by
 dropping the duplicate link. `/admin/dugout/kit-room/page.tsx` itself was
 left in place (not deleted) — it's simply unreachable from any nav now,
 a known, harmless orphan rather than a route someone might still have
 bookmarked being pulled out from under them.
 
-Items needing care against this list's prefix-match active-state check
-(`path.startsWith(item.href)` for any entry without `exact: true`):
-`'/'`, `'/dugout'`, and `'/captains-corner'` are all marked `exact: true`
-specifically because something else in the list is a real sub-route of
-each (every other path in the app technically "starts with" `/`, and
-`/dugout/store-orders`/`/dugout/gear` and
-`/captains-corner/unavailable-dates` would otherwise satisfy the parent
-entry's `startsWith` check first and mask the more specific one). Any
+**Active-state / mobile-bottom-bar-label matching** no longer walks `NAV`
+directly — a flattened `ALL_LEAVES` array (every `kind: 'link'` entry plus
+every group's `children`, group buttons themselves excluded since they
+never navigate) is what `path.startsWith()`/`===` checks run against.
+Items needing care against this prefix-match check (`exact: true` for
+anything that's a real path-prefix of another entry in the list, so the
+broader entry's `startsWith` doesn't mask the more specific one first):
+`'/'`, `'/dugout'`, and `'/captains-corner'` (Squad Selection, inside the
+Captains' Corner group) — every other path in the app technically "starts
+with" `/`, and `/dugout/store-orders`/`/captains-corner/unavailable-dates`
+etc. would otherwise be shadowed by their parent's bare prefix check. Any
 future addition to this list that's itself a path-prefix of another entry
 needs the same treatment.
 
