@@ -502,7 +502,9 @@ already fetch data two different ways.
 
 ## 6.2.1 Orange & Purple Caps (Detailed → Bat / Bowl) — added October 2026
 
-IPL-style recognition: a small cap icon (`CapIcon.tsx`, inline SVG) sits right
+IPL-style recognition: a small cap icon (`CapIcon.tsx`, inline SVG — drawn in the
+same gradient-shaded, dashed-stitch style as the `BallIcon` cricket balls, peak
+pointing left) sits right
 after the player name in `LeaderboardTable` for whoever leads the table —
 **🟠 Orange Cap** on Detailed → Bat (most runs), **🟣 Purple Cap** on Detailed →
 Bowl (most wickets). Not shown on the MVP or Field tabs.
@@ -518,7 +520,7 @@ Bowl (most wickets). Not shown on the MVP or Field tabs.
   nobody holds a cap on 0 runs / 0 wickets. Practice games stay excluded, same
   as the table itself (§10).
 - Purely presentational, client-side, derived from the already-fetched rows: no
-  new query, route or schema. Orange `#F97316` / purple `#8B5CF6` are literals in
+  new query, route or schema. Orange / purple (`CAP_META` in `CapIcon.tsx`) are literals in
   both themes (small status icon, same call as other status chips).
 - **Shared logic.** Tie-breaks live in `src/lib/capHolders.ts`
   (`findCapHolders()`, `capsForPlayer()`, unit-tested in `capHolders.test.ts`),
