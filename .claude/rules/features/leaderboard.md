@@ -520,8 +520,30 @@ Bowl (most wickets). Not shown on the MVP or Field tabs.
 - Purely presentational, client-side, derived from the already-fetched rows: no
   new query, route or schema. Orange `#F97316` / purple `#8B5CF6` are literals in
   both themes (small status icon, same call as other status chips).
-- Possible follow-ons (not built): caps on `/players` cards, the player stats
-  header and the Honor Board cards.
+- **Shared logic.** Tie-breaks live in `src/lib/capHolders.ts`
+  (`findCapHolders()`, `capsForPlayer()`, unit-tested in `capHolders.test.ts`),
+  which is client-safe so the server pages and `LeaderboardTable` agree.
+
+### Season caps on `/players` and `/profile` (added October 2026)
+
+Outside the leaderboard there are no filters, so a "cap holder" there means
+**the current calendar year, all tournaments, practice excluded** — the same
+scope as the default `/leaderboard` view. `getSeasonCapHolders(year)`
+(`src/lib/playerStats.ts`) runs `getLeaderboard({ year })` and returns the
+orange/purple player-id lists.
+
+- **`/players`** (`players/page.tsx` → `PlayerDirectoryGrid`): fetched in the
+  existing `Promise.all` (best-effort — on failure the directory just shows no
+  caps); each `DirectoryPlayer.caps` renders `CapIcon`s after the name on the
+  card. A player can hold both.
+- **`/profile`** hero: `GET /api/players/[id]/stats` now also returns
+  `caps` (own player only, same IDOR guard as before; a failed cap lookup never
+  hides the stats). The hero shows an "Orange Cap 2026" / "Purple Cap 2026"
+  `CapBadge` pill beside CAPTAIN/ACTIVE for the holder.
+- Because the scope differs from a filtered table, a player can wear a cap on
+  `/players` while not leading a differently-filtered Bat/Bowl table, and vice
+  versa.
+- Not built: caps on the Honor Board cards or `/players/[id]/stats` header.
 
 ---
 
