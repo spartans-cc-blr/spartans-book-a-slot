@@ -620,13 +620,13 @@ export default function ProfilePage() {
         </div>
         {/* Spartans Store nudge */}
         {profile?.jersey_name && profile?.jersey_number && profile.jersey_number.trim() !== '' && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center justify-between mb-4">
-            <p className="font-rajdhani text-sm text-amber-700">
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg px-4 py-3 flex items-center justify-between mb-4">
+            <p className="font-rajdhani text-sm text-amber-700 dark:text-amber-300">
               Your jersey details are set — ready to order?
             </p>
             <a
               href="/dugout/kit-room"
-              className="font-rajdhani text-sm font-semibold text-amber-600 hover:text-amber-700 hover:underline underline-offset-2 whitespace-nowrap ml-4"
+              className="font-rajdhani text-sm font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 hover:underline underline-offset-2 whitespace-nowrap ml-4"
             >
               Spartans Store →
             </a>
