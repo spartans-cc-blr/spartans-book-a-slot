@@ -543,7 +543,11 @@ orange/purple player-id lists.
 - Because the scope differs from a filtered table, a player can wear a cap on
   `/players` while not leading a differently-filtered Bat/Bowl table, and vice
   versa.
-- Not built: caps on the Honor Board cards or `/players/[id]/stats` header.
+- **`/players/[id]/stats` header** (`PlayerStatsClient`): the same `CapBadge`
+  pill sits beside the jersey line for whoever holds a cap, on any player's
+  page (not just your own) — it's public leaderboard information. Fetched
+  best-effort in the server page's `Promise.all`; `caps`/`capYear` are props.
+- Not built: caps on the Honor Board cards.
 
 ---
 

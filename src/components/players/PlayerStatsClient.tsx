@@ -38,6 +38,8 @@
 // click-to-filter) only ever apply client-side on top of the
 // already-fetched, server-filtered `matches` array.
 
+import { CapBadge } from '@/components/leaderboard/CapIcon'
+import type { CapKind } from '@/lib/capHolders'
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/components/ui/ThemeProvider'
@@ -79,7 +81,7 @@ const PITCH_TABS: { key: PitchType | 'all'; label: string }[] = [
 ]
 
 export function PlayerStatsClient({
-  player, grounds, initialGroundId, initialCareer, initialMatches, captaincyRows, showCaptaincy, isOwnStats,
+  player, grounds, initialGroundId, initialCareer, initialMatches, captaincyRows, showCaptaincy, isOwnStats, caps, capYear,
 }: {
   player: PlayerInfo
   grounds: { id: string; name: string }[]
@@ -94,6 +96,9 @@ export function PlayerStatsClient({
   captaincyRows: CaptaincyInnings[]
   showCaptaincy: boolean
   isOwnStats: boolean
+  // Season Orange/Purple Caps this player holds (see src/lib/capHolders.ts)
+  caps: CapKind[]
+  capYear: number
 }) {
   const [year, setYear] = useState<number | 'all'>('all')
   const [groundId, setGroundId] = useState<string>(initialGroundId ?? 'all')
@@ -365,6 +370,7 @@ export function PlayerStatsClient({
             </p>
             <h1 className="font-cinzel text-xl md:text-2xl font-bold text-[var(--stats-text)] tracking-wide">{player.name}</h1>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {caps.map(k => <CapBadge key={k} kind={k} year={capYear} />)}
               {(player.jersey_name || player.jersey_number != null) && (
                 <span className="font-rajdhani text-xs text-[var(--stats-text-muted)]">
                   {player.jersey_number != null && `#${player.jersey_number}`}
