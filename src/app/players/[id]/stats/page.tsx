@@ -2,7 +2,8 @@ import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { getPlayerStats, getPlayerMatchHistory } from '@/lib/playerStats'
+import { getPlayerStats, getPlayerMatchHistory, getSeasonCapHolders } from '@/lib/playerStats'
+import { capsForPlayer } from '@/lib/capHolders'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { PlayerStatsClient } from '@/components/players/PlayerStatsClient'
 import { getCaptaincyInnings } from '@/lib/captaincyStats'
@@ -40,7 +41,7 @@ export default async function PlayerStatsPage({ params, searchParams }: { params
   const canSeeCaptaincy = isOwnStats || !!user?.isGC || !!user?.isAdmin
 
   const supabase = createServiceClient()
-  const [{ data: player }, { data: grounds }, career, matches, captaincyRows] = await Promise.all([
+  const [{ data: player }, { data: grounds }, career, matches, captaincyRows, capHolders] = await Promise.all([
     supabase.from('players')
       .select('id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, cricheroes_url')
       .eq('id', params.id).single(),
@@ -53,6 +54,11 @@ export default async function PlayerStatsPage({ params, searchParams }: { params
           return []
         })
       : Promise.resolve([]),
+    // Season Orange/Purple Cap holders — best-effort, header decoration only.
+    getSeasonCapHolders().catch(err => {
+      console.error('[player-stats] cap holders failed:', err)
+      return { year: new Date().getFullYear(), orange: [] as string[], purple: [] as string[] }
+    }),
   ])
 
   if (!player) redirect('/')
@@ -72,6 +78,8 @@ export default async function PlayerStatsPage({ params, searchParams }: { params
         captaincyRows={captaincyRows}
         showCaptaincy={canSeeCaptaincy}
         isOwnStats={isOwnStats}
+        caps={capsForPlayer(params.id, capHolders)}
+        capYear={capHolders.year}
       />
       <footer className="border-t py-5 text-center font-rajdhani text-xs mt-8"
         style={{ borderColor: 'var(--stats-card-border)', color: 'var(--stats-text-muted)' }}>

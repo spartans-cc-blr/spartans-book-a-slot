@@ -8,6 +8,8 @@ import { useMemo, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import type { LeaderboardRow, PlayerStatsTotals } from '@/types'
 import type { TableCategory } from './LeaderboardFilters'
+import { CapIcon } from './CapIcon'
+import { findCapHolders, type CapKind } from '@/lib/capHolders'
 
 type SortKey =
   | 'matches' | 'battingInnings' | 'bowlingInnings' | 'runs' | 'battingAverage' | 'strikeRate'
@@ -113,6 +115,11 @@ export function LeaderboardTable({ rows, category, tournamentFiltered }: {
   // outs/stumpings for the current filter adds nothing to this table.
   const visibleRows = category === 'fielding' ? preFilterRows.filter(r => dismissals(r.stats) >= 1) : preFilterRows
 
+  const caps = useMemo(() => {
+    const kind: CapKind | null = category === 'batting' ? 'orange' : category === 'bowling' ? 'purple' : null
+    return kind ? { kind, ids: findCapHolders(visibleRows, kind) } : null
+  }, [visibleRows, category])
+
   const sorted = useMemo(() => {
     return [...visibleRows].sort((a, b) => {
       const av = statValue(a, sortKey)
@@ -157,6 +164,7 @@ export function LeaderboardTable({ rows, category, tournamentFiltered }: {
                 <td className="px-4 py-3 font-cinzel text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">{i + 1}</td>
                 <td className="px-4 py-3 font-rajdhani text-sm text-[var(--stats-text)] dark:text-parchment">
                   <PlayerNameLink name={row.playerName} playerId={row.playerId} cricHeroesUrl={row.cricheroesUrl} />
+                  {caps?.ids.has(row.playerId) && <CapIcon kind={caps.kind} />}
                 </td>
                 {columns.map(col => (
                   <td key={col.key}

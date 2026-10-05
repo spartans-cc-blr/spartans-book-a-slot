@@ -500,6 +500,65 @@ already fetch data two different ways.
 
 ---
 
+## 6.2.1 Orange & Purple Caps (Detailed → Bat / Bowl) — added October 2026
+
+IPL-style recognition: a small cap icon (`CapIcon.tsx`, inline SVG) sits right
+after the player name in `LeaderboardTable` for whoever leads the table —
+**🟠 Orange Cap** on Detailed → Bat (most runs), **🟣 Purple Cap** on Detailed →
+Bowl (most wickets). Not shown on the MVP or Field tabs.
+
+- **Follows the filters, not the sort.** The holder is computed by
+  `capHolders()` over the rows currently shown (so Year / Tournament / Ground /
+  Format / Pitch Type tabs all re-scope it), and doesn't move when the viewer
+  re-sorts by another column.
+- **IPL tie-breaks.** Runs tied → higher strike rate. Wickets tied → lower
+  economy, then lower bowling strike rate. A tie that survives all of that
+  shares the cap.
+- **No qualification bar** (IPL rule, unlike the Honor Board cards in §4) — but
+  nobody holds a cap on 0 runs / 0 wickets. Practice games stay excluded, same
+  as the table itself (§10).
+- Purely presentational, client-side, derived from the already-fetched rows: no
+  new query, route or schema. Orange `#F97316` / purple `#8B5CF6` are literals in
+  both themes (small status icon, same call as other status chips).
+- **Shared logic.** Tie-breaks live in `src/lib/capHolders.ts`
+  (`findCapHolders()`, `capsForPlayer()`, unit-tested in `capHolders.test.ts`),
+  which is client-safe so the server pages and `LeaderboardTable` agree.
+
+### Season caps on `/players` and `/profile` (added October 2026)
+
+Outside the leaderboard there are no filters, so a "cap holder" there means
+**the current calendar year, all tournaments, practice excluded** — the same
+scope as the default `/leaderboard` view. `getSeasonCapHolders(year)`
+(`src/lib/playerStats.ts`) runs `getLeaderboard({ year })` and returns the
+orange/purple player-id lists.
+
+- **`/players`** (`players/page.tsx` → `PlayerDirectoryGrid`): fetched in the
+  existing `Promise.all` (best-effort — on failure the directory just shows no
+  caps); each `DirectoryPlayer.caps` renders `CapIcon`s after the name on the
+  card. A player can hold both.
+- **`/profile`** hero: `GET /api/players/[id]/stats` now also returns
+  `caps` (own player only, same IDOR guard as before; a failed cap lookup never
+  hides the stats). The hero shows an "Orange Cap 2026" / "Purple Cap 2026"
+  `CapBadge` pill beside CAPTAIN/ACTIVE for the holder.
+- Because the scope differs from a filtered table, a player can wear a cap on
+  `/players` while not leading a differently-filtered Bat/Bowl table, and vice
+  versa.
+- **`/players/[id]/stats` header** (`PlayerStatsClient`): the same `CapBadge`
+  pill sits beside the jersey line for whoever holds a cap, on any player's
+  page (not just your own) — it's public leaderboard information. Fetched
+  best-effort in the server page's `Promise.all`; `caps`/`capYear` are props.
+- **Honor Board cards** (`LeaderboardMilestones` Overall, `LeaderboardMonthly`):
+  the "Leading Run Scorer" / "Top Run Scorer" card carries the Orange Cap and the
+  "Leading Wicket Taker" / "Top Wicket Taker" card the Purple Cap, after the
+  player's name. Scope is whatever the tab's filters are. The cap is decided among
+  the players who qualify for the cards (games threshold), with the IPL
+  tie-breaks — so when two players tie on runs both cards still show (§4), but
+  only the tie-break winner wears the cap. Because the table (§6.2.1 above) has
+  no qualification bar, early in a season the table's cap holder can differ from
+  the card's if the table leader hasn't met the games threshold.
+
+---
+
 ## 6.3 Partnerships (Detailed → Partnerships) — added September 2026
 
 A fifth Detailed sub-tab after Field — top 10 partnerships for any wicket,
@@ -781,6 +840,7 @@ dropdown to match what already worked underneath it.
 | `src/app/leaderboard/page.tsx` | Server component — auth guard, filter parsing, all data fetching (`getLeaderboard`, `getPerformances`, `getFilterOptions`, `getAvailableMonths`, `getTopScorersByBattingPosition` for Detailed → Bat only — §6.1), glossary building; computes `showPitchTabs`/`pitchType` for the Pitch Type tabs (§6.2), applied only to the `getLeaderboard()` call that feeds `rows`; the six category-gated analytics reads run as one `Promise.all()` batch rather than sequential awaits (§8.2); Year dropdown (`availableYears`) derived from `availableMonths` instead of a hardcoded 3-year list (§8.4) |
 | `src/lib/playerStats.ts` | `getLeaderboard()`, `getPerformances()` (§3), `getTopScorersByBattingPosition()` (§6.1), plus `getPlayerCareerStats()`/`getPlayerSeasonStats()`/`getPlayerMatchHistory()`/`getPlayerBookingContextStats()` for the individual player stats page and Captains' Corner recent-form; `getScopedMatchIds()` excludes `is_practice` tournaments by default (§10) and, as of §6.2, accepts an optional `pitchType` filter resolved via `getPitchTournamentIds()`/`withPitchType()`; `fetchAllRows()` pages every multi-row analytics-DB read past PostgREST's default 1000-row cap (§8.1) |
 | `src/components/leaderboard/BattingPositionLeaders.tsx` | Detailed → Bat only — horizontal bar chart of the leading run-scorer(s) per batting position, tap a bar for the "Top 3" modal (§6.1); each bar carries a fixed-width, plain-text "N / M Inn" label for the leader's own innings at that position over their total innings any position (same filter scope), right-aligned to a shared column, falling back to a bare "N Inn" when tied players' totals disagree (§6.1) — no card-header total (removed); unaffected by the Pitch Type tabs rendered below it (§6.2) |
+| `src/components/leaderboard/CapIcon.tsx` | Orange/Purple Cap SVG icon shown next to the Bat/Bowl table leader by `LeaderboardTable.tsx` (§6.2.1) |
 | `src/components/leaderboard/PitchTypeTabs.tsx` | Detailed → Bat/Bowl — All/Matted/Astro/Turf tab row narrowing `LeaderboardTable`, hidden and inert whenever a Tournament/Ground is selected (§6.2) |
 | `src/components/ui/Dialog.tsx` | Shared modal — reused as-is for the "Top 3 at Position N" popup, no new modal primitive needed (§6.1) |
 | `src/components/players/PlayerStatsClient.tsx` | `/players/[id]/stats` filter bar — Year/Ground/Format/As Captain/Defending/Chasing, plus the "Include Practice Games" opt-in (§10) |

@@ -10,6 +10,8 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { PlayerAvatar } from '@/components/leaderboard/PlayerAvatar'
 import { pickHighlights, type CareerHighlights } from '@/lib/playerHighlights'
+import { CapIcon } from '@/components/leaderboard/CapIcon'
+import type { CapKind } from '@/lib/capHolders'
 
 export type DirectoryPlayer = {
   id: string
@@ -24,6 +26,7 @@ export type DirectoryPlayer = {
   wallet_balance: number | null // GC/admin viewers only; null for everyone else
   last_played_on: string | null
   highlights: CareerHighlights | null
+  caps: CapKind[] // season Orange/Purple Caps this player currently holds
 }
 
 const SKILL_SHORT: Record<string, string> = {
@@ -207,6 +210,7 @@ function PlayerCard({ p, showWallet }: { p: DirectoryPlayer; showWallet: boolean
         <div className="min-w-0 flex-1">
           <p className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment truncate leading-tight group-hover:text-[var(--stats-accent)]">
             {p.name}
+            {p.caps.map(k => <CapIcon key={k} kind={k} size={15} className="ml-1" />)}
           </p>
           {(p.jersey_name || p.jersey_number != null) && (
             <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 leading-tight mt-0.5 truncate">

@@ -125,6 +125,11 @@ light-only. The avatar reuses `PlayerAvatar`.
 A card in the All view carries a small "Inactive" pill when the player is
 inactive, so the two groups stay distinguishable without a filter.
 
+**Orange / Purple Caps (October 2026):** the current season's leading
+run-scorer / wicket-taker carries a cap icon after their name on the card (see
+`leaderboard.md` §6.2.1 for the rules and scope). Fetched best-effort alongside
+the highlights; nothing changes if it fails.
+
 The footer shows the match count (from highlights) and "Last played
 &lt;date&gt;". Last played is still Hub-side: the latest confirmed,
 already-played booking the player was squadded for.

@@ -18,10 +18,10 @@
 // has been reconciled — see src/lib/playerIdentityResolution.ts. Rows with
 // player_id IS NULL are never surfaced by any function here; that gap is
 // what /admin/player-reconciliation exists to close.
-
 import { createServiceClient } from '@/lib/supabase'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 import type { CareerHighlights } from '@/lib/playerHighlights'
+import { findCapHolders } from '@/lib/capHolders'
 import { computePartnerships } from '@/lib/partnerships'
 import { aggregatePartnershipLeaders, type MatchPartnerships } from '@/lib/partnershipLeaders'
 import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType, PartnershipLeaders } from '@/types'
@@ -652,6 +652,19 @@ export async function getCareerHighlightsByPlayer(): Promise<Record<string, Care
     }
   }
   return result
+}
+
+// Season Orange/Purple Cap holders (all tournaments, practice excluded — same
+// scope as the default /leaderboard view). Used by /players and /profile; the
+// per-table caps on /leaderboard follow that page's own filters instead.
+// Tie-breaks live in src/lib/capHolders.ts. See features/leaderboard.md §6.2.1.
+export async function getSeasonCapHolders(year: number = new Date().getFullYear()): Promise<{ year: number; orange: string[]; purple: string[] }> {
+  const rows = await getLeaderboard({ year })
+  return {
+    year,
+    orange: Array.from(findCapHolders(rows, 'orange')),
+    purple: Array.from(findCapHolders(rows, 'purple')),
+  }
 }
 
 // Batched sibling of getLeaderboard({ tournamentId }) — computes the exact

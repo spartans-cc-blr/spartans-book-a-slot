@@ -45,6 +45,8 @@ import { PlayerNameLink } from '@/lib/playerLink'
 import { PlayerAvatar } from './PlayerAvatar'
 import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
 import { BallIcon } from '@/components/matches/BallIcon'
+import { CapIcon } from './CapIcon'
+import { findCapHolders, type CapKind } from '@/lib/capHolders'
 import { useTheme } from '@/components/ui/ThemeProvider'
 import { MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE_OVERALL, minGamesThreshold, minDismissalsThreshold, bestByAll, totalDismissals } from '@/lib/leaderboardMilestones'
 import type { LeaderboardRow, MonthlyInnings, MonthlyBowlingInnings } from '@/types'
@@ -55,6 +57,7 @@ interface Milestone {
   icon: string
   row: LeaderboardRow
   valueText: string
+  cap?: CapKind // Orange/Purple Cap — only on the two "Leading" cards
 }
 
 // Collapsed by default — these bands are supplementary detail underneath
@@ -183,14 +186,24 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
   // One card per tied player, not one card per category — a genuine tie on
   // centuries (both players with 2+) still renders as multiple "Most 100s"
   // cards instead of silently picking a single "winner".
-  function toMilestones(label: string, icon: string, tied: LeaderboardRow[], valueText: (r: LeaderboardRow) => string): Milestone[] {
-    return tied.map(row => ({ key: `${label}-${row.playerId}`, label, icon, row, valueText: valueText(row) }))
+  // Caps are decided among the players who qualify for these cards, with the
+  // IPL tie-breaks (strike rate / economy) — so a tie on runs still shows the
+  // two cards but only one wears the cap. See src/lib/capHolders.ts.
+  const qualifiedRows = rows.filter(qualifiesOnGames)
+  const orangeIds = findCapHolders(qualifiedRows, 'orange')
+  const purpleIds = findCapHolders(qualifiedRows, 'purple')
+
+  function toMilestones(label: string, icon: string, tied: LeaderboardRow[], valueText: (r: LeaderboardRow) => string, capIds?: { kind: CapKind; ids: Set<string> }): Milestone[] {
+    return tied.map(row => ({
+      key: `${label}-${row.playerId}`, label, icon, row, valueText: valueText(row),
+      cap: capIds?.ids.has(row.playerId) ? capIds.kind : undefined,
+    }))
   }
 
   const milestones: Milestone[] = [
     ...toMilestones('Leading MVP',          '🏆', topMVP,     r => `${r.stats.mvpPoints.toFixed(2)} pts`),
-    ...toMilestones('Leading Run Scorer',   '🏏', topRuns,     r => `${r.stats.runs} runs`),
-    ...toMilestones('Leading Wicket Taker', '🎯', topWickets,  r => `${r.stats.wickets} wkts`),
+    ...toMilestones('Leading Run Scorer',   '🏏', topRuns,     r => `${r.stats.runs} runs`, { kind: 'orange', ids: orangeIds }),
+    ...toMilestones('Leading Wicket Taker', '🎯', topWickets,  r => `${r.stats.wickets} wkts`, { kind: 'purple', ids: purpleIds }),
     ...toMilestones('Most Dismissals',      '🧤', dismissalsCardRows, r => `${totalDismissals(r)} dismissals`),
     ...toMilestones('Most 100s',            '💯', centuryCardRows,   r => `${r.centuries} centuries`),
     ...toMilestones('Most 50s',             '5️⃣0️⃣', halfCenturyCardRows, r => `${r.halfCenturies} fifties`),
@@ -232,6 +245,7 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
                 <div className="min-w-0">
                   <p className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment truncate">
                     <PlayerNameLink name={m.row.playerName} playerId={m.row.playerId} cricHeroesUrl={m.row.cricheroesUrl} />
+                    {m.cap && <CapIcon kind={m.cap} size={15} className="ml-1" />}
                   </p>
                   <p className="font-cinzel text-xs text-[var(--stats-accent)] dark:text-gold mt-0.5">{m.valueText}</p>
                 </div>

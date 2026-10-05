@@ -18,7 +18,8 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { PlayerDirectoryGrid, type DirectoryPlayer } from '@/components/players/PlayerDirectoryGrid'
-import { getCareerHighlightsByPlayer } from '@/lib/playerStats'
+import { getCareerHighlightsByPlayer, getSeasonCapHolders } from '@/lib/playerStats'
+import { capsForPlayer } from '@/lib/capHolders'
 import type { CareerHighlights } from '@/lib/playerHighlights'
 import type { Metadata } from 'next'
 
@@ -35,7 +36,7 @@ export default async function PlayersDirectoryPage() {
   const supabase = createServiceClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [playersRes, playedRes, highlights] = await Promise.all([
+  const [playersRes, playedRes, highlights, capHolders] = await Promise.all([
     supabase
       .from('players')
       .select(`id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain, status${canSeeWallet ? ', wallet_balance' : ''}`)
@@ -53,6 +54,11 @@ export default async function PlayersDirectoryPage() {
     getCareerHighlightsByPlayer().catch(err => {
       console.error('[players] career highlights error:', err?.message ?? err)
       return {} as Record<string, CareerHighlights>
+    }),
+    // Orange/Purple Cap holders for the current season — best-effort too.
+    getSeasonCapHolders().catch(err => {
+      console.error('[players] cap holders error:', err?.message ?? err)
+      return { year: new Date().getFullYear(), orange: [] as string[], purple: [] as string[] }
     }),
   ])
 
@@ -79,6 +85,7 @@ export default async function PlayersDirectoryPage() {
     wallet_balance: canSeeWallet ? Number(p.wallet_balance ?? 0) : null,
     last_played_on: lastPlayed[p.id] ?? null,
     highlights: highlights[p.id] ?? null,
+    caps: capsForPlayer(p.id, capHolders),
   }))
 
   return (
@@ -101,7 +108,7 @@ export default async function PlayersDirectoryPage() {
       <main className="px-5 md:px-8 lg:px-10 py-6 max-w-6xl">
         <PlayerDirectoryGrid players={players} showWallet={canSeeWallet} />
         <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 mt-8">
-          Highlights cover synced Hub matches only; practice games are excluded.
+          Highlights cover synced Hub matches only; practice games are excluded. Orange Cap (most runs) and Purple Cap (most wickets) are for the current season.
         </p>
       </main>
     </div>

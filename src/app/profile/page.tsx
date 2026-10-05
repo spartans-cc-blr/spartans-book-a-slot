@@ -12,6 +12,8 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import { BackButton } from '@/components/ui/BackButton'
 import { DobInput } from '@/components/ui/DobInput'
 import type { PlayerStatsTotals } from '@/types'
+import { CapBadge } from '@/components/leaderboard/CapIcon'
+import type { CapKind } from '@/lib/capHolders'
 import { hasLocalPushSubscription, subscribeToPush as subscribeToPushBrowser, unsubscribeFromPush as unsubscribeFromPushBrowser } from '@/lib/pushSubscription'
 
 const SKILLS = [
@@ -118,6 +120,7 @@ export default function ProfilePage() {
     career: PlayerStatsTotals
     season: PlayerStatsTotals
     seasonYear: number
+    caps?: CapKind[] // season Orange/Purple Caps this player holds
   } | null>(null)
 
   // Editable fields
@@ -400,12 +403,13 @@ export default function ProfilePage() {
         <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-[#1C1917] dark:text-parchment mb-1 tracking-wide">
           {profile?.name ?? player.playerName}
         </h1>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center flex-wrap gap-2 mt-1">
           {profile?.is_captain && (
             <span className="font-rajdhani text-[10px] font-bold bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold px-2 py-0.5 rounded">
               CAPTAIN
             </span>
           )}
+          {stats?.caps?.map(k => <CapBadge key={k} kind={k} year={stats.seasonYear} />)}
           {profile?.status === 'active' && (
             <span className="font-rajdhani text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">
               ACTIVE

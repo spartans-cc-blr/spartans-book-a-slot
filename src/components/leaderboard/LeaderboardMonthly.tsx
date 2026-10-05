@@ -37,6 +37,8 @@
 // "best economy", and a one-ball slog shouldn't win "highest strike rate".
 
 import { PlayerNameLink } from '@/lib/playerLink'
+import { CapIcon } from './CapIcon'
+import { findCapHolders, type CapKind } from '@/lib/capHolders'
 import { bestBy, MIN_BALLS_FOR_ECONOMY, MIN_BALLS_FOR_STRIKE_RATE } from '@/lib/leaderboardMilestones'
 import { PlayerAvatar } from './PlayerAvatar'
 import { BattingInningsRow, BowlingInningsRow } from './InningsRow'
@@ -50,6 +52,7 @@ interface Milestone {
   icon: string
   row: LeaderboardRow | null
   valueText: string
+  cap?: CapKind // Orange/Purple Cap — only on the Top Run Scorer / Wicket Taker cards
 }
 
 function InningsPanel({ icon, label, count, children }: { icon: React.ReactNode; label: string; count: number; children: React.ReactNode }) {
@@ -96,10 +99,15 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
   const bestSR       = bestBy(rows, r => r.stats.strikeRate, r => r.stats.balls >= MIN_BALLS_FOR_STRIKE_RATE && qualifies(r))
   const bestEconomy = bestBy(rows, r => r.stats.economy, r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && qualifies(r), true)
 
+  // Month's cap holders, IPL tie-breaks (src/lib/capHolders.ts).
+  const qualifiedRows = rows.filter(qualifies)
+  const orangeIds = findCapHolders(qualifiedRows, 'orange')
+  const purpleIds = findCapHolders(qualifiedRows, 'purple')
+
   const milestones: Milestone[] = [
     { label: 'Top MVP',         icon: '🏆', row: topMVP,     valueText: topMVP ? `${topMVP.stats.mvpPoints.toFixed(2)} pts` : '' },
-    { label: 'Top Run Scorer',  icon: '🏏', row: topRuns,     valueText: topRuns ? `${topRuns.stats.runs} runs` : '' },
-    { label: 'Top Wicket Taker', icon: '🎯', row: topWickets,  valueText: topWickets ? `${topWickets.stats.wickets} wkts` : '' },
+    { label: 'Top Run Scorer',  icon: '🏏', row: topRuns,     valueText: topRuns ? `${topRuns.stats.runs} runs` : '', cap: topRuns && orangeIds.has(topRuns.playerId) ? ('orange' as CapKind) : undefined },
+    { label: 'Top Wicket Taker', icon: '🎯', row: topWickets,  valueText: topWickets ? `${topWickets.stats.wickets} wkts` : '', cap: topWickets && purpleIds.has(topWickets.playerId) ? ('purple' as CapKind) : undefined },
     { label: 'Best Average',   icon: '📊', row: bestAverage, valueText: bestAverage ? `Avg ${bestAverage.stats.battingAverage!.toFixed(2)}` : '' },
     { label: 'Highest S/R',    icon: '⚡', row: bestSR,       valueText: bestSR ? `SR ${bestSR.stats.strikeRate!.toFixed(2)}` : '' },
     { label: 'Best Economy',   icon: '🛡️', row: bestEconomy, valueText: bestEconomy ? `Econ ${bestEconomy.stats.economy!.toFixed(2)}` : '' },
@@ -138,6 +146,7 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
                 <div className="min-w-0">
                   <p className="font-rajdhani text-sm font-semibold text-[var(--stats-text)] dark:text-parchment truncate">
                     <PlayerNameLink name={m.row!.playerName} playerId={m.row!.playerId} cricHeroesUrl={m.row!.cricheroesUrl} />
+                    {m.cap && <CapIcon kind={m.cap} size={15} className="ml-1" />}
                   </p>
                   <p className="font-cinzel text-xs text-[var(--stats-accent)] dark:text-gold mt-0.5">{m.valueText}</p>
                 </div>
