@@ -106,8 +106,8 @@ export function LeaderboardMonthly({ rows, centuries, halfCenturies, fiveWicketH
 
   const milestones: Milestone[] = [
     { label: 'Top MVP',         icon: '🏆', row: topMVP,     valueText: topMVP ? `${topMVP.stats.mvpPoints.toFixed(2)} pts` : '' },
-    { label: 'Top Run Scorer',  icon: '🏏', row: topRuns,     valueText: topRuns ? `${topRuns.stats.runs} runs` : '', cap: topRuns && orangeIds.has(topRuns.playerId) ? 'orange' : undefined },
-    { label: 'Top Wicket Taker', icon: '🎯', row: topWickets,  valueText: topWickets ? `${topWickets.stats.wickets} wkts` : '', cap: topWickets && purpleIds.has(topWickets.playerId) ? 'purple' : undefined },
+    { label: 'Top Run Scorer',  icon: '🏏', row: topRuns,     valueText: topRuns ? `${topRuns.stats.runs} runs` : '', cap: topRuns && orangeIds.has(topRuns.playerId) ? ('orange' as CapKind) : undefined },
+    { label: 'Top Wicket Taker', icon: '🎯', row: topWickets,  valueText: topWickets ? `${topWickets.stats.wickets} wkts` : '', cap: topWickets && purpleIds.has(topWickets.playerId) ? ('purple' as CapKind) : undefined },
     { label: 'Best Average',   icon: '📊', row: bestAverage, valueText: bestAverage ? `Avg ${bestAverage.stats.battingAverage!.toFixed(2)}` : '' },
     { label: 'Highest S/R',    icon: '⚡', row: bestSR,       valueText: bestSR ? `SR ${bestSR.stats.strikeRate!.toFixed(2)}` : '' },
     { label: 'Best Economy',   icon: '🛡️', row: bestEconomy, valueText: bestEconomy ? `Econ ${bestEconomy.stats.economy!.toFixed(2)}` : '' },
