@@ -263,17 +263,28 @@ function PlayerCard({ p, showWallet }: { p: DirectoryPlayer; showWallet: boolean
         <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 italic">No synced stats yet</p>
       )}
 
+      {/* Wallet strip (GC/admin only) — own row so dues are easy to spot */}
+      {showWallet && p.wallet_balance != null && (
+        <div className={`mt-auto flex items-center justify-between rounded-lg px-3 py-1.5 border ${
+          p.wallet_balance < 0
+            ? 'bg-amber-50 border-amber-300 dark:bg-amber-950/30 dark:border-amber-800'
+            : 'bg-[var(--stats-row-bg)] border-[var(--stats-card-border)] dark:bg-ink-4 dark:border-ink-5'
+        }`}>
+          <span className="font-rajdhani text-[10px] font-bold tracking-widest uppercase text-[var(--stats-text-muted)] dark:text-zinc-500">
+            {p.wallet_balance < 0 ? '⚠ Dues' : 'Wallet'}
+          </span>
+          <span className={`font-rajdhani text-sm font-bold tabular-nums ${p.wallet_balance < 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+            {formatRupees(p.wallet_balance)}
+          </span>
+        </div>
+      )}
+
       {/* Footer */}
-      <div className="flex items-center justify-between mt-auto pt-2.5 border-t border-[var(--stats-divider)] dark:border-ink-4">
-        <span className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500">
+      <div className={`flex items-center justify-between gap-2 ${showWallet && p.wallet_balance != null ? '' : 'mt-auto'} pt-2.5 border-t border-[var(--stats-divider)] dark:border-ink-4`}>
+        <span className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 whitespace-nowrap">
           {p.highlights ? `${p.highlights.matches} match${p.highlights.matches !== 1 ? 'es' : ''}` : ''}
         </span>
-        {showWallet && p.wallet_balance != null && (
-          <span className={`font-rajdhani text-xs font-semibold ${p.wallet_balance < 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-            {formatRupees(p.wallet_balance)}{p.wallet_balance < 0 && ' ⚠ dues'}
-          </span>
-        )}
-        <span className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600">
+        <span className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 whitespace-nowrap">
           {lastPlayed ? `Last played ${lastPlayed}` : 'Never played'}
         </span>
       </div>
