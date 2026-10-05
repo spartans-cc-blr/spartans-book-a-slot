@@ -6,9 +6,11 @@
 //
 // vibe-security: select is limited to public-profile fields (name, photo,
 // jersey, skills, captain flag, and an active/inactive boolean for the
-// filter — the raw status string never reaches the client). No wallet,
-// gmail, dob, whatsapp or blood group ever reaches this page. Expelled
-// players are excluded server-side. No write path.
+// filter — the raw status string never reaches the client). gmail, dob,
+// whatsapp and blood group never reach this page. wallet_balance is fetched
+// and sent ONLY when the viewer is GC or admin (decided server-side); for
+// everyone else it is null. Expelled players are excluded server-side. No
+// write path.
 
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
@@ -29,13 +31,14 @@ export default async function PlayersDirectoryPage() {
   if (!session) redirect(`/login?callbackUrl=${encodeURIComponent('/players')}`)
   if (user?.playerStatus === 'expelled') redirect('/')
 
+  const canSeeWallet = !!(user?.isGC || user?.isAdmin)
   const supabase = createServiceClient()
   const today = new Date().toISOString().split('T')[0]
 
   const [playersRes, playedRes, highlights] = await Promise.all([
     supabase
       .from('players')
-      .select('id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain, status')
+      .select(`id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain, status${canSeeWallet ? ', wallet_balance' : ''}`)
       .neq('status', 'expelled')
       .order('name', { ascending: true }),
     // Last played = most recent confirmed, already-played booking the
@@ -73,6 +76,7 @@ export default async function PlayersDirectoryPage() {
     secondary_skill: p.secondary_skill,
     is_captain: !!p.is_captain,
     is_active: p.status === 'active',
+    wallet_balance: canSeeWallet ? Number(p.wallet_balance ?? 0) : null,
     last_played_on: lastPlayed[p.id] ?? null,
     highlights: highlights[p.id] ?? null,
   }))
@@ -95,7 +99,7 @@ export default async function PlayersDirectoryPage() {
       </div>
 
       <main className="px-5 md:px-8 lg:px-10 py-6 max-w-6xl">
-        <PlayerDirectoryGrid players={players} />
+        <PlayerDirectoryGrid players={players} showWallet={canSeeWallet} />
         <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 mt-8">
           Highlights cover synced Hub matches only; practice games are excluded.
         </p>

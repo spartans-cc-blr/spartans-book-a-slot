@@ -21,6 +21,7 @@ export type DirectoryPlayer = {
   secondary_skill: string | null
   is_captain: boolean
   is_active: boolean // players.status === 'active' (expelled never reaches this page)
+  wallet_balance: number | null // GC/admin viewers only; null for everyone else
   last_played_on: string | null
   highlights: CareerHighlights | null
 }
@@ -63,7 +64,12 @@ function matchesStatus(p: DirectoryPlayer, f: StatusFilter) {
   return f === 'all' || (f === 'active' ? p.is_active : !p.is_active)
 }
 
-export function PlayerDirectoryGrid({ players }: { players: DirectoryPlayer[] }) {
+function formatRupees(n: number) {
+  return `${n < 0 ? '-' : ''}₹${Math.abs(n).toLocaleString('en-IN')}`
+}
+
+export function PlayerDirectoryGrid({ players, showWallet = false }: { players: DirectoryPlayer[]; showWallet?: boolean }) {
+  const [duesOnly, setDuesOnly] = useState(false)
   const [query, setQuery] = useState('')
   const [letter, setLetter] = useState<string | null>(null)
   const [status, setStatus] = useState<StatusFilter>('active')
@@ -78,8 +84,9 @@ export function PlayerDirectoryGrid({ players }: { players: DirectoryPlayer[] })
   const searched = useMemo(
     () => players
       .filter(p => matchesStatus(p, status))
+      .filter(p => !showWallet || !duesOnly || (p.wallet_balance ?? 0) < 0)
       .filter(p => !q || p.name.toLowerCase().includes(q) || (p.jersey_name ?? '').toLowerCase().includes(q)),
-    [players, q, status],
+    [players, q, status, showWallet, duesOnly],
   )
   const availableLetters = useMemo(
     () => new Set(searched.map(p => p.name[0]?.toUpperCase()).filter(Boolean)),
@@ -108,6 +115,18 @@ export function PlayerDirectoryGrid({ players }: { players: DirectoryPlayer[] })
             </button>
           )
         })}
+        {showWallet && (
+          <button
+            onClick={() => { setDuesOnly(d => !d); setLetter(null) }}
+            aria-pressed={duesOnly}
+            className={`ml-auto font-rajdhani text-xs font-bold px-3 h-8 rounded-full border transition-colors ${
+              duesOnly ? 'bg-amber-500 border-amber-500 text-white'
+                       : 'bg-[var(--stats-card-bg)] dark:bg-ink-3 border-amber-400 text-amber-700 dark:text-amber-400'
+            }`}
+          >
+            ⚠ Dues outstanding
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -158,7 +177,7 @@ export function PlayerDirectoryGrid({ players }: { players: DirectoryPlayer[] })
 
       {filtered.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map(p => <PlayerCard key={p.id} p={p} />)}
+          {filtered.map(p => <PlayerCard key={p.id} p={p} showWallet={showWallet} />)}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -170,7 +189,7 @@ export function PlayerDirectoryGrid({ players }: { players: DirectoryPlayer[] })
   )
 }
 
-function PlayerCard({ p }: { p: DirectoryPlayer }) {
+function PlayerCard({ p, showWallet }: { p: DirectoryPlayer; showWallet: boolean }) {
   const [headline, ...rest] = pickHighlights(p.highlights)
   const lastPlayed = formatLastPlayed(p.last_played_on)
   const primary = skillShort(p.primary_skill)
@@ -249,6 +268,11 @@ function PlayerCard({ p }: { p: DirectoryPlayer }) {
         <span className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500">
           {p.highlights ? `${p.highlights.matches} match${p.highlights.matches !== 1 ? 'es' : ''}` : ''}
         </span>
+        {showWallet && p.wallet_balance != null && (
+          <span className={`font-rajdhani text-xs font-semibold ${p.wallet_balance < 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+            {formatRupees(p.wallet_balance)}{p.wallet_balance < 0 && ' ⚠ dues'}
+          </span>
+        )}
         <span className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600">
           {lastPlayed ? `Last played ${lastPlayed}` : 'Never played'}
         </span>
