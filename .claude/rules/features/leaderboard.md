@@ -547,7 +547,15 @@ orange/purple player-id lists.
   pill sits beside the jersey line for whoever holds a cap, on any player's
   page (not just your own) — it's public leaderboard information. Fetched
   best-effort in the server page's `Promise.all`; `caps`/`capYear` are props.
-- Not built: caps on the Honor Board cards.
+- **Honor Board cards** (`LeaderboardMilestones` Overall, `LeaderboardMonthly`):
+  the "Leading Run Scorer" / "Top Run Scorer" card carries the Orange Cap and the
+  "Leading Wicket Taker" / "Top Wicket Taker" card the Purple Cap, after the
+  player's name. Scope is whatever the tab's filters are. The cap is decided among
+  the players who qualify for the cards (games threshold), with the IPL
+  tie-breaks — so when two players tie on runs both cards still show (§4), but
+  only the tie-break winner wears the cap. Because the table (§6.2.1 above) has
+  no qualification bar, early in a season the table's cap holder can differ from
+  the card's if the table leader hasn't met the games threshold.
 
 ---
 
