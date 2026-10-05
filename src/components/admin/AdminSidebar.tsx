@@ -12,14 +12,39 @@ const NAV = [
   { href: '/admin/tournaments',      label: 'Tournaments',      icon: '🏆' },
   { href: '/admin/players',          label: 'Players',          icon: '🏏' },
   { href: '/admin/wallet',           label: 'Wallet',            icon: '💰' },
-  { href: '/schedule',               label: 'Free Schedules',            icon: '🌐', section: 'Hub Views' },
-  { href: '/fixtures',               label: 'Fixtures - Players View',   icon: '🏏' },
-  { href: '/tournament-planner',     label: 'Tournament Planner',   icon: '📊' },
   { href: '/admin/scorecard-backfill', label: 'Scorecard Backfill', icon: '📥', section: 'Utilities' },
   { href: '/admin/booking-backfill', label: 'Booking Backfill', icon: '🗓️' },
   { href: '/admin/player-reconciliation', label: 'Player Reconciliation', icon: '🪪' },
   { href: '/admin/cricheroes-id-backfill', label: 'CricHeroes ID Backfill', icon: '🔗' },
-  { href: '/admin/dugout/kit-room',  label: 'Store Orders',  icon: '🥎', section: 'The Dugout' },
+  // Hub Views — every player-facing destination an admin sees in SiteNav's
+  // own dropdowns (Matches ▾/Stats ▾/Captains' Corner ▾/Council ⚖/Wrangler ⚒),
+  // deduped to one entry per route and grouped with sub-labels mirroring
+  // that structure, so an admin never has to leave /admin to reach them.
+  // Placed after Utilities per the same request that retired the standalone
+  // "The Dugout" section below — Store Orders now points at
+  // /dugout/store-orders (the player-chrome page), not the old
+  // /admin/dugout/kit-room duplicate, which is byte-for-byte the same
+  // AdminKitRoomClient/isAdmin||isGC gate — see navigation.md.
+  { href: '/',                       label: 'Home',              icon: '🏠', section: 'Hub Views', exact: true },
+  { href: '/schedule',               label: 'Free Schedules',    icon: '🌐' },
+  { href: '/matches/history',        label: 'Past Matches',      icon: '📜', section: 'Hub Views · Matches' },
+  { href: '/fixtures',               label: 'Upcoming Fixtures', icon: '🏏' },
+  { href: '/leaderboard',            label: 'Yours Statistically', icon: '📊', section: 'Hub Views · Stats' },
+  { href: '/team-stats',             label: 'Team Record',       icon: '🛡️' },
+  { href: '/dugout/store-orders',    label: 'Store Orders',      icon: '🥎', section: 'Hub Views · The Dugout' },
+  { href: '/dugout/gear',            label: 'Gear Exchange',     icon: '🧢' },
+  { href: '/dugout',                 label: 'The Dugout',        icon: '🏟️', exact: true },
+  { href: '/captains-corner/unavailable-dates', label: 'Unavailable Dates', icon: '🚫', section: "Hub Views · Captains' Corner" },
+  { href: '/captains-corner',        label: 'Squad Selection',   icon: '📝', exact: true },
+  { href: '/gc-review',              label: 'Squad Review',      icon: '⚖️', section: 'Hub Views · Council' },
+  { href: '/gc/feedback',            label: 'Feedback',          icon: '💬' },
+  { href: '/gc-players',             label: 'GC Players',        icon: '🧑‍🤝‍🧑' },
+  { href: '/wrangler/grounds',       label: 'Grounds',           icon: '📍' },
+  { href: '/wrangler/backfill-squad', label: 'Squad Backfill',   icon: '🧩', section: 'Hub Views · Wrangler' },
+  { href: '/opponents',              label: 'Opponents',         icon: '⚔️', section: 'Hub Views · Shared' },
+  { href: '/tournament-planner',     label: 'Tournament Planner', icon: '📈' },
+  { href: '/profile',                label: 'My Profile',        icon: '👤', section: 'Hub Views · Account' },
+  { href: '/wallet',                 label: 'My Wallet',         icon: '🪙' },
 ]
 
 export function AdminSidebar() {

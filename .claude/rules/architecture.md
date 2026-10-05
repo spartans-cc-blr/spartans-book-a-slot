@@ -112,6 +112,51 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/admin/player-reconciliation` | Resolves analytics-DB scorecard `player_name` strings to Hub `players.id` — suggestions, confirm/ignore, "Run Reconciliation Pass"; see `features/player-identity-resolution.md` |
 | `/admin/wallet` | Hub for pending fee applications (links to `/admin/bookings/[id]`), player search + full statement/quick top-up/correction, club-wide recent-transactions feed; see `features/wallet-ledger.md` |
  
+### `AdminSidebar` — "Hub Views" (added October 2026)
+
+`src/components/admin/AdminSidebar.tsx`'s `NAV` array (desktop sidebar +
+mobile drawer, shared) is admin-only CRUD/tooling links plus a flat,
+labeled-section list — **not** a real nested dropdown/accordion component,
+just a label row rendered before any item carrying a `section` string,
+with every subsequent item inheriting that label visually until the next
+one.
+
+**Hub Views** is the block of this list after the Utilities section —
+every player-facing route an admin would otherwise have to leave `/admin`
+to reach, mirroring (and deduping) `SiteNav`'s own dropdowns (Matches ▾/
+Stats ▾/Captains' Corner ▾/Council ⚖/Wrangler ⚒) one destination per
+route rather than reproducing a route that appears in more than one of
+`SiteNav`'s menus (`/opponents`, `/wrangler/grounds`) multiple times —
+an admin already sees "all of the above" in one flat nav, so the
+role-scoped repetition those dropdowns use for a captain/GC/wrangler
+viewer would just be clutter here. Sub-labels (`'Hub Views · Matches'`,
+`'Hub Views · Stats'`, …) use the same single-label-per-section mechanism,
+just with a `·`-separated name, to keep the groups visually distinct
+without building a second nav component.
+
+**Replaced, not kept alongside, the old standalone "The Dugout" section**
+(`/admin/dugout/kit-room`, labeled "Store Orders") — that page and
+`/dugout/store-orders` turned out to be the exact same feature
+(`AdminKitRoomClient`, same `isAdmin || isGC` gate, same `jersey_orders`
+query) shipped twice under two different page shells, one under
+`AdminLayout` and one under `SiteNav`. Hub Views' own "Store Orders" entry
+now points at `/dugout/store-orders` instead, so nothing was lost by
+dropping the duplicate link. `/admin/dugout/kit-room/page.tsx` itself was
+left in place (not deleted) — it's simply unreachable from any nav now,
+a known, harmless orphan rather than a route someone might still have
+bookmarked being pulled out from under them.
+
+Items needing care against this list's prefix-match active-state check
+(`path.startsWith(item.href)` for any entry without `exact: true`):
+`'/'`, `'/dugout'`, and `'/captains-corner'` are all marked `exact: true`
+specifically because something else in the list is a real sub-route of
+each (every other path in the app technically "starts with" `/`, and
+`/dugout/store-orders`/`/dugout/gear` and
+`/captains-corner/unavailable-dates` would otherwise satisfy the parent
+entry's `startsWith` check first and mask the more specific one). Any
+future addition to this list that's itself a path-prefix of another entry
+needs the same treatment.
+
 ---
  
 ## 5. API Routes
@@ -860,6 +905,7 @@ Next.js API Routes (server-side)
 | `src/app/gc-review/page.tsx` | GC-only server page; scoped to the next two rolling weekends (same `weekKey()` grouping as `/captains-corner`, not a fixed calendar week — see `features/squad-selection.md`); renders one `GCReviewClient` block per weekend |
 | `src/app/gc/feedback/page.tsx` + `src/components/gc/GCFeedbackClient.tsx` | `/gc/feedback` — GC-collected feedback campaigns; campaign picker, per-player claim/collect/view flow — see `features/gc-feedback.md` |
 | `src/app/admin/` | All admin pages (dashboard, new/edit booking, players, captains, tournaments) |
+| `src/components/admin/AdminSidebar.tsx` | Admin-only desktop sidebar + mobile drawer nav (`AdminLayout`'s chrome, not `SiteNav`); `NAV`'s "Hub Views" block (below Utilities) is the admin's shortcut into every player-facing route — see the `AdminSidebar` — "Hub Views" note in §4 above |
 | `src/app/admin/layout.tsx` + `src/components/admin/AdminSidebar.tsx` | Shared `/admin/**` chrome (top bar, desktop sidebar, mobile bottom bar/drawer) — converted to Light/Dark/System alongside `/admin/scorecard-backfill` (September 2026, see `features/post-match-scorecard.md` §8 and `ui-theme.md`'s Light/Dark/System section); every other `/admin/**` page body is still dark-only, an accepted seam matching the `SiteNav`/`MobileTabBar` precedent |
 | `src/components/admin/DashboardBookingsTabs.tsx` | `/admin` dashboard's Upcoming/Past bookings tabs (`AdminPastMatchesPanel` backs the Past tab, paginated by `/api/admin/bookings/past`). Past tab gained the same combined-weekend `DateChipSlider` quick filter Upcoming Matches (`/fixtures`) and Past Matches (`/matches/history`) use — layered on top of the existing month stepper (`groupDatesIntoChips()` over whatever month's bookings are currently loaded; resets on month change), purely client-side, no new API param. See `features/post-match-scorecard.md` §8's matching note on `/admin/scorecard-backfill`, which got the identical treatment in the same pass. |
 | `src/components/fixtures/FixturesCard.tsx` | Match card display; squad panel; CricHeroes match link; tournament name links to CricHeroes points table if `cricheroes_points_table_url` set |
