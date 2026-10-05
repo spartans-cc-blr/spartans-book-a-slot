@@ -20,8 +20,7 @@ GC/admin-only and built around admin-style fields (active/inactive status,
 wallet balance, a dues filter). Per a direct request it was turned into
 this directory instead:
 
-- **Removed:** wallet balance, the "Dues outstanding" toggle, and the
-  Expelled filter (expelled players aren't listed at all).
+- **Removed:** the Expelled filter (expelled players aren't listed at all).
 - **Added:** a name/jersey-name search box, and per-card career highlights
   (§3) — the numbers that stand out for that player.
 - **Kept:** photo/initials avatar, jersey number and name, skill pills,
@@ -30,8 +29,8 @@ this directory instead:
   Active** (see §4).
 
 `/gc-players` now just `redirect('/players')`, so old links still work.
-GC-only members no longer have an in-app view of the roster's wallet
-balances or dues. Admins still have `/admin/players` and `/admin/wallet`.
+GC and admin still see wallet balances and a dues filter here (§2.1);
+admins also have `/admin/players` and `/admin/wallet`.
 
 ---
 
@@ -50,6 +49,19 @@ redirect now. `/players` does its own session check, like `/leaderboard`
 and `/team-stats`.
 
 ---
+
+### 2.1 Wallet balance for GC / admin (added October 2026)
+
+The retired `/gc-players` page showed each player's wallet balance and a
+"Dues outstanding" filter to GC; both were dropped in the repurpose (§1) and
+are now restored here **for GC and admin viewers only**. `page.tsx` computes
+`canSeeWallet = isGC || isAdmin` server-side and adds `wallet_balance` to the
+`players` select only then; for every other viewer the column is never
+fetched and `DirectoryPlayer.wallet_balance` is `null`. `PlayerDirectoryGrid`
+takes `showWallet`, which shows the balance in the card footer (emerald if
+≥ 0, amber with "⚠ dues" if negative) and a "⚠ Dues outstanding" toggle
+beside the status pills (it composes with status, search and A–Z). Read-only;
+no write path. Wallet edits stay on `/admin/wallet`.
 
 ## 3. Career highlights
 
