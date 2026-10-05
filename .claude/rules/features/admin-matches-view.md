@@ -50,6 +50,12 @@ grants nothing; the public `/schedule` payload is unchanged).
   block. Each opens the existing form with `?date=&slot=&from=calendar`
   (reserve adds `&mode=reserved`). R1–R8 validation runs as usual; a full
   weekend shows a note that booking needs an R1 override.
+- Since this calendar menu already reaches both `/admin/bookings/new` and
+  `/admin/soft-blocks/new`, the standalone "New Booking"/"Soft Blocks"
+  shortcut rows were removed from `AdminSidebar.tsx`'s `NAV` array
+  (October 2026) — a redundant second path to the same two forms. Both
+  routes are unchanged and still reachable from the calendar; only the
+  sidebar shortcut is gone.
 - **Booked / reserved / soft-block slot** → links to
   `/admin/bookings/[id]?from=calendar` (Edit).
 - `from=calendar` makes save / cancel / Back on those forms return to

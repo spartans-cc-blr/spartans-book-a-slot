@@ -41,10 +41,14 @@ interface GroupEntry {
 type NavEntry = LinkEntry | GroupEntry
 
 const NAV: NavEntry[] = [
+  // New Booking (/admin/bookings/new) and Soft Blocks (/admin/soft-blocks/new)
+  // used to have their own shortcut rows here — dropped once the Matches
+  // page's Calendar view started offering "Book game"/"Reserve slot"/"Soft
+  // block" directly from an open slot (?date=&slot=&from=calendar, see
+  // features/admin-matches-view.md §3), which made a standalone sidebar
+  // link to the same two forms redundant. Both routes still exist and are
+  // still reachable — only the duplicate top-level sidebar entry is gone.
   { kind: 'link', href: '/admin', label: 'Matches', icon: '📋', exact: true },
-  // After the Matches entry:
-  { kind: 'link', href: '/admin/bookings/new', label: 'New Booking', icon: '➕' },
-  { kind: 'link', href: '/admin/soft-blocks/new', label: 'Soft Blocks', icon: '🔒' },
   { kind: 'link', href: '/admin/captains', label: 'Captains', icon: '👥', section: 'Master Data' },
   { kind: 'link', href: '/admin/tournaments', label: 'Tournaments', icon: '🏆' },
   { kind: 'link', href: '/admin/players', label: 'Players', icon: '🏏' },
