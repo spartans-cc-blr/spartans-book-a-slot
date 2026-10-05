@@ -30,8 +30,8 @@ export function BackButton({ fallbackHref, fallbackLabel, className, variant = '
 
   const label = canBack ? 'Back' : fallbackLabel
   const base = variant === 'nav'
-    ? 'inline-flex items-center gap-1 font-rajdhani text-xs font-bold text-gold hover:text-gold-light transition-colors -ml-1 pr-1 py-1'
-    : 'inline-flex items-center gap-1 font-rajdhani text-xs font-bold text-gold hover:text-gold-light transition-colors'
+    ? 'inline-flex items-center gap-1 font-rajdhani text-xs font-bold text-amber-700 dark:text-gold hover:text-amber-600 dark:hover:text-gold-light transition-colors -ml-1 pr-1 py-1'
+    : 'inline-flex items-center gap-1 font-rajdhani text-xs font-bold text-amber-700 dark:text-gold hover:text-amber-600 dark:hover:text-gold-light transition-colors'
   const cls = `${base} ${className ?? ''}`.trim()
   const glyph = variant === 'nav' ? <span className="text-lg leading-none">‹</span> : <span>←</span>
   const text = variant === 'nav' ? (canBack ? 'Back' : label) : label
