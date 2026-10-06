@@ -2,7 +2,11 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { NextRequest, NextResponse } from 'next/server'
 
-const redis = new Redis({
+// Exported so other modules can reuse this one client for small, unrelated
+// caching needs (e.g. src/lib/bookingBackfill.ts's preview cache) instead of
+// each instantiating their own — this is a stateless REST client, so sharing
+// it is just avoiding a redundant object, not a real resource concern.
+export const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 })

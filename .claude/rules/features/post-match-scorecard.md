@@ -2357,6 +2357,167 @@ to login by that page, same as any direct link.
 
 ---
 
+## 18. Booking Backfill — creating a missing booking from CricHeroes (added October 2026)
+
+### Overview
+
+A different gap from everything in §8: Scorecard Backfill assumes a Hub
+`bookings` row already exists and only needs its scorecard parsed/synced.
+**Booking Backfill** (`/admin/booking-backfill`) is for a match that was
+genuinely played on CricHeroes but never got a Hub booking at all — it
+predates the Hub portal going live for that tournament, or was simply
+missed. Admin enters a bare CricHeroes `match_id`, previews what would be
+created, then confirms — which inserts the `bookings` row itself and
+immediately chains into the identical parse+sync pipeline
+(`backfillOneBooking()`, §8) that the daily cron and Scorecard Backfill
+already use.
+
+R1–R6 (`src/lib/validation.ts`) are deliberately never run here — those
+rules protect future ground-scheduling conflicts, which are meaningless
+for a match that already happened. The only scheduling-shaped guard that
+still applies is `game_date < today`, so this path can never be used to
+sneak a future booking in under the guise of a backfill. Fees are never
+touched here either, same rule as Scorecard Backfill.
+
+Admin-only — not wrangler. Unlike sync-match-stats/upload, this route
+creates real booking rows and bypasses R1–R6, so it's gated no wider than
+the admin-only page that serves it.
+
+### Shares the CricHeroes throttle budget with §8 — and spends it 3x per match
+
+`src/lib/bookingBackfill.ts`'s `callMicroservice()` posts to the exact same
+`/fetch-and-parse-scorecard` endpoint on the exact same Render microservice
+that the daily `backfill-scorecards` cron and the Scorecard Backfill admin
+page use (`api.py`'s `requests.get(pdf.cricheroes.in/...)`). CricHeroes has
+no way to tell these callers apart — a 429 ("Rate limited by CricHeroes")
+from one tool is drawing on the identical budget as the other two.
+
+Before the fix below, a single Preview-then-Create cycle for **one** match
+fired **three** separate CricHeroes fetches, with no pacing between them at
+all (unlike Scorecard Backfill's page, which paces its own loop 4s apart —
+see §8):
+
+1. The explicit "Preview" click → `previewBackfillMatch()` → 1 fetch (`dry_run: true`).
+2. The "Create" click → `createBackfillBooking()` called `previewBackfillMatch()`
+   a second time internally, to re-derive `game_date`/`opponent_name`/
+   `ground` server-side rather than trust whatever the admin's browser last
+   displayed → a 2nd fetch, almost always for byte-identical data.
+3. `createBackfillBooking()` then chains into `backfillOneBooking()` (§8) →
+   a 3rd fetch, this time `dry_run: false` — the real, unavoidable write.
+
+### Fix — cache the preview, don't skip the re-derivation
+
+`previewBackfillMatch()` now checks a short-TTL Upstash Redis cache (keyed
+`spartans:booking-backfill-preview:<match_id>`, `PREVIEW_CACHE_TTL_SECONDS
+= 600`) before calling the microservice, and populates it after a real
+fetch. This closes the 2nd fetch above **without weakening the "re-derive
+from CricHeroes, never from the client" guarantee that comment describes**
+— the cached value is still the server's own prior CricHeroes response,
+never anything the browser supplied. `createBackfillBooking()`'s own call
+needed no change at all; it already calls `previewBackfillMatch()`, which
+now transparently returns the cached result from the Preview click a
+moment earlier instead of re-fetching.
+
+10 minutes was chosen as long enough to cover normal Preview → review →
+pick tournament/format → Create human pacing, short enough that an admin
+who walks away and comes back much later still forces a fresh fetch before
+the write — i.e. a genuinely stale preview is never silently trusted,
+exactly as before this change.
+
+Net effect of this Hub-side fix alone: one backfill cycle for one match
+costs 2 CricHeroes fetches instead of 3 — the explicit Preview fetch, plus
+the final, unavoidable `dry_run: false` write fetch inside
+`backfillOneBooking()`. That third fetch can't be removed from the Hub
+side alone — it's the actual parse-and-persist call, not a redundant read.
+
+`src/lib/rateLimit.ts`'s existing Upstash `Redis` client is now `export`ed
+and reused for this — no new dependency, no new connection; it's a
+stateless REST client, so sharing the one instance across unrelated
+caching needs costs nothing.
+
+Both cache operations (`redis.get`/`redis.set`) fail open: a cache-layer
+error of any kind just means this call pays for a fresh CricHeroes fetch,
+exactly as it always did before this change — a cache outage can never
+block a backfill, only make it slightly more expensive against the
+CricHeroes budget.
+
+### Second fix — the real reduction lives in `spartans-python`, not Hub (added October 2026)
+
+The Hub-side cache above only ever closes the *middle* fetch (the Hub's own
+redundant internal re-derivation call) — it can't touch the 3rd fetch,
+since that one is the genuine write and Hub has no way to persist a
+scorecard without asking the microservice to. The fetch that actually
+matters for the CricHeroes budget is the one inside `spartans-python`
+itself, so that's where the real fix landed: `api.py` gained
+`_fetch_cricheroes_pdf(match_id)`, which wraps the existing
+`requests.get(pdf.cricheroes.in/...)` call in a short-lived (10 min),
+plain in-process `dict` cache keyed by `match_id`. `/fetch-and-parse-scorecard`
+now calls this helper instead of fetching inline, for both `dry_run: true`
+and `dry_run: false` requests alike.
+
+**This makes the two fixes compose, not compete.** With both in place, one
+full Booking Backfill cycle (Preview → Create) now costs exactly **1**
+real CricHeroes fetch, not 2 or 3:
+
+1. Preview click → Hub's own Redis cache is empty → calls the microservice
+   → `_fetch_cricheroes_pdf()` cache is also empty → real CricHeroes fetch,
+   cached on both sides.
+2. Create click → `createBackfillBooking()`'s internal re-derivation hits
+   Hub's own Redis cache (§ above) → **never even calls the microservice**
+   for this step.
+3. `backfillOneBooking()`'s own `dry_run: false` call → does reach the
+   microservice (this step was never skippable from Hub) → but
+   `_fetch_cricheroes_pdf()`'s cache is still warm from step 1 → reuses the
+   already-fetched PDF bytes → **zero additional CricHeroes fetches**.
+
+Even without Hub's own Redis cache, the Python-side cache alone would still
+get to 1 fetch total — step 2's call to the microservice would itself be a
+cache hit there. The two layers are complementary: Hub's cache additionally
+saves a network hop to Render (useful given this microservice's documented
+cold-start latency, §3.1), while the Python-side cache is what actually
+protects the CricHeroes-facing budget regardless of which caller, or how
+many, ask for the same `match_id` in a short window — including any future
+caller neither side has to know about in advance.
+
+Only a genuine, verified `%PDF`-magic-byte response is ever cached on the
+Python side — a 404/429/non-PDF response is never remembered, so a failure
+is always retried fresh on the very next call rather than being stuck
+replaying a cached failure. Deliberately a plain in-process `dict`, not
+Redis or a file cache: the microservice runs as a single Render dyno for a
+low-traffic pipeline, so the cache only ever needs to survive a few minutes
+within one running process — if the dyno restarts between two calls (a
+cold start, a redeploy), the cache is simply empty and the next call pays
+for a fresh fetch, same safe fallback as before this existed.
+
+Covered by `spartans-python/tests/test_pdf_cache.py` (cache hit within
+TTL, independent cache per `match_id`, expiry forces a refetch, and —
+critically — a 404/429/non-PDF response is never cached and the next call
+retries fresh).
+
+### Security (vibe-security)
+
+| Check | Status |
+|---|---|
+| Route stays admin-only (`isAdmin`), rate-limited (`adminWrite`) — unchanged by either fix | ✅ |
+| Hub-side preview cache never introduces client trust — the cached value is always a prior *server-side* CricHeroes response, never anything read from the request body | ✅ |
+| Hub-side cache key is derived from `match_id` only, read back as a typed `BackfillPreview` — no arbitrary key/value ever reachable from client input | ✅ |
+| Either cache layer's read/write failure fails open to a fresh fetch, never to a stale or wrong result | ✅ |
+| The real write (`dry_run: false` → `backfillOneBooking()`) still always resolves to a genuine CricHeroes-sourced PDF — the Python-side cache only ever serves bytes it itself verified (`%PDF` magic bytes, a 200 status) on a prior fetch, never anything client-supplied | ✅ |
+| Python-side cache never remembers a failure (404/429/non-PDF) — only ever caches a verified successful fetch | ✅ |
+
+### File Map
+
+| File | Role |
+|---|---|
+| `src/lib/bookingBackfill.ts` | `previewBackfillMatch()` (now cache-backed), `createBackfillBooking()`, `callMicroservice()` |
+| `src/app/api/admin/booking-backfill/route.ts` | POST — `dry_run: true` preview / `dry_run: false` create, admin-only |
+| `src/app/admin/booking-backfill/page.tsx` | Admin UI — match_id entry, Preview, tournament/format/slot pickers, Create |
+| `src/lib/rateLimit.ts` | `redis` client, now exported for reuse by `bookingBackfill.ts`'s preview cache |
+| `spartans-python/api.py` | `_fetch_cricheroes_pdf()` — the short-lived per-`match_id` PDF cache; `/fetch-and-parse-scorecard` now calls it instead of fetching inline |
+| `spartans-python/tests/test_pdf_cache.py` | Cache-hit/miss/expiry/never-caches-a-failure coverage for `_fetch_cricheroes_pdf()` |
+
+---
+
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*
 *Security audit: vibe-security patterns applied per SKILL.md*
 *Analytics pipeline: `spartans-python` repo (Render) · Hub: `spartans-book-a-slot` repo (Vercel)*
