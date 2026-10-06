@@ -453,11 +453,7 @@ silent filter.
   captain leads, each clickable (`onViewTournament`) to scroll to and
   force-expand the matching `TournamentBlock` further down the page (see
   §5's `forceOpenToken`).
-- **Overall slot balance** — a per-slot bar chart (not target-relative
-  here, unlike §5's per-tournament version — this is `count` scaled
-  against this captain's own `maxSlot`, not a `count/target` ratio) with
-  an imbalance nudge (`↗ Heavy on <slot>`) when one slot holds more than
-  half this captain's total bookings across 3+ games.
+- *(Per-captain "Overall slot balance" removed October 2026 — see §12.)*
 
 ---
 
@@ -596,6 +592,8 @@ value.
 
 ## 6. Classification & Sorting — `classifiedTournaments`
 
+> **Superseded October 2026 — see §12.** Completion is now an explicit admin flag (`tournaments.completed_at`), Show toggles are segmented tabs, and the table below describes the old, derived behaviour kept for history.
+
 Every tournament in `tournamentMap` is classified, independent of the
 Show-filter toggles below (so filter cards can display a true count per
 bucket regardless of which buckets are currently visible):
@@ -724,9 +722,21 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 
 ## 12. Admin-feedback rework (October 2026)
 
-Captains rarely use this page; it is mainly the admin/organiser's view of which captain leads which tournament and how many games remain to book. Changes:
+Captains rarely use this page; it is mainly the admin/organiser's view of which captain leads which tournament and how many games remain to book.
 
-- **Per-captain "Overall slot balance" removed** from `BandwidthSection` (not useful). Per-tournament slot balance (§5.6) stays.
-- **One pace assessment, `assessPace()`** (wraps `paceSignal()`), feeds the new **Needs Attention** panel at the top, a pace pill + sort in each captain's "By tournament" list, and the By Tournament sort, so they cannot disagree. Rank 0 = organiser gone quiet ("Nudge to schedule"), 1 = too fast ("Ask to slow down"). Completed tournaments are never flagged.
-- **Show: Upcoming/Ongoing/Completed toggles replaced by segmented pill tabs** (same look as Upcoming / Past Matches), one tab at a time, default Ongoing (first non-empty if empty), with counts and a red dot when a tab holds a flagged tournament. "View" from a captain card or the attention panel switches to the right tab.
-- **Sort within a tab:** needs-attention first, then soonest next game, then A–Z; Completed is most recently finished first.
+**Layout**
+- **Per-captain "Overall slot balance" removed.** Per-tournament slot balance (§5.6) stays.
+- **Show toggles replaced by segmented pill tabs** (Ongoing / Upcoming / Completed, same look as Upcoming / Past Matches), one at a time, default Ongoing (first non-empty if empty), with counts and a red dot when a tab holds a flagged tournament. "View" from a captain card or the attention panel switches to the right tab.
+- **Sort within a tab:** most urgent attention first, then soonest next game, then A–Z; Completed is most recently finished first.
+
+**Completion is an explicit admin decision — never automatic**
+- `tournaments.completed_at date` (migration `085_tournament_completed_at.sql`). Set → Completed tab, no attention flags, excluded from captain bandwidth cards. Set from the planner ("Mark completed" / "Reopen", admin only) via `PATCH /api/tournaments` (admin-only route; value validated as `YYYY-MM-DD` or null). The control is only rendered for admins.
+- Knockout shapes differ (qualifiers, quarters/semis/final, direct final), so we do not model the bracket. Knockout bookings (`bookings.stage_type = 'knockout'`) are excluded from the league-game count (`total_league_games`), so they can no longer make a tournament look finished or over-booked.
+- **One-off backfill (applied with the migration):** every non-practice tournament whose last confirmed game is before 2026 was closed as of that last game, even where league games are missing from bookings — Champions League 5.0, Mario Sixers Thunder, Blendin League 1.0, Glanz T20 Premier League 7th Ed, Stellar Championship League 8.0, CCPL Edition 3, Titans Tournament 4, BK Stars Cup XVII, Super Smash T30 Championship 1.0, Big Bouncers Cup.
+
+**Needs Attention panel (top of page), `assessPace()`** — one assessment shared by the panel, captain-card pills, block header pill and sorting. A tournament that is not completed is flagged as, most urgent first:
+1. **Dormant** (admin only) — nothing scheduled and no game for > 10 weeks (`DORMANT_DAYS = 70`). "No game for N weeks — is this tournament over?" with a **Mark completed** button. Stays at the top until closed or games are booked. Dormant tournaments are never given the old "Nudge to schedule" (so no "121 weeks" nudge).
+2. **League done** (admin only) — all `total_league_games` league games played, nothing scheduled. "League stage finished — did we qualify for knockouts?" If qualified, leave it open until knockouts finish; if the run is over, **Mark completed**.
+3. **Nudge to schedule** (everyone) — organiser quiet for 3–10 weeks with 2+ games unbooked.
+4. **Ask to slow down** (everyone) — playing roughly weekly.
+A tournament with no `total_league_games` set is never flagged "League done".
