@@ -236,7 +236,7 @@ function paceSignal(
 //   slow         3  playing too fast
 //   null         4  fine / completed
 type AttentionKind = 'dormant' | 'league_done' | 'nudge' | 'slow' | null
-const DORMANT_DAYS = 70
+const DORMANT_DAYS = 56
 
 function assessPace(tournament: TournamentInfo, games: Booking[], today: string, isAdmin: boolean) {
   const leagueGames  = games.filter(g => g.stage_type !== 'knockout')
@@ -1359,10 +1359,13 @@ export function TournamentPlannerClient({
     const name = tournamentMap.get(id)?.tournament.name ?? 'this tournament'
     const msg = done ? `Mark "${name}" as completed? It will leave Needs Attention.` : `Reopen "${name}"?`
     if (!window.confirm(msg)) return
+    // Completed date = the tournament's last game, not the day it was closed.
+    const dates = (tournamentMap.get(id)?.games ?? []).map(g => g.game_date).sort()
+    const lastGameDate = dates.length > 0 ? dates[dates.length - 1] : today
     setBusyId(id); setActionError('')
     const res = await fetch('/api/tournaments', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, completed_at: done ? today : null }),
+      body: JSON.stringify({ id, completed_at: done ? lastGameDate : null }),
     })
     if (res.ok) router.refresh()
     else setActionError((await res.json().catch(() => ({}))).error ?? 'Could not update the tournament.')
