@@ -40,6 +40,8 @@ interface Booking {
     intended_formats: string[] | null
     // Admin-set, never automatic — see assessPace() and features/tournament-planner.md §12.
     completed_at: string | null
+    // Admin said "still in the running, waiting on the next stage" on this date.
+    awaiting_next_stage_since: string | null
   } | null
 }
 
@@ -234,13 +236,14 @@ function paceSignal(
 // kind / rank (lower = more urgent). The first four are admin only:
 //   knockout_won  0  last game was a knockout we won — ask about the next stage
 //   knockout_lost 1  last game was a knockout we lost — is there still a path?
-//   dormant       2  nothing scheduled, quiet > DORMANT_DAYS
-//   league_done   3  league games all played, nothing scheduled, no knockout yet
-//   nudge         4  organiser has gone quiet (3–8 weeks)
-//   slow          5  playing too fast
-//   null          6  fine / completed
-type AttentionKind = 'knockout_won' | 'knockout_lost' | 'dormant' | 'league_done' | 'nudge' | 'slow' | null
-const FINE_RANK = 6
+//   awaiting_next 2  admin answered "still in the running" — waiting on the next stage
+//   dormant       3  nothing scheduled, quiet > DORMANT_DAYS
+//   league_done   4  league games all played, nothing scheduled, no knockout yet
+//   nudge         5  organiser has gone quiet (3–8 weeks)
+//   slow          6  playing too fast
+//   null          7  fine / completed
+type AttentionKind = 'awaiting_next' | 'knockout_won' | 'knockout_lost' | 'dormant' | 'league_done' | 'nudge' | 'slow' | null
+const FINE_RANK = 7
 const DORMANT_DAYS = 56
 
 function assessPace(tournament: TournamentInfo, games: Booking[], today: string, isAdmin: boolean) {
@@ -271,9 +274,14 @@ function assessPace(tournament: TournamentInfo, games: Booking[], today: string,
   const koIsFinal = /\bfinal\b/i.test(koStage) && !/semi|quarter/i.test(koStage)
   const koOpp    = lastGame?.opponent_name ? ` against ${lastGame.opponent_name}` : ''
 
+  // The admin's "still in the running" answer only holds until a newer game is played.
+  const awaiting = !!tournament.awaiting_next_stage_since && !!lastGame
+    && lastGame.game_date <= tournament.awaiting_next_stage_since
+
   let kind: AttentionKind = null
   if (!tournament.completed_at) {
-    if (isAdmin && !hasUpcoming && koPlayed && koWon) kind = 'knockout_won'
+    if (isAdmin && !hasUpcoming && awaiting) kind = 'awaiting_next'
+    else if (isAdmin && !hasUpcoming && koPlayed && koWon) kind = 'knockout_won'
     else if (isAdmin && !hasUpcoming && koPlayed && koLost) kind = 'knockout_lost'
     else if (isAdmin && !hasUpcoming && leagueDone) kind = 'league_done'
     else if (isAdmin && dormant) kind = 'dormant'
@@ -281,12 +289,13 @@ function assessPace(tournament: TournamentInfo, games: Booking[], today: string,
       kind = pace.label === 'Nudge to schedule' ? 'nudge' : pace.label === 'Ask to slow down' ? 'slow' : null
     }
   }
-  const RANKS: Record<NonNullable<AttentionKind>, number> = { knockout_won: 0, knockout_lost: 1, dormant: 2, league_done: 3, nudge: 4, slow: 5 }
+  const RANKS: Record<NonNullable<AttentionKind>, number> = { knockout_won: 0, knockout_lost: 1, awaiting_next: 2, dormant: 3, league_done: 4, nudge: 5, slow: 6 }
   const rank = kind ? RANKS[kind] : FINE_RANK
 
   const BLUE  = { bg: 'bg-blue-50 dark:bg-blue-950/40', txt: 'text-blue-700 dark:text-blue-400' }
   const STONE = { bg: 'bg-stone-100 dark:bg-ink-4', txt: 'text-stone-600 dark:text-zinc-400' }
   const pill = tournament.completed_at ? { label: 'Completed', bg: 'bg-emerald-50 dark:bg-emerald-950/40', txt: 'text-emerald-700 dark:text-emerald-400' }
+    : kind === 'awaiting_next' ? { label: 'Awaiting next stage', ...BLUE }
     : kind === 'knockout_won' ? { label: 'Won knockout', bg: 'bg-emerald-50 dark:bg-emerald-950/40', txt: 'text-emerald-700 dark:text-emerald-400' }
     : kind === 'knockout_lost' ? { label: 'Lost knockout', bg: 'bg-rose-50 dark:bg-rose-950/40', txt: 'text-rose-700 dark:text-rose-400' }
     : kind === 'league_done' ? { label: 'League done', ...BLUE }
@@ -296,7 +305,10 @@ function assessPace(tournament: TournamentInfo, games: Booking[], today: string,
   let title = pace.label
   let reason = ''
   const ago = weeksQuiet > 0 ? ` (${weeksQuiet} weeks ago)` : ''
-  if (kind === 'knockout_won') {
+  if (kind === 'awaiting_next') {
+    title = 'Still in the running — waiting on the next stage'
+    reason = `${weeksQuiet > 0 ? `Last game was ${weeksQuiet} weeks ago. ` : ''}When is the next game? Reserve the date as soon as the organiser confirms it — this stays here until a game is booked. If the run turns out to be over, mark it completed.`
+  } else if (kind === 'knockout_won') {
     title = koIsFinal ? `🏆 Congratulations — we won the ${koStage}!` : `Congratulations — we won the ${koStage}${koOpp}! 🎉`
     reason = koIsFinal
       ? `That was the final${ago}. Mark the tournament completed when you're ready to close it.`
@@ -1389,6 +1401,19 @@ export function TournamentPlannerClient({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
 
+  // Admin answer to "did we qualify / still a chance?" — keeps the tournament
+  // open and switches the card to "waiting on the next stage".
+  async function setAwaiting(id: string) {
+    setBusyId(id); setActionError('')
+    const res = await fetch('/api/tournaments', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, awaiting_next_stage_since: today }),
+    })
+    if (res.ok) router.refresh()
+    else setActionError((await res.json().catch(() => ({}))).error ?? 'Could not update the tournament.')
+    setBusyId(null)
+  }
+
   // Admin-only. Completion is always a deliberate call, never inferred.
   async function setCompleted(id: string, done: boolean) {
     const name = tournamentMap.get(id)?.tournament.name ?? 'this tournament'
@@ -1515,7 +1540,7 @@ export function TournamentPlannerClient({
               <div key={tournament.id}
                 className={`rounded-xl border px-4 py-3 ${assessment.pill.bg} ${
                   assessment.kind === 'slow' ? 'border-red-300 dark:border-red-800'
-                  : assessment.kind === 'league_done' ? 'border-blue-300 dark:border-blue-800'
+                  : assessment.kind === 'league_done' || assessment.kind === 'awaiting_next' ? 'border-blue-300 dark:border-blue-800'
                   : assessment.kind === 'knockout_won' ? 'border-emerald-300 dark:border-emerald-800'
                   : assessment.kind === 'knockout_lost' ? 'border-rose-300 dark:border-rose-800'
                   : assessment.kind === 'dormant' ? 'border-stone-300 dark:border-ink-5'
@@ -1530,9 +1555,15 @@ export function TournamentPlannerClient({
                     {tournament.captains ? `${tournament.captains.name} · ` : ''}{assessment.reason}
                   </p>
                 </button>
-                {viewerRole.isAdmin && (assessment.kind === 'league_done' || assessment.kind === 'dormant' || assessment.kind === 'knockout_won' || assessment.kind === 'knockout_lost') && (
+                {viewerRole.isAdmin && assessment.kind && ['league_done', 'dormant', 'knockout_won', 'knockout_lost', 'awaiting_next'].includes(assessment.kind) && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {assessment.kind === 'knockout_won' && !assessment.isFinal && (
+                    {(assessment.kind === 'league_done' || (assessment.kind === 'knockout_lost' && !assessment.isFinal)) && (
+                      <button type="button" disabled={busyId === tournament.id} onClick={() => setAwaiting(tournament.id)}
+                        className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full border border-emerald-600 text-emerald-700 dark:text-emerald-400 disabled:opacity-50">
+                        {assessment.kind === 'league_done' ? 'Yes, qualified — waiting for knockouts' : 'Still a chance — keep open'}
+                      </button>
+                    )}
+                    {((assessment.kind === 'knockout_won' && !assessment.isFinal) || assessment.kind === 'awaiting_next') && (
                       <Link href="/admin/soft-blocks/new"
                         className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full border border-emerald-600 text-emerald-700 dark:text-emerald-400">
                         Reserve next stage
@@ -1540,7 +1571,10 @@ export function TournamentPlannerClient({
                     )}
                     <button type="button" disabled={busyId === tournament.id} onClick={() => setCompleted(tournament.id, true)}
                       className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full bg-amber-600 text-white disabled:opacity-50">
-                      {busyId === tournament.id ? 'Saving…' : assessment.kind === 'knockout_won' && !assessment.isFinal ? 'Run is over — mark completed' : 'Mark completed'}
+                      {busyId === tournament.id ? 'Saving…'
+                        : assessment.kind === 'league_done' ? 'No — run is over, mark completed'
+                        : (assessment.kind === 'knockout_won' && !assessment.isFinal) || assessment.kind === 'knockout_lost' || assessment.kind === 'awaiting_next' ? 'Run is over — mark completed'
+                        : 'Mark completed'}
                     </button>
                   </div>
                 )}
