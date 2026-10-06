@@ -20,6 +20,8 @@ interface Booking {
   // 'league' | 'knockout' | null (null = league). Knockouts never count toward
   // a tournament's league-game target.
   stage_type: string | null
+  // Free-text round label ("Qualifier 1", "Semi Final"…) — display and final-detection only.
+  match_stage: string | null
   // Resolved server-side from match_stats_cache — null until a scorecard is
   // synced for this match, even for a game that's already been played.
   match_result: string | null
@@ -229,13 +231,16 @@ function paceSignal(
 // from the league-game count, since their shape (qualifiers, quarters,
 // semis, a direct final) varies per tournament.
 //
-// kind / rank (lower = more urgent):
-//   dormant      0  admin only — nothing scheduled, quiet > DORMANT_DAYS
-//   league_done  1  admin only — league games all played, nothing scheduled
-//   nudge        2  organiser has gone quiet (3–10 weeks)
-//   slow         3  playing too fast
-//   null         4  fine / completed
-type AttentionKind = 'dormant' | 'league_done' | 'nudge' | 'slow' | null
+// kind / rank (lower = more urgent). The first four are admin only:
+//   knockout_won  0  last game was a knockout we won — ask about the next stage
+//   knockout_lost 1  last game was a knockout we lost — is there still a path?
+//   dormant       2  nothing scheduled, quiet > DORMANT_DAYS
+//   league_done   3  league games all played, nothing scheduled, no knockout yet
+//   nudge         4  organiser has gone quiet (3–8 weeks)
+//   slow          5  playing too fast
+//   null          6  fine / completed
+type AttentionKind = 'knockout_won' | 'knockout_lost' | 'dormant' | 'league_done' | 'nudge' | 'slow' | null
+const FINE_RANK = 6
 const DORMANT_DAYS = 56
 
 function assessPace(tournament: TournamentInfo, games: Booking[], today: string, isAdmin: boolean) {
@@ -254,28 +259,58 @@ function assessPace(tournament: TournamentInfo, games: Booking[], today: string,
   const dormant      = dates.length > 0 && !hasUpcoming && daysQuiet > DORMANT_DAYS
   const pace         = paceSignal(gap, unbooked, lastGameDate, today)
 
+  // Latest game, if it is a knockout we have already played, and how it went
+  // (match_result comes from the synced scorecard; null until synced).
+  const lastGame = [...games].sort((a, b) => a.game_date.localeCompare(b.game_date) || a.slot_time.localeCompare(b.slot_time)).pop()
+  const koPlayed = !!lastGame && lastGame.stage_type === 'knockout' && lastGame.game_date < today
+  const koResult = koPlayed ? (lastGame!.match_result ?? '').toLowerCase() : ''
+  const koWon    = koResult.includes('won')
+  const koLost   = koResult.includes('lost')
+  const koStage  = (lastGame?.match_stage ?? '').trim() || 'knockout'
+  // A final (not a semi/quarter-final) has no "next stage".
+  const koIsFinal = /\bfinal\b/i.test(koStage) && !/semi|quarter/i.test(koStage)
+  const koOpp    = lastGame?.opponent_name ? ` against ${lastGame.opponent_name}` : ''
+
   let kind: AttentionKind = null
   if (!tournament.completed_at) {
-    if (isAdmin && !hasUpcoming && leagueDone) kind = 'league_done'
+    if (isAdmin && !hasUpcoming && koPlayed && koWon) kind = 'knockout_won'
+    else if (isAdmin && !hasUpcoming && koPlayed && koLost) kind = 'knockout_lost'
+    else if (isAdmin && !hasUpcoming && leagueDone) kind = 'league_done'
     else if (isAdmin && dormant) kind = 'dormant'
     else if (!dormant) {
       kind = pace.label === 'Nudge to schedule' ? 'nudge' : pace.label === 'Ask to slow down' ? 'slow' : null
     }
   }
-  const rank = kind === 'dormant' ? 0 : kind === 'league_done' ? 1 : kind === 'nudge' ? 2 : kind === 'slow' ? 3 : 4
+  const RANKS: Record<NonNullable<AttentionKind>, number> = { knockout_won: 0, knockout_lost: 1, dormant: 2, league_done: 3, nudge: 4, slow: 5 }
+  const rank = kind ? RANKS[kind] : FINE_RANK
 
   const BLUE  = { bg: 'bg-blue-50 dark:bg-blue-950/40', txt: 'text-blue-700 dark:text-blue-400' }
   const STONE = { bg: 'bg-stone-100 dark:bg-ink-4', txt: 'text-stone-600 dark:text-zinc-400' }
   const pill = tournament.completed_at ? { label: 'Completed', bg: 'bg-emerald-50 dark:bg-emerald-950/40', txt: 'text-emerald-700 dark:text-emerald-400' }
+    : kind === 'knockout_won' ? { label: 'Won knockout', bg: 'bg-emerald-50 dark:bg-emerald-950/40', txt: 'text-emerald-700 dark:text-emerald-400' }
+    : kind === 'knockout_lost' ? { label: 'Lost knockout', bg: 'bg-rose-50 dark:bg-rose-950/40', txt: 'text-rose-700 dark:text-rose-400' }
     : kind === 'league_done' ? { label: 'League done', ...BLUE }
     : kind === 'dormant' || dormant ? { label: kind === 'dormant' ? 'Dormant' : 'Inactive', ...STONE }
     : pace
 
   let title = pace.label
   let reason = ''
-  if (kind === 'league_done') {
-    title = 'League stage finished — did we qualify for knockouts?'
-    reason = `All ${totalLeague} league games played${weeksQuiet > 0 ? `, last game ${weeksQuiet} weeks ago` : ''}. If we qualified, leave it open until the knockouts are done. If the run is over, mark it completed.`
+  const ago = weeksQuiet > 0 ? ` (${weeksQuiet} weeks ago)` : ''
+  if (kind === 'knockout_won') {
+    title = koIsFinal ? `🏆 Congratulations — we won the ${koStage}!` : `Congratulations — we won the ${koStage}${koOpp}! 🎉`
+    reason = koIsFinal
+      ? `That was the final${ago}. Mark the tournament completed when you're ready to close it.`
+      : `${ago ? `Played${ago}. ` : ''}When is the next stage? Reserve the date as soon as the organiser confirms it — it stays here until the next game is booked.`
+  } else if (kind === 'knockout_lost') {
+    title = koIsFinal ? `So close — we lost the ${koStage}${koOpp}` : `Tough luck — we lost the ${koStage}${koOpp}`
+    reason = koIsFinal
+      ? `That was the final${ago}. Mark the tournament completed when you're ready to close it.`
+      : `${ago ? `Played${ago}. ` : ''}Is there still a chance to progress (a second qualifier, eliminator or similar)? If so, leave it open and book the next stage when the organiser confirms. If the run is over, mark it completed.`
+  } else if (kind === 'league_done') {
+    title = koPlayed ? `A knockout was played${koOpp} — how did it go?` : 'League stage finished — did we qualify for knockouts?'
+    reason = koPlayed
+      ? `Its result isn't in the Hub yet (sync the scorecard and this will update). Mark it completed if the run is over.`
+      : `All ${totalLeague} league games played${weeksQuiet > 0 ? `, last game ${weeksQuiet} weeks ago` : ''}. If we qualified, leave it open until the knockouts are done. If the run is over, mark it completed.`
   } else if (kind === 'dormant') {
     title = `No game for ${weeksQuiet} weeks — is this tournament over?`
     reason = `${unbooked} league ${unbooked === 1 ? 'game' : 'games'} still unbooked. Mark it completed if it has finished; otherwise it stays here until games are booked.`
@@ -284,7 +319,7 @@ function assessPace(tournament: TournamentInfo, games: Booking[], today: string,
   } else if (kind === 'slow') {
     reason = `Playing roughly every week — ${unbooked} still to book, ask to space them out`
   }
-  return { pace, pill, kind, rank, title, reason, unbooked, lastGameDate, nextGameDate }
+  return { pace, pill, kind, rank, title, reason, unbooked, lastGameDate, nextGameDate, isFinal: koIsFinal }
 }
 
 // ── Captain bandwidth section ──────────────────────────────────────
@@ -511,7 +546,7 @@ function BandwidthSection({
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-cinzel text-xs font-bold text-ink dark:text-parchment truncate">{t.name}</span>
                     <span className="flex items-center gap-2 flex-shrink-0">
-                      {assessment.rank < 4 && (
+                      {assessment.rank < FINE_RANK && (
                         <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${assessment.pill.bg} ${assessment.pill.txt}`}>{assessment.pill.label}</span>
                       )}
                       <span className="font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400">↓ view</span>
@@ -1406,7 +1441,7 @@ export function TournamentPlannerClient({
         // Completed only ever by an explicit admin flag.
         const tab: TournamentTab = tournament.completed_at ? 'completed' : playedGames.length === 0 ? 'upcoming' : 'ongoing'
         const assessment = assessPace(tournament, games, today, viewerRole.isAdmin)
-        const needsAttention = tab !== 'completed' && assessment.rank < 4
+        const needsAttention = tab !== 'completed' && assessment.rank < FINE_RANK
 
         return { tournament, games, tab, assessment, needsAttention }
       }),
@@ -1481,6 +1516,8 @@ export function TournamentPlannerClient({
                 className={`rounded-xl border px-4 py-3 ${assessment.pill.bg} ${
                   assessment.kind === 'slow' ? 'border-red-300 dark:border-red-800'
                   : assessment.kind === 'league_done' ? 'border-blue-300 dark:border-blue-800'
+                  : assessment.kind === 'knockout_won' ? 'border-emerald-300 dark:border-emerald-800'
+                  : assessment.kind === 'knockout_lost' ? 'border-rose-300 dark:border-rose-800'
                   : assessment.kind === 'dormant' ? 'border-stone-300 dark:border-ink-5'
                   : 'border-amber-300 dark:border-amber-800'}`}>
                 <button type="button" onClick={() => handleViewTournament(tournament.id)} className="w-full text-left">
@@ -1493,11 +1530,19 @@ export function TournamentPlannerClient({
                     {tournament.captains ? `${tournament.captains.name} · ` : ''}{assessment.reason}
                   </p>
                 </button>
-                {viewerRole.isAdmin && (assessment.kind === 'league_done' || assessment.kind === 'dormant') && (
-                  <button type="button" disabled={busyId === tournament.id} onClick={() => setCompleted(tournament.id, true)}
-                    className="mt-2 font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full bg-amber-600 text-white disabled:opacity-50">
-                    {busyId === tournament.id ? 'Saving…' : 'Mark completed'}
-                  </button>
+                {viewerRole.isAdmin && (assessment.kind === 'league_done' || assessment.kind === 'dormant' || assessment.kind === 'knockout_won' || assessment.kind === 'knockout_lost') && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {assessment.kind === 'knockout_won' && !assessment.isFinal && (
+                      <Link href="/admin/soft-blocks/new"
+                        className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full border border-emerald-600 text-emerald-700 dark:text-emerald-400">
+                        Reserve next stage
+                      </Link>
+                    )}
+                    <button type="button" disabled={busyId === tournament.id} onClick={() => setCompleted(tournament.id, true)}
+                      className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full bg-amber-600 text-white disabled:opacity-50">
+                      {busyId === tournament.id ? 'Saving…' : assessment.kind === 'knockout_won' && !assessment.isFinal ? 'Run is over — mark completed' : 'Mark completed'}
+                    </button>
+                  </div>
                 )}
               </div>
             ))}

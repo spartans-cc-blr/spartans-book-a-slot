@@ -734,9 +734,13 @@ Captains rarely use this page; it is mainly the admin/organiser's view of which 
 - Knockout shapes differ (qualifiers, quarters/semis/final, direct final), so we do not model the bracket. Knockout bookings (`bookings.stage_type = 'knockout'`) are excluded from the league-game count (`total_league_games`), so they can no longer make a tournament look finished or over-booked.
 - **One-off backfill (applied with the migration):** every non-practice tournament whose last confirmed game is before 2026 was closed as of that last game, even where league games are missing from bookings — Champions League 5.0, Mario Sixers Thunder, Blendin League 1.0, Glanz T20 Premier League 7th Ed, Stellar Championship League 8.0, CCPL Edition 3, Titans Tournament 4, BK Stars Cup XVII, Super Smash T30 Championship 1.0, Big Bouncers Cup.
 
-**Needs Attention panel (top of page), `assessPace()`** — one assessment shared by the panel, captain-card pills, block header pill and sorting. A tournament that is not completed is flagged as, most urgent first:
-1. **Dormant** (admin only) — nothing scheduled and no game for > 8 weeks (`DORMANT_DAYS = 56`). "No game for N weeks — is this tournament over?" with a **Mark completed** button. Stays at the top until closed or games are booked. Dormant tournaments are never given the old "Nudge to schedule" (so no "121 weeks" nudge).
-2. **League done** (admin only) — all `total_league_games` league games played, nothing scheduled. "League stage finished — did we qualify for knockouts?" If qualified, leave it open until knockouts finish; if the run is over, **Mark completed**.
-3. **Nudge to schedule** (everyone) — organiser quiet for 3–8 weeks with 2+ games unbooked.
-4. **Ask to slow down** (everyone) — playing roughly weekly.
-A tournament with no `total_league_games` set is never flagged "League done".
+**Needs Attention panel (top of page), `assessPace()`** — one assessment shared by the panel, captain-card pills, block header pill and sorting. A tournament that is not completed is flagged as, most urgent first. The first four are admin only (they offer the Mark completed control):
+1. **Won a knockout** — the tournament's latest game is a knockout (`bookings.stage_type = 'knockout'`) we won (result read from the synced scorecard, `match_stats_cache.match_result`) and nothing is scheduled. "Congratulations — we won the {match_stage} against {opponent}! When is the next stage?" with a **Reserve next stage** link (to `/admin/soft-blocks/new`) and "Run is over — mark completed". If `match_stage` reads as a final (not semi/quarter), it congratulates on the title and only offers **Mark completed**.
+2. **Lost a knockout** — same, but lost. Compassionate prompt: "Tough luck — we lost the {stage}… Is there still a chance to progress (a second qualifier, eliminator or similar)? If so, leave it open and book the next stage; if the run is over, mark it completed." A lost final just offers Mark completed.
+   Both knockout prompts clear themselves as soon as a next game is booked (no dismiss state is stored). If the knockout's result isn't synced yet, it falls back to "League done" with a "result isn't in the Hub yet" note.
+3. **Dormant** — nothing scheduled and no game for > 8 weeks (`DORMANT_DAYS = 56`). "No game for N weeks — is this tournament over?" Stays until closed or games are booked. Dormant tournaments are never given "Nudge to schedule".
+4. **League done** — all `total_league_games` league games played, nothing scheduled, and no knockout played yet. "League stage finished — did we qualify for knockouts?" Never shown when `total_league_games` is unset.
+5. **Nudge to schedule** (everyone) — organiser quiet for 3–8 weeks with 2+ games unbooked.
+6. **Ask to slow down** (everyone) — playing roughly weekly.
+
+These prompts depend on knockout bookings being flagged `stage_type = 'knockout'` (the Game Type toggle on the booking form); an unflagged knockout is counted as a league game.

@@ -29,7 +29,7 @@ export default async function TournamentPlannerPage() {
       .from('bookings')
       .select(`
         id, game_date, slot_time, format, cricheroes_url, match_id, opponent_name,
-        captain_id, is_practice, stage_type,
+        captain_id, is_practice, stage_type, match_stage,
         tournament:tournaments!bookings_tournament_id_fkey(
           id, name, organiser_name, organiser_contact,
           total_league_games, cricheroes_points_table_url,
@@ -144,6 +144,7 @@ export default async function TournamentPlannerPage() {
     match_result: string | null
     opponent_name: string | null
     stage_type: string | null
+    match_stage: string | null
     tournament: {
       id: string
       name: string
