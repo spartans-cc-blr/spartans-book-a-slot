@@ -16,8 +16,33 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { backfillOneBooking, BackfillResult } from '@/lib/scorecardBackfill'
+import { redis } from '@/lib/rateLimit'
 
 const MICROSERVICE_TIMEOUT_MS = 45_000
+
+// previewBackfillMatch() is called twice per backfill — once for the
+// explicit "Preview" click, and again inside createBackfillBooking() to
+// re-derive game_date/opponent/ground server-side rather than trust
+// whatever the admin's browser last displayed (see that function's own
+// comment). Both calls hit CricHeroes's PDF endpoint via the same shared
+// Render microservice that the daily backfill-scorecards cron and the
+// Scorecard Backfill admin page also use — all CricHeroes-facing traffic in
+// this app draws on one throttle budget, and CricHeroes has been observed
+// returning 429 ("Rate limited by CricHeroes") to that endpoint (see
+// api.py's fetch-and-parse-scorecard). A single Preview-then-Create cycle
+// for one match was tripling that exposure for no real benefit, since the
+// second fetch almost always returns byte-identical data to the first,
+// seconds to minutes earlier.
+//
+// This cache closes that gap WITHOUT weakening the "re-derive from
+// CricHeroes, never from the client" guarantee: the cached value is still
+// the server's own prior CricHeroes response, not anything the browser
+// supplied. A short TTL keeps it safe — long enough to cover normal
+// Preview-review-pick-tournament-then-Create human pacing, short enough
+// that a genuinely stale preview (admin walks away, comes back much later)
+// still forces a fresh fetch before writing, exactly as before this change.
+const PREVIEW_CACHE_TTL_SECONDS = 10 * 60
+const previewCacheKey = (matchId: string) => `spartans:booking-backfill-preview:${matchId}`
 
 export interface BackfillPreview {
   match_id:        string
@@ -69,8 +94,22 @@ async function callMicroservice(matchId: string, dryRun: boolean): Promise<any> 
 }
 
 // Always calls the microservice with dry_run: true — safe to call
-// repeatedly, never writes to the analytics DB or Hub.
+// repeatedly, never writes to the analytics DB or Hub. Cached briefly (see
+// PREVIEW_CACHE_TTL_SECONDS above) so the explicit "Preview" click and
+// createBackfillBooking()'s own internal re-derivation don't each cost a
+// separate CricHeroes fetch for the same match_id.
 export async function previewBackfillMatch(matchId: string): Promise<BackfillPreview> {
+  const cacheKey = previewCacheKey(matchId)
+
+  try {
+    const cached = await redis.get<BackfillPreview>(cacheKey)
+    if (cached) return cached
+  } catch (err) {
+    // Fail open — a cache read error should never block a preview, it
+    // just means this call pays for a fresh CricHeroes fetch like before.
+    console.error('[bookingBackfill] preview cache read failed:', err)
+  }
+
   const parsed = await callMicroservice(matchId, true)
   const md = parsed?.match_details ?? {}
 
@@ -79,7 +118,7 @@ export async function previewBackfillMatch(matchId: string): Promise<BackfillPre
   const rawDate = typeof md.date === 'string' ? md.date.split(' ')[0] : null
   const game_date = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null
 
-  return {
+  const preview: BackfillPreview = {
     match_id:        parsed?.match_id ?? matchId,
     opponent_name:   md.opponent ?? null,
     ground:          md.ground ?? null,
@@ -90,6 +129,16 @@ export async function previewBackfillMatch(matchId: string): Promise<BackfillPre
     player_stats:    parsed?.player_stats ?? null,
     team_lists:      parsed?.team_lists ?? null,
   }
+
+  try {
+    await redis.set(cacheKey, preview, { ex: PREVIEW_CACHE_TTL_SECONDS })
+  } catch (err) {
+    // Fail open — caching is purely an optimisation; losing it just means
+    // the next call (Create's own re-derivation) pays for a fresh fetch.
+    console.error('[bookingBackfill] preview cache write failed:', err)
+  }
+
+  return preview
 }
 
 export interface CreateBackfillBookingInput {
