@@ -721,3 +721,12 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 ---
 
 *Maintained by: Spartans CC BLR*
+
+## 12. Admin-feedback rework (October 2026)
+
+Captains rarely use this page; it is mainly the admin/organiser's view of which captain leads which tournament and how many games remain to book. Changes:
+
+- **Per-captain "Overall slot balance" removed** from `BandwidthSection` (not useful). Per-tournament slot balance (§5.6) stays.
+- **One pace assessment, `assessPace()`** (wraps `paceSignal()`), feeds the new **Needs Attention** panel at the top, a pace pill + sort in each captain's "By tournament" list, and the By Tournament sort, so they cannot disagree. Rank 0 = organiser gone quiet ("Nudge to schedule"), 1 = too fast ("Ask to slow down"). Completed tournaments are never flagged.
+- **Show: Upcoming/Ongoing/Completed toggles replaced by segmented pill tabs** (same look as Upcoming / Past Matches), one tab at a time, default Ongoing (first non-empty if empty), with counts and a red dot when a tab holds a flagged tournament. "View" from a captain card or the attention panel switches to the right tab.
+- **Sort within a tab:** needs-attention first, then soonest next game, then A–Z; Completed is most recently finished first.

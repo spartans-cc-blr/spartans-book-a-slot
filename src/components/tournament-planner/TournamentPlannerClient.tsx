@@ -216,6 +216,28 @@ function paceSignal(
   }
 }
 
+// One pace assessment per tournament, shared by the "Needs attention" panel,
+// the captain cards, and the By Tournament sort so they can never disagree.
+// rank 0 = organiser has gone quiet, 1 = playing too fast, 2 = fine.
+function assessPace(tournament: TournamentInfo, games: Booking[], today: string) {
+  const totalLeague  = tournament.total_league_games ?? games.length
+  const dates        = games.map(g => g.game_date).sort()
+  const gap          = avgGapWeeks(dates)
+  const unbooked     = Math.max(0, totalLeague - games.length)
+  const lastGameDate = dates.length > 0 ? dates[dates.length - 1] : today
+  const pace         = paceSignal(gap, unbooked, lastGameDate, today)
+  const rank         = pace.label === 'Nudge to schedule' ? 0 : pace.label === 'Ask to slow down' ? 1 : 2
+  const hasUpcoming  = games.some(g => g.game_date >= today)
+  const nextGameDate = dates.find(d => d >= today) ?? null
+  const daysQuiet    = lastGameDate < today ? differenceInDays(parseISO(today), parseISO(lastGameDate)) : 0
+  const reason = rank === 0
+    ? `No game for ${Math.round(daysQuiet / 7)} weeks${hasUpcoming ? '' : ' and nothing scheduled'} — ${unbooked} still to book`
+    : rank === 1
+    ? `Playing roughly every week — ${unbooked} still to book, ask to space them out`
+    : ''
+  return { pace, rank, reason, unbooked, lastGameDate, nextGameDate }
+}
+
 // ── Captain bandwidth section ──────────────────────────────────────
 function BandwidthSection({
   captains, bookings, today, viewerCaptainId, onViewTournament,
@@ -250,13 +272,15 @@ function BandwidthSection({
         const outstanding = games.filter(g => g.game_date >= today).length
         const totalLeague = t.total_league_games ?? games.length
         const tUnbooked   = Math.max(0, totalLeague - games.length)
-        return { tournament: t, played, outstanding, unbooked: tUnbooked }
+        const assessment  = assessPace(t, games, today)
+        return { tournament: t, played, outstanding, unbooked: tUnbooked, assessment }
       })
       // Hide tournaments with nothing left to play — total games === played means
       // no scheduled or unbooked games remain. Whether that counts as "completed"
       // is a separate decision for later; for now just keep these out of view.
       .filter(({ outstanding, unbooked }) => outstanding > 0 || unbooked > 0)
-      .sort((a, b) => a.tournament.name.localeCompare(b.tournament.name))
+      // Tournaments needing attention first, then A–Z.
+      .sort((a, b) => a.assessment.rank - b.assessment.rank || a.tournament.name.localeCompare(b.tournament.name))
 
     // Headline stats (count line, bar, timeline) are scoped to ongoing
     // tournaments only, matching the breakdown list above — a tournament
@@ -280,23 +304,7 @@ function BandwidthSection({
       }, 0)
     const total = mine.length + unbooked
 
-    const slotCounts = Object.fromEntries(
-      ALL_SLOTS.map(s => [`${s.day}-${s.time}`, 0])
-    ) as Record<SlotKey, number>
-    mine.forEach(b => {
-      const k = slotKey(b.game_date, b.slot_time)
-      if (slotCounts[k] !== undefined) slotCounts[k]++
-    })
-
-    const maxSlot      = Math.max(...Object.values(slotCounts), 1)
-    const dominantSlot = Object.entries(slotCounts).find(([, v]) => v === maxSlot)?.[0]
-    const isImbalanced = maxSlot > Math.ceil(mine.length / 2) && mine.length >= 3
-
     const isLowLoad = total <= 4 && unbooked <= 1
-
-    // Format mix for this captain's bookings
-    const captainFormats = Array.from(new Set(mine.map(b => b.format).filter((f): f is string => !!f)))
-    const captainActiveFormats = captainFormats.length === 0 ? ['T20', 'T30'] : captainFormats
 
     return (
       <div
@@ -450,7 +458,7 @@ function BandwidthSection({
               By tournament
             </p>
             <div className="flex flex-col gap-2">
-              {tournamentBreakdown.map(({ tournament: t, played, outstanding, unbooked: tUnbooked }) => (
+              {tournamentBreakdown.map(({ tournament: t, played, outstanding, unbooked: tUnbooked, assessment }) => (
                 <button
                   key={t.id}
                   type="button"
@@ -459,7 +467,12 @@ function BandwidthSection({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-cinzel text-xs font-bold text-ink dark:text-parchment truncate">{t.name}</span>
-                    <span className="font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400 flex-shrink-0">↓ view</span>
+                    <span className="flex items-center gap-2 flex-shrink-0">
+                      {assessment.rank < 2 && (
+                        <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${assessment.pace.bg} ${assessment.pace.txt}`}>{assessment.pace.label}</span>
+                      )}
+                      <span className="font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400">↓ view</span>
+                    </span>
                   </div>
                   <p className="font-rajdhani text-[11px] text-stone-500 dark:text-zinc-400 mt-1">
                     <span className="text-amber-700 dark:text-amber-400 font-semibold">{outstanding}</span> upcoming &nbsp;·&nbsp;
@@ -472,51 +485,6 @@ function BandwidthSection({
           </div>
         )}
 
-        {/* Overall slot balance — secondary to the per-tournament breakdown above */}
-        {mine.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-parchment-3 dark:border-ink-5">
-            <p className="font-rajdhani text-[10px] font-bold tracking-[2px] uppercase text-stone-500 dark:text-zinc-400 mb-3">
-              Overall slot balance
-            </p>
-            <div className="grid grid-cols-8 gap-1.5">
-              {ALL_SLOTS.map(s => {
-                const k: SlotKey = `${s.day}-${s.time}`
-                const count = slotCounts[k]
-                const barH  = count > 0 ? Math.round((count / maxSlot) * 100) : 0
-                const isSat = s.day === 'Sat'
-                const isApplicable = s.validFor.some(f => captainActiveFormats.includes(f))
-                return (
-                  <div key={k} className="bg-parchment-2 dark:bg-ink-3 border border-parchment-3 dark:border-ink-5 rounded p-1.5 flex flex-col items-center">
-                    <span className={`font-rajdhani text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${
-                      isSat ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-400'
-                    }`}>{s.day}</span>
-                    <span className="font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400 mb-1.5">{s.time}</span>
-                    <div className="w-full h-8 bg-parchment-3 dark:bg-ink-4 rounded overflow-hidden flex flex-col-reverse mb-1">
-                      {count > 0 && isApplicable && (
-                        <div
-                          className="w-full rounded bg-amber-600 transition-all"
-                          style={{ height: `${barH}%` }}
-                        />
-                      )}
-                    </div>
-                    <span className={`font-cinzel text-xs font-bold ${
-                      !isApplicable ? 'text-stone-300 dark:text-zinc-600' :
-                      count > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-stone-500 dark:text-zinc-400'
-                    }`}>
-                      {!isApplicable ? 'N/A' : count > 0 ? count : '0'}
-                    </span>
-                    <span className="font-rajdhani text-[8px] text-stone-400 dark:text-zinc-500 mt-0.5">{s.formats}</span>
-                  </div>
-                )
-              })}
-            </div>
-            {isImbalanced && (
-              <p className="font-rajdhani text-xs text-blue-700 dark:text-blue-400 mt-2">
-                ↗ Heavy on {dominantSlot} — route unbooked games to other slots for balance
-              </p>
-            )}
-          </div>
-        )}
       </div>
     )
   }
@@ -1317,15 +1285,21 @@ function SlotBalanceByDay({
   )
 }
 
+type TournamentTab = 'ongoing' | 'upcoming' | 'completed'
+const TOURNAMENT_TABS: { key: TournamentTab; label: string }[] = [
+  { key: 'ongoing', label: 'Ongoing' },
+  { key: 'upcoming', label: 'Upcoming' },
+  { key: 'completed', label: 'Completed' },
+]
+
 // ── Root client component ──────────────────────────────────────────
 export function TournamentPlannerClient({
   bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, tournamentStatsMap, bookingCaptainMap,
   knockoutHoldsByTournament, emptyTournaments,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
-  const [showUpcoming,  setShowUpcoming]  = useState(true)
-  const [showOngoing,   setShowOngoing]   = useState(true)
-  const [showCompleted, setShowCompleted] = useState(false)
+  // null = not chosen yet; resolves to Ongoing, or the first non-empty tab.
+  const [chosenTab, setChosenTab] = useState<TournamentTab | null>(null)
 
   // "view" click from a Captain Bandwidth tournament card — scrolls to and expands
   // the matching TournamentBlock below. Token bumps on every click (even repeat
@@ -1360,53 +1334,54 @@ export function TournamentPlannerClient({
         const scheduledGames = games.filter(g => g.game_date >= today)
         const isCompleted    = completedGames.length >= totalLeague && scheduledGames.length === 0
         const isUpcoming     = completedGames.length === 0
-        const isOngoing      = !isCompleted && !isUpcoming
 
-        // Priority signal for sorting — "overdue relative to this tournament's
-        // own pace" (paceSignal's Nudge/Ask-to-slow-down labels), not raw avg
-        // gap or raw unbooked count alone. See the same logic driving each
-        // tournament block's own pace pill.
-        const sortedGames  = [...games].sort((a, b) => a.game_date.localeCompare(b.game_date))
-        const gap          = avgGapWeeks(games.map(g => g.game_date).sort())
-        const unbooked     = Math.max(0, totalLeague - games.length)
-        const lastGameDate = sortedGames.length > 0 ? sortedGames[sortedGames.length - 1].game_date : today
-        const pace         = paceSignal(gap, unbooked, lastGameDate, today)
-        const priorityRank = pace.label === 'Nudge to schedule' ? 0
-          : pace.label === 'Ask to slow down' ? 1
-          : 2
+        const tab: TournamentTab = isCompleted ? 'completed' : isUpcoming ? 'upcoming' : 'ongoing'
+        const assessment = assessPace(tournament, games, today)
+        // Completed tournaments are history — never flagged.
+        const needsAttention = tab !== 'completed' && assessment.rank < 2
 
-        return { tournament, games, isCompleted, isUpcoming, isOngoing, priorityRank }
-      })
-      .sort((a, b) => a.priorityRank - b.priorityRank || b.games.length - a.games.length),
+        return { tournament, games, tab, assessment, needsAttention }
+      }),
     [tournamentMap, today]
   )
 
   const tournamentCounts = useMemo(() => ({
-    upcoming:  classifiedTournaments.filter(t => t.isUpcoming).length,
-    ongoing:   classifiedTournaments.filter(t => t.isOngoing).length,
-    completed: classifiedTournaments.filter(t => t.isCompleted).length,
+    ongoing:   classifiedTournaments.filter(t => t.tab === 'ongoing').length,
+    upcoming:  classifiedTournaments.filter(t => t.tab === 'upcoming').length,
+    completed: classifiedTournaments.filter(t => t.tab === 'completed').length,
   }), [classifiedTournaments])
 
+  const attentionList = useMemo(() =>
+    classifiedTournaments
+      .filter(t => t.needsAttention)
+      .sort((a, b) => a.assessment.rank - b.assessment.rank || a.assessment.lastGameDate.localeCompare(b.assessment.lastGameDate)),
+    [classifiedTournaments]
+  )
+
+  const activeTab: TournamentTab = chosenTab
+    ?? (tournamentCounts.ongoing > 0 ? 'ongoing' : tournamentCounts.upcoming > 0 ? 'upcoming' : tournamentCounts.completed > 0 ? 'completed' : 'ongoing')
+
+  // Within a tab: needs-attention first, then by what's happening soonest
+  // (completed: most recently finished first), then A–Z.
   const sortedTournaments = useMemo(() =>
-    classifiedTournaments.filter(t => {
-      if (t.isCompleted) return showCompleted
-      if (t.isUpcoming)  return showUpcoming
-      if (t.isOngoing)   return showOngoing
-      return true
-    }),
-    [classifiedTournaments, showUpcoming, showOngoing, showCompleted]
+    classifiedTournaments
+      .filter(t => t.tab === activeTab)
+      .sort((a, b) => {
+        if (activeTab === 'completed') {
+          return b.assessment.lastGameDate.localeCompare(a.assessment.lastGameDate) || a.tournament.name.localeCompare(b.tournament.name)
+        }
+        const an = a.assessment.nextGameDate ?? '9999-12-31'
+        const bn = b.assessment.nextGameDate ?? '9999-12-31'
+        return a.assessment.rank - b.assessment.rank || an.localeCompare(bn) || a.tournament.name.localeCompare(b.tournament.name)
+      }),
+    [classifiedTournaments, activeTab]
   )
 
   function handleViewTournament(tournamentId: string) {
-    // A tournament under a captain's "By tournament" list is always
-    // upcoming or ongoing (see tournamentBreakdown's own outstanding>0 ||
-    // unbooked>0 filter in BandwidthSection) — but if the viewer has toggled
-    // that bucket's filter card off, the matching block below doesn't exist
-    // to scroll to. Force its bucket back on so "view" never dead-ends.
+    // Make sure the tab holding this tournament is the one showing, so the
+    // block exists to scroll to.
     const entry = classifiedTournaments.find(t => t.tournament.id === tournamentId)
-    if (entry?.isUpcoming && !showUpcoming) setShowUpcoming(true)
-    if (entry?.isOngoing  && !showOngoing)  setShowOngoing(true)
-    if (entry?.isCompleted && !showCompleted) setShowCompleted(true)
+    if (entry) setChosenTab(entry.tab)
 
     expandTokenRef.current += 1
     setExpandRequest({ id: tournamentId, token: expandTokenRef.current })
@@ -1423,6 +1398,31 @@ export function TournamentPlannerClient({
 
   return (
     <div>
+      {attentionList.length > 0 && (
+        <section className="mb-8">
+          <h2 className="font-cinzel text-xl font-bold text-gold-dim mb-1">Needs Attention</h2>
+          <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400 mb-3">
+            Tournaments not moving at a good pace — tap one to open it.
+          </p>
+          <div className="flex flex-col gap-2">
+            {attentionList.map(({ tournament, assessment }) => (
+              <button key={tournament.id} type="button" onClick={() => handleViewTournament(tournament.id)}
+                className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${assessment.pace.bg} ${
+                  assessment.rank === 0 ? 'border-amber-300 dark:border-amber-800' : 'border-red-300 dark:border-red-800'
+                }`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-cinzel text-sm font-bold text-ink dark:text-parchment truncate">{tournament.name}</span>
+                  <span className={`font-rajdhani text-[10px] font-bold uppercase tracking-widest flex-shrink-0 ${assessment.pace.txt}`}>{assessment.pace.label}</span>
+                </div>
+                <p className="font-rajdhani text-xs text-stone-600 dark:text-zinc-400 mt-1">
+                  {tournament.captains ? `${tournament.captains.name} · ` : ''}{assessment.reason}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <BandwidthSection
         captains={captains}
         bookings={bookings}
@@ -1432,59 +1432,31 @@ export function TournamentPlannerClient({
         onViewTournament={handleViewTournament}
       />
 
-      {/* Tournament filter — same stat-card look as the Upcoming/Unbooked
-          cards on each captain's bandwidth card above, rather than plain
-          checkboxes. Each card still toggles show/hide for its bucket —
-          same behaviour as before, just card-styled. */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <span className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400">Show:</span>
-        <button type="button" onClick={() => setShowUpcoming(v => !v)}
-          className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
-            showUpcoming ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' : 'bg-parchment-2 dark:bg-ink-3 border-parchment-3 dark:border-ink-5 opacity-50 hover:opacity-75'
-          }`}>
-          <p className={`font-cinzel text-lg font-bold leading-tight ${showUpcoming ? 'text-amber-700 dark:text-amber-400' : 'text-stone-500 dark:text-zinc-400'}`}>
-            {tournamentCounts.upcoming}
-          </p>
-          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showUpcoming ? 'text-amber-700 dark:text-amber-400' : 'text-stone-500 dark:text-zinc-400'}`}>
-            Upcoming
-          </p>
-        </button>
-        <button type="button" onClick={() => setShowOngoing(v => !v)}
-          className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
-            showOngoing ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' : 'bg-parchment-2 dark:bg-ink-3 border-parchment-3 dark:border-ink-5 opacity-50 hover:opacity-75'
-          }`}>
-          <p className={`font-cinzel text-lg font-bold leading-tight ${showOngoing ? 'text-emerald-700 dark:text-emerald-400' : 'text-stone-500 dark:text-zinc-400'}`}>
-            {tournamentCounts.ongoing}
-          </p>
-          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showOngoing ? 'text-emerald-700 dark:text-emerald-400' : 'text-stone-500 dark:text-zinc-400'}`}>
-            Ongoing
-          </p>
-        </button>
-        <button type="button" onClick={() => setShowCompleted(v => !v)}
-          className={`rounded-lg border px-3 py-2 text-left transition-colors min-w-[84px] ${
-            showCompleted ? 'bg-parchment-3 dark:bg-ink-4 border-stone-300 dark:border-ink-5' : 'bg-parchment-2 dark:bg-ink-3 border-parchment-3 dark:border-ink-5 opacity-50 hover:opacity-75'
-          }`}>
-          <p className={`font-cinzel text-lg font-bold leading-tight ${showCompleted ? 'text-stone-700 dark:text-zinc-300' : 'text-stone-500 dark:text-zinc-400'}`}>
-            {tournamentCounts.completed}
-          </p>
-          <p className={`font-rajdhani text-[10px] font-bold tracking-widest uppercase ${showCompleted ? 'text-stone-700 dark:text-zinc-300' : 'text-stone-500 dark:text-zinc-400'}`}>
-            Completed
-          </p>
-        </button>
-      </div>
-
       <section>
         <h2 className="font-cinzel text-xl font-bold text-gold-dim mb-1">By Tournament</h2>
-        <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400 mb-5">
-          Organiser pace, game scheduling frequency, and slot balance per tournament — tournaments flagged "Nudge to schedule" surface first.
+        <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400 mb-4">
+          Tournaments that need attention come first in each tab.
         </p>
+
+        {/* Segmented tabs — same pill control as Upcoming / Past Matches */}
+        <div className="flex rounded-full p-1 gap-1 max-w-md mb-5 bg-parchment-2 dark:bg-ink-3 border border-parchment-3 dark:border-ink-5">
+          {TOURNAMENT_TABS.map(({ key, label }) => {
+            const active = activeTab === key
+            const attn = attentionList.filter(t => t.tab === key).length
+            return (
+              <button key={key} type="button" onClick={() => setChosenTab(key)}
+                className={`flex-1 text-center font-rajdhani text-sm font-bold py-2 rounded-full transition-colors ${
+                  active ? 'bg-amber-600 text-white' : 'text-stone-500 dark:text-zinc-400'
+                }`}>
+                {label} · {tournamentCounts[key]}
+                {attn > 0 && <span className={`ml-1 ${active ? 'text-white' : 'text-red-600 dark:text-red-400'}`}>●</span>}
+              </button>
+            )
+          })}
+        </div>
         {sortedTournaments.length === 0 ? (
           <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400">
-            No tournaments match the selected filters.{' '}
-            <button
-              onClick={() => { setShowUpcoming(true); setShowOngoing(true); setShowCompleted(true) }}
-              className="text-gold-dim underline"
-            >Show all</button>
+            No {activeTab} tournaments.
           </p>
         ) : (
           <>
