@@ -99,6 +99,16 @@ export async function PATCH(request: Request) {
     updates.pitch_type = updates.pitch_type || null
   }
 
+  // completed_at is an explicit admin decision (never automatic): a
+  // YYYY-MM-DD date, or null/'' to reopen. See features/tournament-planner.md §12.
+  if ('completed_at' in updates) {
+    const v = updates.completed_at
+    if (v === null || v === '' || v === undefined) updates.completed_at = null
+    else if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(Date.parse(v))) {
+      return NextResponse.json({ error: 'completed_at must be a YYYY-MM-DD date or null' }, { status: 400 })
+    }
+  }
+
   // vibe-security: validate captain if being changed
   if (updates.captain_id) {
     const { data: cap } = await supabase
