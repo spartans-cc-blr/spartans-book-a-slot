@@ -33,7 +33,7 @@ export default async function TournamentPlannerPage() {
         tournament:tournaments!bookings_tournament_id_fkey(
           id, name, organiser_name, organiser_contact,
           total_league_games, cricheroes_points_table_url,
-          captain_id, is_practice, intended_formats, completed_at,
+          captain_id, is_practice, intended_formats, completed_at, awaiting_next_stage_since,
           captains!tournaments_captain_id_fkey(id, name, player_id)
         )
       `)
@@ -110,7 +110,7 @@ export default async function TournamentPlannerPage() {
       .select(`
         id, name, organiser_name, organiser_contact,
         total_league_games, cricheroes_points_table_url, captain_id, is_practice,
-        intended_formats, completed_at,
+        intended_formats, completed_at, awaiting_next_stage_since,
         captains!tournaments_captain_id_fkey(id, name, player_id)
       `)
       .eq('active', true),
@@ -156,6 +156,7 @@ export default async function TournamentPlannerPage() {
       is_practice: boolean
       intended_formats: string[] | null
       completed_at: string | null
+      awaiting_next_stage_since: string | null
       captains: { id: string; name: string; player_id: string | null } | null
     } | null
   }>
@@ -254,6 +255,7 @@ export default async function TournamentPlannerPage() {
       captain_id: t.captain_id,
       intended_formats: t.intended_formats,
       completed_at: t.completed_at,
+      awaiting_next_stage_since: t.awaiting_next_stage_since,
       captains: Array.isArray(t.captains) ? t.captains[0] ?? null : t.captains,
     }))
 
