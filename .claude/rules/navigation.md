@@ -1121,6 +1121,20 @@ This means photos are populated passively — existing players who have already 
 ---
  
 ## 6. My Profile Page — `src/app/profile/page.tsx`
+
+### Layout (reorganised October 2026)
+
+Top to bottom, so the page reads from "who am I" to "what can I change":
+
+1. **Identity header** — avatar with a 📷 button to change the photo (replaces the separate Profile Photo card), name, CAPTAIN / cap / ACTIVE badges, member-since.
+2. **At a glance** — Wallet tile (balance, links to `/wallet`; the only place balance is shown now) and Availability tile (pending / upcoming, links to `/fixtures`), plus the Next Match row with the player's response. The duplicate "Fixtures upcoming" tile was folded into Availability.
+3. **My Stats** — career + season, one "Full Stats" link (the hero no longer repeats it).
+4. **My Details** — one form card in three groups: Contact & personal, Cricket (skills + CricHeroes URL), Jersey (with the Spartans Store nudge inline).
+5. **Notifications** — push enable/disable, moved out of the read-only card.
+6. **Managed by admin** — name, Gmail, inducted on (read-only, dashed border).
+7. **Sticky save bar** — Save is always visible (above the mobile tab bar); the in-page Back button was dropped since `SiteNav` already provides one.
+
+Fixed a theme bug here: the old dashboard band used the non-existent `dark:bg-ink-1`, so it stayed light in dark mode. `ink-1` was also replaced by `ink` in the join, wrangler and `ChunkErrorBoundary` pages.
  
 ### Access Control
  

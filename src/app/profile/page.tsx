@@ -9,7 +9,6 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SiteNav } from '@/components/ui/SiteNav'
-import { BackButton } from '@/components/ui/BackButton'
 import { DobInput } from '@/components/ui/DobInput'
 import type { PlayerStatsTotals } from '@/types'
 import { CapBadge } from '@/components/leaderboard/CapIcon'
@@ -283,431 +282,309 @@ export default function ProfilePage() {
     )
   }
 
-  const hasDues = profile && profile.wallet_balance < 0
+  const hasDues = !!profile && profile.wallet_balance < 0
+  const balance = profile?.wallet_balance ?? 0
+  const card = 'bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-5'
+  const cardTitle = 'font-cinzel text-sm text-amber-700 dark:text-gold font-semibold'
+  const subTitle = 'font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500 mb-3'
+  const hint = 'font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-500 mt-1'
+  const tile = 'rounded-lg border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold'
+  const neutralTile = 'bg-white dark:bg-ink-3 border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim'
+  const warnTile = 'bg-amber-50 dark:bg-amber-950/30 border-amber-300/60 dark:border-amber-800/60 hover:border-amber-600'
+  const nm = dashboard?.nextMatch
+  const hasJersey = !!(profile?.jersey_name && profile?.jersey_number && profile.jersey_number.trim() !== '')
 
   return (
     <div className="min-h-screen bg-parchment dark:bg-ink grain">
       <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
-      {/* ── Dashboard Stats ── */}
-              {dashboard && (
-                <section aria-labelledby="dashboard-heading" className="bg-parchment dark:bg-ink-1 border-b border-[#E2DACE] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-5">
-                  <h2 id="dashboard-heading" className="sr-only">Your dashboard</h2>
-                  <div className="max-w-2xl space-y-3">
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {/* Wallet */}
-                      <Link href="/wallet"
-                        aria-label="View full wallet statement"
-                        className={`rounded-lg border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
-                        (profile?.wallet_balance ?? 0) < 0 ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300/60 dark:border-amber-800/60 hover:border-amber-600' : 'bg-white dark:bg-ink-2 border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim'
-                      }`}>
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-base leading-none" aria-hidden="true">💰</span>
-                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500">Wallet</p>
-                        </div>
-                        <p className={`font-cinzel text-lg font-bold ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                          ₹{profile?.wallet_balance ?? 0}
-                        </p>
-                        <p className={`font-rajdhani text-xs mt-0.5 ${(profile?.wallet_balance ?? 0) < 0 ? 'text-amber-500' : 'text-[#78716C] dark:text-zinc-500'}`}>
-                          {(profile?.wallet_balance ?? 0) < 0 ? 'Dues outstanding' : 'Balance'}
-                        </p>
-                      </Link>
-
-                      {/* Pending availability */}
-                      <Link href="/fixtures"
-                        aria-label={dashboard.pendingCount > 0
-                          ? `${dashboard.pendingCount} matches need your availability response — go to Fixtures`
-                          : 'All matches marked — go to Fixtures'}
-                        className={`rounded-lg border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
-                          dashboard.pendingCount > 0
-                            ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300/60 dark:border-amber-800/60 hover:border-amber-600'
-                            : 'bg-white dark:bg-ink-2 border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim'
-                        }`}>
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-base leading-none" aria-hidden="true">{dashboard.pendingCount > 0 ? '⚠️' : '✅'}</span>
-                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500">Pending</p>
-                        </div>
-                        <p className={`font-cinzel text-lg font-bold ${dashboard.pendingCount > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                          {dashboard.pendingCount}
-                        </p>
-                        <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-0.5">
-                          {dashboard.pendingCount > 0 ? 'Need response' : 'All marked ✓'}
-                        </p>
-                      </Link>
-
-                      {/* Upcoming fixtures */}
-                      <Link href="/fixtures"
-                        aria-label={`${dashboard.upcomingCount} upcoming confirmed matches — go to Fixtures`}
-                        className="rounded-lg border bg-white dark:bg-ink-2 border-[#D4C9B0] dark:border-ink-5 px-4 py-3 transition-colors hover:border-gold-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-base leading-none" aria-hidden="true">🏏</span>
-                          <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500">Fixtures</p>
-                        </div>
-                        <p className="font-cinzel text-lg font-bold text-[#1C1917] dark:text-parchment">{dashboard.upcomingCount}</p>
-                        <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-0.5">Upcoming</p>
-                      </Link>
-                    </div>
-
-                    {/* Next match */}
-                    {dashboard.nextMatch && (
-                      <Link href={`/fixtures/${dashboard.nextMatch.id}`}
-                        aria-label={`Next match: ${dashboard.nextMatch.opponent_name ? `versus ${dashboard.nextMatch.opponent_name}` : dashboard.nextMatch.tournament?.name ?? 'TBD'} on ${new Date(dashboard.nextMatch.game_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} at ${dashboard.nextMatch.slot_time}. ${dashboard.nextMatchResponse ? `Your response: ${dashboard.nextMatchResponse}` : 'Response not yet marked'}`}
-                        className="block rounded-lg border border-[#D4C9B0] dark:border-ink-5 bg-white dark:bg-ink-2 px-4 py-3 hover:border-gold/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-rajdhani text-xs font-bold tracking-wide uppercase text-[#78716C] dark:text-zinc-500 mb-0.5 flex items-center gap-1.5">
-                              <span aria-hidden="true">📅</span> Next Match
-                            </p>
-                            <p className="font-rajdhani text-sm font-semibold text-[#1C1917] dark:text-parchment truncate">
-                              {dashboard.nextMatch.opponent_name
-                                ? `vs ${dashboard.nextMatch.opponent_name}`
-                                : dashboard.nextMatch.tournament?.name ?? 'TBD'}
-                            </p>
-                            <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
-                              {new Date(dashboard.nextMatch.game_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              {' · '}{dashboard.nextMatch.slot_time}
-                            </p>
-                          </div>
-                          <div className="flex-shrink-0">
-                            {dashboard.nextMatchResponse ? (
-                              <span className={`font-rajdhani text-xs font-bold px-2.5 py-1 rounded border ${
-                                dashboard.nextMatchResponse === 'Y' ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400' :
-                                dashboard.nextMatchResponse === 'N' ? 'bg-red-50 dark:bg-red-950/50 border-red-300 dark:border-red-800 text-red-700 dark:text-red-400' :
-                                dashboard.nextMatchResponse === 'O' ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-400' :
-                                dashboard.nextMatchResponse === 'E' ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-400' :
-                                'bg-white dark:bg-zinc-900 border-[#D4C9B0] dark:border-zinc-700 text-[#57534E] dark:text-zinc-400'
-                              }`}>
-                                {dashboard.nextMatchResponse}
-                              </span>
-                            ) : (
-                              <span className="font-rajdhani text-xs font-bold px-2.5 py-1 rounded border bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400">
-                                Mark →
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    )}
-
-                  </div>
-                </section>
+      {/* ── Identity: photo, name, badges, quick links ── */}
+      <div className="bg-white dark:bg-ink-2 border-b border-[#E2DACE] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-6">
+        <div className="max-w-2xl flex items-center gap-4 sm:gap-5">
+          <div className="relative flex-shrink-0">
+            <img
+              src={photoPreview ?? '/default-avatar.png'}
+              alt={profile?.name ?? ''}
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 border-gold-dim"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Change profile photo"
+              className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-gold text-ink flex items-center justify-center text-sm shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700"
+            >
+              {photoFile ? '✓' : '📷'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handlePhotoChange}
+            />
+          </div>
+          <div className="min-w-0">
+            <h1 className="font-cinzel text-xl sm:text-2xl md:text-3xl font-bold text-[#1C1917] dark:text-parchment tracking-wide break-words">
+              {profile?.name ?? player.playerName}
+            </h1>
+            <div className="flex items-center flex-wrap gap-2 mt-1.5">
+              {profile?.is_captain && (
+                <span className="font-rajdhani text-[10px] font-bold bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold px-2 py-0.5 rounded">CAPTAIN</span>
               )}
-      {/* Hero */}
-      <div className="bg-white dark:bg-ink-2 border-b border-[#E2DACE] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
-        <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)' }} />
-        <p className="text-amber-700 dark:text-gold text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2">
-          <span className="w-4 h-px bg-gold inline-block" />
-          My Profile
-        </p>
-        <h1 className="font-cinzel text-2xl md:text-3xl font-bold text-[#1C1917] dark:text-parchment mb-1 tracking-wide">
-          {profile?.name ?? player.playerName}
-        </h1>
-        <div className="flex items-center flex-wrap gap-2 mt-1">
-          {profile?.is_captain && (
-            <span className="font-rajdhani text-[10px] font-bold bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold px-2 py-0.5 rounded">
-              CAPTAIN
-            </span>
-          )}
-          {stats?.caps?.map(k => <CapBadge key={k} kind={k} year={stats.seasonYear} />)}
-          {profile?.status === 'active' && (
-            <span className="font-rajdhani text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">
-              ACTIVE
-            </span>
-          )}
-          {profile?.inducted_on && (
-            <span className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">
-              Member since {new Date(profile.inducted_on).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center flex-wrap gap-3 mt-3">
-          {player?.playerId && (
-            <Link href={`/players/${player.playerId}/stats`}
-              className="inline-flex items-center gap-1.5 font-rajdhani text-xs font-bold tracking-wide bg-gold/10 border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold hover:text-ink px-3 py-1.5 rounded transition-colors">
-              📊 View Full Stats
-            </Link>
-          )}
-          {profile?.cricheroes_url && (
-            <a href={profile.cricheroes_url} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold underline decoration-dotted underline-offset-2 transition-colors">
-              View on CricHeroes ↗
-            </a>
-          )}
-        </div>
-      </div>
-
-      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl">
-
-        {/* ── PHOTO ── */}
-        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Profile Photo</h2>
-          <div className="flex items-center gap-5">
-            <div className="relative flex-shrink-0">
-              <Link href={player?.playerId ? `/players/${player.playerId}/stats` : '#'}>
-                <img
-                  src={photoPreview ?? '/default-avatar.png'}
-                  alt={profile?.name ?? ''}
-                  className="w-20 h-20 rounded-full object-cover border-2 border-gold-dim"
-                />
-              </Link>
-              {photoFile && (
-                <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-gold rounded-full flex items-center justify-center text-ink text-xs font-bold">
-                  ✓
+              {stats?.caps?.map(k => <CapBadge key={k} kind={k} year={stats.seasonYear} />)}
+              {profile?.status === 'active' && (
+                <span className="font-rajdhani text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">ACTIVE</span>
+              )}
+              {profile?.inducted_on && (
+                <span className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
+                  Member since {new Date(profile.inducted_on).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
                 </span>
               )}
             </div>
-            <div>
-              <button onClick={() => fileInputRef.current?.click()}
-                className="font-rajdhani text-xs font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim text-[#57534E] dark:text-zinc-400 hover:text-amber-700 dark:hover:text-gold px-4 py-2 rounded transition-colors mb-2 block">
-                {photoFile ? '✓ Photo selected — save to upload' : 'Choose Photo'}
-              </button>
-              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600">
-                JPG, PNG or WebP · Max 5MB · Square crop recommended
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={handlePhotoChange}
-              />
-            </div>
+            <p className="font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-500 mt-1.5">
+              {photoFile ? 'New photo selected — tap Save to upload' : 'JPG, PNG or WebP · max 5MB'}
+            </p>
           </div>
         </div>
+      </div>
 
-        {/* ── READ-ONLY INFO ── */}
-        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Club Details</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <ReadOnlyField label="Full Name" value={profile?.name} />
-            <ReadOnlyField label="Club Gmail" value={profile?.gmail_id} />
-            <div>
-              <label className="form-label">Wallet Balance</label>
-              <p className={`font-rajdhani font-bold text-sm ${hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-[#1C1917] dark:text-parchment'}`}>
-                ₹{profile?.wallet_balance ?? 0}
-                {hasDues && <span className="font-normal text-amber-600 ml-2">(dues outstanding)</span>}
+      <div className="px-5 md:px-8 lg:px-10 py-6 max-w-2xl space-y-4">
+
+        {/* ── At a glance: wallet + next match (one place each) ── */}
+        <section aria-label="At a glance" className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Link href="/wallet" aria-label="View full wallet statement"
+              className={`${tile} ${hasDues ? warnTile : neutralTile}`}>
+              <p className={subTitle.replace('mb-3', 'mb-1')}>💰 Wallet</p>
+              <p className={`font-cinzel text-xl font-bold ${hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>₹{balance}</p>
+              <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-0.5">
+                {hasDues ? 'Dues outstanding · ' : ''}View statement →
               </p>
-              <Link href="/wallet" className="font-rajdhani text-xs text-gold-dim hover:text-amber-700 dark:hover:text-gold transition-colors inline-block mt-1">
-                💰 View Full Statement →
+            </Link>
+
+            {dashboard && (
+              <Link href="/fixtures"
+                aria-label={dashboard.pendingCount > 0 ? `${dashboard.pendingCount} matches need your availability response — go to Fixtures` : 'All matches marked — go to Fixtures'}
+                className={`${tile} ${dashboard.pendingCount > 0 ? warnTile : neutralTile}`}>
+                <p className={subTitle.replace('mb-3', 'mb-1')}>{dashboard.pendingCount > 0 ? '⚠️' : '✅'} Availability</p>
+                <p className={`font-cinzel text-xl font-bold ${dashboard.pendingCount > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                  {dashboard.pendingCount > 0 ? `${dashboard.pendingCount} pending` : 'All marked'}
+                </p>
+                <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-0.5">
+                  {dashboard.upcomingCount} upcoming · {dashboard.pendingCount > 0 ? 'Mark now →' : 'View fixtures →'}
+                </p>
               </Link>
-            </div>
-            {profile?.inducted_on && (
-              <ReadOnlyField label="Inducted On" value={new Date(profile.inducted_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} />
             )}
           </div>
-          <div className="mt-4">
-            <div className="flex items-center gap-3 flex-wrap">
-              <button
-                onClick={subscribeToPush}
-                disabled={pushSubscribed || pushLoading}
-                className="font-rajdhani text-xs font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim text-[#57534E] dark:text-zinc-400 hover:text-amber-700 dark:hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded transition-colors"
-              >
-                {pushLoading
-                  ? (pushSubscribed ? 'Disabling...' : 'Enabling...')
-                  : pushSubscribed
-                  ? '✓ Notifications enabled'
-                  : pushServerSubscribed
-                  ? '🔔 Re-enable notifications on this device'
-                  : '🔔 Subscribe to notifications'}
-              </button>
-              {pushSubscribed && (
-                <button
-                  onClick={unsubscribeFromPush}
-                  disabled={pushLoading}
-                  className="font-rajdhani text-xs font-bold text-[#78716C] dark:text-zinc-500 hover:text-crimson underline disabled:opacity-50"
-                >
-                  Unsubscribe
-                </button>
-              )}
-            </div>
-            {!pushSubscribed && pushServerSubscribed && !pushLoading && (
-              <p className="font-rajdhani text-[11px] text-amber-700 dark:text-amber-400 mt-1.5">
-                We have a notification subscription on file for you, but this device/browser has lost it
-                (common on iPhone if the Hub icon hasn't been opened in a while) — tap above to refresh it.
-              </p>
-            )}
-            {pushSuccess && (
-              <p className="font-rajdhani text-[11px] text-emerald-700 dark:text-emerald-400 mt-1.5">You'll be notified when you're selected in a squad.</p>
-            )}
-            {pushError && (
-              <p className="font-rajdhani text-[11px] text-crimson mt-1.5">{pushError}</p>
-            )}
-          </div>
-          <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-700 mt-3 italic">
-            Name, email and wallet balance are managed by the admin. Contact Muthu to update these.
-          </p>
-        </div>
 
-        {/* ── MY STATS ── */}
-        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
+          {nm && (
+            <Link href={`/fixtures/${nm.id}`}
+              className={`block ${tile} ${neutralTile}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={subTitle.replace('mb-3', 'mb-0.5')}>📅 Next match</p>
+                  <p className="font-rajdhani text-sm font-semibold text-[#1C1917] dark:text-parchment truncate">
+                    {nm.opponent_name ? `vs ${nm.opponent_name}` : nm.tournament?.name ?? 'TBD'}
+                  </p>
+                  <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
+                    {new Date(nm.game_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {nm.slot_time}
+                  </p>
+                </div>
+                <span className={`flex-shrink-0 font-rajdhani text-xs font-bold px-2.5 py-1 rounded border ${
+                  !dashboard?.nextMatchResponse ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400' :
+                  dashboard.nextMatchResponse === 'Y' ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400' :
+                  dashboard.nextMatchResponse === 'N' ? 'bg-red-50 dark:bg-red-950/50 border-red-300 dark:border-red-800 text-red-700 dark:text-red-400' :
+                  dashboard.nextMatchResponse === 'O' ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-400' :
+                  dashboard.nextMatchResponse === 'E' ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-400' :
+                  'bg-white dark:bg-zinc-900 border-[#D4C9B0] dark:border-zinc-700 text-[#57534E] dark:text-zinc-400'
+                }`}>
+                  {dashboard?.nextMatchResponse ?? 'Mark →'}
+                </span>
+              </div>
+            </Link>
+          )}
+        </section>
+
+        {/* ── My stats ── */}
+        <section className={card}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold">My Stats</h2>
-            {player?.playerId && (
-              <Link href={`/players/${player.playerId}/stats`}
-                className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold hover:text-ink px-3 py-1.5 rounded transition-colors">
-                Full Stats →
-              </Link>
-            )}
+            <h2 className={cardTitle}>My Stats</h2>
+            <Link href={`/players/${player.playerId}/stats`}
+              className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-amber-700 dark:text-gold hover:bg-gold hover:text-ink px-3 py-1.5 rounded transition-colors">
+              📊 Full Stats →
+            </Link>
           </div>
           {!stats || stats.career.matches === 0 ? (
             <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">No stats yet.</p>
           ) : (
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-2 gap-5">
               <StatsColumn title="Career" totals={stats.career} />
               <StatsColumn title={`This Season (${stats.seasonYear})`} totals={stats.season} />
             </div>
           )}
-        </div>
+        </section>
 
-        {/* ── EDITABLE FIELDS ── */}
-        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Personal Details</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
+        {/* ── Editable details (single form card) ── */}
+        <section className={card}>
+          <h2 className={`${cardTitle} mb-1`}>My Details</h2>
+          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mb-5">Edit anything below, then tap Save.</p>
+
+          <p className={subTitle}>Contact &amp; personal</p>
+          <div className="grid sm:grid-cols-2 gap-4 mb-6">
             <div>
-              <label className="form-label">WhatsApp Number</label>
-              <input
-                type="tel"
-                value={whatsapp}
-                onChange={e => setWhatsapp(e.target.value)}
-                placeholder="e.g. 919876543210"
-                className="form-input"
-              />
-              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">Include country code</p>
+              <label className="form-label" htmlFor="pf-whatsapp">WhatsApp Number</label>
+              <input id="pf-whatsapp" type="tel" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
+                placeholder="e.g. 919876543210" className="form-input" />
+              <p className={hint}>Include country code</p>
             </div>
             <div>
               <label className="form-label">Date of Birth</label>
               <DobInput value={dob} onChange={setDob} />
-              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">
-                Year is optional — day and month are enough for birthday wishes 🎂
-              </p>
+              <p className={hint}>Year optional — day &amp; month are enough for birthday wishes 🎂</p>
             </div>
             <div>
-              <label className="form-label">Blood Group</label>
-              <select value={bloodGroup} onChange={e => setBloodGroup(e.target.value)} className="form-input">
+              <label className="form-label" htmlFor="pf-blood">Blood Group</label>
+              <select id="pf-blood" value={bloodGroup} onChange={e => setBloodGroup(e.target.value)} className="form-input">
                 <option value="">Select...</option>
                 {BLOOD_GROUPS.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
           </div>
-        </div>
 
-        {/* ── JERSEY ── */}
-        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Jersey</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <p className={subTitle}>Cricket</p>
+          <div className="grid sm:grid-cols-2 gap-4 mb-6">
             <div>
-              <label className="form-label">Jersey Name</label>
-              <input
-                type="text"
-                value={jerseyName}
-                onChange={e => setJerseyName(e.target.value)}
-                placeholder="e.g. MUTHU"
-                className="form-input uppercase"
-              />
-              <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">Name printed on the back</p>
-            </div>
-            <div>
-              <label className="form-label">Jersey Number</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]{1,3}"
-                maxLength={3}
-                value={jerseyNumber}
-                onChange={e => setJerseyNumber(e.target.value)}
-                placeholder="e.g. 7, 07, or 007"
-                className="form-input"
-              />
-            </div>
-          </div>
-        </div>
-        {/* Spartans Store nudge */}
-        {profile?.jersey_name && profile?.jersey_number && profile.jersey_number.trim() !== '' && (
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg px-4 py-3 flex items-center justify-between mb-4">
-            <p className="font-rajdhani text-sm text-amber-700 dark:text-amber-300">
-              Your jersey details are set — ready to order?
-            </p>
-            <a
-              href="/dugout/kit-room"
-              className="font-rajdhani text-sm font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 hover:underline underline-offset-2 whitespace-nowrap ml-4"
-            >
-              Spartans Store →
-            </a>
-          </div>
-        )}
-        {/* ── SKILLS ── */}
-        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-4">
-          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">Playing Skills</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="form-label">Primary Skill</label>
-              <select value={primarySkill} onChange={e => setPrimarySkill(e.target.value)} className="form-input">
+              <label className="form-label" htmlFor="pf-primary">Primary Skill</label>
+              <select id="pf-primary" value={primarySkill} onChange={e => setPrimarySkill(e.target.value)} className="form-input">
                 <option value="">Select...</option>
                 {SKILLS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="form-label">Secondary Skill</label>
-              <select value={secondarySkill} onChange={e => setSecondarySkill(e.target.value)} className="form-input">
+              <label className="form-label" htmlFor="pf-secondary">Secondary Skill</label>
+              <select id="pf-secondary" value={secondarySkill} onChange={e => setSecondarySkill(e.target.value)} className="form-input">
                 <option value="">Select...</option>
                 {SKILLS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+            <div className="sm:col-span-2">
+              <label className="form-label" htmlFor="pf-ch">CricHeroes Profile URL</label>
+              <input id="pf-ch" type="url" value={cricheroes} onChange={e => setCricheroes(e.target.value)}
+                placeholder="https://chshare.link/..." className="form-input" />
+              <p className={hint}>
+                Open your CricHeroes profile → Share → paste the link here
+                {cricheroes && (
+                  <> · <a href={cricheroes} target="_blank" rel="noopener noreferrer"
+                    className="underline decoration-dotted hover:text-amber-700 dark:hover:text-gold">Test link ↗</a></>
+                )}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* ── CRICHEROES ── */}
-        <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-5 mb-6">
-          <h2 className="font-cinzel text-sm text-amber-700 dark:text-gold font-semibold mb-4">CricHeroes</h2>
-          <div>
-            <label className="form-label">CricHeroes Profile URL</label>
-            <input
-              type="url"
-              value={cricheroes}
-              onChange={e => setCricheroes(e.target.value)}
-              placeholder="https://chshare.link/..."
-              className="form-input"
-            />
-            <p className="font-rajdhani text-[10px] text-[#78716C] dark:text-zinc-600 mt-1">
-              Open your CricHeroes profile → Share → paste the link here
-            </p>
+          <p className={subTitle}>Jersey</p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="form-label" htmlFor="pf-jname">Jersey Name</label>
+              <input id="pf-jname" type="text" value={jerseyName} onChange={e => setJerseyName(e.target.value)}
+                placeholder="e.g. MUTHU" className="form-input uppercase" />
+              <p className={hint}>Name printed on the back</p>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="pf-jnum">Jersey Number</label>
+              <input id="pf-jnum" type="text" inputMode="numeric" pattern="[0-9]{1,3}" maxLength={3}
+                value={jerseyNumber} onChange={e => setJerseyNumber(e.target.value)}
+                placeholder="e.g. 7, 07, or 007" className="form-input" />
+            </div>
           </div>
-          {cricheroes && (
-            <a href={cricheroes} target="_blank" rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1.5 font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hover:text-amber-700 dark:hover:text-gold transition-colors">
-              Test link ↗
-            </a>
+          {hasJersey && (
+            <div className="mt-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
+              <p className="font-rajdhani text-sm text-amber-700 dark:text-amber-300">Jersey details set — ready to order?</p>
+              <Link href="/dugout/kit-room"
+                className="font-rajdhani text-sm font-semibold text-amber-700 dark:text-amber-400 hover:underline underline-offset-2 whitespace-nowrap">
+                Spartans Store →
+              </Link>
+            </div>
           )}
-        </div>
+        </section>
 
-        {/* ── ERROR / SUCCESS ── */}
+        {/* ── Notifications ── */}
+        <section className={card}>
+          <h2 className={`${cardTitle} mb-1`}>Notifications</h2>
+          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mb-3">
+            Get alerted when you&apos;re selected in a squad. Applies to this device only.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={subscribeToPush}
+              disabled={pushSubscribed || pushLoading}
+              className="font-rajdhani text-xs font-bold tracking-wide border border-[#D4C9B0] dark:border-ink-5 hover:border-gold-dim text-[#57534E] dark:text-zinc-400 hover:text-amber-700 dark:hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded transition-colors"
+            >
+              {pushLoading
+                ? (pushSubscribed ? 'Disabling...' : 'Enabling...')
+                : pushSubscribed
+                ? '✓ Notifications enabled'
+                : pushServerSubscribed
+                ? '🔔 Re-enable on this device'
+                : '🔔 Enable notifications'}
+            </button>
+            {pushSubscribed && (
+              <button onClick={unsubscribeFromPush} disabled={pushLoading}
+                className="font-rajdhani text-xs font-bold text-[#78716C] dark:text-zinc-500 hover:text-crimson underline disabled:opacity-50">
+                Turn off
+              </button>
+            )}
+          </div>
+          {!pushSubscribed && pushServerSubscribed && !pushLoading && (
+            <p className="font-rajdhani text-[11px] text-amber-700 dark:text-amber-400 mt-2">
+              We have a subscription on file, but this device lost it (common on iPhone if the Hub icon hasn&apos;t been opened in a while) — tap above to refresh.
+            </p>
+          )}
+          {pushSuccess && <p className="font-rajdhani text-[11px] text-emerald-700 dark:text-emerald-400 mt-2">You&apos;ll be notified when you&apos;re selected in a squad.</p>}
+          {pushError && <p className="font-rajdhani text-[11px] text-crimson mt-2">{pushError}</p>}
+        </section>
+
+        {/* ── Admin-managed (read-only) ── */}
+        <section className="rounded-lg border border-dashed border-[#D4C9B0] dark:border-ink-5 p-5">
+          <h2 className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500 mb-3">Managed by admin</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <ReadOnlyField label="Full Name" value={profile?.name} />
+            <ReadOnlyField label="Club Gmail" value={profile?.gmail_id} />
+            {profile?.inducted_on && (
+              <ReadOnlyField label="Inducted On" value={new Date(profile.inducted_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} />
+            )}
+          </div>
+          <p className="font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-500 mt-3 italic">
+            Name, email and wallet balance can only be changed by the admin. Contact Muthu to update these.
+          </p>
+        </section>
+
+        {/* ── Feedback ── */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 font-rajdhani text-sm px-4 py-3 rounded mb-4">
+          <div role="alert" className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 font-rajdhani text-sm px-4 py-3 rounded">
             {error}
           </div>
         )}
         {success && (
-          <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded mb-4">
+          <div role="status" className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-rajdhani text-sm px-4 py-3 rounded">
             ✓ Profile updated successfully.
           </div>
         )}
+      </div>
 
-        {/* ── SAVE ── */}
-        <div className="flex gap-3 justify-between items-center">
-          <BackButton fallbackHref="/" fallbackLabel="Home"
-            className="!text-zinc-500 hover:!text-zinc-300 border border-[#D4C9B0] dark:border-ink-5 px-4 py-2.5 rounded font-normal" />
+      {/* ── Sticky save bar ── */}
+      <div className="sticky bottom-[4.5rem] md:bottom-0 z-30 bg-white/95 dark:bg-ink-2/95 backdrop-blur border-t border-[#D4C9B0] dark:border-ink-5 px-5 md:px-8 lg:px-10 py-3">
+        <div className="max-w-2xl flex items-center justify-between gap-3">
+          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 hidden sm:block">Changes to My Details apply when you save.</p>
           <button
             onClick={handleSave}
             disabled={saving || uploadingPhoto}
-            className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors">
+            className="w-full sm:w-auto font-rajdhani text-sm font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded transition-colors">
             {saving || uploadingPhoto ? 'Saving...' : 'Save Profile'}
           </button>
         </div>
-
       </div>
 
-      <footer className="border-t border-[#E2DACE] dark:border-ink-4 py-5 text-center font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-8">
+      <footer className="border-t border-[#E2DACE] dark:border-ink-4 py-5 text-center font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">
         © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
       </footer>
     </div>

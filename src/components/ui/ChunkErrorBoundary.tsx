@@ -42,7 +42,7 @@ export class ChunkErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError && !this.state.refreshed) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-parchment dark:bg-ink-1">
+        <div className="min-h-screen flex items-center justify-center bg-parchment dark:bg-ink">
           <p className="font-rajdhani text-[#57534E] dark:text-zinc-400 text-sm">
             Updating to latest version…
           </p>
