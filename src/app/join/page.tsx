@@ -106,7 +106,7 @@ const SKILLS = [
   // ── Loading ───────────────────────────────────────────────────────────────
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center">
+      <div className="min-h-screen bg-parchment dark:bg-ink flex items-center justify-center">
         <p className="font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">Loading…</p>
       </div>
     )
@@ -115,7 +115,7 @@ const SKILLS = [
   // ── Success state ─────────────────────────────────────────────────────────
   if (success) {
     return (
-      <main className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center px-4">
+      <main className="min-h-screen bg-parchment dark:bg-ink flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-8 text-center space-y-5">
           <div className="text-4xl">🏏</div>
           <h1 className="font-cinzel font-bold text-amber-700 dark:text-gold text-xl tracking-widest uppercase">
@@ -139,7 +139,7 @@ const SKILLS = [
           </p>
           <button
             onClick={() => signIn('google')}
-            className="w-full font-rajdhani text-sm font-bold tracking-widest uppercase bg-gold hover:bg-gold/90 text-ink-1 px-6 py-3 rounded transition-colors"
+            className="w-full font-rajdhani text-sm font-bold tracking-widest uppercase bg-gold hover:bg-gold/90 text-ink px-6 py-3 rounded transition-colors"
           >
             Sign in to get started
           </button>
@@ -151,7 +151,7 @@ const SKILLS = [
   // ── Not signed in ─────────────────────────────────────────────────────────
   if (!session) {
     return (
-      <main className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center px-4">
+      <main className="min-h-screen bg-parchment dark:bg-ink flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-8 text-center space-y-6">
           <img src="/Transparent High Resolution.png" alt="Spartans CC"
             className="w-16 h-16 object-contain mx-auto opacity-80" />
@@ -177,7 +177,7 @@ const SKILLS = [
   // ── No token ──────────────────────────────────────────────────────────────
   if (!token) {
     return (
-      <main className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center px-4">
+      <main className="min-h-screen bg-parchment dark:bg-ink flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-8 text-center space-y-5">
           <img src="/Transparent High Resolution.png" alt="Spartans CC"
             className="w-16 h-16 object-contain mx-auto opacity-80" />
@@ -196,7 +196,7 @@ const SKILLS = [
   return (
     <>
       <SiteNav activePage="home" />
-      <main className="min-h-screen bg-parchment dark:bg-ink-1 pt-16 pb-12 px-4">
+      <main className="min-h-screen bg-parchment dark:bg-ink pt-16 pb-12 px-4">
         <div className="max-w-lg mx-auto">
 
           {/* Header */}
@@ -319,7 +319,7 @@ const SKILLS = [
 export default function JoinPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-parchment dark:bg-ink-1 flex items-center justify-center">
+      <div className="min-h-screen bg-parchment dark:bg-ink flex items-center justify-center">
         <p className="font-rajdhani text-[#78716C] dark:text-zinc-600 text-sm">Loading…</p>
       </div>
     }>

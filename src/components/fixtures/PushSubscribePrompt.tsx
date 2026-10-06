@@ -76,7 +76,7 @@ export function PushSubscribePrompt() {
           <button
             onClick={handleSubscribe}
             disabled={loading}
-            className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold hover:bg-gold/90 text-ink-1 px-4 py-2 rounded transition-colors disabled:opacity-50"
+            className="font-rajdhani text-xs font-bold tracking-widest uppercase bg-gold hover:bg-gold/90 text-ink px-4 py-2 rounded transition-colors disabled:opacity-50"
           >
             {loading ? 'Enabling...' : 'Subscribe'}
           </button>
