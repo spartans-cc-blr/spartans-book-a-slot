@@ -99,6 +99,14 @@ export async function PATCH(request: Request) {
     updates.pitch_type = updates.pitch_type || null
   }
 
+  if ('awaiting_next_stage_since' in updates) {
+    const v = updates.awaiting_next_stage_since
+    if (v === null || v === '' || v === undefined) updates.awaiting_next_stage_since = null
+    else if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(Date.parse(v))) {
+      return NextResponse.json({ error: 'awaiting_next_stage_since must be a YYYY-MM-DD date or null' }, { status: 400 })
+    }
+  }
+
   // completed_at is an explicit admin decision (never automatic): a
   // YYYY-MM-DD date, or null/'' to reopen. See features/tournament-planner.md §12.
   if ('completed_at' in updates) {

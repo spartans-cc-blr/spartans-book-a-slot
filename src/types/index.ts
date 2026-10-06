@@ -70,6 +70,8 @@ export interface Tournament {
   tentative_start_date:        string | null
   // Admin-set "finished" marker — never automatic (migration 085).
   completed_at:                string | null
+  // Admin answered "still in the running" on this date (migration 086).
+  awaiting_next_stage_since:   string | null
   captains: {
     id:      string
     name:    string
