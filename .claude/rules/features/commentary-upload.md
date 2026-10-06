@@ -117,3 +117,8 @@ The page shows which matches still lack commentary (from the analytics `match_co
 The "Over by over" preview on the upload form shows the bowler only for the **opponent batting** innings (our bowlers). For **Spartans batting** it shows the runs and wickets of each over by our batters together, plus the running score, since the opposition bowler per over isn't useful there.
 
 The microservice's side check (`is_spartans()` in `spartans-python/utils/commentary_store.py`) used to match any team containing "spartans", so an opponent called "CG Spartans" was rejected as "Spartans batting". It now requires the name to start with "spartans" and not to closely match the booked opponent.
+
+
+## Page background (October 2026)
+
+The page background sits on a full-width wrapper (`bg-parchment dark:bg-ink`) around the `max-w-3xl` content column, so the margins either side of the column follow the theme instead of showing black. The same wrapper is used on `/wrangler/backfill-squad` and `/wrangler/grounds`. The earlier `dark:bg-ink-1` class was a no-op (no such token), which left the column light in dark mode.

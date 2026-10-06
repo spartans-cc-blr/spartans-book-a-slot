@@ -23,9 +23,11 @@ export default async function WranglerGroundsPage() {
   return (
     <>
       <SiteNav activePage="wrangler" />
-      <main className="min-h-screen bg-parchment dark:bg-ink px-4 md:px-8 py-8 max-w-4xl mx-auto">
+      <div className="min-h-screen bg-parchment dark:bg-ink">
+      <main className="px-4 md:px-8 py-8 max-w-4xl mx-auto">
         <GroundsClient canAdd={canAdd} canEdit={canEdit} />
       </main>
+      </div>
     </>
   )
 }
