@@ -64,6 +64,8 @@ CAPTAIN MATCHING: Match captain names fuzzily against KNOWN CAPTAINS. "Muthu" �
 
 GROUND MATCHING: Match ground/venue mentions fuzzily against KNOWN GROUNDS. Return the matching real id as ground_id and its name as ground_name. No confident match (e.g. a ground not in the list at all) → both null. Never invent an id or return raw unmatched text as ground_id.
 
+MULTIPLE SLOTS: "07:30 and 12:30", "7:30, 12:30" → slot_times lists them all (one date, several slots). Do not drop any. Do not judge availability yourself — the system checks each slot and reports conflicts.
+
 For MODIFY actions, identify the target booking from the upcoming bookings list using date+slot or partial ID. Set booking_id.
 For CANCEL actions, same — identify booking_id from the list.
 
@@ -72,7 +74,8 @@ Respond ONLY with valid JSON, no markdown fences, no preamble:
   "action": "book" | "reserve" | "modify" | "cancel",
   "booking_id": "uuid or null (for modify/cancel — use full uuid from the list)",
   "game_date": "YYYY-MM-DD or null",
-  "slot_time": "07:30|10:30|12:30|14:30 or null",
+  "slot_time": "first requested slot: 07:30|10:30|12:30|14:30 or null",
+  "slot_times": ["every slot the user asked for on that date, e.g. [\"07:30\",\"12:30\"]; [] if none. Always include ALL slots mentioned"],
   "format": "T20|T30|null",
   "captain_id": "uuid or null",
   "captain_name": "matched name or null",
@@ -147,7 +150,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: process.env.NLP_PARSE_MODEL || 'claude-sonnet-5-5',
-        max_tokens: 500,
+        max_tokens: 800,
         system: buildSystemPrompt(today, context ?? { captains: [], grounds: [], tournaments: [], upcomingBookings: [] }),
         // Security: user text goes ONLY in the user message — not interpolated into system prompt
         messages: [{ role: 'user', content: text }],
