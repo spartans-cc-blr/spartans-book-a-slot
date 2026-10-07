@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: process.env.NLP_PARSE_MODEL || 'claude-sonnet-5-5',
         max_tokens: 500,
         system: buildSystemPrompt(today, context ?? { captains: [], grounds: [], tournaments: [], upcomingBookings: [] }),
         // Security: user text goes ONLY in the user message — not interpolated into system prompt
@@ -156,8 +156,14 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const err = await response.text()
-      console.error('Anthropic API error:', err)
-      return NextResponse.json({ error: 'AI parse failed' }, { status: 502 })
+      console.error('Anthropic API error:', response.status, err)
+      let detail = ''
+      try { detail = JSON.parse(err)?.error?.message ?? '' } catch { /* non-JSON body */ }
+      // Admin-only route, so surfacing the upstream reason is safe and saves a log dive
+      return NextResponse.json(
+        { error: `AI parse failed (${response.status}${detail ? `: ${detail}` : ''})` },
+        { status: 502 },
+      )
     }
 
     const data = await response.json()

@@ -1062,3 +1062,4 @@ Next.js API Routes (server-side)
 ---
  
 *Maintained by: Spartans Data Wranglers Team · Coordinator: Muthu, Spartans CC BLR · Last synced: June 2026*
+> **NLP booking bar (`/api/admin/nlp-parse`, October 2026):** the route's pinned model `claude-sonnet-4-20250514` had been retired, so every parse returned "AI parse failed" (502). It now defaults to `claude-sonnet-5-5`, overridable via the `NLP_PARSE_MODEL` env var, and the 502 message includes the Anthropic status and error text (admin-only route). Known limit: the schema has a single `slot_time`, so a request naming two slots ("07:30 and 12:30") is not supported yet.
