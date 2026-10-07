@@ -4,7 +4,6 @@ import { createServiceClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { format, addDays } from 'date-fns'
 import type { Booking } from '@/types'
-import NLPBookingBar from '@/components/admin/NLPBookingBar'
 import { ScheduleGrid } from '@/components/schedule/ScheduleGrid'
 import { DashboardBookingsTabs, type DashboardBookingRow } from '@/components/admin/DashboardBookingsTabs'
 
@@ -59,10 +58,6 @@ export default async function AdminDashboard({
   // was played — the old `.limit(100)` fetch here silently capped both the
   // list and the "(100)" tab count once history grew past 100 bookings.
 
-  const { data: captains }     = await supabase.from('captains').select('id, name').eq('active', true).order('name')
-  const { data: grounds }      = await supabase.from('grounds').select('id, name').order('name')
-  const { data: tournamentsMd } = await supabase.from('tournaments').select('id, name').eq('active', true).order('name')
-
   // This weekend games count
   const day = new Date().getDay()
   const sat = format(addDays(new Date(), day === 6 ? 0 : (6 - day)), 'yyyy-MM-dd')
@@ -108,26 +103,6 @@ export default async function AdminDashboard({
             <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-1">{card.sub}</p>
           </div>
         ))}
-      </div>
-
-      {/* NLP Command Bar */}
-      <div className="mb-5">
-        <NLPBookingBar
-          captains={captains ?? []}
-          grounds={grounds ?? []}
-          tournaments={tournamentsMd ?? []}
-          upcomingBookings={(bookings ?? [])
-            .filter(b => b.status !== 'cancelled')
-            .map(b => ({
-              id: b.id,
-              game_date: b.game_date,
-              slot_time: b.slot_time,
-              format: b.format ?? null,
-              status: b.status,
-              captain_name: (b as any).tournament?.captains?.name ?? null,
-              tournament_name: (b as any).tournament?.name ?? null,
-            }))}
-        />
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
