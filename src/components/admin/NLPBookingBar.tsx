@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Captain { id: string; name: string; cricheroes_url?: string | null }
@@ -23,6 +24,8 @@ interface ParsedCommand {
   game_date: string | null
   slot_time: string | null
   slot_times?: string[]
+  cricheroes_url?: string | null
+  match_id?: string | null
   format: string | null
   captain_id: string | null
   captain_name: string | null
@@ -49,6 +52,7 @@ interface NLPBookingBarProps {
 // ── Example hints ─────────────────────────────────────────────────────────────
 const EXAMPLES = [
   'book sat 3 may 07:30 T30 at Neelgiri',
+  'book 29 nov 07:30 T20 <CricHeroes match link>',
   'reserve 26 apr 07:30 for Ranjith',
   'cancel booking on 3 may 10:30',
   'change 26 apr 07:30 captain to Vikram',
@@ -138,6 +142,12 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
   // ── Parse ─────────────────────────────────────────────────────────────────
   const handleParse = useCallback(async () => {
     if (!text.trim()) return
+    // A pasted CricHeroes link is read here, not by the model: it keeps the
+    // URL out of the 500-char prompt and means no CricHeroes fetch is needed.
+    const urlMatch = text.match(/https?:\/\/[^\s]*cricheroes[^\s]*/i)
+    const chUrl = urlMatch ? urlMatch[0] : null
+    const textForModel = (chUrl ? text.replace(chUrl, ' ') : text).replace(/\s+/g, ' ').trim()
+    if (!textForModel) { setParseError('Add a date and slot along with the link'); return }
     setParsing(true)
     setParsed(null)
     setParseError('')
@@ -149,7 +159,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: text.trim(),
+          text: textForModel,
           context: {
             captains: captains.map(c => ({ id: c.id, name: c.name })),
             grounds:  grounds.map(g => ({ id: g.id, name: g.name })),
@@ -173,6 +183,16 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
       }
 
       const data: ParsedCommand = await res.json()
+      if (chUrl) {
+        try {
+          const parts = new URL(chUrl).pathname.split('/').filter(Boolean)
+          const i = parts.indexOf('scorecard')
+          data.cricheroes_url = chUrl
+          data.match_id = i !== -1 && parts[i + 1] ? parts[i + 1] : null
+          const guess = parts.length ? opponentFromMatchSlug(parts[parts.length - 1]) : null
+          if (guess && !data.opponent_name) data.opponent_name = guess
+        } catch { /* malformed link — ignore */ }
+      }
       setParsed(data)
 
       // Low confidence → redirect to form pre-filled instead of confirming directly
@@ -330,6 +350,8 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
                 ground_id:      parsed.ground_id ?? null,
                 notes:          parsed.notes ?? null,
                 opponent_name:  parsed.opponent_name ?? null,
+                cricheroes_url: parsed.cricheroes_url ?? null,
+                match_id:       parsed.match_id ?? null,
               }),
             })
           }
@@ -416,6 +438,9 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
           )}
           {parsed.notes && (
             <Field label="Notes" value={parsed.notes} />
+          )}
+          {parsed.cricheroes_url && (
+            <Field label="CricHeroes" value={parsed.match_id ? `Match ${parsed.match_id}` : 'Link attached'} />
           )}
         </div>
 
