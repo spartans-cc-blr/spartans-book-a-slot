@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Captain { id: string; name: string; cricheroes_url?: string | null }
@@ -22,6 +23,9 @@ interface ParsedCommand {
   booking_id: string | null
   game_date: string | null
   slot_time: string | null
+  slot_times?: string[]
+  cricheroes_url?: string | null
+  match_id?: string | null
   format: string | null
   captain_id: string | null
   captain_name: string | null
@@ -48,6 +52,7 @@ interface NLPBookingBarProps {
 // ── Example hints ─────────────────────────────────────────────────────────────
 const EXAMPLES = [
   'book sat 3 may 07:30 T30 at Neelgiri',
+  'book 29 nov 07:30 T20 <CricHeroes match link>',
   'reserve 26 apr 07:30 for Ranjith',
   'cancel booking on 3 may 10:30',
   'change 26 apr 07:30 captain to Vikram',
@@ -100,6 +105,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
   const [parseError, setParseError] = useState('')
   const [executing, setExecuting] = useState(false)
   const [execError, setExecError] = useState('')
+  const [results, setResults]   = useState<{ slot: string; ok: boolean; reason?: string }[]>([])
   const [hintIdx, setHintIdx]     = useState(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -130,22 +136,30 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
     setParsed(null)
     setParseError('')
     setExecError('')
+    setResults([])
   }
 
   // ── Parse ─────────────────────────────────────────────────────────────────
   const handleParse = useCallback(async () => {
     if (!text.trim()) return
+    // A pasted CricHeroes link is read here, not by the model: it keeps the
+    // URL out of the 500-char prompt and means no CricHeroes fetch is needed.
+    const urlMatch = text.match(/https?:\/\/[^\s]*cricheroes[^\s]*/i)
+    const chUrl = urlMatch ? urlMatch[0] : null
+    const textForModel = (chUrl ? text.replace(chUrl, ' ') : text).replace(/\s+/g, ' ').trim()
+    if (!textForModel) { setParseError('Add a date and slot along with the link'); return }
     setParsing(true)
     setParsed(null)
     setParseError('')
     setExecError('')
+    setResults([])
 
     try {
       const res = await fetch('/api/admin/nlp-parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: text.trim(),
+          text: textForModel,
           context: {
             captains: captains.map(c => ({ id: c.id, name: c.name })),
             grounds:  grounds.map(g => ({ id: g.id, name: g.name })),
@@ -169,6 +183,16 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
       }
 
       const data: ParsedCommand = await res.json()
+      if (chUrl) {
+        try {
+          const parts = new URL(chUrl).pathname.split('/').filter(Boolean)
+          const i = parts.indexOf('scorecard')
+          data.cricheroes_url = chUrl
+          data.match_id = i !== -1 && parts[i + 1] ? parts[i + 1] : null
+          const guess = parts.length ? opponentFromMatchSlug(parts[parts.length - 1]) : null
+          if (guess && !data.opponent_name) data.opponent_name = guess
+        } catch { /* malformed link — ignore */ }
+      }
       setParsed(data)
 
       // Low confidence → redirect to form pre-filled instead of confirming directly
@@ -224,6 +248,24 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
     return `/admin/bookings/new?${params}`
   }
 
+  function slotsOf(p: ParsedCommand): string[] {
+    const list = (p.slot_times ?? []).filter(Boolean)
+    if (list.length) return Array.from(new Set(list))
+    return p.slot_time ? [p.slot_time] : []
+  }
+
+  // Why a create call was refused, in words the admin can act on
+  async function reasonFrom(res: Response, fallback: string): Promise<string> {
+    try {
+      const d = await res.json()
+      if (Array.isArray(d.errors) && d.errors.length) {
+        return d.errors.map((e: any) => (e.rule ? `${e.rule}: ${e.message}` : e.message)).join('; ')
+      }
+      if (d.error) return d.error
+    } catch { /* non-JSON */ }
+    return fallback
+  }
+
   // ── Execute — calls existing API routes, all protected by requireAdmin() ──
   async function handleExecute() {
     if (!parsed) return
@@ -265,54 +307,63 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
         return
       }
 
-      // RESERVE (soft block)
-      if (parsed.action === 'reserve') {
-        if (!parsed.game_date || !parsed.slot_time) {
-          setExecError('Date and slot are required for a reservation.')
+      // RESERVE / BOOK — one or more slots on the date. Each slot is attempted
+      // independently: free slots are created, taken/invalid ones are rejected
+      // with a reason, and the admin sees the per-slot outcome.
+      if (parsed.action === 'reserve' || parsed.action === 'book') {
+        const slots = slotsOf(parsed)
+        if (!parsed.game_date || slots.length === 0) {
+          setExecError('Date and slot are required.')
           return
         }
-        const res = await fetch('/api/bookings/reserve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            game_date:      parsed.game_date,
-            slot_time:      parsed.slot_time,
-            organiser_name: parsed.organiser_name ?? 'TBC',
-            organiser_phone:parsed.organiser_phone ?? null,
-            notes:          parsed.notes ?? null,
-          }),
-        })
-        if (!res.ok) { const d = await res.json(); setExecError(d.error ?? 'Reserve failed'); return }
-        setOpen(false); reset()
-        router.push('/admin?reserved=1')
-        router.refresh()
-        return
-      }
-
-      // BOOK (new confirmed booking)
-      if (parsed.action === 'book') {
-        if (!parsed.game_date || !parsed.slot_time || !parsed.format) {
+        if (parsed.action === 'book' && !parsed.format) {
           setExecError('Date, slot and format are required to book.')
           return
         }
-        const res = await fetch('/api/bookings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            game_date:      parsed.game_date,
-            slot_time:      parsed.slot_time,
-            format:         parsed.format,
-            captain_id:     parsed.captain_id ?? null,
-            tournament_id:  parsed.tournament_id ?? null,
-            ground_id:      parsed.ground_id ?? null,
-            notes:          parsed.notes ?? null,
-            opponent_name:  parsed.opponent_name ?? null,
-          }),
-        })
-        if (!res.ok) { const d = await res.json(); setExecError(d.error ?? 'Booking failed'); return }
-        setOpen(false); reset()
-        router.push('/admin?booked=1')
+        const outcome: { slot: string; ok: boolean; reason?: string }[] = []
+        for (const slot of slots) {
+          let res: Response
+          if (parsed.action === 'reserve') {
+            const noteParts = [parsed.tournament_name, parsed.notes].filter(Boolean)
+            res = await fetch('/api/bookings/reserve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                game_date:       parsed.game_date,
+                slot_time:       slot,
+                organiser_name:  parsed.organiser_name ?? 'TBC',
+                organiser_phone: parsed.organiser_phone ?? null,
+                reserved_until:  new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+                notes:           noteParts.length ? noteParts.join(' — ') : null,
+              }),
+            })
+          } else {
+            res = await fetch('/api/bookings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                game_date:      parsed.game_date,
+                slot_time:      slot,
+                format:         parsed.format,
+                captain_id:     parsed.captain_id ?? null,
+                tournament_id:  parsed.tournament_id ?? null,
+                ground_id:      parsed.ground_id ?? null,
+                notes:          parsed.notes ?? null,
+                opponent_name:  parsed.opponent_name ?? null,
+                cricheroes_url: parsed.cricheroes_url ?? null,
+                match_id:       parsed.match_id ?? null,
+              }),
+            })
+          }
+          if (res.ok) outcome.push({ slot, ok: true })
+          else outcome.push({ slot, ok: false, reason: await reasonFrom(res, 'Request failed') })
+        }
+        setResults(outcome)
         router.refresh()
+        if (outcome.every(o => o.ok)) {
+          setOpen(false); reset()
+          router.push(parsed.action === 'reserve' ? '/admin?reserved=1' : '/admin?booked=1')
+        }
         return
       }
 
@@ -364,8 +415,8 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
           {parsed.game_date && (
             <Field label="Date" value={fmtDate(parsed.game_date)} />
           )}
-          {parsed.slot_time && (
-            <Field label="Slot" value={slotLabel(parsed.slot_time)} />
+          {slotsOf(parsed).length > 0 && (
+            <Field label={slotsOf(parsed).length > 1 ? 'Slots' : 'Slot'} value={slotsOf(parsed).map(slotLabel).join(' + ')} />
           )}
           {parsed.format && (
             <Field label="Format" value={parsed.format} />
@@ -388,6 +439,9 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
           {parsed.notes && (
             <Field label="Notes" value={parsed.notes} />
           )}
+          {parsed.cricheroes_url && (
+            <Field label="CricHeroes" value={parsed.match_id ? `Match ${parsed.match_id}` : 'Link attached'} />
+          )}
         </div>
 
         {/* Issues */}
@@ -396,6 +450,18 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
             {parsed.issues.map((iss, i) => (
               <p key={i} className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5 mt-1">
                 <span className="mt-0.5">⚠</span> {iss}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {/* Per-slot outcome */}
+        {results.length > 0 && (
+          <div className="px-4 pb-3 space-y-1">
+            {results.map(r => (
+              <p key={r.slot} className={`font-rajdhani text-xs flex items-start gap-1.5 ${r.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                <span>{r.ok ? '✓' : '✕'}</span>
+                <span>{slotLabel(r.slot)}: {r.ok ? (parsed.action === 'reserve' ? 'reserved' : 'booked') : `not created — ${r.reason}`}</span>
               </p>
             ))}
           </div>
@@ -431,7 +497,7 @@ export default function NLPBookingBar({ captains, grounds, tournaments, upcoming
                 Edit in form
               </button>
               <span className="flex-1" />
-              {!hasErrors && (
+              {!hasErrors && results.length === 0 && (
                 <button
                   onClick={handleExecute}
                   disabled={executing}
