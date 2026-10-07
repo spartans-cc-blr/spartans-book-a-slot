@@ -1489,8 +1489,7 @@ export function TournamentPlannerClient({
   const activeTab: TournamentTab = chosenTab
     ?? (tournamentCounts.ongoing > 0 ? 'ongoing' : tournamentCounts.upcoming > 0 ? 'upcoming' : tournamentCounts.completed > 0 ? 'completed' : 'ongoing')
 
-  // Within a tab: needs-attention first, then by what's happening soonest
-  // (completed: most recently finished first), then A–Z.
+  // Within a tab: A–Z by tournament name (completed: most recently finished first).
   const sortedTournaments = useMemo(() =>
     classifiedTournaments
       .filter(t => t.tab === activeTab)
@@ -1498,9 +1497,9 @@ export function TournamentPlannerClient({
         if (activeTab === 'completed') {
           return b.assessment.lastGameDate.localeCompare(a.assessment.lastGameDate) || a.tournament.name.localeCompare(b.tournament.name)
         }
-        const an = a.assessment.nextGameDate ?? '9999-12-31'
-        const bn = b.assessment.nextGameDate ?? '9999-12-31'
-        return a.assessment.rank - b.assessment.rank || an.localeCompare(bn) || a.tournament.name.localeCompare(b.tournament.name)
+        // Ongoing / Upcoming: plain A–Z — attention items are already surfaced
+        // in the Needs Attention panel and by their pills.
+        return a.tournament.name.localeCompare(b.tournament.name)
       }),
     [classifiedTournaments, activeTab]
   )
