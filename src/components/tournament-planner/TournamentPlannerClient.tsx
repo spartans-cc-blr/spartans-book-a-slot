@@ -1392,6 +1392,16 @@ const TOURNAMENT_TABS: { key: TournamentTab; label: string }[] = [
 ]
 
 // ── Root client component ──────────────────────────────────────────
+type SortKey = 'az' | 'quiet' | 'league_left' | 'unbooked' | 'captain' | 'recent'
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'az',          label: 'Name (A–Z)' },
+  { key: 'quiet',       label: 'Longest without a game' },
+  { key: 'league_left', label: 'Fewest league games left' },
+  { key: 'unbooked',    label: 'Most games still to book' },
+  { key: 'captain',     label: 'Captain (A–Z)' },
+  { key: 'recent',      label: 'Most recently played' },
+]
+
 export function TournamentPlannerClient({
   bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, tournamentStatsMap, bookingCaptainMap,
   knockoutHoldsByTournament, emptyTournaments,
@@ -1433,6 +1443,7 @@ export function TournamentPlannerClient({
   }
   // null = not chosen yet; resolves to Ongoing, or the first non-empty tab.
   const [chosenTab, setChosenTab] = useState<TournamentTab | null>(null)
+  const [chosenSort, setChosenSort] = useState<SortKey | null>(null)
 
   // "view" click from a Captain Bandwidth tournament card — scrolls to and expands
   // the matching TournamentBlock below. Token bumps on every click (even repeat
@@ -1489,20 +1500,49 @@ export function TournamentPlannerClient({
   const activeTab: TournamentTab = chosenTab
     ?? (tournamentCounts.ongoing > 0 ? 'ongoing' : tournamentCounts.upcoming > 0 ? 'upcoming' : tournamentCounts.completed > 0 ? 'completed' : 'ongoing')
 
-  // Within a tab: A–Z by tournament name (completed: most recently finished first).
-  const sortedTournaments = useMemo(() =>
-    classifiedTournaments
+  const sortKey: SortKey = chosenSort ?? (activeTab === 'completed' ? 'recent' : 'az')
+
+  // Within a tab: the admin's chosen order, ties broken by name. A tournament
+  // missing the sorted value (no games yet, no captain, no league target)
+  // always goes last.
+  const sortedTournaments = useMemo(() => {
+    const NONE = Number.POSITIVE_INFINITY
+    const leagueLeft = (t: typeof classifiedTournaments[number]) => {
+      const total = t.tournament.total_league_games
+      if (total == null) return NONE
+      const played = t.games.filter(g => g.stage_type !== 'knockout' && g.game_date < today).length
+      return Math.max(0, total - played)
+    }
+    const byName = (a: typeof classifiedTournaments[number], b: typeof classifiedTournaments[number]) =>
+      a.tournament.name.localeCompare(b.tournament.name)
+    const hasGames = (t: typeof classifiedTournaments[number]) => t.games.length > 0
+    return classifiedTournaments
       .filter(t => t.tab === activeTab)
       .sort((a, b) => {
-        if (activeTab === 'completed') {
-          return b.assessment.lastGameDate.localeCompare(a.assessment.lastGameDate) || a.tournament.name.localeCompare(b.tournament.name)
+        switch (sortKey) {
+          case 'quiet':
+            // oldest last game first; never-played tournaments last
+            if (hasGames(a) !== hasGames(b)) return hasGames(a) ? -1 : 1
+            return a.assessment.lastGameDate.localeCompare(b.assessment.lastGameDate) || byName(a, b)
+          case 'recent':
+            if (hasGames(a) !== hasGames(b)) return hasGames(a) ? -1 : 1
+            return b.assessment.lastGameDate.localeCompare(a.assessment.lastGameDate) || byName(a, b)
+          case 'league_left': {
+            const x = leagueLeft(a), y = leagueLeft(b)
+            return x === y ? byName(a, b) : x < y ? -1 : 1
+          }
+          case 'unbooked':
+            return b.assessment.unbooked - a.assessment.unbooked || byName(a, b)
+          case 'captain': {
+            const an = a.tournament.captains?.name, bn = b.tournament.captains?.name
+            if (!an !== !bn) return an ? -1 : 1
+            return (an ?? '').localeCompare(bn ?? '') || byName(a, b)
+          }
+          default:
+            return byName(a, b)
         }
-        // Ongoing / Upcoming: plain A–Z — attention items are already surfaced
-        // in the Needs Attention panel and by their pills.
-        return a.tournament.name.localeCompare(b.tournament.name)
-      }),
-    [classifiedTournaments, activeTab]
-  )
+      })
+  }, [classifiedTournaments, activeTab, sortKey, today])
 
   function handleViewTournament(tournamentId: string) {
     // Make sure the tab holding this tournament is the one showing, so the
@@ -1596,7 +1636,7 @@ export function TournamentPlannerClient({
       <section>
         <h2 className="font-cinzel text-xl font-bold text-gold-dim mb-1">By Tournament</h2>
         <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400 mb-4">
-          Tournaments that need attention come first in each tab.
+          Tournaments that need attention are listed under Needs Attention above.
         </p>
 
         {/* Segmented tabs — same pill control as Upcoming / Past Matches */}
@@ -1614,6 +1654,13 @@ export function TournamentPlannerClient({
               </button>
             )
           })}
+        </div>
+        <div className="flex items-center gap-2 mb-4">
+          <label htmlFor="tp-sort" className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400">Sort by</label>
+          <select id="tp-sort" value={sortKey} onChange={e => setChosenSort(e.target.value as SortKey)}
+            className="font-rajdhani text-sm font-semibold rounded-lg px-3 py-1.5 bg-white dark:bg-ink-3 text-ink dark:text-parchment border border-parchment-3 dark:border-ink-5">
+            {SORT_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
         </div>
         {sortedTournaments.length === 0 ? (
           <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400">

@@ -727,7 +727,7 @@ Captains rarely use this page; it is mainly the admin/organiser's view of which 
 **Layout**
 - **Per-captain "Overall slot balance" removed.** Per-tournament slot balance (§5.6) stays.
 - **Show toggles replaced by segmented pill tabs** (Ongoing / Upcoming / Completed, same look as Upcoming / Past Matches), one at a time, default Ongoing (first non-empty if empty), with counts and a red dot when a tab holds a flagged tournament. "View" from a captain card or the attention panel switches to the right tab.
-- **Sort within a tab:** Ongoing and Upcoming are A–Z by tournament name (changed Oct 2026; attention is shown by the Needs Attention panel and per-card pills, not by order); Completed is most recently finished first.
+- **Sort within a tab:** a "Sort by" dropdown (Oct 2026): Name A–Z (default for Ongoing/Upcoming), Longest without a game, Fewest league games left, Most games still to book, Captain A–Z, Most recently played (default for Completed). Ties go A–Z; tournaments missing the sorted value (no games, no league target, no captain) go last. The choice is per-visit client state; attention is surfaced by the Needs Attention panel and pills, not by order.
 
 **Completion is an explicit admin decision — never automatic**
 - `tournaments.completed_at date` (migration `085_tournament_completed_at.sql`). Set → Completed tab, no attention flags, excluded from captain bandwidth cards. Set from the planner ("Mark completed" / "Reopen", admin only); the stored date is the tournament's last game date, not the day it was closed. Written via `PATCH /api/tournaments` (admin-only route; value validated as `YYYY-MM-DD` or null). The control is only rendered for admins.
