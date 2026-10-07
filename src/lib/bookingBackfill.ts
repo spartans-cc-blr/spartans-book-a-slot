@@ -224,3 +224,92 @@ export async function createBackfillBooking(
   const backfill = await backfillOneBooking(booking.id)
   return { ok: backfill.ok, booking_id: booking.id, backfill }
 }
+
+export interface CreateManualBackfillBookingInput {
+  match_id:      string
+  tournament_id: string
+  format:        'T20' | 'T30'
+  slot_time:     string
+  // Admin-supplied because CricHeroes can't be reached right now to
+  // re-derive these (see the file-level comment on this function).
+  game_date:     string // YYYY-MM-DD
+  opponent_name: string | null
+}
+
+// Fallback for when CricHeroes is rate-limiting (or otherwise unreachable)
+// and createBackfillBooking() above can't even get a preview, let alone
+// re-derive game_date/opponent/ground to write a real booking. Rather than
+// retry the CricHeroes fetch synchronously, this creates the booking row
+// directly from admin-supplied fields and deliberately does NOT call
+// backfillOneBooking() — no CricHeroes request is made at all here.
+//
+// The booking is left exactly as any other confirmed booking with a real
+// match_id and no synced scorecard yet — the same shape the existing
+// self-healing backfill-scorecards cron already looks for (see
+// features/post-match-scorecard.md §8's eligibility query: confirmed,
+// non-practice, has match_id, not yet synced/fees_applied). Its next run
+// (13:00/19:00 IST) will pick this booking up and attempt the real parse+
+// sync itself — benefiting from whatever CricHeroes-side cooldown has
+// elapsed by then — with no new queue table or scheduling logic needed.
+// An admin can also drive it immediately from /admin/scorecard-backfill,
+// which already lists exactly this class of booking.
+//
+// Still re-validates everything that doesn't require CricHeroes: the
+// duplicate-match_id guard, that the tournament exists, and that game_date
+// is genuinely in the past (this route is for backfilling completed
+// matches only, same rule createBackfillBooking() enforces — it's just
+// checked against the admin's own typed date here instead of CricHeroes'
+// own "date" field, since there is no CricHeroes response to check it
+// against). opponent_name is accepted as freely as venue/notes already
+// are elsewhere on a booking — descriptive text, not a security boundary.
+export async function createManualBackfillBooking(
+  input: CreateManualBackfillBookingInput
+): Promise<CreateBackfillBookingResult> {
+  const supabase = createServiceClient()
+
+  const { data: existing } = await supabase
+    .from('bookings')
+    .select('id')
+    .eq('match_id', input.match_id)
+    .maybeSingle()
+  if (existing) {
+    return { ok: false, error: `A booking already exists for match_id ${input.match_id}` }
+  }
+
+  const { data: tournament } = await supabase
+    .from('tournaments')
+    .select('id')
+    .eq('id', input.tournament_id)
+    .maybeSingle()
+  if (!tournament) {
+    return { ok: false, error: 'Tournament not found' }
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+  if (input.game_date >= today) {
+    return { ok: false, error: 'This match is not in the past — booking backfill is for completed matches only' }
+  }
+
+  const { data: booking, error: insertErr } = await supabase
+    .from('bookings')
+    .insert({
+      game_date:     input.game_date,
+      slot_time:     input.slot_time,
+      format:        input.format,
+      status:        'confirmed',
+      tournament_id: input.tournament_id,
+      opponent_name: input.opponent_name,
+      match_id:      input.match_id,
+    })
+    .select('id')
+    .single()
+
+  if (insertErr || !booking) {
+    return { ok: false, error: insertErr?.message ?? 'Failed to create booking' }
+  }
+
+  // Deliberately no backfillOneBooking() call here — see the function
+  // comment above. The booking now simply exists, unsynced, which is all
+  // "queued for the cron" means in this app — no separate queue table.
+  return { ok: true, booking_id: booking.id }
+}

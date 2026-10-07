@@ -9,15 +9,21 @@
 // non-admin away), so gating any wider than that here would be a route
 // nobody but an admin could ever actually reach.
 //
-// dry_run: true  → preview only from CricHeroes, no writes, safe to repeat
-// dry_run: false → creates the booking, then chains parse+sync
+// dry_run: true           → preview only from CricHeroes, no writes, safe to repeat
+// dry_run: false, no manual → creates the booking, then chains parse+sync
+// dry_run: false, manual: true → CricHeroes-unreachable fallback: creates the
+//   booking from admin-supplied fields with no CricHeroes call at all,
+//   leaving it for the backfill-scorecards cron (or a manual
+//   /admin/scorecard-backfill run) to sync once CricHeroes is reachable
+//   again — see src/lib/bookingBackfill.ts's createManualBackfillBooking()
+//   and features/post-match-scorecard.md §18.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 import { bookingBackfillRequestSchema } from '@/lib/schemas'
-import { previewBackfillMatch, createBackfillBooking } from '@/lib/bookingBackfill'
+import { previewBackfillMatch, createBackfillBooking, createManualBackfillBooking } from '@/lib/bookingBackfill'
 
 export const maxDuration = 60
 
@@ -48,6 +54,22 @@ export async function POST(req: NextRequest) {
     } catch (err: any) {
       return NextResponse.json({ error: err?.message ?? 'Preview failed' }, { status: 502 })
     }
+  }
+
+  if ('manual' in input && input.manual) {
+    const result = await createManualBackfillBooking({
+      match_id:      input.match_id,
+      tournament_id: input.tournament_id,
+      format:        input.format,
+      slot_time:     input.slot_time,
+      game_date:     input.game_date,
+      opponent_name: input.opponent_name ?? null,
+    })
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+    return NextResponse.json(result)
   }
 
   const result = await createBackfillBooking({

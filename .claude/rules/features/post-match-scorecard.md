@@ -2494,24 +2494,97 @@ TTL, independent cache per `match_id`, expiry forces a refetch, and —
 critically — a 404/429/non-PDF response is never cached and the next call
 retries fresh).
 
+### Third fix — a no-CricHeroes-fetch-at-all manual fallback (added October 2026)
+
+The two fixes above reduce a Booking Backfill cycle's *own* CricHeroes
+footprint, but they can't do anything about CricHeroes already rate-
+limiting the service from earlier, unrelated traffic (the cron, other
+admin activity) — at that point even the single remaining fetch 429s, and
+retrying sooner just spends more of the same budget. The only real answer
+to that is to not fetch at all for a while, which the two caches can't
+offer on their own.
+
+`/admin/booking-backfill` now offers a manual fallback the moment Preview
+fails for any reason (429 included, but also a timeout, a 502, or any
+other "CricHeroes isn't answering right now" shape): **"Create booking
+manually instead (no CricHeroes fetch)"**. This switches the form to admin-
+supplied fields instead of a CricHeroes-derived preview — a CricHeroes
+match URL (optional, parsed client-side with zero network calls via
+`extractMatchIdFromUrl()`/`opponentFromMatchSlug()`, same "-vs-" slug
+parsing `/admin/bookings/new` already uses to prefill Opponent from a
+pasted URL), Match ID, Match date (since there's no CricHeroes response to
+read `game_date` from any more), Opponent, Tournament, Format, and Slot
+label.
+
+Submitting this form hits the same `POST /api/admin/booking-backfill`
+route with `manual: true` alongside `dry_run: false`, routed to a new
+`createManualBackfillBooking()` in `src/lib/bookingBackfill.ts`. It keeps
+every guard that doesn't need CricHeroes — the duplicate-`match_id` check,
+the tournament-exists check, the past-date-only rule (checked against the
+admin's own typed date, since there's no CricHeroes "date" field to check
+it against instead) — but **inserts the `bookings` row directly and never
+calls `backfillOneBooking()`**. No CricHeroes request happens anywhere in
+this path.
+
+**"Queued" means nothing more than "exists, unsynced"** — there's no new
+queue table or scheduling mechanism. A booking created this way is, from
+that point on, indistinguishable from any other confirmed booking with a
+real `match_id` and no synced scorecard: exactly the shape
+`backfill-scorecards`' own eligibility query already looks for (§8 —
+confirmed, non-practice, has `match_id`, not yet `synced`/`fees_applied`).
+Its very next scheduled run (13:00/19:00 IST) will pick it up and attempt
+the real parse+sync itself, by which point CricHeroes' own rate-limit
+window has had a chance to clear. An admin impatient to see it sync sooner
+can also just open `/admin/scorecard-backfill`, which lists this exact
+class of booking and lets them pace retries themselves.
+
+**Why this doesn't need a `.strict()`-adjacent trust relaxation beyond
+`game_date`/`opponent_name`.** Every other field this route already
+trusted the admin for (`tournament_id`, `format`, `slot_time`) is
+unchanged. The two new admin-supplied fields are the two that the auto
+path previously re-derived from CricHeroes specifically to avoid trusting
+the browser's last-displayed preview — but there's no CricHeroes response
+left to re-derive them from in this path, so admin input is the only
+remaining source. `opponent_name` is free text at the same trust level as
+`venue`/`notes` already are elsewhere on a booking (never used to derive
+an identity match or a security decision); `game_date` is still validated
+format- and past-only server-side exactly like the auto path's CricHeroes-
+derived value was.
+
+**Schema disambiguation note:** `bookingBackfillRequestSchema` moved from
+a `z.discriminatedUnion('dry_run', [...])` of two variants to a
+`z.union([...])` of three (`bookingBackfillPreviewSchema`,
+`bookingBackfillManualSchema`, `bookingBackfillConfirmSchema`), each now
+`.strict()`. `.strict()` here isn't cosmetic — without it, a manual-mode
+payload (which carries every field the confirm schema requires, plus a few
+it's never heard of) would validate against the confirm schema too, and
+whichever schema a plain `z.union` tries first would silently win,
+dropping `game_date`/`opponent_name`/`manual` and routing a manual request
+through the CricHeroes-dependent auto path instead.
+
 ### Security (vibe-security)
 
 | Check | Status |
 |---|---|
-| Route stays admin-only (`isAdmin`), rate-limited (`adminWrite`) — unchanged by either fix | ✅ |
+| Route stays admin-only (`isAdmin`), rate-limited (`adminWrite`) — unchanged by any of the three fixes | ✅ |
 | Hub-side preview cache never introduces client trust — the cached value is always a prior *server-side* CricHeroes response, never anything read from the request body | ✅ |
 | Hub-side cache key is derived from `match_id` only, read back as a typed `BackfillPreview` — no arbitrary key/value ever reachable from client input | ✅ |
 | Either cache layer's read/write failure fails open to a fresh fetch, never to a stale or wrong result | ✅ |
 | The real write (`dry_run: false` → `backfillOneBooking()`) still always resolves to a genuine CricHeroes-sourced PDF — the Python-side cache only ever serves bytes it itself verified (`%PDF` magic bytes, a 200 status) on a prior fetch, never anything client-supplied | ✅ |
 | Python-side cache never remembers a failure (404/429/non-PDF) — only ever caches a verified successful fetch | ✅ |
+| Manual-mode booking creation keeps the duplicate-`match_id`, tournament-exists, and past-date-only guards — only `game_date`/`opponent_name` are admin-supplied instead of CricHeroes-derived, and both are validated/trust-scoped the same way every other free-text or date booking field already is | ✅ |
+| `bookingBackfillRequestSchema`'s three variants are all `.strict()` so a manual-mode payload can never be silently parsed as an auto-mode confirm (or vice versa) | ✅ |
+| Manual mode never calls the microservice — verified by reading `createManualBackfillBooking()`, not just by the absence of a `backfillOneBooking()` call in the diff | ✅ |
 
 ### File Map
 
 | File | Role |
 |---|---|
-| `src/lib/bookingBackfill.ts` | `previewBackfillMatch()` (now cache-backed), `createBackfillBooking()`, `callMicroservice()` |
-| `src/app/api/admin/booking-backfill/route.ts` | POST — `dry_run: true` preview / `dry_run: false` create, admin-only |
-| `src/app/admin/booking-backfill/page.tsx` | Admin UI — match_id entry, Preview, tournament/format/slot pickers, Create |
+| `src/lib/bookingBackfill.ts` | `previewBackfillMatch()` (cache-backed), `createBackfillBooking()`, `callMicroservice()`, `createManualBackfillBooking()` (no-CricHeroes-fetch fallback) |
+| `src/app/api/admin/booking-backfill/route.ts` | POST — `dry_run: true` preview / `dry_run: false` create (auto or `manual: true`), admin-only |
+| `src/app/admin/booking-backfill/page.tsx` | Admin UI — match_id entry, Preview, tournament/format/slot pickers, Create; manual-fallback form shown on any preview failure |
+| `src/lib/schemas.ts` | `bookingBackfillRequestSchema` — `z.union` of three `.strict()` variants (preview / confirm / manual) |
+| `src/lib/cricheroesMatchUrl.ts` | `extractMatchIdFromUrl()` — pure URL-path parsing, used by the manual fallback form; `opponentFromMatchSlug()` (pre-existing, reused here too) |
 | `src/lib/rateLimit.ts` | `redis` client, now exported for reuse by `bookingBackfill.ts`'s preview cache |
 | `spartans-python/api.py` | `_fetch_cricheroes_pdf()` — the short-lived per-`match_id` PDF cache; `/fetch-and-parse-scorecard` now calls it instead of fetching inline |
 | `spartans-python/tests/test_pdf_cache.py` | Cache-hit/miss/expiry/never-caches-a-failure coverage for `_fetch_cricheroes_pdf()` |
