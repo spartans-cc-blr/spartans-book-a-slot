@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { opponentFromMatchSlug } from './cricheroesMatchUrl'
+import { opponentFromMatchSlug, extractMatchIdFromUrl } from './cricheroesMatchUrl'
 
 describe('opponentFromMatchSlug', () => {
   it('returns the opponent when Spartans CC Bengaluru is listed first', () => {
@@ -39,5 +39,30 @@ describe('opponentFromMatchSlug', () => {
 
   it('returns null when the slug has no "-vs-" separator', () => {
     expect(opponentFromMatchSlug('not-a-match-slug')).toBeNull()
+  })
+})
+
+describe('extractMatchIdFromUrl', () => {
+  it('extracts the match_id from a cricheroes.in scorecard URL', () => {
+    expect(extractMatchIdFromUrl('https://cricheroes.in/scorecard/22422538/some-tournament/spartans-cc-bengaluru-vs-whackers-cricket-club'))
+      .toBe('22422538')
+  })
+
+  it('extracts the match_id from a cricheroes.com scorecard URL', () => {
+    expect(extractMatchIdFromUrl('https://cricheroes.com/scorecard/26452955/championship-league/a-vs-b'))
+      .toBe('26452955')
+  })
+
+  it('returns null for a URL with no "scorecard" path segment', () => {
+    expect(extractMatchIdFromUrl('https://cricheroes.in/player-profile/12345/some-name')).toBeNull()
+  })
+
+  it('returns null for a "scorecard" segment with nothing after it', () => {
+    expect(extractMatchIdFromUrl('https://cricheroes.in/scorecard/')).toBeNull()
+  })
+
+  it('returns null for an invalid URL', () => {
+    expect(extractMatchIdFromUrl('not a url')).toBeNull()
+    expect(extractMatchIdFromUrl('22422538')).toBeNull()
   })
 })

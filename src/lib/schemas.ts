@@ -178,7 +178,7 @@ const backfillMatchIdField = z.string().min(1, 'match_id is required').max(30)
 export const bookingBackfillPreviewSchema = z.object({
   dry_run:  z.literal(true),
   match_id: backfillMatchIdField,
-})
+}).strict()
 
 export const bookingBackfillConfirmSchema = z.object({
   dry_run:       z.literal(false),
@@ -186,10 +186,37 @@ export const bookingBackfillConfirmSchema = z.object({
   tournament_id: z.string().uuid('tournament_id must be a valid UUID'),
   format:        z.enum(['T20', 'T30']),
   slot_time:     z.enum(['07:30', '10:30', '12:30', '14:30']),
-})
+}).strict()
 
-export const bookingBackfillRequestSchema = z.discriminatedUnion('dry_run', [
+// Fallback path for when CricHeroes itself is unreachable (rate limited or
+// otherwise) and the normal confirm step above — which re-derives
+// game_date/opponent_name/ground from a fresh CricHeroes fetch — has
+// nothing to re-derive them from. The admin supplies game_date (and,
+// optionally, opponent_name) directly instead; every other guard
+// (duplicate match_id, tournament-exists, the past-date check) still
+// applies exactly as the auto path. `.strict()` on every variant here is
+// load-bearing, not cosmetic: without it, a manual-mode payload (which
+// happens to carry every field bookingBackfillConfirmSchema requires, plus
+// some it doesn't know about) would silently also validate against the
+// confirm schema in the z.union below, and whichever schema the union
+// tries first would win — `.strict()` makes the extra/missing fields a
+// real mismatch instead of a silently-ignored one, so each payload shape
+// can only ever match its own schema. See
+// features/post-match-scorecard.md §18.
+export const bookingBackfillManualSchema = z.object({
+  dry_run:       z.literal(false),
+  manual:        z.literal(true),
+  match_id:      backfillMatchIdField,
+  tournament_id: z.string().uuid('tournament_id must be a valid UUID'),
+  format:        z.enum(['T20', 'T30']),
+  slot_time:     z.enum(['07:30', '10:30', '12:30', '14:30']),
+  game_date:     z.string().regex(GAME_DATE_REGEX, 'game_date must be YYYY-MM-DD'),
+  opponent_name: z.string().trim().min(1).max(120).optional(),
+}).strict()
+
+export const bookingBackfillRequestSchema = z.union([
   bookingBackfillPreviewSchema,
+  bookingBackfillManualSchema,
   bookingBackfillConfirmSchema,
 ])
 

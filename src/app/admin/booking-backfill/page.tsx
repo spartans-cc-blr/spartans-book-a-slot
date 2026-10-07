@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { extractMatchIdFromUrl, opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
 
 interface Tournament {
   id:   string
@@ -107,12 +108,40 @@ export default function BookingBackfillPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  // Manual fallback — for when CricHeroes can't be reached at all (rate
+  // limited, timed out, briefly down) and a preview never comes back. Creates
+  // the booking straight from these admin-supplied fields with zero CricHeroes
+  // calls, then leaves it for the self-healing backfill-scorecards cron (or a
+  // manual /admin/scorecard-backfill run) to actually sync once CricHeroes is
+  // reachable again. See features/post-match-scorecard.md §18.
+  const [manualMode, setManualMode] = useState(false)
+  const [manualUrl, setManualUrl] = useState('')
+  const [manualMatchId, setManualMatchId] = useState('')
+  const [manualOpponent, setManualOpponent] = useState('')
+  const [manualGameDate, setManualGameDate] = useState('')
+
   useEffect(() => {
     fetch('/api/tournaments')
       .then(res => res.json())
       .then(data => setTournaments((data.tournaments ?? []).map((t: any) => ({ id: t.id, name: t.name }))))
       .catch(() => {})
   }, [])
+
+  // Pure string parsing of the pasted URL — no network call, so this works
+  // exactly when CricHeroes itself is unreachable, unlike the Preview button.
+  useEffect(() => {
+    if (!manualUrl.trim()) return
+    const id = extractMatchIdFromUrl(manualUrl.trim())
+    if (id) setManualMatchId(id)
+    try {
+      const parts = new URL(manualUrl.trim()).pathname.split('/').filter(Boolean)
+      const slug = parts[parts.length - 1]
+      const guess = slug ? opponentFromMatchSlug(slug) : null
+      if (guess) setManualOpponent(prev => prev || guess)
+    } catch {
+      // Not a valid URL yet — ignore until it is
+    }
+  }, [manualUrl])
 
   async function runPreview() {
     if (!matchId.trim()) return
@@ -169,6 +198,55 @@ export default function BookingBackfillPage() {
     }
   }
 
+  function startManualMode() {
+    setManualMode(true)
+    setManualMatchId(prev => prev || matchId.trim())
+    setError('')
+  }
+
+  function cancelManualMode() {
+    setManualMode(false)
+    setManualUrl('')
+    setManualMatchId('')
+    setManualOpponent('')
+    setManualGameDate('')
+  }
+
+  async function confirmManualBackfill() {
+    if (!manualMatchId.trim() || !tournamentId || !manualGameDate) return
+    setConfirming(true)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await fetch('/api/admin/booking-backfill', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          dry_run:       false,
+          manual:        true,
+          match_id:      manualMatchId.trim(),
+          tournament_id: tournamentId,
+          format,
+          slot_time:     slotTime,
+          game_date:     manualGameDate,
+          opponent_name: manualOpponent.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Backfill failed'); return }
+      setSuccess(
+        `Booking created (booking_id ${data.booking_id}) — no CricHeroes fetch was made. It'll sync ` +
+        'automatically on the next scheduled run, or you can run it now from Scorecard Backfill.'
+      )
+      cancelManualMode()
+      setMatchId('')
+    } catch {
+      setError('Network error')
+    } finally {
+      setConfirming(false)
+    }
+  }
+
   return (
     <div className="max-w-xl">
       <div className="mb-6">
@@ -176,7 +254,9 @@ export default function BookingBackfillPage() {
         <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500 mt-1">
           For a match that was actually played but never got a Hub booking at all — not the same as
           &ldquo;Scorecard Backfill&rdquo;, which only re-syncs an already-existing booking. Enter the
-          CricHeroes match_id to preview what would be created before anything is written.
+          CricHeroes match_id to preview what would be created before anything is written. If CricHeroes
+          itself can&apos;t be reached (rate limited, down), you can create the booking manually instead
+          and let the scheduled sync pick it up later.
         </p>
       </div>
 
@@ -203,6 +283,118 @@ export default function BookingBackfillPage() {
 
         {error && <p className="font-rajdhani text-sm text-red-700 dark:text-red-400">{error}</p>}
         {success && <p className="font-rajdhani text-sm text-emerald-700 dark:text-emerald-400">{success}</p>}
+
+        {error && !preview && !manualMode && (
+          <button
+            onClick={startManualMode}
+            className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50 px-4 py-2 rounded transition-colors">
+            Create booking manually instead (no CricHeroes fetch)
+          </button>
+        )}
+
+        {manualMode && (
+          <div className="bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded p-3 space-y-2">
+            <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400">
+              Creates the booking straight away with no CricHeroes request at all. It&apos;ll sync
+              automatically on the next scheduled backfill run (13:00/19:00 IST), or you can trigger it
+              sooner yourself from Scorecard Backfill.
+            </p>
+            <div>
+              <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                CricHeroes match URL <span className="text-[#78716C] dark:text-zinc-700">(optional — prefills Opponent)</span>
+              </label>
+              <input
+                value={manualUrl}
+                onChange={e => setManualUrl(e.target.value)}
+                placeholder="https://cricheroes.in/scorecard/22422538/..."
+                className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1"
+              />
+            </div>
+            <div>
+              <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                Match ID
+              </label>
+              <input
+                value={manualMatchId}
+                onChange={e => setManualMatchId(e.target.value)}
+                className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  Match date
+                </label>
+                <input
+                  type="date"
+                  value={manualGameDate}
+                  onChange={e => setManualGameDate(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1"
+                />
+              </div>
+              <div>
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  Opponent <span className="text-[#78716C] dark:text-zinc-700">(optional)</span>
+                </label>
+                <input
+                  value={manualOpponent}
+                  onChange={e => setManualOpponent(e.target.value)}
+                  className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1"
+                />
+              </div>
+              <div>
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  Tournament
+                </label>
+                <select
+                  value={tournamentId}
+                  onChange={e => setTournamentId(e.target.value)}
+                  className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
+                  <option value="">Select…</option>
+                  {tournaments.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  Format
+                </label>
+                <select
+                  value={format}
+                  onChange={e => setFormat(e.target.value as typeof FORMATS[number])}
+                  className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
+                  {FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  Slot label <span className="text-[#78716C] dark:text-zinc-700">(display only — not a real reservation)</span>
+                </label>
+                <select
+                  value={slotTime}
+                  onChange={e => setSlotTime(e.target.value as typeof SLOT_TIMES[number])}
+                  className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
+                  {SLOT_TIMES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={confirmManualBackfill}
+                disabled={confirming || !manualMatchId.trim() || !tournamentId || !manualGameDate}
+                className="flex-1 font-rajdhani text-sm font-bold tracking-widest uppercase bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 disabled:opacity-40 px-4 py-2 rounded transition-colors">
+                {confirming ? 'Creating…' : 'Create Booking (queue for sync)'}
+              </button>
+              <button
+                onClick={cancelManualMode}
+                className="font-rajdhani text-sm font-bold tracking-widest uppercase bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 text-[#57534E] dark:text-zinc-400 hover:text-[#1C1917] dark:hover:text-zinc-200 px-4 py-2 rounded transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {preview && (
           <div className="bg-parchment-2 dark:bg-ink-4 border border-[#D4C9B0] dark:border-ink-5 rounded p-3 space-y-2">

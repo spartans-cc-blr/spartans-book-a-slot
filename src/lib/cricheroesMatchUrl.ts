@@ -63,6 +63,24 @@ const VS_SEPARATOR = /-vs-/i
 // the roster, and the other squad's real name becomes the Opponent field
 // (e.g. "Spartans United"), rather than falling through to whatever the
 // old loose substring check happened to pick.
+// Extracts the bare CricHeroes match_id from a full match URL's own
+// ".../scorecard/<match_id>/..." path segment — pure string parsing, no
+// network call. Used by Booking Backfill's manual fallback (see
+// features/post-match-scorecard.md §18) so an admin can paste the one
+// CricHeroes URL they have on hand instead of hunting for the bare
+// numeric ID separately. Returns null for anything that doesn't parse as
+// a URL, or whose path doesn't contain a "scorecard" segment.
+export function extractMatchIdFromUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    const idIndex = parts.indexOf('scorecard')
+    return idIndex !== -1 && parts[idIndex + 1] ? parts[idIndex + 1] : null
+  } catch {
+    return null
+  }
+}
+
 export function opponentFromMatchSlug(slug: string): string | null {
   if (!VS_SEPARATOR.test(slug)) return null
   const [teamA, teamB] = slug.split(VS_SEPARATOR)
