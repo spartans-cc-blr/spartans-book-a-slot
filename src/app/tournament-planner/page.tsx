@@ -29,11 +29,11 @@ export default async function TournamentPlannerPage() {
       .from('bookings')
       .select(`
         id, game_date, slot_time, format, cricheroes_url, match_id, opponent_name,
-        captain_id, is_practice,
+        captain_id, is_practice, stage_type, match_stage,
         tournament:tournaments!bookings_tournament_id_fkey(
           id, name, organiser_name, organiser_contact,
           total_league_games, cricheroes_points_table_url,
-          captain_id, is_practice, intended_formats,
+          captain_id, is_practice, intended_formats, completed_at, awaiting_next_stage_since,
           captains!tournaments_captain_id_fkey(id, name, player_id)
         )
       `)
@@ -110,7 +110,7 @@ export default async function TournamentPlannerPage() {
       .select(`
         id, name, organiser_name, organiser_contact,
         total_league_games, cricheroes_points_table_url, captain_id, is_practice,
-        intended_formats,
+        intended_formats, completed_at, awaiting_next_stage_since,
         captains!tournaments_captain_id_fkey(id, name, player_id)
       `)
       .eq('active', true),
@@ -143,6 +143,8 @@ export default async function TournamentPlannerPage() {
     match_id: string | null
     match_result: string | null
     opponent_name: string | null
+    stage_type: string | null
+    match_stage: string | null
     tournament: {
       id: string
       name: string
@@ -153,6 +155,8 @@ export default async function TournamentPlannerPage() {
       captain_id: string | null
       is_practice: boolean
       intended_formats: string[] | null
+      completed_at: string | null
+      awaiting_next_stage_since: string | null
       captains: { id: string; name: string; player_id: string | null } | null
     } | null
   }>
@@ -250,6 +254,8 @@ export default async function TournamentPlannerPage() {
       cricheroes_points_table_url: t.cricheroes_points_table_url,
       captain_id: t.captain_id,
       intended_formats: t.intended_formats,
+      completed_at: t.completed_at,
+      awaiting_next_stage_since: t.awaiting_next_stage_since,
       captains: Array.isArray(t.captains) ? t.captains[0] ?? null : t.captains,
     }))
 

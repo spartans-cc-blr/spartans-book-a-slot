@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseISO, differenceInDays, format } from 'date-fns'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { TournamentShareButton } from './TournamentShareButton'
 import { ResultBadge } from '@/components/shared/ResultBadge'
@@ -16,6 +17,11 @@ interface Booking {
   format: string | null
   cricheroes_url: string | null
   opponent_name: string | null
+  // 'league' | 'knockout' | null (null = league). Knockouts never count toward
+  // a tournament's league-game target.
+  stage_type: string | null
+  // Free-text round label ("Qualifier 1", "Semi Final"…) — display and final-detection only.
+  match_stage: string | null
   // Resolved server-side from match_stats_cache — null until a scorecard is
   // synced for this match, even for a game that's already been played.
   match_result: string | null
@@ -32,6 +38,10 @@ interface Booking {
     // a tournament with zero confirmed games yet (see resolveActiveFormats
     // in src/lib/slotTargets.ts and the local activeFormats calc below).
     intended_formats: string[] | null
+    // Admin-set, never automatic — see assessPace() and features/tournament-planner.md §12.
+    completed_at: string | null
+    // Admin said "still in the running, waiting on the next stage" on this date.
+    awaiting_next_stage_since: string | null
   } | null
 }
 
@@ -216,37 +226,124 @@ function paceSignal(
   }
 }
 
-// One pace assessment per tournament, shared by the "Needs attention" panel,
-// the captain cards, and the By Tournament sort so they can never disagree.
-// rank 0 = organiser has gone quiet, 1 = playing too fast, 2 = fine.
-function assessPace(tournament: TournamentInfo, games: Booking[], today: string) {
-  const totalLeague  = tournament.total_league_games ?? games.length
+// One assessment per tournament, shared by the "Needs attention" panel, the
+// captain cards, the block header pill and the By Tournament sort so they can
+// never disagree. Nothing here ever completes a tournament — that is an
+// explicit admin action (tournaments.completed_at). Knockouts are excluded
+// from the league-game count, since their shape (qualifiers, quarters,
+// semis, a direct final) varies per tournament.
+//
+// kind / rank (lower = more urgent). The first four are admin only:
+//   knockout_won  0  last game was a knockout we won — ask about the next stage
+//   knockout_lost 1  last game was a knockout we lost — is there still a path?
+//   awaiting_next 2  admin answered "still in the running" — waiting on the next stage
+//   dormant       3  nothing scheduled, quiet > DORMANT_DAYS
+//   league_done   4  league games all played, nothing scheduled, no knockout yet
+//   nudge         5  organiser has gone quiet (3–8 weeks)
+//   slow          6  playing too fast
+//   null          7  fine / completed
+type AttentionKind = 'awaiting_next' | 'knockout_won' | 'knockout_lost' | 'dormant' | 'league_done' | 'nudge' | 'slow' | null
+const FINE_RANK = 7
+const DORMANT_DAYS = 56
+
+function assessPace(tournament: TournamentInfo, games: Booking[], today: string, isAdmin: boolean) {
+  const leagueGames  = games.filter(g => g.stage_type !== 'knockout')
+  const totalLeague  = tournament.total_league_games ?? leagueGames.length
   const dates        = games.map(g => g.game_date).sort()
   const gap          = avgGapWeeks(dates)
-  const unbooked     = Math.max(0, totalLeague - games.length)
+  const unbooked     = Math.max(0, totalLeague - leagueGames.length)
   const lastGameDate = dates.length > 0 ? dates[dates.length - 1] : today
-  const pace         = paceSignal(gap, unbooked, lastGameDate, today)
-  const rank         = pace.label === 'Nudge to schedule' ? 0 : pace.label === 'Ask to slow down' ? 1 : 2
   const hasUpcoming  = games.some(g => g.game_date >= today)
   const nextGameDate = dates.find(d => d >= today) ?? null
   const daysQuiet    = lastGameDate < today ? differenceInDays(parseISO(today), parseISO(lastGameDate)) : 0
-  const reason = rank === 0
-    ? `No game for ${Math.round(daysQuiet / 7)} weeks${hasUpcoming ? '' : ' and nothing scheduled'} — ${unbooked} still to book`
-    : rank === 1
-    ? `Playing roughly every week — ${unbooked} still to book, ask to space them out`
-    : ''
-  return { pace, rank, reason, unbooked, lastGameDate, nextGameDate }
+  const weeksQuiet   = Math.round(daysQuiet / 7)
+  const leagueDone   = tournament.total_league_games != null
+    && leagueGames.filter(g => g.game_date < today).length >= totalLeague
+  const dormant      = dates.length > 0 && !hasUpcoming && daysQuiet > DORMANT_DAYS
+  const pace         = paceSignal(gap, unbooked, lastGameDate, today)
+
+  // Latest game, if it is a knockout we have already played, and how it went
+  // (match_result comes from the synced scorecard; null until synced).
+  const lastGame = [...games].sort((a, b) => a.game_date.localeCompare(b.game_date) || a.slot_time.localeCompare(b.slot_time)).pop()
+  const koPlayed = !!lastGame && lastGame.stage_type === 'knockout' && lastGame.game_date < today
+  const koResult = koPlayed ? (lastGame!.match_result ?? '').toLowerCase() : ''
+  const koWon    = koResult.includes('won')
+  const koLost   = koResult.includes('lost')
+  const koStage  = (lastGame?.match_stage ?? '').trim() || 'knockout'
+  // A final (not a semi/quarter-final) has no "next stage".
+  const koIsFinal = /\bfinal\b/i.test(koStage) && !/semi|quarter/i.test(koStage)
+  const koOpp    = lastGame?.opponent_name ? ` against ${lastGame.opponent_name}` : ''
+
+  // The admin's "still in the running" answer only holds until a newer game is played.
+  const awaiting = !!tournament.awaiting_next_stage_since && !!lastGame
+    && lastGame.game_date <= tournament.awaiting_next_stage_since
+
+  let kind: AttentionKind = null
+  if (!tournament.completed_at) {
+    if (isAdmin && !hasUpcoming && awaiting) kind = 'awaiting_next'
+    else if (isAdmin && !hasUpcoming && koPlayed && koWon) kind = 'knockout_won'
+    else if (isAdmin && !hasUpcoming && koPlayed && koLost) kind = 'knockout_lost'
+    else if (isAdmin && !hasUpcoming && leagueDone) kind = 'league_done'
+    else if (isAdmin && dormant) kind = 'dormant'
+    else if (!dormant) {
+      kind = pace.label === 'Nudge to schedule' ? 'nudge' : pace.label === 'Ask to slow down' ? 'slow' : null
+    }
+  }
+  const RANKS: Record<NonNullable<AttentionKind>, number> = { knockout_won: 0, knockout_lost: 1, awaiting_next: 2, dormant: 3, league_done: 4, nudge: 5, slow: 6 }
+  const rank = kind ? RANKS[kind] : FINE_RANK
+
+  const BLUE  = { bg: 'bg-blue-50 dark:bg-blue-950/40', txt: 'text-blue-700 dark:text-blue-400' }
+  const STONE = { bg: 'bg-stone-100 dark:bg-ink-4', txt: 'text-stone-600 dark:text-zinc-400' }
+  const pill = tournament.completed_at ? { label: 'Completed', bg: 'bg-emerald-50 dark:bg-emerald-950/40', txt: 'text-emerald-700 dark:text-emerald-400' }
+    : kind === 'awaiting_next' ? { label: 'Awaiting next stage', ...BLUE }
+    : kind === 'knockout_won' ? { label: 'Won knockout', bg: 'bg-emerald-50 dark:bg-emerald-950/40', txt: 'text-emerald-700 dark:text-emerald-400' }
+    : kind === 'knockout_lost' ? { label: 'Lost knockout', bg: 'bg-rose-50 dark:bg-rose-950/40', txt: 'text-rose-700 dark:text-rose-400' }
+    : kind === 'league_done' ? { label: 'League done', ...BLUE }
+    : kind === 'dormant' || dormant ? { label: kind === 'dormant' ? 'Dormant' : 'Inactive', ...STONE }
+    : pace
+
+  let title = pace.label
+  let reason = ''
+  const ago = weeksQuiet > 0 ? ` (${weeksQuiet} weeks ago)` : ''
+  if (kind === 'awaiting_next') {
+    title = 'Still in the running — waiting on the next stage'
+    reason = `${weeksQuiet > 0 ? `Last game was ${weeksQuiet} weeks ago. ` : ''}When is the next game? Reserve the date as soon as the organiser confirms it — this stays here until a game is booked. If the run turns out to be over, mark it completed.`
+  } else if (kind === 'knockout_won') {
+    title = koIsFinal ? `🏆 Congratulations — we won the ${koStage}!` : `Congratulations — we won the ${koStage}${koOpp}! 🎉`
+    reason = koIsFinal
+      ? `That was the final${ago}. Mark the tournament completed when you're ready to close it.`
+      : `${ago ? `Played${ago}. ` : ''}When is the next stage? Reserve the date as soon as the organiser confirms it — it stays here until the next game is booked.`
+  } else if (kind === 'knockout_lost') {
+    title = koIsFinal ? `So close — we lost the ${koStage}${koOpp}` : `Tough luck — we lost the ${koStage}${koOpp}`
+    reason = koIsFinal
+      ? `That was the final${ago}. Mark the tournament completed when you're ready to close it.`
+      : `${ago ? `Played${ago}. ` : ''}Is there still a chance to progress (a second qualifier, eliminator or similar)? If so, leave it open and book the next stage when the organiser confirms. If the run is over, mark it completed.`
+  } else if (kind === 'league_done') {
+    title = koPlayed ? `A knockout was played${koOpp} — how did it go?` : 'League stage finished — did we qualify for knockouts?'
+    reason = koPlayed
+      ? `Its result isn't in the Hub yet (sync the scorecard and this will update). Mark it completed if the run is over.`
+      : `All ${totalLeague} league games played${weeksQuiet > 0 ? `, last game ${weeksQuiet} weeks ago` : ''}. If we qualified, leave it open until the knockouts are done. If the run is over, mark it completed.`
+  } else if (kind === 'dormant') {
+    title = `No game for ${weeksQuiet} weeks — is this tournament over?`
+    reason = `${unbooked} league ${unbooked === 1 ? 'game' : 'games'} still unbooked. Mark it completed if it has finished; otherwise it stays here until games are booked.`
+  } else if (kind === 'nudge') {
+    reason = `No game for ${weeksQuiet} weeks${hasUpcoming ? '' : ' and nothing scheduled'} — ${unbooked} still to book`
+  } else if (kind === 'slow') {
+    reason = `Playing roughly every week — ${unbooked} still to book, ask to space them out`
+  }
+  return { pace, pill, kind, rank, title, reason, unbooked, lastGameDate, nextGameDate, isFinal: koIsFinal }
 }
 
 // ── Captain bandwidth section ──────────────────────────────────────
 function BandwidthSection({
-  captains, bookings, today, viewerCaptainId, onViewTournament,
+  captains, bookings, today, viewerCaptainId, isAdmin, onViewTournament,
 }: {
   captains: Captain[]
   bookings: Booking[]
   announcedSet: Set<string>
   today: string
   viewerCaptainId: string | null
+  isAdmin: boolean
   onViewTournament: (tournamentId: string) => void
 }) {
   const tourneyBookings = bookings.filter(b => b.tournament)
@@ -270,15 +367,13 @@ function BandwidthSection({
       .map(({ tournament: t, games }) => {
         const played      = games.filter(g => g.game_date < today).length
         const outstanding = games.filter(g => g.game_date >= today).length
-        const totalLeague = t.total_league_games ?? games.length
-        const tUnbooked   = Math.max(0, totalLeague - games.length)
-        const assessment  = assessPace(t, games, today)
-        return { tournament: t, played, outstanding, unbooked: tUnbooked, assessment }
+        const assessment  = assessPace(t, games, today, isAdmin)
+        return { tournament: t, played, outstanding, unbooked: assessment.unbooked, assessment }
       })
       // Hide tournaments with nothing left to play — total games === played means
       // no scheduled or unbooked games remain. Whether that counts as "completed"
       // is a separate decision for later; for now just keep these out of view.
-      .filter(({ outstanding, unbooked }) => outstanding > 0 || unbooked > 0)
+      .filter(({ tournament: t, outstanding, unbooked }) => !t.completed_at && (outstanding > 0 || unbooked > 0))
       // Tournaments needing attention first, then A–Z.
       .sort((a, b) => a.assessment.rank - b.assessment.rank || a.tournament.name.localeCompare(b.tournament.name))
 
@@ -296,12 +391,7 @@ function BandwidthSection({
     // tournament's negative delta silently cancel out another tournament's
     // genuine unbooked count. This must match tournamentBreakdown's own
     // per-tournament unbooked values above.
-    const unbooked = Array.from(ongoingTournamentIds)
-      .reduce((sum, tid) => {
-        const entry = byTournament.get(tid)!
-        const tLeague = entry.tournament.total_league_games ?? entry.games.length
-        return sum + Math.max(0, tLeague - entry.games.length)
-      }, 0)
+    const unbooked = tournamentBreakdown.reduce((sum, t) => sum + t.unbooked, 0)
     const total = mine.length + unbooked
 
     const isLowLoad = total <= 4 && unbooked <= 1
@@ -468,8 +558,8 @@ function BandwidthSection({
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-cinzel text-xs font-bold text-ink dark:text-parchment truncate">{t.name}</span>
                     <span className="flex items-center gap-2 flex-shrink-0">
-                      {assessment.rank < 2 && (
-                        <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${assessment.pace.bg} ${assessment.pace.txt}`}>{assessment.pace.label}</span>
+                      {assessment.rank < FINE_RANK && (
+                        <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${assessment.pill.bg} ${assessment.pill.txt}`}>{assessment.pill.label}</span>
                       )}
                       <span className="font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400">↓ view</span>
                     </span>
@@ -688,7 +778,7 @@ function GameTimelineCard({ sortedGames, gaps, avgGap }: {
 
 // ── Tournament block ───────────────────────────────────────────────
 function TournamentBlock({
-  tournament, games, announcedSet, today, isAdmin, isGC, players, stats, bookingCaptainMap, knockoutHold, forceOpenToken,
+  tournament, games, announcedSet, today, isAdmin, isGC, players, stats, bookingCaptainMap, knockoutHold, forceOpenToken, onSetCompleted, busy,
 }: {
   tournament: NonNullable<Booking['tournament']>
   games: Booking[]
@@ -701,6 +791,8 @@ function TournamentBlock({
   bookingCaptainMap: Record<string, SquadCaptain>
   knockoutHold?: { game_date: string; slot_time: string } | null
   forceOpenToken?: number
+  onSetCompleted?: (id: string, done: boolean) => void
+  busy?: boolean
 }) {
   const [open, setOpen]               = useState(false)
   const [playersOpen, setPlayersOpen] = useState(false)
@@ -730,7 +822,7 @@ function TournamentBlock({
     tournament.total_league_games ?? null
   )
   const totalLeague = totalLeagueGames ?? games.length
-  const unbooked    = Math.max(0, totalLeague - games.length)
+  const unbooked    = Math.max(0, totalLeague - games.filter(g => g.stage_type !== 'knockout').length)
 
   // Admin-only knockout-candidate nudge — purely informational, mirrors the
   // same "won"/"lost" matching ResultBadge uses. Doesn't gate or create
@@ -760,7 +852,7 @@ function TournamentBlock({
     ? sortedGames[sortedGames.length - 1].game_date
     : today
 
-  const pace = paceSignal(gap, unbooked, lastGameDate, today)
+  const pace = assessPace({ ...tournament, total_league_games: totalLeagueGames }, games, today, isAdmin).pill
 
   // Tournament format mix — use Array.from instead of spread on Set (downlevel compat)
   const tournamentFormats = Array.from(
@@ -827,6 +919,13 @@ function TournamentBlock({
                   </span>
                 )}
                 <span className={`font-rajdhani text-[10px] px-2 py-0.5 rounded-full ${pace.bg} ${pace.txt}`}>{pace.label}</span>
+                {isAdmin && onSetCompleted && (
+                  <button type="button" disabled={busy}
+                    onClick={e => { e.stopPropagation(); onSetCompleted(tournament.id, !tournament.completed_at) }}
+                    className="font-rajdhani text-[10px] font-bold px-2 py-0.5 rounded-full border border-parchment-3 dark:border-ink-5 text-stone-600 dark:text-zinc-400 hover:border-gold-dim disabled:opacity-50">
+                    {tournament.completed_at ? 'Reopen' : 'Mark completed'}
+                  </button>
+                )}
               </div>
               {(isAdmin || isGC) && (
                 <TournamentShareButton
@@ -1293,13 +1392,58 @@ const TOURNAMENT_TABS: { key: TournamentTab; label: string }[] = [
 ]
 
 // ── Root client component ──────────────────────────────────────────
+type SortKey = 'az' | 'quiet' | 'league_left' | 'unbooked' | 'captain' | 'recent'
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'az',          label: 'Name (A–Z)' },
+  { key: 'quiet',       label: 'Longest without a game' },
+  { key: 'league_left', label: 'Fewest league games left' },
+  { key: 'unbooked',    label: 'Most games still to book' },
+  { key: 'captain',     label: 'Captain (A–Z)' },
+  { key: 'recent',      label: 'Most recently played' },
+]
+
 export function TournamentPlannerClient({
   bookings, announcedBookingIds, captains, today, viewerRole, tournamentPlayersMap, tournamentStatsMap, bookingCaptainMap,
   knockoutHoldsByTournament, emptyTournaments,
 }: Props) {
   const announcedSet = useMemo(() => new Set(announcedBookingIds), [announcedBookingIds])
+  const router = useRouter()
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState('')
+
+  // Admin answer to "did we qualify / still a chance?" — keeps the tournament
+  // open and switches the card to "waiting on the next stage".
+  async function setAwaiting(id: string) {
+    setBusyId(id); setActionError('')
+    const res = await fetch('/api/tournaments', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, awaiting_next_stage_since: today }),
+    })
+    if (res.ok) router.refresh()
+    else setActionError((await res.json().catch(() => ({}))).error ?? 'Could not update the tournament.')
+    setBusyId(null)
+  }
+
+  // Admin-only. Completion is always a deliberate call, never inferred.
+  async function setCompleted(id: string, done: boolean) {
+    const name = tournamentMap.get(id)?.tournament.name ?? 'this tournament'
+    const msg = done ? `Mark "${name}" as completed? It will leave Needs Attention.` : `Reopen "${name}"?`
+    if (!window.confirm(msg)) return
+    // Completed date = the tournament's last game, not the day it was closed.
+    const dates = (tournamentMap.get(id)?.games ?? []).map(g => g.game_date).sort()
+    const lastGameDate = dates.length > 0 ? dates[dates.length - 1] : today
+    setBusyId(id); setActionError('')
+    const res = await fetch('/api/tournaments', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, completed_at: done ? lastGameDate : null }),
+    })
+    if (res.ok) router.refresh()
+    else setActionError((await res.json().catch(() => ({}))).error ?? 'Could not update the tournament.')
+    setBusyId(null)
+  }
   // null = not chosen yet; resolves to Ongoing, or the first non-empty tab.
   const [chosenTab, setChosenTab] = useState<TournamentTab | null>(null)
+  const [chosenSort, setChosenSort] = useState<SortKey | null>(null)
 
   // "view" click from a Captain Bandwidth tournament card — scrolls to and expands
   // the matching TournamentBlock below. Token bumps on every click (even repeat
@@ -1329,20 +1473,15 @@ export function TournamentPlannerClient({
   const classifiedTournaments = useMemo(() =>
     Array.from(tournamentMap.values())
       .map(({ tournament, games }) => {
-        const totalLeague    = tournament.total_league_games ?? games.length
-        const completedGames = games.filter(g => g.game_date < today)
-        const scheduledGames = games.filter(g => g.game_date >= today)
-        const isCompleted    = completedGames.length >= totalLeague && scheduledGames.length === 0
-        const isUpcoming     = completedGames.length === 0
-
-        const tab: TournamentTab = isCompleted ? 'completed' : isUpcoming ? 'upcoming' : 'ongoing'
-        const assessment = assessPace(tournament, games, today)
-        // Completed tournaments are history — never flagged.
-        const needsAttention = tab !== 'completed' && assessment.rank < 2
+        const playedGames = games.filter(g => g.game_date < today)
+        // Completed only ever by an explicit admin flag.
+        const tab: TournamentTab = tournament.completed_at ? 'completed' : playedGames.length === 0 ? 'upcoming' : 'ongoing'
+        const assessment = assessPace(tournament, games, today, viewerRole.isAdmin)
+        const needsAttention = tab !== 'completed' && assessment.rank < FINE_RANK
 
         return { tournament, games, tab, assessment, needsAttention }
       }),
-    [tournamentMap, today]
+    [tournamentMap, today, viewerRole.isAdmin]
   )
 
   const tournamentCounts = useMemo(() => ({
@@ -1361,21 +1500,49 @@ export function TournamentPlannerClient({
   const activeTab: TournamentTab = chosenTab
     ?? (tournamentCounts.ongoing > 0 ? 'ongoing' : tournamentCounts.upcoming > 0 ? 'upcoming' : tournamentCounts.completed > 0 ? 'completed' : 'ongoing')
 
-  // Within a tab: needs-attention first, then by what's happening soonest
-  // (completed: most recently finished first), then A–Z.
-  const sortedTournaments = useMemo(() =>
-    classifiedTournaments
+  const sortKey: SortKey = chosenSort ?? (activeTab === 'completed' ? 'recent' : 'az')
+
+  // Within a tab: the admin's chosen order, ties broken by name. A tournament
+  // missing the sorted value (no games yet, no captain, no league target)
+  // always goes last.
+  const sortedTournaments = useMemo(() => {
+    const NONE = Number.POSITIVE_INFINITY
+    const leagueLeft = (t: typeof classifiedTournaments[number]) => {
+      const total = t.tournament.total_league_games
+      if (total == null) return NONE
+      const played = t.games.filter(g => g.stage_type !== 'knockout' && g.game_date < today).length
+      return Math.max(0, total - played)
+    }
+    const byName = (a: typeof classifiedTournaments[number], b: typeof classifiedTournaments[number]) =>
+      a.tournament.name.localeCompare(b.tournament.name)
+    const hasGames = (t: typeof classifiedTournaments[number]) => t.games.length > 0
+    return classifiedTournaments
       .filter(t => t.tab === activeTab)
       .sort((a, b) => {
-        if (activeTab === 'completed') {
-          return b.assessment.lastGameDate.localeCompare(a.assessment.lastGameDate) || a.tournament.name.localeCompare(b.tournament.name)
+        switch (sortKey) {
+          case 'quiet':
+            // oldest last game first; never-played tournaments last
+            if (hasGames(a) !== hasGames(b)) return hasGames(a) ? -1 : 1
+            return a.assessment.lastGameDate.localeCompare(b.assessment.lastGameDate) || byName(a, b)
+          case 'recent':
+            if (hasGames(a) !== hasGames(b)) return hasGames(a) ? -1 : 1
+            return b.assessment.lastGameDate.localeCompare(a.assessment.lastGameDate) || byName(a, b)
+          case 'league_left': {
+            const x = leagueLeft(a), y = leagueLeft(b)
+            return x === y ? byName(a, b) : x < y ? -1 : 1
+          }
+          case 'unbooked':
+            return b.assessment.unbooked - a.assessment.unbooked || byName(a, b)
+          case 'captain': {
+            const an = a.tournament.captains?.name, bn = b.tournament.captains?.name
+            if (!an !== !bn) return an ? -1 : 1
+            return (an ?? '').localeCompare(bn ?? '') || byName(a, b)
+          }
+          default:
+            return byName(a, b)
         }
-        const an = a.assessment.nextGameDate ?? '9999-12-31'
-        const bn = b.assessment.nextGameDate ?? '9999-12-31'
-        return a.assessment.rank - b.assessment.rank || an.localeCompare(bn) || a.tournament.name.localeCompare(b.tournament.name)
-      }),
-    [classifiedTournaments, activeTab]
-  )
+      })
+  }, [classifiedTournaments, activeTab, sortKey, today])
 
   function handleViewTournament(tournamentId: string) {
     // Make sure the tab holding this tournament is the one showing, so the
@@ -1402,22 +1569,55 @@ export function TournamentPlannerClient({
         <section className="mb-8">
           <h2 className="font-cinzel text-xl font-bold text-gold-dim mb-1">Needs Attention</h2>
           <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400 mb-3">
-            Tournaments not moving at a good pace — tap one to open it.
+            {viewerRole.isAdmin
+              ? 'Pace issues, finished league stages and dormant tournaments. Nothing closes automatically — close a tournament when you decide it is over.'
+              : 'Tournaments not moving at a good pace — tap one to open it.'}
           </p>
+          {actionError && <p className="font-rajdhani text-sm text-red-600 dark:text-red-400 mb-2">{actionError}</p>}
           <div className="flex flex-col gap-2">
             {attentionList.map(({ tournament, assessment }) => (
-              <button key={tournament.id} type="button" onClick={() => handleViewTournament(tournament.id)}
-                className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${assessment.pace.bg} ${
-                  assessment.rank === 0 ? 'border-amber-300 dark:border-amber-800' : 'border-red-300 dark:border-red-800'
-                }`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-cinzel text-sm font-bold text-ink dark:text-parchment truncate">{tournament.name}</span>
-                  <span className={`font-rajdhani text-[10px] font-bold uppercase tracking-widest flex-shrink-0 ${assessment.pace.txt}`}>{assessment.pace.label}</span>
-                </div>
-                <p className="font-rajdhani text-xs text-stone-600 dark:text-zinc-400 mt-1">
-                  {tournament.captains ? `${tournament.captains.name} · ` : ''}{assessment.reason}
-                </p>
-              </button>
+              <div key={tournament.id}
+                className={`rounded-xl border px-4 py-3 ${assessment.pill.bg} ${
+                  assessment.kind === 'slow' ? 'border-red-300 dark:border-red-800'
+                  : assessment.kind === 'league_done' || assessment.kind === 'awaiting_next' ? 'border-blue-300 dark:border-blue-800'
+                  : assessment.kind === 'knockout_won' ? 'border-emerald-300 dark:border-emerald-800'
+                  : assessment.kind === 'knockout_lost' ? 'border-rose-300 dark:border-rose-800'
+                  : assessment.kind === 'dormant' ? 'border-stone-300 dark:border-ink-5'
+                  : 'border-amber-300 dark:border-amber-800'}`}>
+                <button type="button" onClick={() => handleViewTournament(tournament.id)} className="w-full text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-cinzel text-sm font-bold text-ink dark:text-parchment truncate">{tournament.name}</span>
+                    <span className={`font-rajdhani text-[10px] font-bold uppercase tracking-widest flex-shrink-0 ${assessment.pill.txt}`}>{assessment.pill.label}</span>
+                  </div>
+                  <p className="font-rajdhani text-sm font-semibold text-ink dark:text-parchment mt-1">{assessment.title}</p>
+                  <p className="font-rajdhani text-xs text-stone-600 dark:text-zinc-400 mt-0.5">
+                    {tournament.captains ? `${tournament.captains.name} · ` : ''}{assessment.reason}
+                  </p>
+                </button>
+                {viewerRole.isAdmin && assessment.kind && ['league_done', 'dormant', 'knockout_won', 'knockout_lost', 'awaiting_next'].includes(assessment.kind) && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(assessment.kind === 'league_done' || (assessment.kind === 'knockout_lost' && !assessment.isFinal)) && (
+                      <button type="button" disabled={busyId === tournament.id} onClick={() => setAwaiting(tournament.id)}
+                        className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full border border-emerald-600 text-emerald-700 dark:text-emerald-400 disabled:opacity-50">
+                        {assessment.kind === 'league_done' ? 'Yes, qualified — waiting for knockouts' : 'Still a chance — keep open'}
+                      </button>
+                    )}
+                    {((assessment.kind === 'knockout_won' && !assessment.isFinal) || assessment.kind === 'awaiting_next') && (
+                      <Link href="/admin/soft-blocks/new"
+                        className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full border border-emerald-600 text-emerald-700 dark:text-emerald-400">
+                        Reserve next stage
+                      </Link>
+                    )}
+                    <button type="button" disabled={busyId === tournament.id} onClick={() => setCompleted(tournament.id, true)}
+                      className="font-rajdhani text-xs font-bold px-3 py-1.5 rounded-full bg-amber-600 text-white disabled:opacity-50">
+                      {busyId === tournament.id ? 'Saving…'
+                        : assessment.kind === 'league_done' ? 'No — run is over, mark completed'
+                        : (assessment.kind === 'knockout_won' && !assessment.isFinal) || assessment.kind === 'knockout_lost' || assessment.kind === 'awaiting_next' ? 'Run is over — mark completed'
+                        : 'Mark completed'}
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </section>
@@ -1429,13 +1629,14 @@ export function TournamentPlannerClient({
         announcedSet={announcedSet}
         today={today}
         viewerCaptainId={viewerRole.captainId}
+        isAdmin={viewerRole.isAdmin}
         onViewTournament={handleViewTournament}
       />
 
       <section>
         <h2 className="font-cinzel text-xl font-bold text-gold-dim mb-1">By Tournament</h2>
         <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400 mb-4">
-          Tournaments that need attention come first in each tab.
+          Tournaments that need attention are listed under Needs Attention above.
         </p>
 
         {/* Segmented tabs — same pill control as Upcoming / Past Matches */}
@@ -1454,6 +1655,13 @@ export function TournamentPlannerClient({
             )
           })}
         </div>
+        <div className="flex items-center gap-2 mb-4">
+          <label htmlFor="tp-sort" className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400">Sort by</label>
+          <select id="tp-sort" value={sortKey} onChange={e => setChosenSort(e.target.value as SortKey)}
+            className="font-rajdhani text-sm font-semibold rounded-lg px-3 py-1.5 bg-white dark:bg-ink-3 text-ink dark:text-parchment border border-parchment-3 dark:border-ink-5">
+            {SORT_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
+        </div>
         {sortedTournaments.length === 0 ? (
           <p className="font-rajdhani text-sm text-stone-500 dark:text-zinc-400">
             No {activeTab} tournaments.
@@ -1471,7 +1679,8 @@ export function TournamentPlannerClient({
                     stats={tournamentStatsMap[tournament.id] ?? {}}
                     bookingCaptainMap={bookingCaptainMap}
                     knockoutHold={knockoutHoldsByTournament[tournament.id] ?? null}
-                    forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
+                    forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined}
+                    onSetCompleted={viewerRole.isAdmin ? setCompleted : undefined} busy={busyId === tournament.id} />
                 ))}
                 {otherTournaments.length > 0 && (
                   <p className="font-rajdhani text-[10px] uppercase tracking-widest text-stone-500 dark:text-zinc-400 mt-6 mb-3">Other tournaments</p>
@@ -1485,7 +1694,8 @@ export function TournamentPlannerClient({
                 players={tournamentPlayersMap[tournament.id] ?? []}
                 stats={tournamentStatsMap[tournament.id] ?? {}}
                 bookingCaptainMap={bookingCaptainMap}
-                forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined} />
+                forceOpenToken={expandRequest?.id === tournament.id ? expandRequest.token : undefined}
+                    onSetCompleted={viewerRole.isAdmin ? setCompleted : undefined} busy={busyId === tournament.id} />
             ))}
           </>
         )}

@@ -92,7 +92,7 @@ so a drained credit balance made the bar fail outright, and they were a poor
 fit anyway: one slot per command, `reserve` dropped the tournament and sent
 no `reserved_until` (so NLP-made holds never expired). Booking, reserving and
 soft-blocking go through the calendar menu and the existing forms. The
-`ANTHROPIC_API_KEY` env var is no longer used by the app and can be removed
+`ANTHROPIC_API_KEY` and `NLP_PARSE_MODEL` env vars are no longer used by the app and can be removed
 from Vercel. A deterministic multi-slot "hold for tournament" flow is the
 planned replacement.
 
