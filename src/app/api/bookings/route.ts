@@ -109,8 +109,7 @@ export async function POST(req: NextRequest) {
 
   // Omitted key → default to the tournament's own ground/captain (this is
   // what the admin form's pickers already pre-fill client-side, but the
-  // server defends the same way for any other caller, e.g. the NLP quick-
-  // command bar). An explicit null is a deliberate "no captain/ground"
+  // server defends the same way for any other caller). An explicit null is a deliberate "no captain/ground"
   // override and is respected as such, not coerced back to the default.
   const resolvedCaptainId: string | null =
     'captain_id' in safeBody ? (captain_id ?? null) : (tournament.captain_id ?? null)

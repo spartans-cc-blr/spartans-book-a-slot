@@ -84,6 +84,18 @@ grants nothing; the public `/schedule` payload is unchanged).
 | `src/app/admin/bookings/new/page.tsx`, `soft-blocks/new/page.tsx`, `bookings/[id]/page.tsx` | Prefill and `from=calendar` return |
 | `src/components/admin/AdminSidebar.tsx`, `src/app/admin/schedule/page.tsx` | Single entry, redirect |
 
+## 5.1 NLP quick-command bar removed (October 2026)
+
+The ⌘K "Quick command" bar on `/admin` (`NLPBookingBar.tsx`) and its route
+`POST /api/admin/nlp-parse` were deleted. They called the Anthropic API,
+so a drained credit balance made the bar fail outright, and they were a poor
+fit anyway: one slot per command, `reserve` dropped the tournament and sent
+no `reserved_until` (so NLP-made holds never expired). Booking, reserving and
+soft-blocking go through the calendar menu and the existing forms. The
+`ANTHROPIC_API_KEY` env var is no longer used by the app and can be removed
+from Vercel. A deterministic multi-slot "hold for tournament" flow is the
+planned replacement.
+
 ## 6. Not built yet
 
 Row drawer with a state-based primary action; tabbed split of the 1,500-line
