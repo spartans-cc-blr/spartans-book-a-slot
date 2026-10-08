@@ -9,7 +9,8 @@
 // filter — the raw status string never reaches the client). gmail, dob,
 // whatsapp and blood group never reach this page. wallet_balance is fetched
 // and sent ONLY when the viewer is GC or admin (decided server-side); for
-// everyone else it is null. Expelled players are excluded server-side. No
+// everyone else it is null. Absence reasons (player_absences) are likewise
+// fetched only for captain/GC/admin. Expelled players are excluded server-side. No
 // write path.
 
 import { redirect } from 'next/navigation'
@@ -33,10 +34,12 @@ export default async function PlayersDirectoryPage() {
   if (user?.playerStatus === 'expelled') redirect('/')
 
   const canSeeWallet = !!(user?.isGC || user?.isAdmin)
+  // Captains, GC and admin can see and record why a player is inactive (§8).
+  const canManageAbsences = !!(user?.isCaptain || user?.isGC || user?.isAdmin)
   const supabase = createServiceClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [playersRes, playedRes, highlights, capHolders] = await Promise.all([
+  const [playersRes, playedRes, highlights, capHolders, absencesRes] = await Promise.all([
     supabase
       .from('players')
       .select(`id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain, status${canSeeWallet ? ', wallet_balance' : ''}`)
@@ -60,10 +63,26 @@ export default async function PlayersDirectoryPage() {
       console.error('[players] cap holders error:', err?.message ?? err)
       return { year: new Date().getFullYear(), orange: [] as string[], purple: [] as string[] }
     }),
+    // Reasons can be sensitive (injury, family) — fetched only for roles that may manage them.
+    canManageAbsences
+      ? supabase.from('player_absences')
+          .select('player_id, reason, expected_return, note, created_at')
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: null, error: null } as any),
   ])
 
   if (playersRes.error) console.error('[players] players query error:', playersRes.error.message)
   if (playedRes.error) console.error('[players] last-played query error:', playedRes.error.message)
+
+  if (absencesRes.error) console.error('[players] absences query error:', absencesRes.error.message)
+  // Newest row per player is the current state; a NULL reason means cleared.
+  const absences: Record<string, DirectoryPlayer['absence']> = {}
+  for (const a of (absencesRes.data ?? []) as any[]) {
+    if (a.player_id in absences) continue
+    absences[a.player_id] = a.reason
+      ? { reason: a.reason, expected_return: a.expected_return ?? null, note: a.note ?? null }
+      : null
+  }
 
   const lastPlayed: Record<string, string> = {}
   for (const row of playedRes.data ?? []) {
@@ -86,6 +105,7 @@ export default async function PlayersDirectoryPage() {
     last_played_on: lastPlayed[p.id] ?? null,
     highlights: highlights[p.id] ?? null,
     caps: capsForPlayer(p.id, capHolders),
+    absence: absences[p.id] ?? null,
   }))
 
   return (
@@ -106,7 +126,7 @@ export default async function PlayersDirectoryPage() {
       </div>
 
       <main className="px-5 md:px-8 lg:px-10 py-6 max-w-6xl">
-        <PlayerDirectoryGrid players={players} showWallet={canSeeWallet} />
+        <PlayerDirectoryGrid players={players} showWallet={canSeeWallet} canManageAbsences={canManageAbsences} />
         <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 mt-8">
           Highlights cover synced Hub matches only; practice games are excluded. Orange Cap (most runs) and Purple Cap (most wickets) are for the current season.
         </p>
