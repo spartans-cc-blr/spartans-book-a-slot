@@ -148,6 +148,24 @@ describe('forwarding', () => {
     expect((await POST(request(good()))).status).toBe(504)
   })
 
+  it('says so plainly when the edge returns a non-JSON 429', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('Too Many Requests', { status: 429, headers: { server: 'cloudflare' } }))
+    const res = await POST(request(good()))
+    expect(res.status).toBe(429)
+    expect((await res.json()).error).toMatch(/rate-limiting.*HTTP 429.*try again/i)
+  })
+
+  it('names a rejected secret and includes the status in the generic failure', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Forbidden' }), { status: 403 }))
+    const forbidden = await POST(request(good()))
+    expect(forbidden.status).toBe(502)
+    expect((await forbidden.json()).error).toMatch(/rejected.*HTTP 403.*tell an admin/i)
+
+    fetchMock.mockResolvedValueOnce(new Response('oops', { status: 500 }))
+    const failed = await POST(request(good()))
+    expect((await failed.json()).error).toMatch(/failed to process this PDF \(HTTP 500\)/)
+  })
+
   it('500 when the microservice is not configured', async () => {
     delete process.env.MICROSERVICE_SECRET
     expect((await POST(request(good()))).status).toBe(500)
