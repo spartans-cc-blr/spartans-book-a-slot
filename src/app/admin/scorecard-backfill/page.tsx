@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
 import { MonthStepper, distinctMonths, monthOfDate } from '@/components/ui/MonthStepper'
 import { groupDatesIntoChips } from '@/lib/dateChipGroups'
+import { normaliseResult } from '@/lib/teamStatsCore'
 
 interface Booking {
   booking_id:     string
@@ -19,6 +20,8 @@ interface Booking {
   reconciliation_note:            string | null
   reconciliation_flagged_at:      string | null
   reconciliation_flagged_by_name: string | null
+  synced_at:    string | null
+  match_result: string | null
 }
 
 type RowStatus = 'idle' | 'processing' | 'success' | 'failed'
@@ -27,6 +30,10 @@ type RowStatus = 'idle' | 'processing' | 'success' | 'failed'
 // wrangler's standalone download_scorecard.py (a few seconds between
 // requests rather than firing them all at once).
 const DELAY_BETWEEN_MS = 4000
+
+// How many rows the "Recently Synced" panel shows before truncating — this
+// is a glance-level "what just happened" list, not a full history browser.
+const RECENT_SYNCED_LIMIT = 10
 
 // Scalloped-seal "verified" badge — mirrors VerifiedBadge in
 // MatchHistoryClient.tsx so the same match reads identically here. Left as
@@ -63,6 +70,42 @@ const CURRENT_STATUS_CONFIG: Record<string, { label: string; className: string }
   parsed:        { label: 'Parsed, not synced', className: 'bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400' },
   synced:        { label: 'Synced', className: 'bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400' },
   fees_applied:  { label: 'Fees applied', className: 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400' },
+}
+
+// Result tag for the Recently Synced panel — reuses the same
+// won/lost/tied/nr normalisation Team Record already uses
+// (normaliseResult(), teamStatsCore.ts) rather than re-deriving match
+// result parsing a second time; only the badge styling is local to this
+// page, matching the other status-chip conventions above.
+const RESULT_CONFIG: Record<'won' | 'lost' | 'tied' | 'nr', { label: string; className: string }> = {
+  won:  { label: 'WON',  className: 'bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400' },
+  lost: { label: 'LOST', className: 'bg-red-100 border-red-300 text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-400' },
+  tied: { label: 'TIED', className: 'bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400' },
+  nr:   { label: 'NR',   className: 'bg-[#EEEAE2] border-[#D4C9B0] text-[#78716C] dark:bg-ink-4 dark:border-ink-5 dark:text-zinc-500' },
+}
+
+function ResultTag({ matchResult }: { matchResult: string | null }) {
+  const kind = normaliseResult(matchResult)
+  if (!kind) return null
+  const cfg = RESULT_CONFIG[kind]
+  return (
+    <span className={`font-rajdhani text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${cfg.className}`}>
+      {cfg.label}
+    </span>
+  )
+}
+
+// IST date + time for the Recently Synced panel — this is when the sync
+// actually happened (match_stats_cache.synced_at), not the match's own
+// game_date, so the absolute time (not just the day) is worth showing.
+function formatSyncedAt(iso: string): string {
+  return new Date(iso).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 function CurrentStatusBadge({ status }: { status: string | null }) {
@@ -135,6 +178,20 @@ export default function ScorecardBackfillPage() {
     if (!q) return bookings
     return bookings.filter(b => b.match_id.toLowerCase().includes(q))
   }, [bookings, matchIdQuery])
+
+  // Recently Synced — deliberately derived from the full, unfiltered
+  // `bookings` list (not matchIdFiltered/filtered below) so the Match ID
+  // search and date-chip filters never hide it; this panel answers "what
+  // just happened", independent of whatever the admin is currently
+  // searching the main list for.
+  const recentlySynced = useMemo(
+    () => bookings
+      .filter(b => b.synced_at)
+      .sort((a, b) => (b.synced_at as string).localeCompare(a.synced_at as string))
+      .slice(0, RECENT_SYNCED_LIMIT),
+    [bookings]
+  )
+  const recentlySyncedTotal = useMemo(() => bookings.filter(b => b.synced_at).length, [bookings])
 
   // Date-chip quick filter — same combined-weekend-chip convention as
   // Upcoming Matches (/fixtures) and Past Matches (/matches/history), but
@@ -307,6 +364,47 @@ export default function ScorecardBackfillPage() {
 
       {!loading && !loadError && bookings.length > 0 && (
         <>
+          {recentlySynced.length > 0 && (
+            <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 mb-4">
+              <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500 mb-2">
+                🕒 Recently Synced
+              </h2>
+              <div className="space-y-1.5">
+                {recentlySynced.map(b => (
+                  <button
+                    key={b.booking_id}
+                    onClick={() => setMatchIdQuery(b.match_id)}
+                    title="Jump to this match in the list below"
+                    className="w-full flex items-center gap-2 text-left px-2 py-1 rounded hover:bg-[#EEEAE2] dark:hover:bg-ink-4 transition-colors">
+                    <span className="font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-500 flex-shrink-0 w-[92px]">
+                      {formatSyncedAt(b.synced_at as string)}
+                    </span>
+                    <span className="font-rajdhani text-sm text-[#292524] dark:text-zinc-300 flex-1 min-w-0 truncate">
+                      {b.game_date} · {b.format ?? ''} vs {b.opponent_name ?? 'TBD'}
+                      <span className="text-[#78716C] dark:text-zinc-600"> · match_id {b.match_id}</span>
+                    </span>
+                    <ResultTag matchResult={b.match_result} />
+                    {b.current_status === 'fees_applied' && (
+                      <span className="font-rajdhani text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400">
+                        Fees applied
+                      </span>
+                    )}
+                    {b.verified && (
+                      <span className="flex-shrink-0 inline-flex items-center">
+                        <VerifiedBadge />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {recentlySyncedTotal > recentlySynced.length && (
+                <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-600 mt-2">
+                  +{recentlySyncedTotal - recentlySynced.length} synced earlier
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-4 mb-4">
             <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
               Match ID

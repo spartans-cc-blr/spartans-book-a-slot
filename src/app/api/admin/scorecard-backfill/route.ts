@@ -33,6 +33,16 @@ import { isPastMatch } from '@/lib/matchStatus'
 
 export const maxDuration = 60
 
+// Simple fixed-size batcher for a Postgres `.in()` filter — same inline
+// convention teamStats.ts/captaincyStats.ts already use rather than a
+// shared export, since each caller's chunk size/usage is slightly
+// different and this is only a few lines.
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
@@ -58,6 +68,25 @@ export async function GET(req: NextRequest) {
     isPastMatch(b.game_date, b.slot_time, b.format, today)
   )
 
+  // match_stats_cache.synced_at — when this booking's scorecard was last
+  // actually synced (not just uploaded/attempted). Feeds the "Recently
+  // Synced" panel (sorted newest-first) so an admin can see what the
+  // cron/manual backfill has actually caught up without a direct DB query.
+  // Fetched as a separate batched query, not an embedded `bookings`
+  // select, matching the same join-avoidance convention
+  // /api/matches/history already uses for this exact table.
+  const pastBookingIds = pastBookings.map((b: any) => b.id as string)
+  const syncedAtByBooking = new Map<string, { synced_at: string; match_result: string | null }>()
+  await Promise.all(chunk(pastBookingIds, 200).map(async ids => {
+    const { data } = await supabase
+      .from('match_stats_cache')
+      .select('booking_id, synced_at, match_result')
+      .in('booking_id', ids)
+    for (const row of data ?? []) {
+      if (row.synced_at) syncedAtByBooking.set(row.booking_id, { synced_at: row.synced_at, match_result: row.match_result ?? null })
+    }
+  }))
+
   // scorecard_uploads has several FK columns to players (uploaded_by,
   // fees_applied_by, verified_by, reconciliation_flagged_by) — an embedded
   // `players(...)` select would hit the FK-ambiguity error documented in
@@ -78,6 +107,7 @@ export async function GET(req: NextRequest) {
     // this as a single object — but a defensive array check costs
     // nothing and avoids a footgun if that ever changes.
     const su = Array.isArray(b.scorecard_uploads) ? b.scorecard_uploads[0] : b.scorecard_uploads
+    const synced = syncedAtByBooking.get(b.id)
     return {
       booking_id:      b.id,
       game_date:       b.game_date,
@@ -92,6 +122,8 @@ export async function GET(req: NextRequest) {
       reconciliation_note:            su?.reconciliation_note ?? null,
       reconciliation_flagged_at:      su?.reconciliation_flagged_at ?? null,
       reconciliation_flagged_by_name: su?.reconciliation_flagged_by ? (flaggerName.get(su.reconciliation_flagged_by) ?? null) : null,
+      synced_at:    synced?.synced_at ?? null,
+      match_result: synced?.match_result ?? null,
     }
   })
 
