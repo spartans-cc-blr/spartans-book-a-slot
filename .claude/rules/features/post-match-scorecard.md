@@ -2591,6 +2591,74 @@ through the CricHeroes-dependent auto path instead.
 
 ---
 
+## 20. "Recently Synced" panel on `/admin/scorecard-backfill` (added October 2026)
+
+### Why
+
+An admin asked whether any match had actually been caught up for scorecard
+sync "today" — answering that meant hand-querying `match_stats_cache.synced_at`
+directly, since nothing in the app showed sync activity ordered by *when it
+happened*. `/admin/scorecard-backfill`'s own list (§8's eligibility query) is
+sorted newest-match-first by `game_date` — the right order for "what to
+re-run next," but the wrong order for "what just happened," since a sync run
+mostly works through old backlog, not recently-played matches (see the real
+example surfaced the same day: the cron's last successful run synced a
+January 2026 match and a February 2026 match, both months old).
+
+### What was added
+
+A small panel, **"🕒 Recently Synced"**, at the top of
+`/admin/scorecard-backfill` — above the Match ID search box, and
+deliberately **unaffected by it**: it's derived from the full, unfiltered
+booking list, not from `matchIdFiltered`/`filtered`, since its whole point
+is "what happened lately" regardless of whatever the admin is currently
+searching the main list for.
+
+- **Data** — `GET /api/admin/scorecard-backfill` now also batch-fetches
+  `match_stats_cache.synced_at`/`match_result` for every past booking
+  already being listed (`.in('booking_id', ids)`, chunked at 200 — same
+  inline `chunk()` convention `teamStats.ts`/`captaincyStats.ts` already
+  use — rather than an embedded `bookings` select, matching the existing
+  join-avoidance pattern this exact table already uses in
+  `/api/matches/history`). Both fields ride along on each row as
+  `synced_at: string | null` / `match_result: string | null`; a booking
+  that's never been synced simply has `synced_at: null` and is excluded
+  from the panel.
+- **UI** — `recentlySynced` (`page.tsx`) sorts the full list by `synced_at`
+  descending and caps it at `RECENT_SYNCED_LIMIT = 10`, a glance-level "what
+  just happened" list, not a full history browser; a trailing "+N synced
+  earlier" line shows the rest exist without listing them. Each row shows
+  the sync time (IST, date + time — this is genuinely when the sync
+  happened, not the match's own `game_date`, so the full timestamp matters
+  here unlike everywhere else on this page), the match's own date/format/
+  opponent/match_id, a result tag (WON/LOST/TIED/NR — `ResultTag`, reusing
+  `normaliseResult()` from `teamStatsCore.ts` rather than re-deriving match-
+  result parsing a second time), a "Fees applied" chip when relevant, and
+  the same scalloped `VerifiedBadge` the main list already uses when the
+  scorecard has been verified.
+- **Jump-to-row shortcut** — clicking a row sets `matchIdQuery` to that
+  row's `match_id`, which immediately narrows the main list below to just
+  that match — useful since the Recently Synced panel itself has no
+  Reset/Resolve actions of its own; it's purely a dashboard, and the main
+  list below it is where every action already lives.
+
+### Security (vibe-security)
+
+Purely additive, read-only — no new route, no new write path. The two new
+fields are sourced from `match_stats_cache`, already readable by this
+admin-only page's existing query; no new access surface, no new
+client-reachable input.
+
+### File Map
+
+| File | Role |
+|---|---|
+| `src/app/api/admin/scorecard-backfill/route.ts` | Batches `match_stats_cache.synced_at`/`match_result` alongside the existing booking fetch |
+| `src/app/admin/scorecard-backfill/page.tsx` | `recentlySynced`/`recentlySyncedTotal`, the "🕒 Recently Synced" panel, `ResultTag`, `formatSyncedAt()` |
+| `src/lib/teamStatsCore.ts` | `normaliseResult()` — reused as-is for the result tag, not re-implemented |
+
+---
+
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*
 *Security audit: vibe-security patterns applied per SKILL.md*
 *Analytics pipeline: `spartans-python` repo (Render) · Hub: `spartans-book-a-slot` repo (Vercel)*
