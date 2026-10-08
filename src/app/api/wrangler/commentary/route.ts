@@ -93,7 +93,11 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const body = await res.json().catch(() => null)
+  // Read as text first: an edge-level rejection (e.g. Cloudflare's 429 page in front of
+  // Render) is not JSON, and the raw text is the only clue to what really happened.
+  const rawText = await res.text().catch(() => '')
+  let body: any = null
+  try { body = rawText ? JSON.parse(rawText) : null } catch { body = null }
 
   // 200 = parsed (and saved when dry_run=false); 422 = checks failed, nothing
   // saved. Both carry the full result for the UI to render.
@@ -118,6 +122,26 @@ export async function POST(req: NextRequest) {
   if (res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 403 && detail) {
     return NextResponse.json({ error: detail }, { status: res.status })
   }
-  console.error('[wrangler/commentary] microservice returned', res.status, detail)
-  return NextResponse.json({ error: 'The analytics service failed to process this PDF' }, { status: 502 })
+  console.error(
+    '[wrangler/commentary] microservice returned', res.status, detail,
+    `server=${res.headers.get('server') ?? '?'}`, `body=${rawText.slice(0, 200)}`,
+  )
+
+  // Say what actually went wrong where we can tell, instead of one catch-all.
+  if (res.status === 429) {
+    return NextResponse.json(
+      { error: 'The analytics service is rate-limiting requests right now (HTTP 429). Wait a few minutes and try again.' },
+      { status: 429 },
+    )
+  }
+  if (res.status === 401 || res.status === 403) {
+    return NextResponse.json(
+      { error: `The analytics service rejected this request (HTTP ${res.status}). Its access secret may be misconfigured; tell an admin.` },
+      { status: 502 },
+    )
+  }
+  return NextResponse.json(
+    { error: `The analytics service failed to process this PDF (HTTP ${res.status}). If it keeps happening, tell an admin.` },
+    { status: 502 },
+  )
 }

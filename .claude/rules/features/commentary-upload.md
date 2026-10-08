@@ -122,3 +122,8 @@ The microservice's side check (`is_spartans()` in `spartans-python/utils/comment
 ## Page background (October 2026)
 
 The page background sits on a full-width wrapper (`bg-parchment dark:bg-ink`) around the `max-w-3xl` content column, so the margins either side of the column follow the theme instead of showing black. The same wrapper is used on `/wrangler/backfill-squad` and `/wrangler/grounds`. The earlier `dark:bg-ink-1` class was a no-op (no such token), which left the column light in dark mode.
+
+
+## Clearer upstream errors (October 2026)
+
+`POST /api/wrangler/commentary` used to turn every unexplained microservice reply into "The analytics service failed to process this PDF", which hid whether it was a rate limit, a bad secret or a parser crash. It now reads the reply as text first (an edge-level Cloudflare 429 in front of Render is not JSON), logs the status, `server` header and first 200 characters of the body, and answers: **429** → "rate-limiting requests right now (HTTP 429). Wait a few minutes and try again." (returned as 429); **401/403** → "rejected this request (HTTP n)… secret may be misconfigured; tell an admin" (502); anything else → the old message plus "(HTTP n)". Upstream 4xx replies that carry a text `detail` are still shown as before.
