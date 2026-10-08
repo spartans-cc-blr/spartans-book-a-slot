@@ -274,6 +274,69 @@ a stats line, not a squad card.
 
 ---
 
+## 2.4 "Player Stats — 0" on a long-finished tournament — PostgREST's
+1000-row cap, same bug class as §8.1 in `features/leaderboard.md` (fixed
+October 2026)
+
+**Reported symptom:** "Professionals League T30 Red ball III" (3 past,
+fully squad-announced bookings — 25 unique players, confirmed directly
+against the DB) showed "PLAYER STATS — 0" on this page, surviving a
+logout/login — ruling out a stale page/cache, unlike a similar-looking
+report on BlendIn Challengers that *was* just a caching issue (see the
+conversation this doc pass came from).
+
+**Root cause.** The announced-squad fetch feeding `tournamentPlayersMap`
+(§2 step 3) was a single, unpaginated
+`.from('squad').select(...).in('booking_id', bookingIds).eq('status',
+'announced')` — up to 100 booking IDs (the existing S-4 cap), each with
+~12 announced players. PostgREST silently caps an unpaginated response at
+1000 rows, with no error surfaced. Confirmed live: a full 100-booking
+window for this page already needs **1183** squad rows — past the cap —
+so some bookings' squads were being dropped from the result on every page
+load, with nothing anywhere signalling it.
+
+**Which bookings got dropped was essentially unpredictable, not oldest-
+or newest-first.** `bookingIds` is ordered by `game_date` ascending, but
+the squad *query itself* had no `.order()` at all — PostgREST/Postgres
+makes no ordering guarantee without one, and `POST /api/squad` deletes and
+fully re-inserts a booking's squad rows on every save (see
+`squad-selection.md` §3's "key architectural decision"), so a squad's
+physical row position tracks *when it was last edited*, not the game's
+`game_date`. A long-finished tournament's squads can easily have been
+edited (or re-synced/corrected) more recently than a newer tournament's,
+pushing them later in an unordered scan and past the cutoff — which is
+exactly how one specific old tournament could read "0" while every other
+tournament on the same page, built from the identical code path, looked
+fine.
+
+**Fixed** the same way `features/leaderboard.md` §8.1 fixed the identical
+class of bug on the analytics DB: page through the query with `.range()`
+in a loop (`fetchAllSquadRows()`, 1000 rows per page) until a short page
+comes back, instead of trusting one request to return everything. Ordered
+by `(booking_id, player_id)` — squad's own unique key — since `.range()`
+pagination needs a deterministic order to avoid skipping or repeating rows
+across pages (the same requirement `fetchAllRows()` in `playerStats.ts`
+already documents). Verified directly against the live DB with the new
+deterministic order: this tournament's 36 squad rows land at positions
+521–924 of 1183 — comfortably inside the first page even without needing
+the second — confirming the fix surfaces them; before the fix, with no
+`.order()` at all, Postgres's actual (unordered) scan order was evidently
+pushing them past the old single-page 1000-row cutoff.
+
+This is a **Hub-DB-side** instance of the same bug `features/leaderboard.md`
+§8.1 first found on the analytics DB — worth checking any other
+unpaginated `.in()`/`.eq()` Supabase read on this page (or elsewhere) that
+can plausibly return more than 1000 rows, the same way that incident's
+own "take-away" note already flags for analytics-DB reads.
+
+### File Map addition
+
+| File | Role |
+|---|---|
+| `src/app/tournament-planner/page.tsx` | `fetchAllSquadRows()` — pages the announced-squad fetch past PostgREST's 1000-row cap, ordered by `(booking_id, player_id)` for safe `.range()` pagination |
+
+---
+
 ## 3. Slot Model — `ALL_SLOTS` / `distributeSlotTargets()`
 
 Both the in-file copy (`TournamentPlannerClient.tsx`) and the extracted
@@ -687,7 +750,7 @@ own (stricter, `isAdmin`-only) knockout-awareness gating.
 
 | File | Role |
 |---|---|
-| `src/app/tournament-planner/page.tsx` | Server component — role guard, all data fetching described in §2, `emptyTournaments` computation (§2.1); fires its independent Supabase reads via `Promise.all` and its per-tournament stats board via one batched `getLeaderboardsByTournament()` call instead of one `getLeaderboard()` call per tournament (§2.2), scoped to every tournament with a confirmed booking and merged into `tournamentPlayersMap` so a scorecard-only player is never dropped (§2.3) |
+| `src/app/tournament-planner/page.tsx` | Server component — role guard, all data fetching described in §2, `emptyTournaments` computation (§2.1); fires its independent Supabase reads via `Promise.all` and its per-tournament stats board via one batched `getLeaderboardsByTournament()` call instead of one `getLeaderboard()` call per tournament (§2.2), scoped to every tournament with a confirmed booking and merged into `tournamentPlayersMap` so a scorecard-only player is never dropped (§2.3); `fetchAllSquadRows()` pages the announced-squad fetch past PostgREST's 1000-row cap so a tournament never silently reads "Player Stats — 0" (§2.4) |
 | `src/components/tournament-planner/TournamentPlannerClient.tsx` | Root client component — `BandwidthSection`, `TournamentBlock`, `MatchTabsSection`, `SlotBalanceByDay`, `GameTimelineCard`, `InlineGameCountEditor`; owns `classifiedTournaments`/Show-filter state and `expandRequest` (view-to-scroll-and-expand); `tournamentMap` merges `emptyTournaments` in as zero-game entries (§2.1) |
 | `src/components/tournament-planner/TournamentShareButton.tsx` | Native-share-or-clipboard-copy button for the public share page's URL — used both here (admin/GC only) and on `TournamentShareCard.tsx` |
 | `src/lib/slotTargets.ts` | Shared `distributeSlotTargets()` / `ALL_SLOTS` / `SlotKey` / `resolveActiveFormats()` (§3.1) — the extracted copy used by the public share page and the organiser self-service suggestion engine; this page keeps its own historical in-file duplicate of `ALL_SLOTS`/`distributeSlotTargets` (§1) but not of `resolveActiveFormats`, which it inlines instead |

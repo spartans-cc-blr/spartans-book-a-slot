@@ -75,6 +75,45 @@ export default async function TournamentPlannerPage() {
   // Cap at 100 booking IDs (vibe-security: uncapped .in() is S-4 risk).
   const bookingIds = normalizedBookings.map(b => b.id).slice(0, 100)
 
+  // The announced-squad query below used to be a single unpaginated .in()
+  // call. PostgREST silently caps an unpaginated response at 1000 rows with
+  // no error — and with up to 100 bookings × ~12 announced players each,
+  // this routinely needs more than that (confirmed live: 1183 rows for a
+  // full 100-booking window). The truncated rows aren't the newest or
+  // oldest bookings in any predictable way (squad rows are deleted and
+  // re-inserted on every save — see squad-selection.md — so physical row
+  // order tracks last-edited time, not game_date), which is how a
+  // long-finished tournament's "Players Represented" list could silently
+  // read 0 while bookings with the identical shape elsewhere on the page
+  // were unaffected. Paged via .range() past the cap, same fix shape as
+  // fetchAllRows() in playerStats.ts (built for an identical PostgREST-cap
+  // bug on the analytics DB — see features/leaderboard.md §8.1). Ordered by
+  // (booking_id, player_id) — squad's own unique key — since .range()
+  // pagination needs a deterministic order to avoid skipping or repeating
+  // rows across pages.
+  const SQUAD_PAGE_SIZE = 1000
+  async function fetchAllSquadRows() {
+    if (!bookingIds.length) return [] as any[]
+    const rows: any[] = []
+    let from = 0
+    for (;;) {
+      const { data, error } = await supabase
+        .from('squad')
+        .select('booking_id, status, is_captain, players(id, name, cricheroes_url)')
+        .in('booking_id', bookingIds)
+        .eq('status', 'announced')
+        .order('booking_id')
+        .order('player_id')
+        .range(from, from + SQUAD_PAGE_SIZE - 1)
+      if (error) throw new Error(error.message)
+      if (!data || data.length === 0) break
+      rows.push(...data)
+      if (data.length < SQUAD_PAGE_SIZE) break
+      from += SQUAD_PAGE_SIZE
+    }
+    return rows
+  }
+
   // Active, non-practice tournaments with zero confirmed bookings (§2.1) —
   // deliberately derived from `rawBookings` (every confirmed booking joined
   // to a tournament), not the informal-format-filtered set above — otherwise
@@ -98,13 +137,7 @@ export default async function TournamentPlannerPage() {
     matchIds.length
       ? supabase.from('match_stats_cache').select('match_id, match_result').in('match_id', matchIds)
       : Promise.resolve({ data: [] as { match_id: string; match_result: string | null }[] }),
-    bookingIds.length
-      ? supabase
-          .from('squad')
-          .select('booking_id, status, is_captain, players(id, name, cricheroes_url)')
-          .in('booking_id', bookingIds)
-          .eq('status', 'announced')
-      : Promise.resolve({ data: [] as any[] }),
+    fetchAllSquadRows().then(data => ({ data })),
     supabase
       .from('tournaments')
       .select(`
