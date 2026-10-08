@@ -239,6 +239,12 @@ needs the same treatment.
 | `/api/opponents` | POST, PATCH | Captain / GC / wrangler / admin | Create / edit an opponent (name, marquee, CricHeroes team URL, notes); Zod-validated, `captainWrite` rate limit — see `features/team-stats.md` §5 |
 | `/api/opponents/link` | POST | Captain / GC / wrangler / admin | Link a raw `opponent_name` spelling to an opponent — writes `opponent_aliases`, back-fills `bookings.opponent_id` |
 
+### Player absence API
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/players/[id]/absence` | PUT | Captain / GC / admin | Record or clear why a player is inactive (injured, family/personal, work/abroad, left the club, unknown) — appends a `player_absences` row; see `features/player-directory.md` §8 |
+
 ### GC APIs
  
 | Endpoint | Method | Auth | Purpose |
@@ -494,6 +500,10 @@ balance. `CHECK (sponsor_player_id != beneficiary_player_id)`. Admin-only,
 same trust model as every other wallet-balance-changing action — see
 `features/wallet-ledger.md` §14. Migration `074_wallet_transfers.sql`.
 **RLS enabled, no anon/authenticated policies** — service role only.
+
+#### `player_absences`
+`id, player_id FK, reason ('injured'|'family_personal'|'work_abroad'|'left_club'|'unknown', NULL = cleared), expected_return, note, recorded_by FK, recorded_by_email, created_at`
+Append-only; newest row per player is the current reason they're inactive (`players.status` is cron-managed and records no reason). Written by captain/GC/admin from the Inactive filter on `/players`. **RLS enabled, no anon/authenticated policies** — service role only. Migration `087_player_absences.sql`; see `features/player-directory.md` §8.
 
 #### `player_future_availability`
 `id, player_id FK, game_date, slot_time, response ('Y'|'O'|'E'|'L'), updated_at`

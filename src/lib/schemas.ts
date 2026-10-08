@@ -466,3 +466,12 @@ export const opponentMergeSchema = z.object({
   source_id: z.string().uuid(),
   target_id: z.string().uuid(),
 }).strict()
+
+// ── PLAYER ABSENCES — why a player is inactive (/api/players/[id]/absence) ──
+// See features/player-directory.md §8. reason null = clear the current absence.
+export const ABSENCE_REASONS = ['injured', 'family_personal', 'work_abroad', 'left_club', 'unknown'] as const
+export const playerAbsenceSchema = z.object({
+  reason:          z.enum(ABSENCE_REASONS).nullable(),
+  expected_return: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD').nullable().optional(),
+  note:            z.string().trim().max(300).nullable().optional(),
+}).strict()

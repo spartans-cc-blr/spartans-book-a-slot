@@ -155,7 +155,9 @@ already-played booking the player was squadded for.
 | File | Role |
 |---|---|
 | `src/app/players/page.tsx` | Server page — auth gate, public-field player fetch, last-played, highlights |
-| `src/components/players/PlayerDirectoryGrid.tsx` | Active/Inactive/All filter (default Active), search, A–Z, cards |
+| `src/components/players/PlayerDirectoryGrid.tsx` | Active/Inactive/All filter (default Active), search, A–Z, cards; `AbsenceControl` on Inactive cards for captain/GC/admin (§8) |
+| `src/app/api/players/[id]/absence/route.ts` | PUT — record/clear why a player is inactive (§8) |
+| `supabase/migrations/087_player_absences.sql` | `player_absences` table (§8) |
 | `src/lib/playerHighlights.ts` (+ `.test.ts`) | `CareerHighlights` type, `pickHighlights()` |
 | `src/lib/playerStats.ts` | `getCareerHighlightsByPlayer()` |
 | `src/app/gc-players/page.tsx` | Redirect to `/players` |
@@ -171,6 +173,35 @@ already-played booking the player was squadded for.
   leaderboard already ranks; this page is for finding a person.
 - Filtering by skill or captain.
 - Linking each highlight to the match it happened in.
+
+## 8. Why a player is inactive — absence reasons (added October 2026)
+
+`players.status` is cron-managed (`sync-player-status`: Y/O/E in the last 30
+days) and says nothing about *why* someone went quiet — injured, paternity or
+wedding leave, abroad, or gone from the club all look the same. Captains and GC
+can now record the reason from the **Inactive** filter on this page.
+
+- **UI:** on each Inactive card, a "Why inactive?" strip under the card
+  (`AbsenceControl` in `PlayerDirectoryGrid.tsx`): a dropdown (Injured · Family
+  / personal · Work / abroad · Left the club · Unknown / no reply · Not set),
+  an optional "Back by" date (hidden for Left the club) and a short note, with a
+  Save button once something changed. The saved reason shows beside the label.
+  Only shown to `isCaptain || isGC || isAdmin`, and only for inactive players.
+- **Storage:** `player_absences` (migration `087_player_absences.sql`) is
+  append-only: every save inserts a row (`reason`, `expected_return`, `note`,
+  `recorded_by`, `recorded_by_email`, `created_at`); the newest row per player is
+  the current state and a NULL `reason` means cleared. `players.status` is not
+  touched, since the cron would overwrite it.
+- **API:** `PUT /api/players/[id]/absence` (captain/GC/admin, not expelled,
+  `captainWrite` rate limit, Zod `playerAbsenceSchema`, `.strict()`). A
+  "Left the club" row stores no return date.
+- **Privacy:** reasons can be medical or family matters, so `page.tsx` only
+  queries `player_absences` for those three roles; everyone else gets
+  `absence: null` and never sees the control. Table is RLS-on, service role only.
+- **Not yet wired:** nothing reads the reason besides this page. Suppressing
+  the Sun–Wed availability nudge for players who are away (and a "welcome
+  back" nudge near their return date), and hiding "Left the club" players from
+  outreach lists, are the planned follow-ups.
 
 ---
 
