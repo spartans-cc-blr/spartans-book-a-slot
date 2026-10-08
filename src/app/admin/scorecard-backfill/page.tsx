@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
 import { MonthStepper, distinctMonths, monthOfDate } from '@/components/ui/MonthStepper'
 import { groupDatesIntoChips } from '@/lib/dateChipGroups'
@@ -371,10 +372,10 @@ export default function ScorecardBackfillPage() {
               </h2>
               <div className="space-y-1.5">
                 {recentlySynced.map(b => (
-                  <button
+                  <Link
                     key={b.booking_id}
-                    onClick={() => setMatchIdQuery(b.match_id)}
-                    title="Jump to this match in the list below"
+                    href={`/matches/history/${b.booking_id}`}
+                    title="Open this match's scorecard"
                     className="w-full flex items-center gap-2 text-left px-2 py-1 rounded hover:bg-[#EEEAE2] dark:hover:bg-ink-4 transition-colors">
                     <span className="font-rajdhani text-[11px] text-[#78716C] dark:text-zinc-500 flex-shrink-0 w-[92px]">
                       {formatSyncedAt(b.synced_at as string)}
@@ -394,7 +395,7 @@ export default function ScorecardBackfillPage() {
                         <VerifiedBadge />
                       </span>
                     )}
-                  </button>
+                  </Link>
                 ))}
               </div>
               {recentlySyncedTotal > recentlySynced.length && (

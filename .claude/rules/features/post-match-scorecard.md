@@ -2636,11 +2636,17 @@ searching the main list for.
   result parsing a second time), a "Fees applied" chip when relevant, and
   the same scalloped `VerifiedBadge` the main list already uses when the
   scorecard has been verified.
-- **Jump-to-row shortcut** — clicking a row sets `matchIdQuery` to that
-  row's `match_id`, which immediately narrows the main list below to just
-  that match — useful since the Recently Synced panel itself has no
-  Reset/Resolve actions of its own; it's purely a dashboard, and the main
-  list below it is where every action already lives.
+- **Each row is a real link to its match card** — a plain Next.js
+  `<Link href={`/matches/history/${booking_id}`}>` wrapping the whole row,
+  navigating same-tab to the standalone shareable match page (the same
+  destination every other "View Scorecard"/match-link in this app points
+  at — `/admin/wallet`, `WalletStatementClient.tsx`, Team Record, the
+  leaderboard's innings rows, Captaincy stats — see `architecture.md`'s
+  File Map for the full list). First cut (same day) instead set
+  `matchIdQuery` to jump the admin to that match's row in the main list
+  below; changed per direct feedback to go straight to the actual match
+  card instead, since that's genuinely where an admin wants to end up
+  from a "what just synced" glance, not back into this page's own list.
 
 ### Security (vibe-security)
 
