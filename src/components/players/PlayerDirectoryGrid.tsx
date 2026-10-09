@@ -80,6 +80,8 @@ function matchesStatus(p: DirectoryPlayer, f: StatusFilter) {
   return f === 'all' || (f === 'active' ? p.is_active : !p.is_active)
 }
 
+type ReasonFilter = 'all' | AbsenceReason | 'not_set'
+
 function formatRupees(n: number) {
   return `${n < 0 ? '-' : ''}₹${Math.abs(n).toLocaleString('en-IN')}`
 }
@@ -89,6 +91,12 @@ export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbse
   const [query, setQuery] = useState('')
   const [letter, setLetter] = useState<string | null>(null)
   const [status, setStatus] = useState<StatusFilter>('active')
+  const [reasonFilter, setReasonFilter] = useState<ReasonFilter>('all')
+  // Reasons saved this session, so the filter and counts update without a reload.
+  const [absenceOverrides, setAbsenceOverrides] = useState<Record<string, Absence | null>>({})
+  const absenceOf = (p: DirectoryPlayer): Absence | null =>
+    p.id in absenceOverrides ? absenceOverrides[p.id] : p.absence
+  const showReasons = canManageAbsences && status === 'inactive'
 
   const counts = useMemo(() => ({
     active:   players.filter(p => p.is_active).length,
@@ -97,12 +105,26 @@ export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbse
   }), [players])
 
   const q = query.trim().toLowerCase()
-  const searched = useMemo(
+  const beforeReason = useMemo(
     () => players
       .filter(p => matchesStatus(p, status))
       .filter(p => !showWallet || !duesOnly || (p.wallet_balance ?? 0) < 0)
       .filter(p => !q || p.name.toLowerCase().includes(q) || (p.jersey_name ?? '').toLowerCase().includes(q)),
     [players, q, status, showWallet, duesOnly],
+  )
+  const reasonCounts = useMemo(() => {
+    const c: Record<string, number> = { all: beforeReason.length, not_set: 0 }
+    for (const p of beforeReason) {
+      const r = (p.id in absenceOverrides ? absenceOverrides[p.id] : p.absence)?.reason ?? 'not_set'
+      c[r] = (c[r] ?? 0) + 1
+    }
+    return c
+  }, [beforeReason, absenceOverrides])
+  const searched = useMemo(
+    () => !showReasons || reasonFilter === 'all'
+      ? beforeReason
+      : beforeReason.filter(p => ((p.id in absenceOverrides ? absenceOverrides[p.id] : p.absence)?.reason ?? 'not_set') === reasonFilter),
+    [beforeReason, showReasons, reasonFilter, absenceOverrides],
   )
   const availableLetters = useMemo(
     () => new Set(searched.map(p => p.name[0]?.toUpperCase()).filter(Boolean)),
@@ -121,7 +143,7 @@ export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbse
               key={opt.value}
               role="radio"
               aria-checked={on}
-              onClick={() => { setStatus(opt.value); setLetter(null) }}
+              onClick={() => { setStatus(opt.value); setLetter(null); setReasonFilter('all') }}
               className={`font-rajdhani text-xs font-bold px-3 h-8 rounded-full border transition-colors ${
                 on ? 'bg-[var(--stats-accent)] border-[var(--stats-accent)] text-white dark:text-ink'
                    : 'bg-[var(--stats-card-bg)] dark:bg-ink-3 border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-2)] hover:text-[var(--stats-accent)]'
@@ -144,6 +166,29 @@ export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbse
           </button>
         )}
       </div>
+
+      {/* Reason (Inactive view, captain/GC/admin only) */}
+      {showReasons && (
+        <div className="flex flex-wrap items-center gap-1 mb-3" role="radiogroup" aria-label="Inactive reason">
+          {([{ value: 'all', label: 'Any reason' }, ...ABSENCE_OPTIONS, { value: 'not_set', label: 'Not set' }] as { value: ReasonFilter; label: string }[]).map(opt => {
+            const on = reasonFilter === opt.value
+            return (
+              <button
+                key={opt.value}
+                role="radio"
+                aria-checked={on}
+                onClick={() => { setReasonFilter(opt.value); setLetter(null) }}
+                className={`font-rajdhani text-xs font-bold px-2.5 h-7 rounded-full border transition-colors ${
+                  on ? 'bg-[var(--stats-accent)] border-[var(--stats-accent)] text-white dark:text-ink'
+                     : 'bg-[var(--stats-card-bg)] dark:bg-ink-3 border-[var(--stats-card-border)] dark:border-ink-5 text-[var(--stats-text-2)] hover:text-[var(--stats-accent)]'
+                }`}
+              >
+                {opt.label} <span className={on ? 'opacity-80' : 'text-[var(--stats-text-faint)]'}>({reasonCounts[opt.value] ?? 0})</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Search */}
       <input
@@ -193,7 +238,7 @@ export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbse
 
       {filtered.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map(p => <PlayerCard key={p.id} p={p} showWallet={showWallet} canManageAbsences={canManageAbsences} />)}
+          {filtered.map(p => <PlayerCard key={p.id} p={p} showWallet={showWallet} canManageAbsences={canManageAbsences} onAbsenceSaved={a => setAbsenceOverrides(o => ({ ...o, [p.id]: a }))} />)}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -205,7 +250,7 @@ export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbse
   )
 }
 
-function PlayerCard({ p, showWallet, canManageAbsences }: { p: DirectoryPlayer; showWallet: boolean; canManageAbsences: boolean }) {
+function PlayerCard({ p, showWallet, canManageAbsences, onAbsenceSaved }: { p: DirectoryPlayer; showWallet: boolean; canManageAbsences: boolean; onAbsenceSaved: (a: Absence | null) => void }) {
   const [headline, ...rest] = pickHighlights(p.highlights)
   const lastPlayed = formatLastPlayed(p.last_played_on)
   const primary = skillShort(p.primary_skill)
@@ -307,14 +352,14 @@ function PlayerCard({ p, showWallet, canManageAbsences }: { p: DirectoryPlayer; 
         </span>
       </div>
     </Link>
-    {canManageAbsences && !p.is_active && <AbsenceControl p={p} />}
+    {canManageAbsences && !p.is_active && <AbsenceControl p={p} onSaved={onAbsenceSaved} />}
     </div>
   )
 }
 
 // Captain/GC/admin only, Inactive players only. Saves via PUT
 // /api/players/[id]/absence (append-only; "Not set" clears). See §8.
-function AbsenceControl({ p }: { p: DirectoryPlayer }) {
+function AbsenceControl({ p, onSaved }: { p: DirectoryPlayer; onSaved: (a: Absence | null) => void }) {
   const [saved, setSaved] = useState<Absence | null>(p.absence)
   const [reason, setReason] = useState<AbsenceReason | ''>(p.absence?.reason ?? '')
   const [ret, setRet] = useState(p.absence?.expected_return ?? '')
@@ -341,7 +386,9 @@ function AbsenceControl({ p }: { p: DirectoryPlayer }) {
       const body = await res.json().catch(() => ({}))
       if (!res.ok) { setErr(body.error ?? 'Could not save'); return }
       const a = body.absence
-      setSaved(a?.reason ? { reason: a.reason, expected_return: a.expected_return, note: a.note } : null)
+      const next = a?.reason ? { reason: a.reason, expected_return: a.expected_return, note: a.note } : null
+      setSaved(next)
+      onSaved(next)
     } catch {
       setErr('Network error')
     } finally {

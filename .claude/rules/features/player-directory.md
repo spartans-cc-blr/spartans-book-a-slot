@@ -198,6 +198,13 @@ can now record the reason from the **Inactive** filter on this page.
 - **Privacy:** reasons can be medical or family matters, so `page.tsx` only
   queries `player_absences` for those three roles; everyone else gets
   `absence: null` and never sees the control. Table is RLS-on, service role only.
+- **Filter by reason (added October 2026):** for captain/GC/admin, the Inactive view
+  shows a second pill row under the status pills — Any reason · Injured · Family /
+  personal · Work / abroad · Left the club · Unknown / no reply · Not set — each with a
+  count. It composes with search, A–Z and the dues toggle (counts reflect them), resets
+  when the status pill changes, and updates live when a reason is saved on a card
+  (`absenceOverrides` in `PlayerDirectoryGrid`). Hidden for everyone else, who never
+  receive absence data. Client-side only; no API change.
 - **Not yet wired:** nothing reads the reason besides this page. Suppressing
   the Sun–Wed availability nudge for players who are away (and a "welcome
   back" nudge near their return date), and hiding "Left the club" players from
