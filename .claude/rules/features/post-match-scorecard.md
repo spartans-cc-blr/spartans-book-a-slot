@@ -850,6 +850,17 @@ re-sync, so there's no separate "un-flag" step needed here.
 > from "process the backlog latest first," with no special case for *why*
 > a row needs (re-)processing.
 
+> **Update (2026-10-09) — schedule moved off the :30 marks, third slot, retry.**
+> Between 5 and 8 Oct the 07:30 UTC slot never fired and the 13:30 UTC slot
+> started 1-3 hours late; on 8 Oct the one run that did start failed after
+> ~61s (most likely the 60s Vercel ceiling). GitHub scheduled runs are
+> best-effort, so `cron-backfill-scorecards.yml` now uses `17 7,13 * * *`
+> plus a safety-net `43 16 * * *` (about 12:47, 18:47 and 22:13 IST). The
+> route call no longer uses `curl --fail`: it prints the HTTP status and the
+> first 600 characters of the body, and retries once after 20s on a 5xx or
+> timeout. Extra runs are harmless because the route only touches bookings
+> not yet synced.
+
 ### Why the daily-cron-plus-guard shape exists at all
 Vercel Hobby does not support day-of-week-restricted cron expressions —
 this was discovered the hard way on the *separate* `lock-availability`
