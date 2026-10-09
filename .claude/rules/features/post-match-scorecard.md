@@ -488,6 +488,31 @@ flagged it, with an admin-only **Resolve** action that clears the flag
 without re-running the fetch (a false-alarm override, distinct from "Reset
 Upload").
 
+**📥 Needs CricHeroes Fetch section (added October 2026)** — a second
+highlighted section, directly below Needs Reconciliation and above the
+plain "All Matches" list: every row that's either never been uploaded at
+all (`current_status === null`) or got stuck mid-fetch (`pending_parse`),
+*excluding* anything already flagged (a flagged-and-unsynced row stays
+solely in Needs Reconciliation — the flag is the more urgent reason to act
+on it, and a row only ever lives in one highlighted section). Named to
+mirror "Needs Reconciliation" grammatically (`needsCricheroesFetch()`,
+`src/app/admin/scorecard-backfill/page.tsx`) rather than something vaguer
+like "Pending"/"Never Synced," since "fetch" is the actual action this
+section exists to prompt.
+
+Sorted most-recently-played first (`game_date` descending) — the matches
+CricHeroes is most likely to already have a scorecard ready for, and the
+ones worth catching up on before they age further into the backlog. This
+is purely a client-side re-derivation of the same `filtered` array the
+existing flagged/rest split already works from (the `GET` route itself is
+unchanged — see Section 7's own header comment on why it never filters by
+`status` server-side); no new query, no new API field. Rows in this
+section get a sky-tinted card background (`bg-sky-50`/`border-sky-300`,
+dark `bg-sky-950/20`/`border-sky-800/60`) so they're visually distinct from
+both a flagged (amber) row and a plain one — same "-50/-300, dark -950/40,
+-800" stepping convention the rest of this page's status chips already
+use.
+
 **Date-chip quick filter (added September 2026)** — the same combined-
 weekend-chip `DateChipSlider` used by Upcoming Matches (`/fixtures`, see
 `features/player-availability.md` §10.1) and Past Matches
@@ -497,8 +522,9 @@ fetched in one shot, see the `/api/admin/scorecard-backfill` row above),
 so no `hasMore`/`onLoadMore` props are passed. Sits directly under the
 Match ID search box; both filters compose (`matchIdFiltered` narrowed
 further by the selected date group), so "Select all shown"/"Run Backfill"
-and the ⚠ Needs Reconciliation/All Matches split all operate on whichever
-subset is currently narrowed by match ID *and* date. Dates are derived from
+and the ⚠ Needs Reconciliation/📥 Needs CricHeroes Fetch/All Matches split
+all operate on whichever subset is currently narrowed by match ID *and*
+date. Dates are derived from
 whatever `matchIdFiltered` currently holds (`groupDatesIntoChips()`,
 `src/lib/dateChipGroups.ts`) and shown reverse-chronologically — most
 recently played first, since a recent match is the one most likely to need
