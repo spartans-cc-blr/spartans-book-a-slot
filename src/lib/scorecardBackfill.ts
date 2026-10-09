@@ -61,10 +61,21 @@ export async function backfillOneBooking(bookingId: string): Promise<BackfillRes
     return { booking_id: bookingId, match_id: booking.match_id, ok: false, parsed: false, synced: false, error: 'Analytics microservice is not configured' }
   }
 
+  // A re-pull (reconciliation flag, stats refresh) of a booking whose fees
+  // are already applied must never rewind its status — fees_applied is
+  // terminal (post-match-scorecard.md §6). Otherwise the booking reverts to
+  // 'synced' and the admin list offers "Apply fee" again.
+  const { data: existingUpload } = await supabase
+    .from('scorecard_uploads')
+    .select('status')
+    .eq('booking_id', bookingId)
+    .maybeSingle()
+  const feesAlreadyApplied = existingUpload?.status === 'fees_applied'
+
   await supabase.from('scorecard_uploads').upsert({
     booking_id:    bookingId,
     match_id:      booking.match_id,
-    status:        'pending_parse',
+    ...(feesAlreadyApplied ? {} : { status: 'pending_parse' }),
     uploaded_by:   null, // no human uploader — this run was automated
     uploaded_at:   new Date().toISOString(),
     error_message: null,
@@ -132,6 +143,7 @@ export async function backfillOneBooking(bookingId: string): Promise<BackfillRes
     .from('scorecard_uploads')
     .update({ status: 'parsed' })
     .eq('booking_id', bookingId)
+    .neq('status', 'fees_applied')
 
   if (statusErr) {
     return { booking_id: bookingId, match_id: booking.match_id, ok: false, parsed: false, synced: false, error: statusErr.message }
