@@ -27,6 +27,17 @@ interface Booking {
 
 type RowStatus = 'idle' | 'processing' | 'success' | 'failed'
 
+// A row that's never been fetched from CricHeroes at all (current_status is
+// null) or got stuck mid-fetch (pending_parse) — the actual "needs to be
+// caught up from CricHeroes" backlog, as opposed to a row that's already
+// parsed/synced and just happens to be selected for a re-run. Excludes a
+// flagged row even if it also happens to be unsynced — that stays solely in
+// Needs Reconciliation, since the flag is the more urgent reason to act on
+// it and a row should only ever live in one highlighted section.
+function needsCricheroesFetch(b: Booking) {
+  return !b.needs_reconciliation && (b.current_status === null || b.current_status === 'pending_parse')
+}
+
 // Respectful pacing between CricHeroes fetches — same spirit as the
 // wrangler's standalone download_scorecard.py (a few seconds between
 // requests rather than firing them all at once).
@@ -469,7 +480,14 @@ export default function ScorecardBackfillPage() {
 
               {(() => {
                 const flagged = filtered.filter(b => b.needs_reconciliation)
-                const rest    = filtered.filter(b => !b.needs_reconciliation)
+                // Most recently played first — the matches CricHeroes is
+                // most likely to already have a scorecard ready for, and
+                // the ones worth catching up on before they age into the
+                // backlog further.
+                const pendingFetch = filtered
+                  .filter(needsCricheroesFetch)
+                  .sort((a, b) => b.game_date.localeCompare(a.game_date))
+                const rest = filtered.filter(b => !b.needs_reconciliation && !needsCricheroesFetch(b))
                 return (
                   <>
                     {flagged.length > 0 && (
@@ -495,7 +513,30 @@ export default function ScorecardBackfillPage() {
                       </div>
                     )}
 
-                    {flagged.length > 0 && rest.length > 0 && (
+                    {pendingFetch.length > 0 && (
+                      <div className="mb-4">
+                        <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-sky-700 dark:text-sky-400 mb-2">
+                          📥 Needs CricHeroes Fetch ({pendingFetch.length})
+                        </h2>
+                        <div className="space-y-2">
+                          {pendingFetch.map(b => (
+                            <BookingRow
+                              key={b.booking_id}
+                              booking={b}
+                              selected={selected.has(b.booking_id)}
+                              running={running}
+                              result={results[b.booking_id]}
+                              isResetting={resetting.has(b.booking_id)}
+                              onToggle={() => toggle(b.booking_id)}
+                              onReset={() => resetUpload(b)}
+                              onResolveFlag={() => resolveFlag(b)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(flagged.length > 0 || pendingFetch.length > 0) && rest.length > 0 && (
                       <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500 mb-2">
                         All Matches
                       </h2>
@@ -544,7 +585,9 @@ function BookingRow({
     <div className={`border rounded px-4 py-3 flex items-center gap-3 ${
       b.needs_reconciliation
         ? 'bg-amber-50 border-amber-300 dark:bg-amber-950/20 dark:border-amber-800/60'
-        : 'bg-white dark:bg-ink-3 border-[#D4C9B0] dark:border-ink-5'
+        : needsCricheroesFetch(b)
+          ? 'bg-sky-50 border-sky-300 dark:bg-sky-950/20 dark:border-sky-800/60'
+          : 'bg-white dark:bg-ink-3 border-[#D4C9B0] dark:border-ink-5'
     }`}>
       <input
         type="checkbox"
