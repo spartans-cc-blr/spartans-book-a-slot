@@ -27,7 +27,12 @@ name: Cron — backfill-scorecards
 
 on:
   schedule:
-    # 07:30 UTC = 13:00 IST, and 13:30 UTC = 19:00 IST
+    # 07:17 UTC = 12:47 IST, 13:17 UTC = 18:47 IST, 16:43 UTC = 22:13 IST.
+    # Off the :00/:30 marks on purpose (2026-10-09): GitHub scheduled runs are
+    # best-effort and are delayed or dropped at busy minutes. Between 5 and 8
+    # Oct the 07:30 UTC slot never fired and the 13:30 slot started 1-3 hours
+    # late. The third, later slot is a safety net; the route is idempotent
+    # (only touches bookings not yet synced), so extra runs are harmless.
     # Moved off 07:00 IST on 2026-08-01 — no games are ever played between
     # 19:00 and 07:00 IST, so a 07:00 run only ever re-checked the same
     # backlog the prior 19:00 run had already seen. Moved off 12:00 IST to
@@ -35,7 +40,8 @@ on:
     # CricHeroes time to publish scorecards for the day's morning slots
     # (07:30/10:30) before the fetch attempt runs — 13:00 IST gives it even
     # more room.
-    - cron: '30 7,13 * * *'
+    - cron: '17 7,13 * * *'
+    - cron: '43 16 * * *'
   workflow_dispatch: {}
 
 jobs:
@@ -64,6 +70,21 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl --fail --silent --show-error \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            https://hub.spartanscricketclub.in/api/cron/backfill-scorecards
+          # No --fail: a bare red step hides why it failed. Print the status
+          # and the first part of the body, and retry once on a 5xx (a Vercel
+          # 504 on a slow Render hop usually clears on the second try because
+          # the first attempt already did part of the work).
+          for attempt in 1 2; do
+            code=$(curl --silent --show-error --max-time 100 \
+              --output /tmp/resp.txt --write-out '%{http_code}' \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              https://hub.spartanscricketclub.in/api/cron/backfill-scorecards) || code=000
+            echo "attempt $attempt: HTTP $code"
+            head -c 600 /tmp/resp.txt; echo
+            if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then exit 0; fi
+            if [ "$code" -ge 500 ] || [ "$code" = 000 ]; then
+              [ "$attempt" = 1 ] && { echo "retrying in 20s"; sleep 20; continue; }
+            fi
+            exit 1
+          done
+          exit 1
