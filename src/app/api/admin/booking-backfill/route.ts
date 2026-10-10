@@ -64,6 +64,10 @@ export async function POST(req: NextRequest) {
       slot_time:     input.slot_time,
       game_date:     input.game_date,
       opponent_name: input.opponent_name ?? null,
+      cricheroes_url:    input.cricheroes_url,
+      ground_id:         input.ground_id,
+      captain_id:        input.captain_id,
+      captain_player_id: input.captain_player_id,
     })
 
     if (!result.ok) {
@@ -77,6 +81,10 @@ export async function POST(req: NextRequest) {
     tournament_id: input.tournament_id,
     format:        input.format,
     slot_time:     input.slot_time,
+    cricheroes_url:    input.cricheroes_url,
+    ground_id:         input.ground_id,
+    captain_id:        input.captain_id,
+    captain_player_id: input.captain_player_id,
   })
 
   if (!result.ok && !result.booking_id) {

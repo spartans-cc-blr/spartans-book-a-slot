@@ -175,6 +175,16 @@ export const playerReconciliationRequestSchema = z.discriminatedUnion('mode', [
 
 const backfillMatchIdField = z.string().min(1, 'match_id is required').max(30)
 
+// Optional booking details, accepted by both the auto and the manual create
+// paths. captain_player_id is for a past-match stand-in with no captains row
+// (see src/lib/bookingCaptain.ts).
+const backfillExtras = {
+  cricheroes_url:    z.string().trim().max(500).refine(isCricheroesUrl, 'Must be a CricHeroes URL').optional(),
+  ground_id:         z.string().uuid().optional(),
+  captain_id:        z.string().uuid().optional(),
+  captain_player_id: z.string().uuid().optional(),
+}
+
 export const bookingBackfillPreviewSchema = z.object({
   dry_run:  z.literal(true),
   match_id: backfillMatchIdField,
@@ -186,6 +196,7 @@ export const bookingBackfillConfirmSchema = z.object({
   tournament_id: z.string().uuid('tournament_id must be a valid UUID'),
   format:        z.enum(['T20', 'T30']),
   slot_time:     z.enum(['07:30', '10:30', '12:30', '14:30']),
+  ...backfillExtras,
 }).strict()
 
 // Fallback path for when CricHeroes itself is unreachable (rate limited or
@@ -212,6 +223,7 @@ export const bookingBackfillManualSchema = z.object({
   slot_time:     z.enum(['07:30', '10:30', '12:30', '14:30']),
   game_date:     z.string().regex(GAME_DATE_REGEX, 'game_date must be YYYY-MM-DD'),
   opponent_name: z.string().trim().min(1).max(120).optional(),
+  ...backfillExtras,
 }).strict()
 
 export const bookingBackfillRequestSchema = z.union([

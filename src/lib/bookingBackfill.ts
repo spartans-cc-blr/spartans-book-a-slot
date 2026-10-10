@@ -17,6 +17,48 @@
 import { createServiceClient } from '@/lib/supabase'
 import { backfillOneBooking, BackfillResult } from '@/lib/scorecardBackfill'
 import { redis } from '@/lib/rateLimit'
+import { resolveBookingCaptain } from '@/lib/bookingCaptain'
+
+// Optional booking details the admin can supply on either create path.
+// Previously none of these were stored, so every backfilled booking had to be
+// reopened in the matches admin to add ground, captain and CricHeroes URL.
+export interface BackfillBookingExtras {
+  cricheroes_url?:    string
+  ground_id?:         string
+  captain_id?:        string
+  captain_player_id?: string
+}
+
+// Validates ground, resolves the captain (a backfilled match is always in the
+// past, so an inactive captain or any player is allowed), and defaults both
+// from the tournament when the admin left them blank.
+async function resolveExtras(
+  supabase: ReturnType<typeof createServiceClient>,
+  tournamentId: string,
+  gameDate: string,
+  extras: BackfillBookingExtras,
+): Promise<{ ground_id: string | null; captain_id: string | null; cricheroes_url: string | null } | { error: string }> {
+  const { data: t } = await supabase
+    .from('tournaments')
+    .select('ground_id, captain_id')
+    .eq('id', tournamentId)
+    .single()
+
+  const groundId = extras.ground_id ?? t?.ground_id ?? null
+  if (groundId) {
+    const { data: gr } = await supabase.from('grounds').select('id').eq('id', groundId).single()
+    if (!gr) return { error: 'Ground not found' }
+  }
+
+  const captain = await resolveBookingCaptain(supabase, {
+    captainId:       extras.captain_player_id ? null : (extras.captain_id ?? t?.captain_id ?? null),
+    captainPlayerId: extras.captain_player_id ?? null,
+    gameDate,
+  })
+  if ('error' in captain) return { error: captain.error }
+
+  return { ground_id: groundId, captain_id: captain.id, cricheroes_url: extras.cricheroes_url ?? null }
+}
 
 const MICROSERVICE_TIMEOUT_MS = 45_000
 
@@ -147,6 +189,7 @@ export interface CreateBackfillBookingInput {
   format:        'T20' | 'T30'
   slot_time:     string
 }
+export type CreateBackfillBookingArgs = CreateBackfillBookingInput & BackfillBookingExtras
 
 export interface CreateBackfillBookingResult {
   ok:          boolean
@@ -160,7 +203,7 @@ export interface CreateBackfillBookingResult {
 // last displayed from the preview call; only tournament_id, format, and
 // slot_time (cosmetic labels the admin actually chooses) come from the client.
 export async function createBackfillBooking(
-  input: CreateBackfillBookingInput
+  input: CreateBackfillBookingArgs
 ): Promise<CreateBackfillBookingResult> {
   const supabase = createServiceClient()
 
@@ -200,6 +243,9 @@ export async function createBackfillBooking(
     return { ok: false, error: 'This match is not in the past — booking backfill is for completed matches only' }
   }
 
+  const extras = await resolveExtras(supabase, input.tournament_id, preview.game_date, input)
+  if ('error' in extras) return { ok: false, error: extras.error }
+
   const { data: booking, error: insertErr } = await supabase
     .from('bookings')
     .insert({
@@ -211,6 +257,9 @@ export async function createBackfillBooking(
       opponent_name: preview.opponent_name,
       venue:         preview.ground,
       match_id:      input.match_id,
+      ground_id:      extras.ground_id,
+      captain_id:     extras.captain_id,
+      cricheroes_url: extras.cricheroes_url,
     })
     .select('id')
     .single()
@@ -235,6 +284,7 @@ export interface CreateManualBackfillBookingInput {
   game_date:     string // YYYY-MM-DD
   opponent_name: string | null
 }
+export type CreateManualBackfillBookingArgs = CreateManualBackfillBookingInput & BackfillBookingExtras
 
 // Fallback for when CricHeroes is rate-limiting (or otherwise unreachable)
 // and createBackfillBooking() above can't even get a preview, let alone
@@ -263,7 +313,7 @@ export interface CreateManualBackfillBookingInput {
 // against). opponent_name is accepted as freely as venue/notes already
 // are elsewhere on a booking — descriptive text, not a security boundary.
 export async function createManualBackfillBooking(
-  input: CreateManualBackfillBookingInput
+  input: CreateManualBackfillBookingArgs
 ): Promise<CreateBackfillBookingResult> {
   const supabase = createServiceClient()
 
@@ -290,6 +340,9 @@ export async function createManualBackfillBooking(
     return { ok: false, error: 'This match is not in the past — booking backfill is for completed matches only' }
   }
 
+  const extras = await resolveExtras(supabase, input.tournament_id, input.game_date, input)
+  if ('error' in extras) return { ok: false, error: extras.error }
+
   const { data: booking, error: insertErr } = await supabase
     .from('bookings')
     .insert({
@@ -300,6 +353,9 @@ export async function createManualBackfillBooking(
       tournament_id: input.tournament_id,
       opponent_name: input.opponent_name,
       match_id:      input.match_id,
+      ground_id:      extras.ground_id,
+      captain_id:     extras.captain_id,
+      cricheroes_url: extras.cricheroes_url,
     })
     .select('id')
     .single()
