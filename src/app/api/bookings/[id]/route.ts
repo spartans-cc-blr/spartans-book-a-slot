@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { resolveOrCreateOpponentIdByName } from '@/lib/opponents'
+import { resolveBookingCaptain } from '@/lib/bookingCaptain'
 import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
 import { ORGANISER_SELF_SERVICE_REASON } from '@/types'
 
@@ -113,10 +114,23 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
   // unconditionally would make a booking permanently uneditable the moment
   // its assigned captain is later deactivated. Only a genuine reassignment
   // needs to point at someone currently active.
-  if (safeUpdates.captain_id && safeUpdates.captain_id !== existing?.captain_id) {
-    const { data: cap } = await supabase.from('captains').select('id, active').eq('id', safeUpdates.captain_id).single()
-    if (!cap) return NextResponse.json({ error: 'Captain not found' }, { status: 400 })
-    if (!cap.active) return NextResponse.json({ error: 'Captain is not active' }, { status: 400 })
+  //
+  // A past match may be given an inactive captain or any player (a stand-in
+  // with no captains row gets an inactive one) — see src/lib/bookingCaptain.ts.
+  const captainPlayerId =
+    typeof safeUpdates.captain_player_id === 'string' ? safeUpdates.captain_player_id : null
+  delete safeUpdates.captain_player_id
+  if (captainPlayerId || (safeUpdates.captain_id && safeUpdates.captain_id !== existing?.captain_id)) {
+    const resolution = await resolveBookingCaptain(supabase, {
+      captainId: captainPlayerId ? null : safeUpdates.captain_id,
+      captainPlayerId,
+      gameDate: safeUpdates.game_date ?? existing?.game_date ?? '',
+      currentCaptainId: existing?.captain_id ?? null,
+    })
+    if ('error' in resolution) {
+      return NextResponse.json({ error: resolution.error }, { status: 400 })
+    }
+    safeUpdates.captain_id = resolution.id
   }
   if (safeUpdates.ground_id) {
     const { data: gr } = await supabase.from('grounds').select('id').eq('id', safeUpdates.ground_id).single()

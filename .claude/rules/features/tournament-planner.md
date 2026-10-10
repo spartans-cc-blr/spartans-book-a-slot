@@ -707,6 +707,27 @@ designation), not `bookings.captain_id` (the booking-level default/override
 of *who leads this tournament*, independent of whether that person is
 even in the squad).
 
+### 7.1 Captain for a past match — inactive captains and any player (added October 2026)
+
+Booking a past game, or editing one, used to be limited to currently-active
+captains (`POST /api/bookings` and a changed `captain_id` on `PATCH
+/api/bookings/[id]` both 400'd with "Captain is not active"). The person who
+actually led an already-played match may since have gone inactive, or may
+have stood in without ever being in the captains list.
+
+For a `game_date` before today (IST) the admin booking forms
+(`BookingCaptainSelect`, used by `/admin/bookings/new` and
+`/admin/bookings/[id]`) now offer every captain, inactive ones marked, plus an
+"Other players" group of every non-expelled player who has no captains row. A
+player pick is sent as `captain_player_id`; `resolveBookingCaptain()`
+(`src/lib/bookingCaptain.ts`) reuses that player's existing captains row, or
+creates one with `active = false` (`bookings.captain_id` is an FK to
+`captains`, so a captains row is still required). Upcoming games are unchanged:
+active captains only, and `captain_player_id` is rejected for them server-side.
+Re-saving a booking's already-stored inactive captain stays allowed as before.
+The inactive captains row doesn't appear in bandwidth cards (those use active
+captains) and doesn't grant the player captain access.
+
 ---
 
 ## 8. Removed — Internal "Suggested Slots" Panel
