@@ -76,6 +76,8 @@ export interface CommentaryResult {
   replaces_existing: boolean
   balls?: CommentaryBall[]
   detail?: string
+  /** From a dry run: lets the save skip re-uploading the PDF (see the wrangler commentary route). */
+  parse_token?: string
 }
 
 /** Ball-by-ball status of a match, from the analytics `match_coverage` view. */
