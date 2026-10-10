@@ -77,9 +77,10 @@ export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[]
     setSides({ spartans: EMPTY, opponent: EMPTY })
   }
 
-  async function send(side: CommentarySide, file: File, dryRun: boolean, saveAnyway: boolean) {
+  async function send(side: CommentarySide, file: File | null, dryRun: boolean, saveAnyway: boolean, parseToken?: string) {
     const fd = new FormData()
-    fd.append('file', file)
+    if (file) fd.append('file', file)
+    if (parseToken) fd.append('parse_token', parseToken)
     fd.append('booking_id', bookingId)
     fd.append('side', side)
     fd.append('dry_run', String(dryRun))
@@ -110,7 +111,9 @@ export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[]
     if (!s.file) return
     patch(side, { saving: true, error: '' })
     try {
-      const { res, data } = await send(side, s.file, false, s.saveAnyway)
+      // Try the token from the check first (no re-upload); if it expired, resend the file once.
+      let { res, data } = await send(side, s.result?.parse_token ? null : s.file, false, s.saveAnyway, s.result?.parse_token)
+      if (res.status === 410 && data?.parse_expired) ({ res, data } = await send(side, s.file, false, s.saveAnyway))
       if (res.status === 422) patch(side, { saving: false, error: 'Checks failed, nothing saved. Tick “Save anyway” to keep it with the failures recorded.' })
       else if (!res.ok) patch(side, { saving: false, error: data?.error ?? 'Save failed' })
       else patch(side, { saving: false, savedAt: new Date().toLocaleTimeString(), result: data as CommentaryResult })

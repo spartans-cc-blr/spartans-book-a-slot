@@ -114,6 +114,26 @@ describe('forwarding', () => {
     expect(sent.get('save_anyway')).toBe('true')
   })
 
+  it('saves with just a parse_token (no file), only on a real save', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, saved: true }), { status: 200 }))
+    const tok = 'abcdefghijklmnopqrstuvwx_-12'
+    const res = await POST(request({ booking_id: BOOKING, side: 'opponent', dry_run: 'false', parse_token: tok }))
+    expect(res.status).toBe(200)
+    const sent = fetchMock.mock.calls[0][1].body as FormData
+    expect(sent.get('parse_token')).toBe(tok)
+    expect(sent.get('file')).toBeNull()
+    // a token on a dry run, or a malformed token, does not stand in for the file
+    expect((await POST(request({ booking_id: BOOKING, side: 'opponent', parse_token: tok }))).status).toBe(400)
+    expect((await POST(request({ booking_id: BOOKING, side: 'opponent', dry_run: 'false', parse_token: 'bad token!' }))).status).toBe(400)
+  })
+
+  it('turns the microservice parse_expired 410 into a resend-the-file signal', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ detail: 'parse_expired' }), { status: 410 }))
+    const res = await POST(request({ booking_id: BOOKING, side: 'opponent', dry_run: 'false', parse_token: 'abcdefghijklmnopqrstuvwx' }))
+    expect(res.status).toBe(410)
+    expect((await res.json()).parse_expired).toBe(true)
+  })
+
   it('passes a 422 (checks failed, nothing saved) through with its body', async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: false, saved: false, issues: [] }), { status: 422 }))
     const res = await POST(request({ ...good(), dry_run: 'false' }))

@@ -127,3 +127,8 @@ The page background sits on a full-width wrapper (`bg-parchment dark:bg-ink`) ar
 ## Clearer upstream errors (October 2026)
 
 `POST /api/wrangler/commentary` used to turn every unexplained microservice reply into "The analytics service failed to process this PDF", which hid whether it was a rate limit, a bad secret or a parser crash. It now reads the reply as text first (an edge-level Cloudflare 429 in front of Render is not JSON), logs the status, `server` header and first 200 characters of the body, and answers: **429** → "rate-limiting requests right now (HTTP 429). Wait a few minutes and try again." (returned as 429); **401/403** → "rejected this request (HTTP n)… secret may be misconfigured; tell an admin" (502); anything else → the old message plus "(HTTP n)". Upstream 4xx replies that carry a text `detail` are still shown as before.
+
+
+## Fewer microservice calls: parse token (October 2026)
+
+A commentary upload is a check (`dry_run=true`) then a save (`dry_run=false`) of the same PDF, which used to upload and parse the file twice per innings (4 requests per match). The dry run now returns `parse_token`; `spartans-python` keeps the parsed result in memory for 10 minutes (max 20), bound to match id, side and overs. `CommentaryClient` saves with the token and **no file**, and the route forwards it (`PARSE_TOKEN_RE`; only honoured when `dry_run=false`). If the token is unknown, expired or from a restart, the microservice answers 410 `parse_expired`, the route returns 410 with `parse_expired: true`, and the client resends the file once. Cross-checks still run again on save against the current `match_stats`. Deploy `spartans-python` first; until then no token comes back and the flow works as before.

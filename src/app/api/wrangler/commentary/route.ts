@@ -25,6 +25,10 @@ import { isCommentarySide, validateCommentaryPdf } from '@/lib/commentary'
 const MICROSERVICE_TIMEOUT_MS = 45_000
 export const maxDuration = 60
 
+// Opaque token from the microservice's dry run (secrets.token_urlsafe). Lets the save call skip
+// re-uploading and re-parsing the same PDF; see spartans-python api.py _remember_parse.
+const PARSE_TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function POST(req: NextRequest) {
@@ -43,13 +47,19 @@ export async function POST(req: NextRequest) {
   const dryRun = String(form?.get('dry_run') ?? 'true') !== 'false'
   const saveAnyway = String(form?.get('save_anyway') ?? 'false') === 'true'
 
-  if (!(file instanceof File)) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+  const rawToken = String(form?.get('parse_token') ?? '')
+  const parseToken = !dryRun && PARSE_TOKEN_RE.test(rawToken) ? rawToken : ''
+  const hasFile = file instanceof File
+  if (!hasFile && !parseToken) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
   if (!UUID_RE.test(bookingId)) return NextResponse.json({ error: 'Invalid booking' }, { status: 400 })
   if (!isCommentarySide(side)) return NextResponse.json({ error: 'side must be spartans or opponent' }, { status: 400 })
 
-  const buf = Buffer.from(await file.arrayBuffer())
-  const fileError = validateCommentaryPdf(buf.length, buf)
-  if (fileError) return NextResponse.json({ error: fileError }, { status: 400 })
+  // With a token the microservice reuses the PDF it parsed during the dry run, so none is needed.
+  const buf = hasFile ? Buffer.from(await (file as File).arrayBuffer()) : null
+  if (buf) {
+    const fileError = validateCommentaryPdf(buf.length, buf)
+    if (fileError) return NextResponse.json({ error: fileError }, { status: 400 })
+  }
 
   const supabase = createServiceClient()
   const { data: booking } = await supabase
@@ -70,7 +80,8 @@ export async function POST(req: NextRequest) {
   }
 
   const upstream = new FormData()
-  upstream.append('file', new Blob([buf], { type: 'application/pdf' }), file.name || `${side}.pdf`)
+  if (buf) upstream.append('file', new Blob([buf], { type: 'application/pdf' }), (file as File).name || `${side}.pdf`)
+  if (parseToken) upstream.append('parse_token', parseToken)
   upstream.append('match_id', String(booking.match_id))
   upstream.append('side', side)
   upstream.append('dry_run', String(dryRun))
@@ -108,6 +119,11 @@ export async function POST(req: NextRequest) {
   // Microservice 4xx messages are written for humans (unknown match, bad PDF…)
   // and safe to show. Anything else is an upstream fault.
   const detail = typeof body?.detail === 'string' ? body.detail : null
+
+  // The saved parse expired or the service restarted: ask the client to resend the file once.
+  if (res.status === 410 && detail === 'parse_expired') {
+    return NextResponse.json({ error: 'The earlier check expired. Resending the file…', parse_expired: true }, { status: 410 })
+  }
 
   // FastAPI's own bare "Not Found" means the route itself is missing, i.e. the
   // microservice is running a build without /parse-commentary. Say so instead
