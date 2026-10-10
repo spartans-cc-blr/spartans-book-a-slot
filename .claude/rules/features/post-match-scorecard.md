@@ -2718,6 +2718,14 @@ client-reachable input.
 
 ---
 
+## 21. Incident (9 Oct 2026) — re-pull rewound `fees_applied` to `synced`
+
+**Symptom:** the admin Past list offered "Apply fee" for a match (26 Sep Glanz) whose fees were already applied. **Cause:** `backfillOneBooking()` upserted `scorecard_uploads.status = 'pending_parse'` then `'parsed'` unconditionally before syncing, so any re-pull (e.g. the 1 Oct reconciliation re-sync) rewound `fees_applied` to `synced`. The `matchStatsSync.ts` guard only stopped the final flip. Wallet debits were never duplicated, since `POST /api/fees/apply` checks `wallet_transactions`.
+
+**Fix:** `backfillOneBooking()` now reads the existing status and omits `status` from the upsert when it is `fees_applied`, and the `parsed` update has `.neq('status', 'fees_applied')`. Data: 14 bookings (8 Aug – 27 Sep) with `fees_applied_at` set and live debits were restored to `fees_applied` by SQL.
+
+---
+
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*
 *Security audit: vibe-security patterns applied per SKILL.md*
 *Analytics pipeline: `spartans-python` repo (Render) · Hub: `spartans-book-a-slot` repo (Vercel)*
