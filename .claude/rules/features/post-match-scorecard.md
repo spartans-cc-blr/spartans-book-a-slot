@@ -2599,6 +2599,22 @@ whichever schema a plain `z.union` tries first would silently win,
 dropping `game_date`/`opponent_name`/`manual` and routing a manual request
 through the CricHeroes-dependent auto path instead.
 
+### Fourth fix — ground, captain and CricHeroes URL are now saved (added October 2026)
+
+Both create paths (auto and manual) only ever inserted date, slot, format,
+tournament, opponent, venue text and `match_id`, so every backfilled booking
+had to be reopened in the matches admin to add its ground, captain and
+CricHeroes URL. `/admin/booking-backfill` now has Ground and Captain pickers
+(both modes) and a CricHeroes URL field (the existing one in manual mode, a
+new one in the preview step), all optional. Ground and captain default from the
+chosen tournament; the captain picker is `BookingCaptainSelect`, so as for any
+past match it offers inactive captains and any player (`captain_player_id`,
+`features/tournament-planner.md` §7.1). `resolveExtras()` in
+`src/lib/bookingBackfill.ts` validates the ground, resolves the captain via
+`resolveBookingCaptain()` and passes `ground_id`, `captain_id` and
+`cricheroes_url` into the insert; the CricHeroes URL is checked with
+`isCricheroesUrl()` in the Zod schema (`backfillExtras` in `schemas.ts`).
+
 ### Security (vibe-security)
 
 | Check | Status |

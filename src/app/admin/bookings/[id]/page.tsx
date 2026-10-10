@@ -10,6 +10,8 @@ import { PracticeToggle } from '@/components/admin/PracticeToggle'
 import { BackButton } from '@/components/ui/BackButton'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 import { buildOrganiserWhatsAppUrl, buildCaptainWhatsAppUrl } from '@/lib/bookingNotify'
+import BookingCaptainSelect from '@/components/admin/BookingCaptainSelect'
+import { captainRequestFields } from '@/lib/bookingCaptainShared'
 import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
 
 type ScorecardUploadStatus = 'pending_parse' | 'parsed' | 'synced' | 'fees_applied'
@@ -131,6 +133,7 @@ type CaptainOption = {
   id: string
   name: string
   active: boolean
+  player_id?: string | null
   players: { cricheroes_url: string | null; whatsapp: string | null } | null
 }
 
@@ -669,7 +672,7 @@ function BookingDetailPageInner() {
         organiser_phone: organiserPhone || null,
         match_fee_override: matchFeeOverride ? parseInt(matchFeeOverride) : null,
         ground_id:       tournamentId ? (groundId || null) : null,
-        captain_id:      tournamentId ? (captainId || null) : null,
+        ...(tournamentId ? captainRequestFields(captainId) : { captain_id: null }),
         overrides: overridesToLog.map(([rule, reason]) => ({
           rule,
           reason,
@@ -932,17 +935,13 @@ function BookingDetailPageInner() {
             {tournamentId && (
               <div className="mt-3">
                 <label className="form-label">Captain</label>
-                <select
+                <BookingCaptainSelect
+                  captains={captainOptions}
                   value={captainId}
-                  onChange={e => setCaptainId(e.target.value)}
+                  onChange={setCaptainId}
+                  gameDate={gameDate}
                   disabled={feesMode}
-                  className="form-input disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">No captain</option>
-                  {captainOptions.filter(c => c.active || c.id === captainId).map(c => (
-                    <option key={c.id} value={c.id}>{c.name}{!c.active ? ' (inactive)' : ''}</option>
-                  ))}
-                </select>
+                />
                 {!captainId && (
                   <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 mt-1">
                     No captain selected — WhatsApp captain notification won&apos;t be available.

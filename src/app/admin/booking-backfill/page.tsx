@@ -2,11 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { extractMatchIdFromUrl, opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
+import BookingCaptainSelect, { type CaptainChoice } from '@/components/admin/BookingCaptainSelect'
+import { captainRequestFields } from '@/lib/bookingCaptainShared'
 
 interface Tournament {
   id:   string
   name: string
+  ground_id:  string | null
+  captain_id: string | null
 }
+
+interface GroundOption { id: string; name: string }
 
 interface Preview {
   match_id:        string
@@ -120,12 +126,42 @@ export default function BookingBackfillPage() {
   const [manualOpponent, setManualOpponent] = useState('')
   const [manualGameDate, setManualGameDate] = useState('')
 
+  // Booking details that used to be missing from every backfilled booking
+  // (the admin had to reopen it in the matches panel to add them). Ground and
+  // captain default from the tournament; the CricHeroes URL is typed/pasted.
+  const [grounds, setGrounds] = useState<GroundOption[]>([])
+  const [captains, setCaptains] = useState<CaptainChoice[]>([])
+  const [groundId, setGroundId] = useState('')
+  const [captainId, setCaptainId] = useState('')
+  const [chUrl, setChUrl] = useState('')
+
   useEffect(() => {
     fetch('/api/tournaments')
       .then(res => res.json())
-      .then(data => setTournaments((data.tournaments ?? []).map((t: any) => ({ id: t.id, name: t.name }))))
+      .then(data => setTournaments((data.tournaments ?? []).map((t: any) => ({
+        id: t.id, name: t.name, ground_id: t.ground_id ?? null, captain_id: t.captain_id ?? null,
+      }))))
       .catch(() => {})
+    fetch('/api/grounds').then(r => r.json()).then(d => setGrounds(d.grounds ?? [])).catch(() => {})
+    fetch('/api/captains?all=true').then(r => r.json()).then(d => setCaptains(d.captains ?? [])).catch(() => {})
   }, [])
+
+  function pickTournament(id: string) {
+    setTournamentId(id)
+    const t = tournaments.find(x => x.id === id)
+    setGroundId(t?.ground_id ?? '')
+    setCaptainId(t?.captain_id ?? '')
+  }
+
+  function extraFields(url: string) {
+    return {
+      ...(groundId ? { ground_id: groundId } : {}),
+      ...captainRequestFields(captainId),
+      ...(url.trim() ? { cricheroes_url: url.trim() } : {}),
+    }
+  }
+
+  function resetExtras() { setGroundId(''); setCaptainId(''); setChUrl('') }
 
   // Pure string parsing of the pasted URL — no network call, so this works
   // exactly when CricHeroes itself is unreachable, unlike the Preview button.
@@ -180,6 +216,7 @@ export default function BookingBackfillPage() {
           tournament_id: tournamentId,
           format,
           slot_time: slotTime,
+          ...extraFields(chUrl),
         }),
       })
       const data = await res.json()
@@ -191,6 +228,7 @@ export default function BookingBackfillPage() {
       }
       setPreview(null)
       setMatchId('')
+      resetExtras()
     } catch {
       setError('Network error')
     } finally {
@@ -230,6 +268,7 @@ export default function BookingBackfillPage() {
           slot_time:     slotTime,
           game_date:     manualGameDate,
           opponent_name: manualOpponent.trim() || undefined,
+          ...extraFields(manualUrl),
         }),
       })
       const data = await res.json()
@@ -240,6 +279,7 @@ export default function BookingBackfillPage() {
       )
       cancelManualMode()
       setMatchId('')
+      resetExtras()
     } catch {
       setError('Network error')
     } finally {
@@ -301,7 +341,7 @@ export default function BookingBackfillPage() {
             </p>
             <div>
               <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
-                CricHeroes match URL <span className="text-[#78716C] dark:text-zinc-700">(optional — prefills Opponent)</span>
+                CricHeroes match URL <span className="text-[#78716C] dark:text-zinc-700">(optional — saved on the booking, prefills Opponent)</span>
               </label>
               <input
                 value={manualUrl}
@@ -349,7 +389,7 @@ export default function BookingBackfillPage() {
                 </label>
                 <select
                   value={tournamentId}
-                  onChange={e => setTournamentId(e.target.value)}
+                  onChange={e => pickTournament(e.target.value)}
                   className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
                   <option value="">Select…</option>
                   {tournaments.map(t => (
@@ -380,6 +420,28 @@ export default function BookingBackfillPage() {
                 </select>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div>
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  Ground
+                </label>
+                <select
+                  value={groundId}
+                  onChange={e => setGroundId(e.target.value)}
+                  className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
+                  <option value="">No ground</option>
+                  {grounds.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  Captain
+                </label>
+                <div className="mt-1">
+                  <BookingCaptainSelect captains={captains} value={captainId} onChange={setCaptainId} gameDate={manualGameDate} />
+                </div>
+              </div>
+              </div>
             <div className="flex gap-2 pt-1">
               <button
                 onClick={confirmManualBackfill}
@@ -454,7 +516,7 @@ export default function BookingBackfillPage() {
                   </label>
                   <select
                     value={tournamentId}
-                    onChange={e => setTournamentId(e.target.value)}
+                    onChange={e => pickTournament(e.target.value)}
                     className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
                     <option value="">Select…</option>
                     {tournaments.map(t => (
@@ -486,6 +548,40 @@ export default function BookingBackfillPage() {
                 </div>
               </div>
             )}
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div>
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  Ground
+                </label>
+                <select
+                  value={groundId}
+                  onChange={e => setGroundId(e.target.value)}
+                  className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1">
+                  <option value="">No ground</option>
+                  {grounds.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  Captain
+                </label>
+                <div className="mt-1">
+                  <BookingCaptainSelect captains={captains} value={captainId} onChange={setCaptainId} gameDate={preview.game_date ?? ''} />
+                </div>
+              </div>
+              <div className="col-span-2">
+                <label className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">
+                  CricHeroes match URL <span className="text-[#78716C] dark:text-zinc-700">(optional)</span>
+                </label>
+                <input
+                  value={chUrl}
+                  onChange={e => setChUrl(e.target.value)}
+                  placeholder="https://cricheroes.in/scorecard/..."
+                  className="w-full bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded px-2 py-1.5 font-rajdhani text-sm text-[#1C1917] dark:text-zinc-200 mt-1"
+                />
+              </div>
+            </div>
 
             <button
               onClick={confirmBackfill}

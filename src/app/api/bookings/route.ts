@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { resolveOrCreateOpponentIdByName } from '@/lib/opponents'
 import { validateBooking } from '@/lib/validation'
+import { resolveBookingCaptain } from '@/lib/bookingCaptain'
 import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
 import type { CreateBookingRequest } from '@/types'
 
@@ -62,6 +63,9 @@ export async function POST(req: NextRequest) {
     // Both validated below and defaulted from the tournament when the key
     // is omitted entirely — see the resolution after the tournament fetch.
     captain_id, ground_id,
+    // Past matches only: a player with no (active) captains row — see
+    // src/lib/bookingCaptain.ts.
+    captain_player_id,
   } = safeBody
 
   if (!game_date || !slot_time || !format || !tournament_id) {
@@ -111,17 +115,23 @@ export async function POST(req: NextRequest) {
   // what the admin form's pickers already pre-fill client-side, but the
   // server defends the same way for any other caller). An explicit null is a deliberate "no captain/ground"
   // override and is respected as such, not coerced back to the default.
-  const resolvedCaptainId: string | null =
+  const requestedCaptainId: string | null =
     'captain_id' in safeBody ? (captain_id ?? null) : (tournament.captain_id ?? null)
   const resolvedGroundId: string | null =
     'ground_id' in safeBody ? (ground_id ?? null) : (tournament.ground_id ?? null)
 
-  // vibe-security: never trust a client-supplied FK without checking it's real
-  if (resolvedCaptainId) {
-    const { data: cap } = await supabase.from('captains').select('id, active').eq('id', resolvedCaptainId).single()
-    if (!cap) return NextResponse.json({ error: 'Captain not found' }, { status: 400 })
-    if (!cap.active) return NextResponse.json({ error: 'Captain is not active' }, { status: 400 })
+  // vibe-security: never trust a client-supplied FK without checking it's
+  // real. A past match may use an inactive captain or any player (stand-in);
+  // anything else needs a currently-active captain.
+  const captainResolution = await resolveBookingCaptain(supabase, {
+    captainId: requestedCaptainId,
+    captainPlayerId: typeof captain_player_id === 'string' ? captain_player_id : null,
+    gameDate: game_date,
+  })
+  if ('error' in captainResolution) {
+    return NextResponse.json({ error: captainResolution.error }, { status: 400 })
   }
+  const resolvedCaptainId = captainResolution.id
   if (resolvedGroundId) {
     const { data: gr } = await supabase.from('grounds').select('id').eq('id', resolvedGroundId).single()
     if (!gr) return NextResponse.json({ error: 'Ground not found' }, { status: 400 })

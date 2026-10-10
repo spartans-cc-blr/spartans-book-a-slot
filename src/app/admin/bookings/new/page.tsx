@@ -7,9 +7,11 @@ import { StageTypeToggle } from '@/components/admin/StageTypeToggle'
 import { PracticeToggle } from '@/components/admin/PracticeToggle'
 import { RuleCheckStrip, ruleChecksAllPassed } from '@/components/admin/RuleCheckStrip'
 import { opponentFromMatchSlug } from '@/lib/cricheroesMatchUrl'
+import BookingCaptainSelect from '@/components/admin/BookingCaptainSelect'
+import { captainRequestFields } from '@/lib/bookingCaptainShared'
 
 type Ground   = { id: string; name: string; maps_url: string; hospital_url: string }
-type Captain  = { id: string; name: string; active: boolean }
+type Captain  = { id: string; name: string; active: boolean; player_id?: string | null }
 type TournamentWithCaptain = Tournament & {
   captain_id: string | null
   captains: { id: string; name: string; players: { cricheroes_url: string | null } | null } | null
@@ -276,7 +278,7 @@ function NewBookingForm() {
           slot_time:      slotTime,
           tournament_id:  tournamentId,
           ground_id:      groundId || null,
-          captain_id:     captainId || null,
+          ...captainRequestFields(captainId),
           notes:          notes || null,
           opponent_name:  opponentName || null,
           match_id:       matchId || null,
@@ -482,16 +484,12 @@ function NewBookingForm() {
                 {tournamentId && (
                   <div className="mt-3">
                     <label className="form-label">Captain</label>
-                    <select
+                    <BookingCaptainSelect
+                      captains={captains}
                       value={captainId}
-                      onChange={e => setCaptainId(e.target.value)}
-                      className="form-input"
-                    >
-                      <option value="">No captain</option>
-                      {captains.filter(c => c.active || c.id === captainId).map(c => (
-                        <option key={c.id} value={c.id}>{c.name}{!c.active ? ' (inactive)' : ''}</option>
-                      ))}
-                    </select>
+                      onChange={setCaptainId}
+                      gameDate={gameDate}
+                    />
                     {!captainId && (
                       <p className="font-rajdhani text-xs text-amber-700 dark:text-amber-400 mt-1">
                         No captain selected — WhatsApp captain notification won&apos;t be available.
@@ -664,7 +662,7 @@ function NewBookingForm() {
                 {gameDate      && <p>📅 {gameDate}</p>}
                 {slotTime  && <p>🕐 Slot: {slotTime}{format ? ` — ${format}` : ''}</p>}
                 {matchTime && <p>⏰ Match starts: {matchTime}</p>}
-                {mode === 'confirmed' && captainId && <p>👤 {captains.find(c => c.id === captainId)?.name}</p>}
+                {mode === 'confirmed' && captainId && !captainId.startsWith('player:') && <p>👤 {captains.find(c => c.id === captainId)?.name}</p>}
                 {mode === 'confirmed' && tournamentId && <p>🏆 {selectedTournament?.name}</p>}
                 {mode === 'confirmed' && groundId && <p>📍 {grounds.find(g => g.id === groundId)?.name}</p>}
                 {mode === 'confirmed' && opponentName && <p>⚔️ vs {opponentName}</p>}
