@@ -64,7 +64,10 @@ Captains' Corner section of the mobile More sheet (`activePage="captains-plannin
 
 `src/lib/matchPlanningData.ts` (server-only) `getPlanningContext(bookingId, lens)`:
 
-1. Upcoming confirmed bookings with an `opponent_name` (picker + selection).
+1. Upcoming confirmed bookings with an `opponent_name` (picker + selection). A game played today
+   leaves the picker as soon as it is completed — ended, or scorecard synced (`isCompletedMatch()`,
+   shared with `/fixtures` and the admin Matches tab, see `admin-matches-view.md` §2.1) — and a
+   `?booking=` link to such a game falls back to the next upcoming one.
 2. History: `getTeamMatches()` filtered by the chosen lens (Opponent uses master
    `opponent_id` **or** normalised spelling, the same rule as the Captains'
    Corner → Team Record link), practice games excluded.

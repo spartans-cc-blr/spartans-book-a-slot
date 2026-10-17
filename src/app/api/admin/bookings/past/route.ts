@@ -31,6 +31,7 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import type { DashboardBookingRow } from '@/components/admin/DashboardBookingsTabs'
 import { computeNextStep } from '@/lib/matchNextStep'
+import { istToday, isCompletedMatch, getSyncedBookingIds } from '@/lib/matchCompletion'
 
 const MONTH_RE = /^(\d{4})-(\d{2})$/
 // Generous safety cap for a single month's bookings — a club plays at most
@@ -62,8 +63,20 @@ export async function GET(req: NextRequest) {
   const deny = await requireAdmin()
   if (deny) return deny
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = istToday()
   const supabase = createServiceClient()
+
+  // Today's games that are already over (ended, or scorecard synced) belong
+  // in Past too — the same rule that drops them from Upcoming.
+  const { data: todayRows } = await supabase
+    .from('bookings')
+    .select('id, game_date, slot_time, format')
+    .neq('status', 'cancelled')
+    .eq('game_date', today)
+  const syncedToday = await getSyncedBookingIds(supabase, (todayRows ?? []).map(r => r.id))
+  // Today's games not yet over are dropped from both queries below (at most
+  // a few rows), rather than a second .or() that would clash with ?q=.
+  const notYetOver = new Set((todayRows ?? []).filter(r => !isCompletedMatch(r, today, syncedToday)).map(r => r.id))
 
   const monthParam = req.nextUrl.searchParams.get('month') || null
   const monthMatch = monthParam?.match(MONTH_RE)
@@ -74,14 +87,15 @@ export async function GET(req: NextRequest) {
   // same query for free.
   const { data: monthRows, error: monthErr } = await supabase
     .from('bookings')
-    .select('game_date')
+    .select('id, game_date')
     .neq('status', 'cancelled')
-    .lt('game_date', today)
+    .lte('game_date', today)
   if (monthErr) return NextResponse.json({ error: monthErr.message }, { status: 500 })
 
-  const monthSet = new Set((monthRows ?? []).map(r => r.game_date.slice(0, 7)))
+  const pastMonthRows = (monthRows ?? []).filter(r => !notYetOver.has(r.id))
+  const monthSet = new Set(pastMonthRows.map(r => r.game_date.slice(0, 7)))
   const months = Array.from(monthSet).sort((a, b) => b.localeCompare(a)) // most recent first
-  const totalCount = monthRows?.length ?? 0
+  const totalCount = pastMonthRows.length
 
   // ?q= searches opponent, match ID, tournament name or captain across ALL
   // months (the month stepper is ignored while searching). Characters that
@@ -109,7 +123,7 @@ export async function GET(req: NextRequest) {
     .from('bookings')
     .select(tournamentSelect)
     .neq('status', 'cancelled')
-    .lt('game_date', today)
+    .lte('game_date', today)
     .order('game_date', { ascending: false })
     .order('slot_time', { ascending: false })
     .limit(MONTH_LIMIT)
@@ -122,8 +136,9 @@ export async function GET(req: NextRequest) {
       .lt('game_date', `${nextMonthStr(monthMatch[0])}-01`)
   }
 
-  const { data: bookings, error } = await query
+  const { data: bookingsRaw, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const bookings = (bookingsRaw ?? []).filter((b: any) => !notYetOver.has(b.id))
 
   // Scorecard status per booking — drives the "Apply Match Fee" shortcut,
   // same eligibility rule as the old admin/page.tsx query it replaces.

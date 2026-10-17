@@ -39,6 +39,21 @@ Tabs: **Upcoming**, **Needs action**, **Past**.
   Post-Match panel otherwise).
 - The separate "Apply Match Fee" button was replaced by the chip; "Edit" stays.
 
+### 2.1 Upcoming vs past — same rule as /fixtures (October 2026)
+
+A match counts as **completed** once its estimated end time has passed
+(slot time + format duration, `isPastMatch()`) **or** its scorecard has
+synced (`scorecard_uploads.status` `synced`/`fees_applied`), whichever comes
+first. One helper, `isCompletedMatch()` in `src/lib/matchCompletion.ts`, is
+used by every upcoming/past split: the admin Upcoming tab (`admin/page.tsx`
+drops today's completed games), Past (`/api/admin/bookings/past` now
+includes them, months and count too), Needs action, `/fixtures`,
+`/matches/history` and Captains' Corner match planning. Before this, a game
+played today stayed in admin Upcoming for the rest of the day and only
+reached Past the next morning. `istToday()` gives the IST date so the admin
+routes don't lag a day between 00:00 and 05:30 IST. The calendar view is
+unchanged (it shows the slot as booked either way).
+
 ## 3. Calendar view (admin mode)
 
 `ScheduleGrid` takes `adminMode`. `/api/availability?admin=1` adds

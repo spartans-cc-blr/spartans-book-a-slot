@@ -2381,6 +2381,10 @@ one by hand from `/admin/bookings/[id]`; it just isn't nagged. To move the
 cutoff, change the one constant. The wrangler's "Request top performer to
 verify" share button (§15) is a manual action and is unchanged.
 
+## 18.1 Past Matches includes a game as soon as its scorecard syncs (October 2026)
+
+`GET /api/matches/history` now treats a game as past when it has ended **or** its scorecard has synced (`isCompletedMatch()`, `src/lib/matchCompletion.ts`), mirroring `/fixtures`, so an early-finishing game is never missing from both lists. See `admin-matches-view.md` §2.1.
+
 ## 19. Share button on Past Matches cards (added October 2026)
 
 Each `MatchHistoryCard` on `/matches/history` has a share icon beside the

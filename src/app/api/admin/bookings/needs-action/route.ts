@@ -11,13 +11,14 @@ import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import type { DashboardBookingRow } from '@/components/admin/DashboardBookingsTabs'
 import { computeNextStep, NEEDS_ACTION_DAYS } from '@/lib/matchNextStep'
+import { istToday, isCompletedMatch } from '@/lib/matchCompletion'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!(session?.user as any)?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 403 })
 
   const supabase = createServiceClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = istToday()
   const since = new Date(Date.now() - NEEDS_ACTION_DAYS * 86400000).toISOString().split('T')[0]
 
   const { data: bookings, error } = await supabase
@@ -29,7 +30,7 @@ export async function GET() {
       )
     `)
     .eq('status', 'confirmed')
-    .lt('game_date', today)
+    .lte('game_date', today)
     .gte('game_date', since)
     .order('game_date', { ascending: false })
     .order('slot_time', { ascending: false })
@@ -42,9 +43,12 @@ export async function GET() {
         .select('booking_id, status, fees_reconciled_externally, needs_reconciliation').in('booking_id', ids)
     : { data: [] as any[] }
   const sc = new Map((scRows ?? []).map((r: any) => [r.booking_id, r]))
+  const syncedIds = new Set((scRows ?? []).filter((r: any) => r.status === 'synced' || r.status === 'fees_applied').map((r: any) => r.booking_id))
 
   const rows: DashboardBookingRow[] = []
   for (const b of (bookings ?? []) as any[]) {
+    // Today's games count once over (ended or scorecard synced), same as Past.
+    if (!isCompletedMatch(b, today, syncedIds)) continue
     const s = sc.get(b.id)
     const next = computeNextStep({
       status: b.status, match_id: b.match_id ?? null,
