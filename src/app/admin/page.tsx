@@ -6,6 +6,7 @@ import { format, addDays } from 'date-fns'
 import type { Booking } from '@/types'
 import { ScheduleGrid } from '@/components/schedule/ScheduleGrid'
 import { DashboardBookingsTabs, type DashboardBookingRow } from '@/components/admin/DashboardBookingsTabs'
+import { istToday, isCompletedMatch, getSyncedBookingIds } from '@/lib/matchCompletion'
 
 export const revalidate = 0  // Always fresh for admin
 
@@ -31,7 +32,7 @@ export default async function AdminDashboard({
   const session  = await getServerSession(authOptions)
   const view     = searchParams?.view === 'calendar' ? 'calendar' : 'list'
   const supabase = createServiceClient()
-  const today    = format(new Date(), 'yyyy-MM-dd')
+  const today    = istToday()
 
   const tournamentSelect = `
     id, game_date, slot_time, format, status, venue, opponent_name, block_reason, notes, created_at, updated_at, tournament_id,
@@ -41,7 +42,7 @@ export default async function AdminDashboard({
   `
 
   // Upcoming confirmed bookings + soft blocks
-  const { data: bookings } = await supabase
+  const { data: bookingsRaw } = await supabase
     .from('bookings')
     .select(tournamentSelect)
     .neq('status', 'cancelled')
@@ -49,6 +50,13 @@ export default async function AdminDashboard({
     .order('game_date')
     .order('slot_time')
     .limit(100) as { data: Booking[] | null }
+
+  // Same rule as /fixtures: a game played today drops out of Upcoming once
+  // it has ended, or as soon as its scorecard has synced — it then shows
+  // under Past (see /api/admin/bookings/past).
+  const todayIds = (bookingsRaw ?? []).filter(b => b.game_date === today).map(b => b.id)
+  const syncedToday = await getSyncedBookingIds(supabase, todayIds)
+  const bookings = (bookingsRaw ?? []).filter(b => !isCompletedMatch(b, today, syncedToday))
 
   // Past bookings are no longer fetched here — the "Past" tab
   // (DashboardBookingsTabs / AdminPastMatchesPanel) now paginates them

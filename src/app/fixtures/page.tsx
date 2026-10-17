@@ -12,6 +12,7 @@ import { MatchesSegmentedTabs } from '@/components/matches/MatchesSegmentedTabs'
 import { getEligibleTournamentIdsForPlayer } from '@/lib/knockoutEligibility'
 import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
+import { getSyncedBookingIds } from '@/lib/matchCompletion'
 
 export const dynamic = 'force-dynamic'
 
@@ -167,7 +168,12 @@ export default async function FixturesPage() {
   }
 
   // Filter out ended matches, tag in-progress ones
+  // A game whose scorecard has already synced is over even if it finished
+  // before the estimated end time — it shows on Past Matches instead
+  // (shared rule: src/lib/matchCompletion.ts).
+  const syncedRecent = await getSyncedBookingIds(supabase, (bookings ?? []).map(b => (b as any).id))
   const activeBookings = (bookings ?? []).filter(b => {
+    if (syncedRecent.has((b as any).id)) return false
     const status = getMatchStatus((b as any).game_date, (b as any).slot_time, (b as any).format)
     return status !== 'ended'
   })

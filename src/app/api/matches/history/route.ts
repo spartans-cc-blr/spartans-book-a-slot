@@ -51,7 +51,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { computeTopPerformers, computeMatchMVP, summarizeTopPerformance, type SquadRef } from '@/lib/matchTopPerformers'
-import { isPastMatch } from '@/lib/matchStatus'
+import { isCompletedMatch, getSyncedBookingIds } from '@/lib/matchCompletion'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 
 const DEFAULT_LIMIT = 15
@@ -214,7 +214,12 @@ export async function GET(req: NextRequest) {
     supabase.from('bookings').select('id, game_date, slot_time, format')
   )
   if (countErr) return NextResponse.json({ error: countErr.message }, { status: 500 })
-  const totalCount = (countRows ?? []).filter((b: any) => isPastMatch(b.game_date, b.slot_time, b.format, today)).length
+  // A game played today is past once it has ended or its scorecard synced
+  // (isCompletedMatch, shared with /fixtures and the admin Matches tab).
+  const syncedToday = await getSyncedBookingIds(
+    supabase, (countRows ?? []).filter((b: any) => b.game_date >= today).map((b: any) => b.id),
+  )
+  const totalCount = (countRows ?? []).filter((b: any) => isCompletedMatch(b, today, syncedToday)).length
 
   let query = applySharedFilters(
     supabase
@@ -247,7 +252,7 @@ export async function GET(req: NextRequest) {
   // exhausted — today can contribute at most 4 excluded rows, and they can
   // only ever appear at the very top of this game_date-desc ordering.
   const data = (rawData ?? [])
-    .filter((b: any) => isPastMatch(b.game_date, b.slot_time, b.format, today))
+    .filter((b: any) => isCompletedMatch(b, today, syncedToday))
     .slice(0, limit)
 
   const bookingIds = (data ?? []).map((b: any) => b.id)

@@ -660,6 +660,10 @@ All three default to **All time** (no behaviour change until used), changing
 month clears the selected chip, and ‹ / › are disabled while All time is
 selected, matching `/matches/history`.
 
+## 10.1.2 Synced scorecard ends a fixture early (October 2026)
+
+`/fixtures` drops a booking once its estimated end time passes, and now also as soon as its scorecard has synced, so a game that finished early moves straight to Past Matches. Shared rule: `isCompletedMatch()` / `getSyncedBookingIds()` in `src/lib/matchCompletion.ts`, also used by `/matches/history`, the admin Matches tab and match planning (`admin-matches-view.md` §2.1).
+
 ## 10.2 "Matches" — Fixtures + Match History merged into one bottom tab (added September 2026)
 
 The mobile bottom tab bar originally shipped with "Fixtures" and "Matches"

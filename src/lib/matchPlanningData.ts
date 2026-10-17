@@ -13,6 +13,7 @@ import { getTeamMatches, type TeamMatch } from '@/lib/teamStats'
 import { normaliseOpponentName } from '@/lib/opponents'
 import { repairDismissedBatters, type BallRow } from '@/lib/ballByBall'
 import type { ScoutMatchInput } from '@/lib/matchPlanning'
+import { istToday, isCompletedMatch, getSyncedBookingIds } from '@/lib/matchCompletion'
 
 const BALL_COLUMNS = [
   'match_id', 'batting_side', 'seq', 'over_no', 'ball_in_over', 'is_legal', 'bowler', 'batter', 'outcome',
@@ -68,7 +69,7 @@ const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ?
 
 export async function getPlanningContext(bookingId?: string | null, lens: Lens = 'opponent'): Promise<PlanningContext> {
   const hub = createServiceClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = istToday()
 
   const { data: ups } = await hub
     .from('bookings')
@@ -78,9 +79,14 @@ export async function getPlanningContext(bookingId?: string | null, lens: Lens =
     .not('opponent_name', 'is', null)
     .order('game_date', { ascending: true })
     .order('slot_time', { ascending: true })
-    .limit(15)
+    .limit(20)
 
-  const upRows = ((ups ?? []) as any[]).filter(b => b.opponent_name && String(b.opponent_name).trim())
+  // Same rule as /fixtures: a game played today leaves the picker once it
+  // has ended or its scorecard has synced (it's a past match then). A stale
+  // ?booking= link to such a game falls back to the next upcoming one.
+  const named = ((ups ?? []) as any[]).filter(b => b.opponent_name && String(b.opponent_name).trim())
+  const syncedToday = await getSyncedBookingIds(hub, named.filter(b => b.game_date === today).map(b => b.id))
+  const upRows = named.filter(b => !isCompletedMatch(b, today, syncedToday)).slice(0, 15)
   // A booking's own ground wins over its tournament's default (bookings.ground_id, migration 066).
   const groundOf = (b: any): { id: string | null; name: string | null } => {
     const own = one<any>(b.ground)
