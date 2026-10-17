@@ -69,7 +69,7 @@ analytics read is logged and treated as "not available", never an error page.
   bowling**, then each over newest-first as a card laid out like CricHeroes' Overs tab (October 2026): a left
   column with "Ov N" and the score after the over (`131-11`), the middle with bowler to batters and a
   pastel tile per delivery (dot `•` grey, runs grey, 4 amber, 6 teal, WD/NB rose, W red; light/dark
-  pairs via Tailwind `dark:` classes), and a right panel with the over's runs (plus wickets if any), and the dismissal line under any over with a wicket. On **Spartans batting** each over also lists what every batter scored in it, `Name runs (balls)` in the order they faced (wides not counted as balls faced); the bowling innings doesn't show this.
+  pairs via Tailwind `dark:` classes), and a right panel with the over's runs (plus wickets if any). The cards use the system sans font (not condensed Rajdhani), full-contrast bowler/batter names, a white card in light mode, slightly darker tile tints so dots and singles stay visible, and a rounded inset runs panel, for legibility closer to CricHeroes, and the dismissal line under any over with a wicket. On **Spartans batting** each over also lists what every batter scored in it, `Name runs (balls)` in the order they faced (wides not counted as balls faced); the bowling innings doesn't show this.
 
 ### Definitions (checked against the stored CricHeroes scorecard)
 

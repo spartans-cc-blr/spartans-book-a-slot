@@ -361,22 +361,24 @@ export function FieldingView({ balls }: { balls: BallRow[] }) {
 // Pastel tiles with coloured text, like CricHeroes' Overs tab. Status chips,
 // so literal colours with dark: pairs rather than --scorecard-* tokens.
 const CHIP_CLASS: Record<string, string> = {
-  dot:    'bg-stone-100 text-stone-800 dark:bg-white/10 dark:text-zinc-200',
-  run:    'bg-stone-100 text-stone-800 dark:bg-white/10 dark:text-zinc-200',
-  four:   'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300',
-  six:    'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300',
-  wide:   'bg-rose-50 text-stone-800 dark:bg-rose-500/15 dark:text-rose-200',
-  noball: 'bg-rose-50 text-stone-800 dark:bg-rose-500/15 dark:text-rose-200',
-  bye:    'bg-stone-100 text-stone-600 dark:bg-white/10 dark:text-zinc-300',
-  wicket: 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-300',
+  dot:    'bg-stone-200/70 text-stone-900 dark:bg-white/10 dark:text-zinc-100',
+  run:    'bg-stone-200/70 text-stone-900 dark:bg-white/10 dark:text-zinc-100',
+  four:   'bg-amber-100 text-amber-800 dark:bg-amber-500/25 dark:text-amber-200',
+  six:    'bg-teal-100 text-teal-700 dark:bg-teal-500/25 dark:text-teal-200',
+  wide:   'bg-rose-100 text-stone-900 dark:bg-rose-500/20 dark:text-rose-100',
+  noball: 'bg-rose-100 text-stone-900 dark:bg-rose-500/20 dark:text-rose-100',
+  bye:    'bg-stone-200/70 text-stone-700 dark:bg-white/10 dark:text-zinc-300',
+  wicket: 'bg-red-100 text-red-600 dark:bg-red-500/25 dark:text-red-200',
 }
 
 function Chip({ ball }: { ball: BallRow }) {
   const chip = ballChip(ball)
-  const label = chip.kind === 'dot' ? '•' : chip.label.toUpperCase()
+  const isDot = chip.kind === 'dot'
+  const label = isDot ? '•' : chip.label.toUpperCase()
+  const long = label.length > 2
   return (
     <span title={`${ballLabel(ball)}  ${ball.bowler} to ${ball.batter}: ${ball.outcome ?? chip.label}`}
-      className={`inline-flex h-9 min-w-[36px] px-1.5 items-center justify-center rounded-xl text-sm font-bold font-rajdhani tabular-nums ${CHIP_CLASS[chip.kind]}`}>
+      className={`inline-flex h-9 min-w-[2.25rem] px-1.5 items-center justify-center rounded-xl font-semibold tabular-nums ${long ? 'text-xs' : isDot ? 'text-lg leading-none' : 'text-base'} ${CHIP_CLASS[chip.kind]}`}>
       {label}
     </span>
   )
@@ -415,24 +417,24 @@ export function CommentaryView({ balls }: { balls: BallRow[] }) {
           const wickets = o.balls.filter(b => b.is_wicket)
           return (
             <div key={o.over_no}
-              className="flex items-stretch rounded-2xl border border-[var(--scorecard-table-border)] bg-[var(--scorecard-table-bg)] overflow-hidden">
-              <div className="w-16 sm:w-20 flex-shrink-0 flex flex-col items-center justify-center py-3 border-r border-[var(--scorecard-table-border)]">
-                <span className="font-rajdhani text-base font-bold text-[var(--scorecard-heading-text)]">Ov {o.over_no}</span>
+              className="flex items-stretch rounded-2xl border border-[var(--scorecard-table-border)] bg-white dark:bg-[var(--scorecard-table-bg)] overflow-hidden font-sans">
+              <div className="w-[4.5rem] flex-shrink-0 flex flex-col items-center justify-center py-3 border-r border-[var(--scorecard-table-divider)]">
+                <span className="text-base font-bold text-[var(--scorecard-heading-text)] whitespace-nowrap">Ov {o.over_no}</span>
                 {last?.score_after != null && (
-                  <span className="font-rajdhani text-xs tabular-nums text-[var(--scorecard-text-muted)]">
+                  <span className="text-sm tabular-nums text-[var(--scorecard-text-2)]">
                     {last.score_after}-{last.wickets_after ?? 0}
                   </span>
                 )}
               </div>
               <div className="flex-1 min-w-0 px-3 py-2.5">
-                <p className="font-rajdhani text-sm text-[var(--scorecard-heading-text)]">
-                  {o.bowlers.join(', ')} <span className="text-[var(--scorecard-text-muted)]">to {o.batters.join(', ')}</span>
+                <p className="text-sm leading-snug text-[var(--scorecard-heading-text)]">
+                  {o.bowlers.join(', ')} to {o.batters.join(', ')}
                 </p>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {o.balls.map(b => <Chip key={b.seq} ball={b} />)}
                 </div>
                 {side === 'spartans' && (
-                  <p className="font-rajdhani text-xs mt-2 text-[var(--scorecard-text-2)]">
+                  <p className="text-xs mt-2 text-[var(--scorecard-text-2)]">
                     {o.batterScores.map((s, i) => (
                       <span key={s.name}>
                         {i > 0 && <span className="text-[var(--scorecard-text-faint)]"> · </span>}
@@ -443,17 +445,17 @@ export function CommentaryView({ balls }: { balls: BallRow[] }) {
                   </p>
                 )}
                 {wickets.map(w => (
-                  <p key={w.seq} className="font-rajdhani text-xs mt-1" style={{ color: 'var(--fx-danger-text)' }}>
+                  <p key={w.seq} className="text-xs mt-1" style={{ color: 'var(--fx-danger-text)' }}>
                     {w.dismissed_batter ?? w.batter} {howOut(w.dismissed_batter ?? w.batter, w.dismissal_text, w.dismissal_kind)}
                     {w.shot ? ` · ${w.shot}${w.direction ? ` to ${w.direction}` : ''}` : ''}
                   </p>
                 ))}
               </div>
-              <div className="w-16 sm:w-20 flex-shrink-0 flex flex-col items-center justify-center border-l border-[var(--scorecard-table-border)] bg-[var(--scorecard-panel-bg)]">
-                <span className="font-rajdhani text-lg font-bold tabular-nums text-[var(--scorecard-heading-text)]">{o.runs}</span>
-                <span className="font-rajdhani text-xs text-[var(--scorecard-text-muted)]">Run{o.runs === 1 ? '' : 's'}</span>
+              <div className="w-[4.5rem] flex-shrink-0 flex flex-col items-center justify-center my-1.5 mr-1.5 rounded-xl bg-stone-100 dark:bg-white/5">
+                <span className="text-lg font-bold tabular-nums text-[var(--scorecard-heading-text)]">{o.runs}</span>
+                <span className="text-sm text-[var(--scorecard-text-2)]">Run{o.runs === 1 ? '' : 's'}</span>
                 {o.wickets > 0 && (
-                  <span className="font-rajdhani text-[11px] font-semibold text-red-600 dark:text-red-300">{o.wickets} wkt{o.wickets > 1 ? 's' : ''}</span>
+                  <span className="text-xs font-semibold text-red-600 dark:text-red-300">{o.wickets} wkt{o.wickets > 1 ? 's' : ''}</span>
                 )}
               </div>
             </div>
