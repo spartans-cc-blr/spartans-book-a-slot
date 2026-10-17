@@ -358,25 +358,26 @@ export function FieldingView({ balls }: { balls: BallRow[] }) {
 
 // ── Commentary ─────────────────────────────────────────────────────────────
 
-const CHIP_STYLE: Record<string, { bg: string; fg: string }> = {
-  dot:    { bg: '#9CA3AF', fg: '#fff' },
-  run:    { bg: '#374151', fg: '#fff' },
-  four:   { bg: '#E8A23B', fg: '#fff' },
-  six:    { bg: '#8FB82B', fg: '#fff' },
-  wide:   { bg: '#C98379', fg: '#fff' },
-  noball: { bg: '#C98379', fg: '#fff' },
-  bye:    { bg: '#6B7280', fg: '#fff' },
-  wicket: { bg: '#DC2626', fg: '#fff' },
+// Pastel tiles with coloured text, like CricHeroes' Overs tab. Status chips,
+// so literal colours with dark: pairs rather than --scorecard-* tokens.
+const CHIP_CLASS: Record<string, string> = {
+  dot:    'bg-stone-100 text-stone-800 dark:bg-white/10 dark:text-zinc-200',
+  run:    'bg-stone-100 text-stone-800 dark:bg-white/10 dark:text-zinc-200',
+  four:   'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300',
+  six:    'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300',
+  wide:   'bg-rose-50 text-stone-800 dark:bg-rose-500/15 dark:text-rose-200',
+  noball: 'bg-rose-50 text-stone-800 dark:bg-rose-500/15 dark:text-rose-200',
+  bye:    'bg-stone-100 text-stone-600 dark:bg-white/10 dark:text-zinc-300',
+  wicket: 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-300',
 }
 
 function Chip({ ball }: { ball: BallRow }) {
   const chip = ballChip(ball)
-  const s = CHIP_STYLE[chip.kind]
+  const label = chip.kind === 'dot' ? '•' : chip.label.toUpperCase()
   return (
     <span title={`${ballLabel(ball)}  ${ball.bowler} to ${ball.batter}: ${ball.outcome ?? chip.label}`}
-      className="inline-flex h-7 min-w-[28px] px-1 items-center justify-center rounded-full text-[11px] font-bold font-rajdhani"
-      style={{ background: s.bg, color: s.fg }}>
-      {chip.label}
+      className={`inline-flex h-9 min-w-[36px] px-1.5 items-center justify-center rounded-xl text-sm font-bold font-rajdhani tabular-nums ${CHIP_CLASS[chip.kind]}`}>
+      {label}
     </span>
   )
 }
@@ -408,42 +409,53 @@ export function CommentaryView({ balls }: { balls: BallRow[] }) {
 
       {overs.length === 0 && <Empty>No ball-by-ball for this innings.</Empty>}
 
-      <div className="divide-y divide-[var(--scorecard-table-divider)]">
+      <div className="space-y-2.5">
         {overs.map(o => {
           const last = o.balls[o.balls.length - 1]
           const wickets = o.balls.filter(b => b.is_wicket)
           return (
-            <div key={o.over_no} className="py-2.5">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="font-rajdhani text-sm text-[var(--scorecard-heading-text)] min-w-0">
-                  <span className="font-bold mr-2">Ov {o.over_no}</span>
-                  {o.bowlers.join(', ')} <span className="text-[var(--scorecard-text-faint)]">to {o.batters.join(', ')}</span>
-                </p>
-                <p className="font-rajdhani text-xs text-[var(--scorecard-text-faint)] whitespace-nowrap">
-                  {o.runs} run{o.runs === 1 ? '' : 's'}{o.wickets ? ` · ${o.wickets} wkt${o.wickets > 1 ? 's' : ''}` : ''}
-                  {last?.score_after != null ? ` · ${last.score_after}/${last.wickets_after ?? ''}` : ''}
-                </p>
+            <div key={o.over_no}
+              className="flex items-stretch rounded-2xl border border-[var(--scorecard-table-border)] bg-[var(--scorecard-table-bg)] overflow-hidden">
+              <div className="w-16 sm:w-20 flex-shrink-0 flex flex-col items-center justify-center py-3 border-r border-[var(--scorecard-table-border)]">
+                <span className="font-rajdhani text-base font-bold text-[var(--scorecard-heading-text)]">Ov {o.over_no}</span>
+                {last?.score_after != null && (
+                  <span className="font-rajdhani text-xs tabular-nums text-[var(--scorecard-text-muted)]">
+                    {last.score_after}-{last.wickets_after ?? 0}
+                  </span>
+                )}
               </div>
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {o.balls.map(b => <Chip key={b.seq} ball={b} />)}
+              <div className="flex-1 min-w-0 px-3 py-2.5">
+                <p className="font-rajdhani text-sm text-[var(--scorecard-heading-text)]">
+                  {o.bowlers.join(', ')} <span className="text-[var(--scorecard-text-muted)]">to {o.batters.join(', ')}</span>
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {o.balls.map(b => <Chip key={b.seq} ball={b} />)}
+                </div>
+                {side === 'spartans' && (
+                  <p className="font-rajdhani text-xs mt-2 text-[var(--scorecard-text-2)]">
+                    {o.batterScores.map((s, i) => (
+                      <span key={s.name}>
+                        {i > 0 && <span className="text-[var(--scorecard-text-faint)]"> · </span>}
+                        {s.name} <span className="font-semibold tabular-nums">{s.runs}</span>
+                        <span className="text-[var(--scorecard-text-faint)] tabular-nums"> ({s.balls})</span>
+                      </span>
+                    ))}
+                  </p>
+                )}
+                {wickets.map(w => (
+                  <p key={w.seq} className="font-rajdhani text-xs mt-1" style={{ color: 'var(--fx-danger-text)' }}>
+                    {w.dismissed_batter ?? w.batter} {howOut(w.dismissed_batter ?? w.batter, w.dismissal_text, w.dismissal_kind)}
+                    {w.shot ? ` · ${w.shot}${w.direction ? ` to ${w.direction}` : ''}` : ''}
+                  </p>
+                ))}
               </div>
-              {side === 'spartans' && (
-                <p className="font-rajdhani text-xs mt-1 text-[var(--scorecard-text-2)]">
-                  {o.batterScores.map((s, i) => (
-                    <span key={s.name}>
-                      {i > 0 && <span className="text-[var(--scorecard-text-faint)]"> · </span>}
-                      {s.name} <span className="font-semibold tabular-nums">{s.runs}</span>
-                      <span className="text-[var(--scorecard-text-faint)] tabular-nums"> ({s.balls})</span>
-                    </span>
-                  ))}
-                </p>
-              )}
-              {wickets.map(w => (
-                <p key={w.seq} className="font-rajdhani text-xs mt-1" style={{ color: 'var(--fx-danger-text)' }}>
-                  {w.dismissed_batter ?? w.batter} {howOut(w.dismissed_batter ?? w.batter, w.dismissal_text, w.dismissal_kind)}
-                  {w.shot ? ` · ${w.shot}${w.direction ? ` to ${w.direction}` : ''}` : ''}
-                </p>
-              ))}
+              <div className="w-16 sm:w-20 flex-shrink-0 flex flex-col items-center justify-center border-l border-[var(--scorecard-table-border)] bg-[var(--scorecard-panel-bg)]">
+                <span className="font-rajdhani text-lg font-bold tabular-nums text-[var(--scorecard-heading-text)]">{o.runs}</span>
+                <span className="font-rajdhani text-xs text-[var(--scorecard-text-muted)]">Run{o.runs === 1 ? '' : 's'}</span>
+                {o.wickets > 0 && (
+                  <span className="font-rajdhani text-[11px] font-semibold text-red-600 dark:text-red-300">{o.wickets} wkt{o.wickets > 1 ? 's' : ''}</span>
+                )}
+              </div>
             </div>
           )
         })}
