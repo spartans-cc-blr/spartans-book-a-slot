@@ -419,7 +419,7 @@ or column and bowling similarly" either way the viewport folds it:
 |---|---|---|
 | **Overview** | Matches (with the "Bat N · Bowl N" caption, unchanged), MVP Pts, Dismissals | Fielding MVP |
 | **Batting** | Runs, Highest, Avg, S/R | Batting MVP |
-| **Bowling** | Wickets, Best Bowling, Economy, S/R | Bowling MVP |
+| **Bowling** | Wickets, Best Bowling, Economy, S/R, Stands Broken (see `partnerships.md` §13) | Bowling MVP |
 
 **Replaces the old separate 3-column MVP breakdown row** (Batting MVP /
 Bowling MVP / Fielding MVP, previously below the flat grid) — each

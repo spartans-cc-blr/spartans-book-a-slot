@@ -299,6 +299,9 @@ export interface PlayerStatsTotals {
   // batting/bowling row exists in scope.
   highestScore:   { runs: number; balls: number; notOut: boolean } | null
   bestBowling:    { wickets: number; runs: number } | null
+  // Opponent stands this player's bowling ended; only populated by
+  // aggregateMatchHistoryRows() (the player stats page), absent elsewhere.
+  standsBroken?:  { broken: number; bigBreaks: number; runs: number }
 }
 
 export interface LeaderboardRow {
@@ -537,6 +540,10 @@ export interface PlayerMatchHistoryRow {
     // bowling_stats.mvp_score for this one innings — same rationale as
     // batting.mvpScore, feeds a filtered Bowling MVP total.
     mvpScore: number
+    // Opponent partnerships this bowler ended in this match (from
+    // opponent_fall_of_wickets, FOW-only — see features/partnerships.md §13):
+    // stands broken, how many were 30+ runs, and the total runs in them.
+    standsBroken: number; bigBreaks: number; standRuns: number
   } | null
   fielding: {
     catches: number; runOuts: number; stumpings: number

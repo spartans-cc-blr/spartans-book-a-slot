@@ -490,6 +490,13 @@ export function PlayerStatsClient({
                 <Stat label="Best Bowling" value={formatBestBowling(bowlingTotals.bestBowling)} />
                 <Stat label="Economy" value={bowlingTotals.economy?.toFixed(2) ?? '—'} />
                 <Stat label="S/R" value={bowlingTotals.bowlingStrikeRate?.toFixed(2) ?? '—'} />
+                <Stat
+                  label="Stands Broken"
+                  value={String(bowlingTotals.standsBroken?.broken ?? 0)}
+                  caption={bowlingTotals.standsBroken?.broken
+                    ? `${bowlingTotals.standsBroken.bigBreaks} big · avg ${(bowlingTotals.standsBroken.runs / bowlingTotals.standsBroken.broken).toFixed(1)}`
+                    : undefined}
+                />
               </SummaryColumn>
             </div>
           )}

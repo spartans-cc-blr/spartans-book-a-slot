@@ -24,7 +24,7 @@ import type { CareerHighlights } from '@/lib/playerHighlights'
 import { findCapHolders } from '@/lib/capHolders'
 import { computePartnerships } from '@/lib/partnerships'
 import { aggregatePartnershipLeaders, type MatchPartnerships } from '@/lib/partnershipLeaders'
-import { computeBreakthroughs } from '@/lib/breakthroughs'
+import { computeBreakthroughs, BIG_STAND_RUNS } from '@/lib/breakthroughs'
 import { aggregateBreakthroughLeaders, type MatchBreakthroughs } from '@/lib/breakthroughLeaders'
 import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType, PartnershipLeaders, BreakthroughLeaders } from '@/types'
 
@@ -493,6 +493,48 @@ export async function getPlayerMatchHistory(
   const bowlingByMatch  = new Map(bowling.map((r: any) => [r.match_id, r]))
   const fieldingByMatch = new Map(fielding.map((r: any) => [r.match_id, r]))
 
+  // Stands broken (features/partnerships.md §13): the opponent's FOW rows
+  // credit a dismissing bowler by scorecard name, so match this player's own
+  // bowling_stats names (an alias can leave two rows in one match) against it.
+  const bowledMatchIds = Array.from(new Set<string>(
+    bowling.filter((r: any) => r.did_bowl).map((r: any) => r.match_id)))
+  const bowlerNamesByMatch = new Map<string, Set<string>>()
+  for (const r of bowling as any[]) {
+    if (!r.did_bowl) continue
+    const set = bowlerNamesByMatch.get(r.match_id) ?? new Set<string>()
+    set.add(String(r.player_name ?? '').trim().toLowerCase().replace(/\s+/g, ' '))
+    bowlerNamesByMatch.set(r.match_id, set)
+  }
+  const fowByMatch = new Map<string, any[]>()
+  if (bowledMatchIds.length > 0) {
+    const fowRows = await fetchAllRows<any>(() => analytics
+      .from('opponent_fall_of_wickets')
+      .select('match_id, wicket_number, team_score, over, player_name, bowler_name, dismissal_type')
+      .in('match_id', bowledMatchIds)
+      .order('match_id').order('wicket_number'))
+    for (const r of fowRows) {
+      const list = fowByMatch.get(r.match_id) ?? []
+      list.push(r)
+      fowByMatch.set(r.match_id, list)
+    }
+  }
+  function standsFor(matchId: string, m: any) {
+    const names = bowlerNamesByMatch.get(matchId)
+    let broken = 0, bigBreaks = 0, standRuns = 0
+    if (names) {
+      const stands = computeBreakthroughs(fowByMatch.get(matchId), m
+        ? { total: num(m.opponent_total), overs: m.opponent_overs ?? 0, wickets: m.opponent_wickets != null ? num(m.opponent_wickets) : null }
+        : null)
+      for (const s of stands) {
+        if (!s.bowlerName) continue
+        if (!names.has(s.bowlerName.trim().toLowerCase().replace(/\s+/g, ' '))) continue
+        broken++; standRuns += s.runs
+        if (s.runs >= BIG_STAND_RUNS) bigBreaks++
+      }
+    }
+    return { standsBroken: broken, bigBreaks, standRuns }
+  }
+
   // Sort match_ids by date+time (most recent first) before building the
   // final rows — game_date alone can't break a tie between two matches
   // played the same day.
@@ -540,6 +582,7 @@ export async function getPlayerMatchHistory(
         bowled: num(bowl.bowled), caught: num(bowl.caught), caughtBehind: num(bowl.caught_behind),
         lbw: num(bowl.lbw), stumping: num(bowl.stumping), other: num(bowl.other),
         mvpScore: num(bowl.mvp_score),
+        ...standsFor(matchId, m),
       } : null,
       fielding: field ? {
         catches: num(field.catches) + num(field.caught_behind),
