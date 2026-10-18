@@ -57,6 +57,29 @@ function num(row: any, keys: string[]): number {
   return v != null ? Number(v) : 0
 }
 
+// CricHeroes' own "overs.balls" notation (e.g. 5.0 = 5 overs, 2.4 = 2 overs
+// 4 balls) is never a true decimal — same convention ScorecardTables.tsx's
+// oversToBalls() already documents. Parsed as a string, not float math, for
+// the identical precision reason that comment gives.
+function oversToBalls(over: number | string): number {
+  const [wholeStr, ballStr] = String(over).split('.')
+  const whole = parseInt(wholeStr, 10) || 0
+  const ball = ballStr ? parseInt(ballStr[0], 10) || 0 : 0
+  return whole * 6 + ball
+}
+
+// Prefers the analytics row's own pre-computed `economy`/`eco` field (what
+// the Bowling tab's own Econ column already reads — see ScorecardTables.tsx)
+// so this never disagrees with what's shown on screen; falls back to
+// deriving it from runs/overs for a row that's missing the field outright.
+function economyOf(row: any): number {
+  const given = pickField(row, ['economy', 'eco'])
+  if (given != null) return Number(given)
+  const balls = oversToBalls(pickField(row, ['overs', 'overs_bowled']) ?? 0)
+  const runs = num(row, ['runs', 'runs_conceded'])
+  return balls > 0 ? (runs * 6) / balls : Infinity
+}
+
 // Same resolution order as ScorecardTables.tsx's findPlayerId — prefers the
 // analytics row's own player_id (set once reconciled, see
 // playerIdentityResolution.ts) over a case-insensitive name match against
@@ -152,13 +175,19 @@ export function summarizeTopPerformance(batting: any[], bowling: any[]): {
     return runs > bestRuns ? cur : best
   }, null)
 
+  // On equal wickets, the winner is whoever bowled it more economically —
+  // not just whoever conceded fewer raw runs. A bare "fewest runs conceded"
+  // tie-break rewards a short spell over a longer, more economical one at
+  // the same wicket haul (e.g. 2/8 off 2 overs beating 2/17 off 5 overs,
+  // even though the second bowler's economy was actually better) — see the
+  // Preetam-vs-Ramesh report this was fixed for, Oct 2026.
   const topBowl = bowlingArr.reduce((best: any, cur: any) => {
     const wkts = num(cur, ['wickets', 'wickets_taken'])
     const bestWkts = best ? num(best, ['wickets', 'wickets_taken']) : -1
     if (wkts !== bestWkts) return wkts > bestWkts ? cur : best
-    const conceded = num(cur, ['runs', 'runs_conceded'])
-    const bestConceded = best ? num(best, ['runs', 'runs_conceded']) : Infinity
-    return conceded < bestConceded ? cur : best
+    const econ = economyOf(cur)
+    const bestEcon = best ? economyOf(best) : Infinity
+    return econ < bestEcon ? cur : best
   }, null)
 
   return {
