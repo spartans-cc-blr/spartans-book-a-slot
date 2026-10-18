@@ -818,6 +818,12 @@ expanded); no new route, no new data, no new client-reachable input.
 
 ---
 
+## 12.3 Column alignment and Fielding tab (added October 2026)
+
+- "Under each captain" (`PlayerCaptaincyBreakdown`) used `max-w-3xl mx-auto`, so on iPad/desktop it sat centred and wider than the left-aligned `max-w-2xl` stats column above it. It now uses the same `max-w-2xl` left-aligned container (`ui-theme.md` "Page Content Width").
+- The **Fielding** tab label no longer shows a count. Every player fields in every match, so a number there read as "matches fielded". The Fielding card instead says "N matches with a dismissal" and a hint that only matches where the player effected a dismissal (catch, stumping or run out) are listed. Batting and Bowling keep their counts.
+
+
 ## 13. "Under each captain" section (added September 2026)
 
 Below the main stats card, the page now renders `PlayerCaptaincyBreakdown`:
