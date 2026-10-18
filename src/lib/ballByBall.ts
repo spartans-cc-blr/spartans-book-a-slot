@@ -515,6 +515,16 @@ export interface Stand {
   outBatter:   string | null   // null = never separated (innings ended first)
 }
 
+/** Same person under two spellings: same first name, and one surname is the other's prefix
+ *  (covers an initial, "Manoj B" ~ "Manoj Balaji"). Exact matches are handled by the caller. */
+export function sameBatter(a: string, b: string): boolean {
+  const toks = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean)
+  const x = toks(a), y = toks(b)
+  if (x.length < 2 || y.length < 2 || x[0] !== y[0]) return false
+  const sx = x.slice(1).join(' '), sy = y.slice(1).join(' ')
+  return sx.startsWith(sy) || sy.startsWith(sx)
+}
+
 /** Partnerships of one batting innings, rebuilt from the ball rows alone (no Fall of Wickets needed).
  *  `restOfOrder` lists batters who never faced a ball, in batting order: a partner who was at the
  *  other end the whole stand (a 0(0) not-out) is only knowable from the scorecard. */
@@ -532,7 +542,16 @@ export function derivePartnerships(inningsBalls: BallRow[], restOfOrder: string[
     else if (id && !idOf.get(k)) idOf.set(k, id)
   }
   for (const b of balls) { note(b.batter, b.batter_player_id); note(b.dismissed_batter, b.dismissed_player_id) }
-  for (const n of restOfOrder) note(n, null)
+  // The scorecard can spell a batter differently from the commentary ("Manoj B" vs "Manoj Balaji").
+  // Fold such a name into the commentary one (only when exactly one commentary name fits), so he
+  // isn't seated a second time as a phantom 0(0) partner.
+  const commentaryNames = [...order]
+  const restAs = restOfOrder.map(n => {
+    if (idOf.has(key(n))) return n
+    const hits = commentaryNames.filter(c => sameBatter(n, c))
+    return hits.length === 1 ? hits[0] : n
+  })
+  for (const n of restAs) note(n, null)
 
   const entered = new Set<string>()
   const stands: Stand[] = []
@@ -547,7 +566,7 @@ export function derivePartnerships(inningsBalls: BallRow[], restOfOrder: string[
   const open = () => { cur = { runs: {}, faced: {}, total: 0, legal: 0 }; start = { score, wkts, balls: legalSoFar } }
   // The scorecard's batting order decides who walks in; first appearance in the commentary only
   // breaks ties (a non-striker can face his first ball several overs after coming in).
-  const rank = new Map(restOfOrder.map((n, i) => [key(n), i] as const))
+  const rank = new Map(restAs.map((n, i) => [key(n), i] as const))
   const fillPartner = () => {
     const waiting = order.filter(n => !entered.has(key(n)))
     const next = [...waiting].sort((a, b) => (rank.get(key(a)) ?? 1e6) - (rank.get(key(b)) ?? 1e6))[0]
