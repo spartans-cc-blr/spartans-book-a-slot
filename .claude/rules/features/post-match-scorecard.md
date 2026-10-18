@@ -1407,6 +1407,39 @@ in the same route) is a separate, always-unrelated computation and is
 unaffected either way — a match still visibly credits its top batter and
 top bowler there even when one of them isn't the share target.
 
+### Match-card "Best Bowler" tie-break — fewest runs conceded → best economy (fixed October 2026)
+
+`summarizeTopPerformance()` (`src/lib/matchTopPerformers.ts`) — the
+single-winner pick behind `summarizeStats()`'s match-card headline and the
+ball-by-ball Bowling tab's own "performer" callout (`features/ball-by-ball-tabs.md`)
+— used to break a tie on equal wickets by **fewest raw runs conceded**,
+with no regard at all for how many overs it took to get there. Reported
+live: a 17 Oct match vs Rejigx had five bowlers tied at 2 wickets each,
+and the headline picked Preetam Patil (2.0-0-8-2, economy 4.00) over
+Ramesh Shanmugamoorthy (5.0-0-17-2, economy **3.40**) — Ramesh bowled
+2.5x the overs at a *better* economy for the same wicket haul, but lost
+the tie-break purely because his total runs conceded was a bigger raw
+number. Cross-checked against `computeMatchMVP()`'s already-computed
+`mvp_score` for the same match, which had already ranked Ramesh (3.00)
+above Preetam (2.94) — i.e. the more sophisticated metric used elsewhere
+in this feature agreed with the report; only this simpler headline's
+tie-break was wrong.
+
+**Fix:** the tie-break is now **best economy rate** (lower wins) instead
+of raw runs conceded — `economyOf()`, a new helper in the same file,
+prefers the analytics row's own pre-computed `economy`/`eco` field (the
+exact number already shown in the Bowling tab's Econ column, so the
+headline can never disagree with the table underneath it) and falls back
+to deriving it from runs/overs (via a local `oversToBalls()` copy of
+`ScorecardTables.tsx`'s own cricket "overs.balls" parsing — overs are
+never a true decimal) only for a row missing that field outright.
+
+Scoped narrowly: only `summarizeTopPerformance()`'s bowling tie-break
+changed. `computeTopPerformers()` (tie-inclusive, feeds `can_verify`/
+`canActOnScorecard()` — see above) and `computeMatchMVP()` (the share-list
+picker) were both already unaffected by this bug, since neither of them
+picks a single "winner" to then run a runs-conceded tie-break against.
+
 ### Authorization — `src/lib/scorecardAuth.ts`
 
 `canActOnScorecard(supabase, bookingId, user)` replaces the auth blocks
