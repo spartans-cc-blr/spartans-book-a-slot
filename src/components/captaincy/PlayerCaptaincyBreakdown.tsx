@@ -184,7 +184,7 @@ export function PlayerCaptaincyBreakdown({
   if (!hasAnyData) return null
 
   return (
-    <div className="px-5 md:px-8 lg:px-10 max-w-3xl mx-auto flex flex-col gap-5">
+    <div className="px-5 md:px-8 lg:px-10 pb-6 max-w-2xl flex flex-col gap-5">
       <section className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5">
         <h2 className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--stats-text-muted)] mb-1">
           Under each captain

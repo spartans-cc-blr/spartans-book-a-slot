@@ -516,13 +516,15 @@ export function PlayerStatsClient({
           {([
             { key: 'batting' as const, label: 'Batting', count: battingInningsInPitchScope },
             { key: 'bowling' as const, label: 'Bowling', count: bowlingInningsInPitchScope },
-            { key: 'fielding' as const, label: 'Fielding', count: fieldingTabMatches.length },
+            // No count: every player fields in every match, so a total here
+            // would be misleading — the list below only has dismissal matches.
+            { key: 'fielding' as const, label: 'Fielding', count: null },
           ]).map(tab => (
             <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)}
               aria-pressed={activeTab === tab.key}
               className={`flex-1 text-center font-rajdhani text-sm font-bold py-2 rounded-full transition-colors whitespace-nowrap
                 ${activeTab === tab.key ? 'bg-[var(--stats-accent)] text-white dark:text-ink' : 'text-[var(--stats-text-muted)] hover:text-[var(--stats-text)]'}`}>
-              {tab.label} <span className="opacity-70">({tab.count})</span>
+              {tab.label}{tab.count != null && <span className="opacity-70"> ({tab.count})</span>}
             </button>
           ))}
         </div>
@@ -607,7 +609,11 @@ export function PlayerStatsClient({
           <div className="bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] rounded-2xl p-5">
             <h2 className="font-cinzel text-sm text-[var(--stats-badge-text)] font-semibold mb-1">Fielding</h2>
             <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] mb-3">
-              {fieldingTabMatches.length} innings with a fielding contribution
+              {fieldingTabMatches.length} matches with a dismissal
+            </p>
+            <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] mb-3">
+              Every player fields in every match, so only matches where this player effected a dismissal
+              (a catch, stumping or run out) are listed.
             </p>
             <CollapsibleHistory open={fieldingHistoryOpen} onToggle={() => setFieldingHistoryOpen(v => !v)} count={fieldingTabMatches.length}>
               {!loading && (fieldingTabMatches.length === 0 ? (
