@@ -1174,7 +1174,7 @@ export async function getPartnershipLeaders(
 
   const hub = createServiceClient()
   const { data: bookings, error: bookErr } = await hub.from('bookings')
-    .select('id, match_id, game_date, format, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
+    .select('id, match_id, game_date, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
   if (bookErr) throw new Error(bookErr.message)
   const bookingByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b]))
 
@@ -1283,7 +1283,7 @@ export async function getBreakthroughLeaders(
   filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
 ): Promise<BreakthroughLeaders> {
   const scoped = await getScopedMatchIds(filters)
-  const emptyWith = (matches: number): BreakthroughLeaders => ({ breakers: [], biggest: [], coverage: { matches, withData: 0 } })
+  const emptyWith = (matches: number): BreakthroughLeaders => ({ biggest: [], byWicket: [], coverage: { matches, withData: 0 } })
   if (scoped && scoped.length === 0) return emptyWith(0)
 
   const analytics = createAnalyticsClient()
@@ -1308,7 +1308,7 @@ export async function getBreakthroughLeaders(
   const summaryByMatch = new Map((summaryRows as any[]).map(r => [r.match_id, r]))
 
   const bowlingRows = await fetchAllRows(() =>
-    analytics!.from('bowling_stats').select('match_id, player_name, player_id, overs, did_bowl')
+    analytics!.from('bowling_stats').select('match_id, player_name, player_id')
       .order('match_id').order('player_name').in('match_id', matchIds).not('player_id', 'is', null)
   )
   const norm = (n: string) => n.trim().toLowerCase().replace(/\s+/g, ' ')
@@ -1317,7 +1317,7 @@ export async function getBreakthroughLeaders(
 
   const hub = createServiceClient()
   const { data: bookings, error: bookErr } = await hub.from('bookings')
-    .select('id, match_id, game_date, format, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
+    .select('id, match_id, game_date, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
   if (bookErr) throw new Error(bookErr.message)
   const bookingByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b]))
 
@@ -1338,7 +1338,7 @@ export async function getBreakthroughLeaders(
       if (id) playerIds.add(id)
     }
     const booking = bookingByMatch.get(matchId) as any
-    perMatch.push({ matchId, bookingId: booking?.id ?? null, gameDate: booking?.game_date ?? null, format: booking?.format ?? null, opponentName: booking?.opponent_name ?? null, stands })
+    perMatch.push({ matchId, bookingId: booking?.id ?? null, gameDate: booking?.game_date ?? null, opponentName: booking?.opponent_name ?? null, stands })
   }
   if (perMatch.length === 0) return emptyWith(totalMatches)
 
@@ -1350,31 +1350,12 @@ export async function getBreakthroughLeaders(
 
   // An unreconciled bowler is kept under their scorecard name (unlinked),
   // grouped by normalised name — dropping them would hide real breaks.
-  // Balls bowled in the matches counted, per reconciled bowler (an alias can
-  // leave two rows for one match, so keep the larger).
-  const countedMatches = new Set(perMatch.map(m => m.matchId))
-  const ballsByMatchPlayer = new Map<string, number>()
-  for (const r of bowlingRows as any[]) {
-    if (!r.did_bowl || !countedMatches.has(r.match_id)) continue
-    const k = `${r.match_id}|${r.player_id}`
-    ballsByMatchPlayer.set(k, Math.max(ballsByMatchPlayer.get(k) ?? 0, oversToBallsStr(r.overs ?? 0)))
-  }
-  const ballsById = new Map<string, number>()
-  ballsByMatchPlayer.forEach((balls, k) => {
-    const id = k.split('|')[1]
-    ballsById.set(id, (ballsById.get(id) ?? 0) + balls)
-  })
-  const baselines = await getStandBaselines()
   const leaders = aggregateBreakthroughLeaders(perMatch, (name, matchId) => {
     const id = bowlerIdByKey.get(`${matchId}|${norm(name)}`)
     const hubPlayer = id ? playerById.get(id) as any : null
     return hubPlayer
       ? { playerId: hubPlayer.id, playerName: hubPlayer.name, cricheroesUrl: hubPlayer.cricheroes_url ?? null }
       : { playerId: null, playerName: name, cricheroesUrl: null }
-  }, {
-    baselines,
-    minBreaks: filters.tournamentId || filters.groundId ? 1 : 3,
-    ballsFor: b => (b.playerId ? ballsById.get(b.playerId) ?? 0 : 0),
   })
   return { ...leaders, coverage: { matches: totalMatches, withData: perMatch.length } }
 }

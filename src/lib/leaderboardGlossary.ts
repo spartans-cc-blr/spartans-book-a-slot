@@ -123,10 +123,7 @@ export function buildPartnershipsGlossary(): GlossaryEntry[] {
 export function buildBreakthroughsGlossary(): GlossaryEntry[] {
   return [
     { term: 'Stand broken', definition: 'An opponent partnership that ended with a Spartans bowler taking the wicket (bowled, caught, lbw, stumped). Run-outs and unbroken closing stands are not credited to a bowler.' },
-    { term: 'Big break', definition: 'A stand in the top quarter for its slot and format. Stands are grouped as openers (wickets 1–2), top order (3–4), middle order (5–8) and tail (9–11), separately for T20 and T30 (all formats combined where a bucket has under 20 stands), and measured against every synced Spartans match, whatever filter is applied.' },
-    { term: 'of N', definition: 'All stands the bowler ended, big or not. A bowler needs 3 to rank (1 when a tournament or ground is selected).' },
-    { term: 'runs vs par', definition: 'Runs in each stand broken minus the average stand for that slot and format, added up. Higher means the bowler ended stands that were running ahead of normal.' },
-    { term: 'big / 10 ov', definition: 'Big breaks per 10 overs bowled in the matches counted, so a bowler who bowls more overs is not favoured.' },
+    { term: 'For each wicket', definition: 'The biggest stand ended for the 1st, 2nd … 10th wicket, credited to the bowler who took that wicket.' },
     { term: '(balls)', definition: 'Balls the stand lasted.' },
     { term: 'Coverage', definition: 'Only matches whose opponent Fall of Wickets has been synced count — older scorecards appear once re-synced. Practice games are excluded, same as every other Detailed tab.' },
   ]

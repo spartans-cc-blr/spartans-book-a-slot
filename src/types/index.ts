@@ -409,16 +409,6 @@ export interface PartnershipLeaders {
 // Opponent-batting stands broken by Spartans bowlers — /leaderboard →
 // Detailed → Breakthroughs. See src/lib/breakthroughLeaders.ts and
 // features/partnerships.md §13.
-export interface BreakerAggregate {
-  bowler:    PartnershipLeaderPlayer
-  broken:    number   // opponent stands ended by this bowler
-  bigBreaks: number   // of those, stands in the top quarter for their slot and format
-  standRuns: number   // total runs in the stands broken
-  abovePar:  number   // stand runs minus the average stand for each slot and format, summed
-  ballsBowled: number // balls bowled in the matches counted (0 if unknown)
-  matches:   number
-}
-
 export interface BreakthroughRecord {
   bowler:        PartnershipLeaderPlayer
   wicketNumber:  number
@@ -433,8 +423,8 @@ export interface BreakthroughRecord {
 }
 
 export interface BreakthroughLeaders {
-  breakers: BreakerAggregate[]     // most stands broken
-  biggest:  BreakthroughRecord[]   // biggest stands ended
+  biggest:  BreakthroughRecord[]   // biggest stands ended, any wicket
+  byWicket: BreakthroughRecord[]   // the biggest stand ended for each wicket (1st–10th), credited to its bowler
   // Matches in the current filter vs those with usable opponent fall of wickets.
   coverage: { matches: number; withData: number }
 }

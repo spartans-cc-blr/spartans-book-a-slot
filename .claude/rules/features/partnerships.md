@@ -1665,10 +1665,10 @@ New props on `ScorecardTables`: `opponentFallOfWickets`, `opponentTotal`, `oppon
 
 A sixth Detailed sub-tab (`category=breakthroughs`, a `DetailedCategory`, not a table). Same Year / Tournament / Ground / Format scope as the other Detailed tabs via `getScopedMatchIds()`; practice games excluded. Two bar charts (`BreakthroughLeaders.tsx`):
 
-1. **Top 10 Partnership Breakers** — ranked by **big breaks**, then runs above par, then total stands broken. A bowler needs 3 stands to rank (1 when a tournament or ground is selected). The bar value is big breaks with "of N" (all stands) under it; the caption shows matches, runs vs par and big breaks per 10 overs bowled.
-2. **Biggest 10 Stands Broken** — largest stand ended, caption shows wicket, batter dismissed, opponent and date, linking to the match.
+1. **Biggest 10 Stands Broken** (top) — largest stand ended by a Spartans bowler, caption shows wicket, batter dismissed, opponent and date, linking to the match.
+2. **Biggest Stand Broken for Each Wicket** (bottom) — mirrors the Spartans-batting Partnerships tab: the largest stand for the 1st … 10th wicket, credited to the bowler who ended it. A wicket with no data is absent. Run-outs and unclassified dismissals have no bowler and are excluded from both charts. The old "Top 10 Partnership Breakers" count ranking was dropped (it duplicated wickets taken); the relative "big stand" baselines now feed only the Stands Broken tile on player stats.
 
-`getBreakthroughLeaders()` (`playerStats.ts`) reads `opponent_fall_of_wickets`, the opponent innings summary from `match_stats` and `bowling_stats` (only to resolve the scorecard bowler name to the live reconciled `player_id`), then `aggregateBreakthroughLeaders()` (`src/lib/breakthroughLeaders.ts`, pure) ranks. An unreconciled bowler is kept under the scorecard name, unlinked. Glossary: `buildBreakthroughsGlossary()`.
+`getBreakthroughLeaders()` (`playerStats.ts`) reads `opponent_fall_of_wickets`, the opponent innings summary from `match_stats` and `bowling_stats` (only to resolve the scorecard bowler name to the live reconciled `player_id`), then `aggregateBreakthroughLeaders()` (`src/lib/breakthroughLeaders.ts`, pure) returns `{ biggest, byWicket }`. An unreconciled bowler is kept under the scorecard name, unlinked. Glossary: `buildBreakthroughsGlossary()`.
 
 ### Coverage and security
 
@@ -1689,7 +1689,7 @@ The Bowling column of the Summary card has a **Stands Broken** tile (count, with
 | File | Role |
 |---|---|
 | `src/lib/breakthroughs.ts` (+ `.test.ts`) | `computeBreakthroughs()`, `summariseBreakers()`, `oversToBalls()`, `BIG_STAND_RUNS` |
-| `src/lib/breakthroughLeaders.ts` | `aggregateBreakthroughLeaders()` |
+| `src/lib/breakthroughLeaders.ts` | `aggregateBreakthroughLeaders()` — biggest 10 stands and biggest per wicket |
 | `src/lib/standBaselines.ts` | `buildStandBaselines()`, `classifyStand()`, `standGroup()` — relative big-stand rule |
 | `src/lib/playerStats.ts` | `getBreakthroughLeaders()` |
 | `src/components/leaderboard/BreakthroughLeaders.tsx` | Detailed → Breakthroughs charts |
