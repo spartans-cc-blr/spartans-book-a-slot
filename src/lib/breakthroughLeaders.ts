@@ -4,13 +4,15 @@
 // getBreakthroughLeaders() in playerStats.ts fetches and resolves names.
 // See features/partnerships.md §13.
 
-import { BIG_STAND_RUNS, type Breakthrough } from '@/lib/breakthroughs'
+import type { Breakthrough } from '@/lib/breakthroughs'
+import { classifyStand, type StandBaselines } from '@/lib/standBaselines'
 import type { BreakerAggregate, BreakthroughLeaders, BreakthroughRecord, PartnershipLeaderPlayer } from '@/types'
 
 export interface MatchBreakthroughs {
   matchId:      string
   bookingId:    string | null
   gameDate:     string | null
+  format:       string | null
   opponentName: string | null
   stands:       Breakthrough[]
 }
@@ -25,7 +27,12 @@ function key(p: PartnershipLeaderPlayer): string {
 export function aggregateBreakthroughLeaders(
   matches: MatchBreakthroughs[],
   resolveBowler: (scorecardName: string, matchId: string) => PartnershipLeaderPlayer,
-  opts: { breakers?: number; biggest?: number } = {},
+  opts: {
+    breakers?: number; biggest?: number
+    baselines?: StandBaselines | null          // what counts as a big stand; none = nothing is big
+    minBreaks?: number                         // stands a bowler needs before ranking
+    ballsFor?: (bowler: PartnershipLeaderPlayer) => number
+  } = {},
 ): Omit<BreakthroughLeaders, 'coverage'> {
   const agg = new Map<string, BreakerAggregate & { matchIds: Set<string> }>()
   const records: BreakthroughRecord[] = []
@@ -35,10 +42,12 @@ export function aggregateBreakthroughLeaders(
       if (!s.bowlerName) continue
       const bowler = resolveBowler(s.bowlerName, m.matchId)
       const k = key(bowler)
-      const cur = agg.get(k) ?? { bowler, broken: 0, bigBreaks: 0, standRuns: 0, matches: 0, matchIds: new Set<string>() }
+      const cur = agg.get(k) ?? { bowler, broken: 0, bigBreaks: 0, standRuns: 0, abovePar: 0, ballsBowled: 0, matches: 0, matchIds: new Set<string>() }
       cur.broken += 1
       cur.standRuns += s.runs
-      if (s.runs >= BIG_STAND_RUNS) cur.bigBreaks += 1
+      const c = classifyStand(opts.baselines, m.format, s.wicketNumber, s.runs)
+      if (c.big) cur.bigBreaks += 1
+      cur.abovePar += c.abovePar
       cur.matchIds.add(m.matchId)
       agg.set(k, cur)
       records.push({
@@ -49,13 +58,14 @@ export function aggregateBreakthroughLeaders(
     }
   }
 
-  // Most stands broken; then more big breaks; then a lower average stand
-  // (broke them earlier); then name for a stable order.
+  // Most big breaks (top-quarter stands for their slot and format); then runs
+  // above par; then total breaks; then name for a stable order. A bowler needs
+  // minBreaks stands before they can rank, so one lucky wicket can't top it.
   const breakers = Array.from(agg.values())
-    .map(({ matchIds, ...a }) => ({ ...a, matches: matchIds.size }))
+    .filter(a => a.broken >= (opts.minBreaks ?? 1))
+    .map(({ matchIds, ...a }) => ({ ...a, matches: matchIds.size, ballsBowled: opts.ballsFor?.(a.bowler) ?? 0 }))
     .sort((a, b) =>
-      b.broken - a.broken || b.bigBreaks - a.bigBreaks
-      || a.standRuns / a.broken - b.standRuns / b.broken
+      b.bigBreaks - a.bigBreaks || b.abovePar - a.abovePar || b.broken - a.broken
       || a.bowler.playerName.localeCompare(b.bowler.playerName))
     .slice(0, opts.breakers ?? TOP_BREAKERS)
 

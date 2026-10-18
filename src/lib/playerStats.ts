@@ -24,7 +24,8 @@ import type { CareerHighlights } from '@/lib/playerHighlights'
 import { findCapHolders } from '@/lib/capHolders'
 import { computePartnerships } from '@/lib/partnerships'
 import { aggregatePartnershipLeaders, type MatchPartnerships } from '@/lib/partnershipLeaders'
-import { computeBreakthroughs, BIG_STAND_RUNS } from '@/lib/breakthroughs'
+import { computeBreakthroughs, oversToBalls as oversToBallsStr } from '@/lib/breakthroughs'
+import { buildStandBaselines, classifyStand, type StandBaselines } from '@/lib/standBaselines'
 import { aggregateBreakthroughLeaders, type MatchBreakthroughs } from '@/lib/breakthroughLeaders'
 import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType, PartnershipLeaders, BreakthroughLeaders } from '@/types'
 
@@ -518,7 +519,9 @@ export async function getPlayerMatchHistory(
       fowByMatch.set(r.match_id, list)
     }
   }
+  const standBaselines = bowledMatchIds.length > 0 ? await getStandBaselines() : null
   function standsFor(matchId: string, m: any) {
+    const format = (bookingByMatchId.get(matchId) as any)?.format ?? null
     const names = bowlerNamesByMatch.get(matchId)
     let broken = 0, bigBreaks = 0, standRuns = 0
     if (names) {
@@ -529,7 +532,7 @@ export async function getPlayerMatchHistory(
         if (!s.bowlerName) continue
         if (!names.has(s.bowlerName.trim().toLowerCase().replace(/\s+/g, ' '))) continue
         broken++; standRuns += s.runs
-        if (s.runs >= BIG_STAND_RUNS) bigBreaks++
+        if (classifyStand(standBaselines, format, s.wicketNumber, s.runs).big) bigBreaks++
       }
     }
     return { standsBroken: broken, bigBreaks, standRuns }
@@ -1171,7 +1174,7 @@ export async function getPartnershipLeaders(
 
   const hub = createServiceClient()
   const { data: bookings, error: bookErr } = await hub.from('bookings')
-    .select('id, match_id, game_date, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
+    .select('id, match_id, game_date, format, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
   if (bookErr) throw new Error(bookErr.message)
   const bookingByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b]))
 
@@ -1218,6 +1221,56 @@ export async function getPartnershipLeaders(
   })
 }
 
+// Club-wide stand baselines (practice excluded, every synced opponent innings
+// with complete FOW) — deliberately NOT narrowed by the page's filters, so
+// "big" means the same thing whatever the viewer has selected. Memoised
+// briefly: it reads every match's FOW and backs both the leaderboard and the
+// player stats tile. See features/partnerships.md §13.
+let standBaselineCache: { at: number; value: StandBaselines } | null = null
+const STAND_BASELINE_TTL_MS = 10 * 60 * 1000
+
+export async function getStandBaselines(): Promise<StandBaselines> {
+  if (standBaselineCache && Date.now() - standBaselineCache.at < STAND_BASELINE_TTL_MS) return standBaselineCache.value
+  const scoped = await getScopedMatchIds({})
+  const analytics = createAnalyticsClient()
+  if (!analytics || (scoped && scoped.length === 0)) return {}
+  const [fowRows, summaryRows] = await Promise.all([
+    fetchAllRows(() => {
+      const q = analytics.from('opponent_fall_of_wickets')
+        .select('match_id, wicket_number, team_score, over, player_name, bowler_name, dismissal_type')
+        .order('match_id').order('wicket_number')
+      return scoped ? q.in('match_id', scoped) : q
+    }),
+    fetchAllRows(() => {
+      const q = analytics.from('match_stats').select('match_id, opponent_total, opponent_overs, opponent_wickets').order('match_id')
+      return scoped ? q.in('match_id', scoped) : q
+    }),
+  ])
+  const fowByMatch = groupBy(fowRows as any[], r => r.match_id)
+  const matchIds = Array.from(fowByMatch.keys())
+  if (matchIds.length === 0) return {}
+  const summaryByMatch = new Map((summaryRows as any[]).map(r => [r.match_id, r]))
+  const hub = createServiceClient()
+  const { data: bookings, error } = await hub.from('bookings')
+    .select('match_id, format').in('match_id', matchIds).eq('status', 'confirmed')
+  if (error) throw new Error(error.message)
+  const formatByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b.format]))
+  const matches = matchIds.map(matchId => {
+    const summary = summaryByMatch.get(matchId) as any
+    const finalScore = summary && summary.opponent_total != null && summary.opponent_overs != null
+      ? { total: num(summary.opponent_total), overs: num(summary.opponent_overs), wickets: summary.opponent_wickets != null ? num(summary.opponent_wickets) : null }
+      : null
+    const stands = computeBreakthroughs((fowByMatch.get(matchId) ?? []).map((r: any) => ({
+      wicket_number: num(r.wicket_number), team_score: num(r.team_score), over: r.over,
+      player_name: r.player_name, bowler_name: r.bowler_name, dismissal_type: r.dismissal_type,
+    })), finalScore)
+    return { format: (formatByMatch.get(matchId) as string | null) ?? null, stands }
+  })
+  const value = buildStandBaselines(matches)
+  standBaselineCache = { at: Date.now(), value }
+  return value
+}
+
 // Club-wide "partnerships broken" for /leaderboard's Detailed → Breakthroughs
 // tab — the OPPONENT's batting stands and which Spartans bowler ended each
 // one. Same match scope as every other Detailed tab (getScopedMatchIds()).
@@ -1255,7 +1308,7 @@ export async function getBreakthroughLeaders(
   const summaryByMatch = new Map((summaryRows as any[]).map(r => [r.match_id, r]))
 
   const bowlingRows = await fetchAllRows(() =>
-    analytics!.from('bowling_stats').select('match_id, player_name, player_id')
+    analytics!.from('bowling_stats').select('match_id, player_name, player_id, overs, did_bowl')
       .order('match_id').order('player_name').in('match_id', matchIds).not('player_id', 'is', null)
   )
   const norm = (n: string) => n.trim().toLowerCase().replace(/\s+/g, ' ')
@@ -1264,7 +1317,7 @@ export async function getBreakthroughLeaders(
 
   const hub = createServiceClient()
   const { data: bookings, error: bookErr } = await hub.from('bookings')
-    .select('id, match_id, game_date, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
+    .select('id, match_id, game_date, format, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
   if (bookErr) throw new Error(bookErr.message)
   const bookingByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b]))
 
@@ -1285,7 +1338,7 @@ export async function getBreakthroughLeaders(
       if (id) playerIds.add(id)
     }
     const booking = bookingByMatch.get(matchId) as any
-    perMatch.push({ matchId, bookingId: booking?.id ?? null, gameDate: booking?.game_date ?? null, opponentName: booking?.opponent_name ?? null, stands })
+    perMatch.push({ matchId, bookingId: booking?.id ?? null, gameDate: booking?.game_date ?? null, format: booking?.format ?? null, opponentName: booking?.opponent_name ?? null, stands })
   }
   if (perMatch.length === 0) return emptyWith(totalMatches)
 
@@ -1297,12 +1350,31 @@ export async function getBreakthroughLeaders(
 
   // An unreconciled bowler is kept under their scorecard name (unlinked),
   // grouped by normalised name — dropping them would hide real breaks.
+  // Balls bowled in the matches counted, per reconciled bowler (an alias can
+  // leave two rows for one match, so keep the larger).
+  const countedMatches = new Set(perMatch.map(m => m.matchId))
+  const ballsByMatchPlayer = new Map<string, number>()
+  for (const r of bowlingRows as any[]) {
+    if (!r.did_bowl || !countedMatches.has(r.match_id)) continue
+    const k = `${r.match_id}|${r.player_id}`
+    ballsByMatchPlayer.set(k, Math.max(ballsByMatchPlayer.get(k) ?? 0, oversToBallsStr(r.overs ?? 0)))
+  }
+  const ballsById = new Map<string, number>()
+  ballsByMatchPlayer.forEach((balls, k) => {
+    const id = k.split('|')[1]
+    ballsById.set(id, (ballsById.get(id) ?? 0) + balls)
+  })
+  const baselines = await getStandBaselines()
   const leaders = aggregateBreakthroughLeaders(perMatch, (name, matchId) => {
     const id = bowlerIdByKey.get(`${matchId}|${norm(name)}`)
     const hubPlayer = id ? playerById.get(id) as any : null
     return hubPlayer
       ? { playerId: hubPlayer.id, playerName: hubPlayer.name, cricheroesUrl: hubPlayer.cricheroes_url ?? null }
       : { playerId: null, playerName: name, cricheroesUrl: null }
+  }, {
+    baselines,
+    minBreaks: filters.tournamentId || filters.groundId ? 1 : 3,
+    ballsFor: b => (b.playerId ? ballsById.get(b.playerId) ?? 0 : 0),
   })
   return { ...leaders, coverage: { matches: totalMatches, withData: perMatch.length } }
 }

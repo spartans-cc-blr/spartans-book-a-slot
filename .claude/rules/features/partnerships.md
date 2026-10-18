@@ -1651,7 +1651,8 @@ Everything above (§1–§10, §12) is **Spartans batting**. This section is the
 - A bowler is credited only when `bowler_name` is present, so run-outs and unclassified dismissals carry none.
 - **Closing unbroken stand:** if the opponent's innings ended not-all-out (`opponent_wickets < 10`) and their final total exceeds the last FOW score, one extra stand is added with `unbroken: true` and no bowler. A zero-wicket innings gives one unbroken opening stand.
 - **Completeness guard:** if the opponent's `opponent_wickets` is known and doesn't equal the FOW row count, the function returns `[]` rather than show merged, wrong stand sizes. With no final score it shows the rows it has.
-- `summariseBreakers()` tallies stands broken, big breaks (`BIG_STAND_RUNS` = 30+) and runs in stands broken, per bowler.
+- `summariseBreakers()` tallies stands broken and runs in stands broken, per bowler.
+- **"Big" is relative, not a fixed 30 (changed October 2026).** `src/lib/standBaselines.ts` groups every synced non-practice opponent stand by format (T20/T30) and batting position — openers (wickets 1–2), top order (3–4), middle order (5–8), tail (9–11) — and a stand is big when its runs are at or above the 75th percentile of its bucket. A bucket under 20 stands falls back to all formats. Unbroken closing stands are left out of the baselines. "Par" is the bucket's average stand; runs above par is stand runs minus par, summed. Baselines are club-wide (`getStandBaselines()`, memoised 10 min) and ignore the page's filters, so "big" means the same thing everywhere; the leaderboard and the player-stats Stands Broken tile both use them.
 - A retirement on the opponent side isn't modelled (the opponent table has no `is_retirement`); such a match fails the guard and is hidden.
 
 ### Per match — `ScorecardTables.tsx`
@@ -1664,7 +1665,7 @@ New props on `ScorecardTables`: `opponentFallOfWickets`, `opponentTotal`, `oppon
 
 A sixth Detailed sub-tab (`category=breakthroughs`, a `DetailedCategory`, not a table). Same Year / Tournament / Ground / Format scope as the other Detailed tabs via `getScopedMatchIds()`; practice games excluded. Two bar charts (`BreakthroughLeaders.tsx`):
 
-1. **Top 10 Partnership Breakers** — most stands broken, then more big breaks, then lower average stand; caption shows matches, big breaks and average stand.
+1. **Top 10 Partnership Breakers** — ranked by **big breaks**, then runs above par, then total stands broken. A bowler needs 3 stands to rank (1 when a tournament or ground is selected). The bar value is big breaks with "of N" (all stands) under it; the caption shows matches, runs vs par and big breaks per 10 overs bowled.
 2. **Biggest 10 Stands Broken** — largest stand ended, caption shows wicket, batter dismissed, opponent and date, linking to the match.
 
 `getBreakthroughLeaders()` (`playerStats.ts`) reads `opponent_fall_of_wickets`, the opponent innings summary from `match_stats` and `bowling_stats` (only to resolve the scorecard bowler name to the live reconciled `player_id`), then `aggregateBreakthroughLeaders()` (`src/lib/breakthroughLeaders.ts`, pure) ranks. An unreconciled bowler is kept under the scorecard name, unlinked. Glossary: `buildBreakthroughsGlossary()`.
@@ -1689,6 +1690,7 @@ The Bowling column of the Summary card has a **Stands Broken** tile (count, with
 |---|---|
 | `src/lib/breakthroughs.ts` (+ `.test.ts`) | `computeBreakthroughs()`, `summariseBreakers()`, `oversToBalls()`, `BIG_STAND_RUNS` |
 | `src/lib/breakthroughLeaders.ts` | `aggregateBreakthroughLeaders()` |
+| `src/lib/standBaselines.ts` | `buildStandBaselines()`, `classifyStand()`, `standGroup()` — relative big-stand rule |
 | `src/lib/playerStats.ts` | `getBreakthroughLeaders()` |
 | `src/components/leaderboard/BreakthroughLeaders.tsx` | Detailed → Breakthroughs charts |
 | `src/components/matches/ScorecardTables.tsx` | Per-match "Partnerships broken" block |
