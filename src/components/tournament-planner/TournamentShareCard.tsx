@@ -37,6 +37,8 @@ interface Booking {
   // Resolved server-side from match_stats_cache — null until a scorecard is
   // synced for this match, even for a game that's already been played.
   match_result: string | null
+  // Game is over: ended, or scorecard synced (src/lib/matchCompletion.ts).
+  played: boolean
 }
 
 interface Tournament {
@@ -72,8 +74,8 @@ export function TournamentShareCard({
   waNumber: string
 }) {
   const sorted     = [...bookings].sort((a, b) => a.game_date.localeCompare(b.game_date))
-  const completed  = sorted.filter(g => g.game_date < today)
-  const scheduled  = sorted.filter(g => g.game_date >= today)
+  const completed  = sorted.filter(g => g.played)
+  const scheduled  = sorted.filter(g => !g.played)
   const totalLeague = tournament.total_league_games ?? sorted.length
   const unbooked    = Math.max(0, totalLeague - sorted.length)
 
@@ -257,7 +259,7 @@ export function TournamentShareCard({
             const d       = parseISO(g.game_date)
             const dayName = d.getDay() === 6 ? 'Sat' : 'Sun'
             const gap     = gameGaps[i]
-            const isDone  = g.game_date < today
+            const isDone  = g.played
             // Fixed-width first/third columns (not `auto`) so the divider
             // between them lines up across rows — each row is its own grid
             // (a separate element per game), so an `auto` track sizes to that

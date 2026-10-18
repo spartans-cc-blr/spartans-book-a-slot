@@ -829,3 +829,7 @@ Captains rarely use this page; it is mainly the admin/organiser's view of which 
 7. **Ask to slow down** (everyone) — playing roughly weekly.
 
 These prompts depend on knockout bookings being flagged `stage_type = 'knockout'` (the Game Type toggle on the booking form); an unflagged knockout is counted as a league game.
+
+## 13. Played vs scheduled follows /fixtures (October 2026)
+
+Every completed/scheduled split on `/tournament-planner` and its public share card used `game_date < today`, so a game played today (e.g. Mario Turner Flash 5) stayed "scheduled" — in the Upcoming tab, captain bandwidth "outstanding", the collapsed bar and the timeline — until the next day, even after it vanished from Upcoming Fixtures. Each booking now carries a server-computed `played` flag from `isCompletedMatch()` (`src/lib/matchCompletion.ts`): the game's estimated end time has passed **or** its scorecard has synced. `page.tsx` and `share/[tournamentId]/page.tsx` set it (one `scorecard_uploads` lookup for today's bookings), and `TournamentPlannerClient.tsx` / `TournamentShareCard.tsx` read `g.played` instead of comparing dates (Upcoming/Past Matches tabs, bandwidth counts, `assessPace()` incl. league-done and knockout prompts, "Players represented"). A played game whose scorecard hasn't synced yet shows under Past Matches without a result badge until it syncs. Same rule as the admin Matches tab (`admin-matches-view.md` §2.1).

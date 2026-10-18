@@ -25,6 +25,9 @@ interface Booking {
   // Resolved server-side from match_stats_cache — null until a scorecard is
   // synced for this match, even for a game that's already been played.
   match_result: string | null
+  // Game is over: ended, or its scorecard has synced (server-computed,
+  // src/lib/matchCompletion.ts). Use this, not a game_date comparison.
+  played: boolean
   tournament: {
     id: string
     name: string
@@ -253,19 +256,19 @@ function assessPace(tournament: TournamentInfo, games: Booking[], today: string,
   const gap          = avgGapWeeks(dates)
   const unbooked     = Math.max(0, totalLeague - leagueGames.length)
   const lastGameDate = dates.length > 0 ? dates[dates.length - 1] : today
-  const hasUpcoming  = games.some(g => g.game_date >= today)
-  const nextGameDate = dates.find(d => d >= today) ?? null
+  const hasUpcoming  = games.some(g => !g.played)
+  const nextGameDate = games.filter(g => !g.played).map(g => g.game_date).sort()[0] ?? null
   const daysQuiet    = lastGameDate < today ? differenceInDays(parseISO(today), parseISO(lastGameDate)) : 0
   const weeksQuiet   = Math.round(daysQuiet / 7)
   const leagueDone   = tournament.total_league_games != null
-    && leagueGames.filter(g => g.game_date < today).length >= totalLeague
+    && leagueGames.filter(g => g.played).length >= totalLeague
   const dormant      = dates.length > 0 && !hasUpcoming && daysQuiet > DORMANT_DAYS
   const pace         = paceSignal(gap, unbooked, lastGameDate, today)
 
   // Latest game, if it is a knockout we have already played, and how it went
   // (match_result comes from the synced scorecard; null until synced).
   const lastGame = [...games].sort((a, b) => a.game_date.localeCompare(b.game_date) || a.slot_time.localeCompare(b.slot_time)).pop()
-  const koPlayed = !!lastGame && lastGame.stage_type === 'knockout' && lastGame.game_date < today
+  const koPlayed = !!lastGame && lastGame.stage_type === 'knockout' && lastGame.played
   const koResult = koPlayed ? (lastGame!.match_result ?? '').toLowerCase() : ''
   const koWon    = koResult.includes('won')
   const koLost   = koResult.includes('lost')
@@ -365,8 +368,8 @@ function BandwidthSection({
     })
     const tournamentBreakdown = Array.from(byTournament.values())
       .map(({ tournament: t, games }) => {
-        const played      = games.filter(g => g.game_date < today).length
-        const outstanding = games.filter(g => g.game_date >= today).length
+        const played      = games.filter(g => g.played).length
+        const outstanding = games.filter(g => !g.played).length
         const assessment  = assessPace(t, games, today, isAdmin)
         return { tournament: t, played, outstanding, unbooked: assessment.unbooked, assessment }
       })
@@ -383,8 +386,8 @@ function BandwidthSection({
     // Made explicit in the UI caption below so this isn't a silent filter.
     const ongoingTournamentIds = new Set(tournamentBreakdown.map(({ tournament }) => tournament.id))
     const mine      = allMine.filter(b => ongoingTournamentIds.has(b.tournament!.id))
-    const completed = mine.filter(b => b.game_date < today)
-    const scheduled = mine.filter(b => b.game_date >= today)
+    const completed = mine.filter(b => b.played)
+    const scheduled = mine.filter(b => !b.played)
 
     // Summed per-tournament (each clamped at 0 individually) rather than a
     // single aggregate subtraction — an aggregate sum lets one over-booked
@@ -816,8 +819,8 @@ function TournamentBlock({
     if (forceOpenToken !== undefined) setOpen(true)
   }, [forceOpenToken])
 
-  const completed = games.filter(g => g.game_date < today)
-  const scheduled = games.filter(g => g.game_date >= today)
+  const completed = games.filter(g => g.played)
+  const scheduled = games.filter(g => !g.played)
   const [totalLeagueGames, setTotalLeagueGames] = useState<number | null>(
     tournament.total_league_games ?? null
   )
@@ -955,7 +958,7 @@ function TournamentBlock({
         <div className="px-4 pb-3">
           <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-parchment-3 dark:bg-ink-4 mt-1">
             {sortedGames.map(g => (
-              <div key={g.id} className={`flex-1 ${g.game_date < today ? 'bg-emerald-600' : 'bg-amber-600'}`} />
+              <div key={g.id} className={`flex-1 ${g.played ? 'bg-emerald-600' : 'bg-amber-600'}`} />
             ))}
             {Array.from({ length: unbooked }).map((_, i) => (
               <div key={`u${i}`} className="flex-1 bg-stone-400 opacity-50" />
@@ -1473,7 +1476,7 @@ export function TournamentPlannerClient({
   const classifiedTournaments = useMemo(() =>
     Array.from(tournamentMap.values())
       .map(({ tournament, games }) => {
-        const playedGames = games.filter(g => g.game_date < today)
+        const playedGames = games.filter(g => g.played)
         // Completed only ever by an explicit admin flag.
         const tab: TournamentTab = tournament.completed_at ? 'completed' : playedGames.length === 0 ? 'upcoming' : 'ongoing'
         const assessment = assessPace(tournament, games, today, viewerRole.isAdmin)
@@ -1510,7 +1513,7 @@ export function TournamentPlannerClient({
     const leagueLeft = (t: typeof classifiedTournaments[number]) => {
       const total = t.tournament.total_league_games
       if (total == null) return NONE
-      const played = t.games.filter(g => g.stage_type !== 'knockout' && g.game_date < today).length
+      const played = t.games.filter(g => g.stage_type !== 'knockout' && g.played).length
       return Math.max(0, total - played)
     }
     const byName = (a: typeof classifiedTournaments[number], b: typeof classifiedTournaments[number]) =>
