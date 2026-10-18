@@ -2,7 +2,7 @@
 
 import { PlayerNameLink } from '@/lib/playerLink'
 import { computePartnerships } from '@/lib/partnerships'
-import { computeBreakthroughs, summariseBreakers, BIG_STAND_RUNS } from '@/lib/breakthroughs'
+import { computeBreakthroughs, summariseBreakers } from '@/lib/breakthroughs'
 
 interface SquadRef {
   player_id:      string
@@ -500,7 +500,7 @@ export function ScorecardTables({
           {breakers.length > 0 && (
             <p className="font-rajdhani text-xs text-[var(--scorecard-text-faint)] mt-2 flex flex-wrap items-baseline gap-x-2">
               {breakers.map(br => (
-                <span key={br.bowlerName} title={`${br.bigBreaks} stand${br.bigBreaks === 1 ? '' : 's'} of ${BIG_STAND_RUNS}+`}>
+                <span key={br.bowlerName} title={`${br.standRuns} runs in the stands broken`}>
                   {firstName(br.bowlerName)} <span className="font-semibold text-[var(--scorecard-text-2)]">{br.broken}</span>
                 </span>
               ))}

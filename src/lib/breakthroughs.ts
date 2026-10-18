@@ -39,9 +39,6 @@ export interface Breakthrough {
   unbroken:      boolean
 }
 
-// A stand this size or bigger counts as a "big" breakthrough.
-export const BIG_STAND_RUNS = 30
-
 // CricHeroes "overs.balls" (9.2 = 9 overs 2 balls). Parsed as a string —
 // float maths on 9.2 loses precision (same reason as partnershipLeaders.ts).
 export function oversToBalls(over: number | string): number {
@@ -108,7 +105,6 @@ export function computeBreakthroughs(
 export interface BowlerBreaks {
   bowlerName: string
   broken:     number   // stands ended
-  bigBreaks:  number   // of those, stands of BIG_STAND_RUNS+
   standRuns:  number   // total runs in the stands broken
 }
 
@@ -118,12 +114,11 @@ export function summariseBreakers(stands: Breakthrough[]): BowlerBreaks[] {
   for (const s of stands) {
     if (!s.bowlerName) continue
     const key = s.bowlerName.toLowerCase()
-    const cur = map.get(key) ?? { bowlerName: s.bowlerName, broken: 0, bigBreaks: 0, standRuns: 0 }
+    const cur = map.get(key) ?? { bowlerName: s.bowlerName, broken: 0, standRuns: 0 }
     cur.broken += 1
     cur.standRuns += s.runs
-    if (s.runs >= BIG_STAND_RUNS) cur.bigBreaks += 1
     map.set(key, cur)
   }
   return Array.from(map.values()).sort((a, b) =>
-    b.broken - a.broken || b.bigBreaks - a.bigBreaks || a.standRuns - b.standRuns || a.bowlerName.localeCompare(b.bowlerName))
+    b.broken - a.broken || a.standRuns - b.standRuns || a.bowlerName.localeCompare(b.bowlerName))
 }

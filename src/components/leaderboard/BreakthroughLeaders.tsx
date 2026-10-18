@@ -9,7 +9,6 @@
 import Link from 'next/link'
 import { PlayerNameLink } from '@/lib/playerLink'
 import type { BreakthroughLeaders, BreakthroughRecord, PartnershipLeaderPlayer } from '@/types'
-import { BIG_STAND_RUNS } from '@/lib/breakthroughs'
 
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
@@ -80,28 +79,44 @@ function RecordCaption({ r }: { r: BreakthroughRecord }) {
     : <>{parts}</>
 }
 
+function CoverageNote({ matches, withData }: { matches: number; withData: number }) {
+  if (matches <= withData) return null
+  return (
+    <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mb-3">
+      Based on {withData} of {matches} matches in this filter. Older matches don&apos;t have the opponent&apos;s fall of wickets yet, so totals here can be lower than a bowler&apos;s full wicket count.
+    </p>
+  )
+}
+
 export function BreakthroughLeadersView({ leaders }: { leaders: BreakthroughLeaders }) {
   if (leaders.breakers.length === 0) {
     return (
       <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded p-6 text-center font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">
-        No breakthrough data for this filter yet — it appears once a match&apos;s opponent Fall of Wickets has been synced.
+        No breakthrough data for this filter yet — it appears once a match&apos;s opponent Fall of Wickets has been synced
+        {leaders.coverage.matches > 0 && ` (0 of ${leaders.coverage.matches} matches have it).`}
       </div>
     )
   }
-  const brokenMax = leaders.breakers[0]?.broken ?? 0
+  const brokenMax = leaders.breakers.reduce((m, b) => Math.max(m, b.bigBreaks), 0)
   const biggestMax = leaders.biggest[0]?.runs ?? 0
 
   return (
     <div>
-      <Card title={`Top ${leaders.breakers.length} Partnership Breakers`} subtitle="Opponent stands ended by each bowler, for the current filter. Run-outs aren't credited to a bowler.">
+      <CoverageNote {...leaders.coverage} />
+      <Card title={`Top ${leaders.breakers.length} Partnership Breakers`} subtitle="Ranked by big stands ended — a stand in the top quarter for its batting position and format. Run-outs aren't credited to a bowler.">
         {leaders.breakers.map((b, i) => (
           <Bar
             key={b.bowler.playerId ?? b.bowler.playerName}
             label={`${i + 1}`}
             player={b.bowler}
-            pct={pctOf(b.broken, brokenMax)}
-            value={`${b.broken}`}
-            caption={`${b.matches} match${b.matches === 1 ? '' : 'es'} · ${b.bigBreaks} big (${BIG_STAND_RUNS}+) · avg stand ${(b.standRuns / b.broken).toFixed(1)}`}
+            pct={pctOf(b.bigBreaks, brokenMax)}
+            value={`${b.bigBreaks}`}
+            sub={`of ${b.broken}`}
+            caption={[
+              `${b.matches} match${b.matches === 1 ? '' : 'es'}`,
+              `${b.abovePar >= 0 ? '+' : ''}${b.abovePar.toFixed(0)} runs vs par`,
+              b.ballsBowled > 0 ? `${(b.bigBreaks / (b.ballsBowled / 60)).toFixed(1)} big / 10 ov` : null,
+            ].filter(Boolean).join(' · ')}
           />
         ))}
       </Card>

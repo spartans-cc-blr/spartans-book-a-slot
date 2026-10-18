@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeBreakthroughs, summariseBreakers, oversToBalls } from './breakthroughs'
 import { aggregateBreakthroughLeaders } from './breakthroughLeaders'
+import { buildStandBaselines, classifyStand, standGroup, MIN_BASELINE_SAMPLE } from './standBaselines'
 
 const row = (n: number, score: number, over: number, out: string, bowler: string | null, type = 'bowled') =>
   ({ wicket_number: n, team_score: score, over, player_name: out, bowler_name: bowler, dismissal_type: type })
@@ -59,26 +60,76 @@ describe('summariseBreakers', () => {
       [row(1, 40, 5, 'A', 'Ramesh'), row(2, 45, 6, 'B', null, 'run_out'), row(3, 100, 12, 'C', 'Ramesh'), row(4, 110, 13, 'D', 'Sagar')],
       { total: 140, overs: 16, wickets: 4 })
     expect(summariseBreakers(s)).toEqual([
-      { bowlerName: 'Ramesh', broken: 2, bigBreaks: 2, standRuns: 95 },
-      { bowlerName: 'Sagar', broken: 1, bigBreaks: 0, standRuns: 10 },
+      { bowlerName: 'Ramesh', broken: 2, standRuns: 95 },
+      { bowlerName: 'Sagar', broken: 1, standRuns: 10 },
     ])
   })
 })
 
+describe('standGroup', () => {
+  it('buckets wickets into openers, top, middle and tail', () => {
+    expect([1, 2, 3, 4, 5, 8, 9, 10, 11].map(standGroup))
+      .toEqual(['openers', 'openers', 'top', 'top', 'middle', 'middle', 'tail', 'tail', 'tail'])
+  })
+})
+
+describe('stand baselines', () => {
+  // 25 T20 openers' stands 1..25 runs; 25 T30 openers' stands 11..35.
+  const mk = (format: string, start: number) => ({
+    format,
+    stands: Array.from({ length: 25 }, (_, i) => ({
+      wicketNumber: 1, runs: start + i, balls: 10, overFrom: 0, overTo: 1, outBatter: 'x', bowlerName: 'b', dismissalType: 'bowled', unbroken: false,
+    })),
+  })
+  const b = buildStandBaselines([mk('T20', 1), mk('T30', 11)])
+
+  it('judges a stand against its own format and slot', () => {
+    expect(classifyStand(b, 'T20', 1, 25).big).toBe(true)    // top quarter of 1..25
+    expect(classifyStand(b, 'T30', 1, 25).big).toBe(false)   // ordinary in the T30 bucket
+    expect(classifyStand(b, 'T20', 9, 30).big).toBe(false)   // no tail data at all
+  })
+
+  it('reports runs above the bucket average', () => {
+    expect(classifyStand(b, 'T20', 2, 23).abovePar).toBeCloseTo(23 - 13, 5)
+  })
+
+  it('falls back to all formats for a thin bucket and ignores unbroken stands', () => {
+    const thin = buildStandBaselines([{ format: 'T20', stands: [{ wicketNumber: 1, runs: 99, balls: 1, overFrom: 0, overTo: 1, outBatter: null, bowlerName: null, dismissalType: null, unbroken: true }] }])
+    expect(thin).toEqual({})
+    expect(MIN_BASELINE_SAMPLE).toBe(20)
+    const mixed = buildStandBaselines([mk('T20', 1)])
+    expect(classifyStand(mixed, 'T30', 1, 20).big).toBe(true) // T30 has no bucket → all-formats
+  })
+
+  it('treats nothing as big without baselines', () => {
+    expect(classifyStand(null, 'T20', 1, 200)).toEqual({ big: false, abovePar: 0 })
+  })
+})
+
 describe('aggregateBreakthroughLeaders', () => {
+  const b0 = {
+    'all|openers': { n: 50, p75: 50, mean: 25 },
+    'all|top': { n: 50, p75: 50, mean: 25 },
+  }
   const stands = computeBreakthroughs(
     [row(1, 40, 5, 'A', 'Ramesh'), row(2, 100, 12, 'B', 'Sagar'), row(3, 110, 13, 'C', 'Ramesh')],
     { total: 110, overs: 13, wickets: 3 })
   const resolve = (name: string) => ({ playerId: name === 'Ramesh' ? 'r1' : null, playerName: name, cricheroesUrl: null })
   const out = aggregateBreakthroughLeaders([
-    { matchId: 'm1', bookingId: 'b1', gameDate: '2026-10-01', opponentName: 'X', stands },
-    { matchId: 'm2', bookingId: 'b2', gameDate: '2026-10-08', opponentName: 'Y', stands },
-  ], resolve)
+    { matchId: 'm1', bookingId: 'b1', gameDate: '2026-10-01', format: 'T20', opponentName: 'X', stands },
+    { matchId: 'm2', bookingId: 'b2', gameDate: '2026-10-08', format: 'T20', opponentName: 'Y', stands },
+  ], resolve, { baselines: b0, ballsFor: x => (x.playerName === 'Ramesh' ? 120 : 0) })
 
-  it('ranks by stands broken', () => {
-    expect(out.breakers[0]).toMatchObject({ broken: 4, matches: 2, bigBreaks: 2 })
-    expect(out.breakers[0].bowler.playerName).toBe('Ramesh')
-    expect(out.breakers[1].bowler.playerName).toBe('Sagar')
+  it('ranks by big breaks, then runs above par', () => {
+    // Sagar's one stand (60, wkt 2) is big; Ramesh's 40 (wkt 1) and 10 (wkt 3) are not.
+    expect(out.breakers[0].bowler.playerName).toBe('Sagar')
+    expect(out.breakers[0]).toMatchObject({ broken: 2, bigBreaks: 2, matches: 2 })
+    expect(out.breakers[1]).toMatchObject({ broken: 4, bigBreaks: 0, ballsBowled: 120 })
+  })
+
+  it('needs minBreaks to rank', () => {
+    const r = aggregateBreakthroughLeaders([{ matchId: 'm1', bookingId: 'b1', gameDate: null, format: 'T20', opponentName: null, stands }], resolve, { baselines: b0, minBreaks: 2 })
+    expect(r.breakers.map(x => x.bowler.playerName)).toEqual(['Ramesh'])
   })
 
   it('lists biggest stands first', () => {
