@@ -1671,7 +1671,7 @@ A sixth Detailed sub-tab (`category=breakthroughs`, a `DetailedCategory`, not a 
 
 ### Coverage and security
 
-- Only matches synced since `opponent_fall_of_wickets` was introduced have data; older ones appear after a re-sync.
+- Only matches synced since `opponent_fall_of_wickets` was introduced have data; older ones appear after a re-sync. The tab shows a note, "Based on N of M matches in this filter" (`BreakthroughLeaders.coverage`: M = matches in scope, N = those with complete opponent FOW), whenever N < M, so totals aren't mistaken for a bowler's full wicket count.
 - Read-only: no new route, table or migration. The scorecard route keeps its existing auth (any signed-in, non-expelled member). Analytics reads are server-side with the service key.
 
 ### Not built

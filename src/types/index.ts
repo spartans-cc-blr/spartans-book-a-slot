@@ -433,6 +433,8 @@ export interface BreakthroughRecord {
 export interface BreakthroughLeaders {
   breakers: BreakerAggregate[]     // most stands broken
   biggest:  BreakthroughRecord[]   // biggest stands ended
+  // Matches in the current filter vs those with usable opponent fall of wickets.
+  coverage: { matches: number; withData: number }
 }
 
 export interface RecentForm {

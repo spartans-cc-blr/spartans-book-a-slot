@@ -1229,9 +1229,9 @@ export async function getPartnershipLeaders(
 export async function getBreakthroughLeaders(
   filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
 ): Promise<BreakthroughLeaders> {
-  const empty: BreakthroughLeaders = { breakers: [], biggest: [] }
   const scoped = await getScopedMatchIds(filters)
-  if (scoped && scoped.length === 0) return empty
+  const emptyWith = (matches: number): BreakthroughLeaders => ({ breakers: [], biggest: [], coverage: { matches, withData: 0 } })
+  if (scoped && scoped.length === 0) return emptyWith(0)
 
   const analytics = createAnalyticsClient()
   if (!analytics) throw new Error('Analytics database is not configured')
@@ -1250,7 +1250,8 @@ export async function getBreakthroughLeaders(
   ])
   const fowByMatch = groupBy(fowRows as any[], r => r.match_id)
   const matchIds = Array.from(fowByMatch.keys())
-  if (matchIds.length === 0) return empty
+  const totalMatches = scoped ? scoped.length : (summaryRows as any[]).length
+  if (matchIds.length === 0) return emptyWith(totalMatches)
   const summaryByMatch = new Map((summaryRows as any[]).map(r => [r.match_id, r]))
 
   const bowlingRows = await fetchAllRows(() =>
@@ -1286,7 +1287,7 @@ export async function getBreakthroughLeaders(
     const booking = bookingByMatch.get(matchId) as any
     perMatch.push({ matchId, bookingId: booking?.id ?? null, gameDate: booking?.game_date ?? null, opponentName: booking?.opponent_name ?? null, stands })
   }
-  if (perMatch.length === 0) return empty
+  if (perMatch.length === 0) return emptyWith(totalMatches)
 
   const { data: players, error: pErr } = playerIds.size
     ? await hub.from('players').select('id, name, cricheroes_url').in('id', Array.from(playerIds))
@@ -1296,13 +1297,14 @@ export async function getBreakthroughLeaders(
 
   // An unreconciled bowler is kept under their scorecard name (unlinked),
   // grouped by normalised name — dropping them would hide real breaks.
-  return aggregateBreakthroughLeaders(perMatch, (name, matchId) => {
+  const leaders = aggregateBreakthroughLeaders(perMatch, (name, matchId) => {
     const id = bowlerIdByKey.get(`${matchId}|${norm(name)}`)
     const hubPlayer = id ? playerById.get(id) as any : null
     return hubPlayer
       ? { playerId: hubPlayer.id, playerName: hubPlayer.name, cricheroesUrl: hubPlayer.cricheroes_url ?? null }
       : { playerId: null, playerName: name, cricheroesUrl: null }
   })
+  return { ...leaders, coverage: { matches: totalMatches, withData: perMatch.length } }
 }
 
 // Distinct 'YYYY-MM' months that have at least one confirmed, synced

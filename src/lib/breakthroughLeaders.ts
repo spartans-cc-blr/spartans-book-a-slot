@@ -26,7 +26,7 @@ export function aggregateBreakthroughLeaders(
   matches: MatchBreakthroughs[],
   resolveBowler: (scorecardName: string, matchId: string) => PartnershipLeaderPlayer,
   opts: { breakers?: number; biggest?: number } = {},
-): BreakthroughLeaders {
+): Omit<BreakthroughLeaders, 'coverage'> {
   const agg = new Map<string, BreakerAggregate & { matchIds: Set<string> }>()
   const records: BreakthroughRecord[] = []
 
