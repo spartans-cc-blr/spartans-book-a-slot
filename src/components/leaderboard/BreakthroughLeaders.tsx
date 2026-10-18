@@ -2,8 +2,8 @@
 // /leaderboard → Detailed → Breakthroughs. Opponent batting stands ended by
 // Spartans bowlers, same scope/filters as every other Detailed tab
 // (getBreakthroughLeaders() in src/lib/playerStats.ts). Two bar charts:
-//   1. Most stands broken (with big breaks — 30+ run stands — and avg stand)
-//   2. Biggest stands ended
+//   1. Biggest 10 stands broken
+//   2. Biggest stand broken for each wicket, credited to the bowler
 // Same bar treatment as PartnershipLeaders.tsx. See features/partnerships.md §13.
 
 import Link from 'next/link'
@@ -36,7 +36,7 @@ function Bar({ label, player, pct, value, sub, caption }: {
   return (
     <div>
       <div className="flex items-center gap-2">
-        <span className="font-cinzel text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 w-6 flex-shrink-0 text-right">{label}</span>
+        <span className="font-cinzel text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 w-8 flex-shrink-0 text-right">{label}</span>
         <div className="flex-1 min-w-0 relative h-7 bg-[var(--stats-row-bg)] dark:bg-ink-4 rounded overflow-hidden">
           <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
           <div className="absolute inset-0 flex items-center px-2.5 min-w-0">
@@ -51,7 +51,7 @@ function Bar({ label, player, pct, value, sub, caption }: {
         </span>
       </div>
       {caption && (
-        <div className="pl-8 pr-[4.5rem] mt-0.5 font-rajdhani text-[11px] text-[var(--stats-text-muted)] dark:text-zinc-500 truncate">{caption}</div>
+        <div className="pl-10 pr-[4.5rem] mt-0.5 font-rajdhani text-[11px] text-[var(--stats-text-muted)] dark:text-zinc-500 truncate">{caption}</div>
       )}
     </div>
   )
@@ -89,7 +89,7 @@ function CoverageNote({ matches, withData }: { matches: number; withData: number
 }
 
 export function BreakthroughLeadersView({ leaders }: { leaders: BreakthroughLeaders }) {
-  if (leaders.breakers.length === 0) {
+  if (leaders.biggest.length === 0) {
     return (
       <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded p-6 text-center font-rajdhani text-sm text-[var(--stats-text-muted)] dark:text-zinc-500">
         No breakthrough data for this filter yet — it appears once a match&apos;s opponent Fall of Wickets has been synced
@@ -97,38 +97,34 @@ export function BreakthroughLeadersView({ leaders }: { leaders: BreakthroughLead
       </div>
     )
   }
-  const brokenMax = leaders.breakers.reduce((m, b) => Math.max(m, b.bigBreaks), 0)
   const biggestMax = leaders.biggest[0]?.runs ?? 0
+  const wicketMax = leaders.byWicket.reduce((m, r) => Math.max(m, r.runs), 0)
 
   return (
     <div>
       <CoverageNote {...leaders.coverage} />
-      <Card title={`Top ${leaders.breakers.length} Partnership Breakers`} subtitle="Ranked by big stands ended — a stand in the top quarter for its batting position and format. Run-outs aren't credited to a bowler.">
-        {leaders.breakers.map((b, i) => (
+      <Card title={`Biggest ${leaders.biggest.length} Stands Broken`} subtitle="Largest opponent partnerships ended by a Spartans bowler. Run-outs aren't credited to a bowler.">
+        {leaders.biggest.map((r, i) => (
           <Bar
-            key={b.bowler.playerId ?? b.bowler.playerName}
+            key={`${r.matchId}-${r.wicketNumber}`}
             label={`${i + 1}`}
-            player={b.bowler}
-            pct={pctOf(b.bigBreaks, brokenMax)}
-            value={`${b.bigBreaks}`}
-            sub={`of ${b.broken}`}
-            caption={[
-              `${b.matches} match${b.matches === 1 ? '' : 'es'}`,
-              `${b.abovePar >= 0 ? '+' : ''}${b.abovePar.toFixed(0)} runs vs par`,
-              b.ballsBowled > 0 ? `${(b.bigBreaks / (b.ballsBowled / 60)).toFixed(1)} big / 10 ov` : null,
-            ].filter(Boolean).join(' · ')}
+            player={r.bowler}
+            pct={pctOf(r.runs, biggestMax)}
+            value={`${r.runs}`}
+            sub={r.balls != null ? `(${r.balls})` : null}
+            caption={<RecordCaption r={r} />}
           />
         ))}
       </Card>
 
-      {leaders.biggest.length > 0 && (
-        <Card title={`Biggest ${leaders.biggest.length} Stands Broken`} subtitle="Largest opponent partnerships ended by a Spartans bowler.">
-          {leaders.biggest.map((r, i) => (
+      {leaders.byWicket.length > 0 && (
+        <Card title="Biggest Stand Broken for Each Wicket" subtitle="The largest stand for each wicket, credited to the bowler who ended it.">
+          {leaders.byWicket.map(r => (
             <Bar
-              key={`${r.matchId}-${r.wicketNumber}`}
-              label={`${i + 1}`}
+              key={`w${r.wicketNumber}`}
+              label={ordinal(r.wicketNumber)}
               player={r.bowler}
-              pct={pctOf(r.runs, biggestMax)}
+              pct={pctOf(r.runs, wicketMax)}
               value={`${r.runs}`}
               sub={r.balls != null ? `(${r.balls})` : null}
               caption={<RecordCaption r={r} />}

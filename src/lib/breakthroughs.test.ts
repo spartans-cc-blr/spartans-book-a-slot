@@ -107,33 +107,28 @@ describe('stand baselines', () => {
 })
 
 describe('aggregateBreakthroughLeaders', () => {
-  const b0 = {
-    'all|openers': { n: 50, p75: 50, mean: 25 },
-    'all|top': { n: 50, p75: 50, mean: 25 },
-  }
   const stands = computeBreakthroughs(
-    [row(1, 40, 5, 'A', 'Ramesh'), row(2, 100, 12, 'B', 'Sagar'), row(3, 110, 13, 'C', 'Ramesh')],
+    [row(1, 40, 5, 'A', 'Ramesh'), row(2, 100, 12, 'B', 'Sagar'), row(3, 110, 13, 'C', null, 'run_out')],
     { total: 110, overs: 13, wickets: 3 })
+  const standsB = computeBreakthroughs(
+    [row(1, 70, 8, 'A', 'Sagar'), row(2, 90, 11, 'B', 'Ramesh')],
+    { total: 90, overs: 11, wickets: 2 })
   const resolve = (name: string) => ({ playerId: name === 'Ramesh' ? 'r1' : null, playerName: name, cricheroesUrl: null })
   const out = aggregateBreakthroughLeaders([
-    { matchId: 'm1', bookingId: 'b1', gameDate: '2026-10-01', format: 'T20', opponentName: 'X', stands },
-    { matchId: 'm2', bookingId: 'b2', gameDate: '2026-10-08', format: 'T20', opponentName: 'Y', stands },
-  ], resolve, { baselines: b0, ballsFor: x => (x.playerName === 'Ramesh' ? 120 : 0) })
+    { matchId: 'm1', bookingId: 'b1', gameDate: '2026-10-01', opponentName: 'X', stands },
+    { matchId: 'm2', bookingId: 'b2', gameDate: '2026-10-08', opponentName: 'Y', stands: standsB },
+  ], resolve)
 
-  it('ranks by big breaks, then runs above par', () => {
-    // Sagar's one stand (60, wkt 2) is big; Ramesh's 40 (wkt 1) and 10 (wkt 3) are not.
-    expect(out.breakers[0].bowler.playerName).toBe('Sagar')
-    expect(out.breakers[0]).toMatchObject({ broken: 2, bigBreaks: 2, matches: 2 })
-    expect(out.breakers[1]).toMatchObject({ broken: 4, bigBreaks: 0, ballsBowled: 120 })
-  })
-
-  it('needs minBreaks to rank', () => {
-    const r = aggregateBreakthroughLeaders([{ matchId: 'm1', bookingId: 'b1', gameDate: null, format: 'T20', opponentName: null, stands }], resolve, { baselines: b0, minBreaks: 2 })
-    expect(r.breakers.map(x => x.bowler.playerName)).toEqual(['Ramesh'])
-  })
-
-  it('lists biggest stands first', () => {
-    expect(out.biggest[0]).toMatchObject({ runs: 60, wicketNumber: 2 })
+  it('lists biggest stands first, skipping run-outs', () => {
+    expect(out.biggest.map(r => r.runs)).toEqual([70, 60, 40, 20])
     expect(out.biggest[0].bowler.playerName).toBe('Sagar')
+    expect(out.biggest.some(r => r.runs === 10)).toBe(false)
+  })
+
+  it('picks the biggest stand for each wicket, credited to its bowler', () => {
+    expect(out.byWicket.map(r => r.wicketNumber)).toEqual([1, 2])
+    expect(out.byWicket[0]).toMatchObject({ runs: 70, matchId: 'm2' })
+    expect(out.byWicket[0].bowler.playerName).toBe('Sagar')
+    expect(out.byWicket[1]).toMatchObject({ runs: 60, matchId: 'm1' })
   })
 })
