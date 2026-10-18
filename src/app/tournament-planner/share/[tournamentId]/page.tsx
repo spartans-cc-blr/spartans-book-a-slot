@@ -6,6 +6,7 @@ import { TournamentShareCard } from '@/components/tournament-planner/TournamentS
 import { getSuggestedOpenDates, getSuggestedSlotDates } from '@/lib/suggestedSlots'
 import type { SuggestedDate, SuggestedSlotBucket } from '@/lib/suggestedSlots'
 import type { Metadata } from 'next'
+import { istToday, isCompletedMatch, getSyncedBookingIds } from '@/lib/matchCompletion'
 
 // Fixed regardless of the tournament's own unbooked count — this is a
 // "here's what's open soon" nudge for the organiser, not an exhaustive
@@ -92,12 +93,17 @@ export default async function TournamentSharePage({
     : { data: [] }
   const resultByMatchId = new Map((statsRows ?? []).map(r => [r.match_id, r.match_result]))
 
+  // `played`: ended or scorecard synced — same rule as /fixtures and the
+  // internal planner (src/lib/matchCompletion.ts).
+  const today = istToday()
+  const syncedToday = await getSyncedBookingIds(
+    supabase, (rawBookings ?? []).filter(b => b.game_date >= today).map(b => b.id),
+  )
   const bookings = (rawBookings ?? []).map(b => ({
     ...b,
     match_result: b.match_id ? resultByMatchId.get(b.match_id) ?? null : null,
+    played: isCompletedMatch(b, today, syncedToday),
   }))
-
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 
   // Self-service tournaments get one recommendation per deficient slot
   // bucket (getSuggestedSlotDates — see src/lib/suggestedSlots.ts), matching

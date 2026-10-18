@@ -8,6 +8,7 @@ import { getLeaderboardsByTournament } from '@/lib/playerStats'
 import type { Metadata } from 'next'
 import type { PlayerStatsTotals } from '@/types'
 import { KNOCKOUT_HOLD_REASON, isInformalFormat } from '@/types'
+import { istToday, isCompletedMatch, getSyncedBookingIds } from '@/lib/matchCompletion'
 
 export const metadata: Metadata = { title: 'Tournament Planner — Spartans CC' }
 export const revalidate = 0
@@ -164,11 +165,20 @@ export default async function TournamentPlannerPage() {
 
   const resultByMatchId = new Map((statsRows ?? []).map(r => [r.match_id, r.match_result]))
 
+  // `played` = the game is over: its end time has passed or its scorecard has
+  // synced (same rule as /fixtures, see src/lib/matchCompletion.ts). Every
+  // completed/scheduled split on this page reads it instead of comparing dates.
+  const today = istToday()
+  const syncedToday = await getSyncedBookingIds(
+    supabase, normalizedBookings.filter(b => b.game_date >= today).map(b => b.id),
+  )
   const bookings = normalizedBookings.map(b => ({
     ...b,
     match_result: b.match_id ? resultByMatchId.get(b.match_id) ?? null : null,
+    played: isCompletedMatch(b, today, syncedToday),
   })) as unknown as Array<{
     id: string
+    played: boolean
     game_date: string
     slot_time: string
     format: string | null
@@ -194,8 +204,6 @@ export default async function TournamentPlannerPage() {
     } | null
   }>
 
-  const today = new Date().toISOString().split('T')[0]
-
   const knockoutHoldsByTournament: Record<string, { game_date: string; slot_time: string }> = {}
   for (const row of knockoutRows ?? []) {
     if (row.tournament_id && !knockoutHoldsByTournament[row.tournament_id]) {
@@ -206,10 +214,10 @@ export default async function TournamentPlannerPage() {
   // Players represented per tournament + per-booking squad captain — dedupe + sort,
   // sourced from announced squads only. "Players represented" is specifically a
   // history of who has actually played, so it's restricted to past bookings
-  // (game_date < today) — bookingCaptainMap stays unrestricted since it also
+  // (`played`: ended or scorecard synced) — bookingCaptainMap stays unrestricted since it also
   // feeds the captain badge on upcoming/today's fixtures, not just past ones.
   const bookingToTournamentId = new Map(bookings.map(b => [b.id, b.tournament?.id ?? null]))
-  const pastBookingIds = new Set(bookings.filter(b => b.game_date < today).map(b => b.id))
+  const pastBookingIds = new Set(bookings.filter(b => b.played).map(b => b.id))
 
   const tournamentPlayersMap: Record<string, { id: string; name: string; cricheroes_url: string | null }[]> = {}
   const bookingCaptainMap: Record<string, { id: string; name: string; cricheroes_url: string | null }> = {}
@@ -303,7 +311,7 @@ export default async function TournamentPlannerPage() {
       // booking — either as the tournament's own default captain, or as a
       // per-booking override (see migration 066).
       const hasActiveBooking = bookings.some(
-        b => (b.tournament?.captain_id === myRecord.id || (b as any).captain_id === myRecord.id) && b.game_date >= today
+        b => (b.tournament?.captain_id === myRecord.id || (b as any).captain_id === myRecord.id) && !b.played
       )
       if (hasActiveBooking) {
         viewerCaptainId = myRecord.id
