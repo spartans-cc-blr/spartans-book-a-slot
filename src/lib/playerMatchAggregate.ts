@@ -40,6 +40,7 @@ export function aggregateMatchHistoryRows(rows: PlayerMatchHistoryRow[]): Player
   }
 
   let battingMvp = 0, bowlingMvp = 0, fieldingMvp = 0
+  const stands = { broken: 0, bigBreaks: 0, runs: 0 }
 
   for (const r of rows) {
     if (r.batting) {
@@ -73,6 +74,9 @@ export function aggregateMatchHistoryRows(rows: PlayerMatchHistoryRow[]): Player
         t.bestBowling = cand
       }
       bowlingMvp += r.bowling.mvpScore
+      stands.broken += r.bowling.standsBroken ?? 0
+      stands.bigBreaks += r.bowling.bigBreaks ?? 0
+      stands.runs += r.bowling.standRuns ?? 0
     }
     if (r.fielding) {
       t.catches += r.fielding.catches
@@ -89,6 +93,7 @@ export function aggregateMatchHistoryRows(rows: PlayerMatchHistoryRow[]): Player
   t.economy = t.ballsBowled > 0 ? round2(t.runsConceded / (t.ballsBowled / 6)) : null
   t.bowlingStrikeRate = t.wickets > 0 ? round2(t.ballsBowled / t.wickets) : null
 
+  t.standsBroken = stands
   t.battingMvp = round2(battingMvp)
   t.bowlingMvp = round2(bowlingMvp)
   t.fieldingMvp = round2(fieldingMvp)

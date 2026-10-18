@@ -1677,8 +1677,11 @@ A sixth Detailed sub-tab (`category=breakthroughs`, a `DetailedCategory`, not a 
 ### Not built
 
 - Opponent partner names (needs `opponent_team_list.batting_order`).
-- A "Stands broken" tile on a bowler's `/players/[id]/stats` page.
 - Opponent-side retirements.
+
+### Stands Broken tile — `/players/[id]/stats` (added October 2026)
+
+The Bowling column of the Summary card has a **Stands Broken** tile (count, with "N big · avg X.X" underneath). `getPlayerMatchHistory()` fetches `opponent_fall_of_wickets` for the matches the player bowled in, runs `computeBreakthroughs()` per match (opponent score from the already-fetched `match_stats`) and counts stands credited to the player's own `bowling_stats` name(s) (normalised, so an alias duplicate still matches). Each bowling row carries `standsBroken` / `bigBreaks` / `standRuns`; `aggregateMatchHistoryRows()` sums them into `PlayerStatsTotals.standsBroken`, so the tile follows the page's Year/Ground/Format/Pitch filters and the dismissal-slice selection like the other Bowling tiles. Matches without synced opponent FOW (or failing the completeness guard) contribute 0.
 
 ### File map
 
