@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   type BallRow, phaseOf, phaseBounds, phaseRangeLabel, oversForFormat, hasDefinedPhases, formatOvers, ballChip,
   groupOvers, phaseSplit, summariseBatters, summariseBowlers, summariseFielders, wicketRows,
-  bowlerRuns, isBowlerWicket, isDotForBowler, isDotForBatters, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver, derivePartnerships, repairDismissedBatters,
+  bowlerRuns, isBowlerWicket, isDotForBowler, isDotForBatters, strikeRate, economy, ballsForSide, howOut, ballLabel, fielderFromText, maxWicketsInOver, derivePartnerships, sameBatter, repairDismissedBatters,
 } from './ballByBall'
 
 let seq = 0
@@ -377,6 +377,25 @@ describe('derivePartnerships', () => {
     const rows = [b('A', 2), b('A', 1)]
     const s = derivePartnerships(rows, ['Z'])
     expect(s[0].batters[1]).toMatchObject({ name: 'Z', runs: 0, balls: 0 })
+  })
+
+  it('does not seat a scorecard spelling of a batter already named in the commentary', () => {
+    resetSeq()
+    // Scorecard says "Manoj B", commentary says "Manoj Balaji" (match 7948742)
+    const rows = [
+      b('Manoj Balaji', 2), b('JD', 1), b('Manoj Balaji', 0, { is_wicket: true, dismissed_batter: 'Manoj Balaji', dismissal_kind: 'caught' }),
+      b('JD', 4), b('Kiran', 1),
+    ]
+    const s = derivePartnerships(rows, ['Manoj B', 'JD', 'Kiran'])
+    expect(s[0].batters.map(x => x && x.name)).toEqual(['Manoj Balaji', 'JD'])
+    expect(s[1].batters.map(x => x && x.name)).toEqual(['Kiran', 'JD'])
+    expect(s.flatMap(x => x.batters).some(x => x?.name === 'Manoj B')).toBe(false)
+  })
+
+  it('sameBatter matches an initial or surname prefix, not different people', () => {
+    expect(sameBatter('Manoj B', 'Manoj Balaji')).toBe(true)
+    expect(sameBatter('Manoj Borse', 'Manoj Balaji')).toBe(false)
+    expect(sameBatter('Ravi K', 'Suresh Kumar')).toBe(false)
   })
 
   it('returns nothing for an empty innings', () => {
