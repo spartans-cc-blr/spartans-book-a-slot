@@ -1510,8 +1510,8 @@ and the `matchStatsSync.ts` fetch.
 
 | Item | Notes |
 |---|---|
-| Partnership-breaking derivation | Run `computePartnerships()`'s crease-pointer walk (or a sibling function) against the opponent's own batting order + `opponent_fall_of_wickets`, then surface `bowler_name` per broken partnership. Not built — see "Deliberately raw data only" above. |
-| Surface for the result | Explicitly deferred — a per-match scorecard annotation and a bowler career stat ("partnerships broken") were both discussed and neither was chosen; decide once the derivation above exists. |
+| Partnership-breaking derivation | ✅ Built October 2026 as a FOW-only derivation (no partner names) — see §13. The fuller version with named opponent batters still needs the opponent's batting order, which isn't stored. |
+| Surface for the result | ✅ Built October 2026 — per-match "Partnerships broken" block and Detailed → Breakthroughs on `/leaderboard` — see §13. A per-bowler tile on `/players/[id]/stats` is not built. |
 | Historical backfill | Every match synced before this shipped has `opponent_fall_of_wickets: NULL` in the cache and zero rows in the analytics table for that `match_id`, same "code merged is not the same as history re-run" caveat as `fall_of_wickets`/`bowling_order` before it — only a re-sync (manual "Sync Stats", or a `backfill-scorecards` re-run) picks it up. |
 
 ---
@@ -1636,6 +1636,61 @@ exposes either new column.
 | "% of wickets by batting style" computation | Not built — join `opponent_fall_of_wickets.batting_style` against `bowler_name`/`bowling_stats` at read time whenever this is wanted. |
 | Opponent batting style for non-dismissed batters | Would need a new opponent-side roster table — see "Not captured" above. Not requested. |
 | Historical backfill | Every match synced before this shipped has `batting_style: NULL` for every row on both tables — only a re-sync picks it up, same as every other column added to these tables. |
+
+---
+
+## 13. Partnerships broken — opponent stands ended by Spartans bowlers (added October 2026)
+
+Everything above (§1–§10, §12) is **Spartans batting**. This section is the other side: the **opponent's** innings and which **Spartans bowler** ended each stand. It uses `opponent_fall_of_wickets` (§11), which already carries `bowler_name`, `dismissal_type` and `fielder_name` per wicket.
+
+**FOW-only by design.** The opponent's batting order isn't stored (`opponent_team_list` has the XI, batting hand and captain flag, no order), so there are no partner names. A "stand" is the runs between consecutive FOW scores, labelled by the batter dismissed at its end. Adding `batting_order` to `opponent_team_list` would allow "A & B" labels later; nothing here depends on it.
+
+### Derivation — `src/lib/breakthroughs.ts` (pure, client-safe)
+
+- `computeBreakthroughs(opponentFow, finalScore)` → one `Breakthrough` per FOW row: wicket number, runs, balls (overs.balls parsed as a string), dismissed batter, dismissal type and credited bowler.
+- A bowler is credited only when `bowler_name` is present, so run-outs and unclassified dismissals carry none.
+- **Closing unbroken stand:** if the opponent's innings ended not-all-out (`opponent_wickets < 10`) and their final total exceeds the last FOW score, one extra stand is added with `unbroken: true` and no bowler. A zero-wicket innings gives one unbroken opening stand.
+- **Completeness guard:** if the opponent's `opponent_wickets` is known and doesn't equal the FOW row count, the function returns `[]` rather than show merged, wrong stand sizes. With no final score it shows the rows it has.
+- `summariseBreakers()` tallies stands broken, big breaks (`BIG_STAND_RUNS` = 30+) and runs in stands broken, per bowler.
+- A retirement on the opponent side isn't modelled (the opponent table has no `is_retirement`); such a match fails the guard and is hidden.
+
+### Per match — `ScorecardTables.tsx`
+
+A **Partnerships broken** block between the Bowling and Fielding tables, same bar treatment as the Spartans partnership bars: wicket number, a bar scaled to the biggest stand, "Batter dismissal-type · Bowler" inside the bar, and runs (balls) at the end (`*` for unbroken). A line underneath lists each bowler's count ("Ramesh 2 · Sagar 1 — stands broken"). Hidden when `computeBreakthroughs()` returns `[]`. The bowler name links via the matching `bowling` row (`findPlayerId` / `findCricHeroesUrl`).
+
+New props on `ScorecardTables`: `opponentFallOfWickets`, `opponentTotal`, `opponentOvers`, `opponentWickets`. Plumbed from `GET /api/matches/history/[bookingId]/scorecard` (now returns `opponent_fall_of_wickets`) through `MatchHistoryClient.tsx`, and from the standalone `/matches/history/[bookingId]` page (select widened to `opponent_fall_of_wickets`) via `MatchTabs`. The final score comes from `match.stats` / `stats` (already fetched). The admin Post-Match preview doesn't pass them, so it doesn't show the block.
+
+### Aggregate — `/leaderboard` → Detailed → **Breakthroughs**
+
+A sixth Detailed sub-tab (`category=breakthroughs`, a `DetailedCategory`, not a table). Same Year / Tournament / Ground / Format scope as the other Detailed tabs via `getScopedMatchIds()`; practice games excluded. Two bar charts (`BreakthroughLeaders.tsx`):
+
+1. **Top 10 Partnership Breakers** — most stands broken, then more big breaks, then lower average stand; caption shows matches, big breaks and average stand.
+2. **Biggest 10 Stands Broken** — largest stand ended, caption shows wicket, batter dismissed, opponent and date, linking to the match.
+
+`getBreakthroughLeaders()` (`playerStats.ts`) reads `opponent_fall_of_wickets`, the opponent innings summary from `match_stats` and `bowling_stats` (only to resolve the scorecard bowler name to the live reconciled `player_id`), then `aggregateBreakthroughLeaders()` (`src/lib/breakthroughLeaders.ts`, pure) ranks. An unreconciled bowler is kept under the scorecard name, unlinked. Glossary: `buildBreakthroughsGlossary()`.
+
+### Coverage and security
+
+- Only matches synced since `opponent_fall_of_wickets` was introduced have data; older ones appear after a re-sync.
+- Read-only: no new route, table or migration. The scorecard route keeps its existing auth (any signed-in, non-expelled member). Analytics reads are server-side with the service key.
+
+### Not built
+
+- Opponent partner names (needs `opponent_team_list.batting_order`).
+- A "Stands broken" tile on a bowler's `/players/[id]/stats` page.
+- Opponent-side retirements.
+
+### File map
+
+| File | Role |
+|---|---|
+| `src/lib/breakthroughs.ts` (+ `.test.ts`) | `computeBreakthroughs()`, `summariseBreakers()`, `oversToBalls()`, `BIG_STAND_RUNS` |
+| `src/lib/breakthroughLeaders.ts` | `aggregateBreakthroughLeaders()` |
+| `src/lib/playerStats.ts` | `getBreakthroughLeaders()` |
+| `src/components/leaderboard/BreakthroughLeaders.tsx` | Detailed → Breakthroughs charts |
+| `src/components/matches/ScorecardTables.tsx` | Per-match "Partnerships broken" block |
+| `src/app/api/matches/history/[bookingId]/scorecard/route.ts`, `src/app/matches/history/[bookingId]/page.tsx`, `src/components/matches/MatchHistoryClient.tsx` | Pass `opponent_fall_of_wickets` and the opponent score through |
+| `src/types/index.ts` | `BreakerAggregate`, `BreakthroughRecord`, `BreakthroughLeaders` |
 
 ---
 

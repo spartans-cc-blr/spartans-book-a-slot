@@ -2,6 +2,7 @@
 
 import { PlayerNameLink } from '@/lib/playerLink'
 import { computePartnerships } from '@/lib/partnerships'
+import { computeBreakthroughs, summariseBreakers, BIG_STAND_RUNS } from '@/lib/breakthroughs'
 
 interface SquadRef {
   player_id:      string
@@ -127,13 +128,20 @@ function formatStrikeRate(v: unknown): string {
 }
 
 export function ScorecardTables({
-  batting, bowling, fielding, teamList, fallOfWickets, teamTotal, teamOvers, teamWickets, squad, partnershipsSlot,
+  batting, bowling, fielding, teamList, fallOfWickets, opponentFallOfWickets, teamTotal, teamOvers, teamWickets, opponentTotal, opponentOvers, opponentWickets, squad, partnershipsSlot,
 }: {
   batting: any[]
   bowling: any[]
   fielding?: any[]
   teamList?: any[]
   fallOfWickets?: any[]
+  // The OPPONENT's Fall of Wickets (each row names the Spartans bowler who
+  // took it) and their final score — feeds the "Partnerships broken" block
+  // under Bowling. Omitted/empty = block hidden. See src/lib/breakthroughs.ts.
+  opponentFallOfWickets?: any[]
+  opponentTotal?: number | null
+  opponentOvers?: number | string | null
+  opponentWickets?: number | null
   // The innings' own final score/overs/wickets — lets computePartnerships()
   // close out an unbroken final stand (zero wickets lost, or the innings
   // ended not-all-out mid-partnership) that Fall of Wickets alone can't
@@ -189,6 +197,17 @@ export function ScorecardTables({
   const finalScore = teamTotal != null && teamOvers != null ? { total: teamTotal, overs: teamOvers, wickets: teamWickets ?? null } : null
   const partnerships = computePartnerships(batting, fallOfWickets ?? [], finalScore) ?? []
   const topPartnershipRuns = partnerships.reduce((max, p) => Math.max(max, p.runs), 0)
+
+  // Opponent stands and who broke them (FOW-only: no partner names, since
+  // the opponent's batting order isn't stored). [] hides the block.
+  const oppFinal = opponentTotal != null && opponentOvers != null
+    ? { total: Number(opponentTotal), overs: opponentOvers, wickets: opponentWickets != null ? Number(opponentWickets) : null }
+    : null
+  const breakthroughs = computeBreakthroughs(opponentFallOfWickets ?? [], oppFinal)
+  const topStandRuns = breakthroughs.reduce((max, b) => Math.max(max, b.runs), 0)
+  const breakers = summariseBreakers(breakthroughs)
+  const bowlerRow = (n: string | null) =>
+    n ? bowling.find(r => (pickField(r, ['player_name', 'name']) ?? '').trim().toLowerCase() === n.trim().toLowerCase()) ?? null : null
 
   // The batting table filters out players who didn't bat, so on its own it
   // can't answer "who else was in the squad that day" — team_list (the full
@@ -439,6 +458,57 @@ export function ScorecardTables({
           </table>
         </div>
       </div>
+
+      {breakthroughs.length > 0 && (
+        <div>
+          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Partnerships broken</p>
+          <div className="relative">
+            <div className="absolute left-3.5 top-3 bottom-3 w-0.5 -translate-x-1/2 bg-[var(--scorecard-divider)]" aria-hidden />
+            <div className="space-y-2">
+              {breakthroughs.map(b => {
+                const pct = topStandRuns > 0 ? Math.max((b.runs / topStandRuns) * 100, 6) : 6
+                const row = bowlerRow(b.bowlerName)
+                return (
+                  <div key={b.wicketNumber} className="flex items-center gap-2">
+                    <span className="relative z-10 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-[var(--fx-accent)] bg-[var(--scorecard-table-bg)] font-rajdhani text-xs font-bold text-[var(--fx-accent)]">{b.wicketNumber}</span>
+                    <div className="flex-1 min-w-0 relative h-7 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">
+                      <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
+                      <div className="absolute inset-0 flex items-center px-2.5 min-w-0">
+                        <span className="font-rajdhani text-xs font-semibold text-[var(--scorecard-heading-text)] truncate text-left">
+                          {b.unbroken
+                            ? <span className="text-[var(--scorecard-text-faint)] font-normal">Unbroken</span>
+                            : <>
+                                {b.outBatter ?? 'Wicket'}
+                                {b.dismissalType && <span className="text-[var(--scorecard-text-faint)] font-normal"> {b.dismissalType.replace(/_/g, ' ')}</span>}
+                                {' · '}
+                                {b.bowlerName
+                                  ? <PlayerNameLink name={firstName(b.bowlerName)} playerId={row ? findPlayerId(row, b.bowlerName, squad) : null} cricHeroesUrl={row ? findCricHeroesUrl(row, b.bowlerName, squad) : null} />
+                                  : <span className="text-[var(--scorecard-text-faint)] font-normal">no bowler credit</span>}
+                              </>}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="font-rajdhani text-xs font-bold text-gold w-20 flex-shrink-0 text-right">
+                      {b.runs}{b.unbroken && '*'}
+                      {b.balls != null && <>{' '}<span className="text-[var(--scorecard-text-faint)] font-normal">({b.balls})</span></>}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          {breakers.length > 0 && (
+            <p className="font-rajdhani text-xs text-[var(--scorecard-text-faint)] mt-2 flex flex-wrap items-baseline gap-x-2">
+              {breakers.map(br => (
+                <span key={br.bowlerName} title={`${br.bigBreaks} stand${br.bigBreaks === 1 ? '' : 's'} of ${BIG_STAND_RUNS}+`}>
+                  {firstName(br.bowlerName)} <span className="font-semibold text-[var(--scorecard-text-2)]">{br.broken}</span>
+                </span>
+              ))}
+              <span>— stands broken</span>
+            </p>
+          )}
+        </div>
+      )}
 
       {fieldingRows.length > 0 && (
         <div>

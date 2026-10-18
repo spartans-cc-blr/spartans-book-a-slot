@@ -120,6 +120,16 @@ export function buildPartnershipsGlossary(): GlossaryEntry[] {
   ]
 }
 
+export function buildBreakthroughsGlossary(): GlossaryEntry[] {
+  return [
+    { term: 'Stand broken', definition: 'An opponent partnership that ended with a Spartans bowler taking the wicket (bowled, caught, lbw, stumped). Run-outs and unbroken closing stands are not credited to a bowler.' },
+    { term: 'Big break', definition: 'A stand of 30 or more runs that the bowler ended.' },
+    { term: 'Avg stand', definition: 'Average runs in the stands the bowler broke — lower means they strike earlier in a partnership.' },
+    { term: '(balls)', definition: 'Balls the stand lasted.' },
+    { term: 'Coverage', definition: 'Only matches whose opponent Fall of Wickets has been synced count — older scorecards appear once re-synced. Practice games are excluded, same as every other Detailed tab.' },
+  ]
+}
+
 export function detailedGlossaryTitle(category: TableCategory): string {
   return `${DETAILED_LABEL[category]} columns`
 }

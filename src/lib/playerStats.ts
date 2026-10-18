@@ -24,7 +24,9 @@ import type { CareerHighlights } from '@/lib/playerHighlights'
 import { findCapHolders } from '@/lib/capHolders'
 import { computePartnerships } from '@/lib/partnerships'
 import { aggregatePartnershipLeaders, type MatchPartnerships } from '@/lib/partnershipLeaders'
-import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType, PartnershipLeaders } from '@/types'
+import { computeBreakthroughs } from '@/lib/breakthroughs'
+import { aggregateBreakthroughLeaders, type MatchBreakthroughs } from '@/lib/breakthroughLeaders'
+import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType, PartnershipLeaders, BreakthroughLeaders } from '@/types'
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -1170,6 +1172,93 @@ export async function getPartnershipLeaders(
     return hubPlayer
       ? { playerId: hubPlayer.id, playerName: hubPlayer.name, cricheroesUrl: hubPlayer.cricheroes_url ?? null }
       : { playerId: null, playerName: p.playerName, cricheroesUrl: null }
+  })
+}
+
+// Club-wide "partnerships broken" for /leaderboard's Detailed → Breakthroughs
+// tab — the OPPONENT's batting stands and which Spartans bowler ended each
+// one. Same match scope as every other Detailed tab (getScopedMatchIds()).
+// Reads opponent_fall_of_wickets (bowler_name per wicket), the innings
+// summary, and bowling_stats only to resolve a scorecard bowler name to the
+// live reconciled Hub player_id (same join-to-stats approach as partnerships;
+// a cached copy could lag a reconciliation). A match with no synced opponent
+// FOW (or incomplete rows) contributes nothing. See features/partnerships.md §13.
+export async function getBreakthroughLeaders(
+  filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
+): Promise<BreakthroughLeaders> {
+  const empty: BreakthroughLeaders = { breakers: [], biggest: [] }
+  const scoped = await getScopedMatchIds(filters)
+  if (scoped && scoped.length === 0) return empty
+
+  const analytics = createAnalyticsClient()
+  if (!analytics) throw new Error('Analytics database is not configured')
+
+  const [fowRows, summaryRows] = await Promise.all([
+    fetchAllRows(() => {
+      const q = analytics!.from('opponent_fall_of_wickets')
+        .select('match_id, wicket_number, team_score, over, player_name, bowler_name, dismissal_type')
+        .order('match_id').order('wicket_number')
+      return scoped ? q.in('match_id', scoped) : q
+    }),
+    fetchAllRows(() => {
+      const q = analytics!.from('match_stats').select('match_id, opponent_total, opponent_overs, opponent_wickets').order('match_id')
+      return scoped ? q.in('match_id', scoped) : q
+    }),
+  ])
+  const fowByMatch = groupBy(fowRows as any[], r => r.match_id)
+  const matchIds = Array.from(fowByMatch.keys())
+  if (matchIds.length === 0) return empty
+  const summaryByMatch = new Map((summaryRows as any[]).map(r => [r.match_id, r]))
+
+  const bowlingRows = await fetchAllRows(() =>
+    analytics!.from('bowling_stats').select('match_id, player_name, player_id')
+      .order('match_id').order('player_name').in('match_id', matchIds).not('player_id', 'is', null)
+  )
+  const norm = (n: string) => n.trim().toLowerCase().replace(/\s+/g, ' ')
+  const bowlerIdByKey = new Map<string, string>()
+  for (const r of bowlingRows as any[]) bowlerIdByKey.set(`${r.match_id}|${norm(r.player_name)}`, r.player_id)
+
+  const hub = createServiceClient()
+  const { data: bookings, error: bookErr } = await hub.from('bookings')
+    .select('id, match_id, game_date, opponent_name').in('match_id', matchIds).eq('status', 'confirmed')
+  if (bookErr) throw new Error(bookErr.message)
+  const bookingByMatch = new Map((bookings ?? []).map((b: any) => [b.match_id, b]))
+
+  const perMatch: MatchBreakthroughs[] = []
+  const playerIds = new Set<string>()
+  for (const matchId of matchIds) {
+    const summary = summaryByMatch.get(matchId) as any
+    const finalScore = summary && summary.opponent_total != null && summary.opponent_overs != null
+      ? { total: num(summary.opponent_total), overs: num(summary.opponent_overs), wickets: summary.opponent_wickets != null ? num(summary.opponent_wickets) : null }
+      : null
+    const stands = computeBreakthroughs((fowByMatch.get(matchId) ?? []).map((r: any) => ({
+      wicket_number: num(r.wicket_number), team_score: num(r.team_score), over: r.over,
+      player_name: r.player_name, bowler_name: r.bowler_name, dismissal_type: r.dismissal_type,
+    })), finalScore)
+    if (stands.length === 0) continue
+    for (const s of stands) {
+      const id = s.bowlerName ? bowlerIdByKey.get(`${matchId}|${norm(s.bowlerName)}`) : null
+      if (id) playerIds.add(id)
+    }
+    const booking = bookingByMatch.get(matchId) as any
+    perMatch.push({ matchId, bookingId: booking?.id ?? null, gameDate: booking?.game_date ?? null, opponentName: booking?.opponent_name ?? null, stands })
+  }
+  if (perMatch.length === 0) return empty
+
+  const { data: players, error: pErr } = playerIds.size
+    ? await hub.from('players').select('id, name, cricheroes_url').in('id', Array.from(playerIds))
+    : { data: [] as any[], error: null }
+  if (pErr) throw new Error(pErr.message)
+  const playerById = new Map((players ?? []).map((p: any) => [p.id, p]))
+
+  // An unreconciled bowler is kept under their scorecard name (unlinked),
+  // grouped by normalised name — dropping them would hide real breaks.
+  return aggregateBreakthroughLeaders(perMatch, (name, matchId) => {
+    const id = bowlerIdByKey.get(`${matchId}|${norm(name)}`)
+    const hubPlayer = id ? playerById.get(id) as any : null
+    return hubPlayer
+      ? { playerId: hubPlayer.id, playerName: hubPlayer.name, cricheroesUrl: hubPlayer.cricheroes_url ?? null }
+      : { playerId: null, playerName: name, cricheroesUrl: null }
   })
 }
 

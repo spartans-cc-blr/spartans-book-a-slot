@@ -105,6 +105,7 @@ interface FullScorecard {
   fielding:        any[]
   team_list:       any[]
   fall_of_wickets: any[]
+  opponent_fall_of_wickets?: any[]
 }
 
 interface Tournament {
@@ -1046,9 +1047,13 @@ function MatchHistoryCard({
                   fielding={scorecard.fielding}
                   teamList={scorecard.team_list}
                   fallOfWickets={scorecard.fall_of_wickets}
+                  opponentFallOfWickets={scorecard.opponent_fall_of_wickets}
                   teamTotal={match.stats?.team_total}
                   teamOvers={match.stats?.team_overs}
                   teamWickets={match.stats?.team_wickets}
+                  opponentTotal={match.stats?.opponent_total}
+                  opponentOvers={match.stats?.opponent_overs}
+                  opponentWickets={match.stats?.opponent_wickets}
                   squad={detail?.squad}
                 />
               )}
