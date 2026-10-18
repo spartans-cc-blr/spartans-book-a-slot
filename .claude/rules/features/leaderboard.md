@@ -48,6 +48,7 @@ Detailed
   ├─ Bowl
   ├─ Field     → LeaderboardTable.tsx (sortable columns, one tab per category)
   └─ Partnerships → PartnershipLeaders.tsx (bar charts — see §6.3)
+  └─ Breakthroughs → BreakthroughLeaders.tsx (opponent stands broken by Spartans bowlers — see §6.4)
 ```
 
 **Year filter** — shown for Detailed and for Honor Board → Overall (both are
@@ -571,6 +572,10 @@ Year/Tournament/Ground/Format scope as every other Detailed tab via
 `category=partnerships` is a `DetailedCategory`, not a `TableCategory` (it
 renders no `LeaderboardTable`), and skips the `getLeaderboard()` fetch.
 Full design: `features/partnerships.md` §10.
+
+## 6.4 Breakthroughs (Detailed → Breakthroughs) — added October 2026
+
+A sixth Detailed sub-tab: the **opponent's** batting stands ended by Spartans bowlers — top 10 partnership breakers (stands broken, big breaks of 30+, average stand) and the 10 biggest stands broken. Same Year/Tournament/Ground/Format scope as the other Detailed tabs; `category=breakthroughs` skips the `getLeaderboard()` fetch. Built from `opponent_fall_of_wickets`, so there are no partner names. Full design: `features/partnerships.md` §13.
 
 ## 7. Architecture — `src/lib/leaderboardMilestones.ts`
 

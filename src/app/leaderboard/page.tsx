@@ -2,19 +2,20 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances, getTopScorersByBattingPosition, getPartnershipLeaders } from '@/lib/playerStats'
+import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances, getTopScorersByBattingPosition, getPartnershipLeaders, getBreakthroughLeaders } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { LeaderboardFilters, type LeaderboardCategory, type Format, type InningsKey } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { BattingPositionLeaders } from '@/components/leaderboard/BattingPositionLeaders'
 import { PitchTypeTabs } from '@/components/leaderboard/PitchTypeTabs'
 import { PartnershipLeadersView } from '@/components/leaderboard/PartnershipLeaders'
+import { BreakthroughLeadersView } from '@/components/leaderboard/BreakthroughLeaders'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
 import { LeaderboardMonthly } from '@/components/leaderboard/LeaderboardMonthly'
 import { LeaderboardGlossary } from '@/components/leaderboard/LeaderboardGlossary'
 import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
-import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, buildPartnershipsGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
+import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, buildPartnershipsGlossary, buildBreakthroughsGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
 import { getMonthSyncStatus } from '@/lib/monthlyRecognition'
 import type { PitchType } from '@/types'
 import type { Metadata } from 'next'
@@ -23,7 +24,7 @@ export const metadata: Metadata = { title: 'Yours Statistically — Spartans CC'
 export const revalidate = 0
 
 function isCategory(v: string | undefined): v is LeaderboardCategory {
-  return v === 'overall' || v === 'monthly' || v === 'batting' || v === 'bowling' || v === 'fielding' || v === 'mvp' || v === 'partnerships'
+  return v === 'overall' || v === 'monthly' || v === 'batting' || v === 'bowling' || v === 'fielding' || v === 'mvp' || v === 'partnerships' || v === 'breakthroughs'
 }
 
 function currentMonthStr(): string {
@@ -169,14 +170,14 @@ export default async function LeaderboardPage({
   // two more common bands stay "real stats only". See `features/leaderboard.md`
   // §5/§5.1/§10 for the full history (removed, then restored, on the
   // Monthly tab specifically).
-  const [rows, monthlyPerformances, monthlyPerformancesNoPractice, monthSyncStatus, yearlyPerformances, battingPositionLeaders, partnershipLeaders] = await Promise.all([
+  const [rows, monthlyPerformances, monthlyPerformancesNoPractice, monthSyncStatus, yearlyPerformances, battingPositionLeaders, partnershipLeaders, breakthroughLeaders] = await Promise.all([
     // pitchType only ever narrows `rows` (the Detailed table) — the batting
     // position chart below (battingPositionLeaders) and, on Overall, the
     // Centuries/5-Wicket Hauls lists (yearlyPerformances) deliberately stay
     // scoped to `overallFilters` alone, unaffected by the pitch tabs.
     // Partnerships renders its own charts, not a LeaderboardTable — skip
     // the (otherwise unused) per-player aggregate fetch entirely.
-    category === 'partnerships' ? Promise.resolve([])
+    category === 'partnerships' || category === 'breakthroughs' ? Promise.resolve([])
       : category === 'monthly' ? getLeaderboard({ month, formats: restrictedFormats }) : getLeaderboard({ ...overallFilters, pitchType }),
     category === 'monthly' ? getPerformances({ month, includePractice: true }) : Promise.resolve(null),
     category === 'monthly' ? getPerformances({ month }) : Promise.resolve(null),
@@ -192,15 +193,20 @@ export default async function LeaderboardPage({
     // Detailed → Partnerships — same Year/Tournament/Ground/Format scope as
     // every other Detailed tab. See features/partnerships.md §10.
     category === 'partnerships' ? getPartnershipLeaders(overallFilters) : Promise.resolve(null),
+    // Detailed → Breakthroughs — opponent stands broken by Spartans bowlers.
+    // See features/partnerships.md §13.
+    category === 'breakthroughs' ? getBreakthroughLeaders(overallFilters) : Promise.resolve(null),
   ])
 
   const glossaryTitle = category === 'overall' ? 'Overall'
     : category === 'monthly' ? 'Monthly'
     : category === 'partnerships' ? 'Partnerships'
+    : category === 'breakthroughs' ? 'Breakthroughs'
     : detailedGlossaryTitle(category)
   const glossaryEntries = category === 'overall' ? buildOverallGlossary(year, tournamentName, groundName)
     : category === 'monthly' ? buildMonthlyGlossary(monthLabel(month))
     : category === 'partnerships' ? buildPartnershipsGlossary()
+    : category === 'breakthroughs' ? buildBreakthroughsGlossary()
     : buildDetailedGlossary(category)
 
   return (
@@ -281,6 +287,8 @@ export default async function LeaderboardPage({
           />
         ) : category === 'partnerships' ? (
           <PartnershipLeadersView leaders={partnershipLeaders!} />
+        ) : category === 'breakthroughs' ? (
+          <BreakthroughLeadersView leaders={breakthroughLeaders!} />
         ) : (
           <>
             {battingPositionLeaders && battingPositionLeaders.length > 0 && (

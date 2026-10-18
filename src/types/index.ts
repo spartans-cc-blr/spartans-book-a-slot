@@ -403,6 +403,35 @@ export interface PartnershipLeaders {
   pairs:    PartnershipPairAggregate[]   // highest aggregate runs by a pair
 }
 
+// Opponent-batting stands broken by Spartans bowlers — /leaderboard →
+// Detailed → Breakthroughs. See src/lib/breakthroughLeaders.ts and
+// features/partnerships.md §13.
+export interface BreakerAggregate {
+  bowler:    PartnershipLeaderPlayer
+  broken:    number   // opponent stands ended by this bowler
+  bigBreaks: number   // of those, stands of 30+ runs
+  standRuns: number   // total runs in the stands broken
+  matches:   number
+}
+
+export interface BreakthroughRecord {
+  bowler:        PartnershipLeaderPlayer
+  wicketNumber:  number
+  runs:          number
+  balls:         number | null
+  outBatter:     string | null
+  dismissalType: string | null
+  matchId:       string
+  bookingId:     string | null
+  gameDate:      string | null
+  opponentName:  string | null
+}
+
+export interface BreakthroughLeaders {
+  breakers: BreakerAggregate[]     // most stands broken
+  biggest:  BreakthroughRecord[]   // biggest stands ended
+}
+
 export interface RecentForm {
   matches: number
   runs:    number

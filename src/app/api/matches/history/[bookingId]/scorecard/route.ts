@@ -31,7 +31,7 @@ export async function GET(
 
   const { data: stats, error: statsErr } = await supabase
     .from('match_stats_cache')
-    .select('batting, bowling, fielding, team_list, fall_of_wickets')
+    .select('batting, bowling, fielding, team_list, fall_of_wickets, opponent_fall_of_wickets')
     .eq('match_id', booking.match_id)
     .maybeSingle()
 
@@ -44,5 +44,6 @@ export async function GET(
     fielding:        stats.fielding ?? [],
     team_list:       stats.team_list ?? [],
     fall_of_wickets: stats.fall_of_wickets ?? [],
+    opponent_fall_of_wickets: stats.opponent_fall_of_wickets ?? [],
   })
 }

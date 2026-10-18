@@ -81,7 +81,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
     booking.match_id
       ? supabase
           .from('match_stats_cache')
-          .select('match_result, team_total, team_wickets, team_overs, opponent_total, opponent_wickets, opponent_overs, batting, bowling, fielding, team_list, fall_of_wickets')
+          .select('match_result, team_total, team_wickets, team_overs, opponent_total, opponent_wickets, opponent_overs, batting, bowling, fielding, team_list, fall_of_wickets, opponent_fall_of_wickets')
           .eq('match_id', booking.match_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -268,7 +268,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
         <div className="mt-5">
           {stats ? (
-            <MatchTabs bookingId={booking.id} format={booking.format} batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} fallOfWickets={stats.fall_of_wickets ?? []} teamTotal={stats.team_total} teamOvers={stats.team_overs} teamWickets={stats.team_wickets} squad={squad} />
+            <MatchTabs bookingId={booking.id} format={booking.format} batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} fallOfWickets={stats.fall_of_wickets ?? []} opponentFallOfWickets={stats.opponent_fall_of_wickets ?? []} teamTotal={stats.team_total} teamOvers={stats.team_overs} teamWickets={stats.team_wickets} opponentTotal={stats.opponent_total} opponentOvers={stats.opponent_overs} opponentWickets={stats.opponent_wickets} squad={squad} />
           ) : (
             <p className="font-rajdhani text-sm" style={{ color: 'var(--scorecard-text-faint)' }}>
               Scorecard not yet synced to Hub for this match.
