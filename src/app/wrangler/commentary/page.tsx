@@ -12,7 +12,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Ball-by-ball Commentary — Spartans CC' }
 export const revalidate = 0
 
-export default async function CommentaryPage() {
+export default async function CommentaryPage({ searchParams }: { searchParams?: { booking?: string } }) {
   const session = await getServerSession(authOptions)
   const user    = session?.user as any
 
@@ -78,7 +78,10 @@ export default async function CommentaryPage() {
             CricHeroes commentary PDF for each innings — Spartans batting and the opponent batting.
           </p>
         </div>
-        <CommentaryClient matches={matches} />
+        <CommentaryClient
+          matches={matches}
+          initialBookingId={matches.some(m => m.booking_id === searchParams?.booking) ? searchParams?.booking : undefined}
+        />
       </main>
       </div>
     </>

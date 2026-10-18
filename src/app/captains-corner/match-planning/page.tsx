@@ -90,6 +90,8 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
   if (!session) redirect('/login')
   if (user?.playerStatus === 'expelled') redirect('/')
   if (!user?.isCaptain && !user?.isGC && !user?.isAdmin) redirect('/fixtures')
+  // The commentary page itself is wrangler/admin only, so only they get the upload shortcut.
+  const canUploadCommentary = !!(user?.isWrangler || user?.isAdmin)
 
   const lens: Lens = (LENSES as string[]).includes(searchParams.lens ?? '') ? (searchParams.lens as Lens) : 'opponent'
   const ctx = await getPlanningContext(searchParams.booking, lens)
@@ -209,6 +211,7 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                         <th className="text-left font-semibold">Match ID</th>
                         {lens !== 'opponent' && <th className="text-left font-semibold">Opponent</th>}
                         <th className="text-left font-semibold">CricHeroes</th>
+                        {canUploadCommentary && <th className="text-left font-semibold">Commentary</th>}
                       </tr>
                     </thead>
                     <tbody className="text-[var(--stats-text)]">
@@ -224,6 +227,11 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                               ? <a href={m.cricheroesUrl} target="_blank" rel="noopener noreferrer" className="underline decoration-dotted">Open &#8599;</a>
                               : <span className={muted}>no link on booking</span>}
                           </td>
+                          {canUploadCommentary && (
+                            <td>
+                              <Link href={`/wrangler/commentary?booking=${m.bookingId}`} className="underline decoration-dotted">Upload &rarr;</Link>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
