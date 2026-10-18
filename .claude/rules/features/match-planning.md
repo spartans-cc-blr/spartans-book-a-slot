@@ -199,3 +199,7 @@ Ground filter, validated against the grounds list); Tournament tab → `/leaderb
 ## 13. Tournament MVP link moved (October 2026)
 
 On the Tournament tab the "Tournament MVP table →" link (`/leaderboard?category=mvp&tournament=<id>&year=all`) now sits once, next to "open Team Record →" in the Last-5 card, instead of under every player card. Tournament-tab player cards show callouts only.
+
+## 14. Upload link in the Commentary-missing table (October 2026)
+
+For wranglers and admins (`isWrangler || isAdmin`; captains and GC don't see it, since `/wrangler/commentary` is wrangler/admin only) the "Commentary missing" table has an extra **Commentary** column with **Upload →**. It links to `/wrangler/commentary?booking=<bookingId>`, which opens with that game already selected. The column appears in all three lenses, so the Ground and Tournament tabs get it too.

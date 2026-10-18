@@ -32,8 +32,8 @@ const STATUS_TEXT: Record<string, string> = {
   none: 'No commentary', partial: 'One innings', mismatch: 'Needs re-upload',
 }
 
-export function CommentaryClient({ matches }: { matches: CommentaryMatchOption[] }) {
-  const [bookingId, setBookingId] = useState(matches[0]?.booking_id ?? '')
+export function CommentaryClient({ matches, initialBookingId }: { matches: CommentaryMatchOption[]; initialBookingId?: string }) {
+  const [bookingId, setBookingId] = useState(initialBookingId ?? matches[0]?.booking_id ?? '')
   const [dayFilter, setDayFilter] = useState<string | null>(null)
   const [monthFilter, setMonthFilter] = useState('')
   const [sides, setSides] = useState<Record<CommentarySide, SideState>>({
