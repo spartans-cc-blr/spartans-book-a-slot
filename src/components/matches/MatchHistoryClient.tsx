@@ -1054,6 +1054,7 @@ function MatchHistoryCard({
                   opponentTotal={match.stats?.opponent_total}
                   opponentOvers={match.stats?.opponent_overs}
                   opponentWickets={match.stats?.opponent_wickets}
+                  opponentName={match.opponent_name}
                   squad={detail?.squad}
                 />
               )}

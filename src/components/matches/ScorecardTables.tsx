@@ -2,7 +2,7 @@
 
 import { PlayerNameLink } from '@/lib/playerLink'
 import { computePartnerships } from '@/lib/partnerships'
-import { computeBreakthroughs, summariseBreakers, describeDismissal } from '@/lib/breakthroughs'
+import { computeBreakthroughs, describeDismissal } from '@/lib/breakthroughs'
 
 interface SquadRef {
   player_id:      string
@@ -128,7 +128,7 @@ function formatStrikeRate(v: unknown): string {
 }
 
 export function ScorecardTables({
-  batting, bowling, fielding, teamList, fallOfWickets, opponentFallOfWickets, teamTotal, teamOvers, teamWickets, opponentTotal, opponentOvers, opponentWickets, squad, partnershipsSlot,
+  batting, bowling, fielding, teamList, fallOfWickets, opponentFallOfWickets, teamTotal, teamOvers, teamWickets, opponentTotal, opponentOvers, opponentWickets, opponentName, squad, partnershipsSlot,
 }: {
   batting: any[]
   bowling: any[]
@@ -142,6 +142,7 @@ export function ScorecardTables({
   opponentTotal?: number | null
   opponentOvers?: number | string | null
   opponentWickets?: number | null
+  opponentName?: string | null
   // The innings' own final score/overs/wickets — lets computePartnerships()
   // close out an unbroken final stand (zero wickets lost, or the innings
   // ended not-all-out mid-partnership) that Fall of Wickets alone can't
@@ -205,7 +206,6 @@ export function ScorecardTables({
     : null
   const breakthroughs = computeBreakthroughs(opponentFallOfWickets ?? [], oppFinal)
   const topStandRuns = breakthroughs.reduce((max, b) => Math.max(max, b.runs), 0)
-  const breakers = summariseBreakers(breakthroughs)
   const bowlerRow = (n: string | null) =>
     n ? bowling.find(r => (pickField(r, ['player_name', 'name']) ?? '').trim().toLowerCase() === n.trim().toLowerCase()) ?? null : null
 
@@ -400,6 +400,45 @@ export function ScorecardTables({
         </div>
       )}
 
+      {breakthroughs.length > 0 && (
+        <div>
+          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">FOW: {opponentName ?? 'Opponent'}</p>
+          <div className="relative">
+            <div className="absolute left-3.5 top-3 bottom-3 w-0.5 -translate-x-1/2 bg-[var(--scorecard-divider)]" aria-hidden />
+            <div className="space-y-2">
+              {breakthroughs.map(b => {
+                const pct = topStandRuns > 0 ? Math.max((b.runs / topStandRuns) * 100, 6) : 6
+                const row = bowlerRow(b.bowlerName)
+                return (
+                  <div key={b.wicketNumber} className="flex items-center gap-2">
+                    <span className="relative z-10 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-[var(--fx-accent)] bg-[var(--scorecard-table-bg)] font-rajdhani text-xs font-bold text-[var(--fx-accent)]">{b.wicketNumber}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-rajdhani text-xs leading-tight text-[var(--scorecard-heading-text)] break-words">
+                        {b.unbroken
+                          ? <span className="text-[var(--scorecard-text-faint)]">Unbroken</span>
+                          : describeDismissal(b).map((seg, i) =>
+                              seg.kind === 'bowler'
+                                ? <PlayerNameLink key={i} name={seg.value} playerId={row ? findPlayerId(row, seg.value, squad) : null} cricHeroesUrl={row ? findCricHeroesUrl(row, seg.value, squad) : null} />
+                                : seg.kind === 'fielder'
+                                  ? <span key={i}>{seg.value}</span>
+                                  : <span key={i} className="text-[var(--scorecard-text-faint)]">{seg.value}</span>)}
+                      </p>
+                      <div className="mt-1 h-1.5 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">
+                        <div className="h-full bg-gold/40 rounded" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                    <span className="font-rajdhani text-xs font-bold text-gold w-20 flex-shrink-0 text-right">
+                      {b.runs}{b.unbroken && '*'}
+                      {b.balls != null && <>{' '}<span className="text-[var(--scorecard-text-faint)] font-normal">({b.balls})</span></>}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Bowling</p>
         <div className="overflow-x-auto">
@@ -458,55 +497,6 @@ export function ScorecardTables({
           </table>
         </div>
       </div>
-
-      {breakthroughs.length > 0 && (
-        <div>
-          <p className="font-rajdhani text-xs font-bold tracking-widest uppercase text-[var(--scorecard-text-faint)] mb-2">Partnerships broken</p>
-          <div className="relative">
-            <div className="absolute left-3.5 top-3 bottom-3 w-0.5 -translate-x-1/2 bg-[var(--scorecard-divider)]" aria-hidden />
-            <div className="space-y-2">
-              {breakthroughs.map(b => {
-                const pct = topStandRuns > 0 ? Math.max((b.runs / topStandRuns) * 100, 6) : 6
-                const row = bowlerRow(b.bowlerName)
-                return (
-                  <div key={b.wicketNumber} className="flex items-center gap-2">
-                    <span className="relative z-10 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-[var(--fx-accent)] bg-[var(--scorecard-table-bg)] font-rajdhani text-xs font-bold text-[var(--fx-accent)]">{b.wicketNumber}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-rajdhani text-xs leading-tight text-[var(--scorecard-heading-text)] break-words">
-                        {b.unbroken
-                          ? <span className="text-[var(--scorecard-text-faint)]">Unbroken</span>
-                          : describeDismissal(b).map((seg, i) =>
-                              seg.kind === 'bowler'
-                                ? <PlayerNameLink key={i} name={seg.value} playerId={row ? findPlayerId(row, seg.value, squad) : null} cricHeroesUrl={row ? findCricHeroesUrl(row, seg.value, squad) : null} />
-                                : seg.kind === 'fielder'
-                                  ? <span key={i} className="font-semibold">{seg.value}</span>
-                                  : <span key={i} className="text-[var(--scorecard-text-faint)]">{seg.value}</span>)}
-                      </p>
-                      <div className="mt-1 h-1.5 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">
-                        <div className="h-full bg-gold/40 rounded" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                    <span className="font-rajdhani text-xs font-bold text-gold w-20 flex-shrink-0 text-right">
-                      {b.runs}{b.unbroken && '*'}
-                      {b.balls != null && <>{' '}<span className="text-[var(--scorecard-text-faint)] font-normal">({b.balls})</span></>}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          {breakers.length > 0 && (
-            <p className="font-rajdhani text-xs text-[var(--scorecard-text-faint)] mt-2 flex flex-wrap items-baseline gap-x-2">
-              {breakers.map(br => (
-                <span key={br.bowlerName} title={`${br.standRuns} runs in the stands broken`}>
-                  {firstName(br.bowlerName)} <span className="font-semibold text-[var(--scorecard-text-2)]">{br.broken}</span>
-                </span>
-              ))}
-              <span>— stands broken</span>
-            </p>
-          )}
-        </div>
-      )}
 
       {fieldingRows.length > 0 && (
         <div>
