@@ -1042,6 +1042,7 @@ function MatchHistoryCard({
                 <MatchTabs
                   bookingId={match.booking_id}
                   format={match.format}
+                  battedFirst={match.stats ? deriveBattedFirst(match.stats.toss_won, match.stats.toss_decision) : null}
                   batting={scorecard.batting}
                   bowling={scorecard.bowling}
                   fielding={scorecard.fielding}

@@ -13,20 +13,23 @@ import { useEffect, useRef, useState, type ComponentProps, type KeyboardEvent } 
 import { ScorecardTables } from '@/components/matches/ScorecardTables'
 import { BattingView, BowlingView, CommentaryView, FieldingView } from '@/components/matches/BallByBallViews'
 import { BallPartnerships } from '@/components/matches/BallPartnerships'
+import { InsightsView } from '@/components/matches/MatchInsights'
 import { ballsForSide, oversForFormat, type BallRow } from '@/lib/ballByBall'
 
 type ScorecardProps = ComponentProps<typeof ScorecardTables>
 
-type TabKey = 'scorecard' | 'batting' | 'bowling' | 'fielding' | 'commentary'
+type TabKey = 'scorecard' | 'insights' | 'batting' | 'bowling' | 'fielding' | 'commentary'
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'scorecard', label: 'Full Scorecard' },
+  { key: 'insights', label: 'Insights' },
   { key: 'batting', label: 'Batting' },
   { key: 'bowling', label: 'Bowling' },
   { key: 'fielding', label: 'Fielding' },
   { key: 'commentary', label: 'Commentary' },
 ]
 
-export function MatchTabs({ bookingId, format, ...scorecard }: { bookingId: string; format: string | null } & ScorecardProps) {
+// `battedFirst` is from the Spartans' point of view (from the toss); null when toss data is missing.
+export function MatchTabs({ bookingId, format, battedFirst = null, ...scorecard }: { bookingId: string; format: string | null; battedFirst?: boolean | null } & ScorecardProps) {
   const [balls, setBalls] = useState<BallRow[] | null>(null)   // null = none (yet)
   const [tab, setTab] = useState<TabKey>('scorecard')
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -94,6 +97,10 @@ export function MatchTabs({ bookingId, format, ...scorecard }: { bookingId: stri
 
       <div role="tabpanel" id={`match-panel-${bookingId}`} aria-labelledby={`match-tab-${bookingId}-${tab}`}>
         {tab === 'scorecard' && <ScorecardTables {...scorecard} partnershipsSlot={partnershipsSlot} />}
+        {tab === 'insights' && (
+          <InsightsView balls={balls} totalOvers={totalOvers} battedFirst={battedFirst} opponentName={scorecard.opponentName}
+            scorecardTotals={{ spartans: scorecard.teamTotal, opponent: scorecard.opponentTotal }} />
+        )}
         {tab === 'batting' && <BattingView balls={balls} totalOvers={totalOvers} />}
         {tab === 'bowling' && <BowlingView balls={balls} totalOvers={totalOvers} />}
         {tab === 'fielding' && <FieldingView balls={balls} />}

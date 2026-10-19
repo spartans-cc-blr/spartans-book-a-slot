@@ -9,9 +9,9 @@
 When ball-by-ball commentary has been uploaded for a match (see
 `commentary-upload.md`), the scorecard area of a match gains underline tabs:
 
-**Full Scorecard · Batting · Bowling · Fielding · Commentary**
+**Full Scorecard · Insights · Batting · Bowling · Fielding · Commentary**
 
-Full Scorecard is the existing `ScorecardTables`, unchanged. The other four are
+Full Scorecard is the existing `ScorecardTables`, unchanged. The other five are
 built from `ball_by_ball` in the analytics DB. A match with **no** commentary
 renders the plain scorecard exactly as before, with no tab bar.
 
@@ -144,3 +144,14 @@ A comparison of ball-by-ball against `fall_of_wickets` / `opponent_fall_of_wicke
 Match `7948742` showed a phantom "Manoj B 0 (0)" as every stand's partner: the scorecard had the opener as `Manoj B` (unreconciled, `player_id` NULL) while the commentary named him `Manoj Balaji`. `derivePartnerships()` matched names exactly, treated them as two people, and `fillPartner()` kept seating the never-facing `Manoj B` (rank 0 in `restOfOrder`).
 
 Fix: `sameBatter()` (first name equal, one surname a prefix of the other, so an initial matches) folds a `restOfOrder` name into a commentary name when **exactly one** commentary name fits; ambiguous cases are left alone. Unit-tested in `ballByBall.test.ts`. Data: a per-match `match_name_overrides` row for `7948742:Manoj B` → Manoj Balaji and `player_id` backfilled in the analytics stat tables and `match_stats_cache`. A per-match override, not a global alias, because "Manoj B" is also Manoj Borse in other matches (e.g. `22868515`).
+
+
+## Insights tab: run-rate worm and required-rate line (October 2026)
+
+A new **Insights** tab (second, after Full Scorecard) draws a run-rate worm: cumulative runs by over for each innings as inline SVG (no chart library), wickets as open circles on the line, and the powerplay and death overs shaded (`phaseBounds()`). Spartans are teal, the opposition red.
+
+- **Required rate:** a constant dashed line from (0, 0) to (total overs, target), labelled "Target N". Target is the first innings total + 1 (the scorecard total when the page has it, else the sum of the commentary), and the legend gives the required rate (target / total overs). Above the dashed line, the chasing side is ahead of the rate needed from ball one. It is not the changing required rate during the chase.
+- **Batting order** comes from the toss (`deriveBattedFirst()`), passed to `MatchTabs` as `battedFirst` by both callers (`MatchHistoryClient.tsx` and `/matches/history/[bookingId]`). With no toss data both worms still draw but there is no target line, and the tab says so.
+- **One innings uploaded:** that worm draws alone; if only the chase is missing the target line still shows.
+- Maths is pure in `src/lib/matchInsights.ts` (`wormPoints()`, `buildWorm()`, `requiredLineAt()`, unit-tested in `matchInsights.test.ts`). The chart is `src/components/matches/MatchInsights.tsx`. No new route, table or migration; the tab only exists when commentary exists, like the others.
+- More Insights (momentum, win probability, etc.) can go on this tab later.
