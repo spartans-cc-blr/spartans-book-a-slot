@@ -477,9 +477,9 @@ export function ScorecardTables({
                           ? <span className="text-[var(--scorecard-text-faint)]">Unbroken</span>
                           : describeDismissal(b).map((seg, i) =>
                               seg.kind === 'bowler'
-                                ? <PlayerNameLink key={i} name={firstName(seg.value)} playerId={row ? findPlayerId(row, seg.value, squad) : null} cricHeroesUrl={row ? findCricHeroesUrl(row, seg.value, squad) : null} />
+                                ? <PlayerNameLink key={i} name={seg.value} playerId={row ? findPlayerId(row, seg.value, squad) : null} cricHeroesUrl={row ? findCricHeroesUrl(row, seg.value, squad) : null} />
                                 : seg.kind === 'fielder'
-                                  ? <span key={i} className="font-semibold">{firstName(seg.value)}</span>
+                                  ? <span key={i} className="font-semibold">{seg.value}</span>
                                   : <span key={i} className="text-[var(--scorecard-text-faint)]">{seg.value}</span>)}
                       </p>
                       <div className="mt-1 h-1.5 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">

@@ -132,33 +132,34 @@ export type DismissalSeg = { kind: 'text' | 'fielder' | 'bowler'; value: string 
 
 const norm = (v: string | null) => (v ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 
-// Full "how out" wording for one broken stand, e.g. "Caught by Sagar, bowled
-// Ramesh" or "Run out (Kishore)". Segments so the UI can link the bowler.
+// "How out" in CricHeroes scorecard notation, e.g. "c PP b Preetam Patil",
+// "c †KV b DS Sakketha" (keeper), "st †KV b X", "lbw b X", "b X",
+// "run out (X)". Segments so the UI can link the bowler.
 export function describeDismissal(
   b: Pick<Breakthrough, 'dismissalType' | 'fielderName' | 'bowlerName'>,
 ): DismissalSeg[] {
   const t = (b.dismissalType ?? '').toLowerCase()
-  const f = b.fielderName
+  const f = b.fielderName?.replace(/^†\s*/, '') ?? null
   const w = b.bowlerName
   const T = (value: string): DismissalSeg => ({ kind: 'text', value })
   const F = (value: string): DismissalSeg => ({ kind: 'fielder', value })
   const B = (value: string): DismissalSeg => ({ kind: 'bowler', value })
-  const bowled = w ? [T(', bowled '), B(w)] : []
+  const bowled = w ? [T(' b '), B(w)] : []
   switch (t) {
-    case 'bowled': return w ? [T('Bowled by '), B(w)] : [T('Bowled')]
-    case 'lbw': return w ? [T('LBW, bowled '), B(w)] : [T('LBW')]
+    case 'bowled': return w ? [T('b '), B(w)] : [T('b')]
+    case 'lbw': return w ? [T('lbw b '), B(w)] : [T('lbw')]
     case 'caught':
-      if (w && f && norm(f) === norm(w)) return [T('Caught & bowled by '), B(w)]
-      return f ? [T('Caught by '), F(f), ...bowled] : [T('Caught'), ...bowled]
+      if (w && f && norm(f) === norm(w)) return [T('c & b '), B(w)]
+      return f ? [T('c '), F(f), ...bowled] : [T('c'), ...bowled]
     case 'caught_behind':
-      return f ? [T('Caught behind by '), F(f), ...bowled] : [T('Caught behind'), ...bowled]
+      return f ? [T('c †'), F(f), ...bowled] : [T('c'), ...bowled]
     case 'stumping':
     case 'stumped':
-      return f ? [T('Stumped by '), F(f), ...bowled] : [T('Stumped'), ...bowled]
+      return f ? [T('st †'), F(f), ...bowled] : [T('st'), ...bowled]
     case 'run_out':
     case 'runout':
-      return f ? [T('Run out ('), F(f), T(')')] : [T('Run out')]
-    case '': return w ? [T('Bowled by '), B(w)] : []
+      return f ? [T('run out ('), F(f), T(')')] : [T('run out')]
+    case '': return w ? [T('b '), B(w)] : []
     default: return [T(t.replace(/_/g, ' ')), ...bowled]
   }
 }
