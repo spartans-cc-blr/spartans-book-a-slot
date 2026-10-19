@@ -835,4 +835,37 @@ design is in `features/captaincy-stats.md`.
 
 ---
 
+## 14. Year filter hardcoded to the last 3 years (fixed October 2026)
+
+**Symptom:** the top filter bar's Year `<select>` only ever offered
+`CURRENT_YEAR`, `CURRENT_YEAR - 1`, `CURRENT_YEAR - 2` — a fixed,
+literal `YEARS` constant — so a player with match history older than
+that (e.g. matches from 2022 or earlier) had no way to select those
+years at all, even though the underlying data and every filter/aggregate
+on the page would have handled it correctly if a valid year were passed.
+
+**Same bug class as `features/leaderboard.md` §8.4** — that incident
+found the Honor Board's own Year dropdown hardcoded to a 3-entry list
+while Team Record's equivalent correctly derived its options from real
+match data. This page had the identical gap, just never previously
+reported.
+
+**Fix:** `PlayerStatsClient.tsx`'s `YEARS` constant was replaced with a
+`years` `useMemo` derived from `initialMatches` — the player's full,
+unfiltered career match list already fetched for the page (the same
+array `battedFirstByBooking` is built from, see §13's file map) — mapping
+each match's `gameDate` to its calendar year, deduping, and always
+unioning in `CURRENT_YEAR` so the dropdown never starts empty for a
+player with no matches yet this year. Sorted descending, same as every
+other year-list on this app's stats surfaces. No new fetch — this reuses
+data the page already has in hand.
+
+### File Map addition
+
+| File | Role |
+|---|---|
+| `src/components/players/PlayerStatsClient.tsx` | `years` — Year dropdown options derived from `initialMatches`, replacing the hardcoded `YEARS` constant |
+
+---
+
 *Maintained by: Spartans CC BLR*

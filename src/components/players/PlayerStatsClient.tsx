@@ -63,7 +63,6 @@ interface PlayerInfo {
 }
 
 const CURRENT_YEAR = new Date().getFullYear()
-const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2]
 
 type Format = 'T20' | 'T30'
 type Innings = 'defending' | 'chasing'
@@ -158,6 +157,18 @@ export function PlayerStatsClient({
   // not just the tables — see aggregateMatchHistoryRows() below.
   const [selectedPitch, setSelectedPitch] = useState<PitchType | 'all'>('all')
   const showPitchTabs = groundId === 'all'
+
+  // Year options are derived from this player's actual match history rather
+  // than a fixed "last 3 years" window — a player with matches going back
+  // to 2023 (or earlier) needs those years selectable too, not just capped
+  // at CURRENT_YEAR - 2. Always includes CURRENT_YEAR even if this player
+  // has no matches yet this year, so the dropdown never starts empty.
+  const years = useMemo(() => {
+    const fromMatches = initialMatches
+      .map(m => m.gameDate ? new Date(m.gameDate).getFullYear() : null)
+      .filter((y): y is number => y !== null)
+    return Array.from(new Set([CURRENT_YEAR, ...fromMatches])).sort((a, b) => b - a)
+  }, [initialMatches])
 
   const fetchScoped = useCallback(async () => {
     setSelectedPosition(null)
@@ -418,7 +429,7 @@ export function PlayerStatsClient({
             <select value={year} onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
               className="font-rajdhani text-sm bg-[var(--stats-card-bg)] border border-[var(--stats-card-border)] text-[var(--stats-text)] rounded px-3 py-1.5 flex-shrink-0">
               <option value="all">All Years</option>
-              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             <label className={`flex items-center gap-1.5 font-rajdhani text-sm font-bold cursor-pointer select-none flex-shrink-0
               ${formats.has('T20') ? 'text-[var(--stats-badge-text)]' : 'text-[var(--stats-text-muted)]'}`}>
