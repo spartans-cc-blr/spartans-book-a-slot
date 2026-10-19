@@ -2,31 +2,47 @@
 // the constant required-rate line for the chase). No I/O, no React; unit-tested in
 // matchInsights.test.ts. Sides follow ballByBall.ts: 'spartans' = Spartans batting.
 
-import { ballsForSide, type BallRow, type InningsSide } from '@/lib/ballByBall'
+import { ballLabel, ballsForSide, howOut, type BallRow, type InningsSide } from '@/lib/ballByBall'
+
+/** One wicket, for the hover/tap readout on the chart. */
+export interface WicketNote {
+  wicketNo: number      // 1-based count of wickets in the innings
+  batter: string
+  how: string           // "c Darshan Shetty b Shabarinath"
+  score: number         // team score when the wicket fell
+  ball: string          // CricHeroes ball label, e.g. "7.2"
+}
 
 export interface WormPoint {
   over: number          // completed overs at this point (0 = start of the innings)
   runs: number          // cumulative runs
   wickets: number       // wickets that fell in this over (0 at the start)
+  notes: WicketNote[]   // one per wicket in this over, in order
 }
 
 /** Cumulative runs at the end of each over, starting from (0, 0). Overs with no deliveries between
  *  the first and last are carried forward so the line has no gaps. */
 export function wormPoints(inningsBalls: BallRow[]): WormPoint[] {
-  const byOver = new Map<number, { runs: number; wickets: number }>()
-  for (const b of inningsBalls) {
-    const o = byOver.get(b.over_no) ?? { runs: 0, wickets: 0 }
+  const byOver = new Map<number, { runs: number; notes: WicketNote[] }>()
+  let running = 0, wicketNo = 0
+  for (const b of [...inningsBalls].sort((a, c) => a.seq - c.seq)) {
+    const o = byOver.get(b.over_no) ?? { runs: 0, notes: [] }
     o.runs += b.runs_total
-    if (b.is_wicket) o.wickets += 1
+    running += b.runs_total
+    if (b.is_wicket) {
+      wicketNo += 1
+      const batter = b.dismissed_batter ?? b.batter
+      o.notes.push({ wicketNo, batter, how: howOut(batter, b.dismissal_text, b.dismissal_kind), score: running, ball: ballLabel(b) })
+    }
     byOver.set(b.over_no, o)
   }
   const last = Math.max(0, ...Array.from(byOver.keys()))
-  const points: WormPoint[] = [{ over: 0, runs: 0, wickets: 0 }]
+  const points: WormPoint[] = [{ over: 0, runs: 0, wickets: 0, notes: [] }]
   let total = 0
   for (let over = 1; over <= last; over++) {
     const o = byOver.get(over)
     total += o?.runs ?? 0
-    points.push({ over, runs: total, wickets: o?.wickets ?? 0 })
+    points.push({ over, runs: total, wickets: o?.notes.length ?? 0, notes: o?.notes ?? [] })
   }
   return points
 }
@@ -89,4 +105,40 @@ export function buildWorm(
  *  the starting required rate, i.e. a straight line from (0, 0) to (totalOvers, target). */
 export function requiredLineAt(over: number, target: number, totalOvers: number): number {
   return (target * over) / totalOvers
+}
+
+export interface ChaseRow {
+  over: number
+  runsInOver: number
+  scored: number           // cumulative after this over
+  needed: number           // runs still needed (0 once the target is reached)
+  oversLeft: number
+  crr: number              // current run rate: scored / over
+  rrr: number | null       // required rate for the rest of the innings (null with no overs left)
+  wickets: number          // wickets down after this over
+}
+
+/** The chase over by over: runs scored, runs still needed and the required rate from that point,
+ *  `(target - scored) / (totalOvers - over)`. Stops at the over the target is reached. */
+export function chaseSeries(points: WormPoint[], target: number, totalOvers: number): ChaseRow[] {
+  const rows: ChaseRow[] = []
+  let wkts = 0
+  for (let i = 1; i < points.length; i++) {
+    const p = points[i]
+    wkts += p.wickets
+    const needed = Math.max(target - p.runs, 0)
+    const oversLeft = Math.max(totalOvers - p.over, 0)
+    rows.push({
+      over: p.over,
+      runsInOver: p.runs - points[i - 1].runs,
+      scored: p.runs,
+      needed,
+      oversLeft,
+      crr: p.runs / p.over,
+      rrr: needed === 0 ? 0 : oversLeft > 0 ? needed / oversLeft : null,
+      wickets: wkts,
+    })
+    if (needed === 0) break
+  }
+  return rows
 }
