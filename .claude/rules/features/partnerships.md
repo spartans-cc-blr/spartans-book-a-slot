@@ -1189,7 +1189,7 @@ was on screen:
   or overlap.
 
 Each bar shows: wicket number (left label), both partnership players
-overlaid on the bar (both render as `PlayerNameLink`s — the larger name is
+overlaid on the bar (both render as `PlayerNameLink`s in normal weight, `font-normal` since October 2026 — the larger name is
 not distinguished), and runs + ball span **outside the bar**, in a
 fixed-width (`w-20`) right-aligned column — not overlaid on the bar itself
 (fixed shortly after the ball-span change, September 2026: a short bar
