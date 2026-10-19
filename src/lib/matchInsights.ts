@@ -2,7 +2,7 @@
 // the constant required-rate line for the chase). No I/O, no React; unit-tested in
 // matchInsights.test.ts. Sides follow ballByBall.ts: 'spartans' = Spartans batting.
 
-import { ballLabel, ballsForSide, howOut, type BallRow, type InningsSide } from '@/lib/ballByBall'
+import { ballLabel, ballsFaced, ballsForSide, howOut, type BallRow, type InningsSide } from '@/lib/ballByBall'
 
 /** One wicket, for the hover/tap readout on the chart. */
 export interface WicketNote {
@@ -13,21 +13,35 @@ export interface WicketNote {
   ball: string          // CricHeroes ball label, e.g. "7.2"
 }
 
+export interface OverBatter { name: string; id: string | null; runs: number; balls: number }
+export interface OverBowler { name: string; id: string | null }
+
 export interface WormPoint {
   over: number          // completed overs at this point (0 = start of the innings)
   runs: number          // cumulative runs
   wickets: number       // wickets that fell in this over (0 at the start)
+  wicketsAfter: number  // cumulative wickets after this over
+  runsInOver: number
   notes: WicketNote[]   // one per wicket in this over, in order
+  batters: OverBatter[] // who faced a ball in this over, in order, with what they scored
+  bowlers: OverBowler[] // who bowled this over (more than one if an over was shared)
 }
 
 /** Cumulative runs at the end of each over, starting from (0, 0). Overs with no deliveries between
  *  the first and last are carried forward so the line has no gaps. */
 export function wormPoints(inningsBalls: BallRow[]): WormPoint[] {
-  const byOver = new Map<number, { runs: number; notes: WicketNote[] }>()
+  interface OverAcc { runs: number; notes: WicketNote[]; batters: Map<string, OverBatter>; bowlers: Map<string, OverBowler> }
+  const byOver = new Map<number, OverAcc>()
   let running = 0, wicketNo = 0
   for (const b of [...inningsBalls].sort((a, c) => a.seq - c.seq)) {
-    const o = byOver.get(b.over_no) ?? { runs: 0, notes: [] }
+    const o: OverAcc = byOver.get(b.over_no) ?? { runs: 0, notes: [], batters: new Map(), bowlers: new Map() }
     o.runs += b.runs_total
+    const bt = o.batters.get(b.batter) ?? { name: b.batter, id: b.batter_player_id, runs: 0, balls: 0 }
+    bt.runs += b.runs_bat
+    if (ballsFaced(b)) bt.balls += 1
+    if (!bt.id && b.batter_player_id) bt.id = b.batter_player_id
+    o.batters.set(b.batter, bt)
+    if (!o.bowlers.has(b.bowler)) o.bowlers.set(b.bowler, { name: b.bowler, id: b.bowler_player_id })
     running += b.runs_total
     if (b.is_wicket) {
       wicketNo += 1
@@ -37,12 +51,16 @@ export function wormPoints(inningsBalls: BallRow[]): WormPoint[] {
     byOver.set(b.over_no, o)
   }
   const last = Math.max(0, ...Array.from(byOver.keys()))
-  const points: WormPoint[] = [{ over: 0, runs: 0, wickets: 0, notes: [] }]
-  let total = 0
+  const points: WormPoint[] = [{ over: 0, runs: 0, wickets: 0, wicketsAfter: 0, runsInOver: 0, notes: [], batters: [], bowlers: [] }]
+  let total = 0, wkts = 0
   for (let over = 1; over <= last; over++) {
     const o = byOver.get(over)
     total += o?.runs ?? 0
-    points.push({ over, runs: total, wickets: o?.notes.length ?? 0, notes: o?.notes ?? [] })
+    wkts += o?.notes.length ?? 0
+    points.push({
+      over, runs: total, wickets: o?.notes.length ?? 0, wicketsAfter: wkts, runsInOver: o?.runs ?? 0,
+      notes: o?.notes ?? [], batters: o ? Array.from(o.batters.values()) : [], bowlers: o ? Array.from(o.bowlers.values()) : [],
+    })
   }
   return points
 }
@@ -141,4 +159,29 @@ export function chaseSeries(points: WormPoint[], target: number, totalOvers: num
     if (needed === 0) break
   }
   return rows
+}
+
+export interface RateCrossing {
+  over: number                    // fractional over where the two lines meet
+  rate: number                    // the rate at that point
+  direction: 'behind' | 'ahead'   // behind = current rate fell below the required rate; ahead = it rose above
+}
+
+/** Where the current rate and the required rate cross, interpolated between the two overs either
+ *  side. A chase can cross more than once. */
+export function rateCrossings(rows: ChaseRow[]): RateCrossing[] {
+  const out: RateCrossing[] = []
+  for (let i = 1; i < rows.length; i++) {
+    const a = rows[i - 1], b = rows[i]
+    if (a.rrr == null || b.rrr == null) continue
+    const d1 = a.crr - a.rrr, d2 = b.crr - b.rrr
+    if (d1 === 0 || d2 === 0 || Math.sign(d1) === Math.sign(d2)) continue
+    const t = d1 / (d1 - d2)
+    out.push({
+      over: a.over + t * (b.over - a.over),
+      rate: a.crr + t * (b.crr - a.crr),
+      direction: d1 > 0 ? 'behind' : 'ahead',
+    })
+  }
+  return out
 }
