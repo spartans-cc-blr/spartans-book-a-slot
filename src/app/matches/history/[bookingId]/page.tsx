@@ -268,7 +268,7 @@ export default async function MatchDetailPage({ params }: { params: { bookingId:
 
         <div className="mt-5">
           {stats ? (
-            <MatchTabs bookingId={booking.id} format={booking.format} batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} fallOfWickets={stats.fall_of_wickets ?? []} opponentFallOfWickets={stats.opponent_fall_of_wickets ?? []} teamTotal={stats.team_total} teamOvers={stats.team_overs} teamWickets={stats.team_wickets} opponentTotal={stats.opponent_total} opponentOvers={stats.opponent_overs} opponentWickets={stats.opponent_wickets} opponentName={booking.opponent_name} squad={squad} />
+            <MatchTabs bookingId={booking.id} format={booking.format} battedFirst={battedFirst} batting={stats.batting ?? []} bowling={stats.bowling ?? []} fielding={stats.fielding ?? []} teamList={stats.team_list ?? []} fallOfWickets={stats.fall_of_wickets ?? []} opponentFallOfWickets={stats.opponent_fall_of_wickets ?? []} teamTotal={stats.team_total} teamOvers={stats.team_overs} teamWickets={stats.team_wickets} opponentTotal={stats.opponent_total} opponentOvers={stats.opponent_overs} opponentWickets={stats.opponent_wickets} opponentName={booking.opponent_name} squad={squad} />
           ) : (
             <p className="font-rajdhani text-sm" style={{ color: 'var(--scorecard-text-faint)' }}>
               Scorecard not yet synced to Hub for this match.
