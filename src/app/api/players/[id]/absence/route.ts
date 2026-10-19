@@ -34,6 +34,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const { data: player } = await supabase.from('players').select('id').eq('id', params.id).maybeSingle()
   if (!player) return NextResponse.json({ error: 'Player not found' }, { status: 404 })
 
+  // "Left the club" blocks sign-in, so only an admin may set it.
+  if (reason === 'left_club' && !user.isAdmin) {
+    return NextResponse.json({ error: 'Only an admin can mark a player as left the club' }, { status: 403 })
+  }
+
   // Once someone is marked "left the club" (which blocks their sign-in), only an
   // admin may change or clear it — that is the "admin approves again" step.
   if (!user.isAdmin) {

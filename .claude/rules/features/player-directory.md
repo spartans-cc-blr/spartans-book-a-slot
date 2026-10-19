@@ -216,7 +216,7 @@ A player whose newest `player_absences` row has `reason = 'left_club'` cannot si
 
 - **New sign-ins:** the NextAuth `signIn` callback (`src/lib/auth.ts`) looks the player up by Gmail and refuses (login page shows "Access denied") when `hasLeftClub()` (`src/lib/leftClub.ts`) is true. Emails in `ADMIN_EMAILS` are never blocked.
 - **Existing sessions:** the `jwt` callback re-checks the player row at most every 10 minutes (`RECHECK_MS`, `token.checkedAt`). A player who has left gets `playerStatus = 'expelled'` and all captain/GC/wrangler flags dropped, so the existing suspension handling applies. Once re-approved, the next re-check restores their real roles.
-- **Re-approval is admin-only:** `PUT /api/players/[id]/absence` still lets captain/GC/admin mark someone as left, but when the current state is `left_club` only an admin may change or clear it (403 otherwise). `AbsenceControl` disables the dropdown for non-admins and explains why; `PlayerDirectoryGrid` takes an `isAdmin` prop.
+- **Admin-only:** `PUT /api/players/[id]/absence` returns 403 unless the caller is an admin when setting `left_club`, and when changing or clearing an existing `left_club` (the "admin approves again" step). Captains and GC can still set the other reasons. `AbsenceControl` hides the "Left the club" option from non-admins and disables the dropdown on a player who has left; `PlayerDirectoryGrid` takes an `isAdmin` prop.
 - A DB error in the lookup fails open (logged), so an outage cannot lock the club out.
 
 ---

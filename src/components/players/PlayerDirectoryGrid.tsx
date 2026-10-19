@@ -422,7 +422,7 @@ function AbsenceControl({ p, isAdmin, onSaved }: { p: DirectoryPlayer; isAdmin: 
         className={fieldCls}
       >
         <option value="">Not set</option>
-        {ABSENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {ABSENCE_OPTIONS.filter(o => isAdmin || o.value !== 'left_club' || reason === 'left_club').map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       {reason === 'left_club' && (
         <p className="font-rajdhani text-[11px] text-[var(--stats-text-muted)]">
