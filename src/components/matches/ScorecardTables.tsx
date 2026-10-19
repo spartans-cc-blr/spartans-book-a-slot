@@ -264,7 +264,7 @@ export function ScorecardTables({
                   <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                     <td className="text-left py-1.5 pr-2 align-middle">
                       <div className="leading-tight">
-                        <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                        <PlayerNameLink highlightSelf name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                         {String(pickField(row, ['not_out']) ?? '').toUpperCase() === 'Y' && <span title="Not out">*</span>}
                         <RoleTag member={findSquadMember(row, name, squad)} />
                       </div>
@@ -296,7 +296,7 @@ export function ScorecardTables({
               const name = pickField(row, ['player_name', 'name'])
               return (
                 <span key={name}>
-                  <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                  <PlayerNameLink highlightSelf name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                   <RoleTag member={findSquadMember(row, name, squad)} />
                   {i < didNotBatRows.length - 1 ? ',' : ''}
                 </span>
@@ -418,7 +418,7 @@ export function ScorecardTables({
                           ? <span className="text-[var(--scorecard-text-faint)]">Unbroken</span>
                           : describeDismissal(b).map((seg, i) =>
                               seg.kind === 'bowler'
-                                ? <PlayerNameLink key={i} name={seg.value} playerId={row ? findPlayerId(row, seg.value, squad) : null} cricHeroesUrl={row ? findCricHeroesUrl(row, seg.value, squad) : null} />
+                                ? <PlayerNameLink highlightSelf key={i} name={seg.value} playerId={row ? findPlayerId(row, seg.value, squad) : null} cricHeroesUrl={row ? findCricHeroesUrl(row, seg.value, squad) : null} />
                                 : seg.kind === 'fielder'
                                   ? <span key={i}>{seg.value}</span>
                                   : <span key={i} className="text-[var(--scorecard-text-faint)]">{seg.value}</span>)}
@@ -472,7 +472,7 @@ export function ScorecardTables({
                   <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                     <td className="text-left py-1.5 pr-2 align-middle">
                       <div className="leading-tight">
-                        <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                        <PlayerNameLink highlightSelf name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                         <RoleTag member={findSquadMember(row, name, squad)} />
                       </div>
                       <div
@@ -530,7 +530,7 @@ export function ScorecardTables({
                   return (
                     <tr key={i} className={`border-b border-[var(--scorecard-table-divider)] ${isTop ? 'text-gold font-semibold' : 'text-[var(--scorecard-text-2)]'}`}>
                       <td className="text-left py-1.5 pr-2 align-middle">
-                        <PlayerNameLink name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
+                        <PlayerNameLink highlightSelf name={name} playerId={findPlayerId(row, name, squad)} cricHeroesUrl={findCricHeroesUrl(row, name, squad)} />
                         <RoleTag member={findSquadMember(row, name, squad)} />
                       </td>
                       <td className="text-right px-1 align-middle tabular-nums">{catches}</td>
