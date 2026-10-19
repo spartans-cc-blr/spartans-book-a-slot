@@ -136,13 +136,13 @@ describe('aggregateBreakthroughLeaders', () => {
 describe('describeDismissal', () => {
   const txt = (t: string | null, f: string | null, w: string | null) =>
     describeDismissal({ dismissalType: t, fielderName: f, bowlerName: w }).map(x => x.value).join('')
-  it('words each dismissal with fielder and bowler', () => {
-    expect(txt('caught', 'Sagar', 'Ramesh')).toBe('Caught by Sagar, bowled Ramesh')
-    expect(txt('caught', 'Ramesh', 'Ramesh')).toBe('Caught & bowled by Ramesh')
-    expect(txt('caught_behind', 'Siva', 'PP')).toBe('Caught behind by Siva, bowled PP')
-    expect(txt('stumping', 'Siva', 'PP')).toBe('Stumped by Siva, bowled PP')
-    expect(txt('bowled', null, 'Kishore')).toBe('Bowled by Kishore')
-    expect(txt('lbw', null, 'Ramesh')).toBe('LBW, bowled Ramesh')
-    expect(txt('run_out', 'Kishore', null)).toBe('Run out (Kishore)')
+  it('uses CricHeroes scorecard notation', () => {
+    expect(txt('caught', 'PP', 'Preetam Patil')).toBe('c PP b Preetam Patil')
+    expect(txt('caught', 'Ramesh', 'Ramesh')).toBe('c & b Ramesh')
+    expect(txt('caught_behind', 'KV', 'DS Sakketha')).toBe('c †KV b DS Sakketha')
+    expect(txt('stumping', 'KV', 'PP')).toBe('st †KV b PP')
+    expect(txt('bowled', null, 'PP')).toBe('b PP')
+    expect(txt('lbw', null, 'Ramesh Shanmugamoorthy')).toBe('lbw b Ramesh Shanmugamoorthy')
+    expect(txt('run_out', 'Kishore', null)).toBe('run out (Kishore)')
   })
 })
