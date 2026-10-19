@@ -79,6 +79,9 @@ On first sign-in, if `photo_url` is null, the Google profile photo is written to
 
 **Session strategy:** JWT, 8-hour expiry. No database session storage.
 
+### Left-the-club sign-in block
+Players whose latest `player_absences` reason is `left_club` are refused at sign-in and downgraded to suspended on token re-check; only an admin can reverse it. See `features/player-directory.md` §8.1.
+
 ### Player Status Enforcement
 The `expelled` status is checked at both the page level (shows suspension banner) and the API level (`/api/player-availability` returns 403 for expelled players).
 
