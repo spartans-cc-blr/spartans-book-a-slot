@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { BallRow } from '@/lib/ballByBall'
-import { buildWorm, chaseSeries, requiredLineAt, wormPoints } from '@/lib/matchInsights'
+import { buildWorm, chaseSeries, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
 
 function ball(side: 'spartans' | 'opponent', over: number, runs: number, wicket = false): BallRow {
   return {
@@ -104,5 +104,47 @@ describe('chaseSeries', () => {
   it('has no required rate with no overs left', () => {
     const rows = chaseSeries(chase, 100, 3)
     expect(rows[2].rrr).toBeNull()
+  })
+})
+
+describe('per-over who', () => {
+  it('lists who bowled and who batted in each over, with their runs and balls', () => {
+    const a = { ...ball('spartans', 1, 4), batter: 'Siva', bowler: 'Kumar', batter_player_id: 'p1' }
+    const b = { ...ball('spartans', 1, 1), seq: 11, batter: 'Loki', bowler: 'Kumar' }
+    const c = { ...ball('spartans', 1, 2), seq: 12, batter: 'Siva', bowler: 'Kumar' }
+    const pts = wormPoints([a, b, c])
+    expect(pts[1].bowlers).toEqual([{ name: 'Kumar', id: null }])
+    expect(pts[1].batters).toEqual([
+      { name: 'Siva', id: 'p1', runs: 6, balls: 2 },
+      { name: 'Loki', id: null, runs: 1, balls: 1 },
+    ])
+    expect(pts[1].runsInOver).toBe(7)
+  })
+
+  it('tracks cumulative wickets', () => {
+    const pts = wormPoints([ball('spartans', 1, 0, true), ball('spartans', 2, 0, true)])
+    expect(pts.map(p => p.wicketsAfter)).toEqual([0, 1, 2])
+  })
+})
+
+describe('rateCrossings', () => {
+  const row = (over: number, crr: number, rrr: number | null) =>
+    ({ over, runsInOver: 0, scored: 0, needed: 1, oversLeft: 1, crr, rrr, wickets: 0 })
+
+  it('finds where current drops below required, interpolated between overs', () => {
+    const x = rateCrossings([row(5, 12, 10), row(6, 10, 11), row(7, 9, 12)])
+    expect(x).toHaveLength(1)
+    expect(x[0].direction).toBe('behind')
+    expect(x[0].over).toBeCloseTo(5.667, 2)
+    expect(x[0].rate).toBeCloseTo(10.667, 2)
+  })
+
+  it('finds a recovery and ignores overs with no required rate', () => {
+    const x = rateCrossings([row(1, 8, 10), row(2, 11, 10), row(3, 12, null)])
+    expect(x.map(c => c.direction)).toEqual(['ahead'])
+  })
+
+  it('returns nothing when the lines never meet', () => {
+    expect(rateCrossings([row(1, 12, 10), row(2, 13, 10)])).toEqual([])
   })
 })
