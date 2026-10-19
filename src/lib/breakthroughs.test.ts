@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeBreakthroughs, summariseBreakers, oversToBalls } from './breakthroughs'
+import { computeBreakthroughs, summariseBreakers, oversToBalls, describeDismissal } from './breakthroughs'
 import { aggregateBreakthroughLeaders } from './breakthroughLeaders'
 import { buildStandBaselines, classifyStand, standGroup, MIN_BASELINE_SAMPLE } from './standBaselines'
 
@@ -130,5 +130,19 @@ describe('aggregateBreakthroughLeaders', () => {
     expect(out.byWicket[0]).toMatchObject({ runs: 70, matchId: 'm2' })
     expect(out.byWicket[0].bowler.playerName).toBe('Sagar')
     expect(out.byWicket[1]).toMatchObject({ runs: 60, matchId: 'm1' })
+  })
+})
+
+describe('describeDismissal', () => {
+  const txt = (t: string | null, f: string | null, w: string | null) =>
+    describeDismissal({ dismissalType: t, fielderName: f, bowlerName: w }).map(x => x.value).join('')
+  it('words each dismissal with fielder and bowler', () => {
+    expect(txt('caught', 'Sagar', 'Ramesh')).toBe('Caught by Sagar, bowled Ramesh')
+    expect(txt('caught', 'Ramesh', 'Ramesh')).toBe('Caught & bowled by Ramesh')
+    expect(txt('caught_behind', 'Siva', 'PP')).toBe('Caught behind by Siva, bowled PP')
+    expect(txt('stumping', 'Siva', 'PP')).toBe('Stumped by Siva, bowled PP')
+    expect(txt('bowled', null, 'Kishore')).toBe('Bowled by Kishore')
+    expect(txt('lbw', null, 'Ramesh')).toBe('LBW, bowled Ramesh')
+    expect(txt('run_out', 'Kishore', null)).toBe('Run out (Kishore)')
   })
 })

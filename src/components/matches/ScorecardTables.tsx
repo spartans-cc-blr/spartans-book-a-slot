@@ -2,7 +2,7 @@
 
 import { PlayerNameLink } from '@/lib/playerLink'
 import { computePartnerships } from '@/lib/partnerships'
-import { computeBreakthroughs, summariseBreakers } from '@/lib/breakthroughs'
+import { computeBreakthroughs, summariseBreakers, describeDismissal } from '@/lib/breakthroughs'
 
 interface SquadRef {
   player_id:      string
@@ -471,21 +471,19 @@ export function ScorecardTables({
                 return (
                   <div key={b.wicketNumber} className="flex items-center gap-2">
                     <span className="relative z-10 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-[var(--fx-accent)] bg-[var(--scorecard-table-bg)] font-rajdhani text-xs font-bold text-[var(--fx-accent)]">{b.wicketNumber}</span>
-                    <div className="flex-1 min-w-0 relative h-7 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">
-                      <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
-                      <div className="absolute inset-0 flex items-center px-2.5 min-w-0">
-                        <span className="font-rajdhani text-xs font-semibold text-[var(--scorecard-heading-text)] truncate text-left">
-                          {b.unbroken
-                            ? <span className="text-[var(--scorecard-text-faint)] font-normal">Unbroken</span>
-                            : <>
-                                {b.outBatter ?? 'Wicket'}
-                                {b.dismissalType && <span className="text-[var(--scorecard-text-faint)] font-normal"> {b.dismissalType.replace(/_/g, ' ')}</span>}
-                                {' · '}
-                                {b.bowlerName
-                                  ? <PlayerNameLink name={firstName(b.bowlerName)} playerId={row ? findPlayerId(row, b.bowlerName, squad) : null} cricHeroesUrl={row ? findCricHeroesUrl(row, b.bowlerName, squad) : null} />
-                                  : <span className="text-[var(--scorecard-text-faint)] font-normal">no bowler credit</span>}
-                              </>}
-                        </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-rajdhani text-xs leading-tight text-[var(--scorecard-heading-text)] break-words">
+                        {b.unbroken
+                          ? <span className="text-[var(--scorecard-text-faint)]">Unbroken</span>
+                          : describeDismissal(b).map((seg, i) =>
+                              seg.kind === 'bowler'
+                                ? <PlayerNameLink key={i} name={firstName(seg.value)} playerId={row ? findPlayerId(row, seg.value, squad) : null} cricHeroesUrl={row ? findCricHeroesUrl(row, seg.value, squad) : null} />
+                                : seg.kind === 'fielder'
+                                  ? <span key={i} className="font-semibold">{firstName(seg.value)}</span>
+                                  : <span key={i} className="text-[var(--scorecard-text-faint)]">{seg.value}</span>)}
+                      </p>
+                      <div className="mt-1 h-1.5 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">
+                        <div className="h-full bg-gold/40 rounded" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                     <span className="font-rajdhani text-xs font-bold text-gold w-20 flex-shrink-0 text-right">
