@@ -329,7 +329,7 @@ export function ScorecardTables({
                   <div className="flex-1 relative h-7 bg-[var(--scorecard-table-bg)] rounded overflow-hidden">
                     <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${pct}%` }} />
                     <div className="absolute inset-0 flex items-center justify-start px-2.5">
-                      <span className="font-rajdhani text-xs font-semibold text-[var(--scorecard-heading-text)] truncate text-left">
+                      <span className="font-rajdhani text-xs font-normal text-[var(--scorecard-heading-text)] truncate text-left">
                         {p.players.map((player, i) => {
                           // player.playerId already comes straight from
                           // batting_stats.player_id — the authoritative,
