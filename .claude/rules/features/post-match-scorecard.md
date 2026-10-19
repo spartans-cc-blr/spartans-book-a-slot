@@ -2761,6 +2761,11 @@ client-reachable input.
 
 **Fix:** `backfillOneBooking()` now reads the existing status and omits `status` from the upsert when it is `fees_applied`, and the `parsed` update has `.neq('status', 'fees_applied')`. Data: 14 bookings (8 Aug – 27 Sep) with `fees_applied_at` set and live debits were restored to `fees_applied` by SQL.
 
+
+## 22. Signed-in player's name highlighted in the scorecard (added October 2026)
+
+`PlayerNameLink` takes `highlightSelf`; `ScorecardTables` passes it on every name (batting, bowling, fielding, did-not-bat, partnerships, FOW bowler). When the name's resolved Hub `player_id` equals the viewer's session `playerId` it renders purple and semibold (`purple-700` light / `purple-400` dark). Matching is by `player_id` (via the alias/override resolution), not by spelling, so a scorecard nickname like "Sagar" lights up for Gunasagar. Unreconciled rows have no id and are never highlighted. Other `PlayerNameLink` users are unchanged.
+
 ---
 
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*
