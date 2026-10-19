@@ -126,7 +126,7 @@ export default async function PlayersDirectoryPage() {
       </div>
 
       <main className="px-5 md:px-8 lg:px-10 py-6 max-w-6xl">
-        <PlayerDirectoryGrid players={players} showWallet={canSeeWallet} canManageAbsences={canManageAbsences} />
+        <PlayerDirectoryGrid players={players} showWallet={canSeeWallet} canManageAbsences={canManageAbsences} isAdmin={!!user?.isAdmin} />
         <p className="font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 mt-8">
           Highlights cover synced Hub matches only; practice games are excluded. Orange Cap (most runs) and Purple Cap (most wickets) are for the current season.
         </p>

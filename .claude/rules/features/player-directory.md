@@ -205,10 +205,19 @@ can now record the reason from the **Inactive** filter on this page.
   when the status pill changes, and updates live when a reason is saved on a card
   (`absenceOverrides` in `PlayerDirectoryGrid`). Hidden for everyone else, who never
   receive absence data. Client-side only; no API change.
-- **Not yet wired:** nothing reads the reason besides this page. Suppressing
+- **Not yet wired (other than §8.1):** nothing reads the reason besides this page. Suppressing
   the Sun–Wed availability nudge for players who are away (and a "welcome
   back" nudge near their return date), and hiding "Left the club" players from
   outreach lists, are the planned follow-ups.
+
+### 8.1 "Left the club" blocks sign-in (added October 2026)
+
+A player whose newest `player_absences` row has `reason = 'left_club'` cannot sign in until an admin changes it.
+
+- **New sign-ins:** the NextAuth `signIn` callback (`src/lib/auth.ts`) looks the player up by Gmail and refuses (login page shows "Access denied") when `hasLeftClub()` (`src/lib/leftClub.ts`) is true. Emails in `ADMIN_EMAILS` are never blocked.
+- **Existing sessions:** the `jwt` callback re-checks the player row at most every 10 minutes (`RECHECK_MS`, `token.checkedAt`). A player who has left gets `playerStatus = 'expelled'` and all captain/GC/wrangler flags dropped, so the existing suspension handling applies. Once re-approved, the next re-check restores their real roles.
+- **Re-approval is admin-only:** `PUT /api/players/[id]/absence` still lets captain/GC/admin mark someone as left, but when the current state is `left_club` only an admin may change or clear it (403 otherwise). `AbsenceControl` disables the dropdown for non-admins and explains why; `PlayerDirectoryGrid` takes an `isAdmin` prop.
+- A DB error in the lookup fails open (logged), so an outage cannot lock the club out.
 
 ---
 

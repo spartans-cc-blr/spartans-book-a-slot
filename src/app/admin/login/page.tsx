@@ -29,7 +29,7 @@ export default function AdminLoginPage() {
           {error && (
             <div className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 font-rajdhani text-sm px-4 py-3 rounded mb-4">
               {error === 'AccessDenied'
-                ? 'Access denied. Only the club coordinator email can sign in.'
+                ? 'Access denied. If you have left the club, ask the club coordinator to re-approve your account.'
                 : 'Sign in failed. Please try again.'}
             </div>
           )}

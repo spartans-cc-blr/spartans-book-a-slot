@@ -34,6 +34,17 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const { data: player } = await supabase.from('players').select('id').eq('id', params.id).maybeSingle()
   if (!player) return NextResponse.json({ error: 'Player not found' }, { status: 404 })
 
+  // Once someone is marked "left the club" (which blocks their sign-in), only an
+  // admin may change or clear it — that is the "admin approves again" step.
+  if (!user.isAdmin) {
+    const { data: current } = await supabase
+      .from('player_absences').select('reason').eq('player_id', params.id)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (current?.reason === 'left_club' && reason !== 'left_club') {
+      return NextResponse.json({ error: 'Only an admin can re-approve a player who left the club' }, { status: 403 })
+    }
+  }
+
   // A cleared row or a "left the club" row carries no return date.
   const keepsDetails = reason !== null
   const row = {

@@ -1,6 +1,10 @@
 import NextAuth, { type NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import { createServiceClient } from '@/lib/supabase'
+import { hasLeftClub } from '@/lib/leftClub'
+
+// Re-check the player row (roles, status, left-the-club) at most this often per token.
+const RECHECK_MS = 10 * 60 * 1000
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '')
   .split(',')
@@ -16,6 +20,13 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async signIn({ user }) {
+      // Players marked "left the club" can't sign in until an admin reverses it.
+      const email = user?.email?.toLowerCase()
+      if (!email || ADMIN_EMAILS.includes(email)) return true
+      const supabase = createServiceClient()
+      const { data: player } = await supabase
+        .from('players').select('id').eq('gmail_id', email).maybeSingle()
+      if (player?.id && await hasLeftClub(supabase, player.id)) return false
       return true
     },
 
@@ -24,7 +35,9 @@ export const authOptions: NextAuthOptions = {
       // We re-fetch on first sign-in so the token is always fresh
       const email = user?.email ?? (token.email as string | undefined)
 
-      if (email && (user || !token.playerId)) {
+      const stale = !!token.playerId && Date.now() - ((token.checkedAt as number | undefined) ?? 0) > RECHECK_MS
+
+      if (email && (user || !token.playerId || stale)) {
         // user present  = first sign-in, always re-fetch
         // !token.playerId = token exists but has no player yet (e.g. deployed while user was signed in)
         const supabase = createServiceClient()
@@ -47,6 +60,17 @@ export const authOptions: NextAuthOptions = {
         token.playerStatus = player?.status ?? null
         token.isAdmin      = ADMIN_EMAILS.includes(email.toLowerCase())
         token.photoUrl     = player?.photo_url ?? null
+        token.checkedAt    = Date.now()
+
+        // Existing sessions of a player who has since left: treat as suspended
+        // (reuses the 'expelled' handling) and drop every role until re-approved.
+        const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase())
+        if (player?.id && !isAdmin && await hasLeftClub(supabase, player.id)) {
+          token.playerStatus = 'expelled'
+          token.isCaptain = false
+          token.isGC = false
+          token.isWrangler = false
+        }
       }
       return token
     },

@@ -86,7 +86,7 @@ function formatRupees(n: number) {
   return `${n < 0 ? '-' : ''}₹${Math.abs(n).toLocaleString('en-IN')}`
 }
 
-export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbsences = false }: { players: DirectoryPlayer[]; showWallet?: boolean; canManageAbsences?: boolean }) {
+export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbsences = false, isAdmin = false }: { players: DirectoryPlayer[]; showWallet?: boolean; canManageAbsences?: boolean; isAdmin?: boolean }) {
   const [duesOnly, setDuesOnly] = useState(false)
   const [query, setQuery] = useState('')
   const [letter, setLetter] = useState<string | null>(null)
@@ -238,7 +238,7 @@ export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbse
 
       {filtered.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map(p => <PlayerCard key={p.id} p={p} showWallet={showWallet} canManageAbsences={canManageAbsences} onAbsenceSaved={a => setAbsenceOverrides(o => ({ ...o, [p.id]: a }))} />)}
+          {filtered.map(p => <PlayerCard key={p.id} p={p} showWallet={showWallet} canManageAbsences={canManageAbsences} isAdmin={isAdmin} onAbsenceSaved={a => setAbsenceOverrides(o => ({ ...o, [p.id]: a }))} />)}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -250,7 +250,7 @@ export function PlayerDirectoryGrid({ players, showWallet = false, canManageAbse
   )
 }
 
-function PlayerCard({ p, showWallet, canManageAbsences, onAbsenceSaved }: { p: DirectoryPlayer; showWallet: boolean; canManageAbsences: boolean; onAbsenceSaved: (a: Absence | null) => void }) {
+function PlayerCard({ p, showWallet, canManageAbsences, isAdmin, onAbsenceSaved }: { p: DirectoryPlayer; showWallet: boolean; canManageAbsences: boolean; isAdmin: boolean; onAbsenceSaved: (a: Absence | null) => void }) {
   const [headline, ...rest] = pickHighlights(p.highlights)
   const lastPlayed = formatLastPlayed(p.last_played_on)
   const primary = skillShort(p.primary_skill)
@@ -352,20 +352,23 @@ function PlayerCard({ p, showWallet, canManageAbsences, onAbsenceSaved }: { p: D
         </span>
       </div>
     </Link>
-    {canManageAbsences && !p.is_active && <AbsenceControl p={p} onSaved={onAbsenceSaved} />}
+    {canManageAbsences && !p.is_active && <AbsenceControl p={p} isAdmin={isAdmin} onSaved={onAbsenceSaved} />}
     </div>
   )
 }
 
 // Captain/GC/admin only, Inactive players only. Saves via PUT
 // /api/players/[id]/absence (append-only; "Not set" clears). See §8.
-function AbsenceControl({ p, onSaved }: { p: DirectoryPlayer; onSaved: (a: Absence | null) => void }) {
+function AbsenceControl({ p, isAdmin, onSaved }: { p: DirectoryPlayer; isAdmin: boolean; onSaved: (a: Absence | null) => void }) {
   const [saved, setSaved] = useState<Absence | null>(p.absence)
   const [reason, setReason] = useState<AbsenceReason | ''>(p.absence?.reason ?? '')
   const [ret, setRet] = useState(p.absence?.expected_return ?? '')
   const [note, setNote] = useState(p.absence?.note ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  // "Left the club" blocks sign-in; only an admin can reverse it.
+  const locked = saved?.reason === 'left_club' && !isAdmin
 
   const dirty = (reason || null) !== (saved?.reason ?? null)
     || (ret || null) !== (saved?.expected_return ?? null)
@@ -414,12 +417,18 @@ function AbsenceControl({ p, onSaved }: { p: DirectoryPlayer; onSaved: (a: Absen
       <select
         aria-label={`Reason ${p.name} is inactive`}
         value={reason}
+        disabled={locked}
         onChange={e => setReason(e.target.value as AbsenceReason | '')}
         className={fieldCls}
       >
         <option value="">Not set</option>
         {ABSENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
+      {reason === 'left_club' && (
+        <p className="font-rajdhani text-[11px] text-[var(--stats-text-muted)]">
+          {locked ? 'Sign-in is blocked. Only an admin can re-approve this player.' : 'Saving this blocks the player from signing in until an admin re-approves.'}
+        </p>
+      )}
       {reason && reason !== 'left_club' && (
         <label className="flex items-center gap-2 font-rajdhani text-xs text-[var(--stats-text-muted)]">
           Back by
