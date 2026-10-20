@@ -9,7 +9,7 @@ import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { formatOvers, type BallRow, type BowlerLine } from '@/lib/ballByBall'
-import { bowlingOverSeries, vsRequiredRate, overContexts, wormPoints } from '@/lib/matchInsights'
+import { bowlingOverSeries, vsRequiredRate, overContexts, overEndRates, wormPoints } from '@/lib/matchInsights'
 
 const W = 360, H = 240
 const PAD = { l: 30, r: 8, t: 12, b: 26 }
@@ -46,23 +46,25 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
   const target = battedFirst === true && firstTotal > 0 ? firstTotal + 1 : null
   const contexts = useMemo(() => overContexts(points, target, totalOvers), [points, target, totalOvers])
 
+  const endRates = useMemo(() => overEndRates(points, target, totalOvers), [points, target, totalOvers])
+
   const xMax = overs.length
   const plotW = W - PAD.l - PAD.r, plotH = H - PAD.t - PAD.b
   const slotW = plotW / xMax
   const maxBar = Math.max(0, ...overs.map(o => o.runs))
-  const maxRate = Math.max(0, ...contexts.map(c => c.crr ?? 0), target ? target / totalOvers : 0)
+  const maxRate = Math.max(0, ...endRates.map(c => c.crr), target ? target / totalOvers : 0)
   // Wicket dots and labels sit above the bars, and the last overs can send the required rate sky-high,
   // so the axis is capped and the required line clipped to it.
   const yMax = Math.min(32, Math.max(12, Math.ceil((Math.max(maxBar, maxRate) * 1.15) / 4) * 4))   // a multiple of 4, so the four gridline steps are whole numbers
   const y = (v: number) => H - PAD.b - (Math.min(v, yMax) / yMax) * plotH
   const xc = (over: number) => PAD.l + (over - 0.5) * slotW
-  const clipped = contexts.some(c => (c.rrr ?? 0) > yMax)
+  const clipped = endRates.some(c => (c.rrr ?? 0) > yMax)
 
-  const lastCtx = contexts[contexts.length - 1]?.over ?? 0
-  const line = (pick: (c: (typeof contexts)[number]) => number | null) =>
-    contexts.flatMap((c, i) => {
+  // The lines show the rates at the END of each over, so over 1's point is its own run rate.
+  const line = (pick: (c: (typeof endRates)[number]) => number | null) =>
+    endRates.flatMap((c, i) => {
       const v = pick(c)
-      return v == null ? [] : [`${i === 0 || pick(contexts[i - 1]) == null ? 'M' : 'L'}${xc(c.over).toFixed(1)},${y(v).toFixed(1)}`]
+      return v == null ? [] : [`${i === 0 || pick(endRates[i - 1]) == null ? 'M' : 'L'}${xc(c.over).toFixed(1)},${y(v).toFixed(1)}`]
     }).join(' ')
   const crrPath = line(c => c.crr)
   const rrrPath = line(c => c.rrr)
@@ -82,6 +84,7 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
   const label = bowler ? bowler.name : 'Entire innings'
   const ov = hover != null ? overs[hover - 1] : null
   const ctx = hover != null ? contexts.find(c => c.over === hover) : undefined
+  const endR = hover != null ? endRates.find(c => c.over === hover) : undefined
   const basis = target != null ? 'rrr' : 'crr'
   const verdict = ov ? vsRequiredRate(ov, ctx, basis) : null
   const econ = ov && ov.legalBalls > 0 ? (ov.runs / ov.legalBalls) * 6 : null
@@ -184,6 +187,12 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
                     <span className={MUTED}> (needed {ctx.needed} from {ctx.oversLeft} ov)</span>
                   </>
                 )}
+                {endR && (
+                  <>
+                    <span className={MUTED}> · after the over: CRR </span><span className="tabular-nums" style={{ color: CRR_COLOUR }}>{endR.crr.toFixed(2)}</span>
+                    {endR.rrr != null && <><span className={MUTED}> · RRR </span><span className="tabular-nums" style={{ color: 'var(--fx-accent)' }}>{endR.rrr.toFixed(2)}</span></>}
+                  </>
+                )}
                 {verdict && (
                   <span className={MUTED}> · {verdict === 'under' ? 'under' : verdict === 'over' ? 'over' : 'level with'} the {basis === 'rrr' ? 'required' : 'current'} rate{verdict === 'under' && basis === 'crr' ? ' (brought it down)' : verdict === 'over' && basis === 'crr' ? ' (pushed it up)' : ''}</span>
                 )}
@@ -208,7 +217,7 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
           <span className="inline-block h-2 w-2 rounded-full" style={{ background: 'var(--scorecard-heading-text)' }} />
           Wicket
         </span>
-        {lastCtx > 0 && (
+        {endRates.length > 0 && (
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block h-0.5 w-4 rounded" style={{ background: CRR_COLOUR }} />
             CRR
@@ -223,9 +232,9 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
       </div>
       <p className={`text-[10px] font-rajdhani mt-1 ${MUTED}`}>
         {target != null
-          ? `Spartans defended ${firstTotal}. CRR and RRR are the batting side's rates going into each over, so a solid bar means the bowler kept them below the rate they needed; a hollow bar means the over went for more.`
+          ? `Spartans defended ${firstTotal}. The CRR and RRR lines show the batting side's rates at the end of each over (the readout also gives the rates going in, which each over is judged against), so a solid bar means the bowler kept them below the rate they needed; a hollow bar means the over went for more.`
           : battedFirst === false
-            ? 'Spartans bowled first, so there is no target yet: only the batting side’s current run rate (going into each over) is shown. A solid bar means the over was cheaper than that rate (it brought the CRR down); a hollow bar means it cost more. Over 1 has no CRR yet, so it stays solid.'
+            ? 'Spartans bowled first, so there is no target yet: only the batting side’s current run rate (at the end of each over) is shown. A solid bar means the over was cheaper than that rate (it brought the CRR down); a hollow bar means it cost more. Over 1 has no CRR yet, so it stays solid.'
             : 'Batting order isn’t known for this match, so there is no required rate: only the batting side’s current run rate is shown.'}
         {bowler ? ' Bars show only the overs this bowler bowled; the faint ticks are overs he did not bowl.' : ' Entire innings counts every run (byes included) and every wicket.'}
         {clipped && ` The axis stops at ${yMax}; the required rate line is clipped above that.`}

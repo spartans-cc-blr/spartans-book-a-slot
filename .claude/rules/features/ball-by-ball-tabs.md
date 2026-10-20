@@ -176,3 +176,9 @@ The Bowling tab's plain over-by-over bars were replaced by `BowlingOverChart` (`
 - **Hover or tap and drag any over:** highlights the over and shows who bowled it, the selected bowler's runs, wickets and economy (or "did not bowl this over"), and the batting side's score, CRR, RRR, runs needed and overs left going in, with "under / over the required rate" for his economy. Spartans bowlers link to their stats.
 - `BowlingView` gets `battedFirst`, `spartansTotal` and `opponentName` from `MatchTabs`. No new route, table or migration.
 - **Under vs over the required rate (October 2026):** when Spartans defend, each bowled over is styled by `vsRequiredRate()` (`matchInsights.ts`): economy at or below the going-in RRR is a **solid** teal bar, an over that went above it is a **hollow** bar (pale fill, teal outline). Shape/fill rather than red/green, so it reads in both themes and for colour-blind viewers. With no target (Spartans bowled first) the same styling compares each over's economy with the batting side's CRR going in: solid = brought the CRR down, hollow = pushed it up (over 1 has no CRR and stays solid). The legend and hover readout use the same verdict.
+
+
+## Bowling chart lines plot end-of-over rates (October 2026)
+
+The CRR and RRR lines on the Bowling chart now plot the rates at the **end** of each over (`overEndRates()`, `matchInsights.ts`), so over 1 has a point (its own run rate) and the line steps at the over that moved it. Each over is still judged (solid/hollow, "under/over") against the rate **going in** (`overContexts()`); the hover readout shows both ("Going in" and "after the over"). Before this the lines used the going-in rate, which drew over 1's point at over 2.
+
