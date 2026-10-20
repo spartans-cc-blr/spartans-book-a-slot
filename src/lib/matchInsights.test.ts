@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import type { BallRow } from '@/lib/ballByBall'
-import { overEndRates, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
+import { summariseBatters, type BallRow } from '@/lib/ballByBall'
+import { batterPar, overEndRates, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
 
 function ball(side: 'spartans' | 'opponent', over: number, runs: number, wicket = false): BallRow {
   return {
@@ -234,6 +234,35 @@ describe('vsRequiredRate', () => {
     expect(vsRequiredRate(ov(5), ctx(null))).toBeNull()
     expect(vsRequiredRate(ov(5), undefined)).toBeNull()
     expect(vsRequiredRate(ov(0, 0, false), ctx(8))).toBeNull()
+  })
+})
+
+describe('batterPar', () => {
+  const bb = (over: number, batter: string, runs: number): BallRow => ({ ...ball('spartans', over, runs), batter, seq: over * 10 + (batter === 'B' ? 1 : 0) })
+
+  it('chase: compares with the required rate going into each ball he faced', () => {
+    const side = [bb(1, 'A', 6), bb(2, 'A', 6)]
+    const lines = summariseBatters(side, 10)
+    const m = batterPar(side, lines, 61, 10)
+    // RRR going in: over 1 = 61/10, over 2 = 55/9
+    const expected = ((61 / 10 / 6 * 100) + (55 / 9 / 6 * 100)) / 2
+    expect(m.get('a')?.basis).toBe('rrr')
+    expect(m.get('a')?.par).toBeCloseTo(expected)
+    expect(m.get('a')?.diff).toBeCloseTo(600 - expected)
+  })
+
+  it('batting first: compares with team-mates in the same phases', () => {
+    const side = [bb(1, 'A', 6), bb(1, 'B', 1), bb(1, 'B', 1)]
+    const lines = summariseBatters(side, 20)
+    const m = batterPar(side, lines, null, 20)
+    expect(m.get('a')).toMatchObject({ basis: 'phase', par: 100 })
+    expect(m.get('a')?.diff).toBeCloseTo(500)
+  })
+
+  it('has no par for someone who faced nothing', () => {
+    const side = [bb(1, 'A', 1)]
+    const lines = summariseBatters([{ ...side[0], is_wicket: true, dismissed_batter: 'Z' }], 20)
+    expect(batterPar(side, lines, null, 20).get('z')?.par).toBeNull()
   })
 })
 

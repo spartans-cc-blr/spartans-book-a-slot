@@ -182,3 +182,11 @@ The Bowling tab's plain over-by-over bars were replaced by `BowlingOverChart` (`
 
 The CRR and RRR lines on the Bowling chart now plot the rates at the **end** of each over (`overEndRates()`, `matchInsights.ts`), so over 1 has a point (its own run rate) and the line steps at the over that moved it. Each over is still judged (solid/hollow, "under/over") against the rate **going in** (`overContexts()`); the hover readout shows both ("Going in" and "after the over"). Before this the lines used the going-in rate, which drew over 1's point at over 2.
 
+## Batting tab: strike rate vs par (October 2026)
+
+The batters table has a **vs par** column: the batter's strike rate minus a benchmark (`batterPar()`, `matchInsights.ts`). A run rate converts to a strike rate as RRR ÷ 6 × 100 (9.0 an over is 150).
+
+- **Chase (Spartans batted second):** par is the required rate going into every ball he faced, converted to a strike rate and averaged over his balls, so a batter who came in at 12 an over is held to a higher par than one at 6. Target is the opposition scorecard total + 1 (else the commentary sum).
+- **Batting first / unknown order:** there is no required rate, so par is his team-mates' strike rate in the same phases, weighted by the balls he faced in each.
+- Plus (bold) = beat par; minus = fell short; "–" = faced no ball or no benchmark. Team rates include extras and partners, which is why the benchmark is the required rate or the others' strike rate, not CRR. Wides aren't balls faced. `BattingView` gets `battedFirst` and `opponentTotal` from `MatchTabs`. No new route, table or migration.
+
