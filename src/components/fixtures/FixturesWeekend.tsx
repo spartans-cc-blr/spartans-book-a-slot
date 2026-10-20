@@ -126,6 +126,8 @@ export function FixturesWeekendGroup({
         if (res.ok) {
           setWeekendResponses(prev => ({ ...prev, [bookingId]: newResponse }))
           adjustYCount(bookingId, current, newResponse)
+          // Contextual moment to offer push: the player just did the thing notifications help with.
+          window.dispatchEvent(new Event('hub:availability-saved'))
         } else {
           const d = await res.json().catch(() => ({}))
           setErrorMap(prev => ({ ...prev, [bookingId]: d.error ?? `Save failed (${res.status})` }))

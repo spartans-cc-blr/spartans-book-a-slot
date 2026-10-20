@@ -27,6 +27,7 @@
 // "the client").
 
 import { NextRequest, NextResponse } from 'next/server'
+import { invalidateStatsCache } from '@/lib/statsCache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
@@ -204,6 +205,7 @@ export async function POST(req: NextRequest) {
       const result = await backfillPlayerIdForName({ analytics, scorecardName: scorecard_name, playerId: player_id })
       if (result.error) return NextResponse.json({ error: result.error }, { status: 500 })
       const { resynced, failed, skipped } = await resyncBookingsForMatchIds(result.matchIds, user.playerId ?? null)
+      invalidateStatsCache()
       return NextResponse.json({
         ok: true, updated: result.updated, cricheroes_player_id, resynced, resync_failed: failed, resync_skipped: skipped,
       })
@@ -227,6 +229,7 @@ export async function POST(req: NextRequest) {
     // player_id from an earlier pass while the Hub-side cache never
     // caught up.
     const { resynced, failed, skipped } = await resyncBookingsForMatchIds([scope.match_id], user.playerId ?? null)
+    invalidateStatsCache()
     return NextResponse.json({ ok: true, updated: result.updated, resynced, resync_failed: failed, resync_skipped: skipped })
   }
 
@@ -271,6 +274,7 @@ export async function POST(req: NextRequest) {
   // resynced once per name across separate "Run Reconciliation Pass"
   // requests — each of those requests only ever carries one name.
   const { resynced, failed, skipped } = await resyncBookingsForMatchIds(Array.from(touchedMatchIds), user.playerId ?? null)
+  if (updated > 0) invalidateStatsCache()
 
   return NextResponse.json({
     ok: true, updated, still_unresolved_matches: stillUnresolved, resynced, resync_failed: failed, resync_skipped: skipped,

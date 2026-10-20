@@ -6,6 +6,7 @@
 // only. Deliberately does NOT touch fees — /api/fees/apply stays a fully
 // separate, manual-only action regardless of how a match got synced.
 
+import { invalidateStatsCache } from '@/lib/statsCache'
 import { createServiceClient } from '@/lib/supabase'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { detectAndLogMilestones, detectAndLogMatchPerformances } from '@/lib/milestones'
@@ -236,6 +237,9 @@ export async function syncMatchStatsForBooking(
   // not yet applied); no-ops silently otherwise (no fee set, no squad yet,
   // already applied, or externally reconciled). See features/fee-reminders.md.
   if (!historic) await notifyFeeReminderIfPending(bookingId).catch(err => console.error('[fee-reminder]', err))
+
+  // Stats pages read through a tagged cache; drop it so the new scorecard shows immediately.
+  invalidateStatsCache()
 
   return { ok: true }
 }

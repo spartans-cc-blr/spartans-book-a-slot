@@ -6,7 +6,7 @@ import { hasLocalPushSubscription, subscribeToPush } from '@/lib/pushSubscriptio
 const DISMISS_KEY = 'push-prompt-dismissed-at'
 const DISMISS_DAYS = 14
 
-// Prompts a signed-in player to subscribe to push notifications if this
+// After a player saves an availability response, prompts them to subscribe to push notifications if this
 // device has never subscribed (or lost its subscription — see
 // features/push-notifications.md). Never shown if the browser doesn't
 // support push, permission is already denied, or the player dismissed it
@@ -16,6 +16,9 @@ export function PushSubscribePrompt() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Offered right after the player saves an availability response (event
+  // dispatched from FixturesWeekend), not on page load, so the ask arrives
+  // with a reason attached.
   useEffect(() => {
     let cancelled = false
     async function check() {
@@ -26,8 +29,9 @@ export function PushSubscribePrompt() {
       const already = await hasLocalPushSubscription()
       if (!already && !cancelled) setShow(true)
     }
-    check()
-    return () => { cancelled = true }
+    const onSaved = () => { void check() }
+    window.addEventListener('hub:availability-saved', onSaved)
+    return () => { cancelled = true; window.removeEventListener('hub:availability-saved', onSaved) }
   }, [])
 
   function dismiss() {

@@ -9,6 +9,7 @@
 // canManage prop is UI only — this route is the real gate.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { invalidateStatsCache } from '@/lib/statsCache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
@@ -170,6 +171,7 @@ export async function POST(req: NextRequest) {
     : 0
 
   await mirrorOpponent(supabase, createAnalyticsClient(), opponent.id)
+  invalidateStatsCache()
   return NextResponse.json({ opponent, linked_bookings: linked + linkedRaw })
 }
 
@@ -199,5 +201,6 @@ export async function PATCH(req: NextRequest) {
   // A renamed opponent's new name should resolve on future bookings too.
   if (updates.name) await linkSpellingToOpponent(supabase, id, updates.name, user.playerId ?? null)
   await mirrorOpponent(supabase, createAnalyticsClient(), id)
+  invalidateStatsCache()
   return NextResponse.json({ opponent: data })
 }

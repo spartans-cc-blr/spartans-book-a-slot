@@ -6,6 +6,7 @@
 // There is no undo: a wrong merge is fixed by re-creating the opponent and re-linking its spelling.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { invalidateStatsCache } from '@/lib/statsCache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
     const analytics = createAnalyticsClient()
     await dropOpponentRef(analytics, parsed.data.source_id)
     await mirrorOpponent(supabase, analytics, parsed.data.target_id)
+    invalidateStatsCache()
     return NextResponse.json({ ok: true, ...result })
   } catch (e: any) {
     if (e instanceof OpponentMergeError) return NextResponse.json({ error: e.message }, { status: 400 })
