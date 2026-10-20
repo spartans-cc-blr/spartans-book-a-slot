@@ -10,6 +10,7 @@
 import { useMemo, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { BowlingOverChart } from '@/components/matches/BowlingOverChart'
+import { batterPar } from '@/lib/matchInsights'
 import {
   type BallRow, type InningsSide, type OverGroup, PHASE_KEYS, PHASE_LABEL,
   ballChip, ballLabel, ballsForSide, economy, formatOvers, groupOvers, hasDefinedPhases, howOut, maxWicketsInOver, phaseRangeLabel, phaseSplit,
@@ -122,9 +123,14 @@ function PhaseTable({ balls, totalOvers, bowling }: { balls: BallRow[]; totalOve
 
 const PHASE_SHORT: Record<string, string> = { pp: 'PP', mid: 'Mid', death: 'Death' }
 
-export function BattingView({ balls, totalOvers }: { balls: BallRow[]; totalOvers: number }) {
+export function BattingView({ balls, totalOvers, battedFirst = null, opponentTotal }: { balls: BallRow[]; totalOvers: number; battedFirst?: boolean | null; opponentTotal?: number | null }) {
   const side = useMemo(() => ballsForSide(balls, 'spartans'), [balls])
   const batters = useMemo(() => summariseBatters(side, totalOvers), [side, totalOvers])
+  // A chase (Spartans batted second) has a target; batting first compares with team-mates by phase.
+  const oppRuns = useMemo(() => ballsForSide(balls, 'opponent').reduce((s, b) => s + b.runs_total, 0), [balls])
+  const firstTotal = opponentTotal && opponentTotal > 0 ? opponentTotal : oppRuns
+  const target = battedFirst === false && firstTotal > 0 ? firstTotal + 1 : null
+  const pars = useMemo(() => batterPar(side, batters, target, totalOvers), [side, batters, target, totalOvers])
   const overs = useMemo(() => groupOvers(side), [side])
   if (side.length === 0) return <Empty>No ball-by-ball for the Spartans innings.</Empty>
 
@@ -143,6 +149,7 @@ export function BattingView({ balls, totalOvers }: { balls: BallRow[]; totalOver
               <th className="text-left py-1 pr-2 font-semibold">Player</th>
               <th className={TH}>R</th><th className={TH}>B</th><th className={TH}>SR</th>
               <th className={TH}>4s</th><th className={TH}>6s</th>
+              <th className={TH} title={target != null ? 'Strike rate minus the strike rate the required rate demanded' : 'Strike rate minus team-mates in the same phases'}>vs par</th>
             </tr>
           </thead>
           <tbody>
@@ -159,11 +166,22 @@ export function BattingView({ balls, totalOvers }: { balls: BallRow[]; totalOver
                 <td className={TD}>{fmt(b.strikeRate)}</td>
                 <td className={TD}>{b.fours}</td>
                 <td className={TD}>{b.sixes}</td>
+                <td className={TD}>
+                  {(() => {
+                    const d = pars.get(b.name.trim().toLowerCase())?.diff
+                    if (d == null) return '–'
+                    return <span style={{ fontWeight: d >= 0 ? 700 : 400, opacity: d >= 0 ? 1 : 0.75 }}>{d >= 0 ? '+' : '−'}{Math.abs(d).toFixed(0)}</span>
+                  })()}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="text-[10px] font-rajdhani text-[var(--scorecard-text-faint)] mt-1">B excludes wides.</p>
+        <p className="text-[10px] font-rajdhani text-[var(--scorecard-text-faint)] mt-1">
+          B excludes wides. vs par is his strike rate minus {target != null
+            ? `the strike rate the required rate demanded (RRR ÷ 6 × 100, ${target} to win), averaged over the balls he faced`
+            : 'his team-mates’ strike rate in the same phases (no target when batting first)'}. Plus means he beat it.
+        </p>
       </div>
       <div>
         <p className={HEAD}>Dot balls and phases</p>
