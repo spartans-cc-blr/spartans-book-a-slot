@@ -257,3 +257,14 @@ export function overContexts(points: WormPoint[], target: number | null, totalOv
   }
   return out
 }
+
+export type RateVerdict = 'under' | 'level' | 'over'
+
+/** How a bowled over compared with the rate the batting side needed going into it: 'under' = the
+ *  bowler kept it below the required rate, 'over' = went for more. Economy is runs per six legal
+ *  balls (a part over is scaled). Null when there is no required rate or the selection didn't bowl. */
+export function vsRequiredRate(over: BowlingOver, ctx: OverContext | undefined): RateVerdict | null {
+  if (!over.bowled || ctx?.rrr == null) return null
+  const econ = over.legalBalls > 0 ? (over.runs / over.legalBalls) * 6 : over.runs
+  return econ < ctx.rrr ? 'under' : econ > ctx.rrr ? 'over' : 'level'
+}

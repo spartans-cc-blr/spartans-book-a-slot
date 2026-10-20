@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { BallRow } from '@/lib/ballByBall'
-import { bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
+import { vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
 
 function ball(side: 'spartans' | 'opponent', over: number, runs: number, wicket = false): BallRow {
   return {
@@ -209,5 +209,24 @@ describe('overContexts', () => {
 
   it('stops once the target has been passed', () => {
     expect(overContexts(pts, 15, 10).map(x => x.over)).toEqual([1, 2])
+  })
+})
+
+describe('vsRequiredRate', () => {
+  const ov = (runs: number, legalBalls = 6, bowled = true) => ({ over: 1, runs, wickets: 0, legalBalls, bowled, bowlers: [] })
+  const ctx = (rrr: number | null) => ({ over: 1, runsBefore: 0, wicketsBefore: 0, crr: null, rrr, needed: 0, oversLeft: 1 })
+
+  it('compares economy with the going-in required rate', () => {
+    expect(vsRequiredRate(ov(5), ctx(8))).toBe('under')
+    expect(vsRequiredRate(ov(8), ctx(8))).toBe('level')
+    expect(vsRequiredRate(ov(11), ctx(8))).toBe('over')
+  })
+  it('scales a part over', () => {
+    expect(vsRequiredRate(ov(5, 3), ctx(8))).toBe('over')
+  })
+  it('is null without a required rate or when the selection did not bowl', () => {
+    expect(vsRequiredRate(ov(5), ctx(null))).toBeNull()
+    expect(vsRequiredRate(ov(5), undefined)).toBeNull()
+    expect(vsRequiredRate(ov(0, 0, false), ctx(8))).toBeNull()
   })
 })
