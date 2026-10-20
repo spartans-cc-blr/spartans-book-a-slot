@@ -5,7 +5,7 @@
 type Variant = 'cards' | 'table' | 'list'
 
 function Bar({ className = '' }: { className?: string }) {
-  return <div className={`rounded bg-[#E2DACE] dark:bg-ink-4 ${className}`} />
+  return <div className={`rounded bg-[#E2DACE] dark:bg-zinc-700/70 ${className}`} />
 }
 
 function CardBlock() {
@@ -41,6 +41,10 @@ export function PageSkeleton({
       <span className="sr-only">Loading{title ? ` ${title}` : ''}…</span>
       {/* Same height as SiteNav so the page doesn't jump when it arrives */}
       <div className="h-14 border-b border-[#D4C9B0] dark:border-ink-5 bg-white dark:bg-ink-2" />
+      {/* Branded loading cue: stays visible in dark mode, where the grey bars alone read as a black screen. */}
+      <div className="fixed inset-0 z-10 flex items-center justify-center pointer-events-none">
+        <img src="/images/logo-128.png" alt="" width={72} height={72} className="w-[72px] h-[72px] object-contain animate-pulse drop-shadow-lg" />
+      </div>
       <div className={`animate-pulse px-5 md:px-8 lg:px-10 py-6 space-y-5 ${wide ? 'max-w-5xl' : 'max-w-2xl'}`}>
         <div className="space-y-2">
           <Bar className="h-7 w-48" />
