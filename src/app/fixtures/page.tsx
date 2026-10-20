@@ -294,6 +294,8 @@ export default async function FixturesPage() {
       <SiteNav activePage="fixtures" />
       {isPlayer && <PushSubscribePrompt />}
 
+      <main>
+
       {/* Hero */}
       <div className="border-b px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden"
         style={{ background: 'var(--fx-hero-bg)', borderColor: 'var(--fx-border)' }}>
@@ -385,6 +387,8 @@ export default async function FixturesPage() {
           </>
         )}
       </div>
+
+      </main>
 
       <footer className="border-t py-5 text-center font-rajdhani text-xs mt-8" style={{ borderColor: 'var(--fx-border)', color: 'var(--fx-text-faint)' }}>
         © 2026 <span style={{ color: 'var(--fx-accent-dim)' }}>Spartans Cricket Club</span> · Bengaluru · Est. 2014

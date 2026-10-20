@@ -25,7 +25,7 @@ export interface VerifyPatch {
 
 export function CricHeroesIcon({ size = 20 }: { size?: number }) {
   return (
-    <img src="/cricheroes-logo.jpg" alt="CricHeroes" width={size} height={size}
+    <img src="/images/cricheroes-64.png" alt="CricHeroes" width={size} height={size}
       style={{ borderRadius: '50%', objectFit: 'cover' }} />
   )
 }

@@ -154,7 +154,7 @@ export function stageIcon(stage: string): string {
 export function CricHeroesIcon({ size = 20 }: { size?: number }) {
   return (
     <img
-      src="/cricheroes-logo.jpg"
+      src="/images/cricheroes-64.png"
       alt="CricHeroes"
       width={size}
       height={size}

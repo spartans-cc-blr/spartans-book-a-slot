@@ -125,7 +125,7 @@ export default async function TournamentSharePage({
     <div className="min-h-screen bg-parchment dark:bg-ink px-4 py-8 max-w-2xl mx-auto">
       {/* Spartans branding strip */}
       <div className="flex items-center gap-3 mb-6">
-        <img src="/images/logo-128.png" alt="Spartans CC" className="w-8 h-8 object-contain" />
+        <img src="/images/logo-64.png" alt="Spartans CC" className="w-8 h-8 object-contain" />
         <div>
           <p className="font-cinzel text-xs font-bold text-gold-dim tracking-[2px]">SPARTANS CC</p>
           <p className="font-rajdhani text-[10px] text-stone-500 dark:text-zinc-400 uppercase tracking-widest">Tournament Update</p>

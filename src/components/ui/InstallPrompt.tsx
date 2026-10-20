@@ -91,7 +91,7 @@ export function InstallPrompt() {
       aria-label="Install Spartans Hub"
     >
       <div className="flex gap-3">
-        <img src="/images/logo-128.png" alt="" width={40} height={40} className="w-10 h-10 object-contain shrink-0" />
+        <img src="/images/logo-64.png" alt="" width={40} height={40} className="w-10 h-10 object-contain shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="font-cinzel text-sm font-bold text-[#1C1917] dark:text-parchment">Add Spartans Hub to your home screen</p>
           {deferred ? (

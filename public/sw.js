@@ -1,8 +1,8 @@
 // Bump VERSION to invalidate every cache on the next deploy.
-const VERSION = 'v2'
+const VERSION = 'v3'
 const STATIC_CACHE = `spartans-static-${VERSION}`
 const OFFLINE_URL = '/offline.html'
-const PRECACHE = [OFFLINE_URL, '/images/logo-128.png', '/icons/icon-192.png']
+const PRECACHE = [OFFLINE_URL, '/images/logo-64.png', '/icons/icon-192.png']
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(STATIC_CACHE).then(c => c.addAll(PRECACHE)))

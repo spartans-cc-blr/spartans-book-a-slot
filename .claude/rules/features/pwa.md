@@ -23,6 +23,12 @@ Result of a PWA self-scan (October 2026). This pass fixed the concrete bugs and 
 - App shortcuts: Mark availability (`/fixtures`), My wallet, Leaderboard. `id` stays `/` (see `navigation.md` §1).
 - `SiteNav`, admin layout, join page and the tournament share card now use `/images/logo-128.png` (26KB) instead of the 2.6MB `Transparent High Resolution.png`, which was being downloaded to render a 32px nav logo on every page. The original stays in `public/` as the source for icons.
 
+### 3.1 Lighthouse pass on `/fixtures` (October 2026, mobile: perf 89, a11y 89, best practices 77, SEO 100)
+
+Fixed: avatar link in the mobile nav had no accessible name (`aria-label`); `/fixtures` content wrapped in `<main>` (other pages without a `<main>`: Home, leaderboard, team-stats, profile, wallet, captains-corner, schedule); contrast failures: light tab bar accent `#B45309` and inactive `#78716C`, Upcoming/Past pill uses `--fx-accent-dim` with `--fx-text-2` for the inactive label; small images served at display size (`logo-64.png` for 28-40px uses, `cricheroes-64.png` replaces the 38KB jpg); SW cache `v3`.
+
+Not fixed, by decision: the Google avatar sets a third-party `COMPASS` cookie (the whole best-practices gap). Routing avatars through `next/image` would stop it but spends Hobby's 1000 source-image optimisation quota; `crossOrigin="anonymous"` is unverified against lh3 CORS headers. Back/forward cache is blocked by Next's `no-store` on dynamic pages. LCP is dominated by an element render delay (~1.9s on the throttled run, TTFB 32ms), i.e. framework JS and hydration (the 31KB shared chunk costs ~700ms of scripting at 4x throttle), not the server. The report was captured with a Chrome extension active, which inflates unused-JS and blocking-time figures; re-run in an incognito window for a clean baseline.
+
 ## 4. Loading skeletons
 
 `src/components/ui/PageSkeleton.tsx` (server component, `animate-pulse`, light/dark) renders a nav-height bar plus placeholder cards, table or list. `loading.tsx` files using it exist for `/fixtures`, `/matches/history`, `/leaderboard`, `/team-stats`, `/players`, `/wallet`, `/profile`, `/captains-corner`. A pulsing centered Spartans logo (fixed overlay, `logo-128.png`) is drawn over the placeholders, and dark-mode bars use `zinc-700/70`, because the original `ink-4` bars on the `#080808` page were close enough to black to read as a blank screen. They stream immediately, so a tap shows content at once while a cold server function works.
