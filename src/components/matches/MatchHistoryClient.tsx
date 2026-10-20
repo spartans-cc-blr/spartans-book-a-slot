@@ -509,8 +509,16 @@ export function MatchHistoryClient({
       {error && (
         <p className="font-rajdhani text-sm rounded px-4 py-2.5" style={{ color: 'var(--fx-danger-text)', background: 'var(--fx-danger-bg)', border: '1px solid var(--fx-danger-border)' }}>{error}</p>
       )}
+      {/* Placeholder cards hold roughly the height the real list will take, so
+          nothing below jumps when results arrive (was a bare "Loading…" line:
+          CLS 0.5 on Lighthouse). */}
       {loading && (
-        <p className="font-rajdhani text-sm text-center py-6" style={{ color: 'var(--fx-text-faint)' }}>Loading…</p>
+        <div role="status" aria-busy="true" className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-pulse">
+          <span className="sr-only">Loading matches…</span>
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="rounded-xl min-h-[330px]" style={{ background: 'var(--scorecard-card-bg)', border: '1px solid var(--scorecard-card-border)' }} />
+          ))}
+        </div>
       )}
 
       {/* Date-chip slider — theme="auto" (default) so it reads the --fx-*
@@ -799,7 +807,7 @@ function MatchHistoryCard({
               link on FixturesCard.tsx — so it reads as clickable at a glance
               rather than blending into the plain white heading text. */}
           {match.tournament_id ? (
-            <Link href={`/leaderboard?tournament=${match.tournament_id}&category=mvp&year=all`}
+            <Link prefetch={false} href={`/leaderboard?tournament=${match.tournament_id}&category=mvp&year=all`}
               style={{ color: 'var(--scorecard-heading-text)', textDecoration: 'underline', textDecorationColor: 'var(--fx-accent)', textUnderlineOffset: '3px' }}
               title="View stats for this tournament">
               {match.tournament_name ?? 'Unassigned'}
