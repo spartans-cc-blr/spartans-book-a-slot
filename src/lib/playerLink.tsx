@@ -34,6 +34,7 @@ export function PlayerNameLink({ name, playerId, cricHeroesUrl, className: baseC
     return (
       <Link
         href={`/players/${playerId}/stats`}
+        prefetch={false}
         className={`underline decoration-dotted underline-offset-2 hover:text-gold transition-colors ${className ?? ''}`}
         onClick={e => e.stopPropagation()}
       >
