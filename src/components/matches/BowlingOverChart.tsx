@@ -67,7 +67,11 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
       return v == null ? [] : [`${i === 0 || pick(endRates[i - 1]) == null ? 'M' : 'L'}${xc(c.over).toFixed(1)},${y(v).toFixed(1)}`]
     }).join(' ')
   const crrPath = line(c => c.crr)
-  const rrrPath = line(c => c.rrr)
+  // The required rate starts at the opening rate (target / total overs) at the left edge, before over 1.
+  const rrrBody = line(c => c.rrr)
+  const rrrPath = target != null && rrrBody
+    ? `M${PAD.l},${y(target / totalOvers).toFixed(1)} L${rrrBody.replace(/^M/, '')}`
+    : rrrBody
 
   const yTicks = [0, 1, 2, 3, 4].map(i => (yMax / 4) * i)
   const xTicks = Array.from({ length: xMax }, (_, i) => i + 1).filter(o => o === 1 || o % 5 === 0 || o === xMax)
