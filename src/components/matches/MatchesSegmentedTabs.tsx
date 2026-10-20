@@ -16,8 +16,8 @@ import Link from 'next/link'
 // it matches the visitor's own theme choice on /fixtures; `/matches/history`
 // passes `theme="light"` to pin the original Warm Light look, since that
 // page's own body content hasn't been made theme-aware yet (see ui-theme.md).
-const LIGHT = { trackBg: '#F8F4EE', trackBorder: '#D4C9B0', accent: '#D97706', accentText: '#fff', inactiveText: '#78716C' }
-const AUTO  = { trackBg: 'var(--fx-card-header-bg)', trackBorder: 'var(--fx-border)', accent: 'var(--fx-accent)', accentText: '#fff', inactiveText: 'var(--fx-card-text-muted)' }
+const LIGHT = { trackBg: '#F8F4EE', trackBorder: '#D4C9B0', accent: '#B45309', accentText: '#fff', inactiveText: '#57534E' }
+const AUTO  = { trackBg: 'var(--fx-card-header-bg)', trackBorder: 'var(--fx-border)', accent: 'var(--fx-accent-dim)', accentText: '#fff', inactiveText: 'var(--fx-text-2)' }
 
 export function MatchesSegmentedTabs({ active, theme = 'auto' }: { active: 'upcoming' | 'past'; theme?: 'auto' | 'light' }) {
   const t = theme === 'light' ? LIGHT : AUTO

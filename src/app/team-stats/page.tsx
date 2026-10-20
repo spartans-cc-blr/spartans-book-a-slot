@@ -76,6 +76,8 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: T
     <div className="min-h-screen bg-[var(--stats-shell-bg)] dark:bg-ink grain">
       <SiteNav activePage="team-stats" back={{ fallbackHref: '/', label: 'Home' }} />
 
+      <main>
+
       <div className="bg-[var(--stats-card-bg)] dark:bg-ink-2 border-b border-[var(--stats-divider)] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-7 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)' }} />
@@ -201,6 +203,8 @@ export default async function TeamStatsPage({ searchParams }: { searchParams?: T
         </p>
         </TeamFilterShell>
       </div>
+
+      </main>
 
       <footer className="border-t border-[var(--stats-divider)] dark:border-ink-4 py-5 text-center font-rajdhani text-xs text-[var(--stats-text-faint)] dark:text-zinc-600 mt-8">
         © 2026 <span className="text-[var(--stats-accent-dim)] dark:text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014

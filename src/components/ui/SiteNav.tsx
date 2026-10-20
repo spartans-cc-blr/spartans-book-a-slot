@@ -98,7 +98,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
         )}
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
-          <img src="/images/logo-128.png" alt="Spartans CC" className="w-8 h-8 object-contain" />
+          <img src="/images/logo-64.png" alt="Spartans CC" className="w-8 h-8 object-contain" />
           <span className="font-cinzel font-bold text-gold tracking-[2px] text-[13px] hidden sm:block">
             SPARTANS CC
           </span>
@@ -411,7 +411,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
             <Link href="/gc-review" className="font-rajdhani text-xs font-bold text-gold">GC</Link>
           )}
           {isLoggedIn ? (
-            <Link href={isExpelled ? '/profile' : player?.playerId ? '/profile' : '/join'}>
+            <Link href={isExpelled ? '/profile' : player?.playerId ? '/profile' : '/join'} aria-label={player?.playerId && !isExpelled ? 'My profile' : isExpelled ? 'Account' : 'Complete registration'}>
               <img
                 src={player?.photoUrl ?? player?.image ?? '/default-avatar.png'}
                 alt=""

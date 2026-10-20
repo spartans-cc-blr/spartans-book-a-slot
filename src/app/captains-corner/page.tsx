@@ -333,6 +333,8 @@ export default async function CaptainsCornerPage() {
     <div className="min-h-screen grain" style={{ background: 'var(--captains-shell-bg)' }}>
       <SiteNav activePage="captains" back={{ fallbackHref: '/', label: 'Home' }} />
 
+      <main>
+
       {/* Hero */}
       <div className="px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden"
         style={{ background: 'var(--captains-hero-bg)', borderBottom: '1px solid var(--captains-border)' }}>
@@ -397,6 +399,8 @@ export default async function CaptainsCornerPage() {
           </div>
         )}
       </div>
+
+      </main>
 
       <footer className="py-5 text-center font-rajdhani text-xs mt-8" style={{ borderTop: '1px solid var(--captains-border)', color: 'var(--captains-text-faint)' }}>
         © 2026 <span style={{ color: 'var(--captains-accent-dim)' }}>Spartans Cricket Club</span> · Bengaluru · Est. 2014

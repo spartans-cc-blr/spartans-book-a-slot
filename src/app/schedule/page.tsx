@@ -88,6 +88,8 @@ export default function SchedulePage() {
     <div style={{ height: '100dvh', background: 'var(--app-bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <SiteNav activePage="schedule" />
 
+      <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+
       {/* Hero */}
       <div style={{ background: 'var(--app-surface)', borderBottom: '1px solid var(--app-border)', padding: '28px 20px 24px', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, var(--app-accent) 0%, #F59E0B 60%, transparent 100%)' }} />
@@ -196,6 +198,7 @@ export default function SchedulePage() {
           </table>
         )}
       </div>
+      </main>
     </div>
   )
 }

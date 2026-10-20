@@ -33,10 +33,10 @@ interface MobileTabBarProps {
 function tokens(theme: MobileTabBarTheme) {
   return theme === 'light' ? {
     navBg: '#FFFFFF', navBorder: '#D4C9B0',
-    accent: '#D97706', inactive: '#A8A29E',
+    accent: '#B45309', inactive: '#78716C',
     sheetBg: '#FFFFFF', handle: '#D4C9B0',
     rowIconBg: '#F8F4EE', rowText: '#1C1917', muted: '#78716C',
-    sectionLabel: '#A8A29E', divider: '#E7E0D3', scrim: 'rgba(28,25,23,0.4)',
+    sectionLabel: '#78716C', divider: '#E7E0D3', scrim: 'rgba(28,25,23,0.4)',
     dangerText: '#DC2626', dangerIconBg: 'rgba(220,38,38,0.08)',
     crimsonRowBg: 'rgba(220,38,38,0.06)', crimsonIconBg: 'rgba(220,38,38,0.12)', crimson: '#DC2626',
   } : {
