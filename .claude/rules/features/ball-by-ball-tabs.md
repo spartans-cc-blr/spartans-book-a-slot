@@ -190,3 +190,8 @@ The "vs par" column was dropped (a single number was hard to relate to the chart
 - **Lines:** the team's CRR (and, in a chase, the RRR from the opening rate, target ÷ total overs, at the left edge) plotted at the end of each over, as on the Bowling chart. Target = opposition scorecard total + 1 (else the commentary sum). Batting first there is no RRR, so only the CRR is shown.
 - **Solid vs hollow:** `vsBattingRate()` compares the batter's scoring rate in the over (runs per six balls he faced) with the rate going in (RRR in a chase, CRR batting first): faster = solid, slower = hollow. Over 1 batting first has no CRR and stays solid.
 - Hover/tap shows the over, who bowled it, his runs off balls (and SR), then the going-in and after-the-over rates and the verdict. `BattingView` gets `battedFirst`, `opponentTotal` and `opponentName` from `MatchTabs`. The old `OverBars` and `batterPar()` were removed. No new route, table or migration.
+
+## RRR line plots the rate going in (October 2026)
+
+On the Bowling and Batting over charts the two lines now use different moments on purpose: the **RRR** line is the rate needed *going into* each over (`overContexts()`), so over 1 is the opening required rate, target ÷ total overs, before a ball is bowled; the **CRR** line is the rate at the *end* of each over (`overEndRates()`), so over 1 is its own run rate. Each bar therefore sits at the same x as the required rate it is judged against. The hover readout's "after the over" part now gives only the CRR. This replaces the end-of-over RRR and the separate left-edge opening point. The Insights rate chart is unchanged (its x axis is continuous, so its RRR already starts at over 0 and its CRR at over 1).
+

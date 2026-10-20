@@ -57,7 +57,7 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
   const yMax = Math.min(32, Math.max(12, Math.ceil((Math.max(maxBar, maxRate) * 1.15) / 4) * 4))   // a multiple of 4
   const y = (v: number) => H - PAD.b - (Math.min(v, yMax) / yMax) * plotH
   const xc = (over: number) => PAD.l + (over - 0.5) * slotW
-  const clipped = endRates.some(c => (c.rrr ?? 0) > yMax)
+  const clipped = contexts.some(c => (c.rrr ?? 0) > yMax)
 
   const line = (pick: (c: (typeof endRates)[number]) => number | null) =>
     endRates.flatMap((c, i) => {
@@ -65,9 +65,10 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
       return v == null ? [] : [`${i === 0 || pick(endRates[i - 1]) == null ? 'M' : 'L'}${xc(c.over).toFixed(1)},${y(v).toFixed(1)}`]
     }).join(' ')
   const crrPath = line(c => c.crr)
-  // The required rate starts at the opening rate (target / total overs) at the left edge, before over 1.
-  const rrrBody = line(c => c.rrr)
-  const rrrPath = target != null && rrrBody ? `M${PAD.l},${y(target / totalOvers).toFixed(1)} L${rrrBody.replace(/^M/, '')}` : rrrBody
+  // The RRR line is the rate needed going INTO each over (over 1 = the opening rate, target / total
+  // overs), so it sits at the same x as the over it judges; the CRR line is the rate at the END of it.
+  const rrrPath = contexts.flatMap((c, i) =>
+    c.rrr == null ? [] : [`${i === 0 || contexts[i - 1].rrr == null ? 'M' : 'L'}${xc(c.over).toFixed(1)},${y(c.rrr).toFixed(1)}`]).join(' ')
 
   const yTicks = [0, 1, 2, 3, 4].map(i => (yMax / 4) * i)
   const xTicks = Array.from({ length: xMax }, (_, i) => i + 1).filter(o => o === 1 || o % 5 === 0 || o === xMax)
@@ -186,7 +187,6 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
                 {endR && (
                   <>
                     <span className={MUTED}> · after the over: CRR </span><span className="tabular-nums" style={{ color: CRR_COLOUR }}>{endR.crr.toFixed(2)}</span>
-                    {endR.rrr != null && <><span className={MUTED}> · RRR </span><span className="tabular-nums" style={{ color: 'var(--fx-accent)' }}>{endR.rrr.toFixed(2)}</span></>}
                   </>
                 )}
                 {verdict && (
@@ -226,7 +226,7 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
       </div>
       <p className={`text-[10px] font-rajdhani mt-1 ${MUTED}`}>
         {target != null
-          ? `Chasing ${target}${opponentName ? ` against ${opponentName}` : ''}. The CRR and RRR lines show the team's rates at the end of each over; each over is judged against the rate going in, so a solid bar means the batter scored faster than the rate needed and a hollow bar slower.`
+          ? `Chasing ${target}${opponentName ? ` against ${opponentName}` : ''}. The RRR line is the rate needed going into each over (over 1 is the opening rate, before a ball is bowled) and the CRR line is the rate at the end of it, so each bar sits next to the rate it is judged against: a solid bar means the batter scored faster than the rate needed and a hollow bar slower.`
           : battedFirst === true
             ? 'Spartans batted first, so there is no target: only the team’s current run rate (at the end of each over) is shown. A solid bar means the batter scored faster than the CRR going in; a hollow bar slower. Over 1 has no CRR yet, so it stays solid.'
             : 'Batting order isn’t known for this match, so there is no required rate: only the team’s current run rate is shown.'}

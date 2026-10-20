@@ -58,7 +58,7 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
   const yMax = Math.min(32, Math.max(12, Math.ceil((Math.max(maxBar, maxRate) * 1.15) / 4) * 4))   // a multiple of 4, so the four gridline steps are whole numbers
   const y = (v: number) => H - PAD.b - (Math.min(v, yMax) / yMax) * plotH
   const xc = (over: number) => PAD.l + (over - 0.5) * slotW
-  const clipped = endRates.some(c => (c.rrr ?? 0) > yMax)
+  const clipped = contexts.some(c => (c.rrr ?? 0) > yMax)
 
   // The lines show the rates at the END of each over, so over 1's point is its own run rate.
   const line = (pick: (c: (typeof endRates)[number]) => number | null) =>
@@ -67,7 +67,10 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
       return v == null ? [] : [`${i === 0 || pick(endRates[i - 1]) == null ? 'M' : 'L'}${xc(c.over).toFixed(1)},${y(v).toFixed(1)}`]
     }).join(' ')
   const crrPath = line(c => c.crr)
-  const rrrPath = line(c => c.rrr)
+  // The RRR line is the rate needed going INTO each over (over 1 = the opening rate, target / total
+  // overs), so it sits at the same x as the over it judges; the CRR line is the rate at the END of it.
+  const rrrPath = contexts.flatMap((c, i) =>
+    c.rrr == null ? [] : [`${i === 0 || contexts[i - 1].rrr == null ? 'M' : 'L'}${xc(c.over).toFixed(1)},${y(c.rrr).toFixed(1)}`]).join(' ')
 
   const yTicks = [0, 1, 2, 3, 4].map(i => (yMax / 4) * i)
   const xTicks = Array.from({ length: xMax }, (_, i) => i + 1).filter(o => o === 1 || o % 5 === 0 || o === xMax)
@@ -190,7 +193,6 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
                 {endR && (
                   <>
                     <span className={MUTED}> · after the over: CRR </span><span className="tabular-nums" style={{ color: CRR_COLOUR }}>{endR.crr.toFixed(2)}</span>
-                    {endR.rrr != null && <><span className={MUTED}> · RRR </span><span className="tabular-nums" style={{ color: 'var(--fx-accent)' }}>{endR.rrr.toFixed(2)}</span></>}
                   </>
                 )}
                 {verdict && (
@@ -232,7 +234,7 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
       </div>
       <p className={`text-[10px] font-rajdhani mt-1 ${MUTED}`}>
         {target != null
-          ? `Spartans defended ${firstTotal}. The CRR and RRR lines show the batting side's rates at the end of each over (the readout also gives the rates going in, which each over is judged against), so a solid bar means the bowler kept them below the rate they needed; a hollow bar means the over went for more.`
+          ? `Spartans defended ${firstTotal}. The RRR line is the rate needed going into each over (over 1 is the opening rate, before a ball is bowled) and the CRR line is the rate at the end of it, so each bar sits next to the rate it is judged against: a solid bar means the bowler kept them below the rate they needed; a hollow bar means the over went for more.`
           : battedFirst === false
             ? 'Spartans bowled first, so there is no target yet: only the batting side’s current run rate (at the end of each over) is shown. A solid bar means the over was cheaper than that rate (it brought the CRR down); a hollow bar means it cost more. Over 1 has no CRR yet, so it stays solid.'
             : 'Batting order isn’t known for this match, so there is no required rate: only the batting side’s current run rate is shown.'}
