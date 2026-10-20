@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { summariseBatters, type BallRow } from '@/lib/ballByBall'
-import { batterPar, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
+import { batterPar, overEndRates, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
 
 function ball(side: 'spartans' | 'opponent', over: number, runs: number, wicket = false): BallRow {
   return {
@@ -263,5 +263,21 @@ describe('batterPar', () => {
     const side = [bb(1, 'A', 1)]
     const lines = summariseBatters([{ ...side[0], is_wicket: true, dismissed_batter: 'Z' }], 20)
     expect(batterPar(side, lines, null, 20).get('z')?.par).toBeNull()
+  })
+})
+
+describe('overEndRates', () => {
+  const pts = wormPoints([ball('opponent', 1, 7), ball('opponent', 2, 3), ball('opponent', 3, 20)])
+  it('gives the rates at the end of each over, so over 1 has a current rate', () => {
+    const r = overEndRates(pts, null, 10)
+    expect(r.map(x => x.crr)).toEqual([7, 5, 10])
+    expect(r.every(x => x.rrr == null)).toBe(true)
+  })
+  it('gives the rate still needed after each over and stops at the target', () => {
+    const r = overEndRates(pts, 25, 10)
+    expect(r[0]).toMatchObject({ over: 1, needed: 18 })
+    expect(r[0].rrr).toBeCloseTo(18 / 9)
+    expect(r.map(x => x.over)).toEqual([1, 2, 3])
+    expect(r[2]).toMatchObject({ needed: 0, rrr: null })
   })
 })

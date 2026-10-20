@@ -314,3 +314,25 @@ export function batterPar(side: BallRow[], batters: BatterLine[], target: number
   }
   return out
 }
+
+export interface OverEndRates {
+  over: number
+  crr: number               // batting side's run rate at the end of this over
+  rrr: number | null        // rate still needed after this over (null with no target, target reached or no overs left)
+  needed: number | null
+}
+
+/** The batting side's rates at the END of each over (what the chart lines plot at that over). The
+ *  bowler's over is judged against the rates going in (`overContexts()`), so an over that brought
+ *  the CRR down shows as the line stepping down at its own x. */
+export function overEndRates(points: WormPoint[], target: number | null, totalOvers: number): OverEndRates[] {
+  const out: OverEndRates[] = []
+  for (let k = 1; k < points.length; k++) {
+    const p = points[k]
+    const needed = target == null ? null : Math.max(target - p.runs, 0)
+    const left = Math.max(totalOvers - k, 0)
+    out.push({ over: k, crr: p.runs / k, needed, rrr: needed != null && needed > 0 && left > 0 ? needed / left : null })
+    if (needed === 0) break
+  }
+  return out
+}
