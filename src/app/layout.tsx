@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Cinzel, Rajdhani } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
@@ -25,6 +25,7 @@ export const metadata: Metadata = {
   title: 'Spartans Hub',
   description: 'Spartans CC BLR — Fixtures, Availability & Squad Hub.',
   manifest: '/manifest.webmanifest',
+  icons: { apple: '/apple-touch-icon.png' },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -35,6 +36,13 @@ export const metadata: Metadata = {
     description: 'Spartans CC BLR — Fixtures, Availability & Squad Hub.',
     siteName: 'Spartans Cricket Club',
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FFFFFF' },
+    { media: '(prefers-color-scheme: dark)', color: '#111111' },
+  ],
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

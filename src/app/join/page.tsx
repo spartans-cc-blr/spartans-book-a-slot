@@ -153,7 +153,7 @@ const SKILLS = [
     return (
       <main className="min-h-screen bg-parchment dark:bg-ink flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-8 text-center space-y-6">
-          <img src="/Transparent High Resolution.png" alt="Spartans CC"
+          <img src="/images/logo-128.png" alt="Spartans CC"
             className="w-16 h-16 object-contain mx-auto opacity-80" />
           <div className="space-y-2">
             <h1 className="font-cinzel font-bold text-amber-700 dark:text-gold text-xl tracking-widest uppercase">
@@ -179,7 +179,7 @@ const SKILLS = [
     return (
       <main className="min-h-screen bg-parchment dark:bg-ink flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded-lg p-8 text-center space-y-5">
-          <img src="/Transparent High Resolution.png" alt="Spartans CC"
+          <img src="/images/logo-128.png" alt="Spartans CC"
             className="w-16 h-16 object-contain mx-auto opacity-80" />
           <h1 className="font-cinzel font-bold text-amber-700 dark:text-gold text-xl tracking-widest uppercase">
             Invite link required
@@ -201,7 +201,7 @@ const SKILLS = [
 
           {/* Header */}
           <div className="text-center mb-8">
-            <img src="/Transparent High Resolution.png" alt="Spartans CC"
+            <img src="/images/logo-128.png" alt="Spartans CC"
               className="w-14 h-14 object-contain mx-auto opacity-80 mb-4" />
             <h1 className="font-cinzel font-bold text-amber-700 dark:text-gold text-xl tracking-widest uppercase mb-1">
               Join Spartans CC

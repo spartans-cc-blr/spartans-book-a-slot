@@ -26,7 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           MobileTabBar already established site-wide. */}
       <header className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 h-12 flex items-center px-5 gap-4 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <img src="/Transparent High Resolution.png" alt="Spartans CC" className="w-7 h-7 object-contain" />
+          <img src="/images/logo-128.png" alt="Spartans CC" className="w-7 h-7 object-contain" />
           <span className="font-cinzel text-gold-dim text-xs tracking-widest">SPARTANS CC</span>
           <span className="font-rajdhani text-[#78716C] dark:text-zinc-700 text-xs tracking-widest">/ ADMIN</span>
         </div>

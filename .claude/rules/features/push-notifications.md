@@ -225,11 +225,11 @@ self.addEventListener('activate', event => event.waitUntil(self.clients.claim())
 ### Precache list must only include existing assets
 `cache.addAll([...])` fails entirely if any URL in the list returns non-200. Only precache assets that are guaranteed to exist:
 ```js
-cache.addAll(['/', '/fixtures'])  // not '/offline' or '/icons/icon-192.png' unless they exist
+cache.addAll(['/offline.html', '/images/logo-128.png', '/icons/icon-192.png'])  // only files that exist
 ```
 
 ### Do not precache auth-aware pages
-`/fixtures` was in the precache list and caused a "sign in" flash — the SW served the cached unauthenticated version. Auth-aware pages must not be precached. Current precache: `['/']` only.
+`/fixtures` was in the precache list and caused a "sign in" flash — the SW served the cached unauthenticated version. Auth-aware pages must not be precached. Current precache: the offline page and two small icons (see `pwa.md`); navigations are network-only.
 
 ### iPhone requirements
 - iOS 16.4+
@@ -287,6 +287,8 @@ Players who reinstall the PWA must re-subscribe once — the old subscription en
 | Welcome push failure never fails player registration/add | ✅ Wrapped in try/catch in both `register/route.ts` and `players/route.ts` |
 
 ---
+
+*Service worker details (cache versioning, badge icon, tag, focus-on-click) are in `pwa.md`.*
 
 *Maintained by: Muthu, Spartans CC BLR Coordinator*
 *vibe-security audit applied per SKILL.md — `never trust the client`*

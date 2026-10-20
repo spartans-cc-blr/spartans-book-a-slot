@@ -1,45 +1,32 @@
-const CACHE = 'spartans-v1'
-const OFFLINE_URL = '/offline'
+// Bump VERSION to invalidate every cache on the next deploy.
+const VERSION = 'v2'
+const STATIC_CACHE = `spartans-static-${VERSION}`
+const OFFLINE_URL = '/offline.html'
+const PRECACHE = [OFFLINE_URL, '/images/logo-128.png', '/icons/icon-192.png']
 
-// Cache the app shell on install
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(cache =>
-      cache.addAll(['/'])
-    )
-  )
+  e.waitUntil(caches.open(STATIC_CACHE).then(c => c.addAll(PRECACHE)))
   self.skipWaiting()
 })
 
-// Clean old caches on activate
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== STATIC_CACHE).map(k => caches.delete(k)))
     )
   )
   self.clients.claim()
 })
 
-// Network-first for API and auth routes, cache-first for shell
-// After
 self.addEventListener('fetch', e => {
   const { request } = e
+  if (request.method !== 'GET') return
   const url = new URL(request.url)
 
-  // Never intercept auth, API, or Supabase calls
-  if (
-    url.pathname.startsWith('/api/') ||
-    url.pathname.startsWith('/api/auth') ||
-    url.hostname.includes('supabase.co') ||
-    url.hostname.includes('googleapis.com')
-  ) {
-    return // Let it go to network untouched
-  }
+  // Never intercept API, auth or third-party calls.
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return
 
-  // Navigation requests (actual page loads) are always network-only.
-  // These pages are session-bound (fixtures/captains-corner/profile/etc) —
-  // never let them be cache-first, even by accident in a future change.
+  // Page loads are session-bound: always network, offline page as fallback only.
   if (request.mode === 'navigate') {
     e.respondWith(
       fetch(request, { cache: 'no-store' }).catch(() => caches.match(OFFLINE_URL))
@@ -47,30 +34,52 @@ self.addEventListener('fetch', e => {
     return
   }
 
-  // Cache-first for static shell assets only (JS, CSS, images, fonts)
-  e.respondWith(
-    caches.match(request).then(cached => {
-      return cached ?? fetch(request).catch(() =>
-        caches.match(OFFLINE_URL)
-      )
+  // Hashed build assets and icons never change for a given URL: cache-first.
+  if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/') || url.pathname.startsWith('/images/')) {
+    e.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached
+        return fetch(request).then(res => {
+          if (res.ok) {
+            const copy = res.clone()
+            caches.open(STATIC_CACHE).then(c => c.put(request, copy))
+          }
+          return res
+        })
+      })
+    )
+  }
+  // Everything else goes straight to the network.
+})
+
+// ── Push notifications ──────────────────────────────────────────────
+self.addEventListener('push', event => {
+  const data = event.data ? event.data.json() : {}
+  const url = data.url ?? '/fixtures'
+  event.waitUntil(
+    self.registration.showNotification(data.title ?? 'Spartans CC', {
+      body: data.body ?? '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/badge-96.png',
+      // Same destination replaces the previous notification instead of stacking.
+      tag: data.tag ?? url,
+      renotify: true,
+      data: { url },
     })
   )
 })
 
-// ── Push notifications ──────────────────────────────────────────────
-self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {}
-  const title = data.title ?? 'Spartans CC'
-  const options = {
-    body: data.body ?? '',
-    icon: '/favicon.ico',
-    data: { url: data.url ?? '/fixtures' },
-  }
-  event.waitUntil(self.registration.showNotification(title, options))
-})
-
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', event => {
   event.notification.close()
-  const url = event.notification.data?.url ?? '/fixtures'
-  event.waitUntil(clients.openWindow(url))
+  const target = new URL(event.notification.data?.url ?? '/fixtures', self.location.origin).href
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(wins => {
+      for (const w of wins) {
+        if (new URL(w.url).origin === self.location.origin && 'focus' in w) {
+          return w.focus().then(f => ('navigate' in f ? f.navigate(target) : f))
+        }
+      }
+      return clients.openWindow(target)
+    })
+  )
 })

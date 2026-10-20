@@ -98,7 +98,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
         )}
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
-          <img src="/Transparent High Resolution.png" alt="Spartans CC" className="w-8 h-8 object-contain" />
+          <img src="/images/logo-128.png" alt="Spartans CC" className="w-8 h-8 object-contain" />
           <span className="font-cinzel font-bold text-gold tracking-[2px] text-[13px] hidden sm:block">
             SPARTANS CC
           </span>
