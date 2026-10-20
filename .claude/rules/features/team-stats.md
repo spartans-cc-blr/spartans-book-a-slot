@@ -65,6 +65,8 @@ other direction (server code reached from a client file, rather than a
 client file reached from server code). Rule of thumb: anything a client
 component needs goes in `teamStatsCore.ts`.
 
+> `getTeamMatches()` is wrapped in a tagged 5-minute data cache invalidated on scorecard sync, opponent and booking edits — see `pwa.md` §8.
+
 ### `getTeamMatches()` — one fetch, then slice in memory
 
 1. `bookings` — `status = 'confirmed'`, `match_id IS NOT NULL`, with embeds

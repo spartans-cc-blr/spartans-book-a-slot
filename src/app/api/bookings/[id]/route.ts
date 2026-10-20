@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { invalidateStatsCache } from '@/lib/statsCache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
@@ -208,6 +209,7 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
     if (overrideError) overrideLogError = overrideError.message
   }
 
+  invalidateStatsCache()
   return NextResponse.json({ booking: data, ...(overrideLogError ? { overrideLogError } : {}) })
 }
 

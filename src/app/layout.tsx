@@ -6,6 +6,7 @@ import { ChunkErrorBoundary } from '@/components/ui/ChunkErrorBoundary'
 import { GlobalMilestoneModal } from '@/components/ui/GlobalMilestoneModal'
 import { GlobalBirthdayModal } from '@/components/ui/GlobalBirthdayModal'
 import { GlobalFeeReminderModal } from '@/components/ui/GlobalFeeReminderModal'
+import { InstallPrompt } from '@/components/ui/InstallPrompt'
 import { ThemeProvider, themeInitScript } from '@/components/ui/ThemeProvider'
 
 const cinzel = Cinzel({
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <GlobalBirthdayModal />
               <GlobalMilestoneModal />
               <GlobalFeeReminderModal />
+              <InstallPrompt />
               {children}
             </ChunkErrorBoundary>
           </ThemeProvider>

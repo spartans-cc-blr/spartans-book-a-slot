@@ -19,6 +19,7 @@
 // player_id IS NULL are never surfaced by any function here; that gap is
 // what /admin/player-reconciliation exists to close.
 import { createServiceClient } from '@/lib/supabase'
+import { cachedStats } from '@/lib/statsCache'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 import type { CareerHighlights } from '@/lib/playerHighlights'
 import { findCapHolders } from '@/lib/capHolders'
@@ -341,7 +342,7 @@ async function getScopedMatchIds(filters: { year?: number; month?: string; tourn
 // excluded from this list entirely — practice games aren't counted towards
 // leaderboard stats at all (see getScopedMatchIds()), so offering it as a
 // selectable Tournament filter here would be misleading.
-export async function getFilterOptions(formats?: string[]): Promise<{
+async function getFilterOptionsUncached(formats?: string[]): Promise<{
   tournaments: { id: string; name: string }[]
   grounds:     { id: string; name: string }[]
 }> {
@@ -598,7 +599,7 @@ export async function getPlayerMatchHistory(
   return rows
 }
 
-export async function getLeaderboard(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; innings?: 'defending' | 'chasing'; pitchType?: PitchType } = {}): Promise<LeaderboardRow[]> {
+async function getLeaderboardUncached(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; innings?: 'defending' | 'chasing'; pitchType?: PitchType } = {}): Promise<LeaderboardRow[]> {
   let scoped = await getScopedMatchIds(filters)
   if (scoped && scoped.length === 0) return []
   scoped = await applyInningsFilter(scoped, filters.innings)
@@ -666,7 +667,7 @@ export async function getLeaderboard(filters: { year?: number; month?: string; t
 // One analytics round trip (4 paginated tables) for the whole roster,
 // never one per player. pickHighlights() (src/lib/playerHighlights.ts)
 // then decides which of these numbers each card leads with.
-export async function getCareerHighlightsByPlayer(): Promise<Record<string, CareerHighlights>> {
+async function getCareerHighlightsByPlayerUncached(): Promise<Record<string, CareerHighlights>> {
   const scoped = await getScopedMatchIds({})
   if (scoped && scoped.length === 0) return {}
   const { batting, bowling, fielding, team } = await fetchAnalyticsRows({ matchIds: scoped })
@@ -706,7 +707,7 @@ export async function getCareerHighlightsByPlayer(): Promise<Record<string, Care
 // scope as the default /leaderboard view). Used by /players and /profile; the
 // per-table caps on /leaderboard follow that page's own filters instead.
 // Tie-breaks live in src/lib/capHolders.ts. See features/leaderboard.md §6.2.1.
-export async function getSeasonCapHolders(year: number = new Date().getFullYear()): Promise<{ year: number; orange: string[]; purple: string[] }> {
+async function getSeasonCapHoldersUncached(year: number = new Date().getFullYear()): Promise<{ year: number; orange: string[]; purple: string[] }> {
   const rows = await getLeaderboard({ year })
   return {
     year,
@@ -1016,7 +1017,7 @@ export function computeMvpRanks(rows: LeaderboardRow[]): MvpRankEntry[] {
 // 3rd rank on a genuine tie there — never fewer than 3 ranks are considered
 // when picking who's in, but a position with under 3 distinct performances
 // just returns however many it has.
-export async function getTopScorersByBattingPosition(
+async function getTopScorersByBattingPositionUncached(
   filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
 ): Promise<BattingPositionLeader[]> {
   let scoped = await getScopedMatchIds(filters)
@@ -1130,7 +1131,7 @@ export async function getTopScorersByBattingPosition(
 // FOW-completeness guard, so a match with no synced Fall of Wickets
 // contributes nothing rather than a fabricated full-innings stand. See
 // features/partnerships.md §10.
-export async function getPartnershipLeaders(
+async function getPartnershipLeadersUncached(
   filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
 ): Promise<PartnershipLeaders> {
   const empty: PartnershipLeaders = { top: [], byWicket: [], pairs: [] }
@@ -1279,7 +1280,7 @@ export async function getStandBaselines(): Promise<StandBaselines> {
 // live reconciled Hub player_id (same join-to-stats approach as partnerships;
 // a cached copy could lag a reconciliation). A match with no synced opponent
 // FOW (or incomplete rows) contributes nothing. See features/partnerships.md §13.
-export async function getBreakthroughLeaders(
+async function getBreakthroughLeadersUncached(
   filters: { year?: number; tournamentId?: string; groundId?: string; formats?: string[] } = {}
 ): Promise<BreakthroughLeaders> {
   const scoped = await getScopedMatchIds(filters)
@@ -1372,7 +1373,7 @@ export async function getBreakthroughLeaders(
 // with nothing in it. Also excludes cancelled bookings — see
 // getPerformances()'s comment for why a stale, rescheduled-away
 // booking can't just be left in.
-export async function getAvailableMonths(): Promise<string[]> {
+async function getAvailableMonthsUncached(): Promise<string[]> {
   const today = new Date().toISOString().split('T')[0]
   const hub = createServiceClient()
   const { data, error } = await hub.from('bookings').select('game_date').not('match_id', 'is', null).eq('status', 'confirmed').lte('game_date', today)
@@ -1415,7 +1416,7 @@ function resolveTournamentName(booking: any): string | null {
 // `centuries`/`fiveWicketHauls` are actually rendered any more (neither
 // `LeaderboardMilestones.tsx` nor `LeaderboardMonthly.tsx` shows
 // halfCenturies/threeWicketHauls). See `features/leaderboard.md` §5/§5.1/§10.
-export async function getPerformances(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; includePractice?: boolean }): Promise<Performances> {
+async function getPerformancesUncached(filters: { year?: number; month?: string; tournamentId?: string; groundId?: string; formats?: string[]; includePractice?: boolean }): Promise<Performances> {
   const scoped = await getScopedMatchIds(filters)
   if (!scoped || scoped.length === 0) return EMPTY_PERFORMANCES
 
@@ -1722,3 +1723,15 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
 
   return { tournament, ground, format: gatedFormatStats }
 }
+
+
+// ── Cached public entry points (see src/lib/statsCache.ts) ─────────────────
+export const getLeaderboard = cachedStats(getLeaderboardUncached, 'getLeaderboard')
+export const getFilterOptions = cachedStats(getFilterOptionsUncached, 'getFilterOptions')
+export const getAvailableMonths = cachedStats(getAvailableMonthsUncached, 'getAvailableMonths')
+export const getPerformances = cachedStats(getPerformancesUncached, 'getPerformances')
+export const getTopScorersByBattingPosition = cachedStats(getTopScorersByBattingPositionUncached, 'getTopScorersByBattingPosition')
+export const getPartnershipLeaders = cachedStats(getPartnershipLeadersUncached, 'getPartnershipLeaders')
+export const getBreakthroughLeaders = cachedStats(getBreakthroughLeadersUncached, 'getBreakthroughLeaders')
+export const getCareerHighlightsByPlayer = cachedStats(getCareerHighlightsByPlayerUncached, 'getCareerHighlightsByPlayer')
+export const getSeasonCapHolders = cachedStats(getSeasonCapHoldersUncached, 'getSeasonCapHolders')

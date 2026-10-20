@@ -704,6 +704,8 @@ multi-player analytics query added to this file without the same
 
 ---
 
+> Update (October 2026): the heavy queries behind this page (`getLeaderboard`, `getPerformances`, partnerships, breakthroughs, filter options, months) are wrapped in a tagged 5-minute data cache, dropped on scorecard sync and reconciliation — see `pwa.md` §8.
+
 ## 8.2 Performance — sequential analytics-DB round trips parallelized
 (fixed September 2026)
 

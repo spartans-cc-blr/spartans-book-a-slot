@@ -21,6 +21,7 @@
 // per split.
 
 import { createServiceClient } from '@/lib/supabase'
+import { cachedStats } from '@/lib/statsCache'
 import { createAnalyticsClient } from '@/lib/playerIdentityResolution'
 import { normaliseResult, type TeamMatch } from '@/lib/teamStatsCore'
 
@@ -44,7 +45,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out
 }
 
-export async function getTeamMatches(): Promise<TeamMatch[]> {
+async function getTeamMatchesUncached(): Promise<TeamMatch[]> {
   const hub = createServiceClient()
 
   // Every confirmed booking that has a synced scorecard. Cancelled rows
@@ -168,3 +169,6 @@ export async function getTeamMatches(): Promise<TeamMatch[]> {
   }
   return out
 }
+
+// Cached public entry point (see src/lib/statsCache.ts).
+export const getTeamMatches = cachedStats(getTeamMatchesUncached, 'getTeamMatches')

@@ -10,6 +10,7 @@
 // (fix the master list first, never silently re-point history).
 
 import { NextRequest, NextResponse } from 'next/server'
+import { invalidateStatsCache } from '@/lib/statsCache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
   try {
     const linked = await linkSpellingToOpponent(supabase, parsed.data.opponent_id, parsed.data.name, user.playerId ?? null)
     await mirrorOpponent(supabase, createAnalyticsClient(), parsed.data.opponent_id)
+    invalidateStatsCache()
     return NextResponse.json({ ok: true, linked_bookings: linked })
   } catch (e: any) {
     if (e instanceof AliasConflictError) return NextResponse.json({ error: e.message }, { status: 409 })

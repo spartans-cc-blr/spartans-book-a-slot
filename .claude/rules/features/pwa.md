@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-Result of a PWA self-scan (October 2026). This pass fixed the concrete bugs and added instant loading placeholders. Larger ideas (install prompt, offline availability queue, caching the stats pages, merging the three global modal fetches) are listed in §6 and not built.
+Result of a PWA self-scan (October 2026). This pass fixed the concrete bugs and added instant loading placeholders. The install prompt, contextual push prompt and cached stats data were added in a second pass (§6-§8); remaining ideas are in §9.
 
 ## 2. Service worker — `public/sw.js`
 
@@ -31,14 +31,25 @@ Not added for `/` (a root `loading.tsx` would also wrap `/login`, `/schedule` an
 
 ## 5. Files
 
-`public/sw.js`, `public/offline.html`, `src/app/manifest.ts`, `src/app/layout.tsx`, `public/icons/*`, `public/apple-touch-icon.png`, `public/images/logo-128.png`, `src/components/ui/PageSkeleton.tsx`, `src/app/*/loading.tsx`.
+`public/sw.js`, `public/offline.html`, `src/app/manifest.ts`, `src/app/layout.tsx`, `public/icons/*`, `public/apple-touch-icon.png`, `public/images/logo-128.png`, `src/components/ui/PageSkeleton.tsx`, `src/app/*/loading.tsx`, `src/components/ui/InstallPrompt.tsx`, `src/lib/statsCache.ts`.
 
-## 6. Not built (ideas, roughly by value)
+## 6. Install prompt — `src/components/ui/InstallPrompt.tsx`
 
-- Android `beforeinstallprompt` banner and an iOS "Add to Home Screen" coach-mark.
-- Ask for push permission in context (after first availability tap).
-- Short `revalidate` plus `revalidateTag` after scorecard sync for the stats pages (currently `revalidate = 0`).
-- Tab-bar link prefetch; Home skeleton via route group.
-- Stale-while-revalidate cache of last `/fixtures` data and Background Sync for availability taps.
+Mounted once in `layout.tsx`. Shown to signed-in, non-expelled members who are not already in the installed app, from their **second** browser session onward (`hub-visit-count` in localStorage), and not again for 30 days after "Not now". Android/Chrome: captures `beforeinstallprompt` and offers a one-tap Install. iOS (including iPadOS reporting as Mac): no install API exists, so it shows "Share, then Add to Home Screen" and says this is needed for squad notifications. `appinstalled` sets `hub-installed` and hides it. Blocked storage means it stays quiet.
+
+## 7. Push prompt timing
+
+`PushSubscribePrompt` (on `/fixtures`) no longer opens on page load. `FixturesWeekend` dispatches `hub:availability-saved` after a successful save, and the prompt checks its usual conditions (supported, not denied, not subscribed, not dismissed in 14 days) at that moment. On iOS the prompt only appears once the app is installed, since Safari tabs have no `PushManager`; the install prompt covers that gap.
+
+## 8. Cached stats data — `src/lib/statsCache.ts`
+
+The stats pages must stay dynamic (they read the session), so caching is one level down: `cachedStats()` wraps `unstable_cache` with tag `stats` and a 5 minute TTL. Wrapped: `getTeamMatches`, `getLeaderboard`, `getFilterOptions`, `getAvailableMonths`, `getPerformances`, `getTopScorersByBattingPosition`, `getPartnershipLeaders`, `getBreakthroughLeaders`, `getCareerHighlightsByPlayer`, `getSeasonCapHolders` (originals are `*Uncached`, same file). Arguments form the cache key. Results must survive a JSON round trip (no Date/Map/Set) and stay under the 2MB entry limit; true today.
+
+`invalidateStatsCache()` (`revalidateTag('stats')`, wrapped in try/catch) is called at the end of `syncMatchStatsForBooking()`, after a player-reconciliation confirm/reconcile that updated rows, and on opponent create/edit/link/merge and booking PATCH. A new scorecard therefore shows straight away; other edits show within 5 minutes at most. Not wrapped (called with many argument shapes or per-player): `getPlayer*`, `getLeaderboardsByTournament/Ground`, `getRecentForm`, `getStandBaselines` (own 10 minute memo). Calling a wrapped function outside a Next request (scripts) would fail; none do, and the tests don't call them.
+
+## 9. Not built (ideas, roughly by value)
+
+- Home skeleton via route group; stale-while-revalidate cache of last `/fixtures` data; Background Sync for availability taps.
 - `navigator.setAppBadge` with the unmarked-availability count; manifest `screenshots`.
 - Merge the three global modal fetches into one request.
+- Tab-bar prefetch needs no change: `loading.tsx` now lets Next prefetch the skeleton for dynamic routes through the existing `Link`s.

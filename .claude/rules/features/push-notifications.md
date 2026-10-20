@@ -288,7 +288,7 @@ Players who reinstall the PWA must re-subscribe once — the old subscription en
 
 ---
 
-*Service worker details (cache versioning, badge icon, tag, focus-on-click) are in `pwa.md`.*
+*The fixtures subscribe prompt now opens after a saved availability response, not on page load (`pwa.md` §7). Service worker details (cache versioning, badge icon, tag, focus-on-click) are in `pwa.md`.*
 
 *Maintained by: Muthu, Spartans CC BLR Coordinator*
 *vibe-security audit applied per SKILL.md — `never trust the client`*
