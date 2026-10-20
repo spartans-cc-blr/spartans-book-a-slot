@@ -456,6 +456,8 @@ export default async function HomePage() {
     <div className="min-h-screen bg-parchment dark:bg-ink grain">
       <SiteNav activePage="home" />
 
+      <main>
+
       {/* ── EXPELLED STATE ── */}
       {isExpelled && (
         <div className="px-5 md:px-8 lg:px-10 py-8 max-w-4xl">
@@ -747,6 +749,8 @@ export default async function HomePage() {
         )}
 
       </div>
+
+      </main>
 
       <footer className="py-5 text-center font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mt-8">
         © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014

@@ -264,9 +264,9 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-parchment dark:bg-ink grain">
         <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
-        <div className="px-5 py-8 space-y-3 animate-pulse max-w-2xl mx-auto mt-8">
+        <main className="px-5 py-8 space-y-3 animate-pulse max-w-2xl mx-auto mt-8">
           {[0, 1, 2].map(i => <div key={i} className="h-16 bg-white dark:bg-ink-3 rounded border border-[#D4C9B0] dark:border-ink-5" />)}
-        </div>
+        </main>
       </div>
     )
   }
@@ -275,9 +275,9 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-parchment dark:bg-ink grain">
         <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
-        <div className="px-5 py-12 text-center font-rajdhani text-[#78716C] dark:text-zinc-500">
+        <main className="px-5 py-12 text-center font-rajdhani text-[#78716C] dark:text-zinc-500">
           {player?.playerStatus === 'expelled' ? 'Account suspended.' : 'Profile not available.'}
-        </div>
+        </main>
       </div>
     )
   }
@@ -298,6 +298,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-parchment dark:bg-ink grain">
       <SiteNav activePage="profile" back={{ fallbackHref: '/', label: 'Home' }} />
 
+      <main>
       {/* ── Identity: photo, name, badges, quick links ── */}
       <div className="bg-white dark:bg-ink-2 border-b border-[#E2DACE] dark:border-ink-4 px-5 md:px-8 lg:px-10 py-6">
         <div className="max-w-2xl flex items-center gap-4 sm:gap-5">
@@ -583,6 +584,8 @@ export default function ProfilePage() {
           </button>
         </div>
       </div>
+
+      </main>
 
       <footer className="border-t border-[#E2DACE] dark:border-ink-4 py-5 text-center font-rajdhani text-xs text-[#78716C] dark:text-zinc-600">
         © 2026 <span className="text-gold-dim">Spartans Cricket Club</span> · Bengaluru · Est. 2014
