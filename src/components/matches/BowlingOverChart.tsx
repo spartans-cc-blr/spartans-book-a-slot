@@ -9,7 +9,7 @@ import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { formatOvers, type BallRow, type BowlerLine } from '@/lib/ballByBall'
-import { bowlingOverSeries, overContexts, wormPoints } from '@/lib/matchInsights'
+import { bowlingOverSeries, vsRequiredRate, overContexts, wormPoints } from '@/lib/matchInsights'
 
 const W = 360, H = 240
 const PAD = { l: 30, r: 8, t: 12, b: 26 }
@@ -82,6 +82,8 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
   const label = bowler ? bowler.name : 'Entire innings'
   const ov = hover != null ? overs[hover - 1] : null
   const ctx = hover != null ? contexts.find(c => c.over === hover) : undefined
+  const basis = target != null ? 'rrr' : 'crr'
+  const verdict = ov ? vsRequiredRate(ov, ctx, basis) : null
   const econ = ov && ov.legalBalls > 0 ? (ov.runs / ov.legalBalls) * 6 : null
 
   return (
@@ -125,11 +127,13 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
             // an over he did not bowl: a faint tick so the whole innings length is still visible
             return <rect key={o.over} x={cx - bw / 2} y={H - PAD.b - 2} width={bw} height={2} rx={1} style={{ fill: 'var(--scorecard-table-border)' }} />
           }
+          const verdict = vsRequiredRate(o, contexts.find(c => c.over === o.over), basis)
+          const hollow = verdict === 'over'
           const top = y(o.runs)
           const h = Math.max(H - PAD.b - top, 2)
           return (
             <g key={o.over}>
-              <rect x={cx - bw / 2} y={H - PAD.b - h} width={bw} height={h} rx={1.5} style={{ fill: BAR, opacity: 0.85 }} />
+              <rect x={cx - bw / 2} y={H - PAD.b - h} width={bw} height={h} rx={1.5} style={hollow ? { fill: BAR, fillOpacity: 0.18, stroke: BAR, strokeWidth: 1.5 } : { fill: BAR, opacity: 0.9 }} />
               <text x={cx} y={H - PAD.b - h - 3} textAnchor="middle" fontSize={8} style={{ fill: 'var(--scorecard-text-2)' }}>{o.runs}</text>
               {Array.from({ length: o.wickets }, (_, i) => (
                 <circle key={i} cx={cx} cy={H - PAD.b - h - 14 - i * 7} r={3} style={{ fill: 'var(--scorecard-heading-text)' }} />
@@ -178,10 +182,10 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
                   <>
                     <span className={MUTED}> · RRR </span><span className="tabular-nums" style={{ color: 'var(--fx-accent)' }}>{ctx.rrr.toFixed(2)}</span>
                     <span className={MUTED}> (needed {ctx.needed} from {ctx.oversLeft} ov)</span>
-                    {ov.bowled && econ != null && (
-                      <span className={MUTED}> · {econ < ctx.rrr ? 'under' : econ > ctx.rrr ? 'over' : 'level with'} the required rate</span>
-                    )}
                   </>
+                )}
+                {verdict && (
+                  <span className={MUTED}> · {verdict === 'under' ? 'under' : verdict === 'over' ? 'over' : 'level with'} the {basis === 'rrr' ? 'required' : 'current'} rate{verdict === 'under' && basis === 'crr' ? ' (brought it down)' : verdict === 'over' && basis === 'crr' ? ' (pushed it up)' : ''}</span>
                 )}
               </p>
             )}
@@ -192,8 +196,14 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 font-rajdhani text-xs text-[var(--scorecard-text-2)]">
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: BAR, opacity: 0.85 }} />
-          Runs conceded{bowler ? ` by ${bowler.name}` : ''}
+          {target != null ? 'Held under RRR' : 'Brought CRR down'}
         </span>
+        {(
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'rgba(15,118,110,0.18)', border: `1.5px solid ${BAR}` }} />
+            {target != null ? 'Went over RRR' : 'Pushed CRR up'}
+          </span>
+        )}
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-2 w-2 rounded-full" style={{ background: 'var(--scorecard-heading-text)' }} />
           Wicket
@@ -213,9 +223,9 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
       </div>
       <p className={`text-[10px] font-rajdhani mt-1 ${MUTED}`}>
         {target != null
-          ? `Spartans defended ${firstTotal}. CRR and RRR are the batting side's rates going into each over, so a bar under the RRR line means the bowler kept them below the rate they needed.`
+          ? `Spartans defended ${firstTotal}. CRR and RRR are the batting side's rates going into each over, so a solid bar means the bowler kept them below the rate they needed; a hollow bar means the over went for more.`
           : battedFirst === false
-            ? 'Spartans bowled first, so there is no target yet: only the batting side’s current run rate (going into each over) is shown.'
+            ? 'Spartans bowled first, so there is no target yet: only the batting side’s current run rate (going into each over) is shown. A solid bar means the over was cheaper than that rate (it brought the CRR down); a hollow bar means it cost more. Over 1 has no CRR yet, so it stays solid.'
             : 'Batting order isn’t known for this match, so there is no required rate: only the batting side’s current run rate is shown.'}
         {bowler ? ' Bars show only the overs this bowler bowled; the faint ticks are overs he did not bowl.' : ' Entire innings counts every run (byes included) and every wicket.'}
         {clipped && ` The axis stops at ${yMax}; the required rate line is clipped above that.`}
