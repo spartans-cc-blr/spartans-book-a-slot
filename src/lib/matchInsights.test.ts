@@ -221,6 +221,12 @@ describe('vsRequiredRate', () => {
     expect(vsRequiredRate(ov(8), ctx(8))).toBe('level')
     expect(vsRequiredRate(ov(11), ctx(8))).toBe('over')
   })
+  it('can compare with the current rate instead', () => {
+    const c = { ...ctx(null), crr: 7 }
+    expect(vsRequiredRate(ov(5), c, 'crr')).toBe('under')
+    expect(vsRequiredRate(ov(9), c, 'crr')).toBe('over')
+    expect(vsRequiredRate(ov(9), ctx(null), 'crr')).toBeNull()
+  })
   it('scales a part over', () => {
     expect(vsRequiredRate(ov(5, 3), ctx(8))).toBe('over')
   })
