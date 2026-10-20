@@ -176,3 +176,13 @@ The Bowling tab's plain over-by-over bars were replaced by `BowlingOverChart` (`
 - **Hover or tap and drag any over:** highlights the over and shows who bowled it, the selected bowler's runs, wickets and economy (or "did not bowl this over"), and the batting side's score, CRR, RRR, runs needed and overs left going in, with "under / over the required rate" for his economy. Spartans bowlers link to their stats.
 - `BowlingView` gets `battedFirst`, `spartansTotal` and `opponentName` from `MatchTabs`. No new route, table or migration.
 - **Under vs over the required rate (October 2026):** when Spartans defend, each bowled over is styled by `vsRequiredRate()` (`matchInsights.ts`): economy at or below the going-in RRR is a **solid** teal bar, an over that went above it is a **hollow** bar (pale fill, teal outline). Shape/fill rather than red/green, so it reads in both themes and for colour-blind viewers. With no target (Spartans bowled first) the same styling compares each over's economy with the batting side's CRR going in: solid = brought the CRR down, hollow = pushed it up (over 1 has no CRR and stays solid). The legend and hover readout use the same verdict.
+
+
+## Batting tab: strike rate vs par (October 2026)
+
+The batters table has a **vs par** column: the batter's strike rate minus a benchmark (`batterPar()`, `matchInsights.ts`). A run rate converts to a strike rate as RRR ÷ 6 × 100 (9.0 an over is 150).
+
+- **Chase (Spartans batted second):** par is the required rate going into every ball he faced, converted to a strike rate and averaged over his balls, so a batter who came in at 12 an over is held to a higher par than one at 6. Target is the opposition scorecard total + 1 (else the commentary sum).
+- **Batting first / unknown order:** there is no required rate, so par is his team-mates' strike rate in the same phases, weighted by the balls he faced in each.
+- Plus (bold) = beat par; minus = fell short; "–" = faced no ball or no benchmark. Team rates include extras and partners, which is why the benchmark is the required rate or the others' strike rate, not CRR. Wides aren't balls faced. `BattingView` gets `battedFirst` and `opponentTotal` from `MatchTabs`. No new route, table or migration.
+
