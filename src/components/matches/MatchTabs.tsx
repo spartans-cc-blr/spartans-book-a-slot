@@ -102,7 +102,10 @@ export function MatchTabs({ bookingId, format, battedFirst = null, ...scorecard 
             scorecardTotals={{ spartans: scorecard.teamTotal, opponent: scorecard.opponentTotal }} />
         )}
         {tab === 'batting' && <BattingView balls={balls} totalOvers={totalOvers} />}
-        {tab === 'bowling' && <BowlingView balls={balls} totalOvers={totalOvers} />}
+        {tab === 'bowling' && (
+          <BowlingView balls={balls} totalOvers={totalOvers} battedFirst={battedFirst} spartansTotal={scorecard.teamTotal}
+            opponentName={scorecard.opponentName} />
+        )}
         {tab === 'fielding' && <FieldingView balls={balls} />}
         {tab === 'commentary' && <CommentaryView balls={balls} />}
       </div>

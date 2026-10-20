@@ -50,7 +50,7 @@ analytics read is logged and treated as "not available", never an error page.
 
 - **Batting**: over-by-over runs as plain bars (the ball-by-ball detail of an over is on the Commentary tab) with one red dot per wicket that fell in that over, so a two-wicket over shows two dots; every column reserves room for the busiest over so the bars share a baseline), runs/wickets/run-rate/dot% by
   phase, a batters table (R, B, SR, 4s, 6s, how out), and dot% and runs (balls) by phase.
-- **Bowling**: the same bars and phase split for the opposition innings, a bowlers table
+- **Bowling**: a runs-and-wickets-by-over chart with a bowler selector (see "Bowling tab: runs and wickets by over" below) and the phase split for the opposition innings, a bowlers table
   (O, M, R, W, Econ, Dot%), boundaries and extras conceded, and each bowler's spell in
   each phase (overs-runs-wickets).
 - **Fielding**: catches, caught-behind, stumpings and run-outs per Spartans fielder, plus
@@ -155,9 +155,23 @@ A new **Insights** tab (second, after Full Scorecard) draws a run-rate worm: cum
 - **One innings uploaded:** that worm draws alone; if only the chase is missing the target line still shows.
 - Maths is pure in `src/lib/matchInsights.ts` (`wormPoints()`, `buildWorm()`, `requiredLineAt()`, unit-tested in `matchInsights.test.ts`). The chart is `src/components/matches/MatchInsights.tsx`. No new route, table or migration; the tab only exists when commentary exists, like the others.
 - **Wicket hover (October 2026):** each wicket circle shows who and how on hover (native `<title>` tooltip), and on keyboard focus or tap a readout line under the chart gives `W3 Siva c Rohit b Kumar · 45/3 at 7.2 ov`. Wicket details (`WicketNote`: batter, how out via `howOut()`, score, ball via `ballLabel()`) come from `wormPoints()`. Several wickets in one over stack above the point.
-- **Current vs required rate (October 2026):** for the chase, a second chart plots current run rate (runs / overs) against the changing required rate, `(target − scored) / (total overs − over)`, starting at target / total overs. The line stops when the target is reached; at the last over the required rate is undefined and left out. The y-axis is capped at 30 and the line clipped there.
+- **Current vs required rate (October 2026):** for the chase, a second chart plots current run rate (runs / overs) against the changing required rate, `(target − scored) / (total overs − over)`, starting at target / total overs. The line stops when the target is reached; at the last over the required rate is undefined and left out. The y-axis is capped at 32 (a multiple of 4, so gridlines are whole numbers) and the line clipped there.
 - **Chase by over:** a collapsed table (`<details>`) under the rate chart: runs in the over, score/wickets, runs still needed, required and current rate. Series come from `chaseSeries()` in `matchInsights.ts`.
 - **Hover or tap any over (October 2026):** on both charts, moving the pointer across the plot (or tapping and dragging on a phone) picks the nearest whole over, draws a guide line and dots, and fills a readout below. The worm shows each innings' score after that over and how many it scored off it, plus **who batted** (Spartans batting: each batter's runs and balls in that over) or **who bowled** (Spartans bowling; more than one name if the over was shared). Spartans players link to their stats. The rate chart shows current rate, required rate, runs needed and overs left, wickets, and the same who-batted/who-bowled for the chase. The readout stays after the pointer leaves, so the player links can be tapped. Per-over data comes from `wormPoints()` (`batters`, `bowlers`, `runsInOver`, `wicketsAfter`).
 - **Where the two rates meet:** `rateCrossings()` interpolates where current and required rate cross between overs. The point is marked on the rate chart (hover or tap it to jump to the nearest over) and listed under it, e.g. "Lines meet at about over 6.3 (10.4 an over): current rate fell below the required rate". A chase can cross more than once.
 - Both charts appear only when the chasing innings has commentary and the batting order is known from the toss.
 - More Insights (momentum, win probability, etc.) can go on this tab later.
+
+
+## Bowling tab: runs and wickets by over (October 2026)
+
+The Bowling tab's plain over-by-over bars were replaced by `BowlingOverChart` (`src/components/matches/BowlingOverChart.tsx`), inline SVG like the Insights charts.
+
+- **Bars and dots:** one slot per over across the whole innings (`totalOvers`, or longer if it ran on). Bars are runs conceded, dark dots above them are wickets. Overs the selected bowler did not bowl show a faint tick, so the innings length stays visible.
+- **Bowler selector:** a dropdown of every Spartans bowler (with his spell, e.g. `4.0-32-2`) plus **Entire innings (all bowlers)**. The signed-in player is pre-selected, marked "(you)", when `bowler_player_id` matches their `playerId` (from `useSession()`); otherwise the entire innings shows. Picking another option sticks for that view.
+- **What counts (`bowlingOverSeries()`):** for one bowler, runs charged to him (bat runs, wides, no-balls, the same as the Bowlers table, not byes) and wickets credited to him (not run-outs). For the entire innings, every run (byes included) and every wicket, so it adds up to the innings score. Names match loosely on case and spaces.
+- **CRR and RRR (`overContexts()`):** two lines on the same axis (both are runs per over). They are the batting side's rates **going into each over**, the position the bowler faced when he took the ball, so a bar under the RRR line means he kept them below the rate they needed. This differs from the Insights rate chart, which uses the rate after each over. Over 1 has no CRR yet.
+  - **Spartans defending** (batted first, from the toss): CRR and RRR, target = Spartans total + 1 (scorecard total, else the commentary sum). The RRR line stops once the target would have been passed, and is clipped at the axis cap (32).
+  - **Spartans bowled first**, or batting order unknown: CRR only, with a note saying why.
+- **Hover or tap and drag any over:** highlights the over and shows who bowled it, the selected bowler's runs, wickets and economy (or "did not bowl this over"), and the batting side's score, CRR, RRR, runs needed and overs left going in, with "under / over the required rate" for his economy. Spartans bowlers link to their stats.
+- `BowlingView` gets `battedFirst`, `spartansTotal` and `opponentName` from `MatchTabs`. No new route, table or migration.

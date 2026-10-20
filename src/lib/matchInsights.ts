@@ -2,7 +2,7 @@
 // the constant required-rate line for the chase). No I/O, no React; unit-tested in
 // matchInsights.test.ts. Sides follow ballByBall.ts: 'spartans' = Spartans batting.
 
-import { ballLabel, ballsFaced, ballsForSide, howOut, type BallRow, type InningsSide } from '@/lib/ballByBall'
+import { ballLabel, ballsFaced, ballsForSide, bowlerRuns, howOut, isBowlerWicket, type BallRow, type InningsSide } from '@/lib/ballByBall'
 
 /** One wicket, for the hover/tap readout on the chart. */
 export interface WicketNote {
@@ -181,6 +181,78 @@ export function rateCrossings(rows: ChaseRow[]): RateCrossing[] {
       over: a.over + t * (b.over - a.over),
       rate: a.crr + t * (b.crr - a.crr),
       direction: d1 > 0 ? 'behind' : 'ahead',
+    })
+  }
+  return out
+}
+
+// ── Bowling tab: runs conceded and wickets by over ─────────────────────────
+
+export interface BowlingOver {
+  over: number
+  runs: number              // runs conceded in this over by the selection
+  wickets: number
+  legalBalls: number
+  bowled: boolean           // the selection bowled at least one ball in this over
+  bowlers: OverBowler[]     // everyone who bowled the over
+}
+
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** One entry per over across the whole innings (`totalOvers`, or longer if the innings ran on).
+ *  With a `bowler`, an over shows only that bowler's balls: runs charged to him (bat runs, wides and
+ *  no-balls, as the Bowling table counts them) and the wickets he is credited with. With `null` it is
+ *  the entire innings: every run in the over and every wicket, so it matches the innings score. */
+export function bowlingOverSeries(inningsBalls: BallRow[], bowler: string | null, totalOvers: number): BowlingOver[] {
+  const last = Math.max(0, ...inningsBalls.map(b => b.over_no))
+  const n = Math.max(totalOvers, last)
+  const out: BowlingOver[] = []
+  for (let over = 1; over <= n; over++) {
+    const inOver = inningsBalls.filter(b => b.over_no === over).sort((a, c) => a.seq - c.seq)
+    const mine = bowler == null ? inOver : inOver.filter(b => sameName(b.bowler, bowler))
+    const bowlers: OverBowler[] = []
+    for (const b of inOver) if (!bowlers.some(x => sameName(x.name, b.bowler))) bowlers.push({ name: b.bowler, id: b.bowler_player_id })
+    out.push({
+      over,
+      runs: mine.reduce((s, b) => s + (bowler == null ? b.runs_total : bowlerRuns(b)), 0),
+      wickets: mine.filter(b => (bowler == null ? b.is_wicket : isBowlerWicket(b))).length,
+      legalBalls: mine.filter(b => b.is_legal).length,
+      bowled: mine.length > 0,
+      bowlers,
+    })
+  }
+  return out
+}
+
+export interface OverContext {
+  over: number
+  runsBefore: number
+  wicketsBefore: number
+  crr: number | null        // batting side's run rate going into this over (null for over 1)
+  rrr: number | null        // rate they needed from here (null when there is no target)
+  needed: number | null     // runs still needed going into this over
+  oversLeft: number         // overs left including this one
+}
+
+/** The batting side's position going into each over: current rate and, when there is a target
+ *  (Spartans batted first), the required rate. "Going in" is deliberate: it is the rate the bowler
+ *  faced when he took the ball, so his over can be compared with it. Stops once the target is passed
+ *  or the innings has no more overs. */
+export function overContexts(points: WormPoint[], target: number | null, totalOvers: number): OverContext[] {
+  const out: OverContext[] = []
+  for (let k = 1; k < points.length; k++) {
+    const before = points[k - 1]
+    const needed = target == null ? null : Math.max(target - before.runs, 0)
+    if (needed === 0) break
+    const oversLeft = Math.max(totalOvers - (k - 1), 0)
+    out.push({
+      over: k,
+      runsBefore: before.runs,
+      wicketsBefore: before.wicketsAfter,
+      crr: k > 1 ? before.runs / (k - 1) : null,
+      rrr: needed != null && oversLeft > 0 ? needed / oversLeft : null,
+      needed,
+      oversLeft,
     })
   }
   return out
