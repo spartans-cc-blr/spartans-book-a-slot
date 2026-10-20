@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { summariseBatters, type BallRow } from '@/lib/ballByBall'
-import { batterPar, overEndRates, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
+import type { BallRow } from '@/lib/ballByBall'
+import { battingOverSeries, vsBattingRate, overEndRates, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
 
 function ball(side: 'spartans' | 'opponent', over: number, runs: number, wicket = false): BallRow {
   return {
@@ -237,35 +237,6 @@ describe('vsRequiredRate', () => {
   })
 })
 
-describe('batterPar', () => {
-  const bb = (over: number, batter: string, runs: number): BallRow => ({ ...ball('spartans', over, runs), batter, seq: over * 10 + (batter === 'B' ? 1 : 0) })
-
-  it('chase: compares with the required rate going into each ball he faced', () => {
-    const side = [bb(1, 'A', 6), bb(2, 'A', 6)]
-    const lines = summariseBatters(side, 10)
-    const m = batterPar(side, lines, 61, 10)
-    // RRR going in: over 1 = 61/10, over 2 = 55/9
-    const expected = ((61 / 10 / 6 * 100) + (55 / 9 / 6 * 100)) / 2
-    expect(m.get('a')?.basis).toBe('rrr')
-    expect(m.get('a')?.par).toBeCloseTo(expected)
-    expect(m.get('a')?.diff).toBeCloseTo(600 - expected)
-  })
-
-  it('batting first: compares with team-mates in the same phases', () => {
-    const side = [bb(1, 'A', 6), bb(1, 'B', 1), bb(1, 'B', 1)]
-    const lines = summariseBatters(side, 20)
-    const m = batterPar(side, lines, null, 20)
-    expect(m.get('a')).toMatchObject({ basis: 'phase', par: 100 })
-    expect(m.get('a')?.diff).toBeCloseTo(500)
-  })
-
-  it('has no par for someone who faced nothing', () => {
-    const side = [bb(1, 'A', 1)]
-    const lines = summariseBatters([{ ...side[0], is_wicket: true, dismissed_batter: 'Z' }], 20)
-    expect(batterPar(side, lines, null, 20).get('z')?.par).toBeNull()
-  })
-})
-
 describe('overEndRates', () => {
   const pts = wormPoints([ball('opponent', 1, 7), ball('opponent', 2, 3), ball('opponent', 3, 20)])
   it('gives the rates at the end of each over, so over 1 has a current rate', () => {
@@ -281,3 +252,53 @@ describe('overEndRates', () => {
     expect(r[2]).toMatchObject({ needed: 0, rrr: null })
   })
 })
+
+describe('battingOverSeries', () => {
+  const bt = (over: number, batter: string, runs: number, extra: Partial<BallRow> = {}): BallRow =>
+    ({ ...ball('spartans', over, runs), batter, runs_bat: runs, ...extra, seq: over * 10 + (extra.seq ?? 0) })
+
+  it('shows only the chosen batter\'s balls, covering the whole innings', () => {
+    const balls = [bt(1, 'Siva', 4), bt(1, 'Loki', 1, { seq: 1 }), bt(2, 'Loki', 2)]
+    const s = battingOverSeries(balls, 'Siva', 3)
+    expect(s).toHaveLength(3)
+    expect(s.map(o => o.faced)).toEqual([true, false, false])
+    expect(s[0]).toMatchObject({ runs: 4, balls: 1 })
+  })
+
+  it('does not count wides as balls faced, and records his dismissal', () => {
+    const balls = [
+      bt(1, 'Siva', 0, { extra_type: 'wide', extras: 1, runs_total: 1, is_legal: false, runs_bat: 0 }),
+      bt(1, 'Siva', 0, { is_wicket: true, dismissed_batter: 'Siva', seq: 1 }),
+    ]
+    const o = battingOverSeries(balls, 'Siva', 1)[0]
+    expect(o.balls).toBe(1)
+    expect(o.wickets).toBe(1)
+  })
+
+  it('shows every run and wicket for the entire innings', () => {
+    const balls = [bt(1, 'Siva', 2), bt(1, 'Loki', 3, { seq: 1 }), bt(2, 'Loki', 0, { is_wicket: true, dismissed_batter: 'Loki' })]
+    const s = battingOverSeries(balls, null, 2)
+    expect(s.map(o => o.runs)).toEqual([5, 0])
+    expect(s[1].wickets).toBe(1)
+  })
+})
+
+describe('vsBattingRate', () => {
+  const ov = (runs: number, balls = 6, faced = true) => ({ over: 1, runs, balls, wickets: 0, faced, bowlers: [] })
+  const ctx = (crr: number | null, rrr: number | null) => ({ over: 2, runsBefore: 0, wicketsBefore: 0, crr, rrr, needed: 0, oversLeft: 1 })
+
+  it('is ahead when he scored faster than the rate going in', () => {
+    expect(vsBattingRate(ov(10), ctx(null, 8), 'rrr')).toBe('ahead')
+    expect(vsBattingRate(ov(8), ctx(null, 8), 'rrr')).toBe('level')
+    expect(vsBattingRate(ov(5), ctx(7, null), 'crr')).toBe('behind')
+  })
+  it('scales a part over by balls faced', () => {
+    expect(vsBattingRate(ov(5, 3), ctx(null, 8), 'rrr')).toBe('ahead')
+  })
+  it('is null with no rate or no balls faced', () => {
+    expect(vsBattingRate(ov(5), ctx(null, null), 'rrr')).toBeNull()
+    expect(vsBattingRate(ov(0, 0, true), ctx(null, 8), 'rrr')).toBeNull()
+    expect(vsBattingRate(ov(5, 6, false), ctx(null, 8), 'rrr')).toBeNull()
+  })
+})
+
