@@ -210,17 +210,6 @@ export async function GET(req: NextRequest) {
   // columns and filters in JS instead. Table size here is small (a club's
   // full match history), so this costs nothing meaningful over the old
   // head-count.
-  const { data: countRows, error: countErr } = await applySharedFilters(
-    supabase.from('bookings').select('id, game_date, slot_time, format')
-  )
-  if (countErr) return NextResponse.json({ error: countErr.message }, { status: 500 })
-  // A game played today is past once it has ended or its scorecard synced
-  // (isCompletedMatch, shared with /fixtures and the admin Matches tab).
-  const syncedToday = await getSyncedBookingIds(
-    supabase, (countRows ?? []).filter((b: any) => b.game_date >= today).map((b: any) => b.id),
-  )
-  const totalCount = (countRows ?? []).filter((b: any) => isCompletedMatch(b, today, syncedToday)).length
-
   let query = applySharedFilters(
     supabase
       .from('bookings')
@@ -243,8 +232,24 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  const { data: rawData, error } = await query
+  // The count query and the page query are independent, so they run
+  // together; today's synced-booking lookup (which needs the count rows)
+  // follows. Page rows are always a subset of the count rows, so one lookup
+  // over the count rows' today-bookings covers both.
+  const [countRes, pageRes] = await Promise.all([
+    applySharedFilters(supabase.from('bookings').select('id, game_date, slot_time, format')),
+    query,
+  ])
+  const { data: countRows, error: countErr } = countRes as { data: any[] | null; error: { message: string } | null }
+  if (countErr) return NextResponse.json({ error: countErr.message }, { status: 500 })
+  const { data: rawData, error } = pageRes as { data: any[] | null; error: { message: string } | null }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // A game played today is past once it has ended or its scorecard synced
+  // (isCompletedMatch, shared with /fixtures and the admin Matches tab).
+  const syncedToday = await getSyncedBookingIds(
+    supabase, (countRows ?? []).filter((b: any) => b.game_date >= today).map((b: any) => b.id),
+  )
+  const totalCount = (countRows ?? []).filter((b: any) => isCompletedMatch(b, today, syncedToday)).length
 
   // Drop today's not-yet-ended games (see isPastMatch above), then trim
   // back down to the requested page size. TODAY_SLOT_BUFFER guarantees this
@@ -262,7 +267,15 @@ export async function GET(req: NextRequest) {
   // batched into one round-trip each rather than per-row, and merged in JS
   // below. Role coverage drives whether the Squad collapsible even needs to
   // be shown on a card that already has synced stats (see roles_complete).
-  const [uploadsRes, statsRes, ledRes, rolesRes, rosterRes] = bookingIds.length ? await Promise.all([
+  // The analytics toss lookup (see below) is independent of these, so it
+  // rides in the same batch instead of waiting for it.
+  const matchIds = Array.from(new Set((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
+  const analytics = createAnalyticsClient()
+  const tossPromise = analytics && matchIds.length
+    ? analytics.from('match_stats').select('match_id, toss_won, toss_decision').in('match_id', matchIds)
+    : Promise.resolve({ data: [] as any[] })
+
+  const [uploadsRes, statsRes, ledRes, rolesRes, rosterRes, { data: tossRows }] = bookingIds.length ? await Promise.all([
     supabase.from('scorecard_uploads').select('booking_id, status, uploaded_at, verified, needs_reconciliation, reconciliation_note, reconciliation_flagged_by, reconciliation_flagged_at').in('booking_id', bookingIds),
     // `fielding` is included alongside batting/bowling — computeMatchMVP()
     // (below) sums mvp_score across all three stat categories, not just
@@ -280,7 +293,8 @@ export async function GET(req: NextRequest) {
     // right before the response is built, same posture as can_upload/
     // can_verify being derived per-viewer from data fetched once.
     supabase.from('squad').select('booking_id, player_id, players(name, whatsapp)').in('booking_id', bookingIds),
-  ]) : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }]
+    tossPromise,
+  ]) : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[], error: null }, { data: [] as any[] }]
 
   const uploadByBooking = new Map((uploadsRes.data ?? []).map((r: any) => [r.booking_id, r]))
   const statsByBooking  = new Map((statsRes.data ?? []).map((r: any) => [r.booking_id, r]))
@@ -293,11 +307,6 @@ export async function GET(req: NextRequest) {
   // bookings, well under any chunking concern. Missing entirely (no
   // ANALYTICS_SUPABASE_URL/KEY configured) just means every card's toss
   // line is omitted, same as a match with no toss data synced yet.
-  const matchIds = Array.from(new Set((data ?? []).map((b: any) => b.match_id).filter(Boolean)))
-  const analytics = createAnalyticsClient()
-  const { data: tossRows } = analytics && matchIds.length
-    ? await analytics.from('match_stats').select('match_id, toss_won, toss_decision').in('match_id', matchIds)
-    : { data: [] as any[] }
   const tossByMatch = new Map((tossRows ?? []).map((r: any) => [r.match_id, r]))
 
   const canSeeWhatsapp = !!user?.isWrangler || !!user?.isAdmin
