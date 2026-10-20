@@ -2,7 +2,7 @@
 // the constant required-rate line for the chase). No I/O, no React; unit-tested in
 // matchInsights.test.ts. Sides follow ballByBall.ts: 'spartans' = Spartans batting.
 
-import { ballLabel, ballsFaced, ballsForSide, bowlerRuns, howOut, isBowlerWicket, type BallRow, type BatterLine, type InningsSide } from '@/lib/ballByBall'
+import { ballLabel, ballsFaced, ballsForSide, bowlerRuns, howOut, isBowlerWicket, type BallRow, type InningsSide } from '@/lib/ballByBall'
 
 /** One wicket, for the hover/tap readout on the chart. */
 export interface WicketNote {
@@ -270,51 +270,6 @@ export function vsRequiredRate(over: BowlingOver, ctx: OverContext | undefined, 
   return econ < rate ? 'under' : econ > rate ? 'over' : 'level'
 }
 
-export interface BatterPar {
-  par: number | null            // the strike rate to compare with (runs per 100 balls)
-  basis: 'rrr' | 'phase'        // rrr = rate the chase needed; phase = the rest of the side in the same phases
-  diff: number | null           // actual strike rate minus par
-}
-
-/** What each Spartans batter's strike rate should be compared with. In a chase (`target` set) it is
- *  the required rate going into every ball he faced, converted to a strike rate (RRR / 6 x 100) and
- *  averaged over his balls. Batting first there is no required rate, so it is the strike rate of his
- *  team-mates in the same phases, weighted by the balls he faced in each. Keyed by lower-cased name. */
-export function batterPar(side: BallRow[], batters: BatterLine[], target: number | null, totalOvers: number): Map<string, BatterPar> {
-  const out = new Map<string, BatterPar>()
-  const contexts = target != null ? overContexts(wormPoints(side), target, totalOvers) : []
-  const key = (n: string) => n.trim().toLowerCase()
-  const phaseTotals = { runs: {} as Record<string, number>, balls: {} as Record<string, number> }
-  for (const b of batters) for (const [p, v] of Object.entries(b.byPhase)) {
-    phaseTotals.runs[p] = (phaseTotals.runs[p] ?? 0) + v.runs
-    phaseTotals.balls[p] = (phaseTotals.balls[p] ?? 0) + v.balls
-  }
-  for (const b of batters) {
-    if (b.balls === 0) { out.set(key(b.name), { par: null, basis: target != null ? 'rrr' : 'phase', diff: null }); continue }
-    let par: number | null = null
-    if (target != null) {
-      let sum = 0, n = 0
-      for (const ball of side) {
-        if (!ballsFaced(ball) || key(ball.batter) !== key(b.name)) continue
-        const rrr = contexts.find(c => c.over === ball.over_no)?.rrr
-        if (rrr != null) { sum += (rrr / 6) * 100; n += 1 }
-      }
-      par = n > 0 ? sum / n : null
-    } else {
-      let sum = 0, n = 0
-      for (const [p, v] of Object.entries(b.byPhase)) {
-        const ob = (phaseTotals.balls[p] ?? 0) - v.balls
-        if (v.balls === 0 || ob <= 0) continue
-        sum += v.balls * (((phaseTotals.runs[p] ?? 0) - v.runs) / ob) * 100
-        n += v.balls
-      }
-      par = n > 0 ? sum / n : null
-    }
-    out.set(key(b.name), { par, basis: target != null ? 'rrr' : 'phase', diff: par != null && b.strikeRate != null ? b.strikeRate - par : null })
-  }
-  return out
-}
-
 export interface OverEndRates {
   over: number
   crr: number               // batting side's run rate at the end of this over
@@ -335,4 +290,53 @@ export function overEndRates(points: WormPoint[], target: number | null, totalOv
     if (needed === 0) break
   }
   return out
+}
+
+// ── Batting tab: runs by over for a batter or the whole innings ────────────
+
+export interface BattingOver {
+  over: number
+  runs: number              // off the bat for one batter; every run (extras too) for the entire innings
+  balls: number             // balls he faced (wides excluded); legal balls for the entire innings
+  wickets: number           // his dismissal in this over (0 or 1); every wicket for the entire innings
+  faced: boolean            // he was at the crease for at least one ball of this over
+  bowlers: OverBowler[]     // the opposition bowlers of the over
+}
+
+/** One entry per over of the innings (`totalOvers`, or longer if it ran on). With a `batter`, an over
+ *  shows only the balls he faced; with `null` it is the whole innings, so it adds up to the score. */
+export function battingOverSeries(inningsBalls: BallRow[], batter: string | null, totalOvers: number): BattingOver[] {
+  const last = Math.max(0, ...inningsBalls.map(b => b.over_no))
+  const n = Math.max(totalOvers, last)
+  const out: BattingOver[] = []
+  for (let over = 1; over <= n; over++) {
+    const inOver = inningsBalls.filter(b => b.over_no === over).sort((a, c) => a.seq - c.seq)
+    const mine = batter == null ? inOver : inOver.filter(b => sameName(b.batter, batter))
+    const bowlers: OverBowler[] = []
+    for (const b of inOver) if (!bowlers.some(x => sameName(x.name, b.bowler))) bowlers.push({ name: b.bowler, id: b.bowler_player_id })
+    const wickets = batter == null
+      ? inOver.filter(b => b.is_wicket).length
+      : inOver.filter(b => b.is_wicket && sameName(b.dismissed_batter ?? b.batter, batter)).length
+    out.push({
+      over,
+      runs: mine.reduce((s, b) => s + (batter == null ? b.runs_total : b.runs_bat), 0),
+      balls: batter == null ? inOver.filter(b => b.is_legal).length : mine.filter(ballsFaced).length,
+      wickets,
+      faced: mine.length > 0 || wickets > 0,
+      bowlers,
+    })
+  }
+  return out
+}
+
+export type BatVerdict = 'ahead' | 'level' | 'behind'
+
+/** Whether the batting selection scored faster than the rate going into the over: 'ahead' = more runs
+ *  an over than the required rate (chase) or the current rate (batting first). Rate is runs per six
+ *  balls faced. Null when there is no rate to compare with or he faced no ball. */
+export function vsBattingRate(over: BattingOver, ctx: OverContext | undefined, basis: 'rrr' | 'crr'): BatVerdict | null {
+  const rate = basis === 'rrr' ? ctx?.rrr : ctx?.crr
+  if (!over.faced || over.balls === 0 || rate == null) return null
+  const mine = (over.runs / over.balls) * 6
+  return mine > rate ? 'ahead' : mine < rate ? 'behind' : 'level'
 }

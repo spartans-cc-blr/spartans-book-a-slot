@@ -182,11 +182,11 @@ The Bowling tab's plain over-by-over bars were replaced by `BowlingOverChart` (`
 
 The CRR and RRR lines on the Bowling chart now plot the rates at the **end** of each over (`overEndRates()`, `matchInsights.ts`), so over 1 has a point (its own run rate) and the line steps at the over that moved it. Each over is still judged (solid/hollow, "under/over") against the rate **going in** (`overContexts()`); the hover readout shows both ("Going in" and "after the over"). Before this the lines used the going-in rate, which drew over 1's point at over 2.
 
-## Batting tab: strike rate vs par (October 2026)
+## Batting tab: runs by over chart (October 2026)
 
-The batters table has a **vs par** column: the batter's strike rate minus a benchmark (`batterPar()`, `matchInsights.ts`). A run rate converts to a strike rate as RRR ÷ 6 × 100 (9.0 an over is 150).
+The "vs par" column was dropped (a single number was hard to relate to the chart). The Batting tab's plain over bars are now `BattingOverChart` (`src/components/matches/BattingOverChart.tsx`), a twin of the Bowling chart.
 
-- **Chase (Spartans batted second):** par is the required rate going into every ball he faced, converted to a strike rate and averaged over his balls, so a batter who came in at 12 an over is held to a higher par than one at 6. Target is the opposition scorecard total + 1 (else the commentary sum).
-- **Batting first / unknown order:** there is no required rate, so par is his team-mates' strike rate in the same phases, weighted by the balls he faced in each.
-- Plus (bold) = beat par; minus = fell short; "–" = faced no ball or no benchmark. Team rates include extras and partners, which is why the benchmark is the required rate or the others' strike rate, not CRR. Wides aren't balls faced. `BattingView` gets `battedFirst` and `opponentTotal` from `MatchTabs`. No new route, table or migration.
-
+- **Bars and dots:** runs in each over of the Spartans innings, a dot for each wicket. A **batter selector** (signed-in player preselected, marked "(you)", else **Entire innings**). For one batter an over shows only the balls he faced (`battingOverSeries()`: bat runs, wides not counted as balls, his dismissal as a dot); overs he did not face show a faint tick. Entire innings counts every run and wicket.
+- **Lines:** the team's CRR (and, in a chase, the RRR from the opening rate, target ÷ total overs, at the left edge) plotted at the end of each over, as on the Bowling chart. Target = opposition scorecard total + 1 (else the commentary sum). Batting first there is no RRR, so only the CRR is shown.
+- **Solid vs hollow:** `vsBattingRate()` compares the batter's scoring rate in the over (runs per six balls he faced) with the rate going in (RRR in a chase, CRR batting first): faster = solid, slower = hollow. Over 1 batting first has no CRR and stays solid.
+- Hover/tap shows the over, who bowled it, his runs off balls (and SR), then the going-in and after-the-over rates and the verdict. `BattingView` gets `battedFirst`, `opponentTotal` and `opponentName` from `MatchTabs`. The old `OverBars` and `batterPar()` were removed. No new route, table or migration.

@@ -10,10 +10,10 @@
 import { useMemo, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { BowlingOverChart } from '@/components/matches/BowlingOverChart'
-import { batterPar } from '@/lib/matchInsights'
+import { BattingOverChart } from '@/components/matches/BattingOverChart'
 import {
-  type BallRow, type InningsSide, type OverGroup, PHASE_KEYS, PHASE_LABEL,
-  ballChip, ballLabel, ballsForSide, economy, formatOvers, groupOvers, hasDefinedPhases, howOut, maxWicketsInOver, phaseRangeLabel, phaseSplit,
+  type BallRow, type InningsSide, PHASE_KEYS, PHASE_LABEL,
+  ballChip, ballLabel, ballsForSide, economy, formatOvers, groupOvers, hasDefinedPhases, howOut, phaseRangeLabel, phaseSplit,
   summariseBatters, summariseBowlers, summariseFielders, wicketRows,
 } from '@/lib/ballByBall'
 
@@ -45,41 +45,6 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 // ── shared pieces ──────────────────────────────────────────────────────────
-
-/** Runs per over as plain bars, with one red dot under the bar for each wicket in that over.
- *  (The full ball-by-ball detail of an over lives on the Commentary tab.) */
-function OverBars({ overs }: { overs: OverGroup[] }) {
-  const max = Math.max(1, ...overs.map(o => o.runs))
-  // A dot is 6px with a 2px gap. Every column reserves room for the busiest over's dots, so the
-  // bars stay on one baseline and the chart grows only as much as it needs to.
-  const DOT_PITCH = 8
-  const maxW = maxWicketsInOver(overs)
-  return (
-    <div>
-      <p className={HEAD}>Over by over</p>
-      <div className="flex items-end gap-[3px]" style={{ height: `${96 + (maxW - 1) * DOT_PITCH}px` }} role="img"
-        aria-label={`Runs per over: ${overs.map(o => `over ${o.over_no} ${o.runs}${o.wickets ? `, ${o.wickets} wicket${o.wickets > 1 ? 's' : ''}` : ''}`).join('; ')}`}>
-        {overs.map(o => (
-          <div key={o.over_no} className="flex-1 min-w-0 flex flex-col items-center justify-end h-full"
-            title={`Over ${o.over_no}: ${o.runs} runs${o.wickets ? `, ${o.wickets} wkt${o.wickets > 1 ? 's' : ''}` : ''}`}>
-            <span className="text-[9px] font-rajdhani text-[var(--scorecard-text-faint)] leading-none mb-0.5">{o.runs}</span>
-            <div className="w-full rounded-t bg-gold/50"
-              style={{ height: `${Math.max((o.runs / max) * 62, 3)}px` }} />
-            <div className="flex flex-col items-center gap-[2px] pt-px" style={{ height: `${maxW * DOT_PITCH}px` }}>
-              {Array.from({ length: o.wickets }, (_, i) => (
-                <span key={i} className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--fx-danger-text)' }} />
-              ))}
-            </div>
-            <span className="text-[9px] font-rajdhani text-[var(--scorecard-text-faint)] leading-none">{o.over_no}</span>
-          </div>
-        ))}
-      </div>
-      <p className="text-[10px] font-rajdhani text-[var(--scorecard-text-faint)] mt-1">
-        Each red dot is a wicket.
-      </p>
-    </div>
-  )
-}
 
 function PhaseTable({ balls, totalOvers, bowling }: { balls: BallRow[]; totalOvers: number; bowling?: boolean }) {
   const lines = phaseSplit(balls, totalOvers, bowling ? 'bowl' : 'bat')
@@ -123,15 +88,10 @@ function PhaseTable({ balls, totalOvers, bowling }: { balls: BallRow[]; totalOve
 
 const PHASE_SHORT: Record<string, string> = { pp: 'PP', mid: 'Mid', death: 'Death' }
 
-export function BattingView({ balls, totalOvers, battedFirst = null, opponentTotal }: { balls: BallRow[]; totalOvers: number; battedFirst?: boolean | null; opponentTotal?: number | null }) {
+export function BattingView({ balls, totalOvers, battedFirst = null, opponentTotal, opponentName }: { balls: BallRow[]; totalOvers: number; battedFirst?: boolean | null; opponentTotal?: number | null; opponentName?: string | null }) {
   const side = useMemo(() => ballsForSide(balls, 'spartans'), [balls])
   const batters = useMemo(() => summariseBatters(side, totalOvers), [side, totalOvers])
-  // A chase (Spartans batted second) has a target; batting first compares with team-mates by phase.
   const oppRuns = useMemo(() => ballsForSide(balls, 'opponent').reduce((s, b) => s + b.runs_total, 0), [balls])
-  const firstTotal = opponentTotal && opponentTotal > 0 ? opponentTotal : oppRuns
-  const target = battedFirst === false && firstTotal > 0 ? firstTotal + 1 : null
-  const pars = useMemo(() => batterPar(side, batters, target, totalOvers), [side, batters, target, totalOvers])
-  const overs = useMemo(() => groupOvers(side), [side])
   if (side.length === 0) return <Empty>No ball-by-ball for the Spartans innings.</Empty>
 
   return (
@@ -139,7 +99,8 @@ export function BattingView({ balls, totalOvers, battedFirst = null, opponentTot
       <p className="font-rajdhani text-sm text-[var(--scorecard-heading-text)]">
         Spartans batting <span className="text-[var(--scorecard-text-faint)]">· {inningsTotal(side)}</span>
       </p>
-      <OverBars overs={overs} />
+      <BattingOverChart side={side} batters={batters} totalOvers={totalOvers} battedFirst={battedFirst} opponentTotal={opponentTotal}
+        opponentRuns={oppRuns} opponentName={opponentName} />
       <PhaseTable balls={side} totalOvers={totalOvers} />
       <div>
         <p className={HEAD}>Batters</p>
@@ -149,7 +110,6 @@ export function BattingView({ balls, totalOvers, battedFirst = null, opponentTot
               <th className="text-left py-1 pr-2 font-semibold">Player</th>
               <th className={TH}>R</th><th className={TH}>B</th><th className={TH}>SR</th>
               <th className={TH}>4s</th><th className={TH}>6s</th>
-              <th className={TH} title={target != null ? 'Strike rate minus the strike rate the required rate demanded' : 'Strike rate minus team-mates in the same phases'}>vs par</th>
             </tr>
           </thead>
           <tbody>
@@ -166,22 +126,11 @@ export function BattingView({ balls, totalOvers, battedFirst = null, opponentTot
                 <td className={TD}>{fmt(b.strikeRate)}</td>
                 <td className={TD}>{b.fours}</td>
                 <td className={TD}>{b.sixes}</td>
-                <td className={TD}>
-                  {(() => {
-                    const d = pars.get(b.name.trim().toLowerCase())?.diff
-                    if (d == null) return '–'
-                    return <span style={{ fontWeight: d >= 0 ? 700 : 400, opacity: d >= 0 ? 1 : 0.75 }}>{d >= 0 ? '+' : '−'}{Math.abs(d).toFixed(0)}</span>
-                  })()}
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="text-[10px] font-rajdhani text-[var(--scorecard-text-faint)] mt-1">
-          B excludes wides. vs par is his strike rate minus {target != null
-            ? `the strike rate the required rate demanded (RRR ÷ 6 × 100, ${target} to win), averaged over the balls he faced`
-            : 'his team-mates’ strike rate in the same phases (no target when batting first)'}. Plus means he beat it.
-        </p>
+        <p className="text-[10px] font-rajdhani text-[var(--scorecard-text-faint)] mt-1">B excludes wides.</p>
       </div>
       <div>
         <p className={HEAD}>Dot balls and phases</p>
