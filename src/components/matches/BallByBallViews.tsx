@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from 'react'
 import { PlayerNameLink } from '@/lib/playerLink'
+import { BowlingOverChart } from '@/components/matches/BowlingOverChart'
 import {
   type BallRow, type InningsSide, type OverGroup, PHASE_KEYS, PHASE_LABEL,
   ballChip, ballLabel, ballsForSide, economy, formatOvers, groupOvers, hasDefinedPhases, howOut, maxWicketsInOver, phaseRangeLabel, phaseSplit,
@@ -196,10 +197,16 @@ export function BattingView({ balls, totalOvers }: { balls: BallRow[]; totalOver
 
 // ── Bowling ────────────────────────────────────────────────────────────────
 
-export function BowlingView({ balls, totalOvers }: { balls: BallRow[]; totalOvers: number }) {
+export function BowlingView({ balls, totalOvers, battedFirst = null, spartansTotal, opponentName }: {
+  balls: BallRow[]
+  totalOvers: number
+  battedFirst?: boolean | null    // Spartans batted first, so they were defending: the chart then shows the required rate
+  spartansTotal?: number | null
+  opponentName?: string | null
+}) {
   const side = useMemo(() => ballsForSide(balls, 'opponent'), [balls])
   const bowlers = useMemo(() => summariseBowlers(side, totalOvers), [side, totalOvers])
-  const overs = useMemo(() => groupOvers(side), [side])
+  const spartansRuns = useMemo(() => ballsForSide(balls, 'spartans').reduce((n, b) => n + b.runs_total, 0), [balls])
   if (side.length === 0) return <Empty>No ball-by-ball for the opposition innings.</Empty>
 
   const spell = (l: { legalBalls: number; runs: number; wickets: number }) =>
@@ -210,7 +217,8 @@ export function BowlingView({ balls, totalOvers }: { balls: BallRow[]; totalOver
       <p className="font-rajdhani text-sm text-[var(--scorecard-heading-text)]">
         Spartans bowling <span className="text-[var(--scorecard-text-faint)]">· opposition {inningsTotal(side)}</span>
       </p>
-      <OverBars overs={overs} />
+      <BowlingOverChart side={side} bowlers={bowlers} totalOvers={totalOvers} battedFirst={battedFirst}
+        spartansTotal={spartansTotal} spartansRuns={spartansRuns} opponentName={opponentName} />
       <PhaseTable balls={side} totalOvers={totalOvers} bowling />
       <div>
         <p className={HEAD}>Bowlers</p>

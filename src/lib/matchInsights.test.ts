@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { BallRow } from '@/lib/ballByBall'
-import { buildWorm, chaseSeries, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
+import { bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
 
 function ball(side: 'spartans' | 'opponent', over: number, runs: number, wicket = false): BallRow {
   return {
@@ -146,5 +146,68 @@ describe('rateCrossings', () => {
 
   it('returns nothing when the lines never meet', () => {
     expect(rateCrossings([row(1, 12, 10), row(2, 13, 10)])).toEqual([])
+  })
+})
+
+describe('bowlingOverSeries', () => {
+  const b = (over: number, bowler: string, runs: number, extra: Partial<BallRow> = {}): BallRow =>
+    ({ ...ball('opponent', over, runs), bowler, ...extra, seq: over * 10 + (extra.seq ?? 0) })
+
+  it('covers the whole innings and shows only the chosen bowler\'s overs', () => {
+    const balls = [b(1, 'Kumar', 4), b(2, 'Rao', 6), b(3, 'Kumar', 0, { is_wicket: true, dismissal_kind: 'bowled' })]
+    const s = bowlingOverSeries(balls, 'Kumar', 5)
+    expect(s).toHaveLength(5)
+    expect(s.map(o => o.bowled)).toEqual([true, false, true, false, false])
+    expect(s.map(o => o.runs)).toEqual([4, 0, 0, 0, 0])
+    expect(s[2].wickets).toBe(1)
+  })
+
+  it('charges the bowler wides and no-balls but not byes, and ignores run-outs', () => {
+    const balls = [
+      b(1, 'Kumar', 0, { extra_type: 'wide', extras: 1, runs_total: 1 }),
+      b(1, 'Kumar', 0, { extra_type: 'bye', extras: 2, runs_total: 2, seq: 1 }),
+      b(1, 'Kumar', 0, { is_wicket: true, dismissal_kind: 'run out', seq: 2 }),
+    ]
+    const o = bowlingOverSeries(balls, 'Kumar', 1)[0]
+    expect(o.runs).toBe(1)
+    expect(o.wickets).toBe(0)
+  })
+
+  it('shows every run and wicket for the entire innings, matching the score', () => {
+    const balls = [
+      b(1, 'Kumar', 2), b(1, 'Rao', 3, { seq: 1 }),
+      b(2, 'Rao', 0, { is_wicket: true, dismissal_kind: 'run out' }),
+    ]
+    const s = bowlingOverSeries(balls, null, 2)
+    expect(s.map(o => o.runs)).toEqual([5, 0])
+    expect(s[1].wickets).toBe(1)
+    expect(s[0].bowlers.map(x => x.name)).toEqual(['Kumar', 'Rao'])
+  })
+
+  it('matches bowler names loosely on case and spaces', () => {
+    expect(bowlingOverSeries([b(1, ' kumar ', 3)], 'Kumar', 1)[0].runs).toBe(3)
+  })
+})
+
+describe('overContexts', () => {
+  const pts = wormPoints([ball('opponent', 1, 6), ball('opponent', 2, 12), ball('opponent', 3, 20, true)])
+
+  it('gives the rates going into each over, with no current rate before over 1', () => {
+    const c = overContexts(pts, 61, 10)
+    expect(c[0]).toMatchObject({ over: 1, runsBefore: 0, crr: null, needed: 61 })
+    expect(c[0].rrr).toBeCloseTo(6.1)
+    expect(c[1]).toMatchObject({ over: 2, runsBefore: 6, crr: 6, wicketsBefore: 0 })
+    expect(c[1].rrr).toBeCloseTo(55 / 9)
+    expect(c[2]).toMatchObject({ over: 3, runsBefore: 18, crr: 9 })
+  })
+
+  it('has no required rate when there is no target (Spartans bowled first)', () => {
+    const c = overContexts(pts, null, 10)
+    expect(c.every(x => x.rrr == null && x.needed == null)).toBe(true)
+    expect(c[2].crr).toBe(9)
+  })
+
+  it('stops once the target has been passed', () => {
+    expect(overContexts(pts, 15, 10).map(x => x.over)).toEqual([1, 2])
   })
 })

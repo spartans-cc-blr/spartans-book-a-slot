@@ -235,7 +235,7 @@ function RateChart({ rows, points, side, target, totalOvers, colour, chaseName }
   const maxOver = rows[rows.length - 1].over
   const start = target / totalOvers
   // The last few overs can push the required rate sky-high, so the axis is capped and the line clipped to it.
-  const yMax = Math.min(30, Math.max(12, Math.ceil(Math.max(start * 2, ...rows.map(r => r.crr)) / 2) * 2))
+  const yMax = Math.min(32, Math.max(12, Math.ceil(Math.max(start * 2, ...rows.map(r => r.crr)) / 4) * 4))   // a multiple of 4, so the gridline steps are whole numbers
   const x = (over: number) => PAD.l + (over / totalOvers) * (W - PAD.l - PAD.r)
   const y = (rate: number) => RH - PAD.b - (Math.min(rate, yMax) / yMax) * (RH - PAD.t - PAD.b)
   const rrr = [{ over: 0, rate: start }, ...rows.filter(r => r.rrr != null).map(r => ({ over: r.over, rate: r.rrr as number }))]
@@ -325,7 +325,7 @@ function RateChart({ rows, points, side, target, totalOvers, colour, chaseName }
       </div>
       <p className={`text-[10px] font-rajdhani mt-1 ${MUTED}`}>
         Required rate = runs still needed ÷ overs left, so it climbs when the chase falls behind and drops when it speeds up.
-        {yMax === 30 && ' The axis stops at 30; the line is clipped above that.'}
+        {yMax === 32 && ' The axis stops at 32; the line is clipped above that.'}
       </p>
     </div>
   )
