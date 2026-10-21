@@ -6,7 +6,7 @@
 //
 // Shared by:
 //   - src/app/api/cron/availability-nudge/route.ts (sends pushes, writes the log)
-//   - src/app/page.tsx (read-only "matches your pattern" dashboard section)
+//   - src/app/(home)/page.tsx (read-only "matches your pattern" dashboard section)
 //
 // Copy rules (hard constraints — see push_notifications spec):
 //   - Always name the explicit date, never "this weekend"
