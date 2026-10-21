@@ -37,7 +37,7 @@ Layout shift was 0.51 (poor). The list rendered a one-line "Loading…" while `/
 
 `src/components/ui/PageSkeleton.tsx` (server component, `animate-pulse`, light/dark) renders a nav-height bar plus placeholder cards, table or list. `loading.tsx` files using it exist for `/fixtures`, `/matches/history`, `/leaderboard`, `/team-stats`, `/players`, `/wallet`, `/profile`, `/captains-corner`. A pulsing centered Spartans logo (fixed overlay, `logo-128.png`) is drawn over the placeholders, and dark-mode bars use `zinc-700/70`, because the original `ink-4` bars on the `#080808` page were close enough to black to read as a blank screen. They stream immediately, so a tap shows content at once while a cold server function works.
 
-Not added for `/` (a root `loading.tsx` would also wrap `/login`, `/schedule` and `/admin/**`), nor for admin pages. Moving Home into a route group would allow it.
+Home has one too: `src/app/page.tsx` moved to `src/app/(home)/page.tsx` so a `(home)/loading.tsx` wraps only `/` (route groups don't change URLs; a root `loading.tsx` would also wrap `/login`, `/schedule` and `/admin/**`). Not added for admin pages.
 
 ## 5. Files
 
@@ -59,7 +59,7 @@ The stats pages must stay dynamic (they read the session), so caching is one lev
 
 ## 9. Not built (ideas, roughly by value)
 
-- Home skeleton via route group; stale-while-revalidate cache of last `/fixtures` data; Background Sync for availability taps.
+- Stale-while-revalidate cache of last `/fixtures` data; Background Sync for availability taps.
 - `navigator.setAppBadge` with the unmarked-availability count; manifest `screenshots`.
 - Merge the three global modal fetches into one request.
 - Tab-bar prefetch needs no change: `loading.tsx` now lets Next prefetch the skeleton for dynamic routes through the existing `Link`s.
