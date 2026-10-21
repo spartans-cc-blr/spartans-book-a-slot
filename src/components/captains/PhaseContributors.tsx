@@ -26,11 +26,15 @@ function Chip({ v }: { v: Verdict }) {
   return <span className={`font-bold ${x.cls}`} title={x.label}>{x.sym} <span className="text-[11px] font-semibold">{x.label}</span></span>
 }
 
-function pickLine(picks: ContribPick[]) {
-  return picks.map(p => `${p.name} (${signed(p.rpoDelta)} an over, ${p.balls} balls)`).join(', ')
+function pickLine(picks: ContribPick[], kind: 'bat' | 'bowl') {
+  // Bowling: a lower economy is the good direction, so say cheaper/costlier rather than a bare minus next to a green arrow.
+  const gap = (d: number) => kind === 'bat'
+    ? `${signed(d)} an over`
+    : `${Math.abs(d).toFixed(1)} an over ${d <= 0 ? 'cheaper' : 'costlier'}`
+  return picks.map(p => `${p.name} (${gap(p.rpoDelta)}, ${p.balls} balls)`).join(', ')
 }
 
-function Recommendations({ data }: { data: PhaseContribution }) {
+function Recommendations({ data, kind }: { data: PhaseContribution; kind: 'bat' | 'bowl' }) {
   const lines = PHASE_KEYS.map(p => ({ p, best: data.best[p], weak: data.weak[p] })).filter(x => x.best.length || x.weak.length)
   if (lines.length === 0) return <p className={`font-rajdhani text-sm ${muted}`}>No available player is clearly above or below the rest of the team in any phase, on the data we have.</p>
   return (
@@ -38,9 +42,9 @@ function Recommendations({ data }: { data: PhaseContribution }) {
       {lines.map(({ p, best, weak }) => (
         <li key={p} className="font-rajdhani text-sm text-[var(--stats-text)]">
           <b>{PHASE_LABEL[p]}:</b>{' '}
-          {best.length > 0 && <span className="text-emerald-700 dark:text-emerald-400">▲ {pickLine(best)}</span>}
+          {best.length > 0 && <span className="text-emerald-700 dark:text-emerald-400">▲ {pickLine(best, kind)}</span>}
           {best.length > 0 && weak.length > 0 && <span className={muted}> · </span>}
-          {weak.length > 0 && <span className="text-red-700 dark:text-red-400">▼ {pickLine(weak)}</span>}
+          {weak.length > 0 && <span className="text-red-700 dark:text-red-400">▼ {pickLine(weak, kind)}</span>}
         </li>
       ))}
     </ul>
@@ -144,15 +148,15 @@ export function PhaseContributors({
       </p>
 
       <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted} mb-1`}>Batting — who to send in for each phase</p>
-      <Recommendations data={data.batting} />
+      <Recommendations data={data.batting} kind="bat" />
       <p className={`font-rajdhani text-[11px] ${muted} mt-1`}>
         Batting position is not recorded ball by ball: a batter&rsquo;s phase depends on when they walked in, which depends on the order and on wickets. Read this
         as evidence of who scores well in a phase, not a fixed instruction.
       </p>
 
       <p className={`font-rajdhani text-xs font-bold uppercase tracking-wide ${muted} mt-4 mb-1`}>Bowling — who to bowl in each phase</p>
-      <Recommendations data={data.bowling} />
-      <p className={`font-rajdhani text-[11px] ${muted} mt-1`}>For bowlers a minus is good: they went for fewer runs an over than the rest of the attack.</p>
+      <Recommendations data={data.bowling} kind="bowl" />
+      <p className={`font-rajdhani text-[11px] ${muted} mt-1`}>Green ▲ is good for bowlers too: it means they went for fewer runs an over than the rest of the attack. In the detail table a minus under &ldquo;vs rest&rdquo; is the good direction for bowling.</p>
 
       <Section title="Batting detail by phase" kind="bat" data={data.batting} who={who} cricUrls={cricUrls} />
       <Section title="Bowling detail by phase" kind="bowl" data={data.bowling} who={who} cricUrls={cricUrls} />
