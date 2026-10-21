@@ -11,7 +11,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
-import { getTodaysBirthdays, istDateString } from '@/lib/birthdays'
+import { getUnseenBirthdays } from '@/lib/modalFeed'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -22,16 +22,10 @@ export async function GET(req: NextRequest) {
   const limited = await rateLimit(req, RATE_LIMITS.publicRead, user.playerId)
   if (limited) return limited
 
-  const supabase = createServiceClient()
-  const { data: me, error: meErr } = await supabase
-    .from('players').select('birthday_wishes_seen_date').eq('id', user.playerId).single()
-  if (meErr) return NextResponse.json({ error: meErr.message }, { status: 500 })
-
-  const today = istDateString()
-  if (me?.birthday_wishes_seen_date === today) {
-    return NextResponse.json({ birthdays: [] })
+  try {
+    const birthdays = await getUnseenBirthdays(createServiceClient(), user.playerId)
+    return NextResponse.json({ birthdays })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
-
-  const birthdays = await getTodaysBirthdays()
-  return NextResponse.json({ birthdays })
 }

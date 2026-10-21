@@ -14,7 +14,7 @@
 // lands on first — and exactly once per session, not once per navigation.
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useModalFeed } from '@/components/ui/ModalFeedProvider'
 import { Dialog } from '@/components/ui/Dialog'
 import { PlayerNameLink } from '@/lib/playerLink'
 import { WicketIcon } from '@/components/leaderboard/WicketIcon'
@@ -91,23 +91,15 @@ function dialogTitle(achievements: Achievement[]): string {
 }
 
 export function MilestoneCelebrationModal() {
-  const { status } = useSession()
+  const feed = useModalFeed()
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (status !== 'authenticated') return
-    let cancelled = false
-    fetch('/api/milestones/unseen')
-      .then(res => (res.ok ? res.json() : null))
-      .then(data => {
-        if (cancelled || !data?.achievements?.length) return
-        setAchievements(data.achievements)
-        setOpen(true)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [status])
+    if (!feed?.achievements?.length) return
+    setAchievements(feed.achievements)
+    setOpen(true)
+  }, [feed])
 
   function dismiss() {
     setOpen(false)

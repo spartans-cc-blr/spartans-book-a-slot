@@ -173,3 +173,5 @@ prompts admins to apply fees. See `post-match-scorecard.md` §18.
 ---
 
 *Maintained by: Spartans CC BLR*
+
+> Update (October 2026): the modal's on-load fetch now comes from the combined `GET /api/modals/pending` feed — see `pwa.md` §10.

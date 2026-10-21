@@ -11,7 +11,7 @@
 // first, and exactly once per day (not once per navigation).
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useModalFeed } from '@/components/ui/ModalFeedProvider'
 import { Dialog } from '@/components/ui/Dialog'
 import { PlayerAvatar } from '@/components/leaderboard/PlayerAvatar'
 
@@ -35,23 +35,15 @@ function buildWishUrl(name: string): string {
 }
 
 export function BirthdayWishesModal() {
-  const { status } = useSession()
+  const feed = useModalFeed()
   const [birthdays, setBirthdays] = useState<BirthdayPlayer[]>([])
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (status !== 'authenticated') return
-    let cancelled = false
-    fetch('/api/birthdays/today')
-      .then(res => (res.ok ? res.json() : null))
-      .then(data => {
-        if (cancelled || !data?.birthdays?.length) return
-        setBirthdays(data.birthdays)
-        setOpen(true)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [status])
+    if (!feed?.birthdays?.length) return
+    setBirthdays(feed.birthdays)
+    setOpen(true)
+  }, [feed])
 
   function dismiss() {
     setOpen(false)

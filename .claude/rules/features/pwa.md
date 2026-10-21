@@ -61,5 +61,8 @@ The stats pages must stay dynamic (they read the session), so caching is one lev
 
 - Stale-while-revalidate cache of last `/fixtures` data; Background Sync for availability taps.
 - `navigator.setAppBadge` with the unmarked-availability count; manifest `screenshots`.
-- Merge the three global modal fetches into one request.
 - Tab-bar prefetch needs no change: `loading.tsx` now lets Next prefetch the skeleton for dynamic routes through the existing `Link`s.
+
+## 10. One request for the global modals (October 2026)
+
+The milestone, birthday and admin fee-reminder modals each fetched on every full page load. `GET /api/modals/pending` now returns `{ achievements, birthdays, bookings }` in one call; `ModalFeedProvider` (root layout) fetches it once and the three modals read it via `useModalFeed()`. Each part keeps its old rules (signed-in, non-expelled; fees admin only, and an admin without a player row still gets fees); one part failing returns an empty list for it. The data readers live in `src/lib/modalFeed.ts`, shared with the original `/api/milestones/unseen` and `/api/birthdays/today` routes, which remain (the modals still POST their own `mark-seen`).
