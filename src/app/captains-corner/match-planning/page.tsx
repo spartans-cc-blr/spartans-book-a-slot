@@ -21,6 +21,8 @@ import { FormPills } from '@/components/team/TeamSplitTable'
 import { recentForm } from '@/lib/teamStatsCore'
 import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
 import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
+import { phaseContributions } from '@/lib/phaseContribution'
+import { PhaseContributors } from '@/components/captains/PhaseContributors'
 import { PHASE_KEYS, PHASE_LABEL, formatOvers } from '@/lib/ballByBall'
 import type { Metadata } from 'next'
 
@@ -84,7 +86,7 @@ function PlayerCard({ p, url, response, href, linkLabel }: { p: PlayerScout; url
   )
 }
 
-export default async function MatchPlanningPage({ searchParams }: { searchParams: { booking?: string; lens?: string } }) {
+export default async function MatchPlanningPage({ searchParams }: { searchParams: { booking?: string; lens?: string; who?: string } }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
   if (!session) redirect('/login')
@@ -96,8 +98,9 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
   const lens: Lens = (LENSES as string[]).includes(searchParams.lens ?? '') ? (searchParams.lens as Lens) : 'opponent'
   const ctx = await getPlanningContext(searchParams.booking, lens)
   const LENS_LABEL: Record<Lens, string> = { opponent: 'Opponent', ground: 'Ground', tournament: 'Tournament' }
-  const href = (b: string | undefined, l: Lens) =>
-    `/captains-corner/match-planning?${new URLSearchParams({ ...(b ? { booking: b } : {}), lens: l }).toString()}`
+  const who: 'available' | 'all' = searchParams.who === 'all' ? 'all' : 'available'
+  const href = (b: string | undefined, l: Lens, w: 'available' | 'all' = 'available') =>
+    `/captains-corner/match-planning?${new URLSearchParams({ ...(b ? { booking: b } : {}), lens: l, ...(w === 'all' ? { who: 'all' } : {}) }).toString()}`
   const scope = ctx.scopeLabel ?? 'this scope'
   const sel = ctx.selected
   // Team Record can filter by ground, tournament and opponent. All time; practice games stay excluded there too.
@@ -118,6 +121,8 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
   const players = ctx.scored.length
     ? scoutPlayers(ctx.scored, ctx.available.map(a => ({ id: a.id, name: a.name })))
     : []
+  const contrib = ctx.scored.length ? phaseContributions(ctx.scored, ctx.available.map(a => ({ id: a.id, name: a.name }))) : null
+  const cricUrls = Object.fromEntries(ctx.available.map(a => [a.id, a.cricHeroesUrl ?? null]))
   const scoutedIds = new Set(players.map(p => p.playerId))
   const noHistory = ctx.available.filter(a => !scoutedIds.has(a.id))
   const meta = new Map(ctx.available.map(a => [a.id, a]))
@@ -256,6 +261,12 @@ export default async function MatchPlanningPage({ searchParams }: { searchParams
                   <PhaseTable title="Our batting by phase (all matches in view)" t={team.batting} wicketLabel="Lost" />
                   <PhaseTable title="Our bowling by phase (all matches in view)" t={team.bowling} wicketLabel="Taken" />
                 </div>
+
+                {contrib && sel && (
+                  <PhaseContributors data={contrib} who={who} cricUrls={cricUrls}
+                    toggleHref={href(sel.id, lens, who === 'all' ? 'available' : 'all')}
+                    scope={lens === 'opponent' ? `against ${sel.opponentName}` : lens === 'ground' ? `at ${scope}` : `in ${scope}`} />
+                )}
 
                 <div className={`${card} grid gap-5 ${lens === 'opponent' ? 'md:grid-cols-2' : ''}`}>
                   {lens === 'opponent' && <div>
