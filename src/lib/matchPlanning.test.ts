@@ -75,3 +75,31 @@ describe('scoutTeam', () => {
     expect(scoutTeam([a]).insights[0]).toMatch(/treat these as hints/)
   })
 })
+
+describe('wicket moments', () => {
+  const opp = (o: Partial<BallRow>) => ball({ batting_side: 'opponent', bowler: 'Gana', bowler_player_id: 'g1', batter_player_id: null, ...o })
+  // Opposition innings: 40 off over 1-5 (no wicket), then Gana takes wickets in overs 6 and 7.
+  const innings = () => [
+    opp({ over_no: 1, runs_total: 40, runs_bat: 40, score_after: 40, bowler: 'Other', bowler_player_id: 'x' }),
+    opp({ over_no: 6, is_wicket: true, dismissal_kind: 'bowled', dismissed_batter: 'A', score_after: 40, wickets_after: 1 }),
+    opp({ over_no: 7, is_wicket: true, dismissal_kind: 'caught', dismissed_batter: 'B', score_after: 44, wickets_after: 2 }),
+  ]
+  it('flags two wickets in two overs and the stand broken', () => {
+    const r = scoutPlayers([{ ...match('m1', '2026-09-06', innings()), opponentName: 'Team Oldmonks' }], [{ id: 'g1', name: 'Ganapathy' }])
+    const ins = r[0].insights.join(' | ')
+    expect(ins).toContain('Struck 2 times in two overs vs Team Oldmonks (6 Sep)')
+    expect(ins).toContain('Broke a 40-run stand')
+  })
+  it('flags a chase-turning wicket when the opposition were chasing', () => {
+    // Spartans made 100 (T20 => RRR 5.05). Opposition 30/0 after 3 overs (CRR 10), then 6 off next 3 and a wicket in over 6.
+    const balls = [
+      opp({ over_no: 3, runs_total: 30, runs_bat: 30, score_after: 30, bowler: 'Other', bowler_player_id: 'x' }),
+      opp({ over_no: 4, runs_total: 2, score_after: 32, bowler: 'Other', bowler_player_id: 'x' }),
+      opp({ over_no: 5, runs_total: 2, score_after: 34, bowler: 'Other', bowler_player_id: 'x' }),
+      opp({ over_no: 5, is_wicket: true, dismissal_kind: 'bowled', dismissed_batter: 'A', score_after: 34, wickets_after: 1 }),
+      opp({ over_no: 12, runs_total: 20, score_after: 54, bowler: 'Other', bowler_player_id: 'x' }),
+    ]
+    const r = scoutPlayers([{ ...match('m2', '2026-09-27', balls), battedFirst: true, teamTotal: 150, opponentName: 'Rising Phoenix' }], [{ id: 'g1', name: 'Manoj' }])
+    expect(r[0].insights.join(' ')).toMatch(/turned the chase/)
+  })
+})

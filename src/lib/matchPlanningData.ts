@@ -140,7 +140,7 @@ export async function getPlanningContext(bookingId?: string | null, lens: Lens =
       const balls = repairDismissedBatters(raw)
       scored.push({
         bookingId: m.bookingId, matchId: m.matchId, opponentName: m.opponentLabel, gameDate: m.gameDate, format: m.format, result: m.result,
-        teamTotal: m.teamTotal, teamWickets: m.teamWickets, oppTotal: m.oppTotal, oppWickets: m.oppWickets, balls,
+        teamTotal: m.teamTotal, teamWickets: m.teamWickets, oppTotal: m.oppTotal, oppWickets: m.oppWickets, battedFirst: m.battedFirst, balls,
       })
     }
   }

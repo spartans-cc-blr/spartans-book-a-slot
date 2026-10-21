@@ -203,3 +203,13 @@ On the Tournament tab the "Tournament MVP table →" link (`/leaderboard?categor
 ## 14. Upload link in the Commentary-missing table (October 2026)
 
 For wranglers and admins (`isWrangler || isAdmin`; captains and GC don't see it, since `/wrangler/commentary` is wrangler/admin only) the "Commentary missing" table has an extra **Commentary** column with **Upload →**. It links to `/wrangler/commentary?booking=<bookingId>`, which opens with that game already selected. The column appears in all three lenses, so the Ground and Tournament tabs get it too.
+
+## 15. Wicket-moment callouts on player cards (October 2026)
+
+Bowlers with no phase spread or economy story (e.g. a tournament-lens player who simply took wickets) used to get "Nothing stands out". `playerInsights()` now also runs `wicketMomentInsights()` over a per-bowler list of `WicketEvent`s (`wicketEvents()` in `matchPlanning.ts`, built from the opposition innings of each commentary match):
+
+- **Burst** — most wickets by the bowler in one innings within the same or next over: "Struck 2 times in two overs vs X (6 Sep)" / "in one over". Needs ≥2.
+- **Breakthrough** — the wicket that ended the biggest stand, from `score_after` between wickets: "Broke a 41-run stand (30 balls) in over 7 vs X". Fires for stands ≥25 runs (`BIG_STAND_RUNS`).
+- **Chase-turning wicket** — when Spartans batted first (`ScoutMatchInput.battedFirst`, from `TeamMatch`), the opposition chase is run through `chaseSeries()`/`rateCrossings()`; the wicket in the over where their current rate first fell below the required rate gets "it turned the chase (CRR a against RRR b needed)". Takes priority over a plain big stand and needs only a ≥10-run stand (`TURNING_STAND_RUNS`).
+
+Run-outs and retirements are excluded (`isBowlerWicket`). These callouts show regardless of the small-bowling-sample note and on all three lenses. Source is ball-by-ball only, so matches without commentary don't contribute. Tests in `matchPlanning.test.ts`.
