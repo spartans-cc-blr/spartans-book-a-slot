@@ -13,8 +13,9 @@
 import {
   type BallRow, type PhaseKey, PHASE_KEYS, PHASE_LABEL,
   ballsForSide, oversForFormat, phaseSplit, summariseBatters, summariseBowlers,
-  strikeRate, economy, howOut, formatOvers,
+  strikeRate, economy, howOut, formatOvers, isBowlerWicket,
 } from './ballByBall'
+import { wormPoints, chaseSeries, rateCrossings } from './matchInsights'
 
 // ── Inputs / outputs ───────────────────────────────────────────────────────
 
@@ -30,6 +31,8 @@ export interface ScoutMatchInput {
   oppTotal: number | null
   oppWickets: number | null
   balls: BallRow[]
+  /** true when Spartans batted first (so the opposition chased); null when unknown */
+  battedFirst?: boolean | null
 }
 
 export interface PhaseTally { runs: number; balls: number; wickets: number; dots: number }
@@ -95,6 +98,19 @@ export interface BowlEntry {
   byPhase: Record<PhaseKey, { legalBalls: number; runs: number; wickets: number }>
 }
 
+/** One wicket a Spartans bowler took (run-outs etc. excluded), with the context it came in. */
+export interface WicketEvent {
+  bookingId: string
+  gameDate: string
+  opponent: string
+  over: number                 // 1-based over of the innings
+  wicketNo: number
+  standRuns: number            // runs added since the previous wicket
+  standBalls: number           // legal balls since the previous wicket
+  /** set when the opposition was chasing and this wicket is where their current rate fell below the required rate */
+  turnedChase: { crr: number; rrr: number } | null
+}
+
 export interface PositionUse { position: number; innings: number; runs: number; balls: number }
 
 export interface PlayerScout {
@@ -111,6 +127,7 @@ export interface PlayerScout {
     spells: number; legalBalls: number; runs: number; wickets: number; economy: number | null
     byPhase: Record<PhaseKey, { legalBalls: number; runs: number; wickets: number }>
     log: BowlEntry[]
+    events: WicketEvent[]
   } | null
   insights: string[]
 }
@@ -359,6 +376,7 @@ export function scoutPlayers(
   const bowls = new Map<string, BowlEntry[]>()
   const batPhase = new Map<string, Record<PhaseKey, { runs: number; balls: number }>>()
   const batDots = new Map<string, number>()
+  const events = new Map<string, WicketEvent[]>()
 
   const ordered = [...matches].sort((a, b) => a.gameDate.localeCompare(b.gameDate)) // oldest first
 
@@ -387,6 +405,12 @@ export function scoutPlayers(
       const arr = bowls.get(l.playerId) ?? []
       arr.push({ bookingId: m.bookingId, gameDate: m.gameDate, legalBalls: l.legalBalls, runs: l.runs, wickets: l.wickets, byPhase: l.byPhase })
       bowls.set(l.playerId, arr)
+    }
+
+    for (const [pid, ev] of Array.from(wicketEvents(m, total, want))) {
+      const arr = events.get(pid) ?? []
+      arr.push(...ev)
+      events.set(pid, arr)
     }
   }
 
@@ -427,6 +451,7 @@ export function scoutPlayers(
       bowling = {
         spells: wLog.length, legalBalls, runs, wickets: wLog.reduce((s, e) => s + e.wickets, 0),
         economy: economy(runs, legalBalls), byPhase, log: [...wLog].reverse(),
+        events: events.get(p.id) ?? [],
       }
     }
 
@@ -436,6 +461,99 @@ export function scoutPlayers(
   }
   return out.sort((a, b) =>
     ((b.batting?.runs ?? 0) + (b.bowling?.wickets ?? 0) * 20) - ((a.batting?.runs ?? 0) + (a.bowling?.wickets ?? 0) * 20))
+}
+
+/** A stand at least this big (runs) counts as a partnership worth having broken. */
+const BIG_STAND_RUNS = 25
+/** …or any stand this big, when its end is what put the chase behind the required rate. */
+const TURNING_STAND_RUNS = 10
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const shortDate = (iso: string) => {
+  const [, m, d] = iso.split('-')
+  return MONTHS[Number(m) - 1] ? `${Number(d)} ${MONTHS[Number(m) - 1]}` : iso
+}
+const versus = (e: WicketEvent) => `${e.opponent ? `vs ${e.opponent}` : 'in a match'} (${shortDate(e.gameDate)})`
+
+/** Per wanted Spartans bowler, the wickets they took in this match with the stand each one ended and,
+ *  when the opposition were chasing, whether it was the wicket that put them behind the required rate. */
+export function wicketEvents(m: ScoutMatchInput, totalOvers: number, want: Map<string, unknown>): Map<string, WicketEvent[]> {
+  const out = new Map<string, WicketEvent[]>()
+  const theirs = [...ballsForSide(m.balls, 'opponent')].sort((a, b) => a.seq - b.seq)
+  if (theirs.length === 0) return out
+
+  // Where the chase fell behind the required rate (opposition chase only).
+  let turnOver: { over: number; crr: number; rrr: number } | null = null
+  if (m.battedFirst === true) {
+    const ours = ballsForSide(m.balls, 'spartans')
+    const first = m.teamTotal ?? ours.reduce((s, b) => s + b.runs_total, 0)
+    if (first > 0) {
+      const rows = chaseSeries(wormPoints(theirs), first + 1, totalOvers)
+      const behind = rateCrossings(rows).find(c => c.direction === 'behind')
+      if (behind) {
+        const over = Math.floor(behind.over) + 1
+        const row = rows.find(r => r.over === over)
+        if (row && row.rrr != null) turnOver = { over, crr: row.crr, rrr: row.rrr }
+      }
+    }
+  }
+
+  let running = 0, prevScore = 0, legalSince = 0, wicketNo = 0
+  for (const b of theirs) {
+    running = b.score_after ?? running + b.runs_total
+    if (b.is_legal) legalSince += 1
+    if (!b.is_wicket) continue
+    wicketNo += 1
+    const standRuns = running - prevScore
+    const standBalls = legalSince
+    prevScore = running
+    legalSince = 0
+    if (!isBowlerWicket(b) || !b.bowler_player_id || !want.has(b.bowler_player_id)) continue
+    const arr = out.get(b.bowler_player_id) ?? []
+    arr.push({
+      bookingId: m.bookingId, gameDate: m.gameDate, opponent: m.opponentName ?? '', over: b.over_no, wicketNo,
+      standRuns, standBalls,
+      turnedChase: turnOver && turnOver.over === b.over_no ? { crr: turnOver.crr, rrr: turnOver.rrr } : null,
+    })
+    out.set(b.bowler_player_id, arr)
+  }
+  return out
+}
+
+/** Callouts about wickets taken: bursts (several wickets close together) and the stand-breaking wicket. */
+export function wicketMomentInsights(events: WicketEvent[]): string[] {
+  const out: string[] = []
+  if (events.length === 0) return out
+
+  // Burst: most wickets within the same or the next over of one innings; newest wins a tie.
+  let best: { n: number; same: boolean; ev: WicketEvent } | null = null
+  const byMatch = new Map<string, WicketEvent[]>()
+  for (const e of events) byMatch.set(e.bookingId, [...(byMatch.get(e.bookingId) ?? []), e])
+  for (const list of Array.from(byMatch.values())) {
+    for (const start of list) {
+      const win = list.filter(e => e.over >= start.over && e.over <= start.over + 1)
+      const n = win.length
+      if (n < 2) continue
+      const same = win.every(e => e.over === start.over)
+      if (!best || n > best.n || (n === best.n && start.gameDate > best.ev.gameDate)) best = { n, same, ev: start }
+    }
+  }
+  if (best) {
+    out.push(`Struck ${best.n} times ${best.same ? 'in one over' : 'in two overs'} ${versus(best.ev)} — a wicket-taker when it matters.`)
+  }
+
+  // Breakthrough: the wicket that ended the biggest stand (a chase-turning wicket first).
+  const turning = events.filter(e => e.turnedChase && e.standRuns >= TURNING_STAND_RUNS)
+    .sort((a, b) => b.standRuns - a.standRuns)[0]
+  const big = events.filter(e => e.standRuns >= BIG_STAND_RUNS).sort((a, b) => b.standRuns - a.standRuns)[0]
+  const key = turning ?? big
+  if (key) {
+    const tone = key.turnedChase
+      ? ` — it turned the chase: their run rate fell below the required rate (${f1(key.turnedChase.crr)} against ${f1(key.turnedChase.rrr)} needed).`
+      : '.'
+    out.push(`Broke a ${key.standRuns}-run stand (${key.standBalls} balls) in over ${key.over} ${versus(key)}${tone}`)
+  }
+  return out
 }
 
 /** Balls before a batting/bowling line is more than anecdote. */
@@ -480,6 +598,7 @@ export function playerInsights(p: PlayerScout): string[] {
 
   const w = p.bowling
   if (w) {
+    out.push(...wicketMomentInsights(w.events))
     if (w.legalBalls < SMALL_BOWL_SAMPLE) out.push(`Small bowling sample (${w.legalBalls} balls) — not much to go on.`)
     else {
       const ph = PHASE_KEYS.filter(k => w.byPhase[k].legalBalls >= 12)
