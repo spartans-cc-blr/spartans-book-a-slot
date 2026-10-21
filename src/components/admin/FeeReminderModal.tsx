@@ -21,7 +21,7 @@
 // today's earlier (smaller) set was already dismissed.
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useModalFeed } from '@/components/ui/ModalFeedProvider'
 import { Dialog } from '@/components/ui/Dialog'
 
 interface PendingFeeBooking {
@@ -45,28 +45,20 @@ function formatDate(gameDate: string): string {
 }
 
 export function FeeReminderModal() {
-  const { status } = useSession()
+  const feed = useModalFeed()
   const [bookings, setBookings] = useState<PendingFeeBooking[]>([])
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (status !== 'authenticated') return
-    let cancelled = false
-    fetch('/api/admin/fee-reminders')
-      .then(res => (res.ok ? res.json() : null))
-      .then(data => {
-        if (cancelled || !data?.bookings?.length) return
-        const key = dismissKey(data.bookings)
-        let alreadyDismissed = false
-        try {
-          alreadyDismissed = window.localStorage.getItem(key) === '1'
-        } catch { /* private browsing / storage blocked — never show worse, just don't suppress */ }
-        setBookings(data.bookings)
-        if (!alreadyDismissed) setOpen(true)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [status])
+    if (!feed?.bookings?.length) return
+    const key = dismissKey(feed.bookings)
+    let alreadyDismissed = false
+    try {
+      alreadyDismissed = window.localStorage.getItem(key) === '1'
+    } catch { /* private browsing / storage blocked — never show worse, just don't suppress */ }
+    setBookings(feed.bookings)
+    if (!alreadyDismissed) setOpen(true)
+  }, [feed])
 
   function dismiss() {
     setOpen(false)

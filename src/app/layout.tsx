@@ -3,6 +3,7 @@ import { Cinzel, Rajdhani } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 import { ChunkErrorBoundary } from '@/components/ui/ChunkErrorBoundary'
+import { ModalFeedProvider } from '@/components/ui/ModalFeedProvider'
 import { GlobalMilestoneModal } from '@/components/ui/GlobalMilestoneModal'
 import { GlobalBirthdayModal } from '@/components/ui/GlobalBirthdayModal'
 import { GlobalFeeReminderModal } from '@/components/ui/GlobalFeeReminderModal'
@@ -64,9 +65,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <ThemeProvider>
             <ChunkErrorBoundary>
-              <GlobalBirthdayModal />
-              <GlobalMilestoneModal />
-              <GlobalFeeReminderModal />
+              <ModalFeedProvider>
+                <GlobalBirthdayModal />
+                <GlobalMilestoneModal />
+                <GlobalFeeReminderModal />
+              </ModalFeedProvider>
               <InstallPrompt />
               {children}
             </ChunkErrorBoundary>

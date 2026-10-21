@@ -150,3 +150,5 @@ still round-trips its real year unchanged.
 ---
 
 *Maintained by: Spartans CC BLR*
+
+> Update (October 2026): the modal's on-load fetch now comes from the combined `GET /api/modals/pending` feed — see `pwa.md` §10.
