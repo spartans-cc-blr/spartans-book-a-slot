@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { GenerateInviteItem } from '@/components/ui/GenerateInviteItem'
 
@@ -20,6 +20,9 @@ interface GroupChild {
   label: string
   icon: string
   exact?: boolean
+  // Query-aware active check, for children that share one pathname and differ
+  // only by ?tab=/?view= (the admin Matches sub-menu).
+  isActive?: (path: string, sp: URLSearchParams) => boolean
 }
 
 // A hover-expandable group, mirroring one of SiteNav's own desktop dropdowns
@@ -48,7 +51,22 @@ const NAV: NavEntry[] = [
   // features/admin-matches-view.md §3), which made a standalone sidebar
   // link to the same two forms redundant. Both routes still exist and are
   // still reachable — only the duplicate top-level sidebar entry is gone.
-  { kind: 'link', href: '/admin', label: 'Matches', icon: '📋', exact: true },
+  // Matches is a sub-menu of the same /admin page: each child deep-links to
+  // a tab (?tab=) or the calendar view (?view=calendar) — see
+  // features/admin-matches-view.md §1.
+  {
+    kind: 'group', key: 'admin-matches', label: 'Matches', icon: '📋',
+    children: [
+      { href: '/admin?tab=upcoming', label: 'Upcoming', icon: '🗓️',
+        isActive: (p, sp) => p === '/admin' && sp.get('view') !== 'calendar' && (!sp.get('tab') || sp.get('tab') === 'upcoming') },
+      { href: '/admin?tab=needs', label: 'Needs action', icon: '⚠️',
+        isActive: (p, sp) => p === '/admin' && sp.get('view') !== 'calendar' && sp.get('tab') === 'needs' },
+      { href: '/admin?tab=past', label: 'Past', icon: '📜',
+        isActive: (p, sp) => p === '/admin' && sp.get('view') !== 'calendar' && sp.get('tab') === 'past' },
+      { href: '/admin?view=calendar', label: 'Calendar', icon: '📅',
+        isActive: (p, sp) => p === '/admin' && sp.get('view') === 'calendar' },
+    ],
+  },
   { kind: 'link', href: '/admin/captains', label: 'Captains', icon: '👥', section: 'Master Data' },
   { kind: 'link', href: '/admin/tournaments', label: 'Tournaments', icon: '🏆' },
   { kind: 'link', href: '/admin/players', label: 'Players', icon: '🏏' },
@@ -129,17 +147,19 @@ const ALL_LEAVES: GroupChild[] = NAV.flatMap(entry =>
   entry.kind === 'link' ? [{ href: entry.href, label: entry.label, icon: entry.icon, exact: entry.exact }] : entry.children
 )
 
-function matches(path: string, item: { href: string; exact?: boolean }) {
+function matches(path: string, item: { href: string; exact?: boolean; isActive?: GroupChild['isActive'] }, sp: URLSearchParams) {
+  if (item.isActive) return item.isActive(path, sp)
   return item.exact ? path === item.href : path.startsWith(item.href)
 }
 
 export function AdminSidebar() {
   const path = usePathname()
+  const sp = useSearchParams()
   const [open, setOpen] = useState(false)
   const [hoverGroup, setHoverGroup] = useState<string | null>(null)
   const [mobileGroup, setMobileGroup] = useState<Record<string, boolean>>({})
 
-  const currentPage = ALL_LEAVES.find(item => matches(path, item))
+  const currentPage = ALL_LEAVES.find(item => matches(path, item, sp))
 
   return (
     <>
@@ -151,7 +171,7 @@ export function AdminSidebar() {
       <aside className="w-52 bg-white dark:bg-ink-2 border-r border-[#D4C9B0] dark:border-ink-5 flex-shrink-0 hidden md:flex flex-col py-4 relative">
         {NAV.map(entry => {
           if (entry.kind === 'link') {
-            const isActive = matches(path, entry)
+            const isActive = matches(path, entry, sp)
             return (
               <div key={entry.href}>
                 {entry.section && (
@@ -170,7 +190,7 @@ export function AdminSidebar() {
           }
 
           // Group — hover-expandable flyout to the right of the sidebar.
-          const isGroupActive = entry.children.some(c => matches(path, c))
+          const isGroupActive = entry.children.some(c => matches(path, c, sp))
           const isOpen = hoverGroup === entry.key
           return (
             <div key={entry.key}>
@@ -194,7 +214,7 @@ export function AdminSidebar() {
                 {isOpen && (
                   <div className="absolute left-full top-0 w-56 bg-white dark:bg-ink-2 border border-[#D4C9B0] dark:border-ink-5 rounded shadow-xl z-50">
                     {entry.children.map((child, i) => {
-                      const childActive = matches(path, child)
+                      const childActive = matches(path, child, sp)
                       return (
                         <Link key={child.href + child.label} href={child.href}
                           className={`flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors
@@ -222,7 +242,7 @@ export function AdminSidebar() {
           <div className="bg-white dark:bg-ink-2 border-t border-[#D4C9B0] dark:border-ink-5 px-4 py-3 flex flex-col gap-1 max-h-[70vh] overflow-y-auto">
             {NAV.map(entry => {
               if (entry.kind === 'link') {
-                const isActive = matches(path, entry)
+                const isActive = matches(path, entry, sp)
                 return (
                   <div key={entry.href}>
                     {entry.section && (
@@ -240,7 +260,7 @@ export function AdminSidebar() {
                 )
               }
 
-              const isGroupActive = entry.children.some(c => matches(path, c))
+              const isGroupActive = entry.children.some(c => matches(path, c, sp))
               const isExpanded = !!mobileGroup[entry.key]
               return (
                 <div key={entry.key}>
@@ -262,7 +282,7 @@ export function AdminSidebar() {
                   {isExpanded && (
                     <div className="ml-6 flex flex-col gap-0.5 border-l border-[#D4C9B0] dark:border-ink-5 pl-3 py-1">
                       {entry.children.map(child => {
-                        const childActive = matches(path, child)
+                        const childActive = matches(path, child, sp)
                         return (
                           <Link key={child.href + child.label} href={child.href} onClick={() => setOpen(false)}
                             className={`flex items-center gap-2 px-2 py-2 rounded font-rajdhani text-xs font-semibold tracking-wide uppercase transition-colors

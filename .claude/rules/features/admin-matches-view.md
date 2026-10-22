@@ -15,6 +15,20 @@ redirects to `/admin?view=calendar`. The sidebar has a single "Matches" entry.
 Weekdays are deliberately **not** shown in the calendar (a product decision):
 it stays Sat/Sun only. Weekday games are visible in the List view.
 
+### 1.1 Sidebar sub-menu (October 2026)
+
+The admin sidebar's **Matches** entry is now a dropdown group
+(`AdminSidebar.tsx`, hover flyout on desktop, tap-to-expand on mobile) with
+four children that deep-link into the same `/admin` page: **Upcoming**
+(`/admin?tab=upcoming`), **Needs action** (`?tab=needs`), **Past**
+(`?tab=past`) and **Calendar** (`?view=calendar`). The list tabs are now
+URL-driven: `DashboardBookingsTabs` reads `?tab=` via `useSearchParams()` and
+its tab buttons `router.replace()` to it, so a sidebar link, a tab click and a
+reload all agree. Children use a query-aware `isActive` check (`GroupChild.isActive`)
+since they share one pathname; the group highlights for any of them. Because
+`AdminSidebar` now calls `useSearchParams()`, both its call sites
+(`admin/layout.tsx`, `gc-review/page.tsx`) wrap it in `<Suspense>`.
+
 ## 2. List view
 
 Tabs: **Upcoming**, **Needs action**, **Past**.

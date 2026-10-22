@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -44,7 +45,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-        <AdminSidebar />
+        <Suspense fallback={null}><AdminSidebar /></Suspense>
         <main className="flex-1 overflow-y-auto p-6 lg:p-8 pb-16 md:pb-8">
           {children}
         </main>

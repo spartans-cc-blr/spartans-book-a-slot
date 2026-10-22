@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -167,7 +168,7 @@ export default async function GCReviewPage() {
     <div className="min-h-screen bg-parchment dark:bg-ink flex flex-col">
       <SiteNav activePage="gc" />
       <div className="flex flex-1">
-        <AdminSidebar />
+        <Suspense fallback={null}><AdminSidebar /></Suspense>
         <main className="flex-1 px-5 md:px-8 lg:px-10 py-8 max-w-5xl">
           <div className="mb-6">
             <h1 className="font-cinzel text-xl font-bold text-amber-700 dark:text-gold">GC Review</h1>
