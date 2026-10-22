@@ -209,3 +209,5 @@ With a batter selected, a thin gold connector now joins the top of each bar to i
 ## Batting chart: par ticks without a tap, per-over gap table (October 2026)
 
 The par tick and gap connector were gated on the hovered over's par, so they only drew after tapping a bar. They now draw for every over as soon as a batter is selected. Run labels and wicket dots sit above whichever of the bar top and the par tick is higher, so they no longer collide with the connector. Under the legend, a per-over table (over, runs (balls), par, gap, with a total row) is always shown for the selected batter, so the deficit is readable without hovering. Gaps below par are red.
+
+**Gap label on the chart (October 2026):** with a batter selected, the figure above each bar is now the gap to par (runs minus par, red when behind), not the runs; his runs move to the foot of the bar (hidden if the bar is too short, the table has them). The axis now includes the batter's highest par (still capped at 32), and a par above the axis is marked with a ▲ instead of silently pinning the tick to the top.

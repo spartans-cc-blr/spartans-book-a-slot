@@ -54,7 +54,8 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
   const slotW = plotW / xMax
   const maxBar = Math.max(0, ...overs.map(o => o.runs))
   const maxRate = Math.max(0, ...endRates.map(c => c.crr), target ? target / totalOvers : 0)
-  const yMax = Math.min(32, Math.max(12, Math.ceil((Math.max(maxBar, maxRate) * 1.15) / 4) * 4))   // a multiple of 4
+  const maxPar = batter ? Math.max(0, ...overs.map(o => parRuns(o, contexts.find(c => c.over === o.over), basis) ?? 0)) : 0
+  const yMax = Math.min(32, Math.max(12, Math.ceil((Math.max(maxBar, maxRate, maxPar) * 1.15) / 4) * 4))   // a multiple of 4
   const y = (v: number) => H - PAD.b - (Math.min(v, yMax) / yMax) * plotH
   const xc = (over: number) => PAD.l + (over - 0.5) * slotW
   const clipped = contexts.some(c => (c.rrr ?? 0) > yMax)
@@ -149,7 +150,18 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
                   </>
                 )
               })()}
-              <text x={cx} y={topY - 5} textAnchor="middle" fontSize={8} style={{ fill: 'var(--scorecard-text-2)' }}>{o.runs}</text>
+              {batter && parHere != null ? (
+                <>
+                  {/* the gap to par sits above the tick; the runs figure moves inside the bar (or the table) */}
+                  <text x={cx} y={topY - 5} textAnchor="middle" fontSize={8} fontWeight={700}
+                    style={{ fill: o.runs < parHere - 0.05 ? CRR_COLOUR : 'var(--scorecard-heading-text)' }}>
+                    {parHere > yMax ? '▲' : ''}{Math.abs(o.runs - parHere) < 0.05 ? '0' : `${o.runs < parHere ? '−' : '+'}${Math.abs(o.runs - parHere).toFixed(1)}`}
+                  </text>
+                  {h >= 10 && <text x={cx} y={H - PAD.b - 3} textAnchor="middle" fontSize={8} style={{ fill: 'var(--scorecard-heading-text)' }}>{o.runs}</text>}
+                </>
+              ) : (
+                <text x={cx} y={topY - 5} textAnchor="middle" fontSize={8} style={{ fill: 'var(--scorecard-text-2)' }}>{o.runs}</text>
+              )}
               {Array.from({ length: o.wickets }, (_, i) => (
                 <circle key={i} cx={cx} cy={topY - 16 - i * 7} r={3} style={{ fill: 'var(--scorecard-heading-text)' }} />
               ))}
@@ -285,7 +297,7 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
           : battedFirst === true
             ? 'Spartans batted first, so there is no target: only the team’s current run rate (at the end of each over) is shown. A solid bar means the batter kept pace with the CRR going in for the balls he faced; a hollow bar fell short. Over 1 has no CRR yet, so it stays solid.'
             : 'Batting order isn’t known for this match, so there is no required rate: only the team’s current run rate is shown.'}
-        {batter ? ' Bars show only the overs this batter faced (wides are not balls faced); the faint ticks are overs he did not face. The gold tick on each bar is par, and the thin gold line joining it to the top of the bar is the gap (the deficit when the bar stops short of the tick): the rate going in scaled to the balls he faced (rate × balls ÷ 6, at most 6 a ball), so one run off one ball against a rate of 6 is level, not a miss.' : ' Entire innings counts every run (extras included) and every wicket.'}
+        {batter ? ' Bars show only the overs this batter faced (wides are not balls faced); the faint ticks are overs he did not face. The gold tick on each bar is par, and the thin gold line joining it to the top of the bar is the gap; the figure above the tick is that gap in runs (red when behind, ▲ when par is above the axis) and the figure inside the bar is his runs: the rate going in scaled to the balls he faced (rate × balls ÷ 6, at most 6 a ball), so one run off one ball against a rate of 6 is level, not a miss.' : ' Entire innings counts every run (extras included) and every wicket.'}
         {clipped && ` The axis stops at ${yMax}; the required rate line is clipped above that.`}
       </p>
     </div>
