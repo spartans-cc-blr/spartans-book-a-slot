@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { DateChipSlider } from '@/components/ui/DateChipSlider'
@@ -382,7 +383,14 @@ export function DashboardBookingsTabs({
 }: {
   upcoming: DashboardBookingRow[]
 }) {
-  const [tab, setTab] = useState<'upcoming' | 'needs' | 'past'>('upcoming')
+  // The active tab is URL-driven (?tab=upcoming|needs|past) so the admin
+  // sidebar's Matches sub-menu can deep-link straight to one.
+  const router = useRouter()
+  const sp = useSearchParams()
+  const tabParam = sp.get('tab')
+  const tab: 'upcoming' | 'needs' | 'past' =
+    tabParam === 'needs' || tabParam === 'past' ? tabParam : 'upcoming'
+  const setTab = (t: 'upcoming' | 'needs' | 'past') => router.replace(`/admin?tab=${t}`, { scroll: false })
   // Lifted out of AdminPastMatchesPanel so the tab label stays accurate —
   // populated as soon as that panel's first fetch resolves.
   const [pastTotal, setPastTotal] = useState<number | null>(null)
