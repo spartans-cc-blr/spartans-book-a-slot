@@ -205,3 +205,7 @@ With a single bowler selected, two flat dashed lines are drawn across the Bowlin
 A part over was judged by extrapolating (runs ÷ balls × 6) and drawn against a full-over line, so one run off his only ball looked like a miss against a rate of 6, and "scoring at 6.00 an over" is meaningless over one ball. `parRuns()` (`matchInsights.ts`) now gives par = rate going in × balls faced ÷ 6, capped at 6 a ball. `vsBattingRate()` compares runs with par (1 run off 1 ball at RRR 6 is level, so the bar stays solid). With a batter selected, each bar carries a gold par tick, and the readout says "N runs off M balls · par X" instead of an extrapolated rate or SR. Entire innings is unchanged (full overs, so par equals the line). Tests in `matchInsights.test.ts`.
 
 With a batter selected, a thin gold connector now joins the top of each bar to its par tick, so every over's deficit (bar below the tick) or surplus shows without tapping; the readout adds "short by X" / "ahead by X".
+
+## Batting chart: par ticks without a tap, per-over gap table (October 2026)
+
+The par tick and gap connector were gated on the hovered over's par, so they only drew after tapping a bar. They now draw for every over as soon as a batter is selected. Run labels and wicket dots sit above whichever of the bar top and the par tick is higher, so they no longer collide with the connector. Under the legend, a per-over table (over, runs (balls), par, gap, with a total row) is always shown for the selected batter, so the deficit is readable without hovering. Gaps below par are red.

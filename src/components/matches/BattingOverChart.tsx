@@ -132,10 +132,13 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
           }
           const hollow = vsBattingRate(o, contexts.find(c => c.over === o.over), basis) === 'behind'
           const h = Math.max(H - PAD.b - y(o.runs), 2)
+          const parHere = batter ? parRuns(o, contexts.find(c => c.over === o.over), basis) : null
+          // labels clear the par tick and its connector: they sit above whichever is higher
+          const topY = Math.min(H - PAD.b - h, parHere != null ? y(parHere) : Infinity)
           return (
             <g key={o.over}>
               <rect x={cx - bw / 2} y={H - PAD.b - h} width={bw} height={h} rx={1.5} style={hollow ? { fill: BAR, fillOpacity: 0.18, stroke: BAR, strokeWidth: 1.5 } : { fill: BAR, opacity: 0.9 }} />
-              {batter && par != null && (() => {
+              {batter && (() => {
                 // par for the balls he faced: where he needed to be, not a full over's rate
                 const p = parRuns(o, contexts.find(c => c.over === o.over), basis)
                 return p == null ? null : (
@@ -146,9 +149,9 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
                   </>
                 )
               })()}
-              <text x={cx} y={H - PAD.b - h - 3} textAnchor="middle" fontSize={8} style={{ fill: 'var(--scorecard-text-2)' }}>{o.runs}</text>
+              <text x={cx} y={topY - 5} textAnchor="middle" fontSize={8} style={{ fill: 'var(--scorecard-text-2)' }}>{o.runs}</text>
               {Array.from({ length: o.wickets }, (_, i) => (
-                <circle key={i} cx={cx} cy={H - PAD.b - h - 14 - i * 7} r={3} style={{ fill: 'var(--scorecard-heading-text)' }} />
+                <circle key={i} cx={cx} cy={topY - 16 - i * 7} r={3} style={{ fill: 'var(--scorecard-heading-text)' }} />
               ))}
             </g>
           )
@@ -212,6 +215,43 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
           </>
         )}
       </div>
+
+
+      {batter && (() => {
+        const rows = overs.flatMap(o => {
+          if (!o.faced || o.balls === 0) return []
+          const p = parRuns(o, contexts.find(c => c.over === o.over), basis)
+          return [{ o, p }]
+        })
+        if (rows.every(r => r.p == null)) return null
+        const rated = rows.filter(r => r.p != null)
+        const runs = rated.reduce((a, r) => a + r.o.runs, 0)
+        const parSum = rated.reduce((a, r) => a + (r.p as number), 0)
+        const gap = runs - parSum
+        return (
+          <div className="mt-2">
+            <p className={`${HEAD} !mb-1`}>{batter.name} against par, over by over</p>
+            <div className="grid grid-cols-[auto_1fr_auto_auto] gap-x-3 gap-y-0.5 font-rajdhani text-xs tabular-nums text-[var(--scorecard-text-2)]">
+              <span className={MUTED}>Over</span><span className={MUTED}>Runs (balls)</span><span className={`${MUTED} text-right`}>Par</span><span className={`${MUTED} text-right`}>Gap</span>
+              {rows.map(({ o, p }) => (
+                <div key={o.over} className="contents">
+                  <span>{o.over}</span>
+                  <span>{o.runs} ({o.balls})</span>
+                  <span className="text-right">{p == null ? '–' : p.toFixed(1)}</span>
+                  <span className="text-right font-bold" style={{ color: p == null ? undefined : o.runs < p - 0.05 ? CRR_COLOUR : 'var(--scorecard-heading-text)' }}>
+                    {p == null ? '–' : Math.abs(o.runs - p) < 0.05 ? '0.0' : `${o.runs < p ? '−' : '+'}${Math.abs(o.runs - p).toFixed(1)}`}
+                  </span>
+                </div>
+              ))}
+              <span className="font-bold text-[var(--scorecard-heading-text)] col-span-2 border-t border-[var(--scorecard-table-divider)] pt-0.5">Total</span>
+              <span className="text-right font-bold border-t border-[var(--scorecard-table-divider)] pt-0.5">{parSum.toFixed(1)}</span>
+              <span className="text-right font-bold border-t border-[var(--scorecard-table-divider)] pt-0.5" style={{ color: gap < -0.05 ? CRR_COLOUR : 'var(--scorecard-heading-text)' }}>
+                {Math.abs(gap) < 0.05 ? '0.0' : `${gap < 0 ? '−' : '+'}${Math.abs(gap).toFixed(1)}`}
+              </span>
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 font-rajdhani text-xs text-[var(--scorecard-text-2)]">
         <span className="inline-flex items-center gap-1.5">
