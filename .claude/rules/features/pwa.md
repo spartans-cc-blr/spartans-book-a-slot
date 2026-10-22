@@ -66,3 +66,7 @@ The stats pages must stay dynamic (they read the session), so caching is one lev
 ## 10. One request for the global modals (October 2026)
 
 The milestone, birthday and admin fee-reminder modals each fetched on every full page load. `GET /api/modals/pending` now returns `{ achievements, birthdays, bookings }` in one call; `ModalFeedProvider` (root layout) fetches it once and the three modals read it via `useModalFeed()`. Each part keeps its old rules (signed-in, non-expelled; fees admin only, and an admin without a player row still gets fees); one part failing returns an empty list for it. The data readers live in `src/lib/modalFeed.ts`, shared with the original `/api/milestones/unseen` and `/api/birthdays/today` routes, which remain (the modals still POST their own `mark-seen`).
+
+## 11. Tab bar no longer flashes dark on load (October 2026)
+
+`MobileTabBar` took its colours from `useTheme().resolvedTheme`, which is `'dark'` during server rendering, so the first paint showed the dark bar and flipped to light once the client read the stored/OS theme. With no per-page override it now uses `'auto'` tokens: every colour is a `var(--tb-*)` defined per `[data-theme]` in `globals.css`, which the inline head script sets before first paint. An explicit `theme` prop (e.g. `/matches/history` pinned light) still uses the fixed palettes. Added an `accentSoft` token to replace the `${accent}1A` hex-alpha concatenation, which can't work with a CSS variable.

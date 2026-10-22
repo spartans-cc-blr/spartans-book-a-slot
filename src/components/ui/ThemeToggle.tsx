@@ -65,7 +65,7 @@ export function ThemeToggleNav({ onSelect }: { onSelect?: () => void }) {
 }
 
 /** Mobile bottom-tab-bar "More" sheet — styled from the same inline colour tokens every other sheet row uses. */
-export function ThemeToggleSheet({ t, onSelect }: { t: { rowText: string; muted: string; accent: string; divider: string; rowIconBg: string }; onSelect?: () => void }) {
+export function ThemeToggleSheet({ t, onSelect }: { t: { rowText: string; muted: string; accent: string; accentSoft: string; divider: string; rowIconBg: string }; onSelect?: () => void }) {
   const { preference, setPreference } = useTheme()
   return (
     <div className="py-3" style={{ borderBottom: `1px solid ${t.divider}` }}>
@@ -82,7 +82,7 @@ export function ThemeToggleSheet({ t, onSelect }: { t: { rowText: string; muted:
               type="button"
               onClick={() => { setPreference(opt.value); onSelect?.() }}
               className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg font-rajdhani text-[10px] font-semibold uppercase tracking-wide"
-              style={{ background: active ? `${t.accent}1A` : t.rowIconBg, color: active ? t.accent : t.rowText }}
+              style={{ background: active ? t.accentSoft : t.rowIconBg, color: active ? t.accent : t.rowText }}
             >
               <Icon />
               {opt.label}

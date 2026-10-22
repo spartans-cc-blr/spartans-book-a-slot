@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { signIn, signOut } from 'next-auth/react'
 import { JerseyIcon } from '@/components/ui/JerseyIcon'
 import { GenerateInviteItem } from '@/components/ui/GenerateInviteItem'
-import { useTheme } from '@/components/ui/ThemeProvider'
 import { ThemeToggleSheet } from '@/components/ui/ThemeToggle'
 
 export type MobileTabBarTheme = 'dark' | 'light'
@@ -30,10 +29,33 @@ interface MobileTabBarProps {
 // still exists as an explicit per-page override for a page that hasn't
 // adopted the toggle for its own body content yet (e.g. /matches/history,
 // which stays pinned 'light' regardless of the visitor's global choice).
-function tokens(theme: MobileTabBarTheme) {
+// 'auto' reads CSS variables (--tb-*, defined per [data-theme] in globals.css)
+// so the server-rendered HTML is already correct for the visitor's theme —
+// the pre-hydration paint no longer flashes dark and then flips to light.
+function tokens(theme: MobileTabBarTheme | 'auto') {
+  if (theme === 'auto') return {
+    navBg: 'var(--tb-nav-bg)',
+    navBorder: 'var(--tb-nav-border)',
+    accent: 'var(--tb-accent)',
+    accentSoft: 'var(--tb-accent-soft)',
+    inactive: 'var(--tb-inactive)',
+    sheetBg: 'var(--tb-sheet-bg)',
+    handle: 'var(--tb-handle)',
+    rowIconBg: 'var(--tb-row-icon-bg)',
+    rowText: 'var(--tb-row-text)',
+    muted: 'var(--tb-muted)',
+    sectionLabel: 'var(--tb-section-label)',
+    divider: 'var(--tb-divider)',
+    scrim: 'var(--tb-scrim)',
+    dangerText: 'var(--tb-danger-text)',
+    dangerIconBg: 'var(--tb-danger-icon-bg)',
+    crimsonRowBg: 'var(--tb-crimson-row-bg)',
+    crimsonIconBg: 'var(--tb-crimson-icon-bg)',
+    crimson: 'var(--tb-crimson)',
+  }
   return theme === 'light' ? {
     navBg: '#FFFFFF', navBorder: '#D4C9B0',
-    accent: '#B45309', inactive: '#78716C',
+    accent: '#B45309', accentSoft: 'rgba(180,83,9,0.1)', inactive: '#78716C',
     sheetBg: '#FFFFFF', handle: '#D4C9B0',
     rowIconBg: '#F8F4EE', rowText: '#1C1917', muted: '#78716C',
     sectionLabel: '#78716C', divider: '#E7E0D3', scrim: 'rgba(28,25,23,0.4)',
@@ -41,7 +63,7 @@ function tokens(theme: MobileTabBarTheme) {
     crimsonRowBg: 'rgba(220,38,38,0.06)', crimsonIconBg: 'rgba(220,38,38,0.12)', crimson: '#DC2626',
   } : {
     navBg: '#111111', navBorder: '#7A6030',
-    accent: '#C9A84C', inactive: 'rgba(201,168,76,0.42)',
+    accent: '#C9A84C', accentSoft: 'rgba(201,168,76,0.1)', inactive: 'rgba(201,168,76,0.42)',
     sheetBg: '#111111', handle: '#2E2E2E',
     rowIconBg: '#1A1A1A', rowText: '#D4D4D8', muted: '#71717A',
     sectionLabel: '#3F3F46', divider: '#242424', scrim: 'rgba(0,0,0,0.5)',
@@ -90,9 +112,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
   const { activePage, isLoggedIn, isExpelled, isAdmin, isGC, isCaptain, isWrangler, playerId, theme: themeOverride } = props
   const [moreOpen, setMoreOpen] = useState(false)
   useReserveBottomSpace()
-  const { resolvedTheme } = useTheme()
-  const theme = themeOverride ?? resolvedTheme
-  const t = tokens(theme)
+  const t = tokens(themeOverride ?? 'auto')
 
   return (
     <>
@@ -208,7 +228,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
                   onClick={() => { setMoreOpen(false); signIn('google') }}
                   className="w-full flex items-center gap-3 py-2.5 mt-1"
                 >
-                  <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-none" style={{ background: `${t.accent}1A`, color: t.accent }}>
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-none" style={{ background: t.accentSoft, color: t.accent }}>
                     <PersonIcon />
                   </span>
                   <span className="font-rajdhani text-sm font-semibold" style={{ color: t.accent }}>Sign In</span>
@@ -295,7 +315,7 @@ function SheetLink({ t, href, icon, label, active, onNavigate, muted }: {
       style={{ borderBottom: `1px solid ${t.divider}` }}
     >
       <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-none"
-        style={{ background: active ? `${t.accent}1A` : t.rowIconBg, color: active ? t.accent : t.muted }}>
+        style={{ background: active ? t.accentSoft : t.rowIconBg, color: active ? t.accent : t.muted }}>
         {icon}
       </span>
       <span className="font-rajdhani text-sm font-semibold" style={{ color: muted ? t.muted : active ? t.accent : t.rowText }}>
