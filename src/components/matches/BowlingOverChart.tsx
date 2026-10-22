@@ -52,7 +52,11 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
   const plotW = W - PAD.l - PAD.r, plotH = H - PAD.t - PAD.b
   const slotW = plotW / xMax
   const maxBar = Math.max(0, ...overs.map(o => o.runs))
-  const maxRate = Math.max(0, ...endRates.map(c => c.crr), target ? target / totalOvers : 0)
+  // With a bowler picked: his overall economy and the opposition's overall run rate, as flat reference lines.
+  const bowlerEcon = bowler && bowler.legalBalls > 0 ? (bowler.runs / bowler.legalBalls) * 6 : null
+  const inningsBalls = side.filter(b => b.is_legal).length
+  const oppRate = bowler && inningsBalls > 0 ? (side.reduce((n, b) => n + b.runs_total, 0) / inningsBalls) * 6 : null
+  const maxRate = Math.max(0, ...endRates.map(c => c.crr), target ? target / totalOvers : 0, bowlerEcon ?? 0, oppRate ?? 0)
   // Wicket dots and labels sit above the bars, and the last overs can send the required rate sky-high,
   // so the axis is capped and the required line clipped to it.
   const yMax = Math.min(32, Math.max(12, Math.ceil((Math.max(maxBar, maxRate) * 1.15) / 4) * 4))   // a multiple of 4, so the four gridline steps are whole numbers
@@ -149,6 +153,18 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
         })}
 
         {target != null && rrrPath && <path d={rrrPath} fill="none" strokeWidth={2} strokeLinejoin="round" style={{ stroke: 'var(--fx-accent)' }} />}
+        {oppRate != null && (
+          <g>
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(oppRate)} y2={y(oppRate)} strokeWidth={1.5} strokeDasharray="5 3" style={{ stroke: CRR_COLOUR }} />
+            <text x={W - PAD.r - 2} y={y(oppRate) - 3} textAnchor="end" fontSize={8} fontWeight={700} style={{ fill: CRR_COLOUR }}>Opp {oppRate.toFixed(2)}</text>
+          </g>
+        )}
+        {bowlerEcon != null && (
+          <g>
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(bowlerEcon)} y2={y(bowlerEcon)} strokeWidth={1.5} strokeDasharray="5 3" style={{ stroke: BAR }} />
+            <text x={W - PAD.r - 2} y={y(bowlerEcon) + 10} textAnchor="end" fontSize={8} fontWeight={700} style={{ fill: BAR }}>Econ {bowlerEcon.toFixed(2)}</text>
+          </g>
+        )}
         {crrPath && <path d={crrPath} fill="none" strokeWidth={2} strokeLinejoin="round" style={{ stroke: CRR_COLOUR }} />}
 
         <rect x={PAD.l} y={PAD.t} width={plotW} height={plotH} fill="transparent" style={{ touchAction: 'pan-y', cursor: 'crosshair' }}
@@ -225,6 +241,18 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
             CRR
           </span>
         )}
+        {bowlerEcon != null && bowler && (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-4 border-t-2 border-dashed" style={{ borderColor: BAR }} />
+            {bowler.name.split(' ')[0]}’s economy <span className={MUTED}>· {bowlerEcon.toFixed(2)}</span>
+          </span>
+        )}
+        {oppRate != null && (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-4 border-t-2 border-dashed" style={{ borderColor: CRR_COLOUR }} />
+            {opponentName || 'Opposition'} run rate <span className={MUTED}>· {oppRate.toFixed(2)}</span>
+          </span>
+        )}
         {target != null && (
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block h-0.5 w-4 rounded" style={{ background: 'var(--fx-accent)' }} />
@@ -238,7 +266,7 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
           : battedFirst === false
             ? 'Spartans bowled first, so there is no target yet: only the batting side’s current run rate (at the end of each over) is shown. A solid bar means the over was cheaper than that rate (it brought the CRR down); a hollow bar means it cost more. Over 1 has no CRR yet, so it stays solid.'
             : 'Batting order isn’t known for this match, so there is no required rate: only the batting side’s current run rate is shown.'}
-        {bowler ? ' Bars show only the overs this bowler bowled; the faint ticks are overs he did not bowl.' : ' Entire innings counts every run (byes included) and every wicket.'}
+        {bowler ? ` Bars show only the overs this bowler bowled; the faint ticks are overs he did not bowl. The dashed lines are his overall economy and the opposition’s run rate for the whole innings, so a bar above his economy line was a dearer-than-usual over for him.` : ' Entire innings counts every run (byes included) and every wicket.'}
         {clipped && ` The axis stops at ${yMax}; the required rate line is clipped above that.`}
       </p>
     </div>
