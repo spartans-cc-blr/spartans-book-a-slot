@@ -199,3 +199,7 @@ On the Bowling and Batting over charts the two lines now use different moments o
 
 With a single bowler selected, two flat dashed lines are drawn across the Bowling chart: the bowler's **overall economy** (his runs ÷ legal balls × 6, teal, same as the Bowlers table) and the **opposition's overall run rate** for the innings (all runs ÷ legal balls × 6, red like the CRR). Each carries a value label at the right edge and a legend entry. They count in the axis maximum. Not shown for **Entire innings**.
 
+
+## Batting chart: par for the balls faced (October 2026)
+
+A part over was judged by extrapolating (runs ÷ balls × 6) and drawn against a full-over line, so one run off his only ball looked like a miss against a rate of 6, and "scoring at 6.00 an over" is meaningless over one ball. `parRuns()` (`matchInsights.ts`) now gives par = rate going in × balls faced ÷ 6, capped at 6 a ball. `vsBattingRate()` compares runs with par (1 run off 1 ball at RRR 6 is level, so the bar stays solid). With a batter selected, each bar carries a gold par tick, and the readout says "N runs off M balls · par X" instead of an extrapolated rate or SR. Entire innings is unchanged (full overs, so par equals the line). Tests in `matchInsights.test.ts`.

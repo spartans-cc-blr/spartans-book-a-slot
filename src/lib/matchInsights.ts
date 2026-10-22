@@ -331,12 +331,21 @@ export function battingOverSeries(inningsBalls: BallRow[], batter: string | null
 
 export type BatVerdict = 'ahead' | 'level' | 'behind'
 
-/** Whether the batting selection scored faster than the rate going into the over: 'ahead' = more runs
- *  an over than the required rate (chase) or the current rate (batting first). Rate is runs per six
- *  balls faced. Null when there is no rate to compare with or he faced no ball. */
-export function vsBattingRate(over: BattingOver, ctx: OverContext | undefined, basis: 'rrr' | 'crr'): BatVerdict | null {
+/** Runs a batter needed to keep pace in an over: the rate going in, scaled to the balls he actually
+ *  faced (rate x balls / 6), and never more than six a ball. A part over is judged on its own balls,
+ *  not extrapolated to a full over. Null when there is no rate or he faced no ball. */
+export function parRuns(over: BattingOver, ctx: OverContext | undefined, basis: 'rrr' | 'crr'): number | null {
   const rate = basis === 'rrr' ? ctx?.rrr : ctx?.crr
   if (!over.faced || over.balls === 0 || rate == null) return null
-  const mine = (over.runs / over.balls) * 6
-  return mine > rate ? 'ahead' : mine < rate ? 'behind' : 'level'
+  return Math.min((rate * over.balls) / 6, over.balls * 6)
+}
+
+/** Whether the batting selection kept pace with the rate going into the over: 'ahead' = more runs than
+ *  par for the balls faced, 'behind' = fewer. Compares runs with par, so one run off one ball against a
+ *  rate of 6 is level, not a shortfall. Null when there is no rate to compare with or he faced no ball. */
+export function vsBattingRate(over: BattingOver, ctx: OverContext | undefined, basis: 'rrr' | 'crr'): BatVerdict | null {
+  const par = parRuns(over, ctx, basis)
+  if (par == null) return null
+  const d = over.runs - par
+  return d > 1e-9 ? 'ahead' : d < -1e-9 ? 'behind' : 'level'
 }

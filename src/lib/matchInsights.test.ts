@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { BallRow } from '@/lib/ballByBall'
-import { battingOverSeries, vsBattingRate, overEndRates, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
+import { battingOverSeries, parRuns, vsBattingRate, overEndRates, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
 
 function ball(side: 'spartans' | 'opponent', over: number, runs: number, wicket = false): BallRow {
   return {
@@ -302,3 +302,22 @@ describe('vsBattingRate', () => {
   })
 })
 
+
+describe('parRuns (part overs)', () => {
+  const ov = (runs: number, balls: number) => ({ over: 1, runs, balls, wickets: 0, faced: true, bowlers: [] })
+  const ctx = (crr: number | null, rrr: number | null) => ({ over: 1, crr, rrr } as never)
+  it('scales the rate to the balls faced', () => {
+    expect(parRuns(ov(1, 1), ctx(null, 6), 'rrr')).toBe(1)
+    expect(parRuns(ov(3, 3), ctx(null, 8), 'rrr')).toBe(4)
+  })
+  it('never asks for more than six a ball', () => {
+    expect(parRuns(ov(6, 1), ctx(null, 50), 'rrr')).toBe(6)
+  })
+  it('one run off one ball against 6 an over is level, not behind', () => {
+    expect(vsBattingRate(ov(1, 1), ctx(null, 6), 'rrr')).toBe('level')
+  })
+  it('is null with no rate or no balls', () => {
+    expect(parRuns(ov(0, 0), ctx(null, 6), 'rrr')).toBeNull()
+    expect(parRuns(ov(2, 2), ctx(null, null), 'rrr')).toBeNull()
+  })
+})
