@@ -16,6 +16,9 @@ const W = 360, H = 240
 const PAD = { l: 30, r: 8, t: 12, b: 26 }
 const ALL = '__all__'
 
+/** Whole runs for a gap to par, with a sign: −7, +3, or 0 when it rounds to nothing. */
+const fmtGap = (g: number) => (Math.round(Math.abs(g)) === 0 ? '0' : `${g < 0 ? '−' : '+'}${Math.round(Math.abs(g))}`)
+
 const BAR = '#0F766E'        // Spartans teal, as on the Insights tab
 const CRR_COLOUR = '#DC2626'
 const MUTED = 'text-[var(--scorecard-text-faint)]'
@@ -154,8 +157,8 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
                 <>
                   {/* the gap to par sits above the tick; the runs figure moves inside the bar (or the table) */}
                   <text x={cx} y={topY - 5} textAnchor="middle" fontSize={8} fontWeight={700}
-                    style={{ fill: o.runs < parHere - 0.05 ? CRR_COLOUR : 'var(--scorecard-heading-text)' }}>
-                    {parHere > yMax ? '▲' : ''}{Math.abs(o.runs - parHere) < 0.05 ? '0' : `${o.runs < parHere ? '−' : '+'}${Math.abs(o.runs - parHere).toFixed(1)}`}
+                    style={{ fill: Math.round(parHere - o.runs) > 0 ? CRR_COLOUR : 'var(--scorecard-heading-text)' }}>
+                    {parHere > yMax ? '▲' : ''}{fmtGap(o.runs - parHere)}
                   </text>
                   {h >= 10 && <text x={cx} y={H - PAD.b - 3} textAnchor="middle" fontSize={8} style={{ fill: 'var(--scorecard-heading-text)' }}>{o.runs}</text>}
                 </>
@@ -196,8 +199,8 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
                 <span className={MUTED}> · </span>
                 <span className="tabular-nums font-bold">{ov.wickets}</span> wicket{ov.wickets === 1 ? '' : 's'}
                 {batter && par != null && (
-                  <span className={MUTED}> · par {par.toFixed(1)} for {ov.balls} ball{ov.balls === 1 ? '' : 's'}
-                    {Math.abs(ov.runs - par) >= 0.05 && <> ({ov.runs < par ? 'short by' : 'ahead by'} {Math.abs(ov.runs - par).toFixed(1)})</>}
+                  <span className={MUTED}> · par {Math.round(par)} for {ov.balls} ball{ov.balls === 1 ? '' : 's'}
+                    {Math.round(Math.abs(ov.runs - par)) >= 1 && <> ({ov.runs < par ? 'short by' : 'ahead by'} {Math.round(Math.abs(ov.runs - par))})</>}
                   </span>
                 )}
               </p>
@@ -249,16 +252,16 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
                 <div key={o.over} className="contents">
                   <span>{o.over}</span>
                   <span>{o.runs} ({o.balls})</span>
-                  <span className="text-right">{p == null ? '–' : p.toFixed(1)}</span>
-                  <span className="text-right font-bold" style={{ color: p == null ? undefined : o.runs < p - 0.05 ? CRR_COLOUR : 'var(--scorecard-heading-text)' }}>
-                    {p == null ? '–' : Math.abs(o.runs - p) < 0.05 ? '0.0' : `${o.runs < p ? '−' : '+'}${Math.abs(o.runs - p).toFixed(1)}`}
+                  <span className="text-right">{p == null ? '–' : Math.round(p)}</span>
+                  <span className="text-right font-bold" style={{ color: p == null ? undefined : Math.round(p - o.runs) > 0 ? CRR_COLOUR : 'var(--scorecard-heading-text)' }}>
+                    {p == null ? '–' : fmtGap(o.runs - p)}
                   </span>
                 </div>
               ))}
               <span className="font-bold text-[var(--scorecard-heading-text)] col-span-2 border-t border-[var(--scorecard-table-divider)] pt-0.5">Total</span>
-              <span className="text-right font-bold border-t border-[var(--scorecard-table-divider)] pt-0.5">{parSum.toFixed(1)}</span>
-              <span className="text-right font-bold border-t border-[var(--scorecard-table-divider)] pt-0.5" style={{ color: gap < -0.05 ? CRR_COLOUR : 'var(--scorecard-heading-text)' }}>
-                {Math.abs(gap) < 0.05 ? '0.0' : `${gap < 0 ? '−' : '+'}${Math.abs(gap).toFixed(1)}`}
+              <span className="text-right font-bold border-t border-[var(--scorecard-table-divider)] pt-0.5">{Math.round(parSum)}</span>
+              <span className="text-right font-bold border-t border-[var(--scorecard-table-divider)] pt-0.5" style={{ color: Math.round(gap) < 0 ? CRR_COLOUR : 'var(--scorecard-heading-text)' }}>
+                {fmtGap(gap)}
               </span>
             </div>
           </div>
