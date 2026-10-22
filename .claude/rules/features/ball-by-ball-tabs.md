@@ -195,3 +195,7 @@ The "vs par" column was dropped (a single number was hard to relate to the chart
 
 On the Bowling and Batting over charts the two lines now use different moments on purpose: the **RRR** line is the rate needed *going into* each over (`overContexts()`), so over 1 is the opening required rate, target ÷ total overs, before a ball is bowled; the **CRR** line is the rate at the *end* of each over (`overEndRates()`), so over 1 is its own run rate. Each bar therefore sits at the same x as the required rate it is judged against. The hover readout's "after the over" part now gives only the CRR. This replaces the end-of-over RRR and the separate left-edge opening point. The Insights rate chart is unchanged (its x axis is continuous, so its RRR already starts at over 0 and its CRR at over 1).
 
+## Bowling chart: economy and run-rate reference lines (October 2026)
+
+With a single bowler selected, two flat dashed lines are drawn across the Bowling chart: the bowler's **overall economy** (his runs ÷ legal balls × 6, teal, same as the Bowlers table) and the **opposition's overall run rate** for the innings (all runs ÷ legal balls × 6, red like the CRR). Each carries a value label at the right edge and a legend entry. They count in the axis maximum. Not shown for **Entire innings**.
+
