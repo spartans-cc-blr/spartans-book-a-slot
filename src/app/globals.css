@@ -18,6 +18,24 @@
    ============================================================ */
 :root,
 [data-theme="light"] {
+  --tb-nav-bg: #FFFFFF;
+  --tb-nav-border: #D4C9B0;
+  --tb-accent: #B45309;
+  --tb-accent-soft: rgba(180,83,9,0.1);
+  --tb-inactive: #78716C;
+  --tb-sheet-bg: #FFFFFF;
+  --tb-handle: #D4C9B0;
+  --tb-row-icon-bg: #F8F4EE;
+  --tb-row-text: #1C1917;
+  --tb-muted: #78716C;
+  --tb-section-label: #78716C;
+  --tb-divider: #E7E0D3;
+  --tb-scrim: rgba(28,25,23,0.4);
+  --tb-danger-text: #DC2626;
+  --tb-danger-icon-bg: rgba(220,38,38,0.08);
+  --tb-crimson-row-bg: rgba(220,38,38,0.06);
+  --tb-crimson-icon-bg: rgba(220,38,38,0.12);
+  --tb-crimson: #DC2626;
   /* Home dashboard (src/app/page.tsx, SelectedMatchCard.tsx) */
   --home-shell-bg: #F0F4F5;
   --home-card-bg: #FFFFFF;
@@ -204,6 +222,24 @@
   --app-accent-dim: #B45309;
 }
 [data-theme="dark"] {
+  --tb-nav-bg: #111111;
+  --tb-nav-border: #7A6030;
+  --tb-accent: #C9A84C;
+  --tb-accent-soft: rgba(201,168,76,0.1);
+  --tb-inactive: rgba(201,168,76,0.42);
+  --tb-sheet-bg: #111111;
+  --tb-handle: #2E2E2E;
+  --tb-row-icon-bg: #1A1A1A;
+  --tb-row-text: #D4D4D8;
+  --tb-muted: #71717A;
+  --tb-section-label: #3F3F46;
+  --tb-divider: #242424;
+  --tb-scrim: rgba(0,0,0,0.5);
+  --tb-danger-text: #F87171;
+  --tb-danger-icon-bg: rgba(220,38,38,0.1);
+  --tb-crimson-row-bg: rgba(220,38,38,0.1);
+  --tb-crimson-icon-bg: rgba(220,38,38,0.15);
+  --tb-crimson: #C0132C;
   --home-shell-bg: #111111;
   --home-card-bg: #1A1A1A;
   --home-card-border: #2E2E2E;
