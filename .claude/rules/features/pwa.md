@@ -60,7 +60,7 @@ The stats pages must stay dynamic (they read the session), so caching is one lev
 ## 9. Not built (ideas, roughly by value)
 
 - Stale-while-revalidate cache of last `/fixtures` data; Background Sync for availability taps.
-- `navigator.setAppBadge` with the unmarked-availability count; manifest `screenshots`.
+- Manifest `screenshots`.
 - Tab-bar prefetch needs no change: `loading.tsx` now lets Next prefetch the skeleton for dynamic routes through the existing `Link`s.
 
 ## 10. One request for the global modals (October 2026)
@@ -70,3 +70,7 @@ The milestone, birthday and admin fee-reminder modals each fetched on every full
 ## 11. Tab bar no longer flashes dark on load (October 2026)
 
 `MobileTabBar` took its colours from `useTheme().resolvedTheme`, which is `'dark'` during server rendering, so the first paint showed the dark bar and flipped to light once the client read the stored/OS theme. With no per-page override it now uses `'auto'` tokens: every colour is a `var(--tb-*)` defined per `[data-theme]` in `globals.css`, which the inline head script sets before first paint. An explicit `theme` prop (e.g. `/matches/history` pinned light) still uses the fixed palettes. Added an `accentSoft` token to replace the `${accent}1A` hex-alpha concatenation, which can't work with a CSS variable.
+
+## 12. App icon badge (October 2026)
+
+`navigator.setAppBadge(n)` shows how many upcoming fixtures the player hasn't marked. `GET /api/modals/pending` returns `unmarked` (from `getUnmarkedFixtureCount()` in `src/lib/modalFeed.ts`: confirmed, not availability-locked, not yet ended, no `availability` row for the player; `null` if the lookup failed), and `AppBadge` (root layout, reads `useModalFeed()`) sets or clears it. It updates when the app is opened or reloaded, not in the background, and is cleared on sign-out. Works for installed PWAs on Android, iOS 16.4+ home-screen apps and desktop; elsewhere the call is a no-op. It is a count only: it doesn't show fixture data, and it doesn't account for knockout ineligibility, so a player who can't mark a knockout may still be counted.

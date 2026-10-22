@@ -4,6 +4,8 @@
 
 import { createServiceClient } from '@/lib/supabase'
 import { getTodaysBirthdays, istDateString } from '@/lib/birthdays'
+import { istToday } from '@/lib/matchCompletion'
+import { hasMatchEnded } from '@/lib/matchStatus'
 
 const MAX_RESULTS = 20
 
@@ -60,4 +62,23 @@ export async function getUnseenBirthdays(supabase: Supabase, playerId: string) {
   if (meErr) throw new Error(meErr.message)
   if (me?.birthday_wishes_seen_date === istDateString()) return []
   return getTodaysBirthdays()
+}
+
+// Upcoming confirmed games this player can still mark and hasn't: not yet
+// ended, not availability-locked, no availability row. Drives the app-icon
+// badge only — a count, never shown as fixture data.
+export async function getUnmarkedFixtureCount(supabase: Supabase, playerId: string): Promise<number> {
+  const today = istToday()
+  const [{ data: bookings, error }, { data: marked, error: mErr }] = await Promise.all([
+    supabase.from('bookings')
+      .select('id, game_date, slot_time, format')
+      .eq('status', 'confirmed').eq('availability_locked', false).gte('game_date', today),
+    supabase.from('availability').select('booking_id').eq('player_id', playerId),
+  ])
+  if (error) throw new Error(error.message)
+  if (mErr) throw new Error(mErr.message)
+  const done = new Set((marked ?? []).map((r: any) => r.booking_id))
+  return (bookings ?? []).filter((b: any) =>
+    !done.has(b.id) && !(b.game_date === today && hasMatchEnded(b.game_date, b.slot_time, b.format)),
+  ).length
 }

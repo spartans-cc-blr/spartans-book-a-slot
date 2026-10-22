@@ -11,7 +11,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
-import { getUnseenAchievements, getUnseenBirthdays } from '@/lib/modalFeed'
+import { getUnseenAchievements, getUnseenBirthdays, getUnmarkedFixtureCount } from '@/lib/modalFeed'
 import { getPendingFeeBookings } from '@/lib/feeReminders'
 
 export async function GET(req: NextRequest) {
@@ -24,10 +24,11 @@ export async function GET(req: NextRequest) {
   if (limited) return limited
 
   const supabase = createServiceClient()
-  const [achievements, birthdays, bookings] = await Promise.all([
+  const [achievements, birthdays, bookings, unmarked] = await Promise.all([
     user.playerId ? getUnseenAchievements(supabase, user.playerId).catch(() => []) : Promise.resolve([]),
     user.playerId ? getUnseenBirthdays(supabase, user.playerId).catch(() => []) : Promise.resolve([]),
     user.isAdmin ? getPendingFeeBookings().catch(() => []) : Promise.resolve([]),
+    user.playerId ? getUnmarkedFixtureCount(supabase, user.playerId).catch(() => null) : Promise.resolve(null),
   ])
-  return NextResponse.json({ achievements, birthdays, bookings })
+  return NextResponse.json({ achievements, birthdays, bookings, unmarked })
 }
