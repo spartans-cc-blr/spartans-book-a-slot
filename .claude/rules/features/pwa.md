@@ -60,9 +60,13 @@ The stats pages must stay dynamic (they read the session), so caching is one lev
 ## 9. Not built (ideas, roughly by value)
 
 - Stale-while-revalidate cache of last `/fixtures` data; Background Sync for availability taps.
-- `navigator.setAppBadge` with the unmarked-availability count; manifest `screenshots`.
+- Manifest `screenshots`.
 - Tab-bar prefetch needs no change: `loading.tsx` now lets Next prefetch the skeleton for dynamic routes through the existing `Link`s.
 
 ## 10. One request for the global modals (October 2026)
 
 The milestone, birthday and admin fee-reminder modals each fetched on every full page load. `GET /api/modals/pending` now returns `{ achievements, birthdays, bookings }` in one call; `ModalFeedProvider` (root layout) fetches it once and the three modals read it via `useModalFeed()`. Each part keeps its old rules (signed-in, non-expelled; fees admin only, and an admin without a player row still gets fees); one part failing returns an empty list for it. The data readers live in `src/lib/modalFeed.ts`, shared with the original `/api/milestones/unseen` and `/api/birthdays/today` routes, which remain (the modals still POST their own `mark-seen`).
+
+## 12. App icon badge (October 2026)
+
+`navigator.setAppBadge(n)` shows how many upcoming fixtures the player hasn't marked. `GET /api/modals/pending` returns `unmarked` (from `getUnmarkedFixtureCount()` in `src/lib/modalFeed.ts`: confirmed, not availability-locked, not yet ended, no `availability` row for the player; `null` if the lookup failed), and `AppBadge` (root layout, reads `useModalFeed()`) sets or clears it. It updates when the app is opened or reloaded, not in the background, and is cleared on sign-out. Works for installed PWAs on Android, iOS 16.4+ home-screen apps and desktop; elsewhere the call is a no-op. It is a count only: it doesn't show fixture data, and it doesn't account for knockout ineligibility, so a player who can't mark a knockout may still be counted.

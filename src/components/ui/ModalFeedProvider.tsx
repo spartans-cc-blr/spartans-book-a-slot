@@ -11,6 +11,8 @@ export interface ModalFeed {
   achievements?: any[]
   birthdays?: any[]
   bookings?: any[]
+  // Upcoming fixtures still to mark (null if it couldn't be worked out).
+  unmarked?: number | null
 }
 
 const ModalFeedContext = createContext<ModalFeed | null>(null)
