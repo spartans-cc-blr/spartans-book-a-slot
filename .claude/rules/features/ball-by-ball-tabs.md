@@ -203,3 +203,5 @@ With a single bowler selected, two flat dashed lines are drawn across the Bowlin
 ## Batting chart: par for the balls faced (October 2026)
 
 A part over was judged by extrapolating (runs ÷ balls × 6) and drawn against a full-over line, so one run off his only ball looked like a miss against a rate of 6, and "scoring at 6.00 an over" is meaningless over one ball. `parRuns()` (`matchInsights.ts`) now gives par = rate going in × balls faced ÷ 6, capped at 6 a ball. `vsBattingRate()` compares runs with par (1 run off 1 ball at RRR 6 is level, so the bar stays solid). With a batter selected, each bar carries a gold par tick, and the readout says "N runs off M balls · par X" instead of an extrapolated rate or SR. Entire innings is unchanged (full overs, so par equals the line). Tests in `matchInsights.test.ts`.
+
+With a batter selected, a thin gold connector now joins the top of each bar to its par tick, so every over's deficit (bar below the tick) or surplus shows without tapping; the readout adds "short by X" / "ahead by X".

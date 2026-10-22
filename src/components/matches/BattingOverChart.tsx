@@ -138,7 +138,13 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
               {batter && par != null && (() => {
                 // par for the balls he faced: where he needed to be, not a full over's rate
                 const p = parRuns(o, contexts.find(c => c.over === o.over), basis)
-                return p == null ? null : <line x1={cx - bw / 2 - 2} x2={cx + bw / 2 + 2} y1={y(p)} y2={y(p)} strokeWidth={2} style={{ stroke: 'var(--fx-accent)' }} />
+                return p == null ? null : (
+                  <>
+                    {/* the gap between runs and par: the deficit (bar below the tick) or surplus (above it) */}
+                    <line x1={cx} x2={cx} y1={y(o.runs)} y2={y(p)} strokeWidth={1.5} style={{ stroke: 'var(--fx-accent)' }} />
+                    <line x1={cx - bw / 2 - 2} x2={cx + bw / 2 + 2} y1={y(p)} y2={y(p)} strokeWidth={2} style={{ stroke: 'var(--fx-accent)' }} />
+                  </>
+                )
               })()}
               <text x={cx} y={H - PAD.b - h - 3} textAnchor="middle" fontSize={8} style={{ fill: 'var(--scorecard-text-2)' }}>{o.runs}</text>
               {Array.from({ length: o.wickets }, (_, i) => (
@@ -174,7 +180,11 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
                 {batter && <><span className="tabular-nums font-bold">{ov.balls}</span> ball{ov.balls === 1 ? '' : 's'}</>}
                 <span className={MUTED}> · </span>
                 <span className="tabular-nums font-bold">{ov.wickets}</span> wicket{ov.wickets === 1 ? '' : 's'}
-                {batter && par != null && <span className={MUTED}> · par {par.toFixed(1)} for {ov.balls} ball{ov.balls === 1 ? '' : 's'}</span>}
+                {batter && par != null && (
+                  <span className={MUTED}> · par {par.toFixed(1)} for {ov.balls} ball{ov.balls === 1 ? '' : 's'}
+                    {Math.abs(ov.runs - par) >= 0.05 && <> ({ov.runs < par ? 'short by' : 'ahead by'} {Math.abs(ov.runs - par).toFixed(1)})</>}
+                  </span>
+                )}
               </p>
             ) : (
               batter && ov.bowlers.length > 0 && <p className={`text-xs ${MUTED}`}>{batter.name} did not face this over.</p>
@@ -235,7 +245,7 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
           : battedFirst === true
             ? 'Spartans batted first, so there is no target: only the team’s current run rate (at the end of each over) is shown. A solid bar means the batter kept pace with the CRR going in for the balls he faced; a hollow bar fell short. Over 1 has no CRR yet, so it stays solid.'
             : 'Batting order isn’t known for this match, so there is no required rate: only the team’s current run rate is shown.'}
-        {batter ? ' Bars show only the overs this batter faced (wides are not balls faced); the faint ticks are overs he did not face. The gold tick on each bar is par: the rate going in scaled to the balls he faced (rate × balls ÷ 6, at most 6 a ball), so one run off one ball against a rate of 6 is level, not a miss.' : ' Entire innings counts every run (extras included) and every wicket.'}
+        {batter ? ' Bars show only the overs this batter faced (wides are not balls faced); the faint ticks are overs he did not face. The gold tick on each bar is par, and the thin gold line joining it to the top of the bar is the gap (the deficit when the bar stops short of the tick): the rate going in scaled to the balls he faced (rate × balls ÷ 6, at most 6 a ball), so one run off one ball against a rate of 6 is level, not a miss.' : ' Entire innings counts every run (extras included) and every wicket.'}
         {clipped && ` The axis stops at ${yMax}; the required rate line is clipped above that.`}
       </p>
     </div>
