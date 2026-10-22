@@ -10,7 +10,7 @@
 import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import type { BallRow, BatterLine } from '@/lib/ballByBall'
-import { battingOverSeries, overContexts, overEndRates, vsBattingRate, wormPoints } from '@/lib/matchInsights'
+import { battingOverSeries, overContexts, overEndRates, parRuns, vsBattingRate, wormPoints } from '@/lib/matchInsights'
 
 const W = 360, H = 240
 const PAD = { l: 30, r: 8, t: 12, b: 26 }
@@ -87,7 +87,7 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
   const ctx = hover != null ? contexts.find(c => c.over === hover) : undefined
   const endR = hover != null ? endRates.find(c => c.over === hover) : undefined
   const verdict = ov ? vsBattingRate(ov, ctx, basis) : null
-  const rate = ov && ov.balls > 0 ? (ov.runs / ov.balls) * 6 : null
+  const par = ov ? parRuns(ov, ctx, basis) : null
 
   return (
     <div>
@@ -135,6 +135,11 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
           return (
             <g key={o.over}>
               <rect x={cx - bw / 2} y={H - PAD.b - h} width={bw} height={h} rx={1.5} style={hollow ? { fill: BAR, fillOpacity: 0.18, stroke: BAR, strokeWidth: 1.5 } : { fill: BAR, opacity: 0.9 }} />
+              {batter && par != null && (() => {
+                // par for the balls he faced: where he needed to be, not a full over's rate
+                const p = parRuns(o, contexts.find(c => c.over === o.over), basis)
+                return p == null ? null : <line x1={cx - bw / 2 - 2} x2={cx + bw / 2 + 2} y1={y(p)} y2={y(p)} strokeWidth={2} style={{ stroke: 'var(--fx-accent)' }} />
+              })()}
               <text x={cx} y={H - PAD.b - h - 3} textAnchor="middle" fontSize={8} style={{ fill: 'var(--scorecard-text-2)' }}>{o.runs}</text>
               {Array.from({ length: o.wickets }, (_, i) => (
                 <circle key={i} cx={cx} cy={H - PAD.b - h - 14 - i * 7} r={3} style={{ fill: 'var(--scorecard-heading-text)' }} />
@@ -169,7 +174,7 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
                 {batter && <><span className="tabular-nums font-bold">{ov.balls}</span> ball{ov.balls === 1 ? '' : 's'}</>}
                 <span className={MUTED}> · </span>
                 <span className="tabular-nums font-bold">{ov.wickets}</span> wicket{ov.wickets === 1 ? '' : 's'}
-                {rate != null && <span className={MUTED}> · scoring at {rate.toFixed(2)} an over{batter ? ` (SR ${((ov.runs / ov.balls) * 100).toFixed(0)})` : ''}</span>}
+                {batter && par != null && <span className={MUTED}> · par {par.toFixed(1)} for {ov.balls} ball{ov.balls === 1 ? '' : 's'}</span>}
               </p>
             ) : (
               batter && ov.bowlers.length > 0 && <p className={`text-xs ${MUTED}`}>{batter.name} did not face this over.</p>
@@ -190,7 +195,7 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
                   </>
                 )}
                 {verdict && (
-                  <span className={MUTED}> · {verdict === 'ahead' ? 'faster than' : verdict === 'behind' ? 'slower than' : 'level with'} the {basis === 'rrr' ? 'required' : 'current'} rate</span>
+                  <span className={MUTED}> · {verdict === 'ahead' ? 'ahead of' : verdict === 'behind' ? 'behind' : 'level with'} the {basis === 'rrr' ? 'required' : 'current'} rate for the balls faced</span>
                 )}
               </p>
             )}
@@ -226,11 +231,11 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
       </div>
       <p className={`text-[10px] font-rajdhani mt-1 ${MUTED}`}>
         {target != null
-          ? `Chasing ${target}${opponentName ? ` against ${opponentName}` : ''}. The RRR line is the rate needed going into each over (over 1 is the opening rate, before a ball is bowled) and the CRR line is the rate at the end of it, so each bar sits next to the rate it is judged against: a solid bar means the batter scored faster than the rate needed and a hollow bar slower.`
+          ? `Chasing ${target}${opponentName ? ` against ${opponentName}` : ''}. The RRR line is the rate needed going into each over (over 1 is the opening rate, before a ball is bowled) and the CRR line is the rate at the end of it, so each bar sits next to the rate it is judged against: a solid bar means the batter kept pace with the rate needed for the balls he faced and a hollow bar fell short.`
           : battedFirst === true
-            ? 'Spartans batted first, so there is no target: only the team’s current run rate (at the end of each over) is shown. A solid bar means the batter scored faster than the CRR going in; a hollow bar slower. Over 1 has no CRR yet, so it stays solid.'
+            ? 'Spartans batted first, so there is no target: only the team’s current run rate (at the end of each over) is shown. A solid bar means the batter kept pace with the CRR going in for the balls he faced; a hollow bar fell short. Over 1 has no CRR yet, so it stays solid.'
             : 'Batting order isn’t known for this match, so there is no required rate: only the team’s current run rate is shown.'}
-        {batter ? ' Bars show only the overs this batter faced (wides are not balls faced); the faint ticks are overs he did not face. A part over is judged on the balls he faced.' : ' Entire innings counts every run (extras included) and every wicket.'}
+        {batter ? ' Bars show only the overs this batter faced (wides are not balls faced); the faint ticks are overs he did not face. The gold tick on each bar is par: the rate going in scaled to the balls he faced (rate × balls ÷ 6, at most 6 a ball), so one run off one ball against a rate of 6 is level, not a miss.' : ' Entire innings counts every run (extras included) and every wicket.'}
         {clipped && ` The axis stops at ${yMax}; the required rate line is clipped above that.`}
       </p>
     </div>
