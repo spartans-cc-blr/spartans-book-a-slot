@@ -399,7 +399,7 @@
   /* Reserve space above the fixed mobile bottom tab bar (SiteNav / MobileTabBar)
      so page content doesn't render underneath it. Toggled by MobileTabBar's
      own mount lifecycle — see useReserveBottomSpace() there. */
-  @media (max-width: 767px) {
+  @media (max-width: 1279px) {
     body.has-mobile-tabbar {
       padding-bottom: 4.5rem;
     }

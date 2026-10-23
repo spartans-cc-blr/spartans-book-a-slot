@@ -119,14 +119,14 @@ export function MobileTabBar(props: MobileTabBarProps) {
       {moreOpen && (
         <div
           onClick={() => setMoreOpen(false)}
-          className="md:hidden fixed inset-0 top-14 z-40"
+          className="xl:hidden fixed inset-0 top-14 z-40"
           style={{ background: t.scrim, ...FIXED_LAYER_STYLE }}
         />
       )}
 
       {moreOpen && (
         <div
-          className="md:hidden fixed inset-x-0 bottom-16 z-50 rounded-t-2xl shadow-2xl max-h-[70vh] flex flex-col"
+          className="xl:hidden fixed inset-x-0 bottom-16 z-50 rounded-t-2xl shadow-2xl max-h-[70vh] flex flex-col"
           style={{ background: t.sheetBg, borderTop: `1px solid ${t.navBorder}`, borderLeft: `1px solid ${t.navBorder}`, borderRight: `1px solid ${t.navBorder}`, ...FIXED_LAYER_STYLE }}
         >
           <div className="w-9 h-1 rounded-full mx-auto mt-2.5 mb-1 flex-none" style={{ background: t.handle }} />
@@ -240,7 +240,7 @@ export function MobileTabBar(props: MobileTabBarProps) {
       )}
 
       <nav
-        className="md:hidden fixed inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)]"
+        className="xl:hidden fixed inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)]"
         style={{ background: t.navBg, borderTop: `1px solid ${t.navBorder}`, ...FIXED_LAYER_STYLE }}
       >
         <div className="h-16 flex items-stretch">

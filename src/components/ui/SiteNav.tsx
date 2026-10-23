@@ -85,8 +85,11 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
         exact WebKit bug class — see FIXED_LAYER_STYLE's own comment in
         MobileTabBar.tsx for the same pairing there. See navigation.md
         §4.1's "Fixed tab bar detaching mid-scroll on iOS" note. */}
-    <nav className="bg-white dark:bg-ink-2 border-b border-[#D4C9B0] dark:border-ink-5 sticky top-0 z-50 transform-gpu will-change-transform [backface-visibility:hidden] [-webkit-backface-visibility:hidden]">
-      <div className="flex items-center px-5 md:px-8 lg:px-10 h-14">
+    {/* Spacer: the nav is position:fixed (a bare `sticky` failed to pin on
+        iPad WebKit), so reserve its height in the document flow. */}
+    <div className="h-14" aria-hidden="true" />
+    <nav className="bg-white/95 dark:bg-ink-2/95 backdrop-blur border-b border-[#D4C9B0] dark:border-ink-5 fixed inset-x-0 top-0 z-50 transform-gpu will-change-transform [backface-visibility:hidden] [-webkit-backface-visibility:hidden]">
+      <div className="flex items-center px-5 md:px-8 xl:px-6 2xl:px-10 h-14">
         {/* Back — router.back() with in-app history, else the page's parent.
             Shown at every width: an installed PWA on an iPad (≥ md) has no
             browser chrome either, so hiding it on desktop widths stranded
@@ -99,20 +102,20 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
           <img src="/images/logo-64.png" alt="Spartans CC" className="w-8 h-8 object-contain" />
-          <span className="font-cinzel font-bold text-gold tracking-[2px] text-[13px] hidden sm:block">
+          <span className="font-cinzel font-bold text-gold tracking-[2px] text-[13px] hidden sm:block whitespace-nowrap">
             SPARTANS CC
           </span>
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center ml-auto gap-0">
+        <div className="hidden xl:flex items-center ml-auto gap-0 whitespace-nowrap">
           {/* Matches submenu — desktop */}
           {isLoggedIn && !isExpelled && (
             <div className="relative"
               onMouseEnter={() => setMatchesOpen(true)}
               onMouseLeave={() => setMatchesOpen(false)}>
               <button
-                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-2.5 2xl:px-4 h-14 flex items-center gap-1 border-b-2 transition-all
                   ${activePage === 'fixtures' || activePage === 'matches'
                     ? 'text-gold border-crimson'
                     : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
@@ -143,7 +146,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
               onMouseEnter={() => setCaptainsOpen(true)}
               onMouseLeave={() => setCaptainsOpen(false)}>
               <button
-                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-2.5 2xl:px-4 h-14 flex items-center gap-1 border-b-2 transition-all
                   ${activePage === 'captains' || activePage === 'captains-unavailable' || activePage === 'captains-players' || activePage === 'captains-planning'
                     ? 'text-gold border-crimson'
                     : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
@@ -193,7 +196,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
               onMouseEnter={() => setStatsOpen(true)}
               onMouseLeave={() => setStatsOpen(false)}>
               <button
-                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-2.5 2xl:px-4 h-14 flex items-center gap-1 border-b-2 transition-all
                   ${activePage === 'leaderboard' || activePage === 'team-stats' || activePage === 'players'
                     ? 'text-gold border-crimson'
                     : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
@@ -226,7 +229,8 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
 
           {links.map(item => (
             <Link key={item.label} href={item.href}
-              className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center border-b-2 transition-all
+              className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-2.5 2xl:px-4 h-14 items-center border-b-2 transition-all
+                ${item.key ? 'flex' : 'hidden 2xl:flex'}
                 ${activePage === item.key ? 'text-gold border-crimson' : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
               {item.label}
             </Link>
@@ -238,7 +242,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
               onMouseEnter={() => setGcOpen(true)}
               onMouseLeave={() => setGcOpen(false)}>
               <button
-                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-2.5 2xl:px-4 h-14 flex items-center gap-1 border-b-2 transition-all
                   ${activePage === 'gc' || activePage === 'invite'
                     ? 'text-gold border-gold'
                     : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
@@ -289,7 +293,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
               onMouseEnter={() => setWranglerOpen(true)}
               onMouseLeave={() => setWranglerOpen(false)}>
               <button
-                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-4 h-14 flex items-center gap-1 border-b-2 transition-all
+                className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-2.5 2xl:px-4 h-14 flex items-center gap-1 border-b-2 transition-all
                   ${activePage === 'wrangler'
                     ? 'text-gold border-gold'
                     : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
@@ -324,13 +328,13 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
 
           {isAdmin && (
             <Link href="/admin"
-              className="ml-3 font-rajdhani text-xs font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark text-white px-4 py-2 rounded transition-colors">
+              className="ml-3 whitespace-nowrap font-rajdhani text-xs font-bold tracking-widest uppercase bg-crimson hover:bg-crimson-dark text-white px-4 py-2 rounded transition-colors">
               Admin ⚙
             </Link>
           )}
 
           {/* Auth button — desktop */}
-          <div className="ml-4 relative">
+          <div className="ml-3 2xl:ml-4 relative">
             {!isLoggedIn ? (
               <button onClick={() => signIn('google')}
                 className="font-rajdhani text-xs font-bold tracking-wide border border-gold-dim text-gold hover:bg-gold/10 px-4 py-2 rounded transition-colors flex items-center gap-2">
@@ -403,7 +407,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
         </div>
 
         {/* Mobile: profile shortcut + auth (nav destinations live in the bottom tab bar) */}
-        <div className="md:hidden ml-auto flex items-center gap-3">
+        <div className="xl:hidden ml-auto flex items-center gap-3">
           {isAdmin && (
             <Link href="/admin" className="font-rajdhani text-xs font-bold text-crimson">Admin</Link>
           )}
