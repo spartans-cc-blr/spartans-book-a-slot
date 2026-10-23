@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { BallRow } from '@/lib/ballByBall'
-import { battingOverSeries, parRuns, vsBattingRate, overEndRates, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
+import { overInsights, battingOverSeries, parRuns, vsBattingRate, overEndRates, vsRequiredRate, bowlingOverSeries, buildWorm, chaseSeries, overContexts, rateCrossings, requiredLineAt, wormPoints } from '@/lib/matchInsights'
 
 function ball(side: 'spartans' | 'opponent', over: number, runs: number, wicket = false): BallRow {
   return {
@@ -319,5 +319,31 @@ describe('parRuns (part overs)', () => {
   it('is null with no rate or no balls', () => {
     expect(parRuns(ov(0, 0), ctx(null, 6), 'rrr')).toBeNull()
     expect(parRuns(ov(2, 2), ctx(null, null), 'rrr')).toBeNull()
+  })
+})
+
+describe('overInsights', () => {
+  const b = (over: number, o: Partial<BallRow> = {}): BallRow => ({ ...ball('spartans', over, 0), seq: over * 10 + (o.seq ?? 0), is_legal: true, ...o })
+  it('reports a double strike and a wicket maiden', () => {
+    const balls = [b(3, { is_wicket: true, dismissed_batter: 'X', dismissal_kind: 'Bowled', seq: 1 }), b(3, { is_wicket: true, dismissed_batter: 'Y', dismissal_kind: 'Bowled', seq: 2 })]
+    const n = overInsights(balls, 3)
+    expect(n[0]).toMatch(/Double strike \(a wicket maiden\)/)
+  })
+  it('counts boundaries from the outcome', () => {
+    const balls = [b(1, { outcome: 'FOUR', runs_bat: 4, runs_total: 4, seq: 1 }), b(1, { outcome: 'SIX', runs_bat: 6, runs_total: 6, seq: 2 })]
+    expect(overInsights(balls, 1).join(' ')).toMatch(/2 boundaries \(1 four, 1 six\): 10 of the over's 10 runs/)
+  })
+  it('flags a bowler coming into the attack only after the openers', () => {
+    const balls = [b(1, { bowler: 'P' }), b(2, { bowler: 'Q' }), b(3, { bowler: 'R' })]
+    expect(overInsights(balls, 3).join(' ')).toMatch(/R comes into the attack/)
+    expect(overInsights(balls, 2).join(' ')).not.toMatch(/comes into the attack/)
+  })
+  it('flags a batter reaching fifty in the over', () => {
+    const balls = [b(1, { batter: 'A', runs_bat: 48, runs_total: 48, seq: 1 }), b(2, { batter: 'A', runs_bat: 4, runs_total: 4, outcome: 'FOUR' })]
+    expect(overInsights(balls, 2).join(' ')).toMatch(/A reaches fifty \(52\)/)
+  })
+  it('is empty for an over with nothing to say', () => {
+    expect(overInsights([b(1, { runs_bat: 1, runs_total: 1 })], 1)).toEqual([])
+    expect(overInsights([], 5)).toEqual([])
   })
 })

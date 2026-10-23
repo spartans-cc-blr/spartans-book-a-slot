@@ -349,3 +349,85 @@ export function vsBattingRate(over: BattingOver, ctx: OverContext | undefined, b
   const d = over.runs - par
   return d > 1e-9 ? 'ahead' : d < -1e-9 ? 'behind' : 'level'
 }
+
+// ── Over insights ──────────────────────────────────────────────────────────
+
+const isBoundary = (b: BallRow): 'four' | 'six' | null => {
+  const o = b.outcome
+  if (o == null) return b.runs_bat === 4 ? 'four' : b.runs_bat === 6 ? 'six' : null
+  if (/\bsix\b/i.test(o)) return 'six'
+  if (/\bfour\b/i.test(o)) return 'four'
+  return null
+}
+
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
+
+/** Plain-language pointers for one over of an innings (either side): wickets, boundaries, a new bowler
+ *  coming on, a maiden or run of dots, extras, a big over and batters reaching 50 / 100. Rule-based and
+ *  only from the balls given, so it never claims more than the commentary shows. Pure. */
+export function overInsights(inningsBalls: BallRow[], over: number): string[] {
+  const inOver = inningsBalls.filter(b => b.over_no === over).sort((a, c) => a.seq - c.seq)
+  if (inOver.length === 0) return []
+  const before = inningsBalls.filter(b => b.over_no < over)
+  const out: string[] = []
+
+  // wickets
+  const wk = inOver.filter(b => b.is_wicket)
+  const runsInOver = inOver.reduce((s, b) => s + b.runs_total, 0)
+  if (wk.length > 0) {
+    const list = wk.map(b => {
+      const name = b.dismissed_batter ?? b.batter
+      return `${name} ${howOut(name, b.dismissal_text, b.dismissal_kind)}`
+    })
+    const label = wk.length >= 3 ? 'Collapse' : wk.length === 2 ? 'Double strike' : 'Wicket'
+    out.push(`${label}${runsInOver === 0 ? ' (a wicket maiden)' : ''}: ${list.join('; ')}.`)
+    if (before.some(b => b.over_no === over - 1 && b.is_wicket)) out.push('A wicket in the previous over too.')
+  }
+
+  // boundaries
+  const bounds = inOver.map(isBoundary).filter(Boolean) as ('four' | 'six')[]
+  const fours = bounds.filter(x => x === 'four').length, sixes = bounds.length - fours
+  if (bounds.length >= 2) {
+    const bRuns = fours * 4 + sixes * 6
+    out.push(`${bounds.length} boundaries (${[fours ? plural(fours, 'four') : '', sixes ? plural(sixes, 'six') : ''].filter(Boolean).join(', ')}): ${bRuns} of the over's ${runsInOver} runs.`)
+  } else if (sixes === 1) {
+    const s = inOver.find(b => isBoundary(b) === 'six')!
+    out.push(`A six by ${s.batter}.`)
+  }
+
+  // bowling change
+  const bowlers = Array.from(new Set(inOver.map(b => b.bowler.trim())))
+  if (over > 2) {
+    for (const bw of bowlers) {
+      const prev = before.filter(b => b.bowler.trim().toLowerCase() === bw.toLowerCase())
+      if (prev.length === 0) out.push(`${bw} comes into the attack.`)
+      else {
+        const lastOver = Math.max(...prev.map(b => b.over_no))
+        if (over - lastOver >= 4) out.push(`${bw} is back after a break of ${over - lastOver - 1} overs.`)
+      }
+    }
+  }
+  if (bowlers.length > 1) out.push(`The over was shared between ${bowlers.join(' and ')}.`)
+
+  // maiden, dots, extras, big over
+  const legal = inOver.filter(b => b.is_legal)
+  const charged = inOver.reduce((s, b) => s + bowlerRuns(b), 0)
+  if (legal.length >= 6 && charged === 0 && wk.length === 0) out.push('Maiden over.')
+  else {
+    const dots = legal.filter(b => b.runs_total === 0).length
+    if (dots >= 4) out.push(`${dots} dot balls out of ${legal.length}.`)
+  }
+  const wides = inOver.filter(b => b.extra_type === 'wide').length, noBalls = inOver.filter(b => b.extra_type === 'noball').length
+  if (wides + noBalls >= 2) out.push(`${plural(wides + noBalls, 'extra ball')} (${[wides ? plural(wides, 'wide') : '', noBalls ? plural(noBalls, 'no-ball') : ''].filter(Boolean).join(', ')}).`)
+  if (runsInOver >= 12) out.push(`Expensive over: ${runsInOver} runs.`)
+
+  // batting milestones reached in this over
+  const names = Array.from(new Set(inOver.map(b => b.batter.trim())))
+  for (const n of names) {
+    const was = before.filter(b => sameName(b.batter, n)).reduce((s, b) => s + b.runs_bat, 0)
+    const now = was + inOver.filter(b => sameName(b.batter, n)).reduce((s, b) => s + b.runs_bat, 0)
+    for (const m of [100, 50]) if (was < m && now >= m) { out.push(`${n} reaches ${m === 100 ? 'a hundred' : 'fifty'} (${now}).`); break }
+  }
+  return out
+}
+
