@@ -5,6 +5,7 @@
 // when Spartans are defending a total, the required run rate (RRR) going into each over. The bowler
 // defaults to the signed-in player when they bowled. Maths: src/lib/matchInsights.ts. Plain inline SVG.
 
+import { OverInsights } from '@/components/matches/OverInsights'
 import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import { PlayerNameLink } from '@/lib/playerLink'
@@ -196,6 +197,7 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
             ) : (
               bowler && ov.bowlers.length > 0 && <p className={`text-xs ${MUTED}`}>{bowler.name} did not bowl this over.</p>
             )}
+            <OverInsights balls={side} over={ov.over} />
             {ctx && (
               <p className="text-xs">
                 <span className={MUTED}>Going in: {opponentName || 'the opposition'} {ctx.runsBefore}/{ctx.wicketsBefore}</span>

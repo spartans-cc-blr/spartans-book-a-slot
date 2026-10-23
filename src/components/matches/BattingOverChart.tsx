@@ -10,6 +10,7 @@
 import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import type { BallRow, BatterLine } from '@/lib/ballByBall'
+import { OverInsights } from '@/components/matches/OverInsights'
 import { battingOverSeries, overContexts, overEndRates, parRuns, vsBattingRate, wormPoints } from '@/lib/matchInsights'
 
 const W = 360, H = 240
@@ -207,6 +208,7 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
             ) : (
               batter && ov.bowlers.length > 0 && <p className={`text-xs ${MUTED}`}>{batter.name} did not face this over.</p>
             )}
+            <OverInsights balls={side} over={ov.over} />
             {ctx && (
               <p className="text-xs">
                 <span className={MUTED}>Going in: Spartans {ctx.runsBefore}/{ctx.wicketsBefore}</span>
