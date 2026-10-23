@@ -343,7 +343,26 @@ describe('overInsights', () => {
     expect(overInsights(balls, 2).join(' ')).toMatch(/A reaches fifty \(52\)/)
   })
   it('is empty for an over with nothing to say', () => {
-    expect(overInsights([b(1, { runs_bat: 1, runs_total: 1 })], 1)).toEqual([])
+    expect(overInsights([b(1, { runs_bat: 1, runs_total: 1 })], 1)).toEqual(['Batting after the over: A 1 (1).'])
     expect(overInsights([], 5)).toEqual([])
+  })
+  it('gives the dismissed batter\'s score, a duck and the stand ended', () => {
+    const balls = [
+      b(1, { batter: 'A', runs_bat: 25, runs_total: 25, seq: 1 }),
+      b(2, { batter: 'B', is_wicket: true, dismissed_batter: 'B', dismissal_kind: 'Bowled', seq: 1 }),
+    ]
+    const n = overInsights(balls, 2).join(' ')
+    expect(n).toMatch(/B Bowled \(0 off 1\), a golden duck/)
+    expect(n).toMatch(/Ended a 25-run stand/)
+  })
+  it('marks a new batter and the bowler\'s figures', () => {
+    const balls = [b(1, { bowler: 'P', seq: 1 }), b(2, { bowler: 'Q', seq: 1 }), b(3, { bowler: 'P', seq: 1, batter: 'N', runs_bat: 1, runs_total: 1 })]
+    const n = overInsights(balls, 3).join(' ')
+    expect(n).toMatch(/N comes in at 0\/0/)
+    expect(n).toMatch(/P: 0\.2-1-0 after 2 overs/)
+  })
+  it('notes a lift against the run rate so far', () => {
+    const balls = [b(1, { runs_total: 2 }), b(2, { runs_total: 2 }), b(3, { runs_total: 2 }), b(4, { runs_bat: 4, runs_total: 4, outcome: 'FOUR', seq: 1 }), b(4, { runs_bat: 6, runs_total: 6, outcome: 'SIX', seq: 2 })]
+    expect(overInsights(balls, 4).join(' ')).toMatch(/10 runs against a run rate of 2\.0 so far/)
   })
 })

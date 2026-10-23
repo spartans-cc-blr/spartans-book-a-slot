@@ -368,16 +368,20 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 export function overInsights(inningsBalls: BallRow[], over: number): string[] {
   const inOver = inningsBalls.filter(b => b.over_no === over).sort((a, c) => a.seq - c.seq)
   if (inOver.length === 0) return []
-  const before = inningsBalls.filter(b => b.over_no < over)
+  const innings = [...inningsBalls].sort((a, c) => a.seq - c.seq)
+  const before = innings.filter(b => b.over_no < over)
   const out: string[] = []
 
   // wickets
   const wk = inOver.filter(b => b.is_wicket)
   const runsInOver = inOver.reduce((s, b) => s + b.runs_total, 0)
   if (wk.length > 0) {
+    const upTo = (b: BallRow, name: string) => innings.filter(x => x.seq <= b.seq && sameName(x.batter, name))
     const list = wk.map(b => {
       const name = b.dismissed_batter ?? b.batter
-      return `${name} ${howOut(name, b.dismissal_text, b.dismissal_kind)}`
+      const faced = upTo(b, name)
+      const r = faced.reduce((n, x) => n + x.runs_bat, 0), f = faced.filter(ballsFaced).length
+      return `${name} ${howOut(name, b.dismissal_text, b.dismissal_kind)} (${r} off ${f})${r === 0 && f === 1 ? ', a golden duck' : r === 0 && f > 1 ? ', a duck' : ''}`
     })
     const label = wk.length >= 3 ? 'Collapse' : wk.length === 2 ? 'Double strike' : 'Wicket'
     out.push(`${label}${runsInOver === 0 ? ' (a wicket maiden)' : ''}: ${list.join('; ')}.`)
@@ -427,6 +431,84 @@ export function overInsights(inningsBalls: BallRow[], over: number): string[] {
     const was = before.filter(b => sameName(b.batter, n)).reduce((s, b) => s + b.runs_bat, 0)
     const now = was + inOver.filter(b => sameName(b.batter, n)).reduce((s, b) => s + b.runs_bat, 0)
     for (const m of [100, 50]) if (was < m && now >= m) { out.push(`${n} reaches ${m === 100 ? 'a hundred' : 'fifty'} (${now}).`); break }
+  }
+  // a partnership broken, and the new batter coming in
+  const running = (upTo: BallRow) => innings.filter(x => x.seq <= upTo.seq)
+  for (const w of wk) {
+    const prior = running(w)
+    const lastW = prior.slice(0, -1).reverse().find(x => x.is_wicket)
+    const stand = prior.filter(x => !lastW || x.seq > lastW.seq)
+    const sRuns = stand.reduce((n, x) => n + x.runs_total, 0), sBalls = stand.filter(x => x.is_legal).length
+    if (sRuns >= 20) out.push(`Ended a ${sRuns}-run stand (${sBalls} balls).`)
+    const wNo = prior.filter(x => x.is_wicket).length
+    if (wNo === 10) out.push('The last wicket: the innings is over.')
+  }
+  const seen = new Set(before.map(b => b.batter.trim().toLowerCase()))
+  const firstBalls = inOver.filter(b => b.batter && !seen.has(b.batter.trim().toLowerCase()))
+  if (over > 1) {
+    for (const nb of firstBalls.filter((b, i, a) => a.findIndex(x => sameName(x.batter, b.batter)) === i)) {
+      const prior = innings.filter(x => x.seq < nb.seq)
+      out.push(`${nb.batter} comes in at ${prior.reduce((n, x) => n + x.runs_total, 0)}/${prior.filter(x => x.is_wicket).length}.`)
+    }
+  }
+
+  // wicket on the first or last ball of the over
+  if (wk.length === 1 && legal.length >= 6) {
+    const idx = legal.findIndex(b => b.is_wicket)
+    if (idx === 0) out.push('A wicket off the first ball of the over.')
+    else if (idx === legal.length - 1 && legal[legal.length - 1].is_wicket) out.push('A wicket off the last ball of the over.')
+  }
+
+  // dots in a row
+  let streak = 0, best = 0
+  for (const b of inOver) { if (b.is_legal && b.runs_total === 0) { streak++; best = Math.max(best, streak) } else if (b.is_legal) streak = 0 }
+  if (best >= 4 && !out.some(t => t.includes('dot balls out of') || t === 'Maiden over.')) out.push(`${best} dot balls in a row.`)
+
+  // boundary drought ending
+  const bOvers = Array.from(new Set(before.filter(x => isBoundary(x)).map(x => x.over_no)))
+  if (bounds.length >= 1 && over > 5) {
+    const lastB = bOvers.length ? Math.max(...bOvers) : 0
+    if (over - lastB >= 5) out.push(lastB === 0 ? 'The first boundary of the innings.' : `The first boundary since over ${lastB}.`)
+  }
+
+  // one batter took most of the over
+  const byBat = new Map<string, number>()
+  for (const b of inOver) byBat.set(b.batter.trim(), (byBat.get(b.batter.trim()) ?? 0) + b.runs_bat)
+  const top = Array.from(byBat.entries()).sort((a, c) => c[1] - a[1])[0]
+  if (top && byBat.size > 1 && runsInOver >= 8 && top[1] / runsInOver >= 0.8) out.push(`${top[0]} scored ${top[1]} of the ${runsInOver} runs.`)
+
+  // the bowler's figures after the over (one bowler)
+  if (bowlers.length === 1) {
+    const mine = innings.filter(b => b.over_no <= over && sameName(b.bowler, bowlers[0]))
+    const legalMine = mine.filter(b => b.is_legal).length
+    const ov = `${Math.floor(legalMine / 6)}${legalMine % 6 ? `.${legalMine % 6}` : ''}`
+    const w = mine.filter(isBowlerWicket).length
+    const nth = new Set(mine.map(b => b.over_no)).size
+    if (nth >= 2) out.push(`${bowlers[0]}: ${ov}-${mine.reduce((n, b) => n + bowlerRuns(b), 0)}-${w} after ${nth} overs.`)
+  }
+
+  // pace against the innings so far, and the biggest / smallest over of the innings
+  const oversDone = new Set(before.map(b => b.over_no)).size
+  if (oversDone >= 3) {
+    const rr = before.reduce((n, b) => n + b.runs_total, 0) / oversDone
+    if (runsInOver - rr >= 5) out.push(`${runsInOver} runs against a run rate of ${rr.toFixed(1)} so far: a big lift.`)
+    else if (rr - runsInOver >= 5 && wk.length === 0) out.push(`Only ${runsInOver} runs against a run rate of ${rr.toFixed(1)} so far: the pressure builds.`)
+  }
+  const perOver = new Map<number, number>()
+  for (const b of innings) perOver.set(b.over_no, (perOver.get(b.over_no) ?? 0) + b.runs_total)
+  if (perOver.size >= 5 && perOver.size === Math.max(...Array.from(perOver.keys())) && !out.some(t => t.startsWith('Expensive over'))) {
+    const vals = Array.from(perOver.values())
+    if (runsInOver === Math.max(...vals) && vals.filter(v => v === runsInOver).length === 1 && runsInOver >= 8) out.push(`The biggest over of the innings (${runsInOver}).`)
+  }
+
+  // who is at the crease after the over
+  const facing = Array.from(new Set(inOver.map(b => b.batter.trim())))
+  if (facing.length > 0 && facing.length <= 3) {
+    const lines = facing.filter(n => !wk.some(w => sameName(w.dismissed_batter ?? w.batter, n))).map(n => {
+      const mine = innings.filter(b => b.over_no <= over && sameName(b.batter, n))
+      return `${n} ${mine.reduce((a, b) => a + b.runs_bat, 0)} (${mine.filter(ballsFaced).length})`
+    })
+    if (lines.length > 0) out.push(`Batting after the over: ${lines.join(', ')}.`)
   }
   return out
 }
