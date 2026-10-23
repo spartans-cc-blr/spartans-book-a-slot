@@ -199,17 +199,26 @@ export interface BowlingOver {
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
 
+/** A selection of one name, several, or none (null / empty = the entire innings). */
+export type NameSelection = string | string[] | null
+const selectionNames = (sel: NameSelection): string[] | null => {
+  const list = sel == null ? [] : Array.isArray(sel) ? sel : [sel]
+  return list.length > 0 ? list : null
+}
+const inSelection = (names: string[], name: string) => names.some(n => sameName(name, n))
+
 /** One entry per over across the whole innings (`totalOvers`, or longer if the innings ran on).
  *  With a `bowler`, an over shows only that bowler's balls: runs charged to him (bat runs, wides and
  *  no-balls, as the Bowling table counts them) and the wickets he is credited with. With `null` it is
  *  the entire innings: every run in the over and every wicket, so it matches the innings score. */
-export function bowlingOverSeries(inningsBalls: BallRow[], bowler: string | null, totalOvers: number): BowlingOver[] {
+export function bowlingOverSeries(inningsBalls: BallRow[], bowlerSel: NameSelection, totalOvers: number): BowlingOver[] {
+  const bowler = selectionNames(bowlerSel)
   const last = Math.max(0, ...inningsBalls.map(b => b.over_no))
   const n = Math.max(totalOvers, last)
   const out: BowlingOver[] = []
   for (let over = 1; over <= n; over++) {
     const inOver = inningsBalls.filter(b => b.over_no === over).sort((a, c) => a.seq - c.seq)
-    const mine = bowler == null ? inOver : inOver.filter(b => sameName(b.bowler, bowler))
+    const mine = bowler == null ? inOver : inOver.filter(b => inSelection(bowler, b.bowler))
     const bowlers: OverBowler[] = []
     for (const b of inOver) if (!bowlers.some(x => sameName(x.name, b.bowler))) bowlers.push({ name: b.bowler, id: b.bowler_player_id })
     out.push({
@@ -305,18 +314,19 @@ export interface BattingOver {
 
 /** One entry per over of the innings (`totalOvers`, or longer if it ran on). With a `batter`, an over
  *  shows only the balls he faced; with `null` it is the whole innings, so it adds up to the score. */
-export function battingOverSeries(inningsBalls: BallRow[], batter: string | null, totalOvers: number): BattingOver[] {
+export function battingOverSeries(inningsBalls: BallRow[], batterSel: NameSelection, totalOvers: number): BattingOver[] {
+  const batter = selectionNames(batterSel)
   const last = Math.max(0, ...inningsBalls.map(b => b.over_no))
   const n = Math.max(totalOvers, last)
   const out: BattingOver[] = []
   for (let over = 1; over <= n; over++) {
     const inOver = inningsBalls.filter(b => b.over_no === over).sort((a, c) => a.seq - c.seq)
-    const mine = batter == null ? inOver : inOver.filter(b => sameName(b.batter, batter))
+    const mine = batter == null ? inOver : inOver.filter(b => inSelection(batter, b.batter))
     const bowlers: OverBowler[] = []
     for (const b of inOver) if (!bowlers.some(x => sameName(x.name, b.bowler))) bowlers.push({ name: b.bowler, id: b.bowler_player_id })
     const wickets = batter == null
       ? inOver.filter(b => b.is_wicket).length
-      : inOver.filter(b => b.is_wicket && sameName(b.dismissed_batter ?? b.batter, batter)).length
+      : inOver.filter(b => b.is_wicket && inSelection(batter, b.dismissed_batter ?? b.batter)).length
     out.push({
       over,
       runs: mine.reduce((s, b) => s + (batter == null ? b.runs_total : b.runs_bat), 0),

@@ -153,6 +153,13 @@ describe('bowlingOverSeries', () => {
   const b = (over: number, bowler: string, runs: number, extra: Partial<BallRow> = {}): BallRow =>
     ({ ...ball('opponent', over, runs), bowler, ...extra, seq: over * 10 + (extra.seq ?? 0) })
 
+  it('combines several selected bowlers', () => {
+    const balls = [b(1, 'Kumar', 4), b(2, 'Rao', 6), b(3, 'Sen', 2)]
+    const s = bowlingOverSeries(balls, ['Kumar', 'Rao'], 3)
+    expect(s.map(o => o.bowled)).toEqual([true, true, false])
+    expect(s[1].runs).toBe(6)
+  })
+
   it('covers the whole innings and shows only the chosen bowler\'s overs', () => {
     const balls = [b(1, 'Kumar', 4), b(2, 'Rao', 6), b(3, 'Kumar', 0, { is_wicket: true, dismissal_kind: 'bowled' })]
     const s = bowlingOverSeries(balls, 'Kumar', 5)
@@ -256,6 +263,13 @@ describe('overEndRates', () => {
 describe('battingOverSeries', () => {
   const bt = (over: number, batter: string, runs: number, extra: Partial<BallRow> = {}): BallRow =>
     ({ ...ball('spartans', over, runs), batter, runs_bat: runs, ...extra, seq: over * 10 + (extra.seq ?? 0) })
+
+  it('combines several selected batters', () => {
+    const balls = [bt(1, 'Siva', 4), bt(1, 'Loki', 1, { seq: 1 }), bt(2, 'Rao', 2)]
+    const s = battingOverSeries(balls, ['Siva', 'Loki'], 3)
+    expect(s.map(o => o.faced)).toEqual([true, false, false])
+    expect(s[0].runs).toBe(5)
+  })
 
   it('shows only the chosen batter\'s balls, covering the whole innings', () => {
     const balls = [bt(1, 'Siva', 4), bt(1, 'Loki', 1, { seq: 1 }), bt(2, 'Loki', 2)]

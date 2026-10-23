@@ -5,6 +5,7 @@
 // when Spartans are defending a total, the required run rate (RRR) going into each over. The bowler
 // defaults to the signed-in player when they bowled. Maths: src/lib/matchInsights.ts. Plain inline SVG.
 
+import { PlayerMultiSelect } from '@/components/matches/PlayerMultiSelect'
 import { OverInsights } from '@/components/matches/OverInsights'
 import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { useSession } from 'next-auth/react'
@@ -33,16 +34,23 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
   const { data: session } = useSession()
   const myId = (session?.user as { playerId?: string | null } | undefined)?.playerId ?? null
   const mine = myId ? bowlers.find(b => b.playerId === myId) : undefined
-  const [choice, setChoice] = useState<string | null>(null)       // null = not touched, use the default
-  const selected = choice ?? (mine ? mine.name : ALL)
-  const bowler = selected === ALL ? null : bowlers.find(b => b.name === selected) ?? null
-  const bowlerName = bowler?.name ?? null
+  const [choice, setChoice] = useState<string[] | null>(null)       // null = not touched, use the default
+  const selectedNames = choice ?? (mine ? [mine.name] : [])
+  const picked = bowlers.filter(b => selectedNames.includes(b.name))
+  // One entry standing for the whole selection: his figures, or the combined figures of several bowlers
+  const bowler = picked.length === 0 ? null : {
+    name: picked.length === 1 ? picked[0].name : picked.map(b => b.name.split(' ')[0]).join(', '),
+    runs: picked.reduce((n, b) => n + b.runs, 0),
+    legalBalls: picked.reduce((n, b) => n + b.legalBalls, 0),
+    many: picked.length > 1,
+  }
+  const bowlerName = picked.map(b => b.name)
 
   const [hover, setHover] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
   const points = useMemo(() => wormPoints(side), [side])
-  const overs = useMemo(() => bowlingOverSeries(side, bowlerName, totalOvers), [side, bowlerName, totalOvers])
+  const overs = useMemo(() => bowlingOverSeries(side, bowlerName, totalOvers), [side, picked.map(b => b.name).join('|'), totalOvers])
   const firstTotal = spartansTotal && spartansTotal > 0 ? spartansTotal : spartansRuns
   const target = battedFirst === true && firstTotal > 0 ? firstTotal + 1 : null
   const contexts = useMemo(() => overContexts(points, target, totalOvers), [points, target, totalOvers])
@@ -101,18 +109,15 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <p className={`${HEAD} !mb-0`}>Runs and wickets by over</p>
-        <label className="flex items-center gap-1.5 font-rajdhani text-xs text-[var(--scorecard-text-2)]">
+        <div className="flex items-center gap-1.5 font-rajdhani text-xs text-[var(--scorecard-text-2)]">
           <span className={MUTED}>Show</span>
-          <select value={selected} onChange={e => { setChoice(e.target.value); setHover(null) }}
-            className="rounded border border-[var(--scorecard-table-border)] bg-transparent px-1.5 py-1 text-xs text-[var(--scorecard-heading-text)] max-w-[11rem]">
-            <option value={ALL}>Entire innings (all bowlers)</option>
-            {bowlers.map(b => (
-              <option key={b.name} value={b.name}>
-                {b.name}{b.playerId && b.playerId === myId ? ' (you)' : ''} · {formatOvers(b.legalBalls)}-{b.runs}-{b.wickets}
-              </option>
-            ))}
-          </select>
-        </label>
+          <PlayerMultiSelect
+            options={bowlers.map(b => ({ value: b.name, label: `${b.name}${b.playerId && b.playerId === myId ? ' (you)' : ''} · ${formatOvers(b.legalBalls)}-${b.runs}-${b.wickets}` }))}
+            selected={selectedNames}
+            onChange={next => { setChoice(next); setHover(null) }}
+            allLabel="Entire innings (all bowlers)"
+            summary={picked.length === 0 ? 'Entire innings (all bowlers)' : picked.length === 1 ? picked[0].name : `${picked.length} bowlers`} />
+        </div>
       </div>
 
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="group"
@@ -246,7 +251,7 @@ export function BowlingOverChart({ side, bowlers, totalOvers, battedFirst, spart
         {bowlerEcon != null && bowler && (
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block w-4 border-t-2 border-dashed" style={{ borderColor: BAR }} />
-            {bowler.name.split(' ')[0]}’s economy <span className={MUTED}>· {bowlerEcon.toFixed(2)}</span>
+            {bowler.many ? 'Selected bowlers’ economy' : `${bowler.name.split(' ')[0]}’s economy`} <span className={MUTED}>· {bowlerEcon.toFixed(2)}</span>
           </span>
         )}
         {oppRate != null && (
