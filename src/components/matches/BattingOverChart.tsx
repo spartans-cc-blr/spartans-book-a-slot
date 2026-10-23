@@ -10,6 +10,7 @@
 import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import type { BallRow, BatterLine } from '@/lib/ballByBall'
+import { PlayerMultiSelect } from '@/components/matches/PlayerMultiSelect'
 import { OverInsights } from '@/components/matches/OverInsights'
 import { battingOverSeries, overContexts, overEndRates, parRuns, vsBattingRate, wormPoints } from '@/lib/matchInsights'
 
@@ -38,15 +39,17 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
   const myId = (session?.user as { playerId?: string | null } | undefined)?.playerId ?? null
   const listed = batters.filter(b => b.balls > 0 || b.out)
   const mine = myId ? listed.find(b => b.playerId === myId) : undefined
-  const [choice, setChoice] = useState<string | null>(null)
-  const selected = choice ?? (mine ? mine.name : ALL)
-  const batter = selected === ALL ? null : listed.find(b => b.name === selected) ?? null
+  const [choice, setChoice] = useState<string[] | null>(null)
+  const selectedNames = choice ?? (mine ? [mine.name] : [])
+  const picked = listed.filter(b => selectedNames.includes(b.name))
+  // One entry standing for the whole selection (his name, or the first names of several batters)
+  const batter = picked.length === 0 ? null : { name: picked.length === 1 ? picked[0].name : picked.map(b => b.name.split(' ')[0]).join(', '), many: picked.length > 1 }
 
   const [hover, setHover] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
   const points = useMemo(() => wormPoints(side), [side])
-  const overs = useMemo(() => battingOverSeries(side, batter?.name ?? null, totalOvers), [side, batter, totalOvers])
+  const overs = useMemo(() => battingOverSeries(side, picked.map(b => b.name), totalOvers), [side, picked.map(b => b.name).join('|'), totalOvers])
   const firstTotal = opponentTotal && opponentTotal > 0 ? opponentTotal : opponentRuns
   const target = battedFirst === false && firstTotal > 0 ? firstTotal + 1 : null
   const contexts = useMemo(() => overContexts(points, target, totalOvers), [points, target, totalOvers])
@@ -98,18 +101,15 @@ export function BattingOverChart({ side, batters, totalOvers, battedFirst, oppon
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <p className={`${HEAD} !mb-0`}>Runs and wickets by over</p>
-        <label className="flex items-center gap-1.5 font-rajdhani text-xs text-[var(--scorecard-text-2)]">
+        <div className="flex items-center gap-1.5 font-rajdhani text-xs text-[var(--scorecard-text-2)]">
           <span className={MUTED}>Show</span>
-          <select value={selected} onChange={e => { setChoice(e.target.value); setHover(null) }}
-            className="rounded border border-[var(--scorecard-table-border)] bg-transparent px-1.5 py-1 text-xs text-[var(--scorecard-heading-text)] max-w-[11rem]">
-            <option value={ALL}>Entire innings (all batters)</option>
-            {listed.map(b => (
-              <option key={b.name} value={b.name}>
-                {b.name}{b.playerId && b.playerId === myId ? ' (you)' : ''} · {b.runs} ({b.balls})
-              </option>
-            ))}
-          </select>
-        </label>
+          <PlayerMultiSelect
+            options={listed.map(b => ({ value: b.name, label: `${b.name}${b.playerId && b.playerId === myId ? ' (you)' : ''} · ${b.runs} (${b.balls})` }))}
+            selected={selectedNames}
+            onChange={next => { setChoice(next); setHover(null) }}
+            allLabel="Entire innings (all batters)"
+            summary={picked.length === 0 ? 'Entire innings (all batters)' : picked.length === 1 ? picked[0].name : `${picked.length} batters`} />
+        </div>
       </div>
 
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="group"
