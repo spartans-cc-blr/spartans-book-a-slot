@@ -478,6 +478,15 @@ concepts for those two uses; `squadOwn` (highlighting the viewer's own row
 gold accent so it still reads as "gold" the same way the rest of the
 card's dark accents do.
 
+**Welcome header flat, dashboard two-column on wide screens (October 2026).**
+The tinted `--home-welcome-grad` card was replaced by a flat header (larger
+avatar, greeting, subtitle) directly on the page colour. At `lg` the dashboard
+container widens to `max-w-6xl` and splits 5/7: stat tiles, nudge and Quick
+Actions on the left; "You're Selected to Play" and Upcoming Fixtures on the
+right. Below `lg` it stays a single `max-w-2xl` column in the old order except
+that Quick Actions now sits before the fixtures. `--home-welcome-grad` is no
+longer used by the page.
+
 ### Dashboard Sections
 
 | Section | Content |
@@ -778,6 +787,26 @@ the gap needs a live device test, which no session so far has had; if it's
 still reproducible after this, the next diagnostic step is Safari Web
 Inspector attached to a real iPhone to see the actual compositing layers,
 not another blind CSS-hint guess.
+
+### Nav breakpoint moved md → xl, nav now `fixed` (October 2026)
+
+Reported on an iPad (≈1000px wide, standalone PWA): the desktop nav overflowed
+(an admin sees ~12 items), "SPARTANS CC" overlapped "Matches", "Admin ⚙" wrapped
+onto two lines, and the bar didn't stay pinned.
+
+- **Breakpoint.** The full desktop nav (and its dropdowns) now shows from `xl`
+  (1280px) instead of `md`. Below that — iPad portrait and most landscape — the
+  slim top row (logo, Admin/GC shortcuts, avatar) plus `MobileTabBar` is used.
+  `MobileTabBar` changed `md:hidden` → `xl:hidden` and the `has-mobile-tabbar`
+  bottom-padding media query in `globals.css` is `max-width: 1279px`, so the two
+  stay in lockstep. Change them together.
+- **Fitting at xl.** Desktop items are `px-2.5` (`2xl:px-4`), the container is
+  `whitespace-nowrap`, the external "Club Site" link is hidden below `2xl` (still
+  in the More sheet), and the container padding is `xl:px-6`.
+- **Pinned.** `<nav>` is `fixed inset-x-0 top-0` with an `h-14` spacer before it,
+  because a bare `sticky` did not pin on iPad WebKit. It keeps the GPU-layer hints
+  and gets a light `backdrop-blur` with 95% opacity. Anything that offsets from
+  the nav (`top-14`) is unaffected.
 
 ### Link Structure
  

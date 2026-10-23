@@ -490,31 +490,35 @@ export default async function HomePage() {
       {/* ── PLAYER DASHBOARD — Warm Light, self-contained ── */}
       {isPlayer && playerData && (
         <div style={{ background: 'var(--home-shell-bg)' }} className="px-5 md:px-8 lg:px-10 py-6">
-          <div className="max-w-2xl">
+          <div className="max-w-2xl lg:max-w-6xl">
             <WeekendAvailabilityGreeting
               playerId={player.playerId}
               firstName={firstName}
               bookings={playerData.weekendGap}
             />
 
-            {/* Welcome banner */}
-            <div className="rounded-2xl p-6 mb-5 flex flex-wrap items-start justify-between gap-4"
-              style={{ background: 'var(--home-welcome-grad)' }}>
-              <div>
-                <img
-                  src={player?.photoUrl ?? player?.image ?? '/default-avatar.png'}
-                  alt=""
-                  className="w-10 h-10 rounded-full object-cover border-2 mb-3"
-                  style={{ borderColor: 'var(--home-accent)' }}
-                />
-                <p className="font-cinzel text-2xl font-bold leading-snug" style={{ color: 'var(--home-text)' }}>
+            {/* Welcome header — flat on the page colour (no tinted card), so it
+                reads as part of the page rather than a separate box */}
+            <div className="mb-6 flex items-center gap-4">
+              <img
+                src={player?.photoUrl ?? player?.image ?? '/default-avatar.png'}
+                alt=""
+                className="w-14 h-14 rounded-full object-cover border-2 flex-shrink-0 shadow-sm"
+                style={{ borderColor: 'var(--home-accent)' }}
+              />
+              <div className="min-w-0">
+                <p className="font-cinzel text-2xl md:text-3xl font-bold leading-tight" style={{ color: 'var(--home-text)' }}>
                   Welcome back, {firstName}! 👋
                 </p>
-                <p className="font-rajdhani text-sm mt-1 max-w-md" style={{ color: 'var(--home-text-2)' }}>
+                <p className="font-rajdhani text-sm md:text-base mt-1" style={{ color: 'var(--home-text-2)' }}>
                   Here's your real-time overview for matches &amp; availability.
                 </p>
               </div>
             </div>
+
+            {/* Two columns on iPad landscape / desktop: overview left, fixtures right */}
+            <div className="grid lg:grid-cols-12 gap-x-6 items-start">
+            <div className="lg:col-span-5">
 
             {/* Stat tiles — 2x2 */}
             <div className="grid grid-cols-2 gap-3 mb-5">
@@ -586,6 +590,26 @@ export default async function HomePage() {
               </Link>
             )}
 
+            {/* Quick Actions */}
+            <div className="rounded-xl p-5 mb-5" style={{ background: 'var(--home-card-bg)', border: '1px solid var(--home-card-border)'}}>
+              <h2 className="font-cinzel text-lg font-bold flex items-center gap-2 mb-2" style={{ color: 'var(--home-text)' }}>
+                <span className="w-1 h-5 rounded-full inline-block" style={{ background: 'var(--home-accent)'}} />
+                Quick Actions
+              </h2>
+              <div className="divide-y" style={{ borderColor: 'var(--home-divider)' }}>
+                <QuickActionRow href="/fixtures" icon={<CalendarGlyph color="var(--home-icon-tint)" />} title="Set Availability" subtitle="Update weekend match availability" />
+                {isCaptain && (
+                  <QuickActionRow href="/captains-corner" icon={<ClipboardGlyph color="var(--home-icon-tint)" />} title="Squad Selection" subtitle="Pick the squad & view availability grid" />
+                )}
+                {isGC && (
+                  <QuickActionRow href="/gc-review" icon={<ScalesGlyph color="var(--home-icon-tint)" />} title="Squad Review" subtitle="Approve or return submitted squads" />
+                )}
+                <QuickActionRow href="/profile" icon={<PersonGlyph color="var(--home-icon-tint)" />} title="My Profile" subtitle="Update your details & photo" />
+              </div>
+            </div>
+            </div>
+            <div className="lg:col-span-7">
+
             {/* You're Selected to Play — one card per upcoming booking with an
                 announced squad this player is in. Shown ahead of Upcoming
                 Fixtures below; those bookings are excluded from that plain
@@ -653,22 +677,7 @@ export default async function HomePage() {
               )}
             </div>
 
-            {/* Quick Actions */}
-            <div className="rounded-xl p-5" style={{ background: 'var(--home-card-bg)', border: '1px solid var(--home-card-border)'}}>
-              <h2 className="font-cinzel text-lg font-bold flex items-center gap-2 mb-2" style={{ color: 'var(--home-text)' }}>
-                <span className="w-1 h-5 rounded-full inline-block" style={{ background: 'var(--home-accent)'}} />
-                Quick Actions
-              </h2>
-              <div className="divide-y" style={{ borderColor: 'var(--home-divider)' }}>
-                <QuickActionRow href="/fixtures" icon={<CalendarGlyph color="var(--home-icon-tint)" />} title="Set Availability" subtitle="Update weekend match availability" />
-                {isCaptain && (
-                  <QuickActionRow href="/captains-corner" icon={<ClipboardGlyph color="var(--home-icon-tint)" />} title="Squad Selection" subtitle="Pick the squad & view availability grid" />
-                )}
-                {isGC && (
-                  <QuickActionRow href="/gc-review" icon={<ScalesGlyph color="var(--home-icon-tint)" />} title="Squad Review" subtitle="Approve or return submitted squads" />
-                )}
-                <QuickActionRow href="/profile" icon={<PersonGlyph color="var(--home-icon-tint)" />} title="My Profile" subtitle="Update your details & photo" />
-              </div>
+            </div>
             </div>
           </div>
         </div>
