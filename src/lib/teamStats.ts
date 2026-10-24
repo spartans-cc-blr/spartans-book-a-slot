@@ -45,7 +45,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out
 }
 
-async function getTeamMatchesUncached(): Promise<TeamMatch[]> {
+export async function getTeamMatchesUncached(): Promise<TeamMatch[]> {
   const hub = createServiceClient()
 
   // Every confirmed booking that has a synced scorecard. Cancelled rows

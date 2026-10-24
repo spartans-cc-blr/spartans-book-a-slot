@@ -424,3 +424,5 @@ recognition for the modal. See `post-match-scorecard.md` §18.
 *Maintained by: Spartans CC BLR*
 
 > Update (October 2026): the modal's on-load fetch now comes from the combined `GET /api/modals/pending` feed — see `pwa.md` §10.
+
+> Related (October 2026): club *records* (not personal milestones) are handled separately as an admin-only share-or-ignore inbox — see `record-breaking.md`.

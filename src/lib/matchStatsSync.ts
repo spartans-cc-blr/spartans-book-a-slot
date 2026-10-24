@@ -16,6 +16,7 @@ import { notifyFeeReminderIfPending } from '@/lib/feeReminders'
 import { isBeforePromptCutoff } from '@/lib/repullCutoff'
 import { chargeMembershipFeeIfDue } from '@/lib/membershipFee'
 import { mirrorOpponent } from '@/lib/opponentMirror'
+import { detectAndLogRecordBreaks } from '@/lib/recordBreakDetect'
 
 export interface SyncMatchStatsResult {
   ok:    boolean
@@ -237,6 +238,11 @@ export async function syncMatchStatsForBooking(
   // not yet applied); no-ops silently otherwise (no fee set, no squad yet,
   // already applied, or externally reconciled). See features/fee-reminders.md.
   if (!historic) await notifyFeeReminderIfPending(bookingId).catch(err => console.error('[fee-reminder]', err))
+
+  // Club-record breaks — admin-only inbox + push, never broadcast to players.
+  // Best-effort (detectAndLogRecordBreaks never throws). See
+  // features/record-breaking.md.
+  if (!historic) await detectAndLogRecordBreaks(bookingId)
 
   // Stats pages read through a tagged cache; drop it so the new scorecard shows immediately.
   invalidateStatsCache()

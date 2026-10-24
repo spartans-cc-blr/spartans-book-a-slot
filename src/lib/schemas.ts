@@ -487,3 +487,9 @@ export const playerAbsenceSchema = z.object({
   expected_return: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD').nullable().optional(),
   note:            z.string().trim().max(300).nullable().optional(),
 }).strict()
+
+// ── RECORD BREAKS (/api/admin/record-breaks/[id]) — record-breaking.md ──
+// Admin decides per break: share to the club WhatsApp group, ignore it, or put it back to pending.
+export const recordBreakDecisionSchema = z.object({
+  status: z.enum(['pending', 'shared', 'ignored']),
+}).strict()
