@@ -110,6 +110,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/admin/soft-blocks/new` | Create reservation (soft block) |
 | `/admin/scorecard-backfill` | One-time catch-up UI — fetches scorecards directly from CricHeroes for past matches never uploaded; see `features/post-match-scorecard.md` |
 | `/admin/player-reconciliation` | Resolves analytics-DB scorecard `player_name` strings to Hub `players.id` — suggestions, confirm/ignore, "Run Reconciliation Pass"; see `features/player-identity-resolution.md` |
+| `/admin/records` | Admin-only inbox of club records broken by a newly synced scorecard — share to the club WhatsApp group or ignore; see `features/record-breaking.md` |
 | `/admin/wallet` | Hub for pending fee applications (links to `/admin/bookings/[id]`), player search + full statement/quick top-up/correction, club-wide recent-transactions feed; see `features/wallet-ledger.md` |
  
 ### `AdminSidebar` — "Hub Views" (added October 2026, rebuilt as real dropdowns later the same month)
@@ -288,6 +289,8 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/wallet/transactions` | PATCH | Admin | Corrects an existing transaction (amount/type/reason/notes/date), logging the pre-edit values to `wallet_transaction_edits` and adjusting `players.wallet_balance` by the delta the correction introduces. Refuses a genuine amount/type change on any row carrying `booking_id` (a match-fee split share) — see `features/wallet-ledger.md` §3 and `features/post-match-scorecard.md` §6.1 |
 | `/api/wallet/opening-balance` | PATCH | Admin | Sets or clears (`amount: null`) a player's "Brought Forward" statement override |
 | `/api/wallet/transfers` | POST | Admin | Player-to-player sponsorship — debits `sponsor_player_id`, credits `beneficiary_player_id` by the same amount, linked via `wallet_transfers`; see `features/wallet-ledger.md` §14 |
+| `/api/admin/record-breaks` (+ `/[id]` PATCH) | GET, PATCH | Admin | Record-break inbox: list, and mark a break shared / ignored / pending; see `features/record-breaking.md` |
+| `/api/admin/record-book` | GET | Admin | Every current club record — the baseline new scorecards are checked against ("Current records" tab of `/admin/records`); see `features/record-breaking.md` §3.1 |
 | `/api/admin/fee-reminders` | GET | Admin | Every currently fee-pending booking (scorecard synced, fee configured, squad announced, not yet applied/externally-reconciled) — feeds the admin-only fee reminder modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
 | `/api/admin/wallet/export` | GET | Admin | Downloadable wallet report (`.xls`, no new npm dependency) for `/admin/wallet`'s top-right "⬇ Export" menu — a Summary sheet (player + balance) and a Detailed sheet (player, transaction, running total); see `features/wallet-ledger.md` §16 |
  
@@ -490,6 +493,10 @@ quarter syncs — no admin review step, unlike match fees. The resulting
 here) to avoid colliding with `/api/fees/apply`'s "already applied" guard.
 Migration `073_membership_fee_charges.sql`. **RLS enabled, no
 anon/authenticated policies** — service role only.
+
+#### `record_breaks`
+`id, booking_id FK, record_key, scope_key, title, scope_label, holder, display, prev_holder, prev_display, game_date, opponent_name, message, status ('pending'|'shared'|'ignored'), decided_by, decided_at, created_at`
+`UNIQUE(booking_id, record_key, scope_key)`. Club records broken by a synced scorecard, detected in `syncMatchStatsForBooking()`; admin-only inbox, shared to WhatsApp or ignored by the admin. Migration `088_record_breaks.sql`. **RLS enabled, no anon/authenticated policies.** See `features/record-breaking.md`.
 
 #### `wallet_transfers`
 `id, sponsor_player_id FK, beneficiary_player_id FK, amount, reason, sponsor_transaction_id FK (nullable), beneficiary_transaction_id FK (nullable), created_by, created_at`
