@@ -44,6 +44,8 @@ announced once, at that scope only — the year version is dropped.
 
 ## 3.1 The baseline is the "Current records" tab
 
+Each card shows how long the record has stood (`age()` from its match date), and the "set in {year}, beat X" marker links to the beaten record's scorecard (`beat.bookingId`).
+
 The format (T20 / T30) and scope (All-time / each year) pills are multi-select, both formats shown by default; each card carries its scope label, and at least one pill of each stays selected.
 
 `/admin/records` → **Current records** lists every standing record (format T20/T30 × all-time or a

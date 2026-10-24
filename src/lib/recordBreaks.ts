@@ -286,7 +286,7 @@ export interface RecordBookEntry {
   // beat — the best from matches played BEFORE that year (null when there was
   // nothing earlier, i.e. the first ever entry).
   setInYear:   string | null
-  beat:        { display: string; holder: string; year: string } | null
+  beat:        { display: string; holder: string; year: string; bookingId: string; gameDate: string } | null
 }
 
 // Every current record — the full baseline new scorecards are checked against.
@@ -318,7 +318,7 @@ export function computeRecordBook(all: RecordMatch[]): RecordBookEntry[] {
           opponentName: cell.best.match.opponentName,
           entries: cell.count, armed: cell.count >= MIN_PRIOR_ENTRIES,
           setInYear: setYear,
-          beat: prev ? { display: prev.display, holder: prev.holder, year: prev.match.gameDate.slice(0, 4) } : null,
+          beat: prev ? { display: prev.display, holder: prev.holder, year: prev.match.gameDate.slice(0, 4), bookingId: prev.match.bookingId, gameDate: prev.match.gameDate } : null,
         })
       }
     }
