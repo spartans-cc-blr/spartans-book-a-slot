@@ -290,6 +290,7 @@ export function detectRecordBreaks(target: RecordMatch, all: RecordMatch[]): Rec
 }
 
 export interface RecordBookEntry {
+  message:     string        // ready-to-send WhatsApp text (for sharing a standing record)
   format:      string
   scopeKey:    string        // 'alltime|T20' | '2026|T20'
   scopeLabel:  string
@@ -338,6 +339,11 @@ export function computeRecordBook(all: RecordMatch[]): RecordBookEntry[] {
           bookingId: cell.best.match.bookingId, gameDate: cell.best.match.gameDate,
           opponentName: cell.best.match.opponentName,
           entries: cell.count, armed: cell.count >= MIN_PRIOR_ENTRIES,
+          message: buildMessage({
+            title: recordTitle(key), scopeLabel: scope.scopeLabel, holder: cell.best.holder, display: cell.best.display,
+            opponent: cell.best.match.opponentName, gameDate: cell.best.match.gameDate,
+            prevHolder: prev?.holder ?? null, prevDisplay: prev?.display ?? null,
+          }),
           setInYear: setYear,
           beat: prev ? { display: prev.display, holder: prev.holder, year: prev.match.gameDate.slice(0, 4), bookingId: prev.match.bookingId, gameDate: prev.match.gameDate } : null,
         })
