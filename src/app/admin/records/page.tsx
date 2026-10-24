@@ -13,7 +13,7 @@ type BookEntry = {
   format: string; scopeKey: string; scopeLabel: string; year: string | null
   recordKey: string; title: string; holder: string; display: string
   bookingId: string; gameDate: string; opponentName: string; entries: number; armed: boolean
-  setInYear: string | null; beat: { display: string; holder: string; year: string } | null
+  setInYear: string | null; beat: { display: string; holder: string; year: string; bookingId: string; gameDate: string } | null
 }
 type RecordBreakRow = {
   id: string; booking_id: string; title: string; scope_label: string
@@ -26,6 +26,16 @@ const TABS: { key: Status; label: string }[] = [
   { key: 'shared', label: 'Shared' },
   { key: 'ignored', label: 'Ignored' },
 ]
+
+// "3 months" / "2 yrs 4 mo" since the record was set.
+function age(d: string) {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(`${d}T00:00:00`).getTime()) / 86400000))
+  if (days < 31) return days <= 1 ? 'today' : `${days} days`
+  const months = Math.floor(days / 30.44)
+  if (months < 12) return `${months} mo`
+  const y = Math.floor(months / 12), m = months % 12
+  return m ? `${y} yr${y > 1 ? 's' : ''} ${m} mo` : `${y} yr${y > 1 ? 's' : ''}`
+}
 
 function formatDate(d: string) {
   return new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
@@ -174,12 +184,13 @@ export default function AdminRecordsPage() {
                 </div>
                 <p className="font-rajdhani text-sm text-[#44403C] dark:text-zinc-300">{b.holder}</p>
                 <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
-                  vs {b.opponentName} · {formatDate(b.gameDate)} ·{' '}
+                  vs {b.opponentName} · {formatDate(b.gameDate)} · <span className="font-bold">standing {age(b.gameDate)}</span> ·{' '}
                   <Link href={`/matches/history/${b.bookingId}`} className="underline hover:text-amber-700 dark:hover:text-gold">scorecard</Link>
                   {' · '}{b.entries} {b.entries === 1 ? 'entry' : 'entries'}
                   {b.setInYear && b.setInYear === latestYear && (
                     <span className="ml-1 text-emerald-700 dark:text-emerald-400 font-bold">
-                      · set in {b.setInYear}{b.beat ? `, beat ${b.beat.display} (${b.beat.holder}, ${b.beat.year})` : ' — first entry'}
+                      · set in {b.setInYear}{b.beat ? `, beat ${b.beat.display} (${b.beat.holder}, ${b.beat.year}, held ${age(b.beat.gameDate)}) ` : ' — first entry'}
+                      {b.beat && <Link href={`/matches/history/${b.beat.bookingId}`} className="underline">old scorecard</Link>}
                     </span>
                   )}
                   {!b.armed && <span className="ml-1 text-amber-700 dark:text-amber-400 font-bold">· not armed yet</span>}
