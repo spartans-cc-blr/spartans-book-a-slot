@@ -200,6 +200,14 @@ export default function AdminRecordsPage() {
                       )}
                       {!b.armed && <span className="ml-1 text-amber-700 dark:text-amber-400 font-bold">· not armed yet</span>}
                     </p>
+                    {latestYear && b.gameDate.startsWith(latestYear) && (
+                      <button
+                        onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(b.message)}`, '_blank', 'noopener,noreferrer')}
+                        className="mt-2 px-3 py-1.5 rounded font-rajdhani text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700"
+                      >
+                        📲 Share on WhatsApp
+                      </button>
+                    )}
                   </div>
                     ))}
                   </div>
