@@ -115,4 +115,13 @@ describe('detectRecordBreaks', () => {
     expect(row.armed).toBe(false)
     expect(row.display).not.toContain('999')
   })
+
+  it('record book shows an all-time record set this year and what it beat', () => {
+    const old = Array.from({ length: 6 }, (_, i) => match({ bookingId: `o${i}`, gameDate: `2025-0${i + 1}-10`, teamTotal: 140 + i }))
+    const fresh = match({ bookingId: 'n', gameDate: '2026-03-10', teamTotal: 190 })
+    const row = computeRecordBook([...old, fresh]).find(b => b.recordKey === 'highest_total' && b.year === null)!
+    expect(row.setInYear).toBe('2026')
+    expect(row.beat?.year).toBe('2025')
+    expect(row.beat?.display).toContain('145')
+  })
 })

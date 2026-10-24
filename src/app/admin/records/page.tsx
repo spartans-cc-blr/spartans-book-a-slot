@@ -13,6 +13,7 @@ type BookEntry = {
   format: string; scopeKey: string; scopeLabel: string; year: string | null
   recordKey: string; title: string; holder: string; display: string
   bookingId: string; gameDate: string; opponentName: string; entries: number; armed: boolean
+  setInYear: string | null; beat: { display: string; holder: string; year: string } | null
 }
 type RecordBreakRow = {
   id: string; booking_id: string; title: string; scope_label: string
@@ -37,6 +38,7 @@ export default function AdminRecordsPage() {
   const [bookLoading, setBookLoading] = useState(false)
   const [bookFmt, setBookFmt] = useState<'T20' | 'T30'>('T20')
   const [bookScope, setBookScope] = useState<string>('alltime')
+  const [onlyNew, setOnlyNew] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -101,7 +103,10 @@ export default function AdminRecordsPage() {
   for (const r of rows) counts[r.status] += 1
   const visible = tab === 'book' ? [] : rows.filter(r => r.status === tab)
   const bookYears = Array.from(new Set((book ?? []).filter(b => b.format === bookFmt && b.year).map(b => b.year as string))).sort().reverse()
-  const bookRows = (book ?? []).filter(b => b.format === bookFmt && (bookScope === 'alltime' ? b.year === null : b.year === bookScope))
+  const latestYear = (book ?? []).reduce((m, b) => (b.year && b.year > m ? b.year : m), '')
+  const bookRows = (book ?? [])
+    .filter(b => b.format === bookFmt && (bookScope === 'alltime' ? b.year === null : b.year === bookScope))
+    .filter(b => !(onlyNew && bookScope === 'alltime') || b.setInYear === latestYear)
   const pill = (active: boolean) =>
     `px-3 py-1.5 rounded-full font-rajdhani text-xs font-bold tracking-wide border ${
       active
@@ -146,6 +151,12 @@ export default function AdminRecordsPage() {
               <button key={y} onClick={() => setBookScope(y)} className={pill(bookScope === y)}>{y}</button>
             ))}
           </div>
+          {bookScope === 'alltime' && latestYear && (
+            <label className="flex items-center gap-2 font-rajdhani text-xs text-[#44403C] dark:text-zinc-300 mb-4">
+              <input type="checkbox" checked={onlyNew} onChange={e => setOnlyNew(e.target.checked)} />
+              Only all-time records set in {latestYear}
+            </label>
+          )}
           {bookLoading && <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">Computing records…</p>}
           {!bookLoading && book && bookRows.length === 0 && (
             <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">No records in this scope yet.</p>
@@ -162,6 +173,11 @@ export default function AdminRecordsPage() {
                   vs {b.opponentName} · {formatDate(b.gameDate)} ·{' '}
                   <Link href={`/matches/history/${b.bookingId}`} className="underline hover:text-amber-700 dark:hover:text-gold">scorecard</Link>
                   {' · '}{b.entries} {b.entries === 1 ? 'entry' : 'entries'}
+                  {b.setInYear && b.setInYear === latestYear && (
+                    <span className="ml-1 text-emerald-700 dark:text-emerald-400 font-bold">
+                      · set in {b.setInYear}{b.beat ? `, beat ${b.beat.display} (${b.beat.holder}, ${b.beat.year})` : ' — first entry'}
+                    </span>
+                  )}
                   {!b.armed && <span className="ml-1 text-amber-700 dark:text-amber-400 font-bold">· not armed yet</span>}
                 </p>
               </div>

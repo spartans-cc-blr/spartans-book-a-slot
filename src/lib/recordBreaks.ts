@@ -282,6 +282,11 @@ export interface RecordBookEntry {
   opponentName: string
   entries:     number        // how many entries the record was picked from
   armed:       boolean       // false = fewer than MIN_PRIOR_ENTRIES: a new match won't alert yet
+  // All-time scope only: the calendar year this record was set in, and what it
+  // beat — the best from matches played BEFORE that year (null when there was
+  // nothing earlier, i.e. the first ever entry).
+  setInYear:   string | null
+  beat:        { display: string; holder: string; year: string } | null
 }
 
 // Every current record — the full baseline new scorecards are checked against.
@@ -294,9 +299,17 @@ export function computeRecordBook(all: RecordMatch[]): RecordBookEntry[] {
       { scopeKey: `alltime|${fmt}`, scopeLabel: `${fmt} all-time`, year: null, inScope: () => true },
       ...years.map(y => ({ scopeKey: `${y}|${fmt}`, scopeLabel: `${fmt} in ${y}`, year: y, inScope: (m: RecordMatch) => m.gameDate.slice(0, 4) === y })),
     ]
+    const beforeYear = new Map<string, Map<string, BaselineCell>>()   // baseline of matches before year Y
+    const priorBaseline = (y: string) => {
+      let b = beforeYear.get(y)
+      if (!b) { b = buildBaseline(matches, m => m.gameDate.slice(0, 4) < y); beforeYear.set(y, b) }
+      return b
+    }
     for (const scope of scopes) {
       const cells = buildBaseline(matches, scope.inScope)
       for (const [key, cell] of Array.from(cells.entries())) {
+        const setYear = scope.year === null ? cell.best.match.gameDate.slice(0, 4) : null
+        const prev = setYear ? priorBaseline(setYear).get(key)?.best : undefined
         out.push({
           format: fmt, scopeKey: scope.scopeKey, scopeLabel: scope.scopeLabel, year: scope.year,
           recordKey: key, title: recordTitle(key),
@@ -304,6 +317,8 @@ export function computeRecordBook(all: RecordMatch[]): RecordBookEntry[] {
           bookingId: cell.best.match.bookingId, gameDate: cell.best.match.gameDate,
           opponentName: cell.best.match.opponentName,
           entries: cell.count, armed: cell.count >= MIN_PRIOR_ENTRIES,
+          setInYear: setYear,
+          beat: prev ? { display: prev.display, holder: prev.holder, year: prev.match.gameDate.slice(0, 4) } : null,
         })
       }
     }
