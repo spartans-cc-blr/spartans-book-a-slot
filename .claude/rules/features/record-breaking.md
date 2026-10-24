@@ -46,7 +46,7 @@ announced once, at that scope only — the year version is dropped.
 
 Each card shows how long the record has stood (`age()` from its match date), and the "set in {year}, beat X" marker links to the beaten record's scorecard (`beat.bookingId`).
 
-The format (T20 / T30) and scope (All-time / each year) pills are multi-select, both formats shown by default; each card carries its scope label, and at least one pill of each stays selected.
+T20 and T30 are shown side by side in two columns from `lg` (iPad landscape / desktop, page scrolls); on mobile each is a collapsible section (T20 open, T30 closed). The scope pills (All-time / each year) are multi-select, with at least one always selected; each card carries its scope label.
 
 `/admin/records` → **Current records** lists every standing record (format T20/T30 × all-time or a
 year × each record key) with value, holder, opponent/date, scorecard link and how many entries it was
