@@ -186,6 +186,41 @@ function buildMessage(opts: {
   return lines.join('\n')
 }
 
+interface Entry extends Candidate { match: RecordMatch }
+interface BaselineCell { best: Entry; count: number }
+
+// The standing record (best entry) and entry count per record key across the
+// given matches in one scope. This ONE function is the baseline: the admin
+// "Current records" view and the alert check both call it, so what the admin
+// sees is exactly what a new scorecard is validated against.
+function buildBaseline(matches: RecordMatch[], inScope: (m: RecordMatch) => boolean): Map<string, BaselineCell> {
+  const cells = new Map<string, BaselineCell>()
+  for (const match of matches) {
+    if (!inScope(match)) continue
+    for (const c of extractCandidates(match)) {
+      const cell = cells.get(c.key)
+      if (!cell) cells.set(c.key, { best: { ...c, match }, count: 1 })
+      else {
+        cell.count += 1
+        if (c.value > cell.best.value) cell.best = { ...c, match }
+      }
+    }
+  }
+  return cells
+}
+
+const rankOf = (k: string) => {
+  const i = RECORD_ORDER.indexOf(k)
+  return i === -1 ? RECORD_ORDER.length + (Number(k.replace(/\D/g, '')) || 0) : i
+}
+
+function scopesFor(fmt: string, year: string) {
+  return [
+    { scopeKey: `alltime|${fmt}`, scopeLabel: `${fmt} all-time`,    inScope: (_: RecordMatch) => true },
+    { scopeKey: `${year}|${fmt}`,  scopeLabel: `${fmt} in ${year}`,  inScope: (o: RecordMatch) => o.gameDate.slice(0, 4) === year },
+  ]
+}
+
 // Which records did `target` break, measured against `all` (which may include
 // target itself — it is ignored by bookingId).
 export function detectRecordBreaks(target: RecordMatch, all: RecordMatch[]): RecordBreak[] {
@@ -195,22 +230,15 @@ export function detectRecordBreaks(target: RecordMatch, all: RecordMatch[]): Rec
 
   const targetBest = bestPerKey(extractCandidates(target))
   const others = all.filter(o => o.bookingId !== target.bookingId && !o.isPractice && o.format === fmt)
-  const otherCands = others.map(o => ({ match: o, cands: extractCandidates(o) }))
-
-  const scopes: { scopeKey: string; scopeLabel: string; inScope: (o: RecordMatch) => boolean }[] = [
-    { scopeKey: `alltime|${fmt}`, scopeLabel: `${fmt} all-time`,   inScope: () => true },
-    { scopeKey: `${year}|${fmt}`,  scopeLabel: `${fmt} in ${year}`, inScope: o => o.gameDate.slice(0, 4) === year },
-  ]
 
   const found = new Map<string, RecordBreak>()   // by recordKey — widest scope wins
-  for (const scope of scopes) {
+  for (const scope of scopesFor(fmt, year)) {
+    const baseline = buildBaseline(others, scope.inScope)
     for (const [key, mine] of Array.from(targetBest.entries())) {
       if (found.has(key)) continue               // already broken at a wider scope
-      const prior = otherCands
-        .filter(o => scope.inScope(o.match))
-        .flatMap(o => o.cands.filter(c => c.key === key))
-      if (prior.length < MIN_PRIOR_ENTRIES) continue
-      const bestPrior = prior.reduce((a, b) => (b.value > a.value ? b : a))
+      const cell = baseline.get(key)
+      if (!cell || cell.count < MIN_PRIOR_ENTRIES) continue
+      const bestPrior = cell.best
       if (mine.value <= bestPrior.value) continue
       const title = recordTitle(key)
       found.set(key, {
@@ -233,13 +261,52 @@ export function detectRecordBreaks(target: RecordMatch, all: RecordMatch[]): Rec
     }
   }
 
-  const rank = (k: string) => {
-    const i = RECORD_ORDER.indexOf(k)
-    return i === -1 ? RECORD_ORDER.length + (Number(k.replace(/\D/g, '')) || 0) : i
-  }
   return Array.from(found.values())
     .sort((a, b) =>
       Number(b.scopeKey.startsWith('alltime')) - Number(a.scopeKey.startsWith('alltime')) ||
-      rank(a.recordKey) - rank(b.recordKey))
+      rankOf(a.recordKey) - rankOf(b.recordKey))
     .slice(0, MAX_BREAKS_PER_MATCH)
+}
+
+export interface RecordBookEntry {
+  format:      string
+  scopeKey:    string        // 'alltime|T20' | '2026|T20'
+  scopeLabel:  string
+  year:        string | null // null = all-time
+  recordKey:   string
+  title:       string
+  holder:      string
+  display:     string
+  bookingId:   string
+  gameDate:    string
+  opponentName: string
+  entries:     number        // how many entries the record was picked from
+  armed:       boolean       // false = fewer than MIN_PRIOR_ENTRIES: a new match won't alert yet
+}
+
+// Every current record — the full baseline new scorecards are checked against.
+export function computeRecordBook(all: RecordMatch[]): RecordBookEntry[] {
+  const out: RecordBookEntry[] = []
+  for (const fmt of RECORD_FORMATS) {
+    const matches = all.filter(m => !m.isPractice && m.format === fmt)
+    const years = Array.from(new Set(matches.map(m => m.gameDate.slice(0, 4)))).sort().reverse()
+    const scopes: { scopeKey: string; scopeLabel: string; year: string | null; inScope: (m: RecordMatch) => boolean }[] = [
+      { scopeKey: `alltime|${fmt}`, scopeLabel: `${fmt} all-time`, year: null, inScope: () => true },
+      ...years.map(y => ({ scopeKey: `${y}|${fmt}`, scopeLabel: `${fmt} in ${y}`, year: y, inScope: (m: RecordMatch) => m.gameDate.slice(0, 4) === y })),
+    ]
+    for (const scope of scopes) {
+      const cells = buildBaseline(matches, scope.inScope)
+      for (const [key, cell] of Array.from(cells.entries())) {
+        out.push({
+          format: fmt, scopeKey: scope.scopeKey, scopeLabel: scope.scopeLabel, year: scope.year,
+          recordKey: key, title: recordTitle(key),
+          holder: cell.best.holder, display: cell.best.display,
+          bookingId: cell.best.match.bookingId, gameDate: cell.best.match.gameDate,
+          opponentName: cell.best.match.opponentName,
+          entries: cell.count, armed: cell.count >= MIN_PRIOR_ENTRIES,
+        })
+      }
+    }
+  }
+  return out.sort((a, b) => rankOf(a.recordKey) - rankOf(b.recordKey))
 }

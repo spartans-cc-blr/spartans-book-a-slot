@@ -9,6 +9,11 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 
 type Status = 'pending' | 'shared' | 'ignored'
+type BookEntry = {
+  format: string; scopeKey: string; scopeLabel: string; year: string | null
+  recordKey: string; title: string; holder: string; display: string
+  bookingId: string; gameDate: string; opponentName: string; entries: number; armed: boolean
+}
 type RecordBreakRow = {
   id: string; booking_id: string; title: string; scope_label: string
   holder: string; display: string; prev_holder: string | null; prev_display: string | null
@@ -27,7 +32,11 @@ function formatDate(d: string) {
 
 export default function AdminRecordsPage() {
   const [rows, setRows] = useState<RecordBreakRow[]>([])
-  const [tab, setTab] = useState<Status>('pending')
+  const [tab, setTab] = useState<Status | 'book'>('pending')
+  const [book, setBook] = useState<BookEntry[] | null>(null)
+  const [bookLoading, setBookLoading] = useState(false)
+  const [bookFmt, setBookFmt] = useState<'T20' | 'T30'>('T20')
+  const [bookScope, setBookScope] = useState<string>('alltime')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -47,6 +56,15 @@ export default function AdminRecordsPage() {
     }
   }, [])
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (tab !== 'book' || book) return
+    setBookLoading(true)
+    fetch('/api/admin/record-book')
+      .then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error ?? 'Failed to load'); setBook(j.records ?? []) })
+      .catch(e => setError(e.message ?? 'Failed to load records'))
+      .finally(() => setBookLoading(false))
+  }, [tab, book])
 
   async function decide(id: string, status: Status) {
     setBusy(id)
@@ -81,7 +99,15 @@ export default function AdminRecordsPage() {
 
   const counts: Record<Status, number> = { pending: 0, shared: 0, ignored: 0 }
   for (const r of rows) counts[r.status] += 1
-  const visible = rows.filter(r => r.status === tab)
+  const visible = tab === 'book' ? [] : rows.filter(r => r.status === tab)
+  const bookYears = Array.from(new Set((book ?? []).filter(b => b.format === bookFmt && b.year).map(b => b.year as string))).sort().reverse()
+  const bookRows = (book ?? []).filter(b => b.format === bookFmt && (bookScope === 'alltime' ? b.year === null : b.year === bookScope))
+  const pill = (active: boolean) =>
+    `px-3 py-1.5 rounded-full font-rajdhani text-xs font-bold tracking-wide border ${
+      active
+        ? 'bg-amber-600 text-white border-amber-600 dark:bg-gold dark:text-ink dark:border-gold'
+        : 'bg-white text-[#44403C] border-[#D4C9B0] dark:bg-ink-3 dark:text-zinc-400 dark:border-ink-5'
+    }`
 
   return (
     <div className="max-w-2xl">
@@ -93,25 +119,58 @@ export default function AdminRecordsPage() {
         </p>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-3 py-1.5 rounded-full font-rajdhani text-xs font-bold tracking-wide border ${
-              tab === t.key
-                ? 'bg-amber-600 text-white border-amber-600 dark:bg-gold dark:text-ink dark:border-gold'
-                : 'bg-white text-[#44403C] border-[#D4C9B0] dark:bg-ink-3 dark:text-zinc-400 dark:border-ink-5'
-            }`}
-          >
+          <button key={t.key} onClick={() => setTab(t.key)} className={pill(tab === t.key)}>
             {t.label} ({counts[t.key]})
           </button>
         ))}
+        <button onClick={() => setTab('book')} className={pill(tab === 'book')}>Current records</button>
       </div>
 
       {error && <p className="font-rajdhani text-sm text-red-700 dark:text-red-400 mb-3">{error}</p>}
+      {tab === 'book' && (
+        <div className="mb-4">
+          <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mb-3">
+            Every standing record — this is the baseline each new scorecard is checked against. A record only
+            alerts once its scope has at least 5 earlier entries; ones with fewer show as &ldquo;not armed&rdquo;.
+          </p>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {(['T20', 'T30'] as const).map(f => (
+              <button key={f} onClick={() => { setBookFmt(f); setBookScope('alltime') }} className={pill(bookFmt === f)}>{f}</button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <button onClick={() => setBookScope('alltime')} className={pill(bookScope === 'alltime')}>All-time</button>
+            {bookYears.map(y => (
+              <button key={y} onClick={() => setBookScope(y)} className={pill(bookScope === y)}>{y}</button>
+            ))}
+          </div>
+          {bookLoading && <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">Computing records…</p>}
+          {!bookLoading && book && bookRows.length === 0 && (
+            <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">No records in this scope yet.</p>
+          )}
+          <div className="space-y-2">
+            {bookRows.map(b => (
+              <div key={b.scopeKey + b.recordKey} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-cinzel text-sm font-bold text-[#1C1917] dark:text-parchment">{b.title}</p>
+                  <p className="font-cinzel text-base font-bold text-amber-700 dark:text-gold whitespace-nowrap">{b.display}</p>
+                </div>
+                <p className="font-rajdhani text-sm text-[#44403C] dark:text-zinc-300">{b.holder}</p>
+                <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
+                  vs {b.opponentName} · {formatDate(b.gameDate)} ·{' '}
+                  <Link href={`/matches/history/${b.bookingId}`} className="underline hover:text-amber-700 dark:hover:text-gold">scorecard</Link>
+                  {' · '}{b.entries} {b.entries === 1 ? 'entry' : 'entries'}
+                  {!b.armed && <span className="ml-1 text-amber-700 dark:text-amber-400 font-bold">· not armed yet</span>}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {loading && <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">Loading…</p>}
-      {!loading && visible.length === 0 && (
+      {!loading && tab !== 'book' && visible.length === 0 && (
         <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">
           {tab === 'pending' ? 'Nothing to review. You’ll get a push when a record is broken.' : 'Nothing here yet.'}
         </p>

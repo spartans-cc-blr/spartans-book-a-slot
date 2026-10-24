@@ -42,6 +42,17 @@ announced once, at that scope only — the year version is dropped.
 - No stored "holder" table: history is recomputed from `match_stats_cache` at sync time, so there is
   nothing to seed or drift, and the numbers always agree with the Team Record / Partnerships pages.
 
+## 3.1 The baseline is the "Current records" tab
+
+`/admin/records` → **Current records** lists every standing record (format T20/T30 × all-time or a
+year × each record key) with value, holder, opponent/date, scorecard link and how many entries it was
+picked from; scopes with fewer than `MIN_PRIOR_ENTRIES` show **not armed yet** (a new match can't
+alert there until it has enough history). `computeRecordBook()` and `detectRecordBreaks()` both call
+the same internal `buildBaseline()` (`src/lib/recordBreaks.ts`), so what the admin sees is exactly
+what each new scorecard is validated against. Nothing is stored: the book is recomputed from
+`match_stats_cache` on request (`GET /api/admin/record-book`, admin only). Practice games are excluded;
+matches before 24 Oct 2026 are part of the baseline even though they never alert.
+
 ## 4. Flow
 
 `syncMatchStatsForBooking()` → `detectAndLogRecordBreaks(bookingId)` (`src/lib/recordBreakDetect.ts`,
@@ -59,6 +70,7 @@ Share / Copy text / Ignore, and "Move back to review". Sharing opens `https://wa
 | Route | Method | Auth |
 |---|---|---|
 | `/api/admin/record-breaks` | GET | `isAdmin` |
+| `/api/admin/record-book` | GET | `isAdmin` — full current-records baseline (§3.1) |
 | `/api/admin/record-breaks/[id]` | PATCH `{status: pending\|shared\|ignored}` | `isAdmin`, `adminWrite` rate limit, Zod `recordBreakDecisionSchema` (`.strict()`) |
 
 ## 6. Database — `supabase/migrations/088_record_breaks.sql`
@@ -80,7 +92,7 @@ fails the scorecard sync.
 | File | Role |
 |---|---|
 | `src/lib/recordBreaks.ts` (+ `.test.ts`) | Pure candidates, scopes, detection, WhatsApp message text |
-| `src/lib/recordBreakDetect.ts` | Server fetch, insert, admin push |
+| `src/lib/recordBreakDetect.ts` | Server fetch (`loadRecordMatches`, shared), insert, admin push, `getRecordBook()` |
 | `src/lib/matchStatsSync.ts` | Calls the detector after the fee reminder (skipped for pre-cutoff games) |
 | `src/lib/teamStats.ts` | `getTeamMatchesUncached` now exported |
 | `src/app/api/admin/record-breaks/**` | List + decision routes |

@@ -9,7 +9,8 @@ import { createServiceClient } from '@/lib/supabase'
 import { getTeamMatchesUncached } from '@/lib/teamStats'
 import { notifyAdmins } from '@/lib/webpush'
 import { isBeforeRecordAlertStart } from '@/lib/repullCutoff'
-import { detectRecordBreaks, type RecordMatch } from '@/lib/recordBreaks'
+import { detectRecordBreaks, computeRecordBook, type RecordMatch, type RecordBookEntry } from '@/lib/recordBreaks'
+import type { TeamMatch } from '@/lib/teamStats'
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = []
@@ -17,38 +18,54 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out
 }
 
+// Every non-practice synced match of the given formats, with the batting /
+// bowling / FOW the record rules need. Uncached on purpose: the cached team
+// list may pre-date the sync that is calling us.
+async function loadRecordMatches(formats: string[]): Promise<{ teamMatches: TeamMatch[]; input: RecordMatch[] } | null> {
+  const supabase = createServiceClient()
+  const teamMatches = await getTeamMatchesUncached()
+  const wanted = teamMatches.filter(m => !m.isPractice && m.format && formats.includes(m.format))
+  const rows: any[] = []
+  for (const ids of chunk(wanted.map(m => m.bookingId), 50)) {
+    const { data, error } = await supabase
+      .from('match_stats_cache')
+      .select('booking_id, batting, bowling, fall_of_wickets')
+      .in('booking_id', ids)
+    if (error) { console.error('[record-breaks] cache read failed:', error.message); return null }
+    rows.push(...(data ?? []))
+  }
+  const byBooking = new Map<string, any>(rows.map(r => [r.booking_id, r]))
+  const input: RecordMatch[] = wanted.map(m => {
+    const c = byBooking.get(m.bookingId)
+    return {
+      bookingId: m.bookingId, gameDate: m.gameDate, format: m.format, isPractice: m.isPractice,
+      opponentName: m.opponentLabel || m.opponentName, result: m.result, battedFirst: m.battedFirst,
+      teamTotal: m.teamTotal, teamWickets: m.teamWickets, teamOvers: m.teamOvers,
+      batting: c?.batting ?? [], bowling: c?.bowling ?? [], fallOfWickets: c?.fall_of_wickets ?? [],
+    }
+  })
+  return { teamMatches, input }
+}
+
+// Feeds GET /api/admin/record-book — the full current baseline.
+export async function getRecordBook(): Promise<RecordBookEntry[]> {
+  const loaded = await loadRecordMatches(['T20', 'T30'])
+  return loaded ? computeRecordBook(loaded.input) : []
+}
+
 export async function detectAndLogRecordBreaks(bookingId: string): Promise<void> {
   try {
     const supabase = createServiceClient()
-
-    // Uncached on purpose: the cached variant may still hold the pre-sync list.
-    const matches = await getTeamMatchesUncached()
-    const target = matches.find(m => m.bookingId === bookingId)
+    const { data: self } = await supabase.from('bookings').select('format').eq('id', bookingId).maybeSingle()
+    const fmt = self?.format
+    if (!fmt) return
+    const loaded = await loadRecordMatches([fmt])
+    if (!loaded) return
+    const target = loaded.teamMatches.find(m => m.bookingId === bookingId)
     if (!target || target.isPractice || !target.format) return
     // Alerts start 24 Oct 2026 — earlier matches are history, never announced.
     if (isBeforeRecordAlertStart(target.gameDate)) return
-
-    const sameFormat = matches.filter(m => !m.isPractice && m.format === target.format)
-    const rows: any[] = []
-    for (const ids of chunk(sameFormat.map(m => m.bookingId), 50)) {
-      const { data, error } = await supabase
-        .from('match_stats_cache')
-        .select('booking_id, batting, bowling, fall_of_wickets')
-        .in('booking_id', ids)
-      if (error) { console.error('[record-breaks] cache read failed:', error.message); return }
-      rows.push(...(data ?? []))
-    }
-    const byBooking = new Map<string, any>(rows.map(r => [r.booking_id, r]))
-
-    const input: RecordMatch[] = sameFormat.map(m => {
-      const c = byBooking.get(m.bookingId)
-      return {
-        bookingId: m.bookingId, gameDate: m.gameDate, format: m.format, isPractice: m.isPractice,
-        opponentName: m.opponentLabel || m.opponentName, result: m.result, battedFirst: m.battedFirst,
-        teamTotal: m.teamTotal, teamWickets: m.teamWickets, teamOvers: m.teamOvers,
-        batting: c?.batting ?? [], bowling: c?.bowling ?? [], fallOfWickets: c?.fall_of_wickets ?? [],
-      }
-    })
+    const input = loaded.input
     const targetInput = input.find(m => m.bookingId === bookingId)
     if (!targetInput) return
 

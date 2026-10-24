@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectRecordBreaks, MIN_PRIOR_ENTRIES, type RecordMatch } from './recordBreaks'
+import { detectRecordBreaks, computeRecordBook, MIN_PRIOR_ENTRIES, type RecordMatch } from './recordBreaks'
 
 function match(over: Partial<RecordMatch> & { bookingId: string }): RecordMatch {
   return {
@@ -92,5 +92,27 @@ describe('detectRecordBreaks', () => {
     expect(b?.title).toBe('1st-wicket partnership')
     expect(b?.holder).toBe('Kushal V & Siva')
     expect(b?.prevValue).toBe(45)
+  })
+
+  it('record book lists the standing record and agrees with what detection validates against', () => {
+    const base = history()
+    const book = computeRecordBook(base)
+    const top = book.find(b => b.recordKey === 'highest_total' && b.year === null && b.format === 'T20')!
+    expect(top.display).toContain('145')
+    expect(top.entries).toBe(base.length)
+    expect(top.armed).toBe(true)
+    // a new match must beat exactly that baseline value
+    const target = match({ bookingId: 't', teamTotal: 146 })
+    const b = detectRecordBreaks(target, [...base, target]).find(r => r.recordKey === 'highest_total')
+    expect(b?.prevDisplay).toBe(top.display)
+  })
+
+  it('record book marks thin scopes as not armed and ignores practice games', () => {
+    const few = history().slice(0, 2)
+    const practice = match({ bookingId: 'p', isPractice: true, teamTotal: 999 })
+    const book = computeRecordBook([...few, practice])
+    const row = book.find(b => b.recordKey === 'highest_total' && b.year === null)!
+    expect(row.armed).toBe(false)
+    expect(row.display).not.toContain('999')
   })
 })

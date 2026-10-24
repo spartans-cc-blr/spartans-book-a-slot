@@ -290,6 +290,7 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/wallet/opening-balance` | PATCH | Admin | Sets or clears (`amount: null`) a player's "Brought Forward" statement override |
 | `/api/wallet/transfers` | POST | Admin | Player-to-player sponsorship — debits `sponsor_player_id`, credits `beneficiary_player_id` by the same amount, linked via `wallet_transfers`; see `features/wallet-ledger.md` §14 |
 | `/api/admin/record-breaks` (+ `/[id]` PATCH) | GET, PATCH | Admin | Record-break inbox: list, and mark a break shared / ignored / pending; see `features/record-breaking.md` |
+| `/api/admin/record-book` | GET | Admin | Every current club record — the baseline new scorecards are checked against ("Current records" tab of `/admin/records`); see `features/record-breaking.md` §3.1 |
 | `/api/admin/fee-reminders` | GET | Admin | Every currently fee-pending booking (scorecard synced, fee configured, squad announced, not yet applied/externally-reconciled) — feeds the admin-only fee reminder modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
 | `/api/admin/wallet/export` | GET | Admin | Downloadable wallet report (`.xls`, no new npm dependency) for `/admin/wallet`'s top-right "⬇ Export" menu — a Summary sheet (player + balance) and a Detailed sheet (player, transaction, running total); see `features/wallet-ledger.md` §16 |
  
