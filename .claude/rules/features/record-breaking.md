@@ -22,6 +22,7 @@ club-wide modal.
 | `lowest_defended` | Lowest total defended (won, batted first) | lower |
 | `highest_score` | Highest individual score | higher (a tie is not a break) |
 | `best_bowling` | Best bowling figures (≥3 wickets; wickets, then fewer runs) | better |
+| `most_dismissals` / `most_catches` / `most_stumpings` / `most_run_outs` | Individual fielding in one match (catches include keeper catches; floors: 2 dismissals, 2 catches, 1 stumping, 1 run-out) | higher |
 | `partnership_w1`…`w10` | Highest partnership for that wicket (`computePartnerships()`) | higher |
 
 Scopes: **`<format>` all-time** and **`<format>` in the match's calendar year**, T20 and T30 kept
