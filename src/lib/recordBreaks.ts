@@ -24,6 +24,7 @@ export const RECORD_FORMATS = ['T20', 'T30'] as const
 
 interface BatRow  { player_name: string; runs?: number | string | null; balls?: number | string | null; not_out?: string | null; batted?: boolean; batting_order?: number | null; player_id?: string | null; dismissal_method?: string | null }
 interface BowlRow { player_name: string; wickets?: number | string | null; runs?: number | string | null; overs?: number | string | null; did_bowl?: boolean | null }
+interface FieldRow { player_name: string; catches?: number | string | null; caught_behind?: number | string | null; run_outs?: number | string | null; stumpings?: number | string | null }
 interface FowRow  { wicket_number: number; team_score: number; over: number; player_name: string; is_retirement?: boolean | null; returning_player_name?: string | null }
 
 export interface RecordMatch {
@@ -39,6 +40,7 @@ export interface RecordMatch {
   teamOvers:    number | null
   batting:      BatRow[]
   bowling:      BowlRow[]
+  fielding?:    FieldRow[]
   fallOfWickets: FowRow[]
 }
 
@@ -80,7 +82,7 @@ function oversToBalls(over: number | string): number {
   return (parseInt(whole, 10) || 0) * 6 + (part ? parseInt(part[0], 10) || 0 : 0)
 }
 
-const RECORD_ORDER = ['highest_total', 'highest_chase', 'lowest_defended', 'highest_score', 'best_bowling']
+const RECORD_ORDER = ['highest_total', 'highest_chase', 'lowest_defended', 'highest_score', 'best_bowling', 'most_dismissals', 'most_catches', 'most_stumpings', 'most_run_outs']
 
 export function recordTitle(key: string): string {
   switch (key) {
@@ -89,6 +91,10 @@ export function recordTitle(key: string): string {
     case 'lowest_defended': return 'Lowest total defended'
     case 'highest_score':   return 'Highest individual score'
     case 'best_bowling':    return 'Best bowling figures'
+    case 'most_dismissals': return 'Most dismissals in a match'
+    case 'most_catches':    return 'Most catches in a match'
+    case 'most_stumpings':  return 'Most stumpings in a match'
+    case 'most_run_outs':   return 'Most run-outs in a match'
     default: {
       const m = /^partnership_w(\d+)$/.exec(key)
       return m ? `${ordinal(Number(m[1]))}-wicket partnership` : key
@@ -137,6 +143,21 @@ export function extractCandidates(m: RecordMatch): Candidate[] {
       holder: w.player_name,
       display: `${wk}/${num(w.runs)}`,
     })
+  }
+
+  // Fielding: individual per-match counts. Catches include keeper catches
+  // (caught_behind), matching the scorecard's "Ct". Floors keep trivial
+  // single-event entries out; a record still needs a strict beat to alert.
+  for (const f of m.fielding ?? []) {
+    const catches = num(f.catches) + num(f.caught_behind)
+    const stumpings = num(f.stumpings)
+    const runOuts = num(f.run_outs)
+    const total = catches + stumpings + runOuts
+    const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
+    if (total >= 2) out.push({ key: 'most_dismissals', value: total, holder: f.player_name, display: plural(total, 'dismissal') })
+    if (catches >= 2) out.push({ key: 'most_catches', value: catches, holder: f.player_name, display: plural(catches, 'catch').replace('catchs', 'catches') })
+    if (stumpings >= 1) out.push({ key: 'most_stumpings', value: stumpings, holder: f.player_name, display: plural(stumpings, 'stumping') })
+    if (runOuts >= 1) out.push({ key: 'most_run_outs', value: runOuts, holder: f.player_name, display: plural(runOuts, 'run-out') })
   }
 
   const finalScore: FinalScore | null = m.teamTotal !== null

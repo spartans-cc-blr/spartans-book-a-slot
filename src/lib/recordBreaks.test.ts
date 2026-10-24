@@ -124,4 +124,16 @@ describe('detectRecordBreaks', () => {
     expect(row.beat?.year).toBe('2025')
     expect(row.beat?.display).toContain('145')
   })
+
+  it('detects fielding records and uses strict beats', () => {
+    const f = (id: string, catches: number, stumpings = 0, run_outs = 0, cb = 0) => match({
+      bookingId: id, fielding: [{ player_name: 'Keeper', catches, caught_behind: cb, stumpings, run_outs }],
+    })
+    const base = Array.from({ length: 6 }, (_, i) => f(`f${i}`, 2 + (i % 2), 1, 1))   // best catches 3
+    const target = f('t', 3, 2, 1, 2)                                                    // 5 catches (3 + 2 behind), 2 stumpings
+    const breaks = detectRecordBreaks(target, [...base, target])
+    expect(breaks.find(b => b.recordKey === 'most_catches')?.display).toBe('5 catches')
+    expect(breaks.find(b => b.recordKey === 'most_stumpings')?.display).toBe('2 stumpings')
+    expect(breaks.find(b => b.recordKey === 'most_run_outs')).toBeUndefined()           // 1 ties the best
+  })
 })
