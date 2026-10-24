@@ -71,7 +71,7 @@ pre-date the sync) + batting/bowling/FOW from `match_stats_cache` → pure `dete
 
 ## 5. Admin UI and API
 
-`/admin/records` (sidebar: 🏆 Records, under Master Data): tabs To review / Shared / Ignored, each card
+`/admin/records` (sidebar: 📖 Records, under Master Data): tabs To review / Shared / Ignored, each card
 shows record, scope, value, holder, what it beat, opponent/date, scorecard link, a message preview,
 Share / Copy text / Ignore, and "Move back to review". Sharing opens `https://wa.me/?text=…`
 (destination-free: the admin picks the group) and records the decision.
@@ -106,7 +106,7 @@ fails the scorecard sync.
 | `src/lib/teamStats.ts` | `getTeamMatchesUncached` now exported |
 | `src/app/api/admin/record-breaks/**` | List + decision routes |
 | `src/app/admin/records/page.tsx` | Review inbox |
-| `src/components/admin/AdminSidebar.tsx` | 🏆 Records entry |
+| `src/components/admin/AdminSidebar.tsx` | 📖 Records entry (book of records) |
 
 ## 9. Not built (ideas)
 

@@ -71,7 +71,7 @@ const NAV: NavEntry[] = [
   { kind: 'link', href: '/admin/tournaments', label: 'Tournaments', icon: '🏆' },
   { kind: 'link', href: '/admin/players', label: 'Players', icon: '🏏' },
   { kind: 'link', href: '/admin/wallet', label: 'Wallet', icon: '💰' },
-  { kind: 'link', href: '/admin/records', label: 'Records', icon: '🏆' },
+  { kind: 'link', href: '/admin/records', label: 'Records', icon: '📖' },
   { kind: 'link', href: '/admin/scorecard-backfill', label: 'Scorecard Backfill', icon: '📥', section: 'Utilities' },
   { kind: 'link', href: '/admin/booking-backfill', label: 'Booking Backfill', icon: '🗓️' },
   { kind: 'link', href: '/admin/player-reconciliation', label: 'Player Reconciliation', icon: '🪪' },
