@@ -38,7 +38,7 @@ announced once, at that scope only — the year version is dropped.
 - **`MAX_BREAKS_PER_MATCH = 6`**, all-time first.
 - **Idempotent:** `UNIQUE(booking_id, record_key, scope_key)` with `ON CONFLICT DO NOTHING`; only newly
   inserted rows trigger the push, so a re-sync never duplicates or re-notifies.
-- **Pre-1 Oct 2026 games never fire** (`isBeforePromptCutoff()`, `post-match-scorecard.md` §18).
+- **Alerts start 24 Oct 2026:** a match with `game_date` before that never produces an alert, even on a re-sync (`isBeforeRecordAlertStart()` / `RECORD_BREAK_ALERTS_START` in `src/lib/repullCutoff.ts`). Earlier matches still count as *history* that a new match must beat. (The sync-level 1 Oct re-pull cutoff, `post-match-scorecard.md` §18, also applies.)
 - No stored "holder" table: history is recomputed from `match_stats_cache` at sync time, so there is
   nothing to seed or drift, and the numbers always agree with the Team Record / Partnerships pages.
 

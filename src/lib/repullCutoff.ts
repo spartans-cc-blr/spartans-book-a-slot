@@ -9,3 +9,11 @@ export const RECOGNITION_AND_FEE_PROMPTS_START = '2026-10-01'
 export function isBeforePromptCutoff(gameDate: string): boolean {
   return String(gameDate).slice(0, 10) < RECOGNITION_AND_FEE_PROMPTS_START
 }
+
+// Record-break alerts (admin-only, features/record-breaking.md) start on this
+// date: a match played before it never produces an alert, even on a re-sync.
+export const RECORD_BREAK_ALERTS_START = '2026-10-24'
+
+export function isBeforeRecordAlertStart(gameDate: string): boolean {
+  return String(gameDate).slice(0, 10) < RECORD_BREAK_ALERTS_START
+}

@@ -8,6 +8,7 @@
 import { createServiceClient } from '@/lib/supabase'
 import { getTeamMatchesUncached } from '@/lib/teamStats'
 import { notifyAdmins } from '@/lib/webpush'
+import { isBeforeRecordAlertStart } from '@/lib/repullCutoff'
 import { detectRecordBreaks, type RecordMatch } from '@/lib/recordBreaks'
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -24,6 +25,8 @@ export async function detectAndLogRecordBreaks(bookingId: string): Promise<void>
     const matches = await getTeamMatchesUncached()
     const target = matches.find(m => m.bookingId === bookingId)
     if (!target || target.isPractice || !target.format) return
+    // Alerts start 24 Oct 2026 — earlier matches are history, never announced.
+    if (isBeforeRecordAlertStart(target.gameDate)) return
 
     const sameFormat = matches.filter(m => !m.isPractice && m.format === target.format)
     const rows: any[] = []
