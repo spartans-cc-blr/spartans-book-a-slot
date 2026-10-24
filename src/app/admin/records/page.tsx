@@ -36,8 +36,8 @@ export default function AdminRecordsPage() {
   const [tab, setTab] = useState<Status | 'book'>('pending')
   const [book, setBook] = useState<BookEntry[] | null>(null)
   const [bookLoading, setBookLoading] = useState(false)
-  const [bookFmt, setBookFmt] = useState<'T20' | 'T30'>('T20')
-  const [bookScope, setBookScope] = useState<string>('alltime')
+  const [bookFmts, setBookFmts] = useState<string[]>(['T20', 'T30'])
+  const [bookScopes, setBookScopes] = useState<string[]>(['alltime'])
   const [onlyNew, setOnlyNew] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -102,11 +102,14 @@ export default function AdminRecordsPage() {
   const counts: Record<Status, number> = { pending: 0, shared: 0, ignored: 0 }
   for (const r of rows) counts[r.status] += 1
   const visible = tab === 'book' ? [] : rows.filter(r => r.status === tab)
-  const bookYears = Array.from(new Set((book ?? []).filter(b => b.format === bookFmt && b.year).map(b => b.year as string))).sort().reverse()
+  // Multi-select: toggle a value, but always keep at least one selected.
+  const toggle = (list: string[], v: string) =>
+    list.includes(v) ? (list.length > 1 ? list.filter(x => x !== v) : list) : [...list, v]
+  const bookYears = Array.from(new Set((book ?? []).filter(b => bookFmts.includes(b.format) && b.year).map(b => b.year as string))).sort().reverse()
   const latestYear = (book ?? []).reduce((m, b) => (b.year && b.year > m ? b.year : m), '')
   const bookRows = (book ?? [])
-    .filter(b => b.format === bookFmt && (bookScope === 'alltime' ? b.year === null : b.year === bookScope))
-    .filter(b => !(onlyNew && bookScope === 'alltime') || b.setInYear === latestYear)
+    .filter(b => bookFmts.includes(b.format) && (b.year === null ? bookScopes.includes('alltime') : bookScopes.includes(b.year)))
+    .filter(b => !(onlyNew && b.year === null) || b.setInYear === latestYear)
   const pill = (active: boolean) =>
     `px-3 py-1.5 rounded-full font-rajdhani text-xs font-bold tracking-wide border ${
       active
@@ -142,16 +145,16 @@ export default function AdminRecordsPage() {
           </p>
           <div className="flex flex-wrap gap-2 mb-2">
             {(['T20', 'T30'] as const).map(f => (
-              <button key={f} onClick={() => { setBookFmt(f); setBookScope('alltime') }} className={pill(bookFmt === f)}>{f}</button>
+              <button key={f} onClick={() => setBookFmts(l => toggle(l, f))} className={pill(bookFmts.includes(f))}>{f}</button>
             ))}
           </div>
           <div className="flex flex-wrap gap-2 mb-4">
-            <button onClick={() => setBookScope('alltime')} className={pill(bookScope === 'alltime')}>All-time</button>
+            <button onClick={() => setBookScopes(l => toggle(l, 'alltime'))} className={pill(bookScopes.includes('alltime'))}>All-time</button>
             {bookYears.map(y => (
-              <button key={y} onClick={() => setBookScope(y)} className={pill(bookScope === y)}>{y}</button>
+              <button key={y} onClick={() => setBookScopes(l => toggle(l, y))} className={pill(bookScopes.includes(y))}>{y}</button>
             ))}
           </div>
-          {bookScope === 'alltime' && latestYear && (
+          {bookScopes.includes('alltime') && latestYear && (
             <label className="flex items-center gap-2 font-rajdhani text-xs text-[#44403C] dark:text-zinc-300 mb-4">
               <input type="checkbox" checked={onlyNew} onChange={e => setOnlyNew(e.target.checked)} />
               Only all-time records set in {latestYear}
@@ -164,6 +167,7 @@ export default function AdminRecordsPage() {
           <div className="space-y-2">
             {bookRows.map(b => (
               <div key={b.scopeKey + b.recordKey} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-3">
+                <p className="font-rajdhani text-[11px] font-bold tracking-widest uppercase text-[#78716C] dark:text-zinc-500">{b.scopeLabel}</p>
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-cinzel text-sm font-bold text-[#1C1917] dark:text-parchment">{b.title}</p>
                   <p className="font-cinzel text-base font-bold text-amber-700 dark:text-gold whitespace-nowrap">{b.display}</p>

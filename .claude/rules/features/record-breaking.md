@@ -44,6 +44,8 @@ announced once, at that scope only — the year version is dropped.
 
 ## 3.1 The baseline is the "Current records" tab
 
+The format (T20 / T30) and scope (All-time / each year) pills are multi-select, both formats shown by default; each card carries its scope label, and at least one pill of each stays selected.
+
 `/admin/records` → **Current records** lists every standing record (format T20/T30 × all-time or a
 year × each record key) with value, holder, opponent/date, scorecard link and how many entries it was
 picked from; scopes with fewer than `MIN_PRIOR_ENTRIES` show **not armed yet** (a new match can't
