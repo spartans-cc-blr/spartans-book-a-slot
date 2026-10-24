@@ -300,6 +300,8 @@ type BookingProp = {
   loggedInWalletBalance?:    number | null
   yCount?:                   number
   isUpcomingWeekendSlot?:    boolean
+  // Only set by the server for this match's captain/VC and GC/admin — never for other viewers.
+  organiserContact?:         { name: string | null; phone: string | null } | null
 }
 
 export function FixturesCard({ booking }: { booking: BookingProp }) {
@@ -311,8 +313,10 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
   const {
     game_date, slot_time, format, opponent_name, cricheroes_url, tournament, matchStatus, match_stage,
     feePerPlayer, isLoggedInPlayerInSquad, isLoggedInPlayerExempt, loggedInWalletBalance,
-    yCount, isUpcomingWeekendSlot,
+    yCount, isUpcomingWeekendSlot, organiserContact,
   } = booking;
+  const orgDigits = (organiserContact?.phone ?? '').replace(/\D/g, '');
+  const orgWaNumber = orgDigits.length === 10 ? `91${orgDigits}` : orgDigits;
   const ground = booking.ground ?? tournament?.ground;
   const ballType  = tournament?.ball_type || "red";
   const jColour   = jerseyColour(ballType);
@@ -479,6 +483,30 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
           </a>
         )}
       </div>
+
+      {/* Organiser contact — captain / VC / GC / admin only (server-gated) */}
+      {organiserContact && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+          fontSize: '11px', fontFamily: "'Rajdhani', sans-serif", color: t.subtitleText,
+        }}>
+          <span>
+            📞 Organiser:{' '}
+            <span style={{ color: t.opponentText, fontWeight: 600 }}>{organiserContact.name ?? 'Contact'}</span>
+          </span>
+          {orgDigits && (
+            <span style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
+              <a href={`tel:+${orgWaNumber}`} style={{ color: '#34A853', fontWeight: 600, textDecoration: 'none' }}>
+                Call
+              </a>
+              <a href={`https://wa.me/${orgWaNumber}`} target="_blank" rel="noopener noreferrer"
+                style={{ color: '#34A853', fontWeight: 600, textDecoration: 'none' }}>
+                WhatsApp
+              </a>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Announced Squad */}
       {squadAnnounced && (

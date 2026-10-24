@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { FixturesWeekendGroup } from '@/components/fixtures/FixturesWeekend'
 import { BackButton } from '@/components/ui/BackButton'
 import { isEligibleForKnockoutTournament } from '@/lib/knockoutEligibility'
+import { splitOrganiserContact } from '@/lib/organiserContact'
 
 export const revalidate = 60
 
@@ -22,8 +23,8 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     .from('bookings')
     .select(`
       id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
-      tournament_id, stage_type,
-      tournament:tournaments(name, ball_type, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url)),
+      tournament_id, stage_type, organiser_name, organiser_phone,
+      tournament:tournaments(name, ball_type, cricheroes_points_table_url, organiser_name, organiser_contact, ground:grounds(name, maps_url, hospital_url)),
       ground:grounds(name, maps_url, hospital_url)
     `)
     .eq('id', params.id)
@@ -102,6 +103,17 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     knockoutIneligible = !eligible
   }
 
+  // Organiser contact: only this match's captain/VC (announced squad) or GC/admin;
+  // not for suspended accounts. Raw organiser fields are stripped for everyone else.
+  const notExpelled = user?.playerStatus !== 'expelled'
+  const isMatchCaptainOrVc = isPlayer && notExpelled && (squadRows ?? []).some(
+    (r: any) => r.player?.id === user.playerId && (r.is_captain || r.is_vc)
+  )
+  const { booking: safeBooking, organiserContact } = splitOrganiserContact(
+    booking as any,
+    notExpelled && (isMatchCaptainOrVc || isGC || isAdmin),
+  )
+
   const entry = {
     id:              booking.id,
     game_date:       booking.game_date,
@@ -109,7 +121,7 @@ export default async function MatchCardPage({ params }: { params: { id: string }
     initialResponse,
     matchStatus:     getMatchStatus(booking.game_date, booking.slot_time, booking.format) as 'upcoming' | 'in_progress',
     squad,
-    cardData:        { ...booking, squad, matchStatus: getMatchStatus(booking.game_date, booking.slot_time, booking.format) },
+    cardData:        { ...safeBooking, organiserContact, squad, matchStatus: getMatchStatus(booking.game_date, booking.slot_time, booking.format) },
     hasDues,
     slotLocked:      (booking as any).availability_locked ?? false,
     squadAnnounced:  (squad ?? []).length > 0,

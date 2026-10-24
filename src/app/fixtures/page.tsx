@@ -13,6 +13,7 @@ import { getEligibleTournamentIdsForPlayer } from '@/lib/knockoutEligibility'
 import { parseISO, format, subDays } from 'date-fns'
 import type { Metadata } from 'next'
 import { getSyncedBookingIds } from '@/lib/matchCompletion'
+import { splitOrganiserContact } from '@/lib/organiserContact'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,8 +73,8 @@ export default async function FixturesPage() {
       .from('bookings')
       .select(`
         id, game_date, slot_time, format, opponent_name, cricheroes_url, match_stage, match_time, availability_locked,
-        match_fee_override, tournament_id, stage_type,
-        tournament:tournaments(name, ball_type, match_fee, cricheroes_points_table_url, ground:grounds(name, maps_url, hospital_url)),
+        match_fee_override, tournament_id, stage_type, organiser_name, organiser_phone,
+        tournament:tournaments(name, ball_type, match_fee, cricheroes_points_table_url, organiser_name, organiser_contact, ground:grounds(name, maps_url, hospital_url)),
         ground:grounds(name, maps_url, hospital_url)
       `)
       .eq('status', 'confirmed')
@@ -258,6 +259,16 @@ export default async function FixturesPage() {
       !bypassesKnockoutRestriction &&
       !eligibleKnockoutTournamentIds.has((b as any).tournament_id)
 
+    // Organiser contact: only this match's captain/VC (announced squad) or GC/admin.
+    // Raw organiser fields are stripped from the payload for everyone else.
+    const isMatchCaptainOrVc = isPlayer && (squadMap[b.id] ?? []).some(
+      (p: any) => p.id === player?.playerId && (p.is_match_captain || p.is_vc)
+    )
+    const { booking: safeBooking, organiserContact } = splitOrganiserContact(
+      b as any,
+      isMatchCaptainOrVc || isGC || isAdmin,
+    )
+
     weekendMap[wk].push({
       id:                      b.id,
       game_date:               (b as any).game_date,
@@ -266,7 +277,8 @@ export default async function FixturesPage() {
       matchStatus:             (b as any).matchStatus as 'upcoming' | 'in_progress',
       squad:                   squadMap[b.id] ?? [],
       cardData: {
-        ...b,
+        ...safeBooking,
+        organiserContact,
         feePerPlayer:             feePerPlayerMap[b.id] ?? null,
         isLoggedInPlayerInSquad:  isInSquad,
         isLoggedInPlayerExempt:   isExempt,

@@ -764,6 +764,34 @@ itself (out of scope here — shared with Match History) was not touched.
 
 ---
 
+## 10.4 Organiser contact on the match card (added October 2026)
+
+`FixturesCard` shows a small "📞 Organiser: <name> · Call · WhatsApp" row,
+above the squad section, to **this match's captain, vice captain, and
+GC/admin only**.
+
+- **Who qualifies** is per match, not the permanent flag: the viewer has an
+  announced `squad` row for that booking with `is_captain` or `is_vc` (a
+  match captain need not have `players.is_captain`, so Captains' Corner would
+  have missed them), or is `isGC`/`isAdmin`. Suspended accounts never see it.
+  Because it keys off the announced squad, it appears once the squad is
+  announced.
+- **Server-gated, not UI-hidden.** `splitOrganiserContact()`
+  (`src/lib/organiserContact.ts`) always strips `organiser_name`/
+  `organiser_phone` from the booking and `organiser_name`/`organiser_contact`
+  from its tournament before the card props are built, and returns the
+  resolved contact only for qualifying viewers (passed as
+  `cardData.organiserContact`). Everyone else's payload contains none of
+  these fields. Same posture as `emergency_contact_phone`.
+- **Source:** the booking's own `organiser_name`/`organiser_phone` (set on the
+  reservation path) win; otherwise the tournament's `organiser_name`/
+  `organiser_contact`. No row renders if neither exists.
+- Wired in both `/fixtures` and `/fixtures/[id]`. Phones are normalised to
+  digits (10-digit numbers get `91`) for `tel:` and `wa.me` links. No
+  migration, no new route.
+
+---
+
 ## 11. File Map
 
 | File | Role |
@@ -776,7 +804,8 @@ itself (out of scope here — shared with Match History) was not touched.
 | `src/app/fixtures/[id]/page.tsx` | Single match share page — same squad fetch pattern as fixtures page |
 | `src/components/fixtures/FixturesWeekend.tsx` | `FixturesWeekendGroup` — shared state owner; handles API calls; renders card + availability pairs; own "outstanding dues" banner theme-aware via `useTheme()` (§10.3) |
 | `src/components/fixtures/FixturesAvailability.tsx` | Controlled availability button row; runs `getBlockReason()` validation on every render; theme-aware via `useTheme()` — no longer permanently dark (§10.3) |
-| `src/components/fixtures/FixturesCard.tsx` | Match card display; squad section uses `is_match_captain`, `is_vc`, `is_wk` from squad row; theme-aware via `useTheme()` — no longer permanently dark (§10.3) |
+| `src/lib/organiserContact.ts` | `splitOrganiserContact()` — strips organiser fields from the booking/tournament and returns the contact only for match captain/VC/GC/admin (§10.4) |
+| `src/components/fixtures/FixturesCard.tsx` | Match card display; organiser contact row for captain/VC/GC/admin (§10.4); squad section uses `is_match_captain`, `is_vc`, `is_wk` from squad row; theme-aware via `useTheme()` — no longer permanently dark (§10.3) |
 | `src/app/api/player-availability/route.ts` | Self-update API — GET, POST, DELETE; explicit SELECT(`id, response`) → INSERT/UPDATE; auto-reactivation; audit log; knockout-only eligibility guard on POST (`features/knockout-day-protection.md` §6) |
 | `src/lib/knockoutEligibility.ts` | Knockout-only availability eligibility — `getEligibleTournamentIdsForPlayer()`, `isEligibleForKnockoutTournament()`, `KNOCKOUT_INELIGIBLE_MESSAGE`; see `features/knockout-day-protection.md` §6 |
 | `src/app/api/captain-availability/route.ts` | Captain proxy API — POST (set availability on behalf of player); GET (audit log fetch) |
