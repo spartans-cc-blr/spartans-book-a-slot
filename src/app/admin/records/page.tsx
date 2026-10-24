@@ -10,6 +10,7 @@ import Link from 'next/link'
 
 type Status = 'pending' | 'shared' | 'ignored'
 type BookEntry = {
+  message: string
   format: string; scopeKey: string; scopeLabel: string; year: string | null
   recordKey: string; title: string; holder: string; display: string
   bookingId: string; gameDate: string; opponentName: string; entries: number; armed: boolean
