@@ -53,6 +53,11 @@ what each new scorecard is validated against. Nothing is stored: the book is rec
 `match_stats_cache` on request (`GET /api/admin/record-book`, admin only). Practice games are excluded;
 matches before 24 Oct 2026 are part of the baseline even though they never alert.
 
+On the **All-time** scope each row also carries `setInYear` and `beat` (the best from matches played
+*before* that year). The tab marks rows set in the latest year with "set in 2026, beat 71 (A & B,
+2025)" (or "first entry"), and an **Only all-time records set in 2026** checkbox filters to them — the
+answer to "what did we newly achieve this year that beats the previous all-time".
+
 ## 4. Flow
 
 `syncMatchStatsForBooking()` → `detectAndLogRecordBreaks(bookingId)` (`src/lib/recordBreakDetect.ts`,
