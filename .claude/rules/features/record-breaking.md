@@ -65,6 +65,8 @@ On the **All-time** scope each row also carries `setInYear` and `beat` (the best
 2025)" (or "first entry"), and an **Only all-time records set in 2026** checkbox filters to them — the
 answer to "what did we newly achieve this year that beats the previous all-time".
 
+The WhatsApp message (alerts and the Current records share button) ends with links: the match that set the record, the match that held the previous one (when there is one), and the player-facing page for that kind of record filtered to the format and season (`recordPageUrl()`: partnerships / batting / bowling / fielding tabs of `/leaderboard`, or `/team-stats` for team totals).
+
 ## 4. Flow
 
 `syncMatchStatsForBooking()` → `detectAndLogRecordBreaks(bookingId)` (`src/lib/recordBreakDetect.ts`,

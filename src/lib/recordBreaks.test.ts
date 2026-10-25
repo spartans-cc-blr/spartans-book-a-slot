@@ -24,6 +24,9 @@ describe('detectRecordBreaks', () => {
     expect(total[0].scopeKey).toBe('alltime|T20')
     expect(total[0].prevValue).toBe(145)
     expect(total[0].message).toContain('New Spartans record')
+    expect(total[0].message).toContain('/matches/history/t')
+    expect(total[0].message).toContain('Previous record match: https://hub.spartanscricketclub.in/matches/history/h5')
+    expect(total[0].message).toContain('/team-stats?format=T20&year=all')
   })
 
   it('does not announce a tie', () => {
