@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectRecordBreaks, computeRecordBook, MIN_PRIOR_ENTRIES, type RecordMatch } from './recordBreaks'
+import { detectRecordBreaks, computeRecordBook, reignHeadline, MIN_PRIOR_ENTRIES, type RecordMatch } from './recordBreaks'
 
 function match(over: Partial<RecordMatch> & { bookingId: string }): RecordMatch {
   return {
@@ -138,5 +138,19 @@ describe('detectRecordBreaks', () => {
     expect(breaks.find(b => b.recordKey === 'most_catches')?.display).toBe('5 catches')
     expect(breaks.find(b => b.recordKey === 'most_stumpings')?.display).toBe('2 stumpings')
     expect(breaks.find(b => b.recordKey === 'most_run_outs')).toBeUndefined()           // 1 ties the best
+  })
+})
+
+describe('reignHeadline', () => {
+  it('is null for a first entry or a short reign in the same year', () => {
+    expect(reignHeadline(null, '2026-09-06')).toBeNull()
+    expect(reignHeadline('2026-03-01', '2026-09-06')).toBeNull()
+  })
+  it('reports reigns of 12+ months', () => {
+    expect(reignHeadline('2025-03-02', '2026-09-06')).toBe('ends a 1 year 6 months reign')
+    expect(reignHeadline('2024-09-06', '2026-09-06')).toBe('ends a 2 years reign')
+  })
+  it('flags a record from an earlier calendar year even under 12 months', () => {
+    expect(reignHeadline('2025-12-10', '2026-02-01')).toBe('beats a record set in Dec 2025')
   })
 })

@@ -199,24 +199,47 @@ export function recordPageUrl(recordKey: string, format: string, year: string | 
   return `${HUB}/team-stats?format=${format}&year=${y}`   // team totals, chases, defences
 }
 
+// Headline ageing for the message: shown when the beaten record stood 12+ months,
+// or was set in an earlier calendar year than the new one. Pure; exported for tests.
+export function reignHeadline(prevDate: string | null, newDate: string): string | null {
+  if (!prevDate) return null
+  const [py, pm] = prevDate.split('-').map(Number)
+  const [ny, nm] = newDate.split('-').map(Number)
+  const months = (ny - py) * 12 + (nm - pm)
+  if (months >= 12) {
+    const y = Math.floor(months / 12), m = months % 12
+    const parts = [`${y} year${y > 1 ? 's' : ''}`, ...(m ? [`${m} month${m > 1 ? 's' : ''}`] : [])]
+    return `ends a ${parts.join(' ')} reign`
+  }
+  if (py < ny) {
+    const mon = new Date(`${prevDate}T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+    return `beats a record set in ${mon}`
+  }
+  return null
+}
+
 function buildMessage(opts: {
   title: string; scopeLabel: string; holder: string; display: string
   opponent: string; gameDate: string; prevHolder: string | null; prevDisplay: string | null
   recordKey: string; format: string; year: string | null
-  bookingId: string; prevBookingId: string | null
+  bookingId: string; prevBookingId: string | null; prevGameDate?: string | null
 }): string {
   const date = new Date(`${opts.gameDate}T00:00:00`).toLocaleDateString('en-IN', {
     weekday: 'short', day: 'numeric', month: 'short',
   })
+  const reign = reignHeadline(opts.prevGameDate ?? null, opts.gameDate)
+  const prevSet = opts.prevGameDate
+    ? ` (${new Date(`${opts.prevGameDate}T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })})`
+    : ''
   const lines = [
-    `🏆 New Spartans record!`,
+    `🏆 New Spartans record${reign ? ` — ${reign}` : ''}!`,
     ``,
     `${opts.title} (${opts.scopeLabel})`,
     `${opts.display} — ${opts.holder}`,
     `vs ${opts.opponent}, ${date}`,
   ]
   if (opts.prevDisplay) {
-    lines.push(`Previous best: ${opts.prevDisplay}${opts.prevHolder ? ` — ${opts.prevHolder}` : ''}`)
+    lines.push(`Previous best: ${opts.prevDisplay}${opts.prevHolder ? ` — ${opts.prevHolder}` : ''}${prevSet}`)
   }
   lines.push(``, `🔗 This match: ${HUB}/matches/history/${opts.bookingId}`)
   if (opts.prevBookingId) lines.push(`🔗 Previous record match: ${HUB}/matches/history/${opts.prevBookingId}`)
@@ -296,7 +319,7 @@ export function detectRecordBreaks(target: RecordMatch, all: RecordMatch[]): Rec
           opponent: target.opponentName, gameDate: target.gameDate,
           prevHolder: bestPrior.holder, prevDisplay: bestPrior.display,
           recordKey: key, format: fmt, year: scope.scopeKey.startsWith('alltime') ? null : scope.scopeKey.split('|')[0],
-          bookingId: target.bookingId, prevBookingId: bestPrior.match.bookingId,
+          bookingId: target.bookingId, prevBookingId: bestPrior.match.bookingId, prevGameDate: bestPrior.match.gameDate,
         }),
       })
     }
@@ -364,7 +387,7 @@ export function computeRecordBook(all: RecordMatch[]): RecordBookEntry[] {
             opponent: cell.best.match.opponentName, gameDate: cell.best.match.gameDate,
             prevHolder: prev?.holder ?? null, prevDisplay: prev?.display ?? null,
             recordKey: key, format: fmt, year: scope.year,
-            bookingId: cell.best.match.bookingId, prevBookingId: prev?.match.bookingId ?? null,
+            bookingId: cell.best.match.bookingId, prevBookingId: prev?.match.bookingId ?? null, prevGameDate: prev?.match.gameDate ?? null,
           }),
           setInYear: setYear,
           beat: prev ? { display: prev.display, holder: prev.holder, year: prev.match.gameDate.slice(0, 4), bookingId: prev.match.bookingId, gameDate: prev.match.gameDate } : null,
