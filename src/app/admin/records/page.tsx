@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { WA_ICON } from '@/components/tournament-planner/TournamentShareButton'
 
 type Status = 'pending' | 'shared' | 'ignored'
 type BookEntry = {
@@ -185,7 +186,19 @@ export default function AdminRecordsPage() {
               <div key={b.scopeKey + b.recordKey} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-3">
                     <div className="flex items-start justify-between gap-3">
                       <p className="font-cinzel text-sm font-bold text-[#1C1917] dark:text-parchment">{b.title}</p>
-                      <p className="font-cinzel text-base font-bold text-amber-700 dark:text-gold whitespace-nowrap">{b.display}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-cinzel text-base font-bold text-amber-700 dark:text-gold whitespace-nowrap">{b.display}</p>
+                        {latestYear && b.gameDate.startsWith(latestYear) && (
+                          <button
+                            onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(b.message)}`, '_blank', 'noopener,noreferrer')}
+                            title="Share this record on WhatsApp"
+                            aria-label="Share this record on WhatsApp"
+                            className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-emerald-600 text-emerald-700 dark:text-emerald-400 rounded-full hover:bg-emerald-600/20 transition-colors"
+                          >
+                            {WA_ICON}
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className="font-rajdhani text-sm text-[#44403C] dark:text-zinc-300">{b.holder}</p>
                     <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
@@ -200,14 +213,6 @@ export default function AdminRecordsPage() {
                       )}
                       {!b.armed && <span className="ml-1 text-amber-700 dark:text-amber-400 font-bold">· not armed yet</span>}
                     </p>
-                    {latestYear && b.gameDate.startsWith(latestYear) && (
-                      <button
-                        onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(b.message)}`, '_blank', 'noopener,noreferrer')}
-                        className="mt-2 px-3 py-1.5 rounded font-rajdhani text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700"
-                      >
-                        📲 Share on WhatsApp
-                      </button>
-                    )}
                   </div>
                     ))}
                   </div>
