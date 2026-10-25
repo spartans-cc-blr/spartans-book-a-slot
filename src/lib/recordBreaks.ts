@@ -186,9 +186,24 @@ function bestPerKey(cands: Candidate[]): Map<string, Candidate> {
   return best
 }
 
+const HUB = 'https://hub.spartanscricketclub.in'
+
+// The page players can open to see this kind of record, pre-filtered to the
+// record's format and season ('all' = all-time).
+export function recordPageUrl(recordKey: string, format: string, year: string | null): string {
+  const y = year ?? 'all'
+  if (/^partnership_w\d+$/.test(recordKey)) return `${HUB}/leaderboard?category=partnerships&format=${format}&year=${y}`
+  if (recordKey === 'highest_score') return `${HUB}/leaderboard?category=batting&format=${format}&year=${y}`
+  if (recordKey === 'best_bowling') return `${HUB}/leaderboard?category=bowling&format=${format}&year=${y}`
+  if (recordKey.startsWith('most_')) return `${HUB}/leaderboard?category=fielding&format=${format}&year=${y}`
+  return `${HUB}/team-stats?format=${format}&year=${y}`   // team totals, chases, defences
+}
+
 function buildMessage(opts: {
   title: string; scopeLabel: string; holder: string; display: string
   opponent: string; gameDate: string; prevHolder: string | null; prevDisplay: string | null
+  recordKey: string; format: string; year: string | null
+  bookingId: string; prevBookingId: string | null
 }): string {
   const date = new Date(`${opts.gameDate}T00:00:00`).toLocaleDateString('en-IN', {
     weekday: 'short', day: 'numeric', month: 'short',
@@ -203,6 +218,9 @@ function buildMessage(opts: {
   if (opts.prevDisplay) {
     lines.push(`Previous best: ${opts.prevDisplay}${opts.prevHolder ? ` — ${opts.prevHolder}` : ''}`)
   }
+  lines.push(``, `🔗 This match: ${HUB}/matches/history/${opts.bookingId}`)
+  if (opts.prevBookingId) lines.push(`🔗 Previous record match: ${HUB}/matches/history/${opts.prevBookingId}`)
+  lines.push(`📊 All ${opts.format} records: ${recordPageUrl(opts.recordKey, opts.format, opts.year)}`)
   lines.push(``, `Well played! 👏`)
   return lines.join('\n')
 }
@@ -277,6 +295,8 @@ export function detectRecordBreaks(target: RecordMatch, all: RecordMatch[]): Rec
           title, scopeLabel: scope.scopeLabel, holder: mine.holder, display: mine.display,
           opponent: target.opponentName, gameDate: target.gameDate,
           prevHolder: bestPrior.holder, prevDisplay: bestPrior.display,
+          recordKey: key, format: fmt, year: scope.scopeKey.startsWith('alltime') ? null : scope.scopeKey.split('|')[0],
+          bookingId: target.bookingId, prevBookingId: bestPrior.match.bookingId,
         }),
       })
     }
@@ -343,6 +363,8 @@ export function computeRecordBook(all: RecordMatch[]): RecordBookEntry[] {
             title: recordTitle(key), scopeLabel: scope.scopeLabel, holder: cell.best.holder, display: cell.best.display,
             opponent: cell.best.match.opponentName, gameDate: cell.best.match.gameDate,
             prevHolder: prev?.holder ?? null, prevDisplay: prev?.display ?? null,
+            recordKey: key, format: fmt, year: scope.year,
+            bookingId: cell.best.match.bookingId, prevBookingId: prev?.match.bookingId ?? null,
           }),
           setInYear: setYear,
           beat: prev ? { display: prev.display, holder: prev.holder, year: prev.match.gameDate.slice(0, 4), bookingId: prev.match.bookingId, gameDate: prev.match.gameDate } : null,
