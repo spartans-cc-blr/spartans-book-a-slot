@@ -67,6 +67,10 @@ answer to "what did we newly achieve this year that beats the previous all-time"
 
 The WhatsApp message (alerts and the Current records share button) ends with links: the match that set the record, the match that held the previous one (when there is one), and the player-facing page for that kind of record filtered to the format and season (`recordPageUrl()`: partnerships / batting / bowling / fielding tabs of `/leaderboard`, or `/team-stats` for team totals).
 
+## 3.2 Player-facing Record Book — `/records`
+
+The same record book is open to every signed-in, non-expelled member at `/records` ("📖 Record Book" in the **Stats ▾** menu and the mobile More sheet). It renders the shared `RecordBookView` (`src/components/records/RecordBookView.tsx`, also used by the admin tab) with `admin={false}`: no WhatsApp share icon and none of the alert details (entry counts, "not armed yet"). It still shows pre-24 Oct records, age, and the "set in {year}, beat X" marker with its old-scorecard link; the 24 Oct date only controls alerts. Data comes from `getRecordBookCached()` (`cachedStats`, 5-minute TTL, dropped on every scorecard sync like the other stats pages). Every figure is already public in the leaderboard and Team Record, so no new data is exposed.
+
 ## 4. Flow
 
 `syncMatchStatsForBooking()` → `detectAndLogRecordBreaks(bookingId)` (`src/lib/recordBreakDetect.ts`,
@@ -110,7 +114,9 @@ fails the scorecard sync.
 | `src/lib/matchStatsSync.ts` | Calls the detector after the fee reminder (skipped for pre-cutoff games) |
 | `src/lib/teamStats.ts` | `getTeamMatchesUncached` now exported |
 | `src/app/api/admin/record-breaks/**` | List + decision routes |
-| `src/app/admin/records/page.tsx` | Review inbox |
+| `src/app/admin/records/page.tsx` | Review inbox (admin) |
+| `src/app/records/page.tsx` (+ `loading.tsx`) | Player-facing Record Book (§3.2) |
+| `src/components/records/RecordBookView.tsx` | Shared record-book UI (admin and player) |
 | `src/components/admin/AdminSidebar.tsx` | 📖 Records entry (book of records) |
 
 ## 9. Not built (ideas)
