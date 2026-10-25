@@ -58,7 +58,7 @@ what each new scorecard is validated against. Nothing is stored: the book is rec
 `match_stats_cache` on request (`GET /api/admin/record-book`, admin only). Practice games are excluded;
 matches before 24 Oct 2026 are part of the baseline even though they never alert.
 
-Any standing record set in the latest year (2026) also has a round WhatsApp icon button (same `WA_ICON` style as the monthly recognition share) beside its value on the Current records card, so records broken before the 24 Oct alert start can still be shared. It only opens a pre-filled `wa.me` message (`RecordBookEntry.message`); nothing is logged and no alert is created.
+Any standing record set in the latest year (2026) also has a plain green WhatsApp glyph (no circle, same look as the `/schedule` page's WhatsApp links) beside its value on the Current records card, so records broken before the 24 Oct alert start can still be shared. It only opens a pre-filled `wa.me` message (`RecordBookEntry.message`); nothing is logged and no alert is created.
 
 On the **All-time** scope each row also carries `setInYear` and `beat` (the best from matches played
 *before* that year). The tab marks rows set in the latest year with "set in 2026, beat 71 (A & B,
