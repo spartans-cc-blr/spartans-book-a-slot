@@ -71,6 +71,8 @@ The WhatsApp message (alerts and the Current records share button) ends with lin
 
 ## 3.2 Player-facing Record Book — `/records`
 
+The page header carries a disclaimer: records reflect only the scorecards synced from CricHeroes so far, so they may change as older matches are caught up.
+
 The same record book is open to every signed-in, non-expelled member at `/records` ("📖 Record Book" in the **Stats ▾** menu and the mobile More sheet). It renders the shared `RecordBookView` (`src/components/records/RecordBookView.tsx`, also used by the admin tab) with `admin={false}`: no WhatsApp share icon and none of the alert details (entry counts, "not armed yet"). It still shows pre-24 Oct records, age, and the "set in {year}, beat X" marker with its old-scorecard link; the 24 Oct date only controls alerts. Data comes from `getRecordBookCached()` (`cachedStats`, 5-minute TTL, dropped on every scorecard sync like the other stats pages). Every figure is already public in the leaderboard and Team Record, so no new data is exposed.
 
 ## 4. Flow
