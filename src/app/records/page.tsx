@@ -39,6 +39,10 @@ export default async function RecordsPage() {
             Spartans&apos; best ever — team totals, individual knocks and spells, fielding and partnerships for every
             wicket — with how long each record has stood. Practice games don&apos;t count.
           </p>
+          <p className="font-rajdhani text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded px-3 py-2 mt-3 max-w-2xl">
+            ℹ️ Records are shown as per how far the Hub has caught up with CricHeroes. Only scorecards synced so far
+            are counted, so a record may change as older matches are added.
+          </p>
         </div>
         <div className="px-5 md:px-8 lg:px-10 py-6 max-w-6xl">
           {records
