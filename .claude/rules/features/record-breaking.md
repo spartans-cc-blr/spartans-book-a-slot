@@ -49,7 +49,7 @@ Each card shows how long the record has stood (`age()` from its match date), and
 
 T20 and T30 are shown side by side in two columns from `lg` (iPad landscape / desktop, page scrolls); on mobile each is a collapsible section (T20 open, T30 closed). The season pills (All-time / each year) are single-select and apply to both columns; cards don't repeat the format or season, since the column heading and selected pill already say it.
 
-`/admin/records` → **Current records** lists every standing record (format T20/T30 × all-time or a
+`/admin/records` opens on the **Current records** tab by default. It lists every standing record (format T20/T30 × all-time or a
 year × each record key) with value, holder, opponent/date, scorecard link and how many entries it was
 picked from; scopes with fewer than `MIN_PRIOR_ENTRIES` show **not armed yet** (a new match can't
 alert there until it has enough history). `computeRecordBook()` and `detectRecordBreaks()` both call

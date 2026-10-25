@@ -44,7 +44,7 @@ function formatDate(d: string) {
 
 export default function AdminRecordsPage() {
   const [rows, setRows] = useState<RecordBreakRow[]>([])
-  const [tab, setTab] = useState<Status | 'book'>('pending')
+  const [tab, setTab] = useState<Status | 'book'>('book')
   const [book, setBook] = useState<BookEntry[] | null>(null)
   const [bookLoading, setBookLoading] = useState(false)
   const [openFmt, setOpenFmt] = useState<Record<string, boolean>>({ T20: true, T30: false })  // mobile only
