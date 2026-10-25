@@ -6,6 +6,7 @@
 // See .claude/rules/features/record-breaking.md.
 
 import { createServiceClient } from '@/lib/supabase'
+import { cachedStats } from '@/lib/statsCache'
 import { getTeamMatchesUncached } from '@/lib/teamStats'
 import { notifyAdmins } from '@/lib/webpush'
 import { isBeforeRecordAlertStart } from '@/lib/repullCutoff'
@@ -52,6 +53,9 @@ export async function getRecordBook(): Promise<RecordBookEntry[]> {
   const loaded = await loadRecordMatches(['T20', 'T30'])
   return loaded ? computeRecordBook(loaded.input) : []
 }
+
+// Player-facing /records: same book, behind the 5-minute stats cache (dropped on every scorecard sync).
+export const getRecordBookCached = cachedStats(getRecordBook, 'record-book')
 
 export async function detectAndLogRecordBreaks(bookingId: string): Promise<void> {
   try {

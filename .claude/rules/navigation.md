@@ -1266,3 +1266,7 @@ section. Visible whenever `isWrangler` (which already includes `isAdmin`). See
 Corner ▾** dropdown and of the mobile More sheet's Captains' Corner section;
 `captains-planning` also highlights the dropdown and the More tab. See
 `features/match-planning.md`.
+
+### Record Book in Stats ▾ (added October 2026)
+
+📖 Record Book (→ `/records`, `activePage="records"`) is the last item of the desktop **Stats ▾** dropdown (which highlights for it) and a "Record Book" row after Players in the mobile More sheet; `records` is in `isAdminOrGcHighlighted()`. See `features/record-breaking.md` §3.2.
