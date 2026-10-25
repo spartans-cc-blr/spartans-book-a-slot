@@ -193,7 +193,7 @@ export default function AdminRecordsPage() {
                             onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(b.message)}`, '_blank', 'noopener,noreferrer')}
                             title="Share this record on WhatsApp"
                             aria-label="Share this record on WhatsApp"
-                            className="w-7 h-7 flex-shrink-0 flex items-center justify-center border border-emerald-600 text-emerald-700 dark:text-emerald-400 rounded-full hover:bg-emerald-600/20 transition-colors"
+                            className="flex-shrink-0 flex items-center justify-center p-1.5 rounded-md text-[#059669] hover:bg-[#059669]/10 transition-colors"
                           >
                             {WA_ICON}
                           </button>
