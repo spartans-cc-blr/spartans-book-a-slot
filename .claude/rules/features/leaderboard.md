@@ -567,7 +567,10 @@ orange/purple player-id lists.
 Two top-10 bar charts above the Bowl table (same bar style as §6.1), below the Pitch Type tabs:
 **Dot Ball %** (dot balls ÷ balls bowled, highest first) and **Least Boundaries Conceded %**
 ((fours + sixes conceded) ÷ balls bowled, lowest first). Each bar shows the %, and
-`count / balls` beside it. Qualification: `MIN_BALLS_FOR_ECONOMY` (30 balls, 5 overs).
+`count / balls` beside it. Qualification: a **cohort** of the 15 bowlers with the most balls
+bowled (everyone tied on balls at the cut-off stays in), ranked within it, top 10 shown per chart.
+A 5-over bowler therefore can't top a season chart, and the bar scales with the filter. The
+`MIN_BALLS_FOR_ECONOMY` (30 balls) floor still applies, so a small filter just gives a shorter list.
 
 - Source: `bowling_stats.dots / fours / sixes`, summed in `aggregate()` into the new optional
   `PlayerStatsTotals.bowlDots / bowlFours / bowlSixes`. No new query or route.
