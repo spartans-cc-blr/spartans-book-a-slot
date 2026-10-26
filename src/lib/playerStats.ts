@@ -1764,7 +1764,7 @@ async function getBowlingPhaseLeadersUncached(
 
   const coverageRows = await fetchAllRows<{ match_id: string; bbb_status: string }>(() =>
     analytics.from('match_coverage').select('match_id, bbb_status').in('match_id', scoped).order('match_id'))
-  const coverage = { covered: 0, total: coverageRows.length }
+  const coverage = { covered: 0, total: coverageRows.length, mismatched: coverageRows.filter(r => r.bbb_status === 'mismatch').length }
   const completeIds = coverageRows.filter(r => r.bbb_status === 'complete').map(r => r.match_id)
   coverage.covered = completeIds.length
   if (completeIds.length === 0) return { ...none, coverage }

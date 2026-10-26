@@ -71,12 +71,14 @@ export const PHASE_FULL_MIN_BOWLERS = 3
 export const PHASE_FULL_MIN_BALLS = 12
 
 export function isFullyCovered(c: PhaseCoverage): boolean {
-  return c.total > 0 && c.covered === c.total
+  return c.total > 0 && c.covered > 0 && c.covered + (c.mismatched ?? 0) === c.total
 }
 
 export interface PhaseTally { balls: number; dots: number; boundaries: number }
 export interface PhaseBowler { playerId: string; phases: Record<PhaseKey, PhaseTally> }
-export interface PhaseCoverage { covered: number; total: number }
+/** covered = matches with complete, reconciled commentary (the only ones whose balls are used);
+ *  mismatched = commentary uploaded but not reconciling with the scorecard (excluded from the numbers). */
+export interface PhaseCoverage { covered: number; total: number; mismatched?: number }
 
 /** What getBowlingPhaseLeaders() returns; plain JSON so it survives the stats cache. */
 export interface BowlingPhaseData {

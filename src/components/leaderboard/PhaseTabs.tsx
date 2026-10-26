@@ -11,7 +11,7 @@ import { PHASE_LABEL, phaseRangeLabel, type PhaseKey } from '@/lib/ballByBall'
 import { pillClass } from './LeaderboardFilters'
 
 export function PhaseTabs({
-  active, phases, format, totalOvers, covered, total,
+  active, phases, format, totalOvers, covered, total, mismatched = 0,
 }: {
   active: PhaseKey | 'all'
   phases: PhaseKey[]
@@ -19,6 +19,7 @@ export function PhaseTabs({
   totalOvers: number
   covered: number
   total: number
+  mismatched?: number
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -44,7 +45,7 @@ export function PhaseTabs({
         ))}
       </div>
       <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mt-1.5">
-        Phase views use ball-by-ball commentary: {covered === total ? `all ${total}` : `${covered} of ${total}`} {format} matches in this filter. They change the two charts below only, not the table.
+        Phase views use ball-by-ball commentary: {covered === total ? `all ${total}` : `${covered} of ${total}`} {format} matches in this filter{mismatched > 0 ? ` (${mismatched} more ${mismatched === 1 ? 'has' : 'have'} commentary that doesn't match the scorecard, so ${mismatched === 1 ? 'is' : 'are'} left out)` : ''}. They change the two charts below only, not the table.
       </p>
     </div>
   )

@@ -319,7 +319,7 @@ export default async function LeaderboardPage({
             {category === 'bowling' && phaseData && phases.length > 0 && (
               <PhaseTabs
                 active={phase ?? 'all'} phases={phases} format={phaseData.format} totalOvers={phaseData.totalOvers}
-                covered={phaseData.coverage.covered} total={phaseData.coverage.total}
+                covered={phaseData.coverage.covered} total={phaseData.coverage.total} mismatched={phaseData.coverage.mismatched}
               />
             )}
             {category === 'bowling' && (
