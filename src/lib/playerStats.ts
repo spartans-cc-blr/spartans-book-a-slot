@@ -1737,13 +1737,26 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
 // DB; the page only shows the tabs when it passes the gate in bowlingPhaseLeaders.ts.
 // See features/leaderboard.md §6.2.3.
 async function getBowlingPhaseLeadersUncached(
-  filters: { year?: number; tournamentId?: string; groundId?: string; format: 'T20' | 'T30'; pitchType?: PitchType }
-): Promise<BowlingPhaseData> {
-  const totalOvers = filters.format === 'T30' ? 30 : 20
-  const none: BowlingPhaseData = { format: filters.format, totalOvers, coverage: { covered: 0, total: 0 }, bowlers: [] }
-
-  const { format, ...rest } = filters
-  const scoped = await getScopedMatchIds({ ...rest, formats: [format] })
+  filters: { year?: number; tournamentId?: string; groundId?: string; format?: 'T20' | 'T30'; pitchType?: PitchType }
+): Promise<BowlingPhaseData | null> {
+  const { format: requested, ...rest } = filters
+  let format = requested
+  let scoped: string[] | null
+  if (format) {
+    scoped = await getScopedMatchIds({ ...rest, formats: [format] })
+  } else {
+    // No format ticked (tournament/ground view): infer it when every match in scope shares one.
+    scoped = await getScopedMatchIds({ ...rest })
+    if (!scoped || scoped.length === 0) return null
+    const { data: bk, error: bkErr } = await createServiceClient()
+      .from('bookings').select('format').in('match_id', scoped).eq('status', 'confirmed')
+    if (bkErr) throw new Error(bkErr.message)
+    const fmts = Array.from(new Set((bk ?? []).map((b: any) => b.format).filter((f: string) => f === 'T20' || f === 'T30')))
+    if (fmts.length !== 1) return null
+    format = fmts[0] as 'T20' | 'T30'
+  }
+  const totalOvers = format === 'T30' ? 30 : 20
+  const none: BowlingPhaseData = { format, totalOvers, coverage: { covered: 0, total: 0 }, bowlers: [] }
   if (!scoped || scoped.length === 0) return none
 
   const analytics = createAnalyticsClient()
@@ -1775,7 +1788,7 @@ async function getBowlingPhaseLeadersUncached(
   const bowlers = agg
     .filter(a => byId.has(a.playerId))
     .map(a => ({ ...a, playerName: byId.get(a.playerId)!.name as string, cricheroesUrl: (byId.get(a.playerId)!.cricheroes_url as string | null) ?? null }))
-  return { format: filters.format, totalOvers, coverage, bowlers }
+  return { format, totalOvers, coverage, bowlers }
 }
 
 // ── Cached public entry points (see src/lib/statsCache.ts) ─────────────────
