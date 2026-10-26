@@ -44,7 +44,7 @@ export function PhaseTabs({
         ))}
       </div>
       <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mt-1.5">
-        Phase views use ball-by-ball commentary: {covered} of {total} {format} matches in this filter. They change the two charts below only, not the table.
+        Phase views use ball-by-ball commentary: {covered === total ? `all ${total}` : `${covered} of ${total}`} {format} matches in this filter. They change the two charts below only, not the table.
       </p>
     </div>
   )

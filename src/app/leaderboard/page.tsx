@@ -19,7 +19,7 @@ import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
 import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, buildPartnershipsGlossary, buildBreakthroughsGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
 import { getMonthSyncStatus } from '@/lib/monthlyRecognition'
-import { availablePhases, isPhaseKey, itemsForPhase, itemsFromRows, PHASE_MIN_BALLS } from '@/lib/bowlingPhaseLeaders'
+import { availablePhases, isPhaseKey, itemsForPhase, itemsFromRows, isFullyCovered, PHASE_FULL_MIN_BALLS, PHASE_MIN_BALLS } from '@/lib/bowlingPhaseLeaders'
 import { PHASE_LABEL, phaseRangeLabel } from '@/lib/ballByBall'
 import { MIN_BALLS_FOR_ECONOMY } from '@/lib/leaderboardMilestones'
 import type { PitchType } from '@/types'
@@ -204,15 +204,16 @@ export default async function LeaderboardPage({
     // Detailed → Bowl phase tabs (powerplay / middle / death) — ball-by-ball based, so only fetched
     // when exactly one format is selected (phases differ per format). Best-effort: a failure just
     // hides the tabs. See features/leaderboard.md §6.2.3.
-    category === 'bowling' && restrictedFormats?.length === 1
+    // With no format ticked, a tournament/ground view infers the format when its matches share one.
+    category === 'bowling' && (restrictedFormats?.length === 1 || (!restrictedFormats && scoped))
       ? getBowlingPhaseLeaders({
           year: overallFilters.year, tournamentId: overallFilters.tournamentId, groundId: overallFilters.groundId,
-          format: restrictedFormats[0], pitchType,
+          format: restrictedFormats?.[0], pitchType,
         }).catch(err => { console.error('[leaderboard] phase data failed:', err?.message ?? err); return null })
       : Promise.resolve(null),
   ])
 
-  const phases = phaseData ? availablePhases(phaseData.bowlers, phaseData.coverage) : []
+  const phases = phaseData ? availablePhases(phaseData.bowlers, phaseData.coverage, scoped) : []
   const phaseParam = searchParams?.phase
   const phase = isPhaseKey(phaseParam) && phases.includes(phaseParam) ? phaseParam : null
 
@@ -324,7 +325,7 @@ export default async function LeaderboardPage({
             {category === 'bowling' && (
               <BowlingControlLeaders
                 items={phase && phaseData ? itemsForPhase(phaseData, phase) : itemsFromRows(rows)}
-                minBalls={phase ? PHASE_MIN_BALLS : MIN_BALLS_FOR_ECONOMY}
+                minBalls={phase ? (scoped && phaseData && isFullyCovered(phaseData.coverage) ? PHASE_FULL_MIN_BALLS : PHASE_MIN_BALLS) : MIN_BALLS_FOR_ECONOMY}
                 phaseLabel={phase && phaseData ? `${PHASE_LABEL[phase]} (${phaseRangeLabel(phase, phaseData.totalOvers).toLowerCase()})` : null}
               />
             )}

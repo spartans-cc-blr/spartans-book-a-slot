@@ -82,4 +82,11 @@ describe('phase gate', () => {
     expect(availablePhases(bowlers(PHASE_MIN_BOWLERS - 1, PHASE_MIN_BALLS), cov)).toEqual([])
     expect(availablePhases(bowlers(PHASE_MIN_BOWLERS, PHASE_MIN_BALLS - 1), cov)).toEqual([])
   })
+
+  it('relaxes the gates for a fully covered tournament/ground', () => {
+    const full = { covered: 4, total: 4 }
+    expect(availablePhases(bowlers(3, 12), full, true)).toEqual(['pp'])
+    expect(availablePhases(bowlers(3, 12), full, false)).toEqual([])
+    expect(availablePhases(bowlers(3, 12), { covered: 3, total: 4 }, true)).toEqual([])
+  })
 })

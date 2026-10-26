@@ -65,6 +65,15 @@ export const PHASE_MIN_COVERAGE = 0.5
 export const PHASE_MIN_BOWLERS = 8
 export const PHASE_MIN_BALLS = 24
 
+/** A tournament/ground whose matches ALL have complete commentary is a complete dataset, so the
+ *  coverage and bowler-count gates relax to these smaller-sample floors. */
+export const PHASE_FULL_MIN_BOWLERS = 3
+export const PHASE_FULL_MIN_BALLS = 12
+
+export function isFullyCovered(c: PhaseCoverage): boolean {
+  return c.total > 0 && c.covered === c.total
+}
+
 export interface PhaseTally { balls: number; dots: number; boundaries: number }
 export interface PhaseBowler { playerId: string; phases: Record<PhaseKey, PhaseTally> }
 export interface PhaseCoverage { covered: number; total: number }
@@ -107,9 +116,12 @@ export function coveragePasses(c: PhaseCoverage): boolean {
 }
 
 /** Phases that earn a tab: coverage gate first, then enough bowlers with a real sample in that phase. */
-export function availablePhases(bowlers: PhaseBowler[], coverage: PhaseCoverage): PhaseKey[] {
-  if (!coveragePasses(coverage)) return []
-  return PHASE_KEYS.filter(p => bowlers.filter(b => b.phases[p].balls >= PHASE_MIN_BALLS).length >= PHASE_MIN_BOWLERS)
+export function availablePhases(bowlers: PhaseBowler[], coverage: PhaseCoverage, scoped = false): PhaseKey[] {
+  const full = scoped && isFullyCovered(coverage)
+  if (!full && !coveragePasses(coverage)) return []
+  const minBowlers = full ? PHASE_FULL_MIN_BOWLERS : PHASE_MIN_BOWLERS
+  const minBalls = full ? PHASE_FULL_MIN_BALLS : PHASE_MIN_BALLS
+  return PHASE_KEYS.filter(p => bowlers.filter(b => b.phases[p].balls >= minBalls).length >= minBowlers)
 }
 
 export function isPhaseKey(v: string | undefined): v is PhaseKey {
