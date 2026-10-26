@@ -3,7 +3,7 @@
 //   2. Boundary % conceded ((fours + sixes) ÷ balls bowled), lowest first.
 // Derived from the same pitch/filter-scoped LeaderboardRow[] as the table
 // below, so it follows Year/Tournament/Ground/Format and the Pitch Type tabs.
-// Bowlers need MIN_BALLS_FOR_ECONOMY balls bowled to qualify. Plain server
+// Only the 15 bowlers with the most balls bowled qualify (see cohort()). Plain server
 // component (no hooks); see features/leaderboard.md §6.5.
 
 import { PlayerNameLink } from '@/lib/playerLink'
@@ -12,9 +12,22 @@ import type { LeaderboardRow } from '@/types'
 
 interface Entry { row: LeaderboardRow; pct: number; count: number; balls: number }
 
+// Cohort: the COHORT_SIZE bowlers with the most balls bowled (everyone tied on
+// balls at the cut-off stays in), then ranked within it. Keeps a handful of
+// overs from topping a season chart, and scales with the filter.
+const COHORT_SIZE = 15
+
+function cohort(rows: LeaderboardRow[]): LeaderboardRow[] {
+  const eligible = rows
+    .filter(r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && r.stats.bowlDots != null)
+    .sort((a, b) => b.stats.ballsBowled - a.stats.ballsBowled)
+  if (eligible.length <= COHORT_SIZE) return eligible
+  const cutoff = eligible[COHORT_SIZE - 1].stats.ballsBowled
+  return eligible.filter(r => r.stats.ballsBowled >= cutoff)
+}
+
 function build(rows: LeaderboardRow[], count: (r: LeaderboardRow) => number, asc: boolean): Entry[] {
   return rows
-    .filter(r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && r.stats.bowlDots != null)
     .map(r => ({ row: r, count: count(r), balls: r.stats.ballsBowled, pct: (count(r) / r.stats.ballsBowled) * 100 }))
     .sort((a, b) => (asc ? a.pct - b.pct : b.pct - a.pct) || b.balls - a.balls || a.row.playerName.localeCompare(b.row.playerName))
     .slice(0, 10)
@@ -53,21 +66,22 @@ function Chart({ title, subtitle, entries, unit }: { title: string; subtitle: st
 }
 
 export function BowlingControlLeaders({ rows }: { rows: LeaderboardRow[] }) {
-  const dots = build(rows, r => r.stats.bowlDots ?? 0, false)
-  const boundaries = build(rows, r => (r.stats.bowlFours ?? 0) + (r.stats.bowlSixes ?? 0), true)
+  const pool = cohort(rows)
+  const dots = build(pool, r => r.stats.bowlDots ?? 0, false)
+  const boundaries = build(pool, r => (r.stats.bowlFours ?? 0) + (r.stats.bowlSixes ?? 0), true)
   if (dots.length === 0) return null
-  const minOvers = MIN_BALLS_FOR_ECONOMY / 6
+  const scope = `Among the ${COHORT_SIZE} bowlers with the most balls bowled, for the current filter.`
   return (
     <>
       <Chart
         title="Dot Ball % — Top 10"
-        subtitle={`Share of balls bowled that were dots. Minimum ${minOvers} overs, for the current filter.`}
+        subtitle={`Share of balls bowled that were dots. ${scope}`}
         entries={dots}
         unit="dot balls"
       />
       <Chart
         title="Least Boundaries Conceded % — Top 10"
-        subtitle={`Share of balls bowled hit for four or six, lowest first. Minimum ${minOvers} overs, for the current filter.`}
+        subtitle={`Share of balls bowled hit for four or six, lowest first. ${scope}`}
         entries={boundaries}
         unit="boundaries"
       />
