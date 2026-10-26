@@ -362,7 +362,7 @@ export function vsBattingRate(over: BattingOver, ctx: OverContext | undefined, b
 
 // ── Over insights ──────────────────────────────────────────────────────────
 
-const isBoundary = (b: BallRow): 'four' | 'six' | null => {
+export const isBoundary = (b: BallRow): 'four' | 'six' | null => {
   const o = b.outcome
   if (o == null) return b.runs_bat === 4 ? 'four' : b.runs_bat === 6 ? 'six' : null
   if (/\bsix\b/i.test(o)) return 'six'

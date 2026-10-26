@@ -580,6 +580,35 @@ A 5-over bowler therefore can't top a season chart, and the bar scales with the 
 - Rows synced before `dots` was extracted would read 0 dots; best-effort like other columns.
 - File: `src/components/leaderboard/BowlingControlLeaders.tsx` (server component).
 
+## 6.2.3 Phase-of-play tabs on the Bowl control charts — added October 2026
+
+An **All / Powerplay / Middle / Death** tab row (`PhaseTabs.tsx`) above the two control charts (§6.2.2),
+below the Pitch Type tabs. It changes the **two charts only**, not the Bowl table. A selected phase shows
+that phase's Dot Ball % and Boundary % (title and subtitle name the phase and its overs).
+
+- **Data source differs:** "All" stays on scorecard data (every synced match). A phase view reads
+  ball-by-ball commentary (`ball_by_ball_linked`, Spartans-bowling innings), because the scorecard has no
+  over-by-over detail. `getBowlingPhaseLeaders()` (`playerStats.ts`, cached via `cachedStats`) counts legal
+  balls, dots (`isDotForBowler`) and boundaries (`isBoundary`) per bowler per phase, using the club's phase
+  plan (`PHASE_PLANS`: T20 1–6 / 7–15 / 16–20, T30 1–8 / 9–23 / 24–30). Only matches with
+  `match_coverage.bbb_status = 'complete'` count; unreconciled bowlers are skipped.
+- **Single format only:** phases differ per format, so the tabs (and the query) exist only when exactly one
+  of T20/T30 is ticked in the format filter. Both ticked = no phase tabs.
+- **The gate** (constants in `src/lib/bowlingPhaseLeaders.ts`): the tabs show only when at least **50%**
+  (`PHASE_MIN_COVERAGE`) of the filter's matches (those present in the analytics DB, same scope as the
+  leaderboard incl. year/tournament/ground/pitch, practice excluded) have complete commentary, **and** a
+  given phase gets a tab only if at least **8** bowlers (`PHASE_MIN_BOWLERS`) bowled **24+** balls
+  (`PHASE_MIN_BALLS`) in it. A hand-edited `?phase=` that fails the gate is ignored. With 2026 coverage at
+  ~36% per format when this shipped, the tabs stay hidden until more commentary is uploaded.
+- **Ranking:** same cohort rule as §6.2.2 (`rankControl()`): the 15 bowlers with the most balls *in that
+  phase*, tied-at-cut-off included, top 10 shown. The caption under the tabs states "N of M {format}
+  matches in this filter".
+- **Cache:** saving a commentary upload (`POST /api/wrangler/commentary`, non-dry-run success) now calls
+  `invalidateStatsCache()`, so new coverage shows within seconds instead of the 5-minute TTL.
+- Files: `src/lib/bowlingPhaseLeaders.ts` (+ `.test.ts`: aggregation, gate, ranking),
+  `src/components/leaderboard/PhaseTabs.tsx`, `BowlingControlLeaders.tsx` (now takes `items`),
+  `matchInsights.ts` (`isBoundary` exported).
+
 ## 6.3 Partnerships (Detailed → Partnerships) — added September 2026
 
 A fifth Detailed sub-tab after Field — top 10 partnerships for any wicket,

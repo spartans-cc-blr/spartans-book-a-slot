@@ -18,6 +18,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
+import { invalidateStatsCache } from '@/lib/statsCache'
 import { isCommentarySide, validateCommentaryPdf } from '@/lib/commentary'
 
 // A cold Render dyno can take ~30s before it even starts parsing, so the
@@ -113,6 +114,8 @@ export async function POST(req: NextRequest) {
   // 200 = parsed (and saved when dry_run=false); 422 = checks failed, nothing
   // saved. Both carry the full result for the UI to render.
   if (res.status === 200 || res.status === 422) {
+    // A saved upload changes match_coverage / ball_by_ball, which the leaderboard's phase tabs read.
+    if (res.status === 200 && !dryRun) invalidateStatsCache()
     return NextResponse.json(body, { status: res.status })
   }
 
