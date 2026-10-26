@@ -1,39 +1,15 @@
 // Detailed → Bowl only — two top-10 bar charts above the table:
 //   1. Dot ball % (dot balls ÷ balls bowled), highest first.
 //   2. Boundary % conceded ((fours + sixes) ÷ balls bowled), lowest first.
-// Derived from the same pitch/filter-scoped LeaderboardRow[] as the table
-// below, so it follows Year/Tournament/Ground/Format and the Pitch Type tabs.
-// Only the 15 bowlers with the most balls bowled qualify (see cohort()). Plain server
-// component (no hooks); see features/leaderboard.md §6.5.
+// Ranked within the 15 bowlers with the most balls bowled (rankControl()). The
+// items come from the leaderboard rows (scorecard data) or, when a phase tab is
+// selected, from ball-by-ball commentary. Plain server component (no hooks);
+// see features/leaderboard.md §6.2.2 and §6.2.3.
 
 import { PlayerNameLink } from '@/lib/playerLink'
-import { MIN_BALLS_FOR_ECONOMY } from '@/lib/leaderboardMilestones'
-import type { LeaderboardRow } from '@/types'
+import { CONTROL_COHORT_SIZE, rankControl, type ControlEntry, type ControlItem } from '@/lib/bowlingPhaseLeaders'
 
-interface Entry { row: LeaderboardRow; pct: number; count: number; balls: number }
-
-// Cohort: the COHORT_SIZE bowlers with the most balls bowled (everyone tied on
-// balls at the cut-off stays in), then ranked within it. Keeps a handful of
-// overs from topping a season chart, and scales with the filter.
-const COHORT_SIZE = 15
-
-function cohort(rows: LeaderboardRow[]): LeaderboardRow[] {
-  const eligible = rows
-    .filter(r => r.stats.ballsBowled >= MIN_BALLS_FOR_ECONOMY && r.stats.bowlDots != null)
-    .sort((a, b) => b.stats.ballsBowled - a.stats.ballsBowled)
-  if (eligible.length <= COHORT_SIZE) return eligible
-  const cutoff = eligible[COHORT_SIZE - 1].stats.ballsBowled
-  return eligible.filter(r => r.stats.ballsBowled >= cutoff)
-}
-
-function build(rows: LeaderboardRow[], count: (r: LeaderboardRow) => number, asc: boolean): Entry[] {
-  return rows
-    .map(r => ({ row: r, count: count(r), balls: r.stats.ballsBowled, pct: (count(r) / r.stats.ballsBowled) * 100 }))
-    .sort((a, b) => (asc ? a.pct - b.pct : b.pct - a.pct) || b.balls - a.balls || a.row.playerName.localeCompare(b.row.playerName))
-    .slice(0, 10)
-}
-
-function Chart({ title, subtitle, entries, unit }: { title: string; subtitle: string; entries: Entry[]; unit: string }) {
+function Chart({ title, subtitle, entries, unit }: { title: string; subtitle: string; entries: ControlEntry[]; unit: string }) {
   const max = Math.max(...entries.map(e => e.pct), 1)
   return (
     <div className="bg-[var(--stats-card-bg)] dark:bg-ink-3 border border-[var(--stats-card-border)] dark:border-ink-5 rounded p-4 mb-4">
@@ -41,13 +17,13 @@ function Chart({ title, subtitle, entries, unit }: { title: string; subtitle: st
       <p className="font-rajdhani text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 mb-4">{subtitle}</p>
       <div className="space-y-2">
         {entries.map((e, i) => (
-          <div key={e.row.playerId} className="flex items-center gap-2">
+          <div key={e.item.playerId} className="flex items-center gap-2">
             <span className="font-cinzel text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 w-7 flex-shrink-0 text-right">{i + 1}</span>
             <div className="flex-1 relative h-7 bg-[var(--stats-row-bg)] dark:bg-ink-4 rounded overflow-hidden">
               <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${Math.max((e.pct / max) * 100, 6)}%` }} />
               <div className="absolute inset-0 flex items-center gap-2 px-2.5">
                 <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text)] dark:text-parchment truncate flex-1 min-w-0">
-                  <PlayerNameLink name={e.row.playerName} playerId={e.row.playerId} cricHeroesUrl={e.row.cricheroesUrl} />
+                  <PlayerNameLink name={e.item.playerName} playerId={e.item.playerId} cricHeroesUrl={e.item.cricheroesUrl} />
                 </span>
                 <span
                   className="font-rajdhani text-[10px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 whitespace-nowrap w-24 text-right"
@@ -65,22 +41,30 @@ function Chart({ title, subtitle, entries, unit }: { title: string; subtitle: st
   )
 }
 
-export function BowlingControlLeaders({ rows }: { rows: LeaderboardRow[] }) {
-  const pool = cohort(rows)
-  const dots = build(pool, r => r.stats.bowlDots ?? 0, false)
-  const boundaries = build(pool, r => (r.stats.bowlFours ?? 0) + (r.stats.bowlSixes ?? 0), true)
+export function BowlingControlLeaders({
+  items, minBalls, phaseLabel = null,
+}: {
+  items: ControlItem[]
+  /** Smallest sample that can qualify at all (balls bowled overall, or in the selected phase). */
+  minBalls: number
+  /** e.g. "Powerplay (overs 1–6)" when a phase tab is selected. */
+  phaseLabel?: string | null
+}) {
+  const { dots, boundaries } = rankControl(items, minBalls)
   if (dots.length === 0) return null
-  const scope = `Among the ${COHORT_SIZE} bowlers with the most balls bowled, for the current filter.`
+  const scope = phaseLabel
+    ? `${phaseLabel} only. Among the ${CONTROL_COHORT_SIZE} bowlers with the most balls bowled in it, for the current filter.`
+    : `Among the ${CONTROL_COHORT_SIZE} bowlers with the most balls bowled, for the current filter.`
   return (
     <>
       <Chart
-        title="Dot Ball % — Top 10"
+        title={phaseLabel ? `Dot Ball % — ${phaseLabel.split(' (')[0]}` : 'Dot Ball % — Top 10'}
         subtitle={`Share of balls bowled that were dots. ${scope}`}
         entries={dots}
         unit="dot balls"
       />
       <Chart
-        title="Least Boundaries Conceded % — Top 10"
+        title={phaseLabel ? `Least Boundaries Conceded % — ${phaseLabel.split(' (')[0]}` : 'Least Boundaries Conceded % — Top 10'}
         subtitle={`Share of balls bowled hit for four or six, lowest first. ${scope}`}
         entries={boundaries}
         unit="boundaries"

@@ -28,6 +28,7 @@ import { aggregatePartnershipLeaders, type MatchPartnerships } from '@/lib/partn
 import { computeBreakthroughs, oversToBalls as oversToBallsStr } from '@/lib/breakthroughs'
 import { buildStandBaselines, classifyStand, type StandBaselines } from '@/lib/standBaselines'
 import { aggregateBreakthroughLeaders, type MatchBreakthroughs } from '@/lib/breakthroughLeaders'
+import { aggregatePhaseBowlers, type BowlingPhaseData } from '@/lib/bowlingPhaseLeaders'
 import type { PlayerStatsTotals, LeaderboardRow, RecentForm, BookingContextStats, PlayerMatchHistoryRow, MonthlyInnings, MonthlyBowlingInnings, BattingPositionLeader, MvpRankEntry, PitchType, PartnershipLeaders, BreakthroughLeaders } from '@/types'
 
 function round2(n: number): number {
@@ -1728,7 +1729,57 @@ export async function getPlayerBookingContextStats(playerId: string, bookingId: 
 }
 
 
+// Phase-of-play bowling control (powerplay / middle / death), for Detailed → Bowl's
+// phase tabs. Phase isn't on the scorecard, so this reads the ball-by-ball view for
+// the Spartans-bowling innings of matches whose commentary is complete (match_coverage),
+// within the same scope as the leaderboard (single format, since phases differ per
+// format). `coverage` is complete matches ÷ matches in scope that exist in the analytics
+// DB; the page only shows the tabs when it passes the gate in bowlingPhaseLeaders.ts.
+// See features/leaderboard.md §6.2.3.
+async function getBowlingPhaseLeadersUncached(
+  filters: { year?: number; tournamentId?: string; groundId?: string; format: 'T20' | 'T30'; pitchType?: PitchType }
+): Promise<BowlingPhaseData> {
+  const totalOvers = filters.format === 'T30' ? 30 : 20
+  const none: BowlingPhaseData = { format: filters.format, totalOvers, coverage: { covered: 0, total: 0 }, bowlers: [] }
+
+  const { format, ...rest } = filters
+  const scoped = await getScopedMatchIds({ ...rest, formats: [format] })
+  if (!scoped || scoped.length === 0) return none
+
+  const analytics = createAnalyticsClient()
+  if (!analytics) throw new Error('Analytics database is not configured')
+
+  const coverageRows = await fetchAllRows<{ match_id: string; bbb_status: string }>(() =>
+    analytics.from('match_coverage').select('match_id, bbb_status').in('match_id', scoped).order('match_id'))
+  const coverage = { covered: 0, total: coverageRows.length }
+  const completeIds = coverageRows.filter(r => r.bbb_status === 'complete').map(r => r.match_id)
+  coverage.covered = completeIds.length
+  if (completeIds.length === 0) return { ...none, coverage }
+
+  const balls = await fetchAllRows<any>(() =>
+    analytics.from('ball_by_ball_linked')
+      .select('match_id, seq, over_no, is_legal, outcome, runs_bat, extras, extra_type, bowler_player_id')
+      .eq('batting_side', 'opponent')
+      .in('match_id', completeIds)
+      .order('match_id').order('seq'))
+
+  const agg = aggregatePhaseBowlers(balls, totalOvers)
+  if (agg.length === 0) return { ...none, coverage }
+
+  const hub = createServiceClient()
+  const { data: players, error } = await hub.from('players').select('id, name, cricheroes_url').in('id', agg.map(a => a.playerId))
+  if (error) throw new Error(error.message)
+  const byId = new Map((players ?? []).map((p: any) => [p.id as string, p]))
+
+  // A player_id no longer in Hub is skipped, same as getLeaderboard().
+  const bowlers = agg
+    .filter(a => byId.has(a.playerId))
+    .map(a => ({ ...a, playerName: byId.get(a.playerId)!.name as string, cricheroesUrl: (byId.get(a.playerId)!.cricheroes_url as string | null) ?? null }))
+  return { format: filters.format, totalOvers, coverage, bowlers }
+}
+
 // ── Cached public entry points (see src/lib/statsCache.ts) ─────────────────
+export const getBowlingPhaseLeaders = cachedStats(getBowlingPhaseLeadersUncached, 'getBowlingPhaseLeaders')
 export const getLeaderboard = cachedStats(getLeaderboardUncached, 'getLeaderboard')
 export const getFilterOptions = cachedStats(getFilterOptionsUncached, 'getFilterOptions')
 export const getAvailableMonths = cachedStats(getAvailableMonthsUncached, 'getAvailableMonths')

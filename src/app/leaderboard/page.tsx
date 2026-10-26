@@ -2,13 +2,14 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
-import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances, getTopScorersByBattingPosition, getPartnershipLeaders, getBreakthroughLeaders } from '@/lib/playerStats'
+import { getLeaderboard, getFilterOptions, getAvailableMonths, getPerformances, getTopScorersByBattingPosition, getPartnershipLeaders, getBreakthroughLeaders, getBowlingPhaseLeaders } from '@/lib/playerStats'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { LeaderboardFilters, type LeaderboardCategory, type Format, type InningsKey } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { BattingPositionLeaders } from '@/components/leaderboard/BattingPositionLeaders'
 import { BowlingControlLeaders } from '@/components/leaderboard/BowlingControlLeaders'
 import { PitchTypeTabs } from '@/components/leaderboard/PitchTypeTabs'
+import { PhaseTabs } from '@/components/leaderboard/PhaseTabs'
 import { PartnershipLeadersView } from '@/components/leaderboard/PartnershipLeaders'
 import { BreakthroughLeadersView } from '@/components/leaderboard/BreakthroughLeaders'
 import { LeaderboardMilestones } from '@/components/leaderboard/LeaderboardMilestones'
@@ -18,6 +19,9 @@ import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
 import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, buildPartnershipsGlossary, buildBreakthroughsGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
 import { getMonthSyncStatus } from '@/lib/monthlyRecognition'
+import { availablePhases, isPhaseKey, itemsForPhase, itemsFromRows, PHASE_MIN_BALLS } from '@/lib/bowlingPhaseLeaders'
+import { PHASE_LABEL, phaseRangeLabel } from '@/lib/ballByBall'
+import { MIN_BALLS_FOR_ECONOMY } from '@/lib/leaderboardMilestones'
 import type { PitchType } from '@/types'
 import type { Metadata } from 'next'
 
@@ -45,7 +49,7 @@ function isPitchType(v: string | undefined): v is PitchType {
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams?: { year?: string; month?: string; tournament?: string; ground?: string; category?: string; format?: string; innings?: string; pitch?: string }
+  searchParams?: { year?: string; month?: string; tournament?: string; ground?: string; category?: string; format?: string; innings?: string; pitch?: string; phase?: string }
 }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
@@ -171,7 +175,7 @@ export default async function LeaderboardPage({
   // two more common bands stay "real stats only". See `features/leaderboard.md`
   // §5/§5.1/§10 for the full history (removed, then restored, on the
   // Monthly tab specifically).
-  const [rows, monthlyPerformances, monthlyPerformancesNoPractice, monthSyncStatus, yearlyPerformances, battingPositionLeaders, partnershipLeaders, breakthroughLeaders] = await Promise.all([
+  const [rows, monthlyPerformances, monthlyPerformancesNoPractice, monthSyncStatus, yearlyPerformances, battingPositionLeaders, partnershipLeaders, breakthroughLeaders, phaseData] = await Promise.all([
     // pitchType only ever narrows `rows` (the Detailed table) — the batting
     // position chart below (battingPositionLeaders) and, on Overall, the
     // Centuries/5-Wicket Hauls lists (yearlyPerformances) deliberately stay
@@ -197,7 +201,20 @@ export default async function LeaderboardPage({
     // Detailed → Breakthroughs — opponent stands broken by Spartans bowlers.
     // See features/partnerships.md §13.
     category === 'breakthroughs' ? getBreakthroughLeaders(overallFilters) : Promise.resolve(null),
+    // Detailed → Bowl phase tabs (powerplay / middle / death) — ball-by-ball based, so only fetched
+    // when exactly one format is selected (phases differ per format). Best-effort: a failure just
+    // hides the tabs. See features/leaderboard.md §6.2.3.
+    category === 'bowling' && restrictedFormats?.length === 1
+      ? getBowlingPhaseLeaders({
+          year: overallFilters.year, tournamentId: overallFilters.tournamentId, groundId: overallFilters.groundId,
+          format: restrictedFormats[0], pitchType,
+        }).catch(err => { console.error('[leaderboard] phase data failed:', err?.message ?? err); return null })
+      : Promise.resolve(null),
   ])
+
+  const phases = phaseData ? availablePhases(phaseData.bowlers, phaseData.coverage) : []
+  const phaseParam = searchParams?.phase
+  const phase = isPhaseKey(phaseParam) && phases.includes(phaseParam) ? phaseParam : null
 
   const glossaryTitle = category === 'overall' ? 'Overall'
     : category === 'monthly' ? 'Monthly'
@@ -298,7 +315,19 @@ export default async function LeaderboardPage({
               <BattingPositionLeaders leaders={battingPositionLeaders} />
             )}
             {showPitchTabs && <PitchTypeTabs active={pitch} />}
-            {category === 'bowling' && <BowlingControlLeaders rows={rows} />}
+            {category === 'bowling' && phaseData && phases.length > 0 && (
+              <PhaseTabs
+                active={phase ?? 'all'} phases={phases} format={phaseData.format} totalOvers={phaseData.totalOvers}
+                covered={phaseData.coverage.covered} total={phaseData.coverage.total}
+              />
+            )}
+            {category === 'bowling' && (
+              <BowlingControlLeaders
+                items={phase && phaseData ? itemsForPhase(phaseData, phase) : itemsFromRows(rows)}
+                minBalls={phase ? PHASE_MIN_BALLS : MIN_BALLS_FOR_ECONOMY}
+                phaseLabel={phase && phaseData ? `${PHASE_LABEL[phase]} (${phaseRangeLabel(phase, phaseData.totalOvers).toLowerCase()})` : null}
+              />
+            )}
             <LeaderboardTable key={category} rows={rows} category={category} tournamentFiltered={tournamentId !== 'all'} />
           </>
         )}
