@@ -562,6 +562,21 @@ orange/purple player-id lists.
 
 ---
 
+## 6.2.2 Bowling control charts (Detailed → Bowl) — added October 2026
+
+Two top-10 bar charts above the Bowl table (same bar style as §6.1), below the Pitch Type tabs:
+**Dot Ball %** (dot balls ÷ balls bowled, highest first) and **Least Boundaries Conceded %**
+((fours + sixes conceded) ÷ balls bowled, lowest first). Each bar shows the %, and
+`count / balls` beside it. Qualification: `MIN_BALLS_FOR_ECONOMY` (30 balls, 5 overs).
+
+- Source: `bowling_stats.dots / fours / sixes`, summed in `aggregate()` into the new optional
+  `PlayerStatsTotals.bowlDots / bowlFours / bowlSixes`. No new query or route.
+- Built from the same `rows` as the table, so unlike the Bat position chart it **does** follow the
+  Pitch Type tabs, plus Year/Tournament/Ground/Format. Practice games excluded as everywhere.
+- Boundary % counts scorecard 4s/6s only (a ball run for four without being marked a boundary isn't counted).
+- Rows synced before `dots` was extracted would read 0 dots; best-effort like other columns.
+- File: `src/components/leaderboard/BowlingControlLeaders.tsx` (server component).
+
 ## 6.3 Partnerships (Detailed → Partnerships) — added September 2026
 
 A fifth Detailed sub-tab after Field — top 10 partnerships for any wicket,

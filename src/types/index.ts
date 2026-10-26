@@ -302,6 +302,12 @@ export interface PlayerStatsTotals {
   // Opponent stands this player's bowling ended; only populated by
   // aggregateMatchHistoryRows() (the player stats page), absent elsewhere.
   standsBroken?:  { broken: number; bigBreaks: number; runs: number }
+  // Bowling control totals from bowling_stats.dots / .fours / .sixes (fours and
+  // sixes conceded). Feeds Detailed → Bowl's Dot Ball % and Boundary % charts.
+  // Only populated by aggregate() (the leaderboard path), absent elsewhere.
+  bowlDots?:      number
+  bowlFours?:     number
+  bowlSixes?:     number
 }
 
 export interface LeaderboardRow {

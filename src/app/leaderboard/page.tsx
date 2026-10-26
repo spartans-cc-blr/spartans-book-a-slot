@@ -7,6 +7,7 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import { LeaderboardFilters, type LeaderboardCategory, type Format, type InningsKey } from '@/components/leaderboard/LeaderboardFilters'
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable'
 import { BattingPositionLeaders } from '@/components/leaderboard/BattingPositionLeaders'
+import { BowlingControlLeaders } from '@/components/leaderboard/BowlingControlLeaders'
 import { PitchTypeTabs } from '@/components/leaderboard/PitchTypeTabs'
 import { PartnershipLeadersView } from '@/components/leaderboard/PartnershipLeaders'
 import { BreakthroughLeadersView } from '@/components/leaderboard/BreakthroughLeaders'
@@ -297,6 +298,7 @@ export default async function LeaderboardPage({
               <BattingPositionLeaders leaders={battingPositionLeaders} />
             )}
             {showPitchTabs && <PitchTypeTabs active={pitch} />}
+            {category === 'bowling' && <BowlingControlLeaders rows={rows} />}
             <LeaderboardTable key={category} rows={rows} category={category} tournamentFiltered={tournamentId !== 'all'} />
           </>
         )}

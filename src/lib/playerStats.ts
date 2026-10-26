@@ -164,6 +164,9 @@ function aggregate(matchIds: Set<string>, batting: any[], bowling: any[], fieldi
     t.wickets      += num(r.wickets)
     t.runsConceded += num(r.runs)
     t.ballsBowled  += oversToBalls(num(r.overs))
+    t.bowlDots  = (t.bowlDots  ?? 0) + num(r.dots)
+    t.bowlFours = (t.bowlFours ?? 0) + num(r.fours)
+    t.bowlSixes = (t.bowlSixes ?? 0) + num(r.sixes)
     const cand = { wickets: num(r.wickets), runs: num(r.runs) }
     if (!bestBowling || cand.wickets > bestBowling.wickets
       || (cand.wickets === bestBowling.wickets && cand.runs < bestBowling.runs)) {
