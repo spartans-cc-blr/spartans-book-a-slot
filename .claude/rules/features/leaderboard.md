@@ -611,7 +611,7 @@ that phase's Dot Ball % and Boundary % (title and subtitle name the phase and it
 
 ### Fully covered tournament/ground (October 2026)
 
-With a Tournament or Ground selected and **every** match in scope having complete commentary (`isFullyCovered()`), the phase tabs show even with no format ticked: the format is inferred from the scope's bookings (`getBowlingPhaseLeaders` returns null if T20 and T30 are mixed, so the user must pick a format). Because that dataset is complete, the 50% coverage gate and the 8-bowler/24-ball floors relax to 3 bowlers with 12+ balls in the phase (`PHASE_FULL_MIN_BOWLERS`, `PHASE_FULL_MIN_BALLS`), and the chart floor drops to 12 balls. Partial coverage in a tournament/ground still uses the normal gates. The caption reads "all N matches" when fully covered.
+With a Tournament or Ground selected and **every** match in scope having complete commentary (`isFullyCovered()`), the phase tabs show even with no format ticked: the format is inferred from the scope's bookings (`getBowlingPhaseLeaders` returns null if T20 and T30 are mixed, so the user must pick a format). Because that dataset is complete, the 50% coverage gate and the 8-bowler/24-ball floors relax to 3 bowlers with 12+ balls in the phase (`PHASE_FULL_MIN_BOWLERS`, `PHASE_FULL_MIN_BALLS`), and the chart floor drops to 12 balls. "Fully covered" counts a match whose commentary is uploaded but flagged `mismatch` against the scorecard as uploaded; its balls are still left out of the numbers and the caption says so. Partial coverage in a tournament/ground still uses the normal gates. The caption reads "all N matches" when fully covered.
 
 ## 6.3 Partnerships (Detailed → Partnerships) — added September 2026
 

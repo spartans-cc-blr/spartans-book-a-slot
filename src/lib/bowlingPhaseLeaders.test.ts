@@ -88,5 +88,7 @@ describe('phase gate', () => {
     expect(availablePhases(bowlers(3, 12), full, true)).toEqual(['pp'])
     expect(availablePhases(bowlers(3, 12), full, false)).toEqual([])
     expect(availablePhases(bowlers(3, 12), { covered: 3, total: 4 }, true)).toEqual([])
+    // uploaded-but-mismatched still counts as uploaded
+    expect(availablePhases(bowlers(3, 12), { covered: 3, total: 4, mismatched: 1 }, true)).toEqual(['pp'])
   })
 })
