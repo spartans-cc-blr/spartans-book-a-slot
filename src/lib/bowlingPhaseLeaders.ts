@@ -20,6 +20,8 @@ export interface ControlItem {
   balls: number
   dots: number
   boundaries: number
+  /** Present on the stacked "All" view: the same totals split by phase. */
+  phases?: Record<PhaseKey, PhaseTally>
 }
 
 export interface ControlEntry { item: ControlItem; count: number; balls: number; pct: number }
@@ -71,12 +73,14 @@ export const PHASE_FULL_MIN_BOWLERS = 3
 export const PHASE_FULL_MIN_BALLS = 12
 
 export function isFullyCovered(c: PhaseCoverage): boolean {
-  return c.total > 0 && c.covered === c.total
+  return c.total > 0 && c.covered > 0 && c.covered + (c.mismatched ?? 0) === c.total
 }
 
 export interface PhaseTally { balls: number; dots: number; boundaries: number }
 export interface PhaseBowler { playerId: string; phases: Record<PhaseKey, PhaseTally> }
-export interface PhaseCoverage { covered: number; total: number }
+/** covered = matches with complete, reconciled commentary (the only ones whose balls are used);
+ *  mismatched = commentary uploaded but not reconciling with the scorecard (excluded from the numbers). */
+export interface PhaseCoverage { covered: number; total: number; mismatched?: number }
 
 /** What getBowlingPhaseLeaders() returns; plain JSON so it survives the stats cache. */
 export interface BowlingPhaseData {
@@ -134,4 +138,16 @@ export function itemsForPhase(data: BowlingPhaseData, phase: PhaseKey): ControlI
     playerId: b.playerId, playerName: b.playerName, cricheroesUrl: b.cricheroesUrl,
     balls: b.phases[phase].balls, dots: b.phases[phase].dots, boundaries: b.phases[phase].boundaries,
   }))
+}
+
+/** "All" view when the phase data passes its gates: each bowler's totals across the three phases,
+ *  keeping the per-phase split so the chart can stack it. */
+export function itemsFromPhaseTotals(data: BowlingPhaseData): ControlItem[] {
+  return data.bowlers.map(b => {
+    const sum = (k: keyof PhaseTally) => PHASE_KEYS.reduce((n, p) => n + b.phases[p][k], 0)
+    return {
+      playerId: b.playerId, playerName: b.playerName, cricheroesUrl: b.cricheroesUrl,
+      balls: sum('balls'), dots: sum('dots'), boundaries: sum('boundaries'), phases: b.phases,
+    }
+  })
 }

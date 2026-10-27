@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  aggregatePhaseBowlers, availablePhases, controlCohort, coveragePasses, rankControl,
+  aggregatePhaseBowlers, availablePhases, itemsFromPhaseTotals, controlCohort, coveragePasses, rankControl,
   PHASE_MIN_BALLS, PHASE_MIN_BOWLERS, type ControlItem, type PhaseBall, type PhaseBowler,
 } from './bowlingPhaseLeaders'
 
@@ -88,5 +88,19 @@ describe('phase gate', () => {
     expect(availablePhases(bowlers(3, 12), full, true)).toEqual(['pp'])
     expect(availablePhases(bowlers(3, 12), full, false)).toEqual([])
     expect(availablePhases(bowlers(3, 12), { covered: 3, total: 4 }, true)).toEqual([])
+    // uploaded-but-mismatched still counts as uploaded
+    expect(availablePhases(bowlers(3, 12), { covered: 3, total: 4, mismatched: 1 }, true)).toEqual(['pp'])
+  })
+})
+
+describe('itemsFromPhaseTotals', () => {
+  it('sums the phases and keeps the split', () => {
+    const [it] = itemsFromPhaseTotals({
+      format: 'T20', totalOvers: 20, coverage: { covered: 1, total: 1 },
+      bowlers: [{ playerId: 'p', playerName: 'P', cricheroesUrl: null, phases: {
+        pp: { balls: 12, dots: 5, boundaries: 1 }, mid: { balls: 24, dots: 8, boundaries: 3 }, death: { balls: 6, dots: 1, boundaries: 2 } } }],
+    })
+    expect([it.balls, it.dots, it.boundaries]).toEqual([42, 14, 6])
+    expect(it.phases?.mid.dots).toBe(8)
   })
 })
