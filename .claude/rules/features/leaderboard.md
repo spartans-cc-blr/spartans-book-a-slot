@@ -617,6 +617,8 @@ With a Tournament or Ground selected and **every** match in scope having complet
 
 When all three phase tabs pass their gates, "All" is no longer the scorecard view: each bowler's bar is stacked by Powerplay / Middle / Death (soft blue / amber / teal fills from the theme-aware `--phase-*` tokens, legend above, each segment labelled with its additive contribution in percentage points (phase dots ÷ the bowler's total balls) at the segment's right end, so the labels sum to the overall % shown on the right; the phase's own rate and balls are in the tooltip; the name sits left of the bar so nothing overlaps). Bar length is the bowler's overall % across the three phases, segment widths are each phase's share of his dots (or boundaries), and the ranking uses these commentary totals (`itemsFromPhaseTotals()`), so ranking and stack agree. The caption says it is built from commentary (N of M matches). If fewer than three phases pass, "All" stays the scorecard-based view. Floor: 30 balls, or 12 for a fully covered tournament/ground.
 
+**Stacked "All" no longer needs all three phase tabs (October 2026).** It shows whenever the coverage gate passes (or the tournament/ground is fully covered) and at least 6 bowlers (`STACK_MIN_BOWLERS`) have the minimum overall sample (`stackedAllPasses()`). A bowler's phase segment with fewer balls than the phase floor (12 for a fully covered scope, else 24) is drawn tinted (40% opacity, noted in the legend and tooltip) instead of the whole view being withheld. Phase tabs still follow their own gates, so a thin Death phase has no tab but still appears, tinted, in the stack.
+
 ## 6.3 Partnerships (Detailed → Partnerships) — added September 2026
 
 A fifth Detailed sub-tab after Field — top 10 partnerships for any wicket,

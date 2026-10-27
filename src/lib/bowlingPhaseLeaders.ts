@@ -128,6 +128,17 @@ export function availablePhases(bowlers: PhaseBowler[], coverage: PhaseCoverage,
   return PHASE_KEYS.filter(p => bowlers.filter(b => b.phases[p].balls >= minBalls).length >= minBowlers)
 }
 
+/** Stacked "All" view: needs the coverage gate (or a fully covered scope) and at least this many
+ *  bowlers with the minimum overall sample. Phases with too few balls for a bowler are tinted, not hidden. */
+export const STACK_MIN_BOWLERS = 6
+
+export function stackedAllPasses(bowlers: PhaseBowler[], coverage: PhaseCoverage, scoped: boolean, minBalls: number): boolean {
+  const full = scoped && isFullyCovered(coverage)
+  if (!full && !coveragePasses(coverage)) return false
+  const total = (b: PhaseBowler) => PHASE_KEYS.reduce((n, p) => n + b.phases[p].balls, 0)
+  return bowlers.filter(b => total(b) >= minBalls).length >= STACK_MIN_BOWLERS
+}
+
 export function isPhaseKey(v: string | undefined): v is PhaseKey {
   return v === 'pp' || v === 'mid' || v === 'death'
 }

@@ -19,7 +19,7 @@ import { StatsSegmentedTabs } from '@/components/stats/StatsSegmentedTabs'
 import { CricHeroesIcon } from '@/components/matches/ScorecardVerifyPanel'
 import { buildOverallGlossary, buildMonthlyGlossary, buildDetailedGlossary, buildPartnershipsGlossary, buildBreakthroughsGlossary, detailedGlossaryTitle } from '@/lib/leaderboardGlossary'
 import { getMonthSyncStatus } from '@/lib/monthlyRecognition'
-import { availablePhases, isPhaseKey, itemsForPhase, itemsFromRows, itemsFromPhaseTotals, isFullyCovered, PHASE_FULL_MIN_BALLS, PHASE_MIN_BALLS } from '@/lib/bowlingPhaseLeaders'
+import { availablePhases, isPhaseKey, itemsForPhase, itemsFromRows, itemsFromPhaseTotals, isFullyCovered, stackedAllPasses, PHASE_FULL_MIN_BALLS, PHASE_MIN_BALLS } from '@/lib/bowlingPhaseLeaders'
 import { PHASE_KEYS, PHASE_LABEL, phaseRangeLabel } from '@/lib/ballByBall'
 import { MIN_BALLS_FOR_ECONOMY } from '@/lib/leaderboardMilestones'
 import type { PitchType } from '@/types'
@@ -218,8 +218,8 @@ export default async function LeaderboardPage({
   const phase = isPhaseKey(phaseParam) && phases.includes(phaseParam) ? phaseParam : null
   // "All" becomes a stacked-by-phase view (from commentary) once all three phases pass their gates;
   // otherwise it stays the scorecard-based view.
-  const stackedAll = !phase && !!phaseData && phases.length === PHASE_KEYS.length
   const phaseFloor = scoped && phaseData && isFullyCovered(phaseData.coverage) ? PHASE_FULL_MIN_BALLS : PHASE_MIN_BALLS
+  const stackedAll = !phase && !!phaseData && stackedAllPasses(phaseData.bowlers, phaseData.coverage, scoped, phaseFloor === PHASE_FULL_MIN_BALLS ? PHASE_FULL_MIN_BALLS : MIN_BALLS_FOR_ECONOMY)
 
   const glossaryTitle = category === 'overall' ? 'Overall'
     : category === 'monthly' ? 'Monthly'
@@ -330,6 +330,7 @@ export default async function LeaderboardPage({
               <BowlingControlLeaders
                 items={phase && phaseData ? itemsForPhase(phaseData, phase) : stackedAll && phaseData ? itemsFromPhaseTotals(phaseData) : itemsFromRows(rows)}
                 minBalls={phase ? phaseFloor : stackedAll ? (phaseFloor === PHASE_FULL_MIN_BALLS ? PHASE_FULL_MIN_BALLS : MIN_BALLS_FOR_ECONOMY) : MIN_BALLS_FOR_ECONOMY}
+                phaseMinBalls={stackedAll ? phaseFloor : undefined}
                 source={stackedAll && phaseData ? `From ball-by-ball commentary (${phaseData.coverage.covered} of ${phaseData.coverage.total} ${phaseData.format} matches).` : null}
                 phaseLabel={phase && phaseData ? `${PHASE_LABEL[phase]} (${phaseRangeLabel(phase, phaseData.totalOvers).toLowerCase()})` : null}
               />
