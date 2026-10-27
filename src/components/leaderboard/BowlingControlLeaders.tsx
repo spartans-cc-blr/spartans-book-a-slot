@@ -34,12 +34,20 @@ function Chart({ title, subtitle, entries, unit, metric }: { title: string; subt
           <div key={e.item.playerId} className="flex items-center gap-2">
             <span className="font-cinzel text-xs text-[var(--stats-text-muted)] dark:text-zinc-500 w-7 flex-shrink-0 text-right">{i + 1}</span>
             {e.item.phases ? (
-              // Stacked: name outside the bar so nothing overlaps; the bar holds only the phase segments.
-              <>
-                <span className="font-rajdhani text-xs font-semibold text-[var(--stats-text)] dark:text-parchment w-32 sm:w-44 flex-shrink-0 truncate">
+              // Stacked: name outside the bar so nothing overlaps. On phones the bar drops to its own
+              // full-width line under the name/figures; from sm up everything sits on one line.
+              <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="order-1 flex-1 min-w-0 sm:flex-none sm:w-44 font-rajdhani text-xs font-semibold text-[var(--stats-text)] dark:text-parchment truncate">
                   <PlayerNameLink name={e.item.playerName} playerId={e.item.playerId} cricHeroesUrl={e.item.cricheroesUrl} />
                 </span>
-                <div className="flex-1 min-w-0 h-7 bg-[var(--stats-row-bg)] dark:bg-ink-4 rounded overflow-hidden">
+                <span
+                  className="order-2 sm:order-3 font-rajdhani text-[10px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 whitespace-nowrap text-right sm:w-24"
+                  title={`${e.count} ${unit} in ${e.balls} balls bowled`}
+                >
+                  {e.count} / {e.balls} balls
+                </span>
+                <span className="order-3 sm:order-4 font-rajdhani text-xs font-bold text-[var(--stats-accent)] dark:text-gold flex-shrink-0 w-12 text-right">{e.pct.toFixed(1)}%</span>
+                <div className="order-4 basis-full sm:basis-0 sm:order-2 sm:flex-1 min-w-0 h-7 bg-[var(--stats-row-bg)] dark:bg-ink-4 rounded overflow-hidden">
                   <div className="h-full flex" style={{ width: `${Math.max((e.pct / max) * 100, 6)}%` }}>
                     {PHASE_KEYS.map(k => {
                       const t = e.item.phases![k]
@@ -53,20 +61,13 @@ function Chart({ title, subtitle, entries, unit, metric }: { title: string; subt
                           style={{ width: `${(c / e.count) * 100}%`, background: PHASE_COLOUR[k], color: 'var(--phase-text)' }}
                           title={`${PHASE_LABEL[k]}: ${c} ${unit} in ${t.balls} balls (${pct.toFixed(1)}%)`}
                         >
-                          {(c / e.count) * (Math.max((e.pct / max) * 100, 6)) >= 7 ? `${pct.toFixed(0)}%` : ''}
+                          {(c / e.count) * (Math.max((e.pct / max) * 100, 6)) >= 9 ? `${pct.toFixed(0)}%` : ''}
                         </div>
                       )
                     })}
                   </div>
                 </div>
-                <span
-                  className="font-rajdhani text-[10px] leading-none font-semibold text-[var(--stats-text-muted)] dark:text-zinc-400 flex-shrink-0 whitespace-nowrap w-24 text-right"
-                  title={`${e.count} ${unit} in ${e.balls} balls bowled`}
-                >
-                  {e.count} / {e.balls} balls
-                </span>
-                <span className="font-rajdhani text-xs font-bold text-[var(--stats-accent)] dark:text-gold flex-shrink-0 w-12 text-right">{e.pct.toFixed(1)}%</span>
-              </>
+              </div>
             ) : (
               <div className="flex-1 relative h-7 bg-[var(--stats-row-bg)] dark:bg-ink-4 rounded overflow-hidden">
                 <div className="absolute inset-y-0 left-0 bg-gold/40 rounded" style={{ width: `${Math.max((e.pct / max) * 100, 6)}%` }} />

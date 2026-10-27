@@ -144,7 +144,7 @@
   --stats-accent-dim: #B45309;
   --stats-row-bg: #F8F4EE;
   /* Phase segments (bowl control charts): soft fills with dark text on light */
-  --phase-pp-bg: #BFD3F2; --phase-mid-bg: #F3D5A4; --phase-death-bg: #BEE2DA; --phase-text: #1C1917;
+  --phase-pp-bg: #A9C4EE; --phase-mid-bg: #EFC98A; --phase-death-bg: #A7D8CC; --phase-text: #1C1917;
   --stats-row-hover: rgba(0,0,0,0.03);
   --stats-badge-bg: #FEF3C7;
   --stats-badge-text: #B45309;
