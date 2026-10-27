@@ -224,3 +224,7 @@ A card between the phase tables and "Their batters to watch" compares every Spar
 - **Pick list per phase** (available players only, best three each way) sits above two collapsed tables, one per discipline, with a whole-team row at the top. The default is available players; "Show everyone" (`?who=all`) lists every Spartans player with ball-by-ball data.
 - **Batting position caveat is printed on the card**: ball-by-ball has no position column, and a batter's phase depends on when they walked in. The table shows the usual position (order of first appearance, most used) next to each name, and the text frames the result as evidence of who scores in a phase, not a rule.
 - The lens tabs and the game picker don't carry `who` over; it resets to available players.
+
+## 17. Player cards never say "nothing stands out" over real data (October 2026)
+
+A card whose rules fire no callout (e.g. a single not-out 32 with no phase spread, dismissal or position change) used to read "Nothing stands out in this view", which looked like missing data. `playerRecordLine()` (`matchPlanning.ts`, tested) now gives a one-line record in that case, e.g. "Batted 1 innings: 32* off 25 balls (SR 128)" and/or "Bowled 4.0 ov: 1/22 (econ 5.5)", followed by "No pointers fired." The old wording remains only for a player with no ball-by-ball data at all. Callouts themselves are unchanged (§12 still applies: cards show callouts, not full figures).

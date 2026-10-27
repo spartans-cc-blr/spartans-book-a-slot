@@ -20,7 +20,7 @@ import { normaliseOpponentName } from '@/lib/opponents'
 import { FormPills } from '@/components/team/TeamSplitTable'
 import { recentForm } from '@/lib/teamStatsCore'
 import { getPlanningContext, LENSES, type Lens } from '@/lib/matchPlanningData'
-import { scoutTeam, scoutPlayers, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
+import { scoutTeam, scoutPlayers, playerRecordLine, rpo, type PhaseTallies, type PlayerScout } from '@/lib/matchPlanning'
 import { phaseContributions } from '@/lib/phaseContribution'
 import { PhaseContributors } from '@/components/captains/PhaseContributors'
 import { PHASE_KEYS, PHASE_LABEL, formatOvers } from '@/lib/ballByBall'
@@ -79,7 +79,10 @@ function PlayerCard({ p, url, response, href, linkLabel }: { p: PlayerScout; url
           {p.insights.map((t, i) => <li key={i} className="font-rajdhani text-sm text-[var(--stats-text-2)]">{t}</li>)}
         </ul>
       ) : (
-        <p className={`font-rajdhani text-sm ${muted}`}>Nothing stands out in this view.</p>
+        <p className={`font-rajdhani text-sm ${muted}`}>
+          {playerRecordLine(p) ?? 'Nothing stands out in this view.'}{' '}
+          <span className="text-[11px]">No pointers fired.</span>
+        </p>
       )}
       {href && <Link href={href} className="inline-block mt-2 font-rajdhani text-xs font-bold text-[var(--stats-accent)] underline decoration-dotted">{linkLabel} &rarr;</Link>}
     </div>
