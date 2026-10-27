@@ -53,15 +53,16 @@ function Chart({ title, subtitle, entries, unit, metric }: { title: string; subt
                       const t = e.item.phases![k]
                       const c = t[metric]
                       if (c === 0 || e.count === 0) return null
-                      const pct = t.balls > 0 ? (c / t.balls) * 100 : 0
+                      const own = t.balls > 0 ? (c / t.balls) * 100 : 0
+                      const points = (c / e.balls) * 100 // this phase's share of the overall %, so segments sum to it
                       return (
                         <div
                           key={k}
                           className="h-full flex items-center justify-end pr-1.5 overflow-hidden font-rajdhani text-[11px] font-bold border-r border-[var(--stats-card-bg)] dark:border-ink-3 last:border-r-0"
                           style={{ width: `${(c / e.count) * 100}%`, background: PHASE_COLOUR[k], color: 'var(--phase-text)' }}
-                          title={`${PHASE_LABEL[k]}: ${c} ${unit} in ${t.balls} balls (${pct.toFixed(1)}%)`}
+                          title={`${PHASE_LABEL[k]}: ${c} ${unit} from ${t.balls} balls in this phase (${own.toFixed(1)}% of them). Adds ${points.toFixed(1)} points to the overall ${e.pct.toFixed(1)}%.`}
                         >
-                          {(c / e.count) * (Math.max((e.pct / max) * 100, 6)) >= 9 ? `${pct.toFixed(0)}%` : ''}
+                          {(c / e.count) * (Math.max((e.pct / max) * 100, 6)) >= 9 ? points.toFixed(1) : ''}
                         </div>
                       )
                     })}
@@ -108,7 +109,7 @@ export function BowlingControlLeaders({
   const scope = phaseLabel
     ? `${phaseLabel} only. Among the ${CONTROL_COHORT_SIZE} bowlers with the most balls bowled in it, for the current filter.`
     : source
-      ? `Stacked by phase. ${source} Among the ${CONTROL_COHORT_SIZE} bowlers with the most balls bowled, for the current filter.`
+      ? `Stacked by phase: each segment is that phase's share, in percentage points, of the bowler's overall % (segments add up to the % on the right; hover a segment for the phase's own rate). ${source} Among the ${CONTROL_COHORT_SIZE} bowlers with the most balls bowled, for the current filter.`
       : `Among the ${CONTROL_COHORT_SIZE} bowlers with the most balls bowled, for the current filter.`
   return (
     <>
