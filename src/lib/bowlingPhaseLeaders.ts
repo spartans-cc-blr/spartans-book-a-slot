@@ -20,6 +20,8 @@ export interface ControlItem {
   balls: number
   dots: number
   boundaries: number
+  /** Present on the stacked "All" view: the same totals split by phase. */
+  phases?: Record<PhaseKey, PhaseTally>
 }
 
 export interface ControlEntry { item: ControlItem; count: number; balls: number; pct: number }
@@ -136,4 +138,16 @@ export function itemsForPhase(data: BowlingPhaseData, phase: PhaseKey): ControlI
     playerId: b.playerId, playerName: b.playerName, cricheroesUrl: b.cricheroesUrl,
     balls: b.phases[phase].balls, dots: b.phases[phase].dots, boundaries: b.phases[phase].boundaries,
   }))
+}
+
+/** "All" view when the phase data passes its gates: each bowler's totals across the three phases,
+ *  keeping the per-phase split so the chart can stack it. */
+export function itemsFromPhaseTotals(data: BowlingPhaseData): ControlItem[] {
+  return data.bowlers.map(b => {
+    const sum = (k: keyof PhaseTally) => PHASE_KEYS.reduce((n, p) => n + b.phases[p][k], 0)
+    return {
+      playerId: b.playerId, playerName: b.playerName, cricheroesUrl: b.cricheroesUrl,
+      balls: sum('balls'), dots: sum('dots'), boundaries: sum('boundaries'), phases: b.phases,
+    }
+  })
 }
