@@ -1,8 +1,9 @@
-// PATCH /api/wrangler/commentary/penalty — wrangler/admin only.
+// PATCH /api/wrangler/commentary/penalty — admin only (a deliberate decision: a commentary/scorecard gap
+// should be looked at by an admin, not waved through at upload time).
 // Records penalty runs for one uploaded commentary innings. Penalty runs are on the scorecard total
 // but are not a delivery, so the printed commentary never contains them; the analytics view
 // ball_by_ball_validation compares commentary runs + penalty_runs with the scorecard.
-// vibe-security: role re-checked server-side, match id re-derived from the booking, input Zod-validated.
+// vibe-security: admin role re-checked server-side, match id re-derived from the booking, input Zod-validated.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -17,7 +18,7 @@ export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
   if (!user?.playerId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  if (!user?.isWrangler && !user?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!user?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const limited = await rateLimit(req, RATE_LIMITS.adminWrite, user.playerId)
   if (limited) return limited
