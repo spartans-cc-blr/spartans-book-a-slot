@@ -612,3 +612,21 @@ export function playerInsights(p: PlayerScout): string[] {
   }
   return out
 }
+
+/** One-line record for a player card with no callouts, so a card never says "nothing stands out" while there is data.
+ *  e.g. "32* off 25 balls (SR 128) in 1 innings · 2-0-14-1". */
+export function playerRecordLine(p: PlayerScout): string | null {
+  const parts: string[] = []
+  const b = p.batting
+  if (b && b.balls > 0) {
+    const notOuts = b.innings - b.dismissals
+    const sr = strikeRate(b.runs, b.balls)
+    parts.push(`Batted ${b.innings} innings: ${b.runs}${b.innings === 1 && notOuts === 1 ? '*' : ''} off ${b.balls} balls`
+      + `${sr != null ? ` (SR ${Math.round(sr)})` : ''}${b.innings > 1 && notOuts > 0 ? `, ${notOuts} not out` : ''}`)
+  }
+  const w = p.bowling
+  if (w && w.legalBalls > 0) {
+    parts.push(`Bowled ${formatOvers(w.legalBalls)} ov: ${w.wickets}/${w.runs} (econ ${f1(w.economy)})`)
+  }
+  return parts.length ? parts.join(' · ') : null
+}
