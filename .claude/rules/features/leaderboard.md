@@ -615,7 +615,7 @@ With a Tournament or Ground selected and **every** match in scope having complet
 
 ### Stacked "All" view (October 2026)
 
-When all three phase tabs pass their gates, "All" is no longer the scorecard view: each bowler's bar is stacked by Powerplay / Middle / Death (blue / amber / teal, legend above, each segment labelled with that phase's own %). Bar length is the bowler's overall % across the three phases, segment widths are each phase's share of his dots (or boundaries), and the ranking uses these commentary totals (`itemsFromPhaseTotals()`), so ranking and stack agree. The caption says it is built from commentary (N of M matches). If fewer than three phases pass, "All" stays the scorecard-based view. Floor: 30 balls, or 12 for a fully covered tournament/ground.
+When all three phase tabs pass their gates, "All" is no longer the scorecard view: each bowler's bar is stacked by Powerplay / Middle / Death (soft blue / amber / teal fills from the theme-aware `--phase-*` tokens, legend above, each segment labelled only with its phase's own % at the segment's right end; the name sits left of the bar so nothing overlaps). Bar length is the bowler's overall % across the three phases, segment widths are each phase's share of his dots (or boundaries), and the ranking uses these commentary totals (`itemsFromPhaseTotals()`), so ranking and stack agree. The caption says it is built from commentary (N of M matches). If fewer than three phases pass, "All" stays the scorecard-based view. Floor: 30 balls, or 12 for a fully covered tournament/ground.
 
 ## 6.3 Partnerships (Detailed → Partnerships) — added September 2026
 
