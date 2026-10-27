@@ -13,7 +13,7 @@ import { CONTROL_COHORT_SIZE, rankControl, type ControlEntry, type ControlItem }
 // Segment colours for the stacked "All" view: theme-aware soft fills (see --phase-* in globals.css).
 const PHASE_COLOUR: Record<PhaseKey, string> = { pp: 'var(--phase-pp-bg)', mid: 'var(--phase-mid-bg)', death: 'var(--phase-death-bg)' }
 
-function Chart({ title, subtitle, entries, unit, metric }: { title: string; subtitle: string; entries: ControlEntry[]; unit: string; metric: 'dots' | 'boundaries' }) {
+function Chart({ title, subtitle, entries, unit, metric, phaseMinBalls }: { title: string; subtitle: string; entries: ControlEntry[]; unit: string; metric: 'dots' | 'boundaries'; phaseMinBalls?: number }) {
   const stacked = entries.some(e => e.item.phases)
   const max = Math.max(...entries.map(e => e.pct), 1)
   return (
@@ -27,6 +27,11 @@ function Chart({ title, subtitle, entries, unit, metric }: { title: string; subt
               <span className="inline-block w-2.5 h-2.5 rounded-sm border border-black/10 dark:border-white/10" style={{ background: PHASE_COLOUR[k] }} />{PHASE_LABEL[k]}
             </span>
           ))}
+          {phaseMinBalls != null && (
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm border border-black/10 dark:border-white/10 opacity-40" style={{ background: 'repeating-linear-gradient(45deg, var(--phase-pp-bg) 0 2px, transparent 2px 4px)' }} />Tinted: under {phaseMinBalls} balls in that phase
+            </span>
+          )}
         </div>
       )}
       <div className="space-y-2">
@@ -55,12 +60,13 @@ function Chart({ title, subtitle, entries, unit, metric }: { title: string; subt
                       if (c === 0 || e.count === 0) return null
                       const own = t.balls > 0 ? (c / t.balls) * 100 : 0
                       const points = (c / e.balls) * 100 // this phase's share of the overall %, so segments sum to it
+                      const thin = phaseMinBalls != null && t.balls < phaseMinBalls // too small a sample: tint, don't hide
                       return (
                         <div
                           key={k}
                           className="h-full flex items-center justify-end pr-1.5 overflow-hidden font-rajdhani text-[11px] font-bold border-r border-[var(--stats-card-bg)] dark:border-ink-3 last:border-r-0"
-                          style={{ width: `${(c / e.count) * 100}%`, background: PHASE_COLOUR[k], color: 'var(--phase-text)' }}
-                          title={`${PHASE_LABEL[k]}: ${c} ${unit} from ${t.balls} balls in this phase (${own.toFixed(1)}% of them). Adds ${points.toFixed(1)} points to the overall ${e.pct.toFixed(1)}%.`}
+                          style={{ width: `${(c / e.count) * 100}%`, background: PHASE_COLOUR[k], color: 'var(--phase-text)', opacity: thin ? 0.4 : 1 }}
+                          title={`${PHASE_LABEL[k]}${thin ? ' (small sample)' : ''}: ${c} ${unit} from ${t.balls} balls in this phase (${own.toFixed(1)}% of them). Adds ${points.toFixed(1)} points to the overall ${e.pct.toFixed(1)}%.`}
                         >
                           {(c / e.count) * (Math.max((e.pct / max) * 100, 6)) >= 9 ? points.toFixed(1) : ''}
                         </div>
@@ -94,8 +100,10 @@ function Chart({ title, subtitle, entries, unit, metric }: { title: string; subt
 }
 
 export function BowlingControlLeaders({
-  items, minBalls, phaseLabel = null, source = null,
+  items, minBalls, phaseLabel = null, source = null, phaseMinBalls,
 }: {
+  /** Stacked view only: a bowler's phase segment with fewer balls than this is drawn tinted. */
+  phaseMinBalls?: number
   items: ControlItem[]
   /** Smallest sample that can qualify at all (balls bowled overall, or in the selected phase). */
   minBalls: number
@@ -119,6 +127,7 @@ export function BowlingControlLeaders({
         entries={dots}
         unit="dot balls"
         metric="dots"
+        phaseMinBalls={phaseMinBalls}
       />
       <Chart
         title={phaseLabel ? `Least Boundaries Conceded % — ${phaseLabel.split(' (')[0]}` : 'Least Boundaries Conceded % — Top 10'}
@@ -126,6 +135,7 @@ export function BowlingControlLeaders({
         entries={boundaries}
         unit="boundaries"
         metric="boundaries"
+        phaseMinBalls={phaseMinBalls}
       />
     </>
   )

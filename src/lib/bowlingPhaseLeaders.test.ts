@@ -104,3 +104,15 @@ describe('itemsFromPhaseTotals', () => {
     expect(it.phases?.mid.dots).toBe(8)
   })
 })
+
+import { stackedAllPasses } from './bowlingPhaseLeaders'
+describe('stackedAllPasses', () => {
+  const mk = (n: number) => Array.from({ length: n }, (_, i) => ({ playerId: `p${i}`, phases: { pp: { balls: 12, dots: 0, boundaries: 0 }, mid: { balls: 12, dots: 0, boundaries: 0 }, death: { balls: 0, dots: 0, boundaries: 0 } } }))
+  it('needs 6 bowlers with the minimum sample', () => {
+    expect(stackedAllPasses(mk(6), { covered: 3, total: 3 }, true, 12)).toBe(true)
+    expect(stackedAllPasses(mk(5), { covered: 3, total: 3 }, true, 12)).toBe(false)
+  })
+  it('needs coverage', () => {
+    expect(stackedAllPasses(mk(8), { covered: 1, total: 4 }, false, 12)).toBe(false)
+  })
+})
