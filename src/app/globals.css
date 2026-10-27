@@ -143,6 +143,8 @@
   --stats-accent: #D97706;
   --stats-accent-dim: #B45309;
   --stats-row-bg: #F8F4EE;
+  /* Phase segments (bowl control charts): soft fills with dark text on light */
+  --phase-pp-bg: #BFD3F2; --phase-mid-bg: #F3D5A4; --phase-death-bg: #BEE2DA; --phase-text: #1C1917;
   --stats-row-hover: rgba(0,0,0,0.03);
   --stats-badge-bg: #FEF3C7;
   --stats-badge-text: #B45309;
@@ -323,6 +325,8 @@
   --stats-accent: #C9A84C;
   --stats-accent-dim: #7A6030;
   --stats-row-bg: #1A1A1A;
+  /* Phase segments: deeper fills with light text on dark */
+  --phase-pp-bg: #2F5E9E; --phase-mid-bg: #94681F; --phase-death-bg: #2A7A6F; --phase-text: #F8F4EE;
   --stats-row-hover: rgba(255,255,255,0.04);
   --stats-badge-bg: #3d2e00;
   --stats-badge-text: #E8C97A;
