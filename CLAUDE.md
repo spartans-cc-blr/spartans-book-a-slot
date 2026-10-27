@@ -36,3 +36,20 @@ most important rule: never put a cron that runs more than once a day in
 `vercel.json`. Hobby rejects the entire deployment, and every merge after
 it silently fails to deploy. Use a GitHub Actions workflow instead.
 
+
+## Pull requests — check the merge status before pushing follow-up work
+
+Before pushing any further commit to a branch that already has a pull request, or
+before opening a PR for work done on top of one, **check whether that PR has been
+merged** (GitHub MCP `pull_request_read` with `get`, or `list_pull_requests` for the
+branch; look at `merged` / `state`). Do this every time, not only when asked, and again
+after any long pause or when the user mentions a PR number.
+
+- **Merged or closed:** do not push to that branch or reuse the PR. Fetch the latest
+  default branch, start a new branch from it (`git fetch origin main && git checkout -b <new-branch> origin/main`),
+  cherry-pick only the commits that are not yet on `main` (`git log origin/main..<old-branch>`),
+  push, and open a **new** PR. Say in the new PR's description which PR it follows.
+- **Still open:** push to the same branch; the PR updates itself.
+- **No PR yet:** only open one when the user asks.
+- Never assume a PR is still open because it was open earlier in the session; merges
+  happen between turns.

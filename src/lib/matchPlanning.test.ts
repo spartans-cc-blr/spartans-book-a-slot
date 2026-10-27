@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { BallRow } from './ballByBall'
-import { scoutTeam, scoutPlayers, dismissalGroup, type ScoutMatchInput } from './matchPlanning'
+import { scoutTeam, scoutPlayers, playerRecordLine, dismissalGroup, type ScoutMatchInput } from './matchPlanning'
 
 let seq = 0
 function ball(o: Partial<BallRow>): BallRow {
@@ -101,5 +101,15 @@ describe('wicket moments', () => {
     ]
     const r = scoutPlayers([{ ...match('m2', '2026-09-27', balls), battedFirst: true, teamTotal: 150, opponentName: 'Rising Phoenix' }], [{ id: 'g1', name: 'Manoj' }])
     expect(r[0].insights.join(' ')).toMatch(/turned the chase/)
+  })
+})
+
+describe('playerRecordLine', () => {
+  it('summarises a not-out innings that triggers no callout', () => {
+    seq = 0
+    const balls = Array.from({ length: 25 }, () => ball({ batter: 'Muthu', batter_player_id: 'p1', runs_bat: 1, runs_total: 1, over_no: 8 }))
+    const [r] = scoutPlayers([match('m1', '2026-01-01', balls)], [{ id: 'p1', name: 'Muthu' }])
+    expect(r.insights).toEqual([])
+    expect(playerRecordLine(r)).toBe('Batted 1 innings: 25* off 25 balls (SR 100)')
   })
 })
