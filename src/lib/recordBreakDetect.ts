@@ -30,7 +30,7 @@ async function loadRecordMatches(formats: string[]): Promise<{ teamMatches: Team
   for (const ids of chunk(wanted.map(m => m.bookingId), 50)) {
     const { data, error } = await supabase
       .from('match_stats_cache')
-      .select('booking_id, batting, bowling, fielding, fall_of_wickets')
+      .select('booking_id, batting, bowling, fielding, fall_of_wickets, opponent_fall_of_wickets, opponent_total, opponent_wickets, opponent_overs')
       .in('booking_id', ids)
     if (error) { console.error('[record-breaks] cache read failed:', error.message); return null }
     rows.push(...(data ?? []))
@@ -43,6 +43,8 @@ async function loadRecordMatches(formats: string[]): Promise<{ teamMatches: Team
       opponentName: m.opponentLabel || m.opponentName, result: m.result, battedFirst: m.battedFirst,
       teamTotal: m.teamTotal, teamWickets: m.teamWickets, teamOvers: m.teamOvers,
       batting: c?.batting ?? [], bowling: c?.bowling ?? [], fielding: c?.fielding ?? [], fallOfWickets: c?.fall_of_wickets ?? [],
+      opponentFallOfWickets: c?.opponent_fall_of_wickets ?? [],
+      opponentTotal: c?.opponent_total ?? null, opponentWickets: c?.opponent_wickets ?? null, opponentOvers: c?.opponent_overs ?? null,
     }
   })
   return { teamMatches, input }
