@@ -154,3 +154,30 @@ describe('reignHeadline', () => {
     expect(reignHeadline('2025-12-10', '2026-02-01')).toBe('beats a record set in Dec 2025')
   })
 })
+
+describe('breakthrough records', () => {
+  // Opponent innings where wicket 1 fell at 60 (bowler Ravi), 2 at 80 (run out), 3 at 150 (Ravi).
+  const oppFow = (firstStand: number) => [
+    { wicket_number: 1, team_score: firstStand, over: 8, player_name: 'A', bowler_name: 'Ravi', dismissal_type: 'bowled' },
+    { wicket_number: 2, team_score: firstStand + 20, over: 11, player_name: 'B', bowler_name: null, dismissal_type: 'run_out' },
+  ]
+  const withOpp = (id: string, stand: number, date: string) =>
+    match({ bookingId: id, gameDate: date, opponentFallOfWickets: oppFow(stand), opponentTotal: stand + 20, opponentWickets: 2, opponentOvers: 11 })
+  const hist = () => Array.from({ length: MIN_PRIOR_ENTRIES + 1 }, (_, i) => withOpp(`o${i}`, 40 + i, `2026-0${i + 1}-10`))
+
+  it('flags the biggest stand a bowler broke at a wicket, ignoring run-outs', () => {
+    const target = withOpp('t', 90, '2026-10-10')
+    const breaks = detectRecordBreaks(target, [...hist(), target])
+    const b = breaks.find(x => x.recordKey === 'breakthrough_w1')
+    expect(b?.scopeKey).toBe('alltime|T20')
+    expect(b?.holder).toBe('Ravi')
+    expect(b?.display).toContain('90')
+    expect(b?.title).toBe('Biggest stand broken — 1st wicket')
+    expect(breaks.find(x => x.recordKey === 'breakthrough_w2')).toBeUndefined()   // run-out, no bowler
+  })
+
+  it('appears in the record book and does not sort among partnerships', () => {
+    const book = computeRecordBook(hist())
+    expect(book.some(r => r.recordKey === 'breakthrough_w1')).toBe(true)
+  })
+})

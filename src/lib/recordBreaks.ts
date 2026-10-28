@@ -17,6 +17,7 @@
 // being the best of two earlier 3rd-wicket stands isn't news.
 
 import { computePartnerships, type FinalScore } from '@/lib/partnerships'
+import { computeBreakthroughs, type OpponentFowRow } from '@/lib/breakthroughs'
 
 export const MIN_PRIOR_ENTRIES = 5
 export const MAX_BREAKS_PER_MATCH = 6
@@ -42,6 +43,12 @@ export interface RecordMatch {
   bowling:      BowlRow[]
   fielding?:    FieldRow[]
   fallOfWickets: FowRow[]
+  // Opponent innings, for breakthrough records (stands a Spartans bowler ended).
+  // Only matches synced since opponent_fall_of_wickets existed have rows.
+  opponentFallOfWickets?: OpponentFowRow[]
+  opponentTotal?:   number | null
+  opponentWickets?: number | null
+  opponentOvers?:   number | string | null
 }
 
 interface Candidate {
@@ -97,7 +104,9 @@ export function recordTitle(key: string): string {
     case 'most_run_outs':   return 'Most run-outs in a match'
     default: {
       const m = /^partnership_w(\d+)$/.exec(key)
-      return m ? `${ordinal(Number(m[1]))}-wicket partnership` : key
+      if (m) return `${ordinal(Number(m[1]))}-wicket partnership`
+      const b = /^breakthrough_w(\d+)$/.exec(key)
+      return b ? `Biggest stand broken — ${ordinal(Number(b[1]))} wicket` : key
     }
   }
 }
@@ -174,6 +183,24 @@ export function extractCandidates(m: RecordMatch): Candidate[] {
       display: `${p.runs}${p.outPlayer === null ? '*' : ''}${balls > 0 ? ` (${balls} balls)` : ''}`,
     })
   }
+
+  // Breakthroughs: the opponent stand a Spartans bowler ended at each wicket.
+  // Needs a credited bowler (no run-outs / unclassified / unbroken closing stand).
+  const oppStands = computeBreakthroughs(
+    m.opponentFallOfWickets,
+    m.opponentTotal != null && m.opponentOvers != null
+      ? { total: m.opponentTotal, overs: m.opponentOvers, wickets: m.opponentWickets ?? null }
+      : null,
+  )
+  for (const s of oppStands) {
+    if (!s.bowlerName || s.wicketNumber < 1 || s.wicketNumber > 10) continue
+    out.push({
+      key: `breakthrough_w${s.wicketNumber}`,
+      value: s.runs,
+      holder: s.bowlerName,
+      display: `${s.runs}${s.balls != null && s.balls > 0 ? ` (${s.balls} balls)` : ''}`,
+    })
+  }
   return out
 }
 
@@ -193,6 +220,7 @@ const HUB = 'https://hub.spartanscricketclub.in'
 export function recordPageUrl(recordKey: string, format: string, year: string | null): string {
   const y = year ?? 'all'
   if (/^partnership_w\d+$/.test(recordKey)) return `${HUB}/leaderboard?category=partnerships&format=${format}&year=${y}`
+  if (recordKey.startsWith('breakthrough_w')) return `${HUB}/leaderboard?category=breakthroughs&format=${format}&year=${y}`
   if (recordKey === 'highest_score') return `${HUB}/leaderboard?category=batting&format=${format}&year=${y}`
   if (recordKey === 'best_bowling') return `${HUB}/leaderboard?category=bowling&format=${format}&year=${y}`
   if (recordKey.startsWith('most_')) return `${HUB}/leaderboard?category=fielding&format=${format}&year=${y}`
@@ -273,7 +301,8 @@ function buildBaseline(matches: RecordMatch[], inScope: (m: RecordMatch) => bool
 
 const rankOf = (k: string) => {
   const i = RECORD_ORDER.indexOf(k)
-  return i === -1 ? RECORD_ORDER.length + (Number(k.replace(/\D/g, '')) || 0) : i
+  const n = Number(k.replace(/\D/g, '')) || 0
+  return i === -1 ? RECORD_ORDER.length + (k.startsWith('breakthrough_') ? 20 : 0) + n : i
 }
 
 function scopesFor(fmt: string, year: string) {

@@ -24,6 +24,7 @@ club-wide modal.
 | `best_bowling` | Best bowling figures (≥3 wickets; wickets, then fewer runs) | better |
 | `most_dismissals` / `most_catches` / `most_stumpings` / `most_run_outs` | Individual fielding in one match (catches include keeper catches; floors: 2 dismissals, 2 catches, 1 stumping, 1 run-out) | higher |
 | `partnership_w1`…`w10` | Highest partnership for that wicket (`computePartnerships()`) | higher |
+| `breakthrough_w1`…`w10` | Biggest opponent stand a Spartans bowler ended at that wicket (`computeBreakthroughs()`, credited to the bowler; run-outs and the unbroken final stand excluded). Built from `opponent_fall_of_wickets`, so only matches synced since that existed count; the `/records` disclaimer covers it. Links to Detailed → Breakthroughs | higher |
 
 Scopes: **`<format>` all-time** and **`<format>` in the match's calendar year**, T20 and T30 kept
 separate (other formats and practice games are ignored). A record broken at the all-time scope is
