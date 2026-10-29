@@ -493,3 +493,11 @@ export const playerAbsenceSchema = z.object({
 export const recordBreakDecisionSchema = z.object({
   status: z.enum(['pending', 'shared', 'ignored']),
 }).strict()
+
+// ── COMMENTARY PENALTY RUNS (/api/wrangler/commentary/penalty) — commentary-upload.md ──
+export const commentaryPenaltySchema = z.object({
+  booking_id: z.string().uuid(),
+  side: z.enum(['spartans', 'opponent']),
+  penalty_runs: z.number().int().min(0).max(50),
+  note: z.string().trim().max(200).optional(),
+}).strict()
