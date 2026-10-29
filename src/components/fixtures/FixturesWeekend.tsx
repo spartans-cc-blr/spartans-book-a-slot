@@ -144,10 +144,10 @@ export function FixturesWeekendGroup({
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 items-start">
       {bookings.map(b => (
         <div key={b.id} className="mb-4">
-          <FixturesCard booking={{ ...b.cardData, squad: b.squad, yCount: yCountMap[b.id] ?? b.cardData?.yCount ?? 0 }} />
+          <FixturesCard attachedBelow booking={{ ...b.cardData, squad: b.squad, yCount: yCountMap[b.id] ?? b.cardData?.yCount ?? 0 }} />
                     {b.hasDues ? (
             <div style={{
-              marginTop: '-6px', padding: '10px 16px',
+              padding: '10px 16px',
              background: duesTokens.bg, border: `1px solid ${duesTokens.border}`,
               borderTop: 'none', borderRadius: '0 0 12px 12px',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
