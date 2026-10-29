@@ -43,11 +43,22 @@ function roleSuffix(skill: string | null, isCaptain: boolean, isVC: boolean, isW
   return suffixes.length > 0 ? ` (${suffixes.join(', ')})` : ''
 }
 
+// 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st, 22nd, 23rd … 31st
+export function ordinalSuffix(day: number): string {
+  if (day % 100 >= 11 && day % 100 <= 13) return 'th'
+  switch (day % 10) {
+    case 1: return 'st'
+    case 2: return 'nd'
+    case 3: return 'rd'
+    default: return 'th'
+  }
+}
+
 function formatAnnouncementDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
   const day = d.getDate()
-  const suffix = [,'st','nd','rd'][((day%100-20)%10)||day%100>10?0:day%10] ?? 'th'
-  return `${day}${suffix} ${d.toLocaleDateString('en-IN', { month: 'long' })} (${d.toLocaleDateString('en-IN', { weekday: 'long' })})`
+  const suffix = ordinalSuffix(day)
+  return `${day}${suffix}${d.toLocaleDateString('en-IN', { month: 'long' })} (${d.toLocaleDateString('en-IN', { weekday: 'long' })})`
 }
 
  function formatReportingTime(matchTime: string | null): string {

@@ -545,6 +545,8 @@ headcount fact, not an invitation to respond, so it can't clash.
  
 Both `buildAnnouncementText()` and `buildSquadAnnouncement()` produce the same full WhatsApp format using `match_time ?? slot_time` minus 15 minutes for reporting time, and include ground, maps URL, hospital, jersey type, CricHeroes match URL, and the match card link (`/fixtures/[id]`) — though only `buildAnnouncementText()` is actually reachable from the running app today (see §5).
 
+**Date ordinal fix (October 2026):** both announcement builders computed the day suffix with an expression whose `||`/`?:` precedence was wrong, so every date got "th" (1st Nov went out as "1th November"; 2, 3, 21, 22, 23 and 31 were wrong too). They now share `ordinalSuffix()` (`src/lib/announcement.ts`), which handles the 11th–13th exceptions.
+
 **Where `match_time` comes from:** as of July 2026, `/admin/bookings/new` and `/admin/bookings/[id]` default this field to `slot_time` itself the moment a slot is picked (changed 31 Jul 2026 — was originally `slot_time + 15 min`, found to be the wrong default in practice), unless already set or manually overridden — see `architecture.md` §8.1. So the `match_time ?? slot_time` fallback above now mostly only matters for bookings created before that default shipped, and for those it makes no practical difference either way now that the two defaults agree. The reporting-time subtraction itself (`− 15 min`, in both `formatReportingTime()` implementations) was independently re-verified against the code this same session and is correct as documented — no change was needed there. Net effect of the default change: a freshly-defaulted booking's reporting time is now `slot_time − 15 min` instead of `slot_time` exactly.
  
 ---

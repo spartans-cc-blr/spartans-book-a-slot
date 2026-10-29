@@ -18,6 +18,7 @@ import Link from 'next/link'
 import type { BookingContextStats, PlayerStatsTotals, MvpRankEntry } from '@/types'
 import { isPracticeMatch } from '@/types'
 import { matchDisplayTime } from '@/lib/matchStatus'
+import { ordinalSuffix } from '@/lib/announcement'
 import { useTheme } from '@/components/ui/ThemeProvider'
 import { PlayerNameLink } from '@/lib/playerLink'
 
@@ -289,7 +290,7 @@ function buildAnnouncementText(
 ): string {
   const d      = new Date(booking.game_date + 'T00:00:00')
   const day    = d.getDate()
-  const suffix = [,'st','nd','rd'][((day % 100 - 20) % 10) || day % 100 > 10 ? 0 : day % 10] ?? 'th'
+  const suffix = ordinalSuffix(day)
   const dateStr = `${day}${suffix} ${d.toLocaleDateString('en-IN', { month: 'long' })} (${d.toLocaleDateString('en-IN', { weekday: 'long' })})`
 
   const squadPlayers  = players.filter(p => selected.has(p.id))
