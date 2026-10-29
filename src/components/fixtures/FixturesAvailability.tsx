@@ -167,7 +167,7 @@ export function FixturesAvailability({
   if (!isPlayer) {
     return (
       <div style={{
-        marginTop: '-6px', padding: '10px 16px',
+        padding: '10px 16px',
         background: t.panelBg, border: `1px solid ${t.panelBorder}`,
         borderTop: 'none', borderRadius: '0 0 12px 12px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
@@ -209,7 +209,7 @@ export function FixturesAvailability({
 
   return (
     <div style={{
-      marginTop: '-6px', padding: '10px 16px 12px',
+      padding: '10px 16px 12px',
       background: t.panelBg, border: `1px solid ${t.panelBorder}`,
       borderTop: `1px solid ${t.panelBorderTop}`, borderRadius: '0 0 12px 12px',
     }}>

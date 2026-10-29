@@ -304,7 +304,7 @@ type BookingProp = {
   organiserContact?:         { name: string | null; phone: string | null } | null
 }
 
-export function FixturesCard({ booking }: { booking: BookingProp }) {
+export function FixturesCard({ booking, attachedBelow = false }: { booking: BookingProp; attachedBelow?: boolean }) {
   const [squadOpen, setSquadOpen] = useState(false)
   const { resolvedTheme } = useTheme()
   const t = resolvedTheme === 'dark' ? DARK : LIGHT
@@ -341,7 +341,9 @@ export function FixturesCard({ booking }: { booking: BookingProp }) {
     <div style={{
       background: t.cardBg,
       border: `1px solid ${t.cardBorder}`,
-      borderRadius: "12px",
+      // attachedBelow: a strip (availability / dues) sits flush under this card, so the
+      // bottom corners stay square instead of curving over it.
+      borderRadius: attachedBelow ? "12px 12px 0 0" : "12px",
       padding: "14px 16px",
       display: "flex",
       flexDirection: "column",

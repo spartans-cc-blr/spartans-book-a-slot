@@ -764,6 +764,10 @@ itself (out of scope here — shared with Match History) was not touched.
 
 ---
 
+**Card/strip seam fixed (October 2026).** The availability (or dues) strip under each card used to be pulled up `-6px` beneath the card, so the card's rounded bottom corners (it has `overflow: hidden`) curved over the strip, most visibly under an expanded squad panel. `FixturesCard` now takes `attachedBelow` (set by `FixturesWeekendGroup`), which squares its bottom corners (`12px 12px 0 0`), and the `marginTop: -6px` was removed from `FixturesAvailability` (both branches) and the dues banner so the strip sits flush.
+
+---
+
 ## 10.4 Organiser contact on the match card (added October 2026)
 
 `FixturesCard` shows a small "📞 Organiser: <name> · Call · WhatsApp" row,
