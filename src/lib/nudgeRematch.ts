@@ -1,33 +1,43 @@
 // Rematch recall for the availability-nudge system — see
-// src/lib/availabilityNudge.ts (the 'rematch_recall' theme) and
-// .claude/rules/features/availability-nudge.md §3b.
+// src/lib/availabilityNudge.ts (the 'rematch_recall' / 'rematch_ready'
+// themes) and .claude/rules/features/availability-nudge.md §3b.
 //
 // For each nextLockWeekend booking with a resolved opponent, finds every
-// player's own best past batting/bowling performance against that same
-// opponent (any prior confirmed, synced meeting), so a standout performer
-// can be nudged with a specific, flattering callback — "you scored 51
-// against them last time" — rather than a generic reminder.
+// player's own best past performance against that same opponent — but
+// "best performance" is deliberately NOT a flat runs/wickets threshold
+// (an earlier version of this file used 50+ runs / 3+ wickets, mirroring
+// milestone-recognition.md's single-match highlight bands). It now reuses
+// computeTopPerformers() (matchTopPerformers.ts) instead — the exact same
+// tie-inclusive "who was the actual standout of this one match" logic
+// already used for the gold top-scorer/top-wicket-taker highlight on
+// ScorecardTables.tsx and for granting verify/flag access
+// (post-match-scorecard.md §15). A rematch-recall nudge therefore only
+// ever names a performance that genuinely stood out *in that match* — a
+// low-scoring game can still produce a credited "top scorer" well under
+// 50 runs, and a high-scoring one won't credit a 40 that wasn't actually
+// the best innings on the day.
 //
-// Deliberately reuses match_stats_cache (already synced into the Hub DB by
-// syncMatchStatsForBooking()) rather than querying the separate analytics
-// project directly — this cron only ever needs the service-role Hub
-// client, same as every other theme in this feature, and match_stats_cache
-// already mirrors the exact batting/bowling column shapes this needs.
+// Known trade-off inherited from computeTopPerformers(): it only resolves
+// a performer to a Hub player_id by cross-checking that match's own squad
+// rows (see matchTopPerformers.ts's "Known gap" note) — a past meeting
+// with no squad rows at all (never staffed through Captains' Corner, or
+// never backfilled) simply resolves no performers for that match, even if
+// the scorecard name itself is already reconciled. This is the same
+// trade-off the rest of the app already accepts for this exact logic
+// (the verify/flag grant, the ScorecardTables gold highlight) — accepted
+// here too, for consistency, rather than inventing a second, looser
+// definition of "performer" just for this nudge.
 //
-// Qualification thresholds reuse the club's existing "worth bragging
-// about" bands — half-century (50+ runs) and three-wicket haul (3+
-// wickets) — the same bar milestone-recognition.md's
-// match_performance_achievements already uses for a single-match
-// highlight. Reusing these rather than inventing a third threshold keeps
-// one consistent definition of "a standout performance" across the app.
+// Deliberately reuses match_stats_cache (already synced into the Hub DB
+// by syncMatchStatsForBooking()) rather than querying the separate
+// analytics project directly — this cron only ever needs the service-role
+// Hub client, same as every other theme in this feature.
 
 import { createServiceClient } from '@/lib/supabase'
 import type { NudgeBooking } from '@/lib/availabilityNudge'
+import { computeTopPerformers, type SquadRef } from '@/lib/matchTopPerformers'
 
 type ServiceClient = ReturnType<typeof createServiceClient>
-
-const REMATCH_MIN_RUNS = 50
-const REMATCH_MIN_WICKETS = 3
 
 export interface RematchBattingHighlight {
   runs: number
@@ -62,6 +72,23 @@ function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = []
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
   return out
+}
+
+// Same defensive field-lookup convention matchTopPerformers.ts documents on
+// its own (unexported) pickField/num — analytics-DB field names aren't part
+// of this repo's schema, so every lookup tries a couple of likely keys
+// rather than assuming one exact shape. Needed here only to pull the raw
+// runs/balls/not_out/wickets/runs-conceded off the row a performer was
+// computed from — computeTopPerformers() itself already did the harder
+// work of deciding WHO qualifies as this match's top performer.
+function pickField(row: any, keys: string[]): any {
+  for (const k of keys) if (row?.[k] != null) return row[k]
+  return null
+}
+
+function num(row: any, keys: string[]): number {
+  const v = pickField(row, keys)
+  return v != null ? Number(v) : 0
 }
 
 // One call per cron run (or per dashboard lookup) — never per player, never
@@ -125,53 +152,81 @@ export async function getRematchRecalls(
       .in('booking_id', ids)
     cacheRows.push(...((data ?? []) as any[]))
   }
+  if (!cacheRows.length) return result
 
-  // opponent_id -> player_id -> best highlight so far.
+  // Each past meeting's own squad — computeTopPerformers() resolves a
+  // performer's player_id against the squad that actually played THAT
+  // match (see matchTopPerformers.ts's "Known gap" note, and this file's
+  // own header comment above). Batched the same way the bookings/
+  // match_stats_cache fetches above are.
+  const squadRows: { booking_id: string; player_id: string; players: { name: string } | null }[] = []
+  for (const ids of chunk(pastBookingIds, 200)) {
+    const { data } = await supabase
+      .from('squad')
+      .select('booking_id, player_id, players(name)')
+      .in('booking_id', ids)
+    squadRows.push(...((data ?? []) as any[]))
+  }
+  const squadByBooking = new Map<string, SquadRef[]>()
+  for (const row of squadRows) {
+    const list = squadByBooking.get(row.booking_id) ?? []
+    list.push({ player_id: row.player_id, player_name: row.players?.name ?? '' })
+    squadByBooking.set(row.booking_id, list)
+  }
+
+  // opponent_id -> player_id -> best highlight so far, across every past
+  // meeting where this player was THAT match's own top performer.
   const byOpponent = new Map<string, Map<string, MutableHighlight>>()
 
   for (const row of cacheRows) {
     const opponentId = opponentByBookingId.get(row.booking_id)
     if (!opponentId) continue
 
+    const batting = row.batting ?? []
+    const bowling = row.bowling ?? []
+    const squad = squadByBooking.get(row.booking_id) ?? []
+    const performers = computeTopPerformers(batting, bowling, squad)
+    if (!performers.length) continue
+
     const perPlayer = byOpponent.get(opponentId) ?? new Map<string, MutableHighlight>()
     byOpponent.set(opponentId, perPlayer)
 
-    for (const bat of (row.batting ?? [])) {
-      if (!bat?.batted || !bat.player_id) continue
-      const runs = Number(bat.runs) || 0
-      if (runs < REMATCH_MIN_RUNS) continue
-      const existing = perPlayer.get(bat.player_id) ?? {}
-      if (!existing.batting || runs > existing.batting.runs) {
-        existing.batting = {
-          runs,
-          balls: Number(bat.balls) || 0,
-          notOut: bat.not_out === 'Y',
-          bookingId: row.booking_id,
-          gameDate: row.match_date ?? null,
-          ground: row.ground ?? null,
-        }
-      }
-      perPlayer.set(bat.player_id, existing)
-    }
+    for (const performer of performers) {
+      if (!performer.player_id) continue
+      const existing = perPlayer.get(performer.player_id) ?? {}
 
-    for (const bowl of (row.bowling ?? [])) {
-      if (!bowl?.did_bowl || !bowl.player_id) continue
-      const wickets = Number(bowl.wickets) || 0
-      if (wickets < REMATCH_MIN_WICKETS) continue
-      const runsConceded = Number(bowl.runs) || 0
-      const existing = perPlayer.get(bowl.player_id) ?? {}
-      if (!existing.bowling
-        || wickets > existing.bowling.wickets
-        || (wickets === existing.bowling.wickets && runsConceded < existing.bowling.runsConceded)) {
-        existing.bowling = {
-          wickets,
-          runsConceded,
-          bookingId: row.booking_id,
-          gameDate: row.match_date ?? null,
-          ground: row.ground ?? null,
+      if (performer.reason === 'top_scorer') {
+        const matchRow = batting.find((r: any) => (pickField(r, ['player_name', 'name']) ?? '') === performer.name)
+        if (!matchRow) continue
+        const runs = num(matchRow, ['runs', 'total_runs'])
+        if (!existing.batting || runs > existing.batting.runs) {
+          existing.batting = {
+            runs,
+            balls: num(matchRow, ['balls', 'balls_faced']),
+            notOut: pickField(matchRow, ['not_out']) === 'Y',
+            bookingId: row.booking_id,
+            gameDate: row.match_date ?? null,
+            ground: row.ground ?? null,
+          }
+        }
+      } else {
+        const matchRow = bowling.find((r: any) => (pickField(r, ['player_name', 'name']) ?? '') === performer.name)
+        if (!matchRow) continue
+        const wickets = num(matchRow, ['wickets', 'wickets_taken'])
+        const runsConceded = num(matchRow, ['runs', 'runs_conceded'])
+        if (!existing.bowling
+          || wickets > existing.bowling.wickets
+          || (wickets === existing.bowling.wickets && runsConceded < existing.bowling.runsConceded)) {
+          existing.bowling = {
+            wickets,
+            runsConceded,
+            bookingId: row.booking_id,
+            gameDate: row.match_date ?? null,
+            ground: row.ground ?? null,
+          }
         }
       }
-      perPlayer.set(bowl.player_id, existing)
+      perPlayer.set(performer.player_id, existing)
     }
   }
 
