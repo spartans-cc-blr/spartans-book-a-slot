@@ -149,7 +149,10 @@ function currentMonthStr(): string {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
+  const d = new Date(dateStr)
+  const base = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
+  const yy = String(d.getFullYear()).slice(-2)
+  return `${base} '${yy}`
 }
 
 function slotLabel(slot: string): string {

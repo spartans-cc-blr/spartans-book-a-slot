@@ -2771,3 +2771,7 @@ client-reachable input.
 *Maintained by: Spartans CC BLR · Coordinator: Muthu*
 *Security audit: vibe-security patterns applied per SKILL.md*
 *Analytics pipeline: `spartans-python` repo (Render) · Hub: `spartans-book-a-slot` repo (Vercel)*
+
+## 23. Two-digit year on the Past Matches card date (added November 2026)
+
+The first line of each `MatchHistoryCard` on `/matches/history` (`formatDate()` in `MatchHistoryClient.tsx`) now appends the year as `'YY`, e.g. "Sat, 22 Mar '25", so matches from different seasons are distinguishable when the month filter is "All time". The standalone `/matches/history/[bookingId]` page already showed the full year and is unchanged.
