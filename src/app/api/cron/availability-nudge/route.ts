@@ -10,12 +10,15 @@ import {
   buildNudgeCopy,
   buildDeadlineCopy,
   buildLeaderCopy,
+  buildRematchCopy,
   type NudgeCandidate,
   type DeadlineNudgeCandidate,
   type LeaderboardLeaderCandidate,
+  type RematchRecallCandidate,
   type WeeklyNudgeHistoryEntry,
 } from '@/lib/availabilityNudge'
 import { attachGroundTournamentInfo, getBookingLeaders } from '@/lib/nudgeLeaderboard'
+import { getRematchRecalls } from '@/lib/nudgeRematch'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -94,7 +97,13 @@ export async function GET(req: NextRequest) {
     // weekend, not with roster size. See nudgeLeaderboard.ts.
     const bookingLeaders = await getBookingLeaders(bookingList)
 
-    const candidates: (NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate)[] = []
+    // Rematch recall — a player's own best past performance against this
+    // weekend's opponent(s) — one call for the whole run, scaling with
+    // distinct opponents this weekend, not with roster size. See
+    // nudgeRematch.ts.
+    const rematchRecalls = await getRematchRecalls(supabase, bookingList)
+
+    const candidates: (NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate | RematchRecallCandidate)[] = []
     for (const player of players) {
       const gapBookings = bookingList.filter(b => !answeredKey.has(`${player.id}|${b.id}`))
       if (!gapBookings.length) continue
@@ -107,7 +116,7 @@ export async function GET(req: NextRequest) {
       const status: 'active' | 'inactive' = player.status === 'inactive' ? 'inactive' : 'active'
 
       const candidate = pickNudgeCandidate(
-        dow, player.id, status, gapBookings, history, prior, usedThemes, referencedBookingIds, bookingLeaders
+        dow, player.id, status, gapBookings, history, prior, usedThemes, referencedBookingIds, bookingLeaders, rematchRecalls
       )
       if (candidate) candidates.push(candidate)
     }
@@ -164,7 +173,9 @@ export async function GET(req: NextRequest) {
             ? buildDeadlineCopy(candidate.gapBookings)
             : candidate.theme === 'leaderboard_leader'
               ? buildLeaderCopy(candidate.booking, candidate.leaderInfo)
-              : buildNudgeCopy(candidate.theme, candidate.booking)
+              : candidate.theme === 'rematch_recall'
+                ? buildRematchCopy(candidate.booking, candidate.info)
+                : buildNudgeCopy(candidate.theme, candidate.booking)
           const pushResults = await sendPushToPlayer(candidate.playerId, {
             title,
             body,
