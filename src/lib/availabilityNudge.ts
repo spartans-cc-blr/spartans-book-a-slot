@@ -504,12 +504,13 @@ export function buildRematchCopy(booking: NudgeBooking, info: RematchRecallInfo)
   const scorecardUrl = scorecardBookingId ? `${HUB_ORIGIN}/matches/history/${scorecardBookingId}` : null
 
   const body = [
-    `We're back up against ${info.opponentName} — you ${joinWithAnd(clauses)} last time we met${whereWhen ? ` at ${whereWhen}` : ''}!`,
-    scorecardUrl ? `Scorecard: ${scorecardUrl}` : null,
+    `${info.opponentName} are back on the calendar — and you've got history with them!`,
+    `You ${joinWithAnd(clauses)} last time we met${whereWhen ? ` at ${whereWhen}` : ''}!`,
+    scorecardUrl ? `Relive it — scorecard: ${scorecardUrl}` : null,
     `${dt} is coming up. Mark your availability!`,
   ].filter(Boolean).join(' ')
 
-  return { title: '🔄 Rematch incoming!', body }
+  return { title: '🔄 Rematch time!', body }
 }
 
 // Wednesday's last-chance warning — must name every booking the player still
