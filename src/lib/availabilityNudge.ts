@@ -20,6 +20,8 @@
 import { createServiceClient } from '@/lib/supabase'
 import type { BookingLeaderInfo, LeaderMetric } from '@/lib/nudgeLeaderboard'
 import { attachGroundTournamentInfo, getBookingLeaders } from '@/lib/nudgeLeaderboard'
+import type { RematchRecallInfo } from '@/lib/nudgeRematch'
+import { getRematchRecalls } from '@/lib/nudgeRematch'
 
 type ServiceClient = ReturnType<typeof createServiceClient>
 
@@ -31,6 +33,7 @@ export type NudgeTheme =
   | 'tournament_eligibility'
   | 'gap_reminder'
   | 'leaderboard_leader'
+  | 'rematch_recall'
   | 'reactivation_1'
   | 'reactivation_2'
   | 'deadline'
@@ -41,7 +44,7 @@ export type NudgeTheme =
 // fallback (matches any remaining gap), which is what guarantees a nudge
 // every day rather than going silent when today's "expected" theme happens
 // not to match any current gap.
-const ACTIVE_THEME_PRIORITY: readonly Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader'>[] = [
+const ACTIVE_THEME_PRIORITY: readonly Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader' | 'rematch_recall'>[] = [
   'habitual',
   'same_format_new_slot',
   'tournament_eligibility',
@@ -56,6 +59,14 @@ export interface NudgeBooking {
   format: string
   tournament_id: string | null
   tournament_name: string | null
+  // Opponent master identity (migration 077 — see features/team-stats.md
+  // §5). opponent_id is the resolved `opponents.id` when this booking has
+  // one (via the bookings.opponent_id FK); opponent_name is the display
+  // name to use regardless — the opponent master's own name when linked,
+  // falling back to the booking's free-text opponent_name otherwise. Only
+  // the 'rematch_recall' theme reads opponent_id.
+  opponent_id: string | null
+  opponent_name: string | null
   // Populated by nudgeLeaderboard.ts's attachGroundTournamentInfo() only —
   // fetchNextLockWeekendBookings() leaves these null/false so every other
   // theme's code path doesn't have to pull leaderboard-only fields it
@@ -72,7 +83,7 @@ export interface NudgeBooking {
 export interface NudgeCandidate {
   playerId: string
   booking: NudgeBooking
-  theme: Exclude<NudgeTheme, 'deadline' | 'leaderboard_leader'>
+  theme: Exclude<NudgeTheme, 'deadline' | 'leaderboard_leader' | 'rematch_recall'>
 }
 
 // A player who's the leading MVP/run-scorer/wicket-taker/dismissals at this
@@ -85,6 +96,17 @@ export interface LeaderboardLeaderCandidate {
   theme: 'leaderboard_leader'
   booking: NudgeBooking
   leaderInfo: BookingLeaderInfo
+}
+
+// A player's own best past performance against this specific upcoming
+// opponent — see nudgeRematch.ts. Same precedent as LeaderboardLeaderCandidate:
+// carries `info`, which buildNudgeCopy()'s theme+booking-only switch has no
+// use for.
+export interface RematchRecallCandidate {
+  playerId: string
+  theme: 'rematch_recall'
+  booking: NudgeBooking
+  info: RematchRecallInfo
 }
 
 // Wednesday is a last-chance warning, not an invitation to one opportunity —
@@ -238,7 +260,7 @@ export async function buildPlayerHistories(
 // matches every remaining gap booking, which is what makes it a true
 // fallback of last resort in the priority loop below.
 function matchThemesCandidates(
-  theme: Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader'>,
+  theme: Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader' | 'rematch_recall'>,
   gapBookings: NudgeBooking[],
   history: PlayerHistory
 ): NudgeBooking[] {
@@ -278,8 +300,9 @@ export function pickNudgeCandidate(
   priorNudgeThisWeek: PriorNudge | null,
   usedThemesThisWeek: Set<NudgeTheme>,
   referencedBookingIds: Set<string>,
-  bookingLeaders: Map<string, BookingLeaderInfo[]>
-): NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate | null {
+  bookingLeaders: Map<string, BookingLeaderInfo[]>,
+  rematchRecalls: Map<string, RematchRecallInfo[]>
+): NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate | RematchRecallCandidate | null {
   if (!gapBookings.length) return null
 
   // Wednesday — always fires if still unanswered, overrides theme choice,
@@ -313,6 +336,23 @@ export function pickNudgeCandidate(
       const booking = pickPreferredBooking(leadingBookings, referencedBookingIds)
       const leaderInfo = bookingLeaders.get(booking.id)!.find(l => l.playerId === playerId)!
       return { playerId, booking, theme: 'leaderboard_leader', leaderInfo }
+    }
+  }
+
+  // Rematch recall — a player's own best past performance against this
+  // specific upcoming opponent (see nudgeRematch.ts). Same tier as
+  // leaderboard_leader above: checked regardless of activity/history
+  // depth, since it's an achievement callout rather than a habit-based
+  // hook, and respects the same once-per-week cap and soft
+  // unreferenced-booking preference.
+  if (!usedThemesThisWeek.has('rematch_recall')) {
+    const rematchBookings = gapBookings.filter(b =>
+      rematchRecalls.get(b.id)?.some(r => r.playerId === playerId)
+    )
+    if (rematchBookings.length) {
+      const booking = pickPreferredBooking(rematchBookings, referencedBookingIds)
+      const info = rematchRecalls.get(booking.id)!.find(r => r.playerId === playerId)!
+      return { playerId, booking, theme: 'rematch_recall', info }
     }
   }
 
@@ -421,6 +461,58 @@ export function buildLeaderCopy(booking: NudgeBooking, leaderInfo: BookingLeader
   }
 }
 
+const HUB_ORIGIN = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://hub.spartanscricketclub.in'
+
+function formatRematchDateLabel(dateStr: string | null): string | null {
+  if (!dateStr) return null
+  const d = new Date(dateStr + 'T00:00:00')
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+}
+
+// Rematch recall — deliberately an exception to the self-referential/
+// no-comparison rule every other theme follows, same posture as
+// buildLeaderCopy() above: this names a specific past achievement against
+// a specific upcoming opponent, not an others'-response-count comparison.
+// When a player has both a qualifying batting and bowling highlight
+// (possibly from two different past meetings), both are named but only one
+// scorecard is linked — the batting one takes precedence, since it's named
+// first in the sentence either way.
+export function buildRematchCopy(booking: NudgeBooking, info: RematchRecallInfo): { title: string; body: string } {
+  const dt = formatNudgeDateTime(booking)
+  const clauses: string[] = []
+  let scorecardBookingId: string | null = null
+  let scorecardDateLabel: string | null = null
+  let scorecardGround: string | null = null
+
+  if (info.batting) {
+    clauses.push(`scored ${info.batting.runs}${info.batting.notOut ? '*' : ''} off ${info.batting.balls} balls`)
+    scorecardBookingId = info.batting.bookingId
+    scorecardDateLabel = formatRematchDateLabel(info.batting.gameDate)
+    scorecardGround = info.batting.ground
+  }
+  if (info.bowling) {
+    clauses.push(`picked up a ${info.bowling.wickets}-wicket haul`)
+    if (!scorecardBookingId) {
+      scorecardBookingId = info.bowling.bookingId
+      scorecardDateLabel = formatRematchDateLabel(info.bowling.gameDate)
+      scorecardGround = info.bowling.ground
+    }
+  }
+
+  const whereWhen = [scorecardGround, scorecardDateLabel].filter(Boolean).join(', ')
+  const scorecardUrl = scorecardBookingId ? `${HUB_ORIGIN}/matches/history/${scorecardBookingId}` : null
+
+  const body = [
+    `${info.opponentName} are back on the calendar — and you've got history with them!`,
+    `You ${joinWithAnd(clauses)} last time we met${whereWhen ? ` at ${whereWhen}` : ''}!`,
+    scorecardUrl ? `Relive it — scorecard: ${scorecardUrl}` : null,
+    `${dt} is coming up. Mark your availability!`,
+  ].filter(Boolean).join(' ')
+
+  return { title: '🔄 Rematch time!', body }
+}
+
 // Wednesday's last-chance warning — must name every booking the player still
 // has a gap on. Naming a player's own count/list of outstanding items is
 // consistent with the existing Pending Availability dashboard card (which
@@ -465,7 +557,7 @@ export async function fetchNextLockWeekendBookings(
 
   const { data } = await supabase
     .from('bookings')
-    .select('id, game_date, slot_time, match_time, format, tournament_id, tournament:tournaments(name)')
+    .select('id, game_date, slot_time, match_time, format, tournament_id, tournament:tournaments(name), opponent_id, opponent_name, opponent:opponents(name)')
     .in('game_date', [saturday, sunday])
     .eq('status', 'confirmed')
     .eq('availability_locked', false)
@@ -479,6 +571,8 @@ export async function fetchNextLockWeekendBookings(
       format: b.format,
       tournament_id: b.tournament_id,
       tournament_name: (b.tournament as any)?.name ?? null,
+      opponent_id: b.opponent_id ?? null,
+      opponent_name: (b.opponent as any)?.name ?? b.opponent_name ?? null,
       // Populated by attachGroundTournamentInfo() (nudgeLeaderboard.ts) —
       // only the 'leaderboard_leader' theme needs these, so they're not
       // part of this base fetch.
@@ -721,6 +815,7 @@ export async function getNudgeForPlayer(
   // dedupe by unique ground/tournament (see nudgeLeaderboard.ts).
   const enrichedGapBookings = await attachGroundTournamentInfo(supabase, gapBookings)
   const bookingLeaders = await getBookingLeaders(enrichedGapBookings)
+  const rematchRecalls = await getRematchRecalls(supabase, enrichedGapBookings)
 
   const candidate = pickNudgeCandidate(
     dow,
@@ -731,7 +826,8 @@ export async function getNudgeForPlayer(
     prior,
     usedThemesThisWeek,
     referencedBookingIds,
-    bookingLeaders
+    bookingLeaders,
+    rematchRecalls
   )
   if (!candidate) return null
 
@@ -742,6 +838,11 @@ export async function getNudgeForPlayer(
 
   if (candidate.theme === 'leaderboard_leader') {
     const { title, body } = buildLeaderCopy(candidate.booking, candidate.leaderInfo)
+    return { theme: candidate.theme, booking: candidate.booking, title, body }
+  }
+
+  if (candidate.theme === 'rematch_recall') {
+    const { title, body } = buildRematchCopy(candidate.booking, candidate.info)
     return { theme: candidate.theme, booking: candidate.booking, title, body }
   }
 

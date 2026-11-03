@@ -21,6 +21,7 @@ Also functions as a re-engagement channel: submitting any availability response 
 | `src/app/api/cron/availability-nudge/route.ts` | Cron entry point — `CRON_SECRET` bearer auth, orchestrates the daily run, writes to `availability_nudge_log`, sends pushes |
 | `src/lib/availabilityNudge.ts` | Core logic — `nextLockWeekend` date calc, historical frequency (`buildPlayerHistories`), priority-list theme selection (`pickNudgeCandidate`), copy generation (`buildNudgeCopy`, `buildDeadlineCopy`, `buildLeaderCopy`), weekly history lookups (`getThemesUsedThisWeek`, `getReferencedBookingIdsThisWeek`, batched as `getWeeklyNudgeHistoryForPlayers`) |
 | `src/lib/nudgeLeaderboard.ts` | Ground/tournament leaderboard recognition (see §3a) — `attachGroundTournamentInfo()` resolves each booking's ground/tournament, `getBookingLeaders()` computes MVP/run-scorer/wicket-taker/dismissals leaders per unique ground/tournament this weekend via `getLeaderboard()` (`src/lib/playerStats.ts`) |
+| `src/lib/nudgeRematch.ts` | Rematch recall (see §3b) — `getRematchRecalls()` finds each player's own best past batting/bowling performance against this weekend's opponent(s), read from `match_stats_cache` (Hub DB only, no analytics-DB round trip) |
 | `src/app/page.tsx` | Read-only rendering of the same day's nudge as a dashboard card, below the 2×2 stat-tile row (`navigation.md` §3.1) |
 | `supabase/migrations/029_availability_nudge_log.sql` | `availability_nudge_log` table — idempotency guard (`UNIQUE(player_id, nudge_date)`) and per-day audit trail |
 | `supabase/migrations/030_availability_nudge_log_delivery_status.sql` | Adds `status` (`pending`/`sent`/`failed`) and `error_message` — per-player delivery outcome, not just attempt |
@@ -72,6 +73,24 @@ For each `nextLockWeekend` booking, if any player is the leading **MVP, run-scor
 
 ---
 
+## 3b. Rematch Recall (`rematch_recall`)
+
+For each `nextLockWeekend` booking with a resolved opponent (`bookings.opponent_id`, the opponent master — see `features/team-stats.md` §5), finds every player's own best past batting/bowling performance against that same opponent, from any prior confirmed, synced meeting — e.g. *"We're back up against Royal Connect Logistics — you scored 51 off 42 balls last time we met at Macushala, 6 Jun! Scorecard: https://hub.spartanscricketclub.in/matches/history/\<old-booking-id\> Sat 7 Nov, 7:15 AM is coming up. Mark your availability!"* If a player has both a qualifying batting and bowling highlight against the same opponent (possibly from two different past meetings), both are named in one sentence; only one scorecard is linked (the batting one, since it's named first).
+
+**Checked at the same tier as `leaderboard_leader`** (§3a) — immediately after it, before the reactivation/priority-list split — for the identical reason: this is an achievement callout independent of recent response volume, not a habit-based hook. Respects the same once-per-week cap and soft unreferenced-booking preference. A player who qualifies for both `leaderboard_leader` and `rematch_recall` on the same day gets whichever check runs first (`leaderboard_leader`); they can still get the other theme on a later day this week, since each theme's own `usedThemesThisWeek` entry is independent.
+
+**Qualification threshold — reuses the club's existing "worth bragging about" bands**, rather than inventing a third one: a half-century (50+ runs) or a three-wicket haul (3+ wickets), the same bar `features/milestone-recognition.md`'s `match_performance_achievements` already uses for a single-match highlight. A player's *best* qualifying batting performance and *best* qualifying bowling performance against that opponent are tracked independently (ties on wickets broken by fewer runs conceded, same convention as `getPlayerCareerStats()`'s own best-bowling tie-break) — across every past meeting, not just the most recent one.
+
+**Deliberate exception to the no-comparison rule**, same posture as `leaderboard_leader` — this names a specific past achievement against a specific opponent, not an others'-response-count comparison.
+
+**Practice-tournament exclusion:** a booking whose `tournament_is_practice` is set (booking-or-tournament combined signal, same as §3a) is excluded from both sides — it's never used to source a qualifying past performance, and it's never offered as an upcoming booking this theme can fire on.
+
+**Data flow — Hub DB only, no analytics-DB round trip.** Unlike `leaderboard_leader` (which reads the leaderboard aggregation, backed by the analytics DB), `getRematchRecalls()` reads `match_stats_cache` directly — already synced into the Hub DB by `syncMatchStatsForBooking()`, and already mirroring the exact `batting`/`bowling` column shapes (`runs`, `balls`, `not_out`, `batted`, `wickets`, `did_bowl`) this needs. One opponent is resolved once per cron run (via `bookings.opponent_id`, scanning every past confirmed/synced meeting against it), not once per player or per booking — cost scales with distinct opponents this weekend, never with roster size. The scorecard link embedded in the push body uses `process.env.NEXT_PUBLIC_BASE_URL ?? 'https://hub.spartanscricketclub.in'` — the same literal-fallback convention `announcement.ts`/`ShareMatchButton.tsx` already use for a server-built absolute URL.
+
+**No fuzzy opponent matching.** A past meeting only counts if its own booking already carries the same `opponents.id` the upcoming booking resolved to — no normalised-spelling fallback the way Team Record's `opponentKey()` has for a still-unlinked raw spelling (`features/team-stats.md` §5). In practice this is a non-issue going forward: every new/edited booking now auto-creates and links an opponent (`features/opponent-identity.md`), so a genuinely unlinked historical meeting is the only case this could miss, and it only means a slightly thinner highlight pool, never a wrong one.
+
+---
+
 ## 4. Scope Guards
 
 - Only `bookings.status = 'confirmed'` and `availability_locked = false` are considered
@@ -103,6 +122,7 @@ For each `nextLockWeekend` booking, if any player is the leading **MVP, run-scor
 > - [x] `030_availability_nudge_log_delivery_status.sql` migration is applied and rows correctly show `status = 'sent'` vs `'failed'` — see the July 2026 incident below; confirmed applied 8 Jul 2026
 > - [ ] Priority-list selection (Fix 7) actually closes the silent-day gap observed in manual simulation — confirm via a live cycle that active players with a real gap get nudged every day, not just on days matching their "expected" theme
 > - [ ] `leaderboard_leader` (§3a) fires correctly on a live weekend with a real ground/tournament leader who has a gap, and the combined ground+tournament copy reads naturally rather than run-on
+> - [ ] `rematch_recall` (§3b) fires correctly on a live weekend against a real rematch opponent, the embedded scorecard URL actually resolves (`NEXT_PUBLIC_BASE_URL` set correctly in production), and the combined batting+bowling copy reads naturally rather than run-on
 
 **Product decision recorded:** an `inactive` player always gets generic reactivation copy regardless of history depth (Fix 3, Option A) — see the comment above `noHistory` in `pickNudgeCandidate()`. Deliberate, not an oversight.
 
