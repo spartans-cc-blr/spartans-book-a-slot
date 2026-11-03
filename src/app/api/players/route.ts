@@ -78,7 +78,8 @@ export async function POST(request: Request) {
       '🎉 Welcome to the Club!',
       `${data.name} just joined Spartans CC — give them a warm welcome!`,
       '/',
-      data.id
+      data.id,
+      'news_welcome'
     )
   } catch (err: any) {
     console.error('[players] welcome push error:', err?.message ?? err)

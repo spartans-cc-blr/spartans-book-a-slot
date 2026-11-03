@@ -18,6 +18,8 @@
 // no defined trigger day, separate from this Sun–Wed cadence.
 
 import { createServiceClient } from '@/lib/supabase'
+import { NO_MUTES, isNudgeDayMuted, isNudgeThemeMuted, type MutedSet } from '@/lib/notificationPrefs'
+import { getMutedKeys } from '@/lib/notificationPrefsServer'
 import type { BookingLeaderInfo, LeaderMetric } from '@/lib/nudgeLeaderboard'
 import { attachGroundTournamentInfo, getBookingLeaders } from '@/lib/nudgeLeaderboard'
 import type { RematchRecallInfo } from '@/lib/nudgeRematch'
@@ -315,7 +317,11 @@ export function pickNudgeCandidate(
   usedThemesThisWeek: Set<NudgeTheme>,
   referencedBookingIds: Set<string>,
   bookingLeaders: Map<string, BookingLeaderInfo[]>,
-  rematchRecalls: Map<string, RematchRecallInfo[]>
+  rematchRecalls: Map<string, RematchRecallInfo[]>,
+  // Notification kinds this player has switched off in My Notifications.
+  // A muted theme is skipped (never "used up"), so the next applicable one
+  // is tried. Reminder DAYS (Sun–Tue) are handled by the callers.
+  muted: MutedSet = NO_MUTES
 ): NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate | RematchRecallCandidate | null {
   if (!gapBookings.length) return null
 
@@ -328,6 +334,7 @@ export function pickNudgeCandidate(
   // the daily log row / push deep-link has one concrete booking to point
   // at — the actual copy is built from the full gapBookings list.
   if (dow === 3) {
+    if (isNudgeThemeMuted('deadline', muted)) return null
     const carried = priorNudgeThisWeek
       ? gapBookings.find(b => b.id === priorNudgeThisWeek.bookingId)
       : undefined
@@ -342,7 +349,7 @@ export function pickNudgeCandidate(
   // availability engagement. Still respects the once-per-week cap like
   // every other theme, and the same soft "prefer an unreferenced booking"
   // preference if the player leads at more than one of this week's gaps.
-  if (!usedThemesThisWeek.has('leaderboard_leader')) {
+  if (!usedThemesThisWeek.has('leaderboard_leader') && !isNudgeThemeMuted('leaderboard_leader', muted)) {
     const leadingBookings = gapBookings.filter(b =>
       bookingLeaders.get(b.id)?.some(l => l.playerId === playerId)
     )
@@ -359,7 +366,7 @@ export function pickNudgeCandidate(
   // depth, since it's an achievement callout rather than a habit-based
   // hook, and respects the same once-per-week cap and soft
   // unreferenced-booking preference.
-  if (!usedThemesThisWeek.has('rematch_recall')) {
+  if (!usedThemesThisWeek.has('rematch_recall') && !isNudgeThemeMuted('rematch_recall', muted)) {
     const rematchBookings = gapBookings.filter(b =>
       rematchRecalls.get(b.id)?.some(r => r.playerId === playerId)
     )
@@ -381,6 +388,7 @@ export function pickNudgeCandidate(
   // which day this player's first nudge of the week actually lands on.
   const noHistory = playerStatus === 'inactive' || !history.hasEnoughSample
   if (noHistory) {
+    if (isNudgeThemeMuted('reactivation_1', muted)) return null
     const booking = gapBookings[0]
     const theme = usedThemesThisWeek.size === 0 ? 'reactivation_1' : 'reactivation_2'
     return { playerId, booking, theme }
@@ -392,6 +400,7 @@ export function pickNudgeCandidate(
   // theme didn't happen to match any current gap.
   for (const theme of ACTIVE_THEME_PRIORITY) {
     if (usedThemesThisWeek.has(theme)) continue
+    if (isNudgeThemeMuted(theme, muted)) continue
     const matches = matchThemesCandidates(theme, gapBookings, history)
     if (!matches.length) continue
     const booking = pickPreferredBooking(matches, referencedBookingIds)
@@ -418,10 +427,12 @@ export function pickRematchReadyCandidate(
   respondedBookings: NudgeBooking[],
   rematchRecalls: Map<string, RematchRecallInfo[]>,
   usedThemesThisWeek: Set<NudgeTheme>,
-  referencedBookingIds: Set<string>
+  referencedBookingIds: Set<string>,
+  muted: MutedSet = NO_MUTES
 ): RematchReadyCandidate | null {
   if (!respondedBookings.length) return null
   if (usedThemesThisWeek.has('rematch_ready')) return null
+  if (isNudgeThemeMuted('rematch_ready', muted)) return null
 
   const matches = respondedBookings.filter(b =>
     rematchRecalls.get(b.id)?.some(r => r.playerId === playerId)
@@ -870,6 +881,11 @@ export async function getNudgeForPlayer(
   const dow = now.getDay()
   if (dow > 3) return null   // outside the Sun 8pm–Wed 8pm nudge window
 
+  // The player's own My Notifications choices: a muted reminder day means no
+  // nudge (and no Home banner) that day; muted kinds are skipped by the picker.
+  const muted = await getMutedKeys(supabase, playerId)
+  if (isNudgeDayMuted(dow, muted)) return null
+
   const bookingList = await fetchNextLockWeekendBookings(supabase, now)
   if (!bookingList.length) return null
   const bookingIds = bookingList.map(b => b.id)
@@ -922,7 +938,8 @@ export async function getNudgeForPlayer(
         usedThemesThisWeek,
         referencedBookingIds,
         bookingLeaders,
-        rematchRecalls
+        rematchRecalls,
+        muted
       )
     : null
 
@@ -950,7 +967,7 @@ export async function getNudgeForPlayer(
   // theme this week is already used) — a rematch-recall performer who has
   // already marked themselves available still gets a hype "get ready to
   // repeat it" ping instead of going quiet.
-  const readyCandidate = pickRematchReadyCandidate(playerId, positivelyRespondedBookings, rematchRecalls, usedThemesThisWeek, referencedBookingIds)
+  const readyCandidate = pickRematchReadyCandidate(playerId, positivelyRespondedBookings, rematchRecalls, usedThemesThisWeek, referencedBookingIds, muted)
   if (!readyCandidate) return null
 
   const { title, body } = buildRematchReadyCopy(readyCandidate.booking, readyCandidate.info)

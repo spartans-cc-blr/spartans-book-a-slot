@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { NO_MUTES, isNudgeDayMuted } from '@/lib/notificationPrefs'
+import { getMutedKeysForPlayers } from '@/lib/notificationPrefsServer'
 import { createServiceClient } from '@/lib/supabase'
 import { sendPushToPlayer, notifyGCs } from '@/lib/webpush'
 import {
@@ -123,8 +125,14 @@ export async function GET(req: NextRequest) {
     // nudgeRematch.ts.
     const rematchRecalls = await getRematchRecalls(supabase, bookingList)
 
+    // My Notifications: one batched read for the whole roster. A muted reminder
+    // day skips the player entirely; muted kinds are skipped by the pickers.
+    const mutedByPlayer = await getMutedKeysForPlayers(supabase, playerIds)
+
     const candidates: (NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate | RematchRecallCandidate | RematchReadyCandidate)[] = []
     for (const player of players) {
+      const muted = mutedByPlayer.get(player.id) ?? NO_MUTES
+      if (isNudgeDayMuted(dow, muted)) continue
       const gapBookings = bookingList.filter(b => !answeredKey.has(`${player.id}|${b.id}`))
 
       const history = histories.get(player.id)
@@ -136,7 +144,7 @@ export async function GET(req: NextRequest) {
 
       const candidate = gapBookings.length
         ? pickNudgeCandidate(
-            dow, player.id, status, gapBookings, history, prior, usedThemes, referencedBookingIds, bookingLeaders, rematchRecalls
+            dow, player.id, status, gapBookings, history, prior, usedThemes, referencedBookingIds, bookingLeaders, rematchRecalls, muted
           )
         : null
 
@@ -152,7 +160,7 @@ export async function GET(req: NextRequest) {
       // ping instead of going quiet. See pickRematchReadyCandidate().
       const positiveBookings = positiveBookingsByPlayer.get(player.id) ?? []
       if (positiveBookings.length) {
-        const readyCandidate = pickRematchReadyCandidate(player.id, positiveBookings, rematchRecalls, usedThemes, referencedBookingIds)
+        const readyCandidate = pickRematchReadyCandidate(player.id, positiveBookings, rematchRecalls, usedThemes, referencedBookingIds, muted)
         if (readyCandidate) candidates.push(readyCandidate)
       }
     }

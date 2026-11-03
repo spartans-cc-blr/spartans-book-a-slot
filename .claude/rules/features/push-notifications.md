@@ -261,6 +261,8 @@ Players who reinstall the PWA must re-subscribe once — the old subscription en
 
 ---
 
+> **Update (November 2026):** players now choose which alerts they get — squad announcements and wallet alerts stay locked on. Wallet pushes (top-up, debit, correction, removal, sponsorship, match-fee correction, membership fee) and a *New match booked* push shipped; see `notification-preferences.md`. The wallet rows in the table below are therefore stale.
+
 ## 11. Future Notification Triggers (not yet implemented)
 
 | Trigger | Who | Notes |
