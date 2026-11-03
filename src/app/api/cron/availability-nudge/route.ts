@@ -7,14 +7,18 @@ import {
   getPriorNudgesThisWeek,
   getWeeklyNudgeHistoryForPlayers,
   pickNudgeCandidate,
+  pickRematchReadyCandidate,
   buildNudgeCopy,
   buildDeadlineCopy,
   buildLeaderCopy,
   buildRematchCopy,
+  buildRematchReadyCopy,
+  type NudgeBooking,
   type NudgeCandidate,
   type DeadlineNudgeCandidate,
   type LeaderboardLeaderCandidate,
   type RematchRecallCandidate,
+  type RematchReadyCandidate,
   type WeeklyNudgeHistoryEntry,
 } from '@/lib/availabilityNudge'
 import { attachGroundTournamentInfo, getBookingLeaders } from '@/lib/nudgeLeaderboard'
@@ -74,11 +78,27 @@ export async function GET(req: NextRequest) {
     // Any existing response (Y/O/E/L) counts as a complete answer.
     const { data: existingResponses } = await supabase
       .from('availability')
-      .select('player_id, booking_id')
+      .select('player_id, booking_id, response')
       .in('booking_id', bookingIds)
       .in('player_id', playerIds)
 
     const answeredKey = new Set((existingResponses ?? []).map(r => `${r.player_id}|${r.booking_id}`))
+
+    // Players who've already marked themselves available (Y/O/E — never L)
+    // for a nextLockWeekend booking, keyed by player — feeds the
+    // rematch_ready fallback below: a rematch-recall performer who's
+    // already answered gets a "get ready to repeat it" hype ping instead
+    // of (never in addition to) an availability ask.
+    const bookingById = new Map(bookingList.map(b => [b.id, b]))
+    const positiveBookingsByPlayer = new Map<string, NudgeBooking[]>()
+    for (const r of (existingResponses ?? [])) {
+      if (!['Y', 'O', 'E'].includes(r.response)) continue
+      const booking = bookingById.get(r.booking_id)
+      if (!booking) continue
+      const list = positiveBookingsByPlayer.get(r.player_id) ?? []
+      list.push(booking)
+      positiveBookingsByPlayer.set(r.player_id, list)
+    }
 
     const histories = await buildPlayerHistories(supabase, playerIds)
 
@@ -103,10 +123,9 @@ export async function GET(req: NextRequest) {
     // nudgeRematch.ts.
     const rematchRecalls = await getRematchRecalls(supabase, bookingList)
 
-    const candidates: (NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate | RematchRecallCandidate)[] = []
+    const candidates: (NudgeCandidate | DeadlineNudgeCandidate | LeaderboardLeaderCandidate | RematchRecallCandidate | RematchReadyCandidate)[] = []
     for (const player of players) {
       const gapBookings = bookingList.filter(b => !answeredKey.has(`${player.id}|${b.id}`))
-      if (!gapBookings.length) continue
 
       const history = histories.get(player.id)
       if (!history) continue
@@ -115,10 +134,27 @@ export async function GET(req: NextRequest) {
       const { usedThemes, referencedBookingIds } = weeklyHistory.get(player.id) ?? emptyWeeklyHistory
       const status: 'active' | 'inactive' = player.status === 'inactive' ? 'inactive' : 'active'
 
-      const candidate = pickNudgeCandidate(
-        dow, player.id, status, gapBookings, history, prior, usedThemes, referencedBookingIds, bookingLeaders, rematchRecalls
-      )
-      if (candidate) candidates.push(candidate)
+      const candidate = gapBookings.length
+        ? pickNudgeCandidate(
+            dow, player.id, status, gapBookings, history, prior, usedThemes, referencedBookingIds, bookingLeaders, rematchRecalls
+          )
+        : null
+
+      if (candidate) {
+        candidates.push(candidate)
+        continue
+      }
+
+      // No gap-driven nudge for this player today (either nothing left to
+      // answer, or every applicable theme this week is already used) — a
+      // rematch-recall performer who's already marked themselves available
+      // for one of this weekend's bookings gets a "get ready to repeat it"
+      // ping instead of going quiet. See pickRematchReadyCandidate().
+      const positiveBookings = positiveBookingsByPlayer.get(player.id) ?? []
+      if (positiveBookings.length) {
+        const readyCandidate = pickRematchReadyCandidate(player.id, positiveBookings, rematchRecalls, usedThemes, referencedBookingIds)
+        if (readyCandidate) candidates.push(readyCandidate)
+      }
     }
 
     if (!candidates.length) {
@@ -175,7 +211,9 @@ export async function GET(req: NextRequest) {
               ? buildLeaderCopy(candidate.booking, candidate.leaderInfo)
               : candidate.theme === 'rematch_recall'
                 ? buildRematchCopy(candidate.booking, candidate.info)
-                : buildNudgeCopy(candidate.theme, candidate.booking)
+                : candidate.theme === 'rematch_ready'
+                  ? buildRematchReadyCopy(candidate.booking, candidate.info)
+                  : buildNudgeCopy(candidate.theme, candidate.booking)
           const pushResults = await sendPushToPlayer(candidate.playerId, {
             title,
             body,

@@ -34,6 +34,7 @@ export type NudgeTheme =
   | 'gap_reminder'
   | 'leaderboard_leader'
   | 'rematch_recall'
+  | 'rematch_ready'
   | 'reactivation_1'
   | 'reactivation_2'
   | 'deadline'
@@ -44,7 +45,7 @@ export type NudgeTheme =
 // fallback (matches any remaining gap), which is what guarantees a nudge
 // every day rather than going silent when today's "expected" theme happens
 // not to match any current gap.
-const ACTIVE_THEME_PRIORITY: readonly Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader' | 'rematch_recall'>[] = [
+const ACTIVE_THEME_PRIORITY: readonly Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader' | 'rematch_recall' | 'rematch_ready'>[] = [
   'habitual',
   'same_format_new_slot',
   'tournament_eligibility',
@@ -83,7 +84,7 @@ export interface NudgeBooking {
 export interface NudgeCandidate {
   playerId: string
   booking: NudgeBooking
-  theme: Exclude<NudgeTheme, 'deadline' | 'leaderboard_leader' | 'rematch_recall'>
+  theme: Exclude<NudgeTheme, 'deadline' | 'leaderboard_leader' | 'rematch_recall' | 'rematch_ready'>
 }
 
 // A player who's the leading MVP/run-scorer/wicket-taker/dismissals at this
@@ -105,6 +106,19 @@ export interface LeaderboardLeaderCandidate {
 export interface RematchRecallCandidate {
   playerId: string
   theme: 'rematch_recall'
+  booking: NudgeBooking
+  info: RematchRecallInfo
+}
+
+// The counterpart to RematchRecallCandidate for a player who has ALREADY
+// marked themselves available (Y/O/E) for the booking in question — see
+// pickRematchReadyCandidate() below. Never produced for a booking that's
+// still a gap; a player either gets asked to mark availability
+// ('rematch_recall') or, once they already have, hyped up to repeat the
+// performance ('rematch_ready') — never both for the same booking.
+export interface RematchReadyCandidate {
+  playerId: string
+  theme: 'rematch_ready'
   booking: NudgeBooking
   info: RematchRecallInfo
 }
@@ -260,7 +274,7 @@ export async function buildPlayerHistories(
 // matches every remaining gap booking, which is what makes it a true
 // fallback of last resort in the priority loop below.
 function matchThemesCandidates(
-  theme: Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader' | 'rematch_recall'>,
+  theme: Exclude<NudgeTheme, 'deadline' | 'reactivation_1' | 'reactivation_2' | 'leaderboard_leader' | 'rematch_recall' | 'rematch_ready'>,
   gapBookings: NudgeBooking[],
   history: PlayerHistory
 ): NudgeBooking[] {
@@ -389,6 +403,36 @@ export function pickNudgeCandidate(
   return null
 }
 
+// ── rematch_ready — the counterpart to the rematch_recall branch inside
+// pickNudgeCandidate() above, for a player who has ALREADY marked
+// themselves available (Y/O/E — never L) for a booking they're a rematch
+// recall performer on. Deliberately a separate, standalone function rather
+// than another branch inside pickNudgeCandidate(): that function only ever
+// receives gapBookings (unanswered), and this one only ever receives the
+// opposite — bookings the player has already responded to positively — so
+// the two can never fire for the same booking. Callers run this only once
+// pickNudgeCandidate() has returned null for the player (no gap-driven
+// nudge today), preserving the one-notification-per-day rule. ─────────────
+export function pickRematchReadyCandidate(
+  playerId: string,
+  respondedBookings: NudgeBooking[],
+  rematchRecalls: Map<string, RematchRecallInfo[]>,
+  usedThemesThisWeek: Set<NudgeTheme>,
+  referencedBookingIds: Set<string>
+): RematchReadyCandidate | null {
+  if (!respondedBookings.length) return null
+  if (usedThemesThisWeek.has('rematch_ready')) return null
+
+  const matches = respondedBookings.filter(b =>
+    rematchRecalls.get(b.id)?.some(r => r.playerId === playerId)
+  )
+  if (!matches.length) return null
+
+  const booking = pickPreferredBooking(matches, referencedBookingIds)
+  const info = rematchRecalls.get(booking.id)!.find(r => r.playerId === playerId)!
+  return { playerId, theme: 'rematch_ready', booking, info }
+}
+
 // ── Copy — self-referential only, explicit date always, no counts/scarcity ─
 // 'deadline' is handled by the dedicated buildDeadlineCopy() below — it needs
 // every remaining gap booking, not just one, so it isn't part of this switch.
@@ -511,6 +555,45 @@ export function buildRematchCopy(booking: NudgeBooking, info: RematchRecallInfo)
   ].filter(Boolean).join(' ')
 
   return { title: '🔄 Rematch time!', body }
+}
+
+// rematch_ready — same achievement callout as buildRematchCopy() above,
+// for a player who's already marked themselves available. No "mark your
+// availability" CTA (they already have) — the ask here is psychological,
+// not logistical: get them picturing themselves doing it again.
+export function buildRematchReadyCopy(booking: NudgeBooking, info: RematchRecallInfo): { title: string; body: string } {
+  const dt = formatNudgeDateTime(booking)
+  const clauses: string[] = []
+  let scorecardBookingId: string | null = null
+  let scorecardDateLabel: string | null = null
+  let scorecardGround: string | null = null
+
+  if (info.batting) {
+    clauses.push(`scored ${info.batting.runs}${info.batting.notOut ? '*' : ''} off ${info.batting.balls} balls`)
+    scorecardBookingId = info.batting.bookingId
+    scorecardDateLabel = formatRematchDateLabel(info.batting.gameDate)
+    scorecardGround = info.batting.ground
+  }
+  if (info.bowling) {
+    clauses.push(`picked up a ${info.bowling.wickets}-wicket haul`)
+    if (!scorecardBookingId) {
+      scorecardBookingId = info.bowling.bookingId
+      scorecardDateLabel = formatRematchDateLabel(info.bowling.gameDate)
+      scorecardGround = info.bowling.ground
+    }
+  }
+
+  const whereWhen = [scorecardGround, scorecardDateLabel].filter(Boolean).join(', ')
+  const scorecardUrl = scorecardBookingId ? `${HUB_ORIGIN}/matches/history/${scorecardBookingId}` : null
+
+  const body = [
+    `You're already in for ${dt} against ${info.opponentName} —`,
+    `last time we met${whereWhen ? ` at ${whereWhen}` : ''} you ${joinWithAnd(clauses)}.`,
+    `Get out there and do it again!`,
+    scorecardUrl ? `Relive it: ${scorecardUrl}` : null,
+  ].filter(Boolean).join(' ')
+
+  return { title: '🔥 Get ready to repeat it!', body }
 }
 
 // Wednesday's last-chance warning — must name every booking the player still
@@ -793,13 +876,18 @@ export async function getNudgeForPlayer(
 
   const { data: responded } = await supabase
     .from('availability')
-    .select('booking_id')
+    .select('booking_id, response')
     .eq('player_id', playerId)
     .in('booking_id', bookingIds)
 
-  const respondedIds = new Set((responded ?? []).map(r => r.booking_id))
+  const respondedRows = responded ?? []
+  const respondedIds = new Set(respondedRows.map(r => r.booking_id))
+  const positiveIds = new Set(respondedRows.filter(r => ['Y', 'O', 'E'].includes(r.response)).map(r => r.booking_id))
+
   const gapBookings = bookingList.filter(b => !respondedIds.has(b.id))
-  if (!gapBookings.length) return null
+  // Nothing left to answer AND nothing already answered positively —
+  // genuinely nothing for this player today (e.g. every booking marked L).
+  if (!gapBookings.length && !positiveIds.size) return null
 
   const histories = await buildPlayerHistories(supabase, [playerId])
   const history = histories.get(playerId)!
@@ -809,43 +897,62 @@ export async function getNudgeForPlayer(
   const usedThemesThisWeek = await getThemesUsedThisWeek(supabase, playerId, now)
   const referencedBookingIds = await getReferencedBookingIdsThisWeek(supabase, playerId, now)
 
-  // Ground/tournament leader lookup, scoped to just this player's own gaps
-  // (1-2 bookings) — trivial cost for the single-player dashboard pipeline,
-  // unlike the cron's roster-wide call which is what actually needs to
-  // dedupe by unique ground/tournament (see nudgeLeaderboard.ts).
-  const enrichedGapBookings = await attachGroundTournamentInfo(supabase, gapBookings)
+  // Ground/tournament/opponent context for the whole weekend, not just the
+  // gap bookings — the rematch_ready fallback below needs it for bookings
+  // this player has already answered, so this is one enrichment pass over
+  // everything rather than two. Trivial cost either way for the
+  // single-player dashboard pipeline (1-2 bookings), unlike the cron's
+  // roster-wide call which is what actually needs to dedupe by unique
+  // ground/tournament (see nudgeLeaderboard.ts).
+  const enrichedBookingList = await attachGroundTournamentInfo(supabase, bookingList)
+  const enrichedGapBookings = enrichedBookingList.filter(b => !respondedIds.has(b.id))
+  const positivelyRespondedBookings = enrichedBookingList.filter(b => positiveIds.has(b.id))
+
   const bookingLeaders = await getBookingLeaders(enrichedGapBookings)
-  const rematchRecalls = await getRematchRecalls(supabase, enrichedGapBookings)
+  const rematchRecalls = await getRematchRecalls(supabase, enrichedBookingList)
 
-  const candidate = pickNudgeCandidate(
-    dow,
-    playerId,
-    playerStatus === 'inactive' ? 'inactive' : 'active',
-    enrichedGapBookings,
-    history,
-    prior,
-    usedThemesThisWeek,
-    referencedBookingIds,
-    bookingLeaders,
-    rematchRecalls
-  )
-  if (!candidate) return null
+  const candidate = enrichedGapBookings.length
+    ? pickNudgeCandidate(
+        dow,
+        playerId,
+        playerStatus === 'inactive' ? 'inactive' : 'active',
+        enrichedGapBookings,
+        history,
+        prior,
+        usedThemesThisWeek,
+        referencedBookingIds,
+        bookingLeaders,
+        rematchRecalls
+      )
+    : null
 
-  if (candidate.theme === 'deadline') {
-    const { title, body } = buildDeadlineCopy(candidate.gapBookings)
-    return { theme: candidate.theme, booking: candidate.representativeBooking, title, body }
-  }
+  if (candidate) {
+    if (candidate.theme === 'deadline') {
+      const { title, body } = buildDeadlineCopy(candidate.gapBookings)
+      return { theme: candidate.theme, booking: candidate.representativeBooking, title, body }
+    }
 
-  if (candidate.theme === 'leaderboard_leader') {
-    const { title, body } = buildLeaderCopy(candidate.booking, candidate.leaderInfo)
+    if (candidate.theme === 'leaderboard_leader') {
+      const { title, body } = buildLeaderCopy(candidate.booking, candidate.leaderInfo)
+      return { theme: candidate.theme, booking: candidate.booking, title, body }
+    }
+
+    if (candidate.theme === 'rematch_recall') {
+      const { title, body } = buildRematchCopy(candidate.booking, candidate.info)
+      return { theme: candidate.theme, booking: candidate.booking, title, body }
+    }
+
+    const { title, body } = buildNudgeCopy(candidate.theme, candidate.booking)
     return { theme: candidate.theme, booking: candidate.booking, title, body }
   }
 
-  if (candidate.theme === 'rematch_recall') {
-    const { title, body } = buildRematchCopy(candidate.booking, candidate.info)
-    return { theme: candidate.theme, booking: candidate.booking, title, body }
-  }
+  // No gap-driven nudge today (nothing left to answer, or every applicable
+  // theme this week is already used) — a rematch-recall performer who has
+  // already marked themselves available still gets a hype "get ready to
+  // repeat it" ping instead of going quiet.
+  const readyCandidate = pickRematchReadyCandidate(playerId, positivelyRespondedBookings, rematchRecalls, usedThemesThisWeek, referencedBookingIds)
+  if (!readyCandidate) return null
 
-  const { title, body } = buildNudgeCopy(candidate.theme, candidate.booking)
-  return { theme: candidate.theme, booking: candidate.booking, title, body }
+  const { title, body } = buildRematchReadyCopy(readyCandidate.booking, readyCandidate.info)
+  return { theme: readyCandidate.theme, booking: readyCandidate.booking, title, body }
 }
