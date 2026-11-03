@@ -6,6 +6,7 @@ import { resolveOrCreateOpponentIdByName } from '@/lib/opponents'
 import { validateBooking } from '@/lib/validation'
 import { resolveBookingCaptain } from '@/lib/bookingCaptain'
 import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
+import { notifyNewMatchBooked } from '@/lib/newMatchNotify'
 import type { CreateBookingRequest } from '@/types'
 
 
@@ -274,6 +275,10 @@ export async function POST(req: NextRequest) {
       )
     }
   }
+
+  // Tell followers of this tournament a new match is on. Awaited (Vercel
+  // freezes un-awaited work) but best-effort — never fails the booking.
+  await notifyNewMatchBooked(data.id)
 
   return NextResponse.json({ booking: data }, { status: 201 })
 }

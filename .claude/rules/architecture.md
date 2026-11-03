@@ -221,6 +221,12 @@ needs the same treatment.
 | `/api/birthdays/mark-seen` | POST | Own session | Advances the signed-in player's own `birthday_wishes_seen_date` cursor to today; player_id and date always server-derived |
 | `/api/wallet/transactions` | GET | Own (any signed-in player with a `playerId`), or admin via `?player_id=`/`?scope=all` | Cursor-paginated bank-statement read — own by default; feeds `/wallet` and, in admin mode, `/admin/wallet`; see `features/wallet-ledger.md` |
  
+### Notification preferences API
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/notification-preferences` | GET, PUT | Own session | Read/save the player's "My Notifications" choices (muted keys + followable tournaments); locked groups not storable — see `features/notification-preferences.md` |
+
 ### Captain APIs
  
 | Endpoint | Method | Auth | Purpose |
@@ -508,6 +514,9 @@ balance. `CHECK (sponsor_player_id != beneficiary_player_id)`. Admin-only,
 same trust model as every other wallet-balance-changing action — see
 `features/wallet-ledger.md` §14. Migration `074_wallet_transfers.sql`.
 **RLS enabled, no anon/authenticated policies** — service role only.
+
+#### `notification_preferences`
+`player_id FK, key, enabled, updated_at` — PK `(player_id, key)`; a missing row means opted in. Per-player alert choices (reminder days/kinds, new-match tournament follows, club-news items). RLS on, service role only. Migration `089_notification_preferences.sql`; see `features/notification-preferences.md`.
 
 #### `player_absences`
 `id, player_id FK, reason ('injured'|'family_personal'|'work_abroad'|'left_club'|'unknown', NULL = cleared), expected_return, note, recorded_by FK, recorded_by_email, created_at`

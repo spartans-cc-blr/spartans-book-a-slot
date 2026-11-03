@@ -166,7 +166,8 @@ export async function POST(req: NextRequest) {
       '🎉 Welcome to the Club!',
       `${player.name} just joined Spartans CC — give them a warm welcome!`,
       '/',
-      player.id
+      player.id,
+      'news_welcome'
     )
   } catch (err: any) {
     console.error('[register] welcome push error:', err?.message ?? err)

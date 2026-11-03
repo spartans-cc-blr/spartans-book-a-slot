@@ -1,5 +1,6 @@
 import webpush from 'web-push'
 import { createServiceClient } from '@/lib/supabase'
+import { getMutedKeysForPlayers } from '@/lib/notificationPrefsServer'
 
 
 
@@ -93,12 +94,19 @@ export async function notifyAllSubscribed(
   title: string,
   body: string,
   url: string = '/',
-  excludePlayerId?: string
+  excludePlayerId?: string,
+  // Notification-preference key (see notificationPrefs.ts). Players who have
+  // muted it are skipped. Omit for categories that can't be muted.
+  pref?: string
 ) {
   const supabase = createServiceClient()
   const { data: subs } = await supabase.from('push_subscriptions').select('player_id')
   if (!subs?.length) return
-  const playerIds = Array.from(new Set(subs.map(s => s.player_id))).filter(id => id !== excludePlayerId)
+  let playerIds = Array.from(new Set(subs.map(s => s.player_id))).filter(id => id !== excludePlayerId)
+  if (pref && playerIds.length) {
+    const muted = await getMutedKeysForPlayers(supabase, playerIds)
+    playerIds = playerIds.filter(id => !muted.get(id)?.has(pref))
+  }
   if (!playerIds.length) return
   await Promise.all(playerIds.map(id => sendPushToPlayer(id, { title, body, url })))
 }

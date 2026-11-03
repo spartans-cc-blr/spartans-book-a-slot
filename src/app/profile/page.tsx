@@ -5,6 +5,7 @@
 // Wallet balance, inducted date, is_captain, status — read-only, admin-managed.
 
 import { useState, useEffect, useRef } from 'react'
+import MyNotifications from '@/components/profile/MyNotifications'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -512,7 +513,7 @@ export default function ProfilePage() {
         <section className={card}>
           <h2 className={`${cardTitle} mb-1`}>Notifications</h2>
           <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500 mb-3">
-            Get alerted when you&apos;re selected in a squad. Applies to this device only.
+            Turn on push on this device to get alerts. Choose what you receive below.
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             <button
@@ -542,6 +543,7 @@ export default function ProfilePage() {
           )}
           {pushSuccess && <p className="font-rajdhani text-[11px] text-emerald-700 dark:text-emerald-400 mt-2">You&apos;ll be notified when you&apos;re selected in a squad.</p>}
           {pushError && <p className="font-rajdhani text-[11px] text-crimson mt-2">{pushError}</p>}
+          <MyNotifications />
         </section>
 
         {/* ── Admin-managed (read-only) ── */}

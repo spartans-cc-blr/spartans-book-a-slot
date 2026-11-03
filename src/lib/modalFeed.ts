@@ -6,6 +6,8 @@ import { createServiceClient } from '@/lib/supabase'
 import { getTodaysBirthdays, istDateString } from '@/lib/birthdays'
 import { istToday } from '@/lib/matchCompletion'
 import { hasMatchEnded } from '@/lib/matchStatus'
+import { getMutedKeys } from '@/lib/notificationPrefsServer'
+import { MATCH_PERFORMANCE_KEY, SEASON_MILESTONE_KEY } from '@/lib/notificationPrefs'
 
 const MAX_RESULTS = 20
 
@@ -46,10 +48,19 @@ export async function getUnseenAchievements(supabase: Supabase, playerId: string
   if (seasonErr) throw new Error(seasonErr.message)
   if (perfErr) throw new Error(perfErr.message)
 
+  // Drop the kinds this player has switched off in My Notifications. The
+  // seen-cursor still advances on dismiss, so un-muting later never resurfaces
+  // old ones.
+  const muted = await getMutedKeys(supabase, playerId)
   const combined = [
     ...(seasonRows ?? []).map(r => ({ kind: 'season' as const, ...r })),
     ...(perfRows ?? []).map(r => ({ kind: 'match' as const, ...r })),
   ]
+    .filter(r => !muted.has(
+      r.kind === 'season'
+        ? SEASON_MILESTONE_KEY[(r as any).milestone_type]
+        : MATCH_PERFORMANCE_KEY[(r as any).performance_type]
+    ))
     .sort((a, b) => a.achieved_at.localeCompare(b.achieved_at))
     .slice(0, MAX_RESULTS)
 
@@ -61,6 +72,7 @@ export async function getUnseenBirthdays(supabase: Supabase, playerId: string) {
     .from('players').select('birthday_wishes_seen_date').eq('id', playerId).single()
   if (meErr) throw new Error(meErr.message)
   if (me?.birthday_wishes_seen_date === istDateString()) return []
+  if ((await getMutedKeys(supabase, playerId)).has('news_birthday')) return []
   return getTodaysBirthdays()
 }
 

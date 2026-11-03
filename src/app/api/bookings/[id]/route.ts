@@ -7,6 +7,7 @@ import { resolveOrCreateOpponentIdByName } from '@/lib/opponents'
 import { resolveBookingCaptain } from '@/lib/bookingCaptain'
 import { GAME_DATE_REGEX, bookingRuleOverridesSchema } from '@/lib/schemas'
 import { ORGANISER_SELF_SERVICE_REASON } from '@/types'
+import { notifyNewMatchBooked } from '@/lib/newMatchNotify'
 
 export async function GET(
   req: NextRequest,
@@ -210,6 +211,11 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
   }
 
   invalidateStatsCache()
+
+  // A reservation just became a confirmed match — alert tournament followers.
+  if (safeUpdates.status === 'confirmed' && existing?.status !== 'confirmed') {
+    await notifyNewMatchBooked(params.id)
+  }
   return NextResponse.json({ booking: data, ...(overrideLogError ? { overrideLogError } : {}) })
 }
 
