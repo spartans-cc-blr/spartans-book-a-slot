@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
 
   // Tell followers of this tournament a new match is on. Awaited (Vercel
   // freezes un-awaited work) but best-effort — never fails the booking.
-  await notifyNewMatchBooked(data.id)
+  const newMatchPush = await notifyNewMatchBooked(data.id)
 
-  return NextResponse.json({ booking: data }, { status: 201 })
+  return NextResponse.json({ booking: data, new_match_push: newMatchPush }, { status: 201 })
 }

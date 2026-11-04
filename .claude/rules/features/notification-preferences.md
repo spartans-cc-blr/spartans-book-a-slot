@@ -50,6 +50,11 @@ Fired (awaited, best-effort) when a booking becomes **confirmed**: `POST /api/bo
 confirmed by the admin). Skipped for practice games, bookings without a tournament, and past
 dates (backfills).
 
+`notifyNewMatchBooked()` returns `{ sent, failed, note }` (why nothing was sent, or per-send error codes),
+logs it as `[new-match-notify] ...` in the server log, and `POST /api/bookings` / `PATCH /api/bookings/[id]`
+include it as `new_match_push` in the response, so a silent miss can be diagnosed. The message shows the
+match start time, not the reporting time.
+
 Audience: everyone with a push subscription, minus expelled players, minus anyone who muted
 `newmatch` or unfollowed that tournament. **All tournaments are followed by default**, including
 new ones. Deep link: `/fixtures/<booking id>`.
