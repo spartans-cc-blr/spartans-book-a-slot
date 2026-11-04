@@ -213,10 +213,11 @@ if (!user?.isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status
   invalidateStatsCache()
 
   // A reservation just became a confirmed match — alert tournament followers.
+  let newMatchPush = null
   if (safeUpdates.status === 'confirmed' && existing?.status !== 'confirmed') {
-    await notifyNewMatchBooked(params.id)
+    newMatchPush = await notifyNewMatchBooked(params.id)
   }
-  return NextResponse.json({ booking: data, ...(overrideLogError ? { overrideLogError } : {}) })
+  return NextResponse.json({ booking: data, ...(newMatchPush ? { new_match_push: newMatchPush } : {}), ...(overrideLogError ? { overrideLogError } : {}) })
 }
 
 // ── DELETE /api/bookings/[id] ─────────────────────────────────────
