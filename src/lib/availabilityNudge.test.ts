@@ -27,7 +27,7 @@ function makeBooking(overrides: Partial<NudgeBooking> = {}): NudgeBooking {
 }
 
 describe('buildRematchCopy', () => {
-  it('names the opponent, the past performance, and links the old scorecard', () => {
+  it('names the opponent, the past performance, without a scorecard URL', () => {
     const info: RematchRecallInfo = {
       playerId: 'p1',
       opponentName: 'Royal Connect Logistics',
@@ -48,7 +48,7 @@ describe('buildRematchCopy', () => {
     expect(body).toContain('scored 51 off 42 balls')
     expect(body).toContain('Macushala')
     expect(body).toContain('6 Jun')
-    expect(body).toContain('https://hub.spartanscricketclub.in/matches/history/old-booking-id')
+    expect(body).not.toContain('http') // no URL in a push body (Chrome spam signal)
     expect(body).toContain(formatNudgeDateTime(booking))
     expect(body).toContain('Mark your availability!')
     // No raw counts/comparisons beyond the player's own named achievement.
@@ -65,7 +65,7 @@ describe('buildRematchCopy', () => {
     expect(body).toContain('51*')
   })
 
-  it('combines a batting and a bowling highlight in one sentence, linking the batting scorecard', () => {
+  it('combines a batting and a bowling highlight in one sentence', () => {
     const info: RematchRecallInfo = {
       playerId: 'p2',
       opponentName: 'Royal Connect Logistics',
@@ -75,11 +75,11 @@ describe('buildRematchCopy', () => {
     const { body } = buildRematchCopy(makeBooking(), info)
     expect(body).toContain('scored 60 off 40 balls')
     expect(body).toContain('3-wicket haul')
-    expect(body).toContain('bat-match')
+    expect(body).not.toContain('bat-match')
     expect(body).not.toContain('bowl-match')
   })
 
-  it('falls back to just the bowling highlight and its own scorecard when there is no batting one', () => {
+  it('falls back to just the bowling highlight when there is no batting one', () => {
     const info: RematchRecallInfo = {
       playerId: 'p3',
       opponentName: 'Royal Connect Logistics',
@@ -87,7 +87,7 @@ describe('buildRematchCopy', () => {
     }
     const { body } = buildRematchCopy(makeBooking(), info)
     expect(body).toContain('3-wicket haul')
-    expect(body).toContain('old-bowl')
+    expect(body).not.toContain('old-bowl')
   })
 
   it('degrades gracefully with no ground/date on record', () => {
@@ -123,13 +123,13 @@ describe('buildRematchReadyCopy', () => {
     expect(body).toContain('scored 51 off 42 balls')
     expect(body).toContain('Macushala')
     expect(body).toContain('6 Jun')
-    expect(body).toContain('https://hub.spartanscricketclub.in/matches/history/old-booking-id')
+    expect(body).not.toContain('http')
     expect(body).toContain(formatNudgeDateTime(booking))
     // This player has already answered — never ask them to mark availability.
     expect(body).not.toContain('Mark your availability')
   })
 
-  it('combines a batting and a bowling highlight, linking the batting scorecard', () => {
+  it('combines a batting and a bowling highlight', () => {
     const info: RematchRecallInfo = {
       playerId: 'p2',
       opponentName: 'Royal Connect Logistics',
@@ -139,7 +139,7 @@ describe('buildRematchReadyCopy', () => {
     const { body } = buildRematchReadyCopy(makeBooking(), info)
     expect(body).toContain('scored 60 off 40 balls')
     expect(body).toContain('3-wicket haul')
-    expect(body).toContain('bat-match')
+    expect(body).not.toContain('bat-match')
     expect(body).not.toContain('bowl-match')
   })
 

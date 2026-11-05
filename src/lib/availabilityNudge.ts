@@ -516,8 +516,6 @@ export function buildLeaderCopy(booking: NudgeBooking, leaderInfo: BookingLeader
   }
 }
 
-const HUB_ORIGIN = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://hub.spartanscricketclub.in'
-
 function formatRematchDateLabel(dateStr: string | null): string | null {
   if (!dateStr) return null
   const d = new Date(dateStr + 'T00:00:00')
@@ -532,36 +530,33 @@ function formatRematchDateLabel(dateStr: string | null): string | null {
 // When a player has both a qualifying batting and bowling highlight
 // (possibly from two different past meetings), both are named but only one
 // scorecard is linked — the batting one takes precedence, since it's named
-// first in the sentence either way.
+// first in the sentence either way. No URL in the body (removed November
+// 2026): links in a push body are a spam signal for Chrome's notification
+// filter, and tapping the push already opens the Hub.
 export function buildRematchCopy(booking: NudgeBooking, info: RematchRecallInfo): { title: string; body: string } {
   const dt = formatNudgeDateTime(booking)
   const clauses: string[] = []
-  let scorecardBookingId: string | null = null
   let scorecardDateLabel: string | null = null
   let scorecardGround: string | null = null
 
   if (info.batting) {
     clauses.push(`scored ${info.batting.runs}${info.batting.notOut ? '*' : ''} off ${info.batting.balls} balls`)
-    scorecardBookingId = info.batting.bookingId
     scorecardDateLabel = formatRematchDateLabel(info.batting.gameDate)
     scorecardGround = info.batting.ground
   }
   if (info.bowling) {
     clauses.push(`picked up a ${info.bowling.wickets}-wicket haul`)
-    if (!scorecardBookingId) {
-      scorecardBookingId = info.bowling.bookingId
+    if (!info.batting) {
       scorecardDateLabel = formatRematchDateLabel(info.bowling.gameDate)
       scorecardGround = info.bowling.ground
     }
   }
 
   const whereWhen = [scorecardGround, scorecardDateLabel].filter(Boolean).join(', ')
-  const scorecardUrl = scorecardBookingId ? `${HUB_ORIGIN}/matches/history/${scorecardBookingId}` : null
 
   const body = [
     `${info.opponentName} are back on the calendar — and you've got history with them!`,
     `You ${joinWithAnd(clauses)} last time we met${whereWhen ? ` at ${whereWhen}` : ''}!`,
-    scorecardUrl ? `Relive it — scorecard: ${scorecardUrl}` : null,
     `${dt} is coming up. Mark your availability!`,
   ].filter(Boolean).join(' ')
 
@@ -575,33 +570,28 @@ export function buildRematchCopy(booking: NudgeBooking, info: RematchRecallInfo)
 export function buildRematchReadyCopy(booking: NudgeBooking, info: RematchRecallInfo): { title: string; body: string } {
   const dt = formatNudgeDateTime(booking)
   const clauses: string[] = []
-  let scorecardBookingId: string | null = null
   let scorecardDateLabel: string | null = null
   let scorecardGround: string | null = null
 
   if (info.batting) {
     clauses.push(`scored ${info.batting.runs}${info.batting.notOut ? '*' : ''} off ${info.batting.balls} balls`)
-    scorecardBookingId = info.batting.bookingId
     scorecardDateLabel = formatRematchDateLabel(info.batting.gameDate)
     scorecardGround = info.batting.ground
   }
   if (info.bowling) {
     clauses.push(`picked up a ${info.bowling.wickets}-wicket haul`)
-    if (!scorecardBookingId) {
-      scorecardBookingId = info.bowling.bookingId
+    if (!info.batting) {
       scorecardDateLabel = formatRematchDateLabel(info.bowling.gameDate)
       scorecardGround = info.bowling.ground
     }
   }
 
   const whereWhen = [scorecardGround, scorecardDateLabel].filter(Boolean).join(', ')
-  const scorecardUrl = scorecardBookingId ? `${HUB_ORIGIN}/matches/history/${scorecardBookingId}` : null
 
   const body = [
     `You're already in for ${dt} against ${info.opponentName} —`,
     `last time we met${whereWhen ? ` at ${whereWhen}` : ''} you ${joinWithAnd(clauses)}.`,
     `Get out there and do it again!`,
-    scorecardUrl ? `Relive it: ${scorecardUrl}` : null,
   ].filter(Boolean).join(' ')
 
   return { title: '🔥 Get ready to repeat it!', body }
