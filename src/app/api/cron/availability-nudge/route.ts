@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { NO_MUTES, isNudgeDayMuted } from '@/lib/notificationPrefs'
 import { getMutedKeysForPlayers } from '@/lib/notificationPrefsServer'
 import { createServiceClient } from '@/lib/supabase'
+import { getLatestAbsenceReasons } from '@/lib/leftClub'
 import { sendPushToPlayer, notifyGCs } from '@/lib/webpush'
 import {
   fetchNextLockWeekendBookings,
@@ -67,12 +68,29 @@ export async function GET(req: NextRequest) {
     const bookingIds = bookingList.map(b => b.id)
     const bookingSlotMap = new Map(bookingList.map(b => [b.id, b.slot_time]))
 
-    const { data: players } = await supabase
+    const { data: candidatePlayers } = await supabase
       .from('players')
       .select('id, status')
       .in('status', ['active', 'inactive'])
 
-    if (!players?.length) {
+    // Skip players a captain/GC/admin has recorded a reason for being away
+    // (player_absences, see features/player-directory.md §8): anyone marked
+    // "Left the club" regardless of status, and any inactive player with a
+    // reason set (injured, family, abroad, unknown/no reply). Nightly
+    // reminders to people who aren't coming were the bulk of the ignored
+    // pushes that got the Hub flagged as spam by Chrome. An active player
+    // with a stale reason still gets nudged — they're back.
+    const absenceReasons = await getLatestAbsenceReasons(
+      supabase, (candidatePlayers ?? []).map(p => p.id),
+    )
+    const players = (candidatePlayers ?? []).filter(p => {
+      const reason = absenceReasons.get(p.id)
+      if (!reason) return true
+      if (reason === 'left_club') return false
+      return p.status !== 'inactive'
+    })
+
+    if (!players.length) {
       return NextResponse.json({ sent: 0, reason: 'no eligible players' })
     }
     const playerIds = players.map(p => p.id)

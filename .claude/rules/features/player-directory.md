@@ -205,10 +205,10 @@ can now record the reason from the **Inactive** filter on this page.
   when the status pill changes, and updates live when a reason is saved on a card
   (`absenceOverrides` in `PlayerDirectoryGrid`). Hidden for everyone else, who never
   receive absence data. Client-side only; no API change.
-- **Not yet wired (other than §8.1):** nothing reads the reason besides this page. Suppressing
-  the Sun–Wed availability nudge for players who are away (and a "welcome
-  back" nudge near their return date), and hiding "Left the club" players from
-  outreach lists, are the planned follow-ups.
+- **Availability nudge (November 2026):** the Sun–Wed reminder push skips players marked
+  Left the club, and inactive players with any reason set — see `availability-nudge.md` §4a.
+  Still not built: a "welcome back" nudge near the return date, and hiding "Left the club"
+  players from other outreach (new-match, club-news pushes).
 
 ### 8.1 "Left the club" blocks sign-in (added October 2026)
 

@@ -76,7 +76,7 @@ For each `nextLockWeekend` booking, if any player is the leading **MVP, run-scor
 
 ## 3b. Rematch Recall (`rematch_recall`)
 
-For each `nextLockWeekend` booking with a resolved opponent (`bookings.opponent_id`, the opponent master — see `features/team-stats.md` §5), finds every player's own best past performance against that same opponent, from any prior confirmed, synced meeting — e.g. *"Royal Connect Logistics are back on the calendar — and you've got history with them! You scored 51 off 42 balls last time we met at Macushala, 6 Jun! Relive it — scorecard: https://hub.spartanscricketclub.in/matches/history/\<old-booking-id\> Sat 7 Nov, 7:15 AM is coming up. Mark your availability!"* If a player has both a qualifying batting and bowling highlight against the same opponent (possibly from two different past meetings), both are named in one sentence; only one scorecard is linked (the batting one, since it's named first).
+For each `nextLockWeekend` booking with a resolved opponent (`bookings.opponent_id`, the opponent master — see `features/team-stats.md` §5), finds every player's own best past performance against that same opponent, from any prior confirmed, synced meeting — e.g. *"Royal Connect Logistics are back on the calendar — and you've got history with them! You scored 51 off 42 balls last time we met at Macushala, 6 Jun! Sat 7 Nov, 7:15 AM is coming up. Mark your availability!"* If a player has both a qualifying batting and bowling highlight against the same opponent (possibly from two different past meetings), both are named in one sentence; the where/when shown is the batting meeting's (named first). The push body carries no URL (see §4a).
 
 **Checked at the same tier as `leaderboard_leader`** (§3a) — immediately after it, before the reactivation/priority-list split — for the identical reason: this is an achievement callout independent of recent response volume, not a habit-based hook. Respects the same once-per-week cap and soft unreferenced-booking preference. A player who qualifies for both `leaderboard_leader` and `rematch_recall` on the same day gets whichever check runs first (`leaderboard_leader`); they can still get the other theme on a later day this week, since each theme's own `usedThemesThisWeek` entry is independent.
 
@@ -96,7 +96,7 @@ For each `nextLockWeekend` booking with a resolved opponent (`bookings.opponent_
 
 ## 3c. Rematch Ready (`rematch_ready`) — the counterpart for a player who already answered
 
-`rematch_recall` (§3b) only ever fires on a *gap* booking — a player who hasn't yet marked availability. A rematch-recall performer who has **already** marked themselves `Y`/`O`/`E` for that same booking gets a different, standalone theme instead: a hype "get ready to repeat it" ping, with no "mark your availability" ask at all (they already have one) — e.g. *"You're already in for Sat 7 Nov, 7:15 AM against Royal Connect Logistics — last time we met at Macushala, 6 Jun you scored 51 off 42 balls. Get out there and do it again! Relive it: https://hub.spartanscricketclub.in/matches/history/\<old-booking-id\>"*
+`rematch_recall` (§3b) only ever fires on a *gap* booking — a player who hasn't yet marked availability. A rematch-recall performer who has **already** marked themselves `Y`/`O`/`E` for that same booking gets a different, standalone theme instead: a hype "get ready to repeat it" ping, with no "mark your availability" ask at all (they already have one) — e.g. *"You're already in for Sat 7 Nov, 7:15 AM against Royal Connect Logistics — last time we met at Macushala, 6 Jun you scored 51 off 42 balls. Get out there and do it again!"*
 
 **Never fires for the same booking as `rematch_recall`** — the two read from disjoint sets (unanswered vs. answered `Y`/`O`/`E`; a `L` response is neither and gets nothing from this feature). A booking is always exactly one of: still a gap (candidate for `rematch_recall` or any other gap theme), or already answered positively (candidate for `rematch_ready` only), or answered `L` (candidate for nothing).
 
@@ -116,6 +116,13 @@ For each `nextLockWeekend` booking with a resolved opponent (`bookings.opponent_
 - Outside the Sun–Wed window (i.e. `getDay() > 3`), the route is a no-op, not an error
 
 ---
+
+## 4a. Spam-signal reductions (added November 2026)
+
+Chrome on Android flagged a Wednesday `deadline` push as "Possible spam" (4 Nov 2026, 168 players sent at 20:56 IST, after four consecutive nights of ~170 pushes, ~136 of them reactivation reminders to inactive players). Chrome's on-device filter weighs message wording and how often a site's notifications are dismissed unopened. Two changes:
+
+- **No URLs in push bodies.** `buildRematchCopy()` / `buildRematchReadyCopy()` no longer append the old scorecard link; the copy still names the opponent, performance, ground and date. Tapping the push already opens the Hub.
+- **Players marked away are skipped.** The cron reads each player's newest `player_absences` reason (`getLatestAbsenceReasons()`, `src/lib/leftClub.ts`, one batched query, fails open) and drops anyone marked **Left the club** (any status) and any **inactive** player with a reason set (injured, family/personal, work/abroad, unknown/no reply). An active player with a stale reason is still nudged. Clearing the reason on `/players` (or the player becoming active by marking availability) brings them back. At the time of the change this excluded 72 players. The Home dashboard banner (`getNudgeForPlayer()`) is unchanged.
 
 ## 5. Security
 
