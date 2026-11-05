@@ -5,7 +5,10 @@
 //   - "Summary"  — a small dashboard header (title, generated date, KPI
 //     tiles) followed by one row per player: name + current wallet balance.
 //   - "Detailed" — one row per transaction, grouped by player, in
-//     chronological (oldest-first) order, with a running total that starts
+//     chronological (oldest-first) order, with separate columns for date,
+//     type, amount and description, plus match context (match ID, match
+//     date, opponent, full match fee, players charged) for match-fee rows,
+//     and a running total that starts
 //     from that player's own opening balance (the same "Brought Forward"
 //     figure the /wallet statement page computes — see §5 of the feature
 //     doc) so the numbers tie out to a real ledger, not just a bare list.
@@ -23,14 +26,70 @@ import writeExcelFile from 'write-excel-file/node'
 import { createServiceClient } from '@/lib/supabase'
 
 export type WalletSummaryRow = { name: string; wallet_balance: number }
-export type WalletDetailRow = { name: string; transaction: string; running_total: number }
+// One Detailed-sheet row. A "Brought Forward" row has kind 'opening' and
+// only name/description/running_total set. Match columns are filled only for
+// a transaction tied to a booking (a match-fee debit, refund or correction).
+export type WalletDetailRow = {
+  kind: 'opening' | 'txn'
+  name: string
+  txn_date: string | null        // e.g. "25 Aug 2026"
+  type: 'Credit' | 'Debit' | null
+  amount: number | null          // signed: credit +, debit −
+  description: string
+  match_id: string | null        // CricHeroes match ID
+  match_date: string | null
+  opponent: string | null
+  match_fee: number | null       // total fee for the match (override ?? tournament fee)
+  players_charged: number | null // players with a net charge on that match
+  running_total: number
+}
 
 type TxRow = {
   player_id: string
+  booking_id: string | null
   type: 'credit' | 'debit'
   amount: number
   reason: string
   created_at: string
+}
+
+type BookingInfo = {
+  match_id: string | null
+  game_date: string | null
+  opponent_name: string | null
+  match_fee: number | null
+}
+
+const fmtDate = (d: string | null) =>
+  d ? new Date(d.length === 10 ? `${d}T00:00:00` : d).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata',
+  }) : null
+
+// Match details for every booking referenced by a wallet row, chunked so the
+// .in() list stays small.
+async function fetchBookingInfo(
+  supabase: ReturnType<typeof createServiceClient>,
+  ids: string[],
+): Promise<Map<string, BookingInfo>> {
+  const out = new Map<string, BookingInfo>()
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id, match_id, game_date, opponent_name, match_fee_override, tournament:tournaments!bookings_tournament_id_fkey(match_fee)')
+      .in('id', ids.slice(i, i + 200))
+    if (error) throw new Error(error.message)
+    for (const b of (data ?? []) as any[]) {
+      const t = Array.isArray(b.tournament) ? b.tournament[0] : b.tournament
+      const fee = b.match_fee_override ?? t?.match_fee ?? null
+      out.set(b.id, {
+        match_id: b.match_id ?? null,
+        game_date: b.game_date ?? null,
+        opponent_name: b.opponent_name ?? null,
+        match_fee: fee != null ? Number(fee) : null,
+      })
+    }
+  }
+  return out
 }
 
 // PostgREST silently caps an unpaginated response at 1000 rows — this exact
@@ -43,7 +102,7 @@ async function fetchAllTransactions(supabase: ReturnType<typeof createServiceCli
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from('wallet_transactions')
-      .select('player_id, type, amount, reason, created_at')
+      .select('player_id, booking_id, type, amount, reason, created_at')
       .is('deleted_at', null)
       .order('player_id', { ascending: true })
       .order('created_at', { ascending: true })
@@ -83,6 +142,24 @@ export async function buildWalletExportData(): Promise<{
     else txByPlayer.set(t.player_id, [t])
   }
 
+  // Match context: booking details, and how many players carry a net
+  // charge on each match (debits − credits per player, after corrections).
+  const bookingIds = Array.from(new Set(allTx.map(t => t.booking_id).filter((x): x is string => !!x)))
+  const bookingInfo = await fetchBookingInfo(supabase, bookingIds)
+  const netByBookingPlayer = new Map<string, Map<string, number>>()
+  for (const t of allTx) {
+    if (!t.booking_id) continue
+    const m = netByBookingPlayer.get(t.booking_id) ?? new Map<string, number>()
+    m.set(t.player_id, (m.get(t.player_id) ?? 0) + (t.type === 'debit' ? Number(t.amount) : -Number(t.amount)))
+    netByBookingPlayer.set(t.booking_id, m)
+  }
+  const playersCharged = new Map<string, number>()
+  netByBookingPlayer.forEach((m, bid) => {
+    let n = 0
+    m.forEach(v => { if (v > 0) n++ })
+    playersCharged.set(bid, n)
+  })
+
   const detailed: WalletDetailRow[] = []
   for (const p of rows) {
     const txs = txByPlayer.get(p.id) ?? []
@@ -99,16 +176,30 @@ export async function buildWalletExportData(): Promise<{
     const opening = p.wallet_opening_balance != null ? Number(p.wallet_opening_balance) : computedOpening
 
     let running = opening
-    detailed.push({ name: p.name, transaction: 'Brought Forward', running_total: round2(running) })
+    detailed.push({
+      kind: 'opening', name: p.name, txn_date: null, type: null, amount: null,
+      description: 'Brought Forward', match_id: null, match_date: null, opponent: null,
+      match_fee: null, players_charged: null, running_total: round2(running),
+    })
 
     for (const t of txs) {
       const delta = t.type === 'credit' ? Number(t.amount) : -Number(t.amount)
       running += delta
-      const dateStr = new Date(t.created_at).toLocaleDateString('en-IN', {
-        day: 'numeric', month: 'short', year: 'numeric',
+      const b = t.booking_id ? bookingInfo.get(t.booking_id) : undefined
+      detailed.push({
+        kind: 'txn',
+        name: p.name,
+        txn_date: fmtDate(t.created_at),
+        type: t.type === 'credit' ? 'Credit' : 'Debit',
+        amount: round2(delta),
+        description: t.reason,
+        match_id: b?.match_id ?? null,
+        match_date: fmtDate(b?.game_date ?? null),
+        opponent: b?.opponent_name ?? null,
+        match_fee: b?.match_fee ?? null,
+        players_charged: t.booking_id ? (playersCharged.get(t.booking_id) ?? null) : null,
+        running_total: round2(running),
       })
-      const label = `${dateStr} · ${t.type === 'credit' ? 'Credit' : 'Debit'} ₹${Number(t.amount).toLocaleString('en-IN')} — ${t.reason}`
-      detailed.push({ name: p.name, transaction: label, running_total: round2(running) })
     }
   }
 
@@ -214,23 +305,42 @@ export async function buildWalletExportWorkbook(
   ]
 
   // ── Detailed sheet — one banded block per player ────────────────────────
+  const DETAIL_HEADERS = [
+    'Player Name', 'Txn Date', 'Type', 'Amount', 'Description',
+    'Match ID', 'Match Date', 'Opponent', 'Match Fee', 'Players Charged', 'Running Total',
+  ]
+  const cols = DETAIL_HEADERS.length
+  const opt = (v: string | null, band: boolean, extra: Record<string, unknown> = {}) =>
+    textCell(v ?? '', band, extra)
   let band = false
   let lastName: string | null = null
   const detailedRows = detailed.map(r => {
     if (r.name !== lastName) { band = !band; lastName = r.name }
-    const isBroughtForward = r.transaction === 'Brought Forward'
+    const bold = r.kind === 'opening' ? { fontWeight: 'bold' } : {}
     return [
-      textCell(r.name, band, isBroughtForward ? { fontWeight: 'bold' } : {}),
-      textCell(r.transaction, band, isBroughtForward ? { fontStyle: 'italic' } : {}),
-      moneyCell(r.running_total, band, isBroughtForward ? { fontWeight: 'bold' } : {}),
+      textCell(r.name, band, bold),
+      opt(r.txn_date, band),
+      opt(r.type, band),
+      r.amount != null ? moneyCell(r.amount, band) : opt(null, band),
+      textCell(r.description, band, r.kind === 'opening' ? { fontStyle: 'italic' } : {}),
+      opt(r.match_id, band),
+      opt(r.match_date, band),
+      opt(r.opponent, band),
+      r.match_fee != null
+        ? moneyCell(r.match_fee, band, { textColor: TITLE_TEXT })
+        : opt(null, band),
+      r.players_charged != null
+        ? { ...textCell('', band), value: r.players_charged, type: Number, align: 'right' as const }
+        : opt(null, band),
+      moneyCell(r.running_total, band, bold),
     ]
   })
 
   const detailedData = [
-    titleRow('Spartans Hub — Wallet Ledger (Detailed)', 3),
-    subtitleRow(`Generated ${generatedAt}`, 3),
-    blankRow(3),
-    [headerCell('Player Name'), headerCell('Transaction'), headerCell('Running Total')],
+    titleRow('Spartans Hub — Wallet Ledger (Detailed)', cols),
+    subtitleRow(`Generated ${generatedAt} · Amount is this player's share (debit −, credit +); Match Fee is the full fee for the match`, cols),
+    blankRow(cols),
+    DETAIL_HEADERS.map(headerCell),
     ...detailedRows,
   ]
 
@@ -244,7 +354,10 @@ export async function buildWalletExportWorkbook(
     {
       sheet: 'Detailed',
       data: detailedData,
-      columns: [{ width: 24 }, { width: 68 }, { width: 18 }],
+      columns: [
+        { width: 24 }, { width: 13 }, { width: 8 }, { width: 13 }, { width: 44 },
+        { width: 12 }, { width: 13 }, { width: 26 }, { width: 12 }, { width: 10 }, { width: 15 },
+      ],
       stickyRowsCount: 4,
     },
   ]).toBuffer()

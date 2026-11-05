@@ -1007,6 +1007,20 @@ Downloads one real workbook with two named sheets:
   statement. A player with zero transactions has no rows on the Detailed
   sheet (nothing to show) but still appears on Summary.
 
+**Detailed sheet split into real columns (added November 2026).** The
+single `Transaction` string (e.g. "25 Aug 2026 · Debit ₹710 — Match fee
+debit — ₹710") didn't say which match a fee was for. The sheet now has
+**Player Name · Txn Date · Type · Amount · Description · Match ID · Match
+Date · Opponent · Match Fee · Players Charged · Running Total**. Amount is
+signed (debit −, credit +) and is this player's share; the match columns
+are filled only for rows with a `booking_id` (match-fee debits, refunds and
+corrections). Match Fee is the full fee for the match
+(`match_fee_override ?? tournaments.match_fee`, same precedence as
+`/api/fees/apply`); Players Charged counts players whose net
+(`debit − credit`) on that booking is above zero, so a corrected split shows
+the current headcount. Booking details come from one chunked `bookings`
+read for every `booking_id` in the ledger; no new route or schema.
+
 **`fetchAllTransactions()` filters `deleted_at IS NULL` (added alongside
 §3.1's soft-delete capability)** — a soft-deleted row's balance effect is
 already reversed out of `players.wallet_balance` at delete time, so
