@@ -131,8 +131,11 @@ run-scorer / wicket-taker carries a cap icon after their name on the card (see
 the highlights; nothing changes if it fails.
 
 The footer shows the match count (from highlights) and "Last played
-&lt;date&gt;". Last played is Hub-side: the latest confirmed booking dated
-today or earlier that the player was squadded for, practice games included.
+&lt;date&gt;". Last played is Hub-side: the latest confirmed, completed
+booking the player was squadded for, practice games included. Past days come
+from `player_last_played(yesterday)`; today's games count only once
+`isCompletedMatch()` says so (ended, or scorecard synced — the same rule as
+`/fixtures`, `admin-matches-view.md` §2.1). Dates are IST (`istToday()`).
 
 **Fixed November 2026 — "Last played" was wrong for many players.** The page
 fetched every `squad` ⋈ `bookings` row in one unpaginated request and took
@@ -143,8 +146,8 @@ players showed an older date or "Never played" (same bug class as
 function `player_last_played(p_today)` (migration
 `090_player_last_played.sql`, applied live, service role only), which does
 the `max(game_date)` per player in Postgres and returns one row per player.
-Known limitation, unchanged: a match later today counts as "last played"
-before it has been played (date check, not end time).
+The same pass fixed a match later today counting as "last played" before
+it had been played (it was a plain date check, in UTC).
 
 ---
 

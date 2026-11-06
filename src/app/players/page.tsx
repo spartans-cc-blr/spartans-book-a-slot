@@ -21,6 +21,7 @@ import { SiteNav } from '@/components/ui/SiteNav'
 import { PlayerDirectoryGrid, type DirectoryPlayer } from '@/components/players/PlayerDirectoryGrid'
 import { getCareerHighlightsByPlayer, getSeasonCapHolders } from '@/lib/playerStats'
 import { capsForPlayer } from '@/lib/capHolders'
+import { istToday, isCompletedMatch, getSyncedBookingIds } from '@/lib/matchCompletion'
 import type { CareerHighlights } from '@/lib/playerHighlights'
 import type { Metadata } from 'next'
 
@@ -37,9 +38,12 @@ export default async function PlayersDirectoryPage() {
   // Captains, GC and admin can see and record why a player is inactive (§8).
   const canManageAbsences = !!(user?.isCaptain || user?.isGC || user?.isAdmin)
   const supabase = createServiceClient()
-  const today = new Date().toISOString().split('T')[0]
+  // IST dates: game_date is an IST calendar date (UTC lags 00:00–05:30 IST).
+  const today = istToday()
+  const [y, m, d] = today.split('-').map(Number)
+  const yesterday = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
 
-  const [playersRes, playedRes, highlights, capHolders, absencesRes] = await Promise.all([
+  const [playersRes, playedRes, todayRes, highlights, capHolders, absencesRes] = await Promise.all([
     supabase
       .from('players')
       .select(`id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain, status${canSeeWallet ? ', wallet_balance' : ''}`)
@@ -48,7 +52,14 @@ export default async function PlayersDirectoryPage() {
     // Last played = most recent confirmed booking (practice included) the
     // player was squadded for, aggregated in the DB (migration 090) so it is
     // one row per player and can't hit PostgREST's 1000-row response cap.
-    supabase.rpc('player_last_played', { p_today: today }),
+    // Up to yesterday only; today's games are checked separately below so a
+    // game later today doesn't count until it has ended (same rule as /fixtures).
+    supabase.rpc('player_last_played', { p_today: yesterday }),
+    supabase
+      .from('bookings')
+      .select('id, game_date, slot_time, format, squad(player_id)')
+      .eq('status', 'confirmed')
+      .eq('game_date', today),
     // Stats are best-effort — the directory still works as a name lookup
     // if the analytics DB is unreachable.
     getCareerHighlightsByPlayer().catch(err => {
@@ -84,6 +95,16 @@ export default async function PlayersDirectoryPage() {
   const lastPlayed: Record<string, string> = {}
   for (const row of (playedRes.data ?? []) as { player_id: string; last_played: string | null }[]) {
     if (row.last_played) lastPlayed[row.player_id] = row.last_played
+  }
+
+  // Today's games count once completed: ended (slot + format duration) or
+  // scorecard synced — isCompletedMatch(), shared with /fixtures.
+  if (todayRes.error) console.error('[players] today bookings query error:', todayRes.error.message)
+  const todayBookings = (todayRes.data ?? []) as any[]
+  const syncedIds = await getSyncedBookingIds(supabase, todayBookings.map(b => b.id))
+  for (const b of todayBookings) {
+    if (!isCompletedMatch(b, today, syncedIds)) continue
+    for (const sq of (b.squad ?? []) as { player_id: string }[]) lastPlayed[sq.player_id] = today
   }
 
   const players: DirectoryPlayer[] = (playersRes.data ?? []).map((p: any) => ({
