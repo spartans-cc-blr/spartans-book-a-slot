@@ -45,13 +45,10 @@ export default async function PlayersDirectoryPage() {
       .select(`id, name, photo_url, jersey_name, jersey_number, primary_skill, secondary_skill, is_captain, status${canSeeWallet ? ', wallet_balance' : ''}`)
       .neq('status', 'expelled')
       .order('name', { ascending: true }),
-    // Last played = most recent confirmed, already-played booking the
-    // player was squadded for (Hub-side, same signal the old GC page used).
-    supabase
-      .from('squad')
-      .select('player_id, bookings!inner(game_date, status)')
-      .eq('bookings.status', 'confirmed')
-      .lte('bookings.game_date', today),
+    // Last played = most recent confirmed booking (practice included) the
+    // player was squadded for, aggregated in the DB (migration 090) so it is
+    // one row per player and can't hit PostgREST's 1000-row response cap.
+    supabase.rpc('player_last_played', { p_today: today }),
     // Stats are best-effort — the directory still works as a name lookup
     // if the analytics DB is unreachable.
     getCareerHighlightsByPlayer().catch(err => {
@@ -85,10 +82,8 @@ export default async function PlayersDirectoryPage() {
   }
 
   const lastPlayed: Record<string, string> = {}
-  for (const row of playedRes.data ?? []) {
-    const d = (row as any).bookings?.game_date as string | undefined
-    const pid = row.player_id as string
-    if (d && (!lastPlayed[pid] || d > lastPlayed[pid])) lastPlayed[pid] = d
+  for (const row of (playedRes.data ?? []) as { player_id: string; last_played: string | null }[]) {
+    if (row.last_played) lastPlayed[row.player_id] = row.last_played
   }
 
   const players: DirectoryPlayer[] = (playersRes.data ?? []).map((p: any) => ({
