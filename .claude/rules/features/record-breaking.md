@@ -78,7 +78,7 @@ The `breakthrough_w*` records were first shown as "Biggest stand broken — Nth 
 - `RecordBookView` lists them under a separate **Against us** heading at the end of each format column, with the value and "set in" line in neutral colours instead of gold/green.
 - Their WhatsApp text (Record Book share icon and `record_breaks.message`) is neutral: 📉 title, stand, opponent and date, who broke it, the previous highest against us, and the match link. No trophy, "New Spartans record", reign line or "Well played".
 - Detection still logs them to `record_breaks` (they appear in the admin inbox), but `detectAndLogRecordBreaks()` sends no "record broken" push for them.
-- Rows logged before this change keep their old stored title and message.
+- The six alerts logged before this change (30 Oct to 6 Nov 2026, all still pending) were rewritten in place by SQL to the new title, "broken by" holder/prev_holder and neutral message.
 
 ## 3.2 Player-facing Record Book — `/records`
 
