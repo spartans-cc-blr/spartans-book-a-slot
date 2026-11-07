@@ -131,8 +131,23 @@ run-scorer / wicket-taker carries a cap icon after their name on the card (see
 the highlights; nothing changes if it fails.
 
 The footer shows the match count (from highlights) and "Last played
-&lt;date&gt;". Last played is still Hub-side: the latest confirmed,
-already-played booking the player was squadded for.
+&lt;date&gt;". Last played is Hub-side: the latest confirmed, completed
+booking the player was squadded for, practice games included. Past days come
+from `player_last_played(yesterday)`; today's games count only once
+`isCompletedMatch()` says so (ended, or scorecard synced — the same rule as
+`/fixtures`, `admin-matches-view.md` §2.1). Dates are IST (`istToday()`).
+
+**Fixed November 2026 — "Last played" was wrong for many players.** The page
+fetched every `squad` ⋈ `bookings` row in one unpaginated request and took
+the max date in code. PostgREST caps a response at 1000 rows; there were
+2,187 such rows, with no sort order, so a random subset was dropped and
+players showed an older date or "Never played" (same bug class as
+`tournament-planner.md` §2.4 and `leaderboard.md` §8.1). It now calls the DB
+function `player_last_played(p_today)` (migration
+`090_player_last_played.sql`, applied live, service role only), which does
+the `max(game_date)` per player in Postgres and returns one row per player.
+The same pass fixed a match later today counting as "last played" before
+it had been played (it was a plain date check, in UTC).
 
 ---
 
@@ -158,6 +173,7 @@ already-played booking the player was squadded for.
 | `src/components/players/PlayerDirectoryGrid.tsx` | Active/Inactive/All filter (default Active), search, A–Z, cards; `AbsenceControl` on Inactive cards for captain/GC/admin (§8) |
 | `src/app/api/players/[id]/absence/route.ts` | PUT — record/clear why a player is inactive (§8) |
 | `supabase/migrations/087_player_absences.sql` | `player_absences` table (§8) |
+| `supabase/migrations/090_player_last_played.sql` | `player_last_played()` — per-player latest played date for the card footer (§4) |
 | `src/lib/playerHighlights.ts` (+ `.test.ts`) | `CareerHighlights` type, `pickHighlights()` |
 | `src/lib/playerStats.ts` | `getCareerHighlightsByPlayer()` |
 | `src/app/gc-players/page.tsx` | Redirect to `/players` |
