@@ -17,7 +17,7 @@
 // being the best of two earlier 3rd-wicket stands isn't news.
 
 import { computePartnerships, type FinalScore } from '@/lib/partnerships'
-import { computeBreakthroughs, type OpponentFowRow } from '@/lib/breakthroughs'
+import { computeBreakthroughs, type Breakthrough, type OpponentFowRow } from '@/lib/breakthroughs'
 
 export const MIN_PRIOR_ENTRIES = 5
 export const MAX_BREAKS_PER_MATCH = 6
@@ -91,14 +91,6 @@ function oversToBalls(over: number | string): number {
 
 const RECORD_ORDER = ['highest_total', 'highest_chase', 'lowest_defended', 'highest_score', 'best_bowling', 'most_dismissals', 'most_catches', 'most_stumpings', 'most_run_outs']
 
-// "Against us" records: the biggest opposition stand at each wicket. A bigger one
-// is worse for the club, so these are the team's dubious records — listed apart
-// in the Record Book and worded neutrally (no trophy, no "well played"). The
-// bowler who ended the stand is noted, not celebrated.
-export function isAgainstUsRecord(key: string): boolean {
-  return key.startsWith('breakthrough_w')
-}
-
 export function recordTitle(key: string): string {
   switch (key) {
     case 'highest_total':   return 'Highest team total'
@@ -114,7 +106,7 @@ export function recordTitle(key: string): string {
       const m = /^partnership_w(\d+)$/.exec(key)
       if (m) return `${ordinal(Number(m[1]))}-wicket partnership`
       const b = /^breakthrough_w(\d+)$/.exec(key)
-      return b ? `Biggest stand against us — ${ordinal(Number(b[1]))} wicket` : key
+      return b ? `Biggest stand broken in a win — ${ordinal(Number(b[1]))} wicket` : key
     }
   }
 }
@@ -192,24 +184,52 @@ export function extractCandidates(m: RecordMatch): Candidate[] {
     })
   }
 
-  // Breakthroughs: the opponent stand a Spartans bowler ended at each wicket.
-  // Needs a credited bowler (no run-outs / unclassified / unbroken closing stand).
-  const oppStands = computeBreakthroughs(
-    m.opponentFallOfWickets,
-    m.opponentTotal != null && m.opponentOvers != null
-      ? { total: m.opponentTotal, overs: m.opponentOvers, wickets: m.opponentWickets ?? null }
-      : null,
-  )
-  for (const s of oppStands) {
-    if (!s.bowlerName || s.wicketNumber < 1 || s.wicketNumber > 10) continue
-    out.push({
-      key: `breakthrough_w${s.wicketNumber}`,
-      value: s.runs,
-      holder: `broken by ${s.bowlerName}`,
-      display: `${s.runs}${s.balls != null && s.balls > 0 ? ` (${s.balls} balls)` : ''}`,
+  // Breakthroughs: the opponent stand a Spartans bowler ended at each wicket, in a
+  // match we WON (a big stand broken in a loss only measures what we conceded).
+  // Opponent chasing: any stand broken counts. Opponent batting first: only a stand
+  // whose breaking held their run rate down for the rest of the innings, i.e. it
+  // helped cut the target we then chased (standCutTheRate()). Needs a credited
+  // bowler (no run-outs / unclassified / unbroken closing stand).
+  if (m.result === 'won' && m.battedFirst !== null) {
+    const oppStands = computeBreakthroughs(
+      m.opponentFallOfWickets,
+      m.opponentTotal != null && m.opponentOvers != null
+        ? { total: m.opponentTotal, overs: m.opponentOvers, wickets: m.opponentWickets ?? null }
+        : null,
+    )
+    oppStands.forEach((s, i) => {
+      if (!s.bowlerName || s.unbroken || s.wicketNumber < 1 || s.wicketNumber > 10) return
+      if (m.battedFirst === false && !standCutTheRate(oppStands, i)) return
+      out.push({
+        key: `breakthrough_w${s.wicketNumber}`,
+        value: s.runs,
+        holder: s.bowlerName,
+        display: `${s.runs}${s.balls != null && s.balls > 0 ? ` (${s.balls} balls)` : ''}`,
+      })
     })
   }
   return out
+}
+
+// Opponent batting first: after stand i was broken, did their run rate (runs per
+// ball, cumulative) stay at or below the rate at that wicket at every later wicket
+// and at the end of the innings? Only those checkpoints are known from the
+// scorecard; ball-by-ball isn't available for most matches. Pure; exported for tests.
+export function standCutTheRate(stands: Breakthrough[], i: number): boolean {
+  let score = 0, balls = 0
+  const points: { score: number; balls: number }[] = []
+  for (const s of stands) {
+    score += s.runs
+    balls = oversToBalls(s.overTo)
+    points.push({ score, balls })
+  }
+  const at = points[i]
+  if (!at || at.balls <= 0) return false
+  for (const p of points.slice(i + 1)) {
+    if (p.balls <= 0) continue
+    if (p.score * at.balls > at.score * p.balls) return false   // rate went up
+  }
+  return true
 }
 
 function bestPerKey(cands: Candidate[]): Map<string, Candidate> {
@@ -263,16 +283,6 @@ function buildMessage(opts: {
   const date = new Date(`${opts.gameDate}T00:00:00`).toLocaleDateString('en-IN', {
     weekday: 'short', day: 'numeric', month: 'short',
   })
-  if (isAgainstUsRecord(opts.recordKey)) {
-    const lines = [
-      `📉 ${opts.title} (${opts.scopeLabel})`,
-      ``,
-      `${opts.display} by ${opts.opponent}, ${date} — ${opts.holder}`,
-    ]
-    if (opts.prevDisplay) lines.push(`Previous highest against us: ${opts.prevDisplay}`)
-    lines.push(``, `🔗 This match: ${HUB}/matches/history/${opts.bookingId}`)
-    return lines.join('\n')
-  }
   const reign = reignHeadline(opts.prevGameDate ?? null, opts.gameDate)
   const prevSet = opts.prevGameDate
     ? ` (${new Date(`${opts.prevGameDate}T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })})`

@@ -7,7 +7,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { WA_ICON } from '@/components/tournament-planner/TournamentShareButton'
-import { isAgainstUsRecord } from '@/lib/recordBreaks'
 
 export type BookEntry = {
   message: string
@@ -49,43 +48,6 @@ export function RecordBookView({ records, loading = false, admin }: { records: B
         : 'bg-white text-[#44403C] border-[#D4C9B0] dark:bg-ink-3 dark:text-zinc-400 dark:border-ink-5'
     }`
 
-  const renderCard = (b: BookEntry) => {
-    const against = isAgainstUsRecord(b.recordKey)
-    return (
-                  <div key={b.scopeKey + b.recordKey} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-cinzel text-sm font-bold text-[#1C1917] dark:text-parchment">{b.title}</p>
-                      <div className="flex items-center gap-2">
-                        <p className={`font-cinzel text-base font-bold whitespace-nowrap ${against ? 'text-[#57534E] dark:text-zinc-300' : 'text-amber-700 dark:text-gold'}`}>{b.display}</p>
-                        {admin && latestYear && b.gameDate.startsWith(latestYear) && (
-                          <button
-                            onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(b.message)}`, '_blank', 'noopener,noreferrer')}
-                            title="Share this record on WhatsApp"
-                            aria-label="Share this record on WhatsApp"
-                            className="flex-shrink-0 flex items-center justify-center p-1.5 rounded-md text-[#059669] hover:bg-[#059669]/10 transition-colors"
-                          >
-                            {WA_ICON}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <p className="font-rajdhani text-sm text-[#44403C] dark:text-zinc-300">{b.holder}</p>
-                    <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
-                      vs {b.opponentName} · {formatDate(b.gameDate)} · <span className="font-bold">standing {age(b.gameDate)}</span> ·{' '}
-                      <Link href={`/matches/history/${b.bookingId}`} className="underline hover:text-amber-700 dark:hover:text-gold">scorecard</Link>
-                      {admin && <>{' · '}{b.entries} {b.entries === 1 ? 'entry' : 'entries'}</>}
-                      {b.setInYear && b.setInYear === latestYear && (
-                        <span className={`ml-1 font-bold ${against ? 'text-[#57534E] dark:text-zinc-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                          · set in {b.setInYear}{b.beat ? `, beat ${b.beat.display} (${b.beat.holder}, ${b.beat.year}, held ${age(b.beat.gameDate)}) ` : ' — first entry'}
-                          {b.beat && <Link href={`/matches/history/${b.beat.bookingId}`} className="underline">old scorecard</Link>}
-                        </span>
-                      )}
-                      {admin && !b.armed && <span className="ml-1 text-amber-700 dark:text-amber-400 font-bold">· not armed yet</span>}
-                    </p>
-                  </div>
-    )
-  }
-
   return (
     <div className="mb-4">
       {admin && (
@@ -124,16 +86,39 @@ export function RecordBookView({ records, loading = false, admin }: { records: B
                 {book && rows.length === 0 && (
                   <p className="font-rajdhani text-sm text-[#78716C] dark:text-zinc-500">No {f} records in this scope yet.</p>
                 )}
-                {rows.filter(b => !isAgainstUsRecord(b.recordKey)).map(renderCard)}
-                {rows.some(b => isAgainstUsRecord(b.recordKey)) && (
-                  <>
-                    <h3 className="font-cinzel text-sm font-bold text-[#57534E] dark:text-zinc-400 pt-3">Against us</h3>
+                {rows.map(b => (
+                  <div key={b.scopeKey + b.recordKey} className="bg-white dark:bg-ink-3 border border-[#D4C9B0] dark:border-ink-5 rounded p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-cinzel text-sm font-bold text-[#1C1917] dark:text-parchment">{b.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-cinzel text-base font-bold text-amber-700 dark:text-gold whitespace-nowrap">{b.display}</p>
+                        {admin && latestYear && b.gameDate.startsWith(latestYear) && (
+                          <button
+                            onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(b.message)}`, '_blank', 'noopener,noreferrer')}
+                            title="Share this record on WhatsApp"
+                            aria-label="Share this record on WhatsApp"
+                            className="flex-shrink-0 flex items-center justify-center p-1.5 rounded-md text-[#059669] hover:bg-[#059669]/10 transition-colors"
+                          >
+                            {WA_ICON}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="font-rajdhani text-sm text-[#44403C] dark:text-zinc-300">{b.holder}</p>
                     <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
-                      The biggest opposition partnership at each wicket, and who finally broke it. Not records to celebrate.
+                      vs {b.opponentName} · {formatDate(b.gameDate)} · <span className="font-bold">standing {age(b.gameDate)}</span> ·{' '}
+                      <Link href={`/matches/history/${b.bookingId}`} className="underline hover:text-amber-700 dark:hover:text-gold">scorecard</Link>
+                      {admin && <>{' · '}{b.entries} {b.entries === 1 ? 'entry' : 'entries'}</>}
+                      {b.setInYear && b.setInYear === latestYear && (
+                        <span className="ml-1 text-emerald-700 dark:text-emerald-400 font-bold">
+                          · set in {b.setInYear}{b.beat ? `, beat ${b.beat.display} (${b.beat.holder}, ${b.beat.year}, held ${age(b.beat.gameDate)}) ` : ' — first entry'}
+                          {b.beat && <Link href={`/matches/history/${b.beat.bookingId}`} className="underline">old scorecard</Link>}
+                        </span>
+                      )}
+                      {admin && !b.armed && <span className="ml-1 text-amber-700 dark:text-amber-400 font-bold">· not armed yet</span>}
                     </p>
-                    {rows.filter(b => isAgainstUsRecord(b.recordKey)).map(renderCard)}
-                  </>
-                )}
+                  </div>
+                ))}
               </div>
             </section>
           )
