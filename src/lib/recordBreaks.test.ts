@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectRecordBreaks, computeRecordBook, reignHeadline, MIN_PRIOR_ENTRIES, type RecordMatch } from './recordBreaks'
+import { detectRecordBreaks, computeRecordBook, reignHeadline, isAgainstUsRecord, MIN_PRIOR_ENTRIES, type RecordMatch } from './recordBreaks'
 
 function match(over: Partial<RecordMatch> & { bookingId: string }): RecordMatch {
   return {
@@ -155,7 +155,7 @@ describe('reignHeadline', () => {
   })
 })
 
-describe('breakthrough records', () => {
+describe('breakthrough (against-us) records', () => {
   // Opponent innings where wicket 1 fell at 60 (bowler Ravi), 2 at 80 (run out), 3 at 150 (Ravi).
   const oppFow = (firstStand: number) => [
     { wicket_number: 1, team_score: firstStand, over: 8, player_name: 'A', bowler_name: 'Ravi', dismissal_type: 'bowled' },
@@ -165,14 +165,19 @@ describe('breakthrough records', () => {
     match({ bookingId: id, gameDate: date, opponentFallOfWickets: oppFow(stand), opponentTotal: stand + 20, opponentWickets: 2, opponentOvers: 11 })
   const hist = () => Array.from({ length: MIN_PRIOR_ENTRIES + 1 }, (_, i) => withOpp(`o${i}`, 40 + i, `2026-0${i + 1}-10`))
 
-  it('flags the biggest stand a bowler broke at a wicket, ignoring run-outs', () => {
+  it('flags the biggest opposition stand at a wicket, ignoring run-outs, worded neutrally', () => {
     const target = withOpp('t', 90, '2026-10-10')
     const breaks = detectRecordBreaks(target, [...hist(), target])
     const b = breaks.find(x => x.recordKey === 'breakthrough_w1')
     expect(b?.scopeKey).toBe('alltime|T20')
-    expect(b?.holder).toBe('Ravi')
+    expect(b?.holder).toBe('broken by Ravi')
     expect(b?.display).toContain('90')
-    expect(b?.title).toBe('Biggest stand broken — 1st wicket')
+    expect(b?.title).toBe('Biggest stand against us — 1st wicket')
+    expect(b?.message).not.toContain('New Spartans record')
+    expect(b?.message).not.toContain('Well played')
+    expect(b?.message).toContain('Previous highest against us')
+    expect(isAgainstUsRecord('breakthrough_w1')).toBe(true)
+    expect(isAgainstUsRecord('partnership_w1')).toBe(false)
     expect(breaks.find(x => x.recordKey === 'breakthrough_w2')).toBeUndefined()   // run-out, no bowler
   })
 

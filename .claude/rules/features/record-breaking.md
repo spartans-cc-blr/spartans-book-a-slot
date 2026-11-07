@@ -24,7 +24,7 @@ club-wide modal.
 | `best_bowling` | Best bowling figures (≥3 wickets; wickets, then fewer runs) | better |
 | `most_dismissals` / `most_catches` / `most_stumpings` / `most_run_outs` | Individual fielding in one match (catches include keeper catches; floors: 2 dismissals, 2 catches, 1 stumping, 1 run-out) | higher |
 | `partnership_w1`…`w10` | Highest partnership for that wicket (`computePartnerships()`) | higher |
-| `breakthrough_w1`…`w10` | Biggest opponent stand a Spartans bowler ended at that wicket (`computeBreakthroughs()`, credited to the bowler; run-outs and the unbroken final stand excluded). Built from `opponent_fall_of_wickets`, so only matches synced since that existed count; the `/records` disclaimer covers it. Links to Detailed → Breakthroughs | higher |
+| `breakthrough_w1`…`w10` | **Against us** (§3.3): biggest opposition stand at that wicket, noted with the Spartans bowler who ended it (`holder` = "broken by X"; `computeBreakthroughs()`; run-outs and the unbroken final stand excluded). Built from `opponent_fall_of_wickets`, so only matches synced since that existed count; the `/records` disclaimer covers it. Links to Detailed → Breakthroughs | higher (worse) |
 
 Scopes: **`<format>` all-time** and **`<format>` in the match's calendar year**, T20 and T30 kept
 separate (other formats and practice games are ignored). A record broken at the all-time scope is
@@ -69,6 +69,16 @@ answer to "what did we newly achieve this year that beats the previous all-time"
 The WhatsApp message (alerts and the Current records share button) ends with links: the match that set the record, the match that held the previous one (when there is one), and the player-facing page for that kind of record filtered to the format and season (`recordPageUrl()`: partnerships / batting / bowling / fielding tabs of `/leaderboard`, or `/team-stats` for team totals).
 
 **Ageing in the headline.** `reignHeadline()` (`recordBreaks.ts`) changes the first line to `🏆 New Spartans record — ends a 1 year 6 months reign!` when the beaten record stood 12+ months, or `— beats a record set in Dec 2025!` when it was set in an earlier calendar year but under 12 months. Otherwise (and for a first entry) the line is unchanged. The `Previous best:` line always appends when it was set, e.g. `(Mar 2025)`.
+
+## 3.3 "Against us" records (changed November 2026)
+
+The `breakthrough_w*` records were first shown as "Biggest stand broken — Nth wicket", crediting the bowler. That rewarded conceding: a bigger opposition stand made a bigger "record" (6 Nov 2026: The Real OG s added 213 for the 2nd wicket in 125 balls, broken by Anuj Jha at 249/2 in the 24th over). They are now the team's dubious records:
+
+- Title "Biggest stand against us — Nth wicket"; `holder` is "broken by <bowler>". `isAgainstUsRecord(key)` in `recordBreaks.ts` identifies them.
+- `RecordBookView` lists them under a separate **Against us** heading at the end of each format column, with the value and "set in" line in neutral colours instead of gold/green.
+- Their WhatsApp text (Record Book share icon and `record_breaks.message`) is neutral: 📉 title, stand, opponent and date, who broke it, the previous highest against us, and the match link. No trophy, "New Spartans record", reign line or "Well played".
+- Detection still logs them to `record_breaks` (they appear in the admin inbox), but `detectAndLogRecordBreaks()` sends no "record broken" push for them.
+- Rows logged before this change keep their old stored title and message.
 
 ## 3.2 Player-facing Record Book — `/records`
 

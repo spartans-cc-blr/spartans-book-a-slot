@@ -10,7 +10,7 @@ import { cachedStats } from '@/lib/statsCache'
 import { getTeamMatchesUncached } from '@/lib/teamStats'
 import { notifyAdmins } from '@/lib/webpush'
 import { isBeforeRecordAlertStart } from '@/lib/repullCutoff'
-import { detectRecordBreaks, computeRecordBook, type RecordMatch, type RecordBookEntry } from '@/lib/recordBreaks'
+import { detectRecordBreaks, computeRecordBook, isAgainstUsRecord, type RecordMatch, type RecordBookEntry } from '@/lib/recordBreaks'
 import type { TeamMatch } from '@/lib/teamStats'
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -89,16 +89,19 @@ export async function detectAndLogRecordBreaks(bookingId: string): Promise<void>
         game_date: target.gameDate, opponent_name: target.opponentLabel || target.opponentName,
         message: b.message,
       })), { onConflict: 'booking_id,record_key,scope_key', ignoreDuplicates: true })
-      .select('id, title, display, holder')
+      .select('id, record_key, title, display, holder')
     if (insErr) { console.error('[record-breaks] insert failed:', insErr.message); return }
-    if (!inserted?.length) return
+    // "Against us" records (biggest opposition stands) are logged for the admin to
+    // review but don't trigger a "record broken" push.
+    const pushable = (inserted ?? []).filter(r => !isAgainstUsRecord(r.record_key))
+    if (!pushable.length) return
 
-    const first = inserted[0]
+    const first = pushable[0]
     await notifyAdmins(
-      inserted.length === 1 ? '🏆 Record broken' : `🏆 ${inserted.length} records broken`,
-      inserted.length === 1
+      pushable.length === 1 ? '🏆 Record broken' : `🏆 ${pushable.length} records broken`,
+      pushable.length === 1
         ? `${first.title}: ${first.display} — ${first.holder}. Share it or ignore?`
-        : `${first.title}: ${first.display} — ${first.holder}, and ${inserted.length - 1} more. Review to share.`,
+        : `${first.title}: ${first.display} — ${first.holder}, and ${pushable.length - 1} more. Review to share.`,
       '/admin/records'
     )
   } catch (err) {

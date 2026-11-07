@@ -91,6 +91,14 @@ function oversToBalls(over: number | string): number {
 
 const RECORD_ORDER = ['highest_total', 'highest_chase', 'lowest_defended', 'highest_score', 'best_bowling', 'most_dismissals', 'most_catches', 'most_stumpings', 'most_run_outs']
 
+// "Against us" records: the biggest opposition stand at each wicket. A bigger one
+// is worse for the club, so these are the team's dubious records — listed apart
+// in the Record Book and worded neutrally (no trophy, no "well played"). The
+// bowler who ended the stand is noted, not celebrated.
+export function isAgainstUsRecord(key: string): boolean {
+  return key.startsWith('breakthrough_w')
+}
+
 export function recordTitle(key: string): string {
   switch (key) {
     case 'highest_total':   return 'Highest team total'
@@ -106,7 +114,7 @@ export function recordTitle(key: string): string {
       const m = /^partnership_w(\d+)$/.exec(key)
       if (m) return `${ordinal(Number(m[1]))}-wicket partnership`
       const b = /^breakthrough_w(\d+)$/.exec(key)
-      return b ? `Biggest stand broken — ${ordinal(Number(b[1]))} wicket` : key
+      return b ? `Biggest stand against us — ${ordinal(Number(b[1]))} wicket` : key
     }
   }
 }
@@ -197,7 +205,7 @@ export function extractCandidates(m: RecordMatch): Candidate[] {
     out.push({
       key: `breakthrough_w${s.wicketNumber}`,
       value: s.runs,
-      holder: s.bowlerName,
+      holder: `broken by ${s.bowlerName}`,
       display: `${s.runs}${s.balls != null && s.balls > 0 ? ` (${s.balls} balls)` : ''}`,
     })
   }
@@ -255,6 +263,16 @@ function buildMessage(opts: {
   const date = new Date(`${opts.gameDate}T00:00:00`).toLocaleDateString('en-IN', {
     weekday: 'short', day: 'numeric', month: 'short',
   })
+  if (isAgainstUsRecord(opts.recordKey)) {
+    const lines = [
+      `📉 ${opts.title} (${opts.scopeLabel})`,
+      ``,
+      `${opts.display} by ${opts.opponent}, ${date} — ${opts.holder}`,
+    ]
+    if (opts.prevDisplay) lines.push(`Previous highest against us: ${opts.prevDisplay}`)
+    lines.push(``, `🔗 This match: ${HUB}/matches/history/${opts.bookingId}`)
+    return lines.join('\n')
+  }
   const reign = reignHeadline(opts.prevGameDate ?? null, opts.gameDate)
   const prevSet = opts.prevGameDate
     ? ` (${new Date(`${opts.prevGameDate}T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })})`
