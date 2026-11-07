@@ -24,7 +24,7 @@ club-wide modal.
 | `best_bowling` | Best bowling figures (≥3 wickets; wickets, then fewer runs) | better |
 | `most_dismissals` / `most_catches` / `most_stumpings` / `most_run_outs` | Individual fielding in one match (catches include keeper catches; floors: 2 dismissals, 2 catches, 1 stumping, 1 run-out) | higher |
 | `partnership_w1`…`w10` | Highest partnership for that wicket (`computePartnerships()`) | higher |
-| `breakthrough_w1`…`w10` | Biggest opponent stand a Spartans bowler ended at that wicket (`computeBreakthroughs()`, credited to the bowler; run-outs and the unbroken final stand excluded). Built from `opponent_fall_of_wickets`, so only matches synced since that existed count; the `/records` disclaimer covers it. Links to Detailed → Breakthroughs | higher |
+| `breakthrough_w1`…`w10` | **Biggest stand broken in a win** (§3.3): the biggest opposition stand a Spartans bowler ended at that wicket, in a match we won; if they batted first, only when their run rate never rose after that wicket (`standCutTheRate()`). Holder is the bowler. Built from `opponent_fall_of_wickets` (`computeBreakthroughs()`; run-outs and the unbroken final stand excluded), so only matches synced since that existed count; the `/records` disclaimer covers it. Links to Detailed → Breakthroughs | higher |
 
 Scopes: **`<format>` all-time** and **`<format>` in the match's calendar year**, T20 and T30 kept
 separate (other formats and practice games are ignored). A record broken at the all-time scope is
@@ -69,6 +69,16 @@ answer to "what did we newly achieve this year that beats the previous all-time"
 The WhatsApp message (alerts and the Current records share button) ends with links: the match that set the record, the match that held the previous one (when there is one), and the player-facing page for that kind of record filtered to the format and season (`recordPageUrl()`: partnerships / batting / bowling / fielding tabs of `/leaderboard`, or `/team-stats` for team totals).
 
 **Ageing in the headline.** `reignHeadline()` (`recordBreaks.ts`) changes the first line to `🏆 New Spartans record — ends a 1 year 6 months reign!` when the beaten record stood 12+ months, or `— beats a record set in Dec 2025!` when it was set in an earlier calendar year but under 12 months. Otherwise (and for a first entry) the line is unchanged. The `Previous best:` line always appends when it was set, e.g. `(Mar 2025)`.
+
+## 3.3 Stands broken in a win (changed November 2026)
+
+First shipped as "Biggest stand broken — Nth wicket" with no conditions, which rewarded conceding: a bigger opposition stand made a bigger "record" even in a heavy loss (6 Nov 2026: The Real OG s added 213 for the 2nd wicket, broken by Anuj Jha at 249/2 in the 24th over, and we lost). Briefly reworded as neutral "Against us" records, then redefined as an achievement:
+
+- **Only matches we won** (`result === 'won'`) with toss data (`battedFirst` known).
+- **Opponent chasing** (we batted first): every stand a bowler broke counts.
+- **Opponent batting first** (they set our target): the stand counts only if their cumulative run rate (runs per ball) never rose above its value at that wicket, checked at every later wicket and at the end of their innings (`standCutTheRate()` in `recordBreaks.ts`, unit-tested). The idea is that the wicket helped cut down the target we then chased. Ball-by-ball isn't available for most matches, so a rise and fall between two wickets isn't seen.
+- Title "Biggest stand broken in a win — Nth wicket", holder is the bowler, normal 🏆 alert and message; listed with the other records.
+- The six old-rule alerts (30 Oct–6 Nov 2026) all came from losses; they were set to **Ignored** by SQL.
 
 ## 3.2 Player-facing Record Book — `/records`
 

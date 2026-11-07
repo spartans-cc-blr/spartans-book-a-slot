@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectRecordBreaks, computeRecordBook, reignHeadline, MIN_PRIOR_ENTRIES, type RecordMatch } from './recordBreaks'
+import { detectRecordBreaks, computeRecordBook, reignHeadline, standCutTheRate, MIN_PRIOR_ENTRIES, type RecordMatch } from './recordBreaks'
 
 function match(over: Partial<RecordMatch> & { bookingId: string }): RecordMatch {
   return {
@@ -155,28 +155,56 @@ describe('reignHeadline', () => {
   })
 })
 
-describe('breakthrough records', () => {
-  // Opponent innings where wicket 1 fell at 60 (bowler Ravi), 2 at 80 (run out), 3 at 150 (Ravi).
+describe('breakthrough records (stands broken in a win)', () => {
+  // Opponent innings: wicket 1 at `firstStand` after 8 overs (bowler Ravi), wicket 2
+  // 20 runs later after 11 overs (run out). battedFirst: true = they chased.
   const oppFow = (firstStand: number) => [
     { wicket_number: 1, team_score: firstStand, over: 8, player_name: 'A', bowler_name: 'Ravi', dismissal_type: 'bowled' },
     { wicket_number: 2, team_score: firstStand + 20, over: 11, player_name: 'B', bowler_name: null, dismissal_type: 'run_out' },
   ]
-  const withOpp = (id: string, stand: number, date: string) =>
-    match({ bookingId: id, gameDate: date, opponentFallOfWickets: oppFow(stand), opponentTotal: stand + 20, opponentWickets: 2, opponentOvers: 11 })
+  const withOpp = (id: string, stand: number, date: string, over: Partial<RecordMatch> = {}) =>
+    match({ bookingId: id, gameDate: date, opponentFallOfWickets: oppFow(stand), opponentTotal: stand + 20, opponentWickets: 2, opponentOvers: 11, ...over })
   const hist = () => Array.from({ length: MIN_PRIOR_ENTRIES + 1 }, (_, i) => withOpp(`o${i}`, 40 + i, `2026-0${i + 1}-10`))
 
-  it('flags the biggest stand a bowler broke at a wicket, ignoring run-outs', () => {
+  it('flags the biggest stand a bowler broke in a win, ignoring run-outs', () => {
     const target = withOpp('t', 90, '2026-10-10')
     const breaks = detectRecordBreaks(target, [...hist(), target])
     const b = breaks.find(x => x.recordKey === 'breakthrough_w1')
     expect(b?.scopeKey).toBe('alltime|T20')
     expect(b?.holder).toBe('Ravi')
     expect(b?.display).toContain('90')
-    expect(b?.title).toBe('Biggest stand broken — 1st wicket')
+    expect(b?.title).toBe('Biggest stand broken in a win — 1st wicket')
+    expect(b?.message).toContain('New Spartans record')
     expect(breaks.find(x => x.recordKey === 'breakthrough_w2')).toBeUndefined()   // run-out, no bowler
   })
 
-  it('appears in the record book and does not sort among partnerships', () => {
+  it('ignores a stand broken in a match we lost', () => {
+    const target = withOpp('t', 200, '2026-10-10', { result: 'lost' })
+    expect(detectRecordBreaks(target, [...hist(), target]).find(x => x.recordKey === 'breakthrough_w1')).toBeUndefined()
+  })
+
+  it('opponent batting first: counts only if their run rate never rose after the wicket', () => {
+    // 90 in 8 ov (11.25/ov), then 110 in 11 ov (10/ov): rate fell, counts.
+    const fell = withOpp('t', 90, '2026-10-10', { battedFirst: false })
+    expect(detectRecordBreaks(fell, [...hist(), fell]).some(x => x.recordKey === 'breakthrough_w1')).toBe(true)
+    // 90 in 8 ov, then 150 in 11 ov (13.6/ov): rate went up, doesn't count.
+    const rose = withOpp('t', 90, '2026-10-10', {
+      battedFirst: false,
+      opponentFallOfWickets: [oppFow(90)[0], { ...oppFow(90)[1], team_score: 150 }],
+      opponentTotal: 150,
+    })
+    expect(detectRecordBreaks(rose, [...hist(), rose]).some(x => x.recordKey === 'breakthrough_w1')).toBe(false)
+  })
+
+  it('standCutTheRate checks every later checkpoint', () => {
+    const st = (runs: number, overTo: number) => ({ wicketNumber: 1, runs, balls: null, overFrom: 0, overTo, outBatter: null, bowlerName: 'X', dismissalType: null, unbroken: false })
+    // 60/10 ov (6/ov) → 80/15 (5.3) → 140/20 (7/ov): rose at the end.
+    expect(standCutTheRate([st(60, 10), st(20, 15), st(60, 20)], 0)).toBe(false)
+    expect(standCutTheRate([st(60, 10), st(20, 15), st(20, 20)], 0)).toBe(true)
+    expect(standCutTheRate([st(60, 10)], 0)).toBe(true)   // last checkpoint
+  })
+
+  it('appears in the record book', () => {
     const book = computeRecordBook(hist())
     expect(book.some(r => r.recordKey === 'breakthrough_w1')).toBe(true)
   })
