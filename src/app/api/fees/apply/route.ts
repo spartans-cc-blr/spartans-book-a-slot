@@ -6,6 +6,7 @@ import { sendPushToPlayer } from '@/lib/webpush'
 import { feesApplySchema, feesCorrectSchema } from '@/lib/schemas'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 import { computeMatchFeeSplit } from '@/lib/matchFeeSplit'
+import { rechargeMembershipFeeForBooking } from '@/lib/membershipFee'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -172,6 +173,10 @@ export async function POST(req: NextRequest) {
     .from('scorecard_uploads')
     .update({ status: 'fees_applied', fees_applied_at: new Date().toISOString() })
     .eq('booking_id', booking_id)
+
+  // Backstop for anyone added to the squad after the scorecard synced
+  // (wallet-ledger.md §12.4). Idempotent; never throws.
+  await rechargeMembershipFeeForBooking(booking_id)
 
   return NextResponse.json({
     ok:                true,
@@ -408,6 +413,10 @@ export async function PATCH(req: NextRequest) {
     correction_reason,
   })
   if (logErr) errors.push(`correction log: ${logErr.message}`)
+
+  // A correction is often prompted by a squad change, so re-check the
+  // quarterly membership fee too (wallet-ledger.md §12.4).
+  await rechargeMembershipFeeForBooking(booking_id)
 
   if (errors.length) {
     return NextResponse.json({ error: 'Partial failure', details: errors }, { status: 500 })

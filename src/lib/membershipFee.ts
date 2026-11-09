@@ -214,3 +214,50 @@ async function chargeOnePlayer(
     url: '/wallet',
   }).catch(err => console.error('[membershipFee] push failed:', err))
 }
+
+// Re-runs the membership-fee check for one booking from its cached
+// scorecard (match_stats_cache) and its current squad. Called when match
+// fees are applied or corrected (/api/fees/apply), as a backstop for a
+// player added to the squad after the scorecard synced: the check at sync
+// time only counts squad members, so such a player was silently skipped
+// (Patnam Umamahesh, 10 Oct 2026). Safe to call any number of times: the
+// UNIQUE(player_id, year, quarter) claim stops double charges. Never throws.
+export async function rechargeMembershipFeeForBooking(bookingId: string): Promise<void> {
+  try {
+    const supabase = createServiceClient()
+    const [bookingRes, cacheRes, squadRes] = await Promise.all([
+      supabase
+        .from('bookings')
+        .select('game_date, is_practice, tournament:tournaments!bookings_tournament_id_fkey(is_practice)')
+        .eq('id', bookingId)
+        .single(),
+      supabase
+        .from('match_stats_cache')
+        .select('batting, bowling, fielding')
+        .eq('booking_id', bookingId)
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('squad')
+        .select('player_id, players(name)')
+        .eq('booking_id', bookingId),
+    ])
+    const booking = bookingRes.data as any
+    const cache = cacheRes.data as any
+    if (!booking || !cache) return
+
+    const tournament = Array.isArray(booking.tournament) ? booking.tournament[0] : booking.tournament
+    const isPractice = !!booking.is_practice || !!tournament?.is_practice
+    const squad: SquadRef[] = (squadRes.data ?? []).map((r: any) => ({
+      player_id:   r.player_id,
+      player_name: r.players?.name ?? '',
+    }))
+
+    await chargeMembershipFeeIfDue(
+      bookingId, String(booking.game_date),
+      cache.batting ?? [], cache.bowling ?? [], cache.fielding ?? [],
+      squad, isPractice)
+  } catch (err) {
+    console.error('[membershipFee] recharge failed:', err)
+  }
+}

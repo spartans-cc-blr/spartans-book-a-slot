@@ -778,6 +778,16 @@ moot for these specific quarters — leaving them is simply consistent with
 this ledger's append-only posture, not load-bearing for correctness
 anymore.
 
+### 12.4 Player added to the squad after the scorecard synced (fixed November 2026)
+
+**Symptom:** Patnam Umamahesh bowled in the 10 Oct 2026 NGCG T20 match (booking `d7f4eec4…`) but got no Q4 membership fee, while nine teammates from the same match did.
+
+**Cause:** `chargeMembershipFeeIfDue()` only counts scorecard rows that resolve to a member of the booking's squad (`resolveSquadMatch()`). The scorecard synced at 13:41 UTC; he was added to the squad at 16:23 UTC. The scorecard already linked "Mahesh09" to him, but the check only runs at sync time and the booking was never re-synced, so he was never re-checked. His match fee was still charged because `/api/fees/apply` ran later (12 Oct), after the squad was fixed.
+
+**Fix:**
+- `rechargeMembershipFeeForBooking(bookingId)` (`src/lib/membershipFee.ts`) re-runs the check from `match_stats_cache` and the current squad. `POST /api/fees/apply` calls it after setting `fees_applied`, and `PATCH /api/fees/apply` (Correct Match Fee) after a correction. Applying fees is always after squad corrections, so it catches late additions. It is idempotent: the `UNIQUE(player_id, year, quarter)` claim means anyone already charged is skipped, and it never throws.
+- Data: his missing Q4 2026 charge was added by SQL on 9 Nov 2026, mirroring `chargeOnePlayer()` (a `membership_fee_charges` row against the 10 Oct booking, a ₹250 debit with a note saying it was charged late, and the balance update). No push was sent for this one-off.
+
 ### Security (vibe-security)
 
 | Check | Status |
@@ -799,7 +809,7 @@ anymore.
 | File | Role |
 |---|---|
 | `supabase/migrations/073_membership_fee_charges.sql` | `membership_fee_charges` table — `UNIQUE(player_id, year, quarter)` is the idempotency guard |
-| `src/lib/membershipFee.ts` | `chargeMembershipFeeIfDue()` / `chargeOnePlayer()` / `quarterOf()` / `isBeforeMembershipFeeStart()` — the last two enforce the Q3 2026 floor (§12.3) |
+| `src/lib/membershipFee.ts` | `chargeMembershipFeeIfDue()` / `chargeOnePlayer()` / `quarterOf()` / `isBeforeMembershipFeeStart()` — the last two enforce the Q3 2026 floor (§12.3); `rechargeMembershipFeeForBooking()` — re-check called from `/api/fees/apply` (§12.4) |
 | `src/lib/matchStatsSync.ts` | Calls `chargeMembershipFeeIfDue()` alongside milestone/performance detection, inside the same `Promise.all()` |
 
 ---
