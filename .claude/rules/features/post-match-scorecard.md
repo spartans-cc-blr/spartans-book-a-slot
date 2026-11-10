@@ -2791,3 +2791,7 @@ client-reachable input.
 ## 23. Two-digit year on the Past Matches card date (added November 2026)
 
 The first line of each `MatchHistoryCard` on `/matches/history` (`formatDate()` in `MatchHistoryClient.tsx`) now appends the year as `'YY`, e.g. "Sat, 22 Mar '25", so matches from different seasons are distinguishable when the month filter is "All time". The standalone `/matches/history/[bookingId]` page already showed the full year and is unchanged.
+
+## 24. Organiser payment recorded on fee apply (added November 2026)
+
+`POST /api/fees/apply` now also records the full match fee as paid to the organiser (`organiser_payments`), and `PATCH` updates it to the corrected base fee. Best-effort via `recordOrganiserPayment()`; it never blocks or fails the fee action. It feeds "Match Fees Paid" on the club balance sheet from 2027. See `finance-balance-sheet.md` §3.

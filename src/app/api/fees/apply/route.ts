@@ -7,6 +7,7 @@ import { feesApplySchema, feesCorrectSchema } from '@/lib/schemas'
 import { RATE_LIMITS, rateLimit } from '@/lib/rateLimit'
 import { computeMatchFeeSplit } from '@/lib/matchFeeSplit'
 import { rechargeMembershipFeeForBooking } from '@/lib/membershipFee'
+import { recordOrganiserPayment } from '@/lib/finance'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -177,6 +178,10 @@ export async function POST(req: NextRequest) {
   // Backstop for anyone added to the squad after the scorecard synced
   // (wallet-ledger.md §12.4). Idempotent; never throws.
   await rechargeMembershipFeeForBooking(booking_id)
+
+  // The organiser is paid when the fee is applied, so the full match fee is
+  // logged as paid now (finance-balance-sheet.md §3). Best-effort.
+  await recordOrganiserPayment(supabase, booking_id, baseFee, user.email ?? null)
 
   return NextResponse.json({
     ok:                true,
@@ -418,6 +423,9 @@ export async function PATCH(req: NextRequest) {
   // A correction is often prompted by a squad change, so re-check the
   // quarterly membership fee too (wallet-ledger.md §12.4).
   await rechargeMembershipFeeForBooking(booking_id)
+
+  // Keep the organiser payment in step with the corrected base fee.
+  await recordOrganiserPayment(supabase, booking_id, split.baseFee, user.email ?? null)
 
   if (errors.length) {
     return NextResponse.json({ error: 'Partial failure', details: errors }, { status: 500 })

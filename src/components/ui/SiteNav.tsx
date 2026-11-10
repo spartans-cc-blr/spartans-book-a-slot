@@ -249,7 +249,7 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
               onMouseLeave={() => setGcOpen(false)}>
               <button
                 className={`font-rajdhani text-xs font-semibold tracking-[1.5px] uppercase px-2.5 2xl:px-4 h-14 flex items-center gap-1 border-b-2 transition-all
-                  ${activePage === 'gc' || activePage === 'invite'
+                  ${activePage === 'gc' || activePage === 'gc-finance' || activePage === 'invite'
                     ? 'text-gold border-gold'
                     : 'text-[#78716C] dark:text-zinc-500 border-transparent hover:text-gold'}`}>
                 Council ⚖ <span className="text-[8px] mt-0.5">▾</span>
@@ -270,6 +270,11 @@ export function SiteNav({ activePage, mobileTabBarTheme, back }: SiteNavProps) {
                     onClick={() => setGcOpen(false)}
                     className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
                     📋 Feedback
+                  </Link>
+                  <Link href="/gc/finance"
+                    onClick={() => setGcOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 font-rajdhani text-xs font-semibold tracking-wide uppercase text-[#44403C] dark:text-zinc-400 hover:text-gold hover:bg-[#F8F4EE] dark:hover:bg-ink-3 transition-colors border-b border-[#D4C9B0] dark:border-ink-5">
+                    🏦 Finance
                   </Link>
                   <Link href="/dugout/store-orders"
                     onClick={() => setGcOpen(false)}

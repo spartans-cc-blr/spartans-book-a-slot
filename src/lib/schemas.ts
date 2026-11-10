@@ -501,3 +501,34 @@ export const commentaryPenaltySchema = z.object({
   penalty_runs: z.number().int().min(0).max(50),
   note: z.string().trim().max(200).optional(),
 }).strict()
+
+// ── Club balance sheet (/admin/finance) — see features/finance-balance-sheet.md ──
+// Line keys are validated against the registry in the routes (financeCore.ts),
+// not here, so this file stays free of that import.
+const financeAmount = z.number().finite().refine(v => v !== 0, 'amount cannot be 0')
+  .refine(v => Math.abs(v) <= 10000000, 'amount is too large')
+
+export const financeEntrySchema = z.object({
+  entry_date: z.string().regex(GAME_DATE_REGEX, 'entry_date must be YYYY-MM-DD'),
+  line_key: z.string().min(1).max(60),
+  amount: financeAmount,
+  particulars: z.string().trim().min(3, 'Particulars: at least 3 characters').max(200),
+  remarks: z.string().trim().max(300).optional(),
+}).strict()
+
+export const financeEntryDeleteSchema = z.object({
+  id: z.string().uuid(),
+  delete_reason: z.string().trim().min(3, 'Reason: at least 3 characters').max(300),
+}).strict()
+
+export const financeBankBalanceSchema = z.object({
+  as_of: z.string().regex(GAME_DATE_REGEX, 'as_of must be YYYY-MM-DD'),
+  amount: z.number().finite().refine(v => Math.abs(v) <= 100000000, 'amount is too large'),
+  note: z.string().trim().max(300).optional(),
+}).strict()
+
+export const financeOpeningSchema = z.object({
+  period: z.enum(['till_2024', '2025', '2026']),
+  line_key: z.string().min(1).max(60),
+  amount: z.number().finite().refine(v => Math.abs(v) <= 100000000, 'amount is too large'),
+}).strict()

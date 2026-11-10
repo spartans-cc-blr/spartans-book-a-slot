@@ -89,6 +89,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | Route | Component | Data source |
 |---|---|---|
 | `/gc-review` | Server → one `GCReviewClient` (client) per rolling weekend | `bookings` (next two rolling weekends, same scoping as `/captains-corner`), `availability`, `squad` (pending/approved/announced) |
+| `/gc/finance` | Server → `BalanceSheetView` (client) | Club balance sheet, summary only (no player balances or individual entries) — see `features/finance-balance-sheet.md` |
 | `/gc/feedback` | Server → `GCFeedbackClient` (client) | GC-collected player feedback campaigns — `feedback_campaigns`/`feedback_responses`/`feedback_claims`, active roster; see `features/gc-feedback.md` |
  
 ### Wrangler Routes (`isWrangler` or `isAdmin`; `/wrangler/grounds` also allows `isGC`)
@@ -112,6 +113,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 | `/admin/scorecard-backfill` | One-time catch-up UI — fetches scorecards directly from CricHeroes for past matches never uploaded; see `features/post-match-scorecard.md` |
 | `/admin/player-reconciliation` | Resolves analytics-DB scorecard `player_name` strings to Hub `players.id` — suggestions, confirm/ignore, "Run Reconciliation Pass"; see `features/player-identity-resolution.md` |
 | `/admin/records` | Admin-only inbox of club records broken by a newly synced scorecard — share to the club WhatsApp group or ignore; see `features/record-breaking.md` |
+| `/admin/finance` | Club balance sheet (opening figures from the legacy sheet up to 2026, Hub data from 1 Jan 2027), bank balance, manual expense entries; see `features/finance-balance-sheet.md` |
 | `/admin/wallet` | Hub for pending fee applications (links to `/admin/bookings/[id]`), player search + full statement/quick top-up/correction, club-wide recent-transactions feed; see `features/wallet-ledger.md` |
  
 ### `AdminSidebar` — "Hub Views" (added October 2026, rebuilt as real dropdowns later the same month)
@@ -296,6 +298,7 @@ Access here is genuinely mixed per-route rather than one role — see
 | `/api/wallet/transactions` | PATCH | Admin | Corrects an existing transaction (amount/type/reason/notes/date), logging the pre-edit values to `wallet_transaction_edits` and adjusting `players.wallet_balance` by the delta the correction introduces. Refuses a genuine amount/type change on any row carrying `booking_id` (a match-fee split share) — see `features/wallet-ledger.md` §3 and `features/post-match-scorecard.md` §6.1 |
 | `/api/wallet/opening-balance` | PATCH | Admin | Sets or clears (`amount: null`) a player's "Brought Forward" statement override |
 | `/api/wallet/transfers` | POST | Admin | Player-to-player sponsorship — debits `sponsor_player_id`, credits `beneficiary_player_id` by the same amount, linked via `wallet_transfers`; see `features/wallet-ledger.md` §14 |
+| `/api/admin/finance/entries`, `/bank-balance`, `/opening` | POST/DELETE, POST, PUT | Admin | Manual balance-sheet entries, bank balance, opening figures; see `features/finance-balance-sheet.md` |
 | `/api/admin/record-breaks` (+ `/[id]` PATCH) | GET, PATCH | Admin | Record-break inbox: list, and mark a break shared / ignored / pending; see `features/record-breaking.md` |
 | `/api/admin/record-book` | GET | Admin | Every current club record — the baseline new scorecards are checked against ("Current records" tab of `/admin/records`); see `features/record-breaking.md` §3.1 |
 | `/api/admin/fee-reminders` | GET | Admin | Every currently fee-pending booking (scorecard synced, fee configured, squad announced, not yet applied/externally-reconciled) — feeds the admin-only fee reminder modal, and `/admin/wallet`'s pending-fees section; see `features/fee-reminders.md` |
@@ -514,6 +517,9 @@ balance. `CHECK (sponsor_player_id != beneficiary_player_id)`. Admin-only,
 same trust model as every other wallet-balance-changing action — see
 `features/wallet-ledger.md` §14. Migration `074_wallet_transfers.sql`.
 **RLS enabled, no anon/authenticated policies** — service role only.
+
+#### `finance_opening_figures` / `finance_entries` / `organiser_payments` / `finance_bank_balances`
+Club balance sheet (migration `091_finance_balance_sheet.sql`): opening figures per period and line, manual entries (soft delete), the amount paid to the organiser per booking (written by `/api/fees/apply`), and bank balance history. RLS on, service role only. See `features/finance-balance-sheet.md`.
 
 #### `notification_preferences`
 `player_id FK, key, enabled, updated_at` — PK `(player_id, key)`; a missing row means opted in. Per-player alert choices (reminder days/kinds, new-match tournament follows, club-news items). RLS on, service role only. Migration `089_notification_preferences.sql`; see `features/notification-preferences.md`.
