@@ -109,7 +109,14 @@ export async function computeMatchFeeSplit(
       squad.map(row => [((row.players as any)?.name ?? '').trim().toLowerCase(), row.player_id])
     )
     for (const row of (statsRow as any)?.batting ?? []) {
-      if (pickField(row, ['dismissal_method']) === 'did_not_bat' || num(row, ['balls', 'balls_faced']) <= 0) continue
+      // Trust the scorecard's own `batted` flag when present: a batter run out
+      // without facing a ball (0 balls, batted = true) still batted.
+      if (pickField(row, ['dismissal_method']) === 'did_not_bat') continue
+      const battedFlag = pickField(row, ['batted'])
+      const batted = battedFlag != null
+        ? battedFlag === true || battedFlag === 'true'
+        : num(row, ['balls', 'balls_faced']) > 0
+      if (!batted) continue
       const pid = pickField(row, ['player_id']) ?? nameToId.get((pickField(row, ['player_name', 'name']) ?? '').trim().toLowerCase())
       if (pid) battedIds.add(pid)
     }
