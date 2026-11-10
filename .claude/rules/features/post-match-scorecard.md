@@ -241,6 +241,14 @@ Nothing — not a wallet PATCH, not a match-fee correction — ever moves
 a ledger-level operation layered on top of the status machine, never a
 rewind of it.
 
+### 6.0.1 Scorecard players missing from the squad are included in the split (fixed November 2026)
+
+**Symptom:** match `28082980` (6 Nov 2026, booking `09774af1…`) showed 11 players in the Apply Match Fee checklist, so the fee was split 11 ways although 12 played. The 12th, scorecard name "John", was correctly reconciled to Kathiresh Kumar (alias in `player_name_aliases`, `player_id` set in the analytics DB and `match_stats_cache`). Reconciliation was fine; he was simply never added to the announced squad, and `computeMatchFeeSplit()` only looked at `squad`.
+
+**Fix:** `computeMatchFeeSplit()` (`src/lib/matchFeeSplit.ts`) now also adds any non-expelled player the synced scorecard credits with batting or bowling (by reconciled `player_id`) who is not in the announced squad. They get `in_squad: false`, the same default of 1 unit and the same exemption check, and appear in the checklist with a "not in squad" tag. Unit overrides are accepted for these ids too; every id is still server-derived. Applies to both Apply (POST) and Correct (PATCH). Adding the player to the squad is still worthwhile for roles and top-performer access; the fee no longer depends on it.
+
+**Data fix (10 Nov 2026):** Kathiresh Kumar was added to this booking's squad directly by SQL (`status = 'announced'`, no C/VC/WK role), so the squad now has 12 rows. Fees had not been applied yet, so no correction was needed.
+
 ### 6.1 Correcting an already-applied match fee (added September 2026)
 
 **Background — how the fee split actually works.** `POST /api/fees/apply`

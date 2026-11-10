@@ -69,6 +69,7 @@ interface FeeSquadRow {
   exempt:        boolean
   batted:        boolean
   bowled:        boolean
+  in_squad?:     boolean
   units:         number
   default_units: number
   fee:           number
@@ -1307,6 +1308,9 @@ function BookingDetailPageInner() {
                                   <span className="font-rajdhani text-[9px] text-emerald-500 shrink-0">
                                     {row.batted && row.bowled ? 'batted & bowled' : row.batted ? 'batted' : 'bowled'}
                                   </span>
+                                )}
+                                {row.in_squad === false && (
+                                  <span className="font-rajdhani text-[9px] font-bold text-sky-700 dark:text-sky-400 shrink-0" title="Played per the scorecard but not in the announced squad">not in squad</span>
                                 )}
                                 {!row.exempt && !row.batted && !row.bowled && (
                                   <span className="font-rajdhani text-[9px] text-amber-500 shrink-0">no role recorded</span>
