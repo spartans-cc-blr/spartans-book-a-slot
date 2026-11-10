@@ -1270,3 +1270,7 @@ Corner ▾** dropdown and of the mobile More sheet's Captains' Corner section;
 ### Record Book in Stats ▾ (added October 2026)
 
 📖 Record Book (→ `/records`, `activePage="records"`) is the last item of the desktop **Stats ▾** dropdown (which highlights for it) and a "Record Book" row after Players in the mobile More sheet; `records` is in `isAdminOrGcHighlighted()`. See `features/record-breaking.md` §3.2.
+
+### Finance in Council ⚖ (added November 2026)
+
+🏦 Finance (→ `/gc/finance`, `activePage="gc-finance"`) sits after Feedback in the desktop **Council ⚖** dropdown (which highlights for it) and in the mobile More sheet's Council section; `gc-finance` is in `isAdminOrGcHighlighted()`. The admin sidebar has 🏦 Finance (→ `/admin/finance`) under Wallet. See `features/finance-balance-sheet.md`.

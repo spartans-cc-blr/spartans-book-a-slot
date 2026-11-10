@@ -212,6 +212,10 @@ per-player share split), the fix also stays on `/admin/bookings/[id]` — a
 "✏️ Correct Match Fee" action recomputes and re-propagates the split across
 the squad. See `features/post-match-scorecard.md` §6.1.
 
+> **Update (November 2026):** organiser payments are now recorded when a
+> match fee is applied, for the club balance sheet — see
+> `finance-balance-sheet.md` §3. The paragraph below is history.
+
 **Recording payments made *to* an organiser (club → organiser, not player
 → club) is explicitly out of scope for this pass** — no such tracking
 exists anywhere in this app today. It's a different ledger domain (no
