@@ -249,6 +249,14 @@ rewind of it.
 
 **Data fix (10 Nov 2026):** Kathiresh Kumar was added to this booking's squad directly by SQL (`status = 'announced'`, no C/VC/WK role), so the squad now has 12 rows. Fees had not been applied yet, so no correction was needed.
 
+### 6.0.2 Run out without facing a ball counts as batting (fixed November 2026)
+
+**Symptom:** match `28090623` (7 Nov 2026, booking `36f3558b…`): Ramesh Shanmugamoorthy (captain and keeper) was left out of the Apply Match Fee split as "no role recorded". He was run out for 0 off 0 balls and didn't bowl.
+
+**Cause:** `computeMatchFeeSplit()` counted a batter only when `balls > 0`, so a non-striker run out before facing never counted. Keeping wicket isn't a fee signal.
+
+**Fix:** the batting check now trusts the scorecard row's own `batted` flag (true for him), falling back to `balls > 0` only when the flag is missing; `did_not_bat` rows are still skipped.
+
 ### 6.1 Correcting an already-applied match fee (added September 2026)
 
 **Background — how the fee split actually works.** `POST /api/fees/apply`
