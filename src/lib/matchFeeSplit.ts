@@ -27,6 +27,9 @@ export interface FeeSquadRow {
   units:         number
   default_units: number
   fee:           number
+  // false for a player the synced scorecard credits with batting/bowling
+  // (reconciled player_id) who is missing from the announced squad.
+  in_squad:      boolean
 }
 
 export interface MatchFeeSplitResult {
@@ -82,10 +85,6 @@ export async function computeMatchFeeSplit(
   // Unit overrides must actually be for players in this booking's own
   // squad — never trust a client-supplied player_id beyond that.
   const squadIds = new Set(squad.map(row => row.player_id))
-  const unitOverrideIds = Object.keys(playerUnits)
-  if (unitOverrideIds.some(id => !squadIds.has(id))) {
-    return { error: "One or more players are not in this booking's announced squad", status: 400 }
-  }
 
   const today = new Date().toISOString().split('T')[0]
   const isExempt = (row: any) =>
@@ -121,6 +120,30 @@ export async function computeMatchFeeSplit(
     }
   }
 
+  // Players the scorecard credits with a role (reconciled player_id) who are
+  // not in the announced squad — e.g. a late substitute nobody added to the
+  // squad (match 28082980: "John" → Kathiresh Kumar). Without this the fee
+  // was silently split among the squad only. Server-derived ids only.
+  const extraIds = Array.from(new Set([...Array.from(battedIds), ...Array.from(bowledIds)]))
+    .filter(id => !squadIds.has(id))
+  let extras: any[] = []
+  if (extraIds.length) {
+    const { data: extraPlayers } = await supabase
+      .from('players')
+      .select('id, name, status, wallet_balance, fee_exemptions(start_date, end_date)')
+      .in('id', extraIds)
+    extras = (extraPlayers ?? [])
+      .filter((p: any) => p.status !== 'expelled')
+      .map((p: any) => ({ player_id: p.id, players: p, in_squad: false }))
+  }
+
+  // Unit overrides must be for this booking's squad or a scorecard-credited
+  // player resolved above — never trust a client-supplied player_id beyond that.
+  const allowedIds = new Set([...Array.from(squadIds), ...extras.map(e => e.player_id)])
+  if (Object.keys(playerUnits).some(id => !allowedIds.has(id))) {
+    return { error: "One or more players are not in this booking's announced squad", status: 400 }
+  }
+
   // Default share count for a player who wasn't given an explicit override:
   // 0 for a standing exemption (never overridable) or a squad member with
   // no recorded batting/bowling role, 1 for a recognized role.
@@ -136,7 +159,8 @@ export async function computeMatchFeeSplit(
   const finalUnits = (row: any): number =>
     isExempt(row) ? 0 : (playerUnits[row.player_id] ?? defaultUnits(row))
 
-  const squadDetail = squad.map(row => ({
+  const candidates = [...squad.map(row => ({ ...row, in_squad: true })), ...extras]
+  const squadDetail = candidates.map((row: any) => ({
     player_id:     row.player_id,
     name:          (row.players as any)?.name ?? 'Unknown',
     exempt:        isExempt(row),
@@ -144,6 +168,7 @@ export async function computeMatchFeeSplit(
     bowled:        bowledIds.has(row.player_id),
     units:         finalUnits(row),
     default_units: defaultUnits(row),
+    in_squad:      row.in_squad as boolean,
   }))
 
   const totalUnits = squadDetail.reduce((sum, row) => sum + row.units, 0)

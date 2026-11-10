@@ -294,6 +294,7 @@ export async function PATCH(req: NextRequest) {
     orphanDiffRows = removedPlayers.map(p => ({
       player_id: p.player_id,
       name: p.name,
+      in_squad: false,
       exempt: false,
       batted: false,
       bowled: false,
