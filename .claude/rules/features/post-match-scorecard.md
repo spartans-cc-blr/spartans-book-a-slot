@@ -247,6 +247,8 @@ rewind of it.
 
 **Fix:** `computeMatchFeeSplit()` (`src/lib/matchFeeSplit.ts`) now also adds any non-expelled player the synced scorecard credits with batting or bowling (by reconciled `player_id`) who is not in the announced squad. They get `in_squad: false`, the same default of 1 unit and the same exemption check, and appear in the checklist with a "not in squad" tag. Unit overrides are accepted for these ids too; every id is still server-derived. Applies to both Apply (POST) and Correct (PATCH). Adding the player to the squad is still worthwhile for roles and top-performer access; the fee no longer depends on it.
 
+**Data fix (10 Nov 2026):** Kathiresh Kumar was added to this booking's squad directly by SQL (`status = 'announced'`, no C/VC/WK role), so the squad now has 12 rows. Fees had not been applied yet, so no correction was needed.
+
 ### 6.1 Correcting an already-applied match fee (added September 2026)
 
 **Background — how the fee split actually works.** `POST /api/fees/apply`
