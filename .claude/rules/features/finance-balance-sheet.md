@@ -124,6 +124,10 @@ fetch server-side; there is no read API.
 | `src/app/api/admin/finance/**` | Write routes |
 | `src/app/api/fees/apply/route.ts` | Records the organiser payment on apply and correct |
 
+## 8.1 Collapsible columns (November 2026)
+
+`BalanceSheetView` shows a "Columns:" toggle row above the tables. Every column except the latest (Till 2024, CY 2025 today) can be collapsed or expanded; they start **collapsed** so the current year fits on a phone, and the choice applies to both Receivables and Expenses (and on `/gc/finance`). Client-side state only, not persisted.
+
 ## 9. Not built yet
 
 - **Sync to the Google Sheet.** Agreed design: a one-way push that overwrites
