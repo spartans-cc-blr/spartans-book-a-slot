@@ -12,14 +12,16 @@ const SOURCE_NOTE: Record<BalanceSheetRow['source'], string> = {
   manual: 'Entered by admin',
 }
 
-function Section({ title, tone, rows, totals, totalLabel, sheet }: {
+function Section({ title, tone, rows, totals, totalLabel, sheet, hidden }: {
   title: string
   tone: 'income' | 'expense'
   rows: BalanceSheetRow[]
   totals: number[]
   totalLabel: string
   sheet: BalanceSheet
+  hidden: Set<string>
 }) {
+  const visible = sheet.columns.map((c, i) => ({ c, i })).filter(({ c }) => !hidden.has(c.key))
   const rule = tone === 'income'
     ? 'border-emerald-700 dark:border-emerald-600'
     : 'border-red-700 dark:border-red-500'
@@ -27,11 +29,11 @@ function Section({ title, tone, rows, totals, totalLabel, sheet }: {
     <section className="mb-8">
       <h2 className="font-cinzel text-lg font-bold text-[#1C1917] dark:text-parchment mb-2">{title}</h2>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[520px] font-rajdhani text-sm">
+        <table className="w-full font-rajdhani text-sm" style={{ minWidth: 200 + visible.length * 110 }}>
           <thead>
             <tr className={`border-y-2 ${rule}`}>
               <th className="text-left py-2 pr-3 font-bold text-[#1C1917] dark:text-parchment">Particulars</th>
-              {sheet.columns.map(c => (
+              {visible.map(({ c }) => (
                 <th key={c.key} className="text-right py-2 pl-3 font-bold text-[#1C1917] dark:text-parchment whitespace-nowrap">
                   {c.label}
                 </th>
@@ -42,19 +44,19 @@ function Section({ title, tone, rows, totals, totalLabel, sheet }: {
             {rows.map(r => (
               <tr key={r.key} className="border-b border-[#E2DACE] dark:border-ink-4">
                 <td className="py-1.5 pr-3 text-[#44403C] dark:text-zinc-300" title={SOURCE_NOTE[r.source]}>{r.label}</td>
-                {r.values.map((v, i) => (
+                {visible.map(({ i }) => { const v = r.values[i]; return (
                   <td key={sheet.columns[i].key}
                     className={`py-1.5 pl-3 text-right tabular-nums whitespace-nowrap ${v < 0 ? 'text-red-700 dark:text-red-400' : 'text-[#1C1917] dark:text-parchment'}`}>
                     {formatRupees(v)}
                   </td>
-                ))}
+                )})}
               </tr>
             ))}
             <tr className={`border-b-2 ${rule}`}>
               <td className="py-2 pr-3 font-bold text-[#1C1917] dark:text-parchment">{totalLabel}</td>
-              {totals.map((v, i) => (
+              {visible.map(({ i }) => (
                 <td key={sheet.columns[i].key} className="py-2 pl-3 text-right font-bold tabular-nums whitespace-nowrap text-[#1C1917] dark:text-parchment">
-                  {formatRupees(v)}
+                  {formatRupees(totals[i])}
                 </td>
               ))}
             </tr>
@@ -81,12 +83,35 @@ function ClosingRow({ label, value, strong, hint }: { label: string; value: stri
 
 export function BalanceSheetView({ sheet }: { sheet: BalanceSheet }) {
   const [excludeDues, setExcludeDues] = useState(true)
+  // Every column except the latest can be collapsed; older years start collapsed
+  // so the current year fits on a phone.
+  const collapsible = sheet.columns.slice(0, -1)
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set(collapsible.map(c => c.key)))
+  const toggle = (key: string) => setHidden(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
   const total = excludeDues ? sheet.totalBalanceExcludingDues : sheet.totalBalanceIncludingDues
 
   return (
     <div>
-      <Section title="Receivables" tone="income" rows={sheet.income} totals={sheet.totalIncome} totalLabel="Total Income" sheet={sheet} />
-      <Section title="Expenses" tone="expense" rows={sheet.expenses} totals={sheet.totalExpenses} totalLabel="Total Expenses" sheet={sheet} />
+      {collapsible.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-4 font-rajdhani text-sm">
+          <span className="text-[#78716C] dark:text-zinc-500">Columns:</span>
+          {collapsible.map(c => {
+            const isHidden = hidden.has(c.key)
+            return (
+              <button key={c.key} type="button" onClick={() => toggle(c.key)} aria-expanded={!isHidden}
+                className="px-2.5 py-1 rounded border border-[#D4C9B0] dark:border-ink-5 bg-white dark:bg-ink-3 text-[#1C1917] dark:text-parchment">
+                {isHidden ? '▸' : '▾'} {c.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <Section title="Receivables" tone="income" rows={sheet.income} totals={sheet.totalIncome} totalLabel="Total Income" sheet={sheet} hidden={hidden} />
+      <Section title="Expenses" tone="expense" rows={sheet.expenses} totals={sheet.totalExpenses} totalLabel="Total Expenses" sheet={sheet} hidden={hidden} />
 
       <section className="max-w-xl">
         <div className="flex items-center justify-between gap-4 py-1.5">
