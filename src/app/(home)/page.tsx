@@ -302,7 +302,7 @@ function formatLastPlayed(dateStr: string) {
 const AVAIL_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
   Y: { color: '#4ade80', bg: '#1a4731', border: '#166534', label: 'Available' },
   E: { color: '#60a5fa', bg: '#1e3a5f', border: '#1d4ed8', label: 'Either game today' },
-  O: { color: '#fbbf24', bg: '#3d2e00', border: '#d97706', label: 'One game this weekend' },
+  O: { color: '#fbbf24', bg: '#3A2403', border: '#d97706', label: 'One game this weekend' },
   L: { color: '#c084fc', bg: '#2e1a47', border: '#7e22ce', label: 'On leave' },
 }
 

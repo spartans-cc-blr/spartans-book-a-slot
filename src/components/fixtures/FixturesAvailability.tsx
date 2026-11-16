@@ -29,7 +29,7 @@ const LIGHT = {
 }
 const DARK = {
   panelBg: '#111827', panelBorder: '#2D3748', panelBorderTop: '#1F2937',
-  notPlayerText: '#6B7280', signInColor: '#C9A84C',
+  notPlayerText: '#6B7280', signInColor: '#F59E0B',
   labelText: '#4B5563',
   idleBg: '#1F2937', idleBorder: '#374151', idleText: '#6B7280',
   blockedText: '#9CA3AF',
@@ -46,7 +46,7 @@ const BUTTONS: {
 }[] = [
   { code: 'Y', label: 'Y', activeBackground: '#1a4731', activeColor: '#4ade80', activeBorder: '#166534', hint: 'Available' },
   { code: 'E', label: 'E', activeBackground: '#1e3a5f', activeColor: '#60a5fa', activeBorder: '#1d4ed8', hint: 'Either game today — one only' },
-  { code: 'O', label: 'O', activeBackground: '#3d2e00', activeColor: '#fbbf24', activeBorder: '#d97706', hint: 'One game this weekend only' },
+  { code: 'O', label: 'O', activeBackground: '#3A2403', activeColor: '#fbbf24', activeBorder: '#d97706', hint: 'One game this weekend only' },
   { code: 'L', label: 'L', activeBackground: '#2e1a47', activeColor: '#c084fc', activeBorder: '#7e22ce', hint: 'On leave this weekend' },
 ]
 

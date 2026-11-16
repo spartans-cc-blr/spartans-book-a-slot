@@ -15,21 +15,21 @@ const config: Config = {
     extend: {
       colors: {
         gold: {
-          DEFAULT: '#C9A84C',
-          light: '#E8C97A',
-          dim: '#7A6030',
-          glow: 'rgba(201,168,76,0.15)',
+          DEFAULT: '#F59E0B',
+          light: '#FBBF24',
+          dim: '#B45309',
+          glow: 'rgba(245,158,11,0.15)',
         },
         crimson: {
-          DEFAULT: '#C0132C',
-          dark: '#8B0000',
+          DEFAULT: '#DC2626',
+          dark: '#B91C1C',
         },
         ink: {
-          DEFAULT: '#080808',
-          2: '#111111',
-          3: '#1A1A1A',
-          4: '#242424',
-          5: '#2E2E2E',
+          DEFAULT: '#02040A',
+          2: '#0A0A0A',
+          3: '#121214',
+          4: '#18181B',
+          5: '#27272A',
         },
         parchment: {
           DEFAULT: '#F8F4EE',

@@ -55,10 +55,10 @@ const LIGHT = {
 const DARK = {
   cardBg: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
   cardBorder: '#2D3748',
-  accentGradient: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)',
-  dateText: '#C9A84C',
+  accentGradient: 'linear-gradient(90deg, #F59E0B, #FCD34D, #F59E0B)',
+  dateText: '#F59E0B',
   headingText: '#F5F5F5',
-  accentUnderline: '#C9A84C',
+  accentUnderline: '#F59E0B',
   subtitleText: '#9CA3AF',
   opponentText: '#D1D5DB',
   groundText: '#6B7280',
@@ -67,10 +67,10 @@ const DARK = {
   stageBg: '#2d1f00', stageText: '#f59e0b', stageBorder: '#d97706',
   squadHeading: '#4ade80',
   chevron: '#6B7280',
-  feeText: '#9CA3AF', feeBorder: '#1F2937', feeAmount: '#F5D78E',
+  feeText: '#9CA3AF', feeBorder: '#1F2937', feeAmount: '#FCD34D',
   walletPositive: '#4ADE80', walletNegative: '#F59E0B',
-  squadText: '#D1D5DB', squadUnderline: '#C9A84C55',
-  cBadgeBg: '#2d2400', cBadgeText: '#C9A84C', cBadgeBorder: '#C9A84C',
+  squadText: '#D1D5DB', squadUnderline: '#F59E0B55',
+  cBadgeBg: '#3A2403', cBadgeText: '#F59E0B', cBadgeBorder: '#F59E0B',
 }
 
 // ── Cricket Ball SVG Components ──────────────────────────────────
@@ -692,7 +692,7 @@ export default function App() {
       gap: "8px",
     }}>
       <div style={{ textAlign: "center", marginBottom: "24px" }}>
-        <div style={{ fontSize: "11px", letterSpacing: "0.2em", color: "#C9A84C", fontWeight: 700, marginBottom: "6px" }}>
+        <div style={{ fontSize: "11px", letterSpacing: "0.2em", color: "#F59E0B", fontWeight: 700, marginBottom: "6px" }}>
           SPARTANS CRICKET CLUB · BENGALURU
         </div>
         <div style={{ fontSize: "22px", fontWeight: 800, color: "#F9FAFB", fontFamily: "'DM Sans', sans-serif" }}>

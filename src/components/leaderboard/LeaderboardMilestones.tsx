@@ -125,7 +125,7 @@ export function LeaderboardMilestones({ rows, year, scoped, centuries, fiveWicke
   const cardBg = isDark ? 'linear-gradient(135deg, #1C2333 0%, #111827 100%)' : 'linear-gradient(135deg, #FFFFFF 0%, #F8F4EE 100%)'
   const cardBorder = isDark ? '#2D3748' : '#D4C9B0'
   const cardShadow = isDark ? '0 4px 20px rgba(0,0,0,0.4)' : '0 4px 20px rgba(28,25,23,0.08)'
-  const accentBarGradient = isDark ? 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)' : 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)'
+  const accentBarGradient = isDark ? 'linear-gradient(90deg, #F59E0B, #FCD34D, #F59E0B)' : 'linear-gradient(90deg, #D97706, #F59E0B, #D97706)'
 
   // Scoped (Tournament/Ground filter) always wins over the year-band
   // treatment — see the header comment. Monthly-style always-open lists

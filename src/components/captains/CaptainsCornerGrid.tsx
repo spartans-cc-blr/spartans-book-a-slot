@@ -139,7 +139,7 @@ const RESP: Record<string, { bg: string; text: string; border: string; label: st
 const FORM_DARK = {
   cardBg: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
   cardBorder: '#2D3748',
-  accentBar: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)',
+  accentBar: 'linear-gradient(90deg, #F59E0B, #FCD34D, #F59E0B)',
   loadingText: '#71717a',
   emptyText: '#71717a',
   headerText: '#6B7280',
@@ -582,7 +582,7 @@ function RoleBatIcon({ size = 14 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, transform: 'rotate(135deg)' }}>
       {/* Blade — fills most of the 60×60 canvas */}
-      <rect x="22" y="4" width="16" height="38" rx="4" fill="#C9A84C" />
+      <rect x="22" y="4" width="16" height="38" rx="4" fill="#F59E0B" />
       {/* Splice taper */}
       <path d="M22 36 L30 46 L38 36Z" fill="#A07830" />
       {/* Handle */}
@@ -974,7 +974,7 @@ function AddPlayerPanel({
     ? [
         { code: 'Y', bg: '#1a4731', text: '#4ade80', border: '#166534' },
         { code: 'E', bg: '#1e3a5f', text: '#60a5fa', border: '#1d4ed8' },
-        { code: 'O', bg: '#3d2e00', text: '#fbbf24', border: '#d97706' },
+        { code: 'O', bg: '#3A2403', text: '#fbbf24', border: '#d97706' },
         { code: 'L', bg: '#2e1a47', text: '#c084fc', border: '#7e22ce' },
       ]
     : (['Y', 'E', 'O', 'L'] as const).map(code => ({ code, bg: RESP[code].bg, text: RESP[code].text, border: RESP[code].border }))

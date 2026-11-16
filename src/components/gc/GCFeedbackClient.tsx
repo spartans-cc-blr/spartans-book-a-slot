@@ -479,7 +479,7 @@ export function GCFeedbackClient({
                 const borderColor = isCollected
                   ? 'border-l-[#1D9E75]'
                   : isClaimedByMe
-                  ? 'border-l-[#C9A84C]'
+                  ? 'border-l-[#F59E0B]'
                   : 'border-l-[#CBD5DC]'
                 return (
                   <div
@@ -513,7 +513,7 @@ export function GCFeedbackClient({
                       )}
                       {isClaimedByMe && !selectedCampaign.closed_at && (
                         <div className="flex items-center gap-2">
-                          <span className="font-rajdhani text-xs text-[#C9A84C]">You claimed this</span>
+                          <span className="font-rajdhani text-xs text-[#F59E0B]">You claimed this</span>
                           <button
                             onClick={e => { e.stopPropagation(); handleUnclaim(player.id) }}
                             className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500 hover:text-red-500 transition-colors"
@@ -530,7 +530,7 @@ export function GCFeedbackClient({
                       {status.type === 'uncollected' && !selectedCampaign.closed_at && (
                         <button
                           onClick={e => { e.stopPropagation(); handleClaim(player.id) }}
-                          className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500 hover:text-[#C9A84C] transition-colors"
+                          className="font-rajdhani text-xs text-stone-400 dark:text-zinc-500 hover:text-[#F59E0B] transition-colors"
                         >
                           Claim
                         </button>
