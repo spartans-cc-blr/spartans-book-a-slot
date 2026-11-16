@@ -326,6 +326,8 @@ API, never replaces it" posture as `wrangler-grounds-menu.md` §4.
 
 ---
 
+> **Pending fees card (November 2026):** `/wallet` also shows an estimated "Pending match fees" card above the statement for matches from 1 Nov 2026 whose fee isn't applied yet — see `fee-reminders.md` §9. It is display-only and never part of the ledger.
+
 ## 7. Admin hub — `/admin/wallet`
 
 `src/app/admin/wallet/page.tsx`, reached via a new "💰 Wallet" entry in

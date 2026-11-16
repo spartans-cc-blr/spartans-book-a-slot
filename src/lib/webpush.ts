@@ -4,7 +4,7 @@ import { getMutedKeysForPlayers } from '@/lib/notificationPrefsServer'
 
 
 
-type PushPayload = { title: string; body: string; url?: string }
+type PushPayload = { title: string; body: string; url?: string; tag?: string }
 
 export async function sendPushToPlayer(playerId: string, payload: PushPayload) {
     webpush.setVapidDetails(

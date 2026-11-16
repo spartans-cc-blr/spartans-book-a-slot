@@ -13,6 +13,7 @@ import { getNudgeForPlayer, getWeekendGapForPlayer } from '@/lib/availabilityNud
 import { WeekendAvailabilityGreeting } from '@/components/ui/WeekendAvailabilityGreeting'
 import { SelectedMatchCard } from '@/components/home/SelectedMatchCard'
 import { FixturesCard } from '@/components/fixtures/FixturesCard'
+import { getPendingFeesForPlayer } from '@/lib/pendingPlayerFees'
 
 export const revalidate = 60
 
@@ -155,6 +156,10 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
 
   const walletBalance = playerRow?.wallet_balance ?? 0
 
+  // Estimated match fees not yet applied (matches from 1 Nov 2026) — feeds
+  // the Wallet Balance tile's sublabel. See features/fee-reminders.md §9.
+  const pendingFeeTotal = (await getPendingFeesForPlayer(playerId)).reduce((s, f) => s + f.share, 0)
+
   const tournamentCount = new Set(
     (squadTournamentRows ?? [])
       .map(r => (r as any).booking?.tournament_id)
@@ -273,7 +278,7 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     upcomingCount: upcomingCount ?? 0,
     upcomingPreview: otherUpcoming,
     nextFixture, nextFixtureResponse, previewResponses, nudge, weekendGap,
-    walletBalance, feeExempt, tournamentCount,
+    walletBalance, pendingFeeTotal, feeExempt, tournamentCount,
     matchesPlayedThisYear, lastPlayedOn,
     selectedToPlay,
   }
@@ -550,16 +555,17 @@ export default async function HomePage() {
                 icon={<RupeeGlyph color={playerData.walletBalance >= 0 ? '#059669' : '#DC2626'} />}
                 value={formatSignedRupees(playerData.walletBalance)}
                 label="Wallet Balance"
+                sublabel={playerData.pendingFeeTotal > 0 ? `${formatRupees(playerData.pendingFeeTotal)} match fees pending` : undefined}
                 tag={
                   playerData.walletBalance >= 0
-                    ? undefined
+                    ? (playerData.pendingFeeTotal > 0 && playerData.walletBalance - playerData.pendingFeeTotal < 0 ? 'Top up' : undefined)
                     : playerData.feeExempt
                     ? 'Exempted'
                     : 'Overdue'
                 }
                 tone={
                   playerData.walletBalance >= 0
-                    ? 'emerald'
+                    ? (playerData.pendingFeeTotal > 0 && playerData.walletBalance - playerData.pendingFeeTotal < 0 ? 'amber' : 'emerald')
                     : playerData.feeExempt
                     ? 'amber'
                     : 'crimson'

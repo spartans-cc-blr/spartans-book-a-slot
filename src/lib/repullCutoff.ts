@@ -17,3 +17,12 @@ export const RECORD_BREAK_ALERTS_START = '2026-10-24'
 export function isBeforeRecordAlertStart(gameDate: string): boolean {
   return String(gameDate).slice(0, 10) < RECORD_BREAK_ALERTS_START
 }
+
+// Player-facing "pending match fee" visibility (wallet card, Home tile, push)
+// covers matches played on or after this date only. Separate from the admin
+// reminder cutoff above. See features/fee-reminders.md §9.
+export const PLAYER_PENDING_FEE_START = '2026-11-01'
+
+export function isBeforePlayerPendingFeeStart(gameDate: string): boolean {
+  return String(gameDate).slice(0, 10) < PLAYER_PENDING_FEE_START
+}
