@@ -34,7 +34,7 @@ export interface PendingFeeBooking {
   squad_count:     number
 }
 
-async function resolvePendingFee(
+export async function resolvePendingFee(
   supabase: ReturnType<typeof createServiceClient>,
   bookingIdFilter?: string[]
 ): Promise<PendingFeeBooking[]> {
