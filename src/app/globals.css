@@ -302,14 +302,14 @@
   --fx-success-text: #4ade80;
 
   --scorecard-page-bg: #02040A;
-  --scorecard-card-bg: linear-gradient(135deg, #1C2333 0%, #111827 100%);
-  --scorecard-card-border: #2D3748;
+  --scorecard-card-bg: linear-gradient(135deg, #18181B 0%, #0A0A0A 100%);
+  --scorecard-card-border: #27272A;
   --scorecard-accent-gradient: linear-gradient(90deg, #F59E0B, #FCD34D, #F59E0B);
   --scorecard-heading-text: #F5F5F5;
   --scorecard-text-2: #D1D5DB;
   --scorecard-text-muted: #9CA3AF;
   --scorecard-text-faint: #6B7280;
-  --scorecard-divider: #2D3748;
+  --scorecard-divider: #27272A;
   --scorecard-table-bg: #1F1F23;
   --scorecard-table-border: #27272A;
   --scorecard-table-divider: rgba(46, 46, 46, 0.5);

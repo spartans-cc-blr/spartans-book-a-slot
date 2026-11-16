@@ -137,8 +137,8 @@ const RESP: Record<string, { bg: string; text: string; border: string; label: st
 // always-dark colours byte-for-byte; LIGHT is new, built from the same Warm
 // Light "match info" palette FixturesCard/SelectedMatchCard use.
 const FORM_DARK = {
-  cardBg: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)',
-  cardBorder: '#2D3748',
+  cardBg: 'linear-gradient(135deg, #18181B 0%, #0A0A0A 100%)',
+  cardBorder: '#27272A',
   accentBar: 'linear-gradient(90deg, #F59E0B, #FCD34D, #F59E0B)',
   loadingText: '#71717a',
   emptyText: '#71717a',

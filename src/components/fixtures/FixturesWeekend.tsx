@@ -15,7 +15,7 @@ type AvailKey = 'Y' | 'O' | 'E' | 'L'
 // original always-dark values byte-for-byte; LIGHT reuses the same amber
 // warning combo the "not registered" banner on /fixtures already uses.
 const DUES_LIGHT = { bg: '#FEF3C7', border: '#F5D9A8', text: '#92400E' }
-const DUES_DARK  = { bg: '#111827', border: '#2D3748', text: '#92400e' }
+const DUES_DARK  = { bg: '#0A0A0A', border: '#27272A', text: '#92400e' }
 
 interface SquadPlayer {
   id: string
