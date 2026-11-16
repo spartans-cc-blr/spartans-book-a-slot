@@ -230,6 +230,19 @@ instead of khaki/maroon. This also moves the shipped tokens toward the Option 1
 values documented below. Not adopted: Teko/Inter fonts, glow shadows, gradient
 buttons (see the comparison in the session that introduced this).
 
+### One "selected" style for pills and chips (November 2026)
+
+The Upcoming/Past pill (`MatchesSegmentedTabs`), the date chips
+(`DateChipSlider`, shared by Fixtures, Past Matches, the admin Past tab,
+Scorecard Backfill and Commentary) and the month picker's active pill
+(`MonthStepper`) now read one token set instead of mixing `--fx-accent`,
+`--fx-accent-dim` and `--fx-badge-*`: `--fx-selected-bg`,
+`--fx-selected-text`, `--fx-selected-text-muted` (globals.css, both themes).
+Dark: `#F59E0B` fill with `#02040A` text (about 9:1; white on that amber was
+about 2:1). Light: `#B45309` with white. The pinned `theme="light"` variants
+use `#B45309` too. Month stepper arrows are slightly larger and less faded when
+disabled. Use these tokens for any new selected-state control.
+
 ---
 
 ## Page Content Width (added October 2026)

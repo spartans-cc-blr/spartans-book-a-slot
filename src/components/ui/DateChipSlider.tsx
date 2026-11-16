@@ -14,13 +14,13 @@
 
 const LIGHT = {
   trackBg: '#EEEAE2', trackBorder: '#D4C9B0',
-  accent: '#D97706', accentText: '#fff',
+  accent: '#B45309', accentText: '#fff',
   chipText: '#1C1917', mutedText: '#78716C', mutedTextOnDark: 'rgba(255,255,255,0.85)',
 }
 const AUTO = {
   trackBg: 'var(--fx-card-header-bg)', trackBorder: 'var(--fx-border)',
-  accent: 'var(--fx-accent)', accentText: '#fff',
-  chipText: 'var(--fx-card-text)', mutedText: 'var(--fx-card-text-muted)', mutedTextOnDark: 'rgba(255,255,255,0.85)',
+  accent: 'var(--fx-selected-bg)', accentText: 'var(--fx-selected-text)',
+  chipText: 'var(--fx-card-text)', mutedText: 'var(--fx-card-text-muted)', mutedTextOnDark: 'var(--fx-selected-text-muted)',
 }
 
 export interface DateChipGroup {

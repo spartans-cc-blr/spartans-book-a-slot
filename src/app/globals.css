@@ -84,6 +84,9 @@
   --fx-badge-border: #F5D9A8;
   --fx-accent: #D97706;
   --fx-accent-dim: #B45309;
+  --fx-selected-bg: #B45309;
+  --fx-selected-text: #FFFFFF;
+  --fx-selected-text-muted: rgba(255,255,255,0.85);
   --fx-danger-bg: #FEE2E2;
   --fx-danger-border: #FCA5A5;
   --fx-danger-text: #991B1B;
@@ -288,6 +291,9 @@
   --fx-badge-border: #B45309;
   --fx-accent: #F59E0B;
   --fx-accent-dim: #B45309;
+  --fx-selected-bg: #F59E0B;
+  --fx-selected-text: #02040A;
+  --fx-selected-text-muted: rgba(2,4,10,0.7);
   --fx-danger-bg: #3f1414;
   --fx-danger-border: #7F1D1D;
   --fx-danger-text: #FCA5A5;

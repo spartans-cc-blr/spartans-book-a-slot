@@ -56,7 +56,7 @@ export function MonthStepper({ months, value, onChange }: {
 
   const arrowStyle = { border: '1px solid var(--fx-accent)', color: 'var(--fx-accent)' }
   const pill = (active: boolean) => active
-    ? { background: 'var(--fx-badge-bg)', borderColor: 'var(--fx-badge-border)', color: 'var(--fx-badge-text)' }
+    ? { background: 'var(--fx-selected-bg)', borderColor: 'var(--fx-selected-bg)', color: 'var(--fx-selected-text)' }
     : { background: 'var(--fx-hero-bg)', borderColor: 'var(--fx-border)', color: 'var(--fx-text-muted)' }
 
   return (
@@ -67,7 +67,7 @@ export function MonthStepper({ months, value, onChange }: {
           onClick={() => canGoOlder && onChange(sorted[idx + 1])}
           disabled={!canGoOlder}
           aria-label="Older month"
-          className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full text-sm transition-colors disabled:opacity-30"
+          className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full text-base transition-colors disabled:opacity-45"
           style={arrowStyle}>
           ‹
         </button>
@@ -84,7 +84,7 @@ export function MonthStepper({ months, value, onChange }: {
           onClick={() => canGoNewer && onChange(sorted[idx - 1])}
           disabled={!canGoNewer}
           aria-label="Newer month"
-          className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full text-sm transition-colors disabled:opacity-30"
+          className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full text-base transition-colors disabled:opacity-45"
           style={arrowStyle}>
           ›
         </button>
