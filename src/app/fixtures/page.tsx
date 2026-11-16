@@ -309,19 +309,19 @@ export default async function FixturesPage() {
       <main>
 
       {/* Hero */}
-      <div className="border-b px-5 md:px-8 lg:px-10 py-7 md:py-9 relative overflow-hidden"
+      <div className="border-b px-5 md:px-8 lg:px-10 py-5 md:py-9 relative overflow-hidden"
         style={{ background: 'var(--fx-hero-bg)', borderColor: 'var(--fx-border)' }}>
         <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(217,119,6,0.1) 0%, transparent 70%)' }} />
-        <p className="text-xs font-rajdhani font-semibold tracking-[3px] uppercase mb-2 flex items-center gap-2" style={{ color: 'var(--fx-accent-dim)' }}>
+        <p className="text-xs font-rajdhani font-semibold tracking-[2px] uppercase mb-1.5 flex items-center gap-2" style={{ color: 'var(--fx-text-muted)' }}>
           <span className="w-4 h-px inline-block" style={{ background: 'var(--fx-accent)' }} />
-          Spartans Cricket Club · Bengaluru
+          Spartans CC · Bengaluru
         </p>
-        <h1 className="font-cinzel text-2xl md:text-3xl font-bold mb-2 tracking-wide" style={{ color: 'var(--fx-text)' }}>
+        <h1 className="font-cinzel text-2xl md:text-3xl font-bold mb-1 tracking-wide" style={{ color: 'var(--fx-text)' }}>
           Matches
         </h1>
-        <p className="text-sm md:text-base max-w-xl leading-relaxed font-rajdhani mb-4" style={{ color: 'var(--fx-text-2)' }}>
-          Confirmed matches for Spartans CC. Mark your availability below each card.
+        <p className="text-sm md:text-base max-w-xl leading-relaxed font-rajdhani mb-3" style={{ color: 'var(--fx-text-2)' }}>
+          Mark your availability below each card.
         </p>
         <MatchesSegmentedTabs active="upcoming" />
       </div>
@@ -347,11 +347,11 @@ export default async function FixturesPage() {
 
       {/* Legend */}
       {isPlayer && (
-        <div className="px-5 md:px-8 lg:px-10 py-2 border-b flex gap-4 flex-wrap" style={{ background: 'var(--fx-hero-bg)', borderColor: 'var(--fx-border)' }}>
+        <div className="px-5 md:px-8 lg:px-10 py-1.5 border-b flex gap-x-3 gap-y-0.5 flex-wrap" style={{ background: 'var(--fx-hero-bg)', borderColor: 'var(--fx-border)' }}>
           {[
             { code: 'Y', color: '#16a34a', label: 'Available' },
-            { code: 'E', color: '#2563eb', label: 'Either game same day' },
-            { code: 'O', color: '#d97706', label: 'One game this weekend' },
+            { code: 'E', color: '#2563eb', label: 'Either game' },
+            { code: 'O', color: '#d97706', label: 'One this weekend' },
             { code: 'L', color: '#9333ea', label: 'On leave' },
           ].map(item => (
             <div key={item.code} className="flex items-center gap-1.5">

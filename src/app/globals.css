@@ -84,6 +84,9 @@
   --fx-badge-border: #F5D9A8;
   --fx-accent: #D97706;
   --fx-accent-dim: #B45309;
+  --fx-selected-bg: #B45309;
+  --fx-selected-text: #FFFFFF;
+  --fx-selected-text-muted: rgba(255,255,255,0.85);
   --fx-danger-bg: #FEE2E2;
   --fx-danger-border: #FCA5A5;
   --fx-danger-text: #991B1B;
@@ -288,6 +291,9 @@
   --fx-badge-border: #B45309;
   --fx-accent: #F59E0B;
   --fx-accent-dim: #B45309;
+  --fx-selected-bg: #F59E0B;
+  --fx-selected-text: #02040A;
+  --fx-selected-text-muted: rgba(2,4,10,0.7);
   --fx-danger-bg: #3f1414;
   --fx-danger-border: #7F1D1D;
   --fx-danger-text: #FCA5A5;
@@ -296,14 +302,14 @@
   --fx-success-text: #4ade80;
 
   --scorecard-page-bg: #02040A;
-  --scorecard-card-bg: linear-gradient(135deg, #1C2333 0%, #111827 100%);
-  --scorecard-card-border: #2D3748;
+  --scorecard-card-bg: linear-gradient(135deg, #18181B 0%, #0A0A0A 100%);
+  --scorecard-card-border: #27272A;
   --scorecard-accent-gradient: linear-gradient(90deg, #F59E0B, #FCD34D, #F59E0B);
   --scorecard-heading-text: #F5F5F5;
   --scorecard-text-2: #D1D5DB;
   --scorecard-text-muted: #9CA3AF;
   --scorecard-text-faint: #6B7280;
-  --scorecard-divider: #2D3748;
+  --scorecard-divider: #27272A;
   --scorecard-table-bg: #1F1F23;
   --scorecard-table-border: #27272A;
   --scorecard-table-divider: rgba(46, 46, 46, 0.5);

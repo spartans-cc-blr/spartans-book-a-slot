@@ -230,6 +230,35 @@ instead of khaki/maroon. This also moves the shipped tokens toward the Option 1
 values documented below. Not adopted: Teko/Inter fonts, glow shadows, gradient
 buttons (see the comparison in the session that introduced this).
 
+### One "selected" style for pills and chips (November 2026)
+
+The Upcoming/Past pill (`MatchesSegmentedTabs`), the date chips
+(`DateChipSlider`, shared by Fixtures, Past Matches, the admin Past tab,
+Scorecard Backfill and Commentary) and the month picker's active pill
+(`MonthStepper`) now read one token set instead of mixing `--fx-accent`,
+`--fx-accent-dim` and `--fx-badge-*`: `--fx-selected-bg`,
+`--fx-selected-text`, `--fx-selected-text-muted` (globals.css, both themes).
+Dark: `#F59E0B` fill with `#02040A` text (about 9:1; white on that amber was
+about 2:1). Light: `#B45309` with white. The pinned `theme="light"` variants
+use `#B45309` too. Month stepper arrows are slightly larger and less faded when
+disabled. Use these tokens for any new selected-state control.
+
+### Neutral dark cards and a tighter Fixtures header (November 2026)
+
+The navy match-card family (`#1C2333` / `#111827`, border `#2D3748`, inner
+rules `#1F2937` / `#374151`) was replaced with the neutral dark palette so cards
+sit on the near-black page without a blue cast: gradient `#18181B` to `#0A0A0A`,
+borders `#27272A`, rules `#1F1F23` / `#3F3F46`. Applies to `FixturesCard`,
+`FixturesAvailability`, `FixturesWeekend` (dues strip), `ShareMatchButton`,
+`SelectedMatchCard`, the Captains' Corner and leaderboard cards, and the
+`--scorecard-*` variables in `globals.css`.
+
+`/fixtures` hero: shorter eyebrow ("Spartans CC · Bengaluru", muted text instead
+of an accent colour, so it no longer wraps or competes with the selected pill),
+less vertical padding on mobile, a one-line subtitle, and a single compact legend
+row ("Either game", "One this weekend"). Rule of thumb: amber is for selected
+states, the active tab and the card date; labels and eyebrows use muted text.
+
 ---
 
 ## Page Content Width (added October 2026)

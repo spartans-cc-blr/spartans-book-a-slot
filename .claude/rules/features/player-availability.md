@@ -796,6 +796,12 @@ GC/admin only**.
 
 ---
 
+## 10.5 Dark palette, shared selected style, tighter header (added November 2026)
+
+`/fixtures` follows the club-site dark palette (see `ui-theme.md`): neutral dark cards instead of navy, one `--fx-selected-*` style shared by the Upcoming/Past pill, `DateChipSlider` and `MonthStepper`, and a shorter hero (muted eyebrow, one-line subtitle, compact legend). No behaviour change.
+
+---
+
 ## 11. File Map
 
 | File | Role |

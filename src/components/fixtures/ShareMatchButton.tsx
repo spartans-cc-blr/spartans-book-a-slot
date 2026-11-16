@@ -26,7 +26,7 @@ const url = `${base}/fixtures/${bookingId}`
     <button onClick={handleShare} style={{
       width: '100%', padding: '10px',
       background: copied ? '#1a3d1a' : '#1a2235',
-      border: `1px solid ${copied ? '#166534' : '#2D3748'}`,
+      border: `1px solid ${copied ? '#166534' : '#27272A'}`,
       borderRadius: '8px', cursor: 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
       color: copied ? '#4ade80' : '#9CA3AF',

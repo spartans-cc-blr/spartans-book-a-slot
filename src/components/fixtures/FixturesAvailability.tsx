@@ -28,10 +28,10 @@ const LIGHT = {
   frozenText: '#78716C',
 }
 const DARK = {
-  panelBg: '#111827', panelBorder: '#2D3748', panelBorderTop: '#1F2937',
+  panelBg: '#0A0A0A', panelBorder: '#27272A', panelBorderTop: '#1F1F23',
   notPlayerText: '#6B7280', signInColor: '#F59E0B',
   labelText: '#4B5563',
-  idleBg: '#1F2937', idleBorder: '#374151', idleText: '#6B7280',
+  idleBg: '#1F1F23', idleBorder: '#3F3F46', idleText: '#6B7280',
   blockedText: '#9CA3AF',
   frozenText: '#6B7280',
 }
