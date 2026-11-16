@@ -201,6 +201,37 @@ How it was done, so future edits stay consistent:
 
 ---
 
+## Dark theme aligned to the club site's `/vision` palette (November 2026)
+
+The dark state now borrows the palette of the legacy club site
+(`spartanscricketclub.vercel.app`, shadcn tokens there), applied as a
+**token-only change**: no layout, font or component-structure edits.
+
+| Role | Old dark | New dark |
+|---|---|---|
+| Page bg (`ink`) | `#080808` | `#02040A` |
+| Surfaces (`ink-2/3/4`) | `#111` / `#1A1A1A` / `#242424` | `#0A0A0A` / `#121214` / `#18181B` |
+| Border (`ink-5`) | `#2E2E2E` | `#27272A` |
+| Accent (`gold`) | `#C9A84C` khaki | `#F59E0B` amber (`light #FBBF24`, `dim #B45309`) |
+| Danger (`crimson`) | `#C0132C` | `#DC2626` (`dark #B91C1C`) |
+| Text (`--*-text`, body) | cream `#F0E8D0` family | `#FAFAFA` / `#D4D4D8` / `#A1A1AA` / `#71717A` |
+
+Where it lives: the `ink`/`gold`/`crimson` scales in `tailwind.config.ts`, the
+whole `[data-theme="dark"]` block, the dark `body` and scrollbar rules in
+`globals.css`, `viewport.themeColor` (dark) in `layout.tsx`, and the dark token
+objects in `MobileTabBar`, `FixturesCard`, `FixturesAvailability`,
+`SelectedMatchCard`, `CaptainsCornerGrid`, the leaderboard cards and
+`GCFeedbackClient`. Brand icons (ball, wicket, jersey) keep their own colours,
+and the scorecard card's navy gradient is unchanged.
+
+Side effect worth knowing: `gold` and `crimson` are bare Tailwind tokens, so the
+few places that still use them in the **light** theme now render amber/red
+instead of khaki/maroon. This also moves the shipped tokens toward the Option 1
+values documented below. Not adopted: Teko/Inter fonts, glow shadows, gradient
+buttons (see the comparison in the session that introduced this).
+
+---
+
 ## Page Content Width (added October 2026)
 
 `/fixtures` sets the reference: content in a left-aligned `px-5 md:px-8 lg:px-10 max-w-2xl` column, with the page background on a full-width wrapper (not on the width-capped element, or the colour stops at the column edge). Card-style pages now match it: Home's player dashboard, `/matches/history` and `/matches/history/[bookingId]`, `/players/[id]/stats`, `/wallet` and `/profile`. Previously these were a mix of `max-w-3xl`/`4xl`, centred (`mx-auto`) or left-aligned, and `px-4` or `px-5` padding, so the column moved when switching tabs on an iPad. Data-dense pages (`/leaderboard`, `/team-stats`, `/players`) deliberately stay wide because of their tables and filter panel. New card-style pages should use the same container. The Dugout hub, Gear Exchange (list and item) and Kit Room follow it too (`px-5 md:px-8 lg:px-10`, `max-w-2xl`, left-aligned, no `mx-auto`); My Players and Match Planning under Captains' Corner are left-aligned with the same padding but keep their wider `max-w-3xl`/`max-w-4xl` because of their tables. Deliberately different: wide data pages (Leaderboard, Team Record, Players, Schedule, Captains' Corner, `/admin/**`), forms (Login, Join), GC Review, Store Orders, wrangler tools, and the public share pages (`/fixtures/[id]` is capped at 480px and centred; the tournament share card is centred) since those are opened from WhatsApp links.

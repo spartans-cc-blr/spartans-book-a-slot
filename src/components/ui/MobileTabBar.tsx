@@ -62,11 +62,11 @@ function tokens(theme: MobileTabBarTheme | 'auto') {
     dangerText: '#DC2626', dangerIconBg: 'rgba(220,38,38,0.08)',
     crimsonRowBg: 'rgba(220,38,38,0.06)', crimsonIconBg: 'rgba(220,38,38,0.12)', crimson: '#DC2626',
   } : {
-    navBg: '#111111', navBorder: '#7A6030',
-    accent: '#C9A84C', accentSoft: 'rgba(201,168,76,0.1)', inactive: 'rgba(201,168,76,0.42)',
-    sheetBg: '#111111', handle: '#2E2E2E',
-    rowIconBg: '#1A1A1A', rowText: '#D4D4D8', muted: '#71717A',
-    sectionLabel: '#3F3F46', divider: '#242424', scrim: 'rgba(0,0,0,0.5)',
+    navBg: '#0A0A0A', navBorder: '#B45309',
+    accent: '#F59E0B', accentSoft: 'rgba(245,158,11,0.1)', inactive: 'rgba(245,158,11,0.42)',
+    sheetBg: '#0A0A0A', handle: '#27272A',
+    rowIconBg: '#18181B', rowText: '#D4D4D8', muted: '#71717A',
+    sectionLabel: '#3F3F46', divider: '#1F1F23', scrim: 'rgba(0,0,0,0.5)',
     dangerText: '#F87171', dangerIconBg: 'rgba(220,38,38,0.1)',
     crimsonRowBg: 'rgba(220,38,38,0.1)', crimsonIconBg: 'rgba(220,38,38,0.15)', crimson: '#C0132C',
   }

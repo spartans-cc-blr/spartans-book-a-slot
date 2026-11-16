@@ -58,16 +58,16 @@ const LIGHT = {
 }
 const DARK = {
   cardBg: 'linear-gradient(135deg, #1C2333 0%, #111827 100%)', cardBorder: '#2D3748',
-  dateText: '#C9A84C', accentGradient: 'linear-gradient(90deg, #C9A84C, #F5D78E, #C9A84C)',
-  headingText: '#F5F5F5', accentUnderline: '#C9A84C',
+  dateText: '#F59E0B', accentGradient: 'linear-gradient(90deg, #F59E0B, #FCD34D, #F59E0B)',
+  headingText: '#F5F5F5', accentUnderline: '#F59E0B',
   subtitleText: '#9CA3AF', opponentText: '#D1D5DB',
   groundText: '#6B7280', divider: '#2D3748', faintText: '#6B7280',
   stageBg: '#2d1f00', stageText: '#f59e0b', stageBorder: '#d97706',
   squadHeading: '#4ade80',
-  feeText: '#9CA3AF', feeBorder: '#1F2937', feeAmount: '#F5D78E',
+  feeText: '#9CA3AF', feeBorder: '#1F2937', feeAmount: '#FCD34D',
   walletPositive: '#4ADE80', walletNegative: '#F59E0B',
-  squadOwn: '#C9A84C', squadOther: '#D1D5DB', squadUnderline: '#C9A84C55',
-  cBadgeBg: '#2d2400', cBadgeText: '#C9A84C', cBadgeBorder: '#C9A84C',
+  squadOwn: '#F59E0B', squadOther: '#D1D5DB', squadUnderline: '#F59E0B55',
+  cBadgeBg: '#3A2403', cBadgeText: '#F59E0B', cBadgeBorder: '#F59E0B',
 }
 
 type SquadPlayer = {
