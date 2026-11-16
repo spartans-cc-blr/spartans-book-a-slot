@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { SiteNav } from '@/components/ui/SiteNav'
 import { WalletStatementClient } from '@/components/wallet/WalletStatementClient'
+import { PendingFeesCard } from '@/components/wallet/PendingFeesCard'
+import { getPendingFeesForPlayer } from '@/lib/pendingPlayerFees'
+import { createServiceClient } from '@/lib/supabase'
 
 // /wallet — a player's own bank-statement-style view of every wallet
 // change: payments they made (credits) and match fees debited, newest
@@ -15,6 +18,13 @@ export default async function WalletPage() {
   if (!session) redirect('/login')
   if (!player?.playerId) redirect('/')
 
+  // Own pending match fees only — playerId always comes from the session.
+  const [pendingFees, { data: balanceRow }] = await Promise.all([
+    getPendingFeesForPlayer(player.playerId),
+    createServiceClient().from('players').select('wallet_balance').eq('id', player.playerId).single(),
+  ])
+  const balance = Number(balanceRow?.wallet_balance ?? 0)
+
   return (
     <div className="min-h-screen bg-parchment dark:bg-ink grain">
       <SiteNav activePage="wallet" back={{ fallbackHref: '/', label: 'Home' }} />
@@ -23,6 +33,7 @@ export default async function WalletPage() {
         <p className="font-rajdhani text-[#78716C] dark:text-zinc-500 text-sm mb-6">
           Every payment and match fee, newest first.
         </p>
+        <PendingFeesCard fees={pendingFees} balance={balance} />
         <WalletStatementClient />
       </main>
     </div>

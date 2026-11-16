@@ -170,6 +170,16 @@ for them. Re-pulling old scorecards to capture newer stats therefore never
 prompts admins to apply fees. See `post-match-scorecard.md` §18.
 
 
+## 9. Player-facing "pending match fees" (added November 2026)
+
+Admins were reminded (§1-§4) but players had no warning between "scorecard synced" and "debited". Three surfaces now show each player their **estimated** share, for matches with `game_date` on/after **1 Nov 2026** only (`PLAYER_PENDING_FEE_START`, `src/lib/repullCutoff.ts`, separate from the admin Oct 2026 cutoff).
+
+- **Source:** `src/lib/pendingPlayerFees.ts`. Reuses `resolvePendingFee()` (§2 eligibility, now exported) and `computeMatchFeeSplit()` (the admin apply split), so the estimate matches the eventual debit unless the admin changes units or the base fee. Players with 0 units (exempt, or no recorded batting/bowling role) are not listed. Read-only, never throws; `playerId` always from the session.
+- **`/wallet`:** `PendingFeesCard` above the statement: one row per pending match, plus "Balance after pending fees". Not in the ledger rows, which stay a record of real debits. The entry disappears once the fee is applied.
+- **Home:** the Wallet Balance tile shows "₹X match fees pending" and an amber "Top up" tag when balance minus pending is below zero.
+- **Push:** `notifyPlayersOfPendingFee()`, called from `syncMatchStatsForBooking()` after the admin reminder. Sent only to a charged player whose balance after *all* their pending fees would be below zero (everyone gets the normal "Wallet Debited" push on apply, so notifying all would be noise). Links to `/wallet`; `tag` is per booking so a re-sync replaces rather than stacks. Wallet alerts are a locked-on group, so no preference check.
+- Matches reconciled externally, practice games and bookings with no announced squad are excluded by the shared §2 rules.
+
 ---
 
 *Maintained by: Spartans CC BLR*

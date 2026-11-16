@@ -13,6 +13,7 @@ import { detectAndLogMilestones, detectAndLogMatchPerformances } from '@/lib/mil
 import { resolveSquadMatch, type SquadRef } from '@/lib/matchTopPerformers'
 import { autoResolveMatch } from '@/lib/playerIdentityResolution'
 import { notifyFeeReminderIfPending } from '@/lib/feeReminders'
+import { notifyPlayersOfPendingFee } from '@/lib/pendingPlayerFees'
 import { isBeforePromptCutoff } from '@/lib/repullCutoff'
 import { chargeMembershipFeeIfDue } from '@/lib/membershipFee'
 import { mirrorOpponent } from '@/lib/opponentMirror'
@@ -238,6 +239,10 @@ export async function syncMatchStatsForBooking(
   // not yet applied); no-ops silently otherwise (no fee set, no squad yet,
   // already applied, or externally reconciled). See features/fee-reminders.md.
   if (!historic) await notifyFeeReminderIfPending(bookingId).catch(err => console.error('[fee-reminder]', err))
+
+  // Player heads-up (only for matches on/after 1 Nov 2026, and only when the
+  // balance won't cover the pending fee). Best-effort. See fee-reminders.md §9.
+  if (!historic) await notifyPlayersOfPendingFee(bookingId).catch(err => console.error('[pending-fee-push]', err))
 
   // Club-record breaks — admin-only inbox + push, never broadcast to players.
   // Best-effort (detectAndLogRecordBreaks never throws). See
