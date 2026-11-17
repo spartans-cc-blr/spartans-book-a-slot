@@ -377,7 +377,7 @@ function StatTile({ icon, value, label, tag, tone, href, sublabel }: {
   icon: React.ReactNode; value: string | number; label: string; tag?: string
   tone: 'gold' | 'amber' | 'emerald' | 'crimson'
   href?: string
-  sublabel?: string
+  sublabel?: string | string[]
 }) {
   const toneMap = {
     gold:    { bg: 'var(--home-tile-tint-bg)', tagBg: 'var(--home-tile-gold-tag-bg)', tagText: 'var(--home-tile-gold-tag-text)' },
@@ -401,9 +401,9 @@ function StatTile({ icon, value, label, tag, tone, href, sublabel }: {
       </div>
       <p className="font-cinzel text-2xl font-bold" style={{ color: 'var(--home-text)' }}>{value}</p>
       <p className="font-rajdhani text-xs mt-1" style={{ color: 'var(--home-text-muted)' }}>{label}</p>
-      {sublabel && (
-        <p className="font-rajdhani text-[10px] mt-0.5" style={{ color: 'var(--home-text-faint)' }}>{sublabel}</p>
-      )}
+      {sublabel && (Array.isArray(sublabel) ? sublabel : [sublabel]).map((line, i) => (
+        <p key={i} className="font-rajdhani text-[10px] mt-0.5" style={{ color: 'var(--home-text-faint)' }}>{line}</p>
+      ))}
     </>
   )
 
@@ -555,7 +555,16 @@ export default async function HomePage() {
                 icon={<RupeeGlyph color={playerData.walletBalance >= 0 ? '#059669' : '#DC2626'} />}
                 value={formatSignedRupees(playerData.walletBalance)}
                 label="Wallet Balance"
-                sublabel={playerData.pendingFeeTotal > 0 ? `${formatRupees(playerData.pendingFeeTotal)} match fees pending` : undefined}
+                sublabel={
+                  playerData.pendingFeeTotal > 0
+                    ? [
+                        `${formatRupees(playerData.pendingFeeTotal)} match fee yet to be debited`,
+                        playerData.walletBalance - playerData.pendingFeeTotal >= 0
+                          ? `Balance after: ${formatSignedRupees(playerData.walletBalance - playerData.pendingFeeTotal)}`
+                          : `${formatRupees(playerData.pendingFeeTotal - playerData.walletBalance)} short · top up`,
+                      ]
+                    : undefined
+                }
                 tag={
                   playerData.walletBalance >= 0
                     ? (playerData.pendingFeeTotal > 0 && playerData.walletBalance - playerData.pendingFeeTotal < 0 ? 'Top up' : undefined)
