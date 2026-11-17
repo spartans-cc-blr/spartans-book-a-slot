@@ -13,9 +13,10 @@ export function PendingFeesCard({ fees, balance }: { fees: PlayerPendingFee[]; b
 
   return (
     <section className="mb-6 rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30 p-4">
-      <h2 className="font-cinzel text-sm font-bold text-amber-800 dark:text-amber-300">Pending match fees</h2>
-      <p className="font-rajdhani text-xs text-[#78716C] dark:text-zinc-400 mt-0.5 mb-3">
-        Estimated. These will be debited once the admin applies the fee.
+      <h2 className="font-cinzel text-sm font-bold text-amber-800 dark:text-amber-300">Match fees yet to be debited</h2>
+      <p className="font-rajdhani text-xs text-[#44403C] dark:text-zinc-300 mt-0.5 mb-3">
+        You don&apos;t owe this yet. Your balance is unchanged until the club applies these fees,
+        which happens after the scorecard is checked. Amounts are estimates and can change slightly.
       </p>
       <ul className="divide-y divide-amber-200 dark:divide-amber-900/50">
         {fees.map(f => (
@@ -37,15 +38,19 @@ export function PendingFeesCard({ fees, balance }: { fees: PlayerPendingFee[]; b
       </ul>
       <div className="flex items-center justify-between border-t border-amber-300 dark:border-amber-800/60 pt-3 mt-1">
         <span className="font-rajdhani text-xs font-bold uppercase tracking-wide text-[#44403C] dark:text-zinc-300">
-          Balance after pending fees
+          Balance after these are debited
         </span>
         <span className={`font-cinzel text-base font-bold ${after < 0 ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
           {inr(after)}
         </span>
       </div>
-      {after < 0 && (
+      {after < 0 ? (
         <p className="font-rajdhani text-xs text-red-700 dark:text-red-400 mt-2">
-          Your balance won&apos;t cover this. Top up to avoid dues.
+          Your balance won&apos;t cover this. Top up {inr(-after)} or more to avoid dues.
+        </p>
+      ) : (
+        <p className="font-rajdhani text-xs text-emerald-700 dark:text-emerald-400 mt-2">
+          Your balance covers this. Nothing to do.
         </p>
       )}
     </section>
