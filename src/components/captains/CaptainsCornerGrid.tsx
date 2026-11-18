@@ -511,12 +511,12 @@ function PlayerName({
   mvpRankKind?: 'tournament' | 'ground' | null
 }) {
   const cls = [
-    'font-rajdhani text-sm flex-1 leading-none',
+    'font-rajdhani text-sm flex-1 min-w-0 flex items-center leading-none',
     isTaken ? 'line-through text-[var(--captains-text-muted)] dark:text-zinc-500' : hasDues ? 'text-amber-700 dark:text-amber-400' : 'text-[var(--captains-text)] dark:text-parchment',
   ].filter(Boolean).join(' ')
 
   const badge = player.is_captain
-    ? <span className="ml-1.5 font-rajdhani text-[9px] font-bold bg-[var(--captains-badge-bg)] dark:bg-gold/10 border border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold px-1 py-px rounded-sm">CAP</span>
+    ? <span className="ml-1.5 flex-shrink-0 font-rajdhani text-[9px] font-bold bg-[var(--captains-badge-bg)] dark:bg-gold/10 border border-[var(--captains-badge-border)] dark:border-gold-dim text-[var(--captains-badge-text)] dark:text-gold px-1 py-px rounded-sm">CAP</span>
     : null
 
 const exemptBadge = player.is_fee_exempt
@@ -528,7 +528,7 @@ const exemptBadge = player.is_fee_exempt
   // edge regardless of whether the rank is one or two digits.
   const rankBadge = (mvpRank != null && !isTaken)
     ? <span
-        className="mr-1.5 font-rajdhani text-xs font-bold text-[var(--captains-accent)] dark:text-gold tabular-nums"
+        className="mr-1.5 flex-shrink-0 font-rajdhani text-xs font-bold text-[var(--captains-accent)] dark:text-gold tabular-nums"
         title={`${mvpRankKind === 'ground' ? 'Ground' : 'Tournament'} MVP rank #${mvpRank}`}>
         {padRank(mvpRank)}
       </span>
@@ -541,12 +541,13 @@ const exemptBadge = player.is_fee_exempt
         target="_blank"
         rel="noopener noreferrer"
         onClick={e => e.stopPropagation()}
+        title={player.name}
         className={cls + ' hover:underline underline-offset-2'}>
-        {rankBadge}{player.name}{badge}{exemptBadge}
+        {rankBadge}<span className="truncate min-w-0">{player.name}</span>{badge}{exemptBadge}
       </a>
     )
   }
-  return <span className={cls}>{rankBadge}{player.name}{badge}{exemptBadge}</span>
+  return <span className={cls} title={player.name}>{rankBadge}<span className="truncate min-w-0">{player.name}</span>{badge}{exemptBadge}</span>
 }
 
 // ── Match Role SVG Icons ──────────────────────────────────────────
@@ -1623,7 +1624,7 @@ function SlotCard({
           </div>
 
           <div className="flex-1 min-w-0">
-            <p className="font-cinzel text-sm font-semibold text-[var(--captains-text)] dark:text-parchment truncate leading-none">
+            <p className="font-cinzel text-sm font-semibold text-[var(--captains-text)] dark:text-parchment break-words leading-snug">
               {/* Links into "Yours Statistically" (/leaderboard), pre-filtered
                   to this game's tournament — same URL shape MatchHistoryCard's
                   own tournament-name link already uses (category defaults to
@@ -1668,22 +1669,27 @@ function SlotCard({
                 into "Yours Statistically" MVP, pre-filtered to this ground —
                 same shape as the tournament-name link above. */}
             {slotGround?.name && (
-              <p className="font-rajdhani text-xs text-[var(--captains-text-muted)] dark:text-zinc-500 mt-0.5 truncate">
-                @{' '}
+              <p className="mt-1">
                 {slotGround.id ? (
                   <Link
                     href={`/leaderboard?ground=${slotGround.id}&category=mvp&year=all`}
                     onClick={e => e.stopPropagation()}
-                    className="underline decoration-dotted underline-offset-2 hover:decoration-solid"
+                    className="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full border border-[var(--captains-card-border)] dark:border-ink-5 bg-[var(--captains-surface-2)] dark:bg-ink-4 font-rajdhani text-[11px] text-[var(--captains-text-2)] dark:text-zinc-400 hover:border-[var(--captains-text-muted)]"
                     title="View stats at this ground">
-                    {slotGround.name}
+                    <span aria-hidden>📍</span>
+                    <span className="truncate">{slotGround.name}</span>
                   </Link>
-                ) : slotGround.name}
+                ) : (
+                  <span className="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full border border-[var(--captains-card-border)] dark:border-ink-5 font-rajdhani text-[11px] text-[var(--captains-text-muted)] dark:text-zinc-500">
+                    <span aria-hidden>📍</span>
+                    <span className="truncate">{slotGround.name}</span>
+                  </span>
+                )}
               </p>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="flex items-center justify-end gap-1.5 flex-wrap flex-shrink-0 max-w-[48%]">
             <StatusBadge status={status} />
             {counts.total === 0 ? (
               <span className="font-rajdhani text-[10px] text-[var(--captains-text-faint)] dark:text-zinc-700">No responses</span>
@@ -1746,6 +1752,13 @@ function SlotCard({
                 </p>
               )}
             </div>
+          )}
+
+          {/* Explains the leading numbers on each row (MVP rank). */}
+          {mvpRankKind && eligible.length > 0 && (
+            <p className="px-3 py-1 font-rajdhani text-[10px] text-[var(--captains-text-muted)] dark:text-zinc-500">
+              Numbers = {mvpRankKind === 'ground' ? 'ground' : 'tournament'} MVP rank (1 = best); list is sorted by it.
+            </p>
           )}
 
           {/* Available across all slots */}
@@ -2219,6 +2232,7 @@ function Legend() {
 export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squadMap = {}, initialSquadMap = {}, mvpRanksByTournament = {}, mvpRanksByGround = {} }: Props) {
 
   const [view, setView] = useState<'slot' | 'matrix'>('slot')
+  const [keyOpen, setKeyOpen] = useState(false)
   const weekendBookings = bookings.filter(b => isWeekendDate(b.game_date))
 
   // Lift selected state up so all SlotCards share cross-slot awareness
@@ -2294,6 +2308,13 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         </div>
       </div>
 
+      <button
+        onClick={() => setKeyOpen(v => !v)}
+        aria-expanded={keyOpen}
+        className="mb-3 font-rajdhani text-[11px] font-bold tracking-wide text-[var(--captains-text-muted)] dark:text-zinc-500 hover:text-[var(--captains-text)] dark:hover:text-zinc-300">
+        ⓘ Key {keyOpen ? '▴' : '▾'}
+      </button>
+      {keyOpen && (
       <div className="mb-4 bg-[var(--captains-card-bg)] dark:bg-ink-3 border border-[var(--captains-card-border)] dark:border-ink-5 rounded px-3 py-2.5">
         {view === 'slot' && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-2.5 pb-2.5 border-b border-[var(--captains-card-border)] dark:border-ink-5">
@@ -2329,6 +2350,7 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
           </div>
         )}
       </div>
+      )}
 
       {view === 'slot' && (
         <div className="flex flex-col gap-3">

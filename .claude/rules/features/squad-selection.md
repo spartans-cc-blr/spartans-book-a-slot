@@ -589,6 +589,10 @@ WK is a `Set<string>` in client state. Captain and VC are `string | null` — se
 
 ---
 
+**Mobile polish (November 2026).** (1) Each week's legend is behind an "ⓘ Key" toggle (`keyOpen` in `CaptainsCornerGrid`), closed by default, so the first game is visible without scrolling. (2) The tournament name in a `SlotCard` header wraps instead of truncating, and the Y/O/E chips and status badge wrap within `max-w-[48%]` rather than squeezing the title. (3) When a MVP rank applies (`mvpRankKind`), a one-line caption above the lists says "Numbers = ground/tournament MVP rank (1 = best); list is sorted by it." (4) `PlayerName` truncates the name (full name in `title`) while the rank, CAP and fee-exempt badges stay on the row, so rows keep one height. (5) The ground is a 📍 pill (still linking to the ground-scoped leaderboard) so it reads differently from the opponent link. Deliberately not added: a "13 available" total, since Y means "confirmed for this game" while O/E can be placed in only one game that weekend, so the counts must not be summed.
+
+---
+
 ## 9.1 Light/Dark/System (added September 2026)
 
 `/captains-corner` is being converted to the app's Light/Dark/System theme
