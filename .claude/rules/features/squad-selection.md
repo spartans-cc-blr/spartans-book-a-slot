@@ -583,6 +583,12 @@ WK is a `Set<string>` in client state. Captain and VC are `string | null` — se
 - `/captains-corner` page re-validates `isCaptain || isAdmin` on every load
 ---
  
+## 9.0 Legend de-duplicated (added November 2026)
+
+`/captains-corner` used to show the Y/O/E/₹ legend three times: the hero sentence, a page-level colour bar, and each week's grid legend. The page-level bar was removed; the single legend now lives in `CaptainsCornerGrid` (`Legend()` plus the slot-view swatch row). `Legend()` no longer lists L, since L is hidden on this page, and the Matrix footer gained a "₹ Outstanding dues" entry so dues are still explained there. The hero reads "Showing Y / O / E responses; players on leave (L) are hidden."
+
+---
+
 ## 9.1 Light/Dark/System (added September 2026)
 
 `/captains-corner` is being converted to the app's Light/Dark/System theme

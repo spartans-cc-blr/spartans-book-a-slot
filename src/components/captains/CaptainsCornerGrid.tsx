@@ -2200,7 +2200,8 @@ function MatrixView({
 function Legend() {
   return (
     <div className="flex items-center gap-4 flex-wrap">
-      {Object.entries(RESP).map(([code, cfg]) => (
+      {/* L (on leave) is hidden from this page, so it isn't listed. */}
+      {Object.entries(RESP).filter(([code]) => code !== 'L').map(([code, cfg]) => (
         <div key={code} className="flex items-center gap-1.5">
           <span
             className="font-rajdhani text-[11px] font-bold w-6 h-5 flex items-center justify-center rounded-sm"
@@ -2313,6 +2314,9 @@ export function CaptainsCornerGrid({ weekLabel, bookings, players, availMap, squ
         {view === 'matrix' && (
           <div className="font-rajdhani text-[10px] text-[var(--captains-text-faint)] dark:text-zinc-700 mt-2 flex flex-wrap gap-x-4 gap-y-1">
             <span>Amber names = O or E across slots.</span>
+            <span className="flex items-center gap-1">
+              <span style={{ color: '#d97706' }}>₹</span> Outstanding dues
+            </span>
             <span className="flex items-center gap-1">
               <span style={{ color: '#34d399' }}>✓</span> In announced squad
             </span>
