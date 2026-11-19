@@ -29,6 +29,11 @@ export interface PatternBooking {
   captainPlayerId: string | null
   groundId: string | null
   groundName: string | null
+  // Response-timing inputs (ISO timestamps). bookedAt is when the booking was
+  // created; cutoffAt is when player availability closes: Thursday 08:00 IST
+  // before a weekend game, the start time for a weekday game.
+  bookedAt?: string | null
+  cutoffAt?: string | null
 }
 
 export interface PatternPlayer {
@@ -51,6 +56,15 @@ export interface PatternInput {
   withdrawals: Map<string, number>
   // `${playerId}|${bookingId}` for every announced squad row
   selected: Set<string>
+  // `${playerId}|${bookingId}` -> ISO time of the player's own first response
+  firstResponseAt?: Map<string, string>
+  // Reminder response: playerId -> ISO times of reminder pushes logged as
+  // sent, playerId -> ISO times of every response the player made themselves,
+  // players with a push subscription now, and the current time.
+  reminders?: Map<string, string[]>
+  ownResponseTimes?: Map<string, string[]>
+  pushSubscribed?: Set<string>
+  now?: string
 }
 
 export interface ValueBreakdown {
@@ -76,6 +90,25 @@ export interface PatternFinding {
 
 export type ReliabilityFlag = 'rarely_responds' | 'often_withdraws' | 'rarely_picked'
 
+export type TimingLabel = 'plans_ahead' | 'leaves_it_late'
+
+export type ReminderLabel = 'answers_after_reminders' | 'ignores_reminders'
+
+export interface ReminderResponse {
+  weeks: number                     // completed reminder weeks (Sun–Wed cycles)
+  answeredWeeks: number             // answered within the week's reminder window
+  label: ReminderLabel | null
+  pushOff: boolean                  // no push subscription: reminders only reach the Home banner
+}
+
+export interface ResponseTiming {
+  timed: number                     // responses with a usable booking window
+  medianDaysBeforeCutoff: number | null
+  label: TimingLabel | null
+  asSoonAsBooked: boolean           // usually answers within 72h of booking
+  bands: { ahead: number; week: number; lastDay: number; afterCutoff: number }
+}
+
 export interface PlayerPattern {
   playerId: string
   name: string
@@ -90,6 +123,8 @@ export interface PlayerPattern {
   findings: PatternFinding[]
   flags: ReliabilityFlag[]
   breakdown: Record<PatternDimension, ValueBreakdown[]>
+  timing: ResponseTiming
+  reminders: ReminderResponse
 }
 
 // Thresholds — tune here and in the doc's table together.
@@ -109,6 +144,20 @@ export const WITHDRAW_MIN = 3
 export const WITHDRAW_RATE = 0.2
 export const PICK_MIN_YES = 8
 export const PICK_RATE = 0.25
+// Response timing — measured from the player's own first response (captain
+// proxy entries don't count) to the availability cutoff.
+export const MIN_TIMED_RESPONSES = 6
+export const MIN_WINDOW_HOURS = 72         // skip games booked < 3 days before cutoff
+export const PLANS_AHEAD_DAYS = 7          // median ≥ a week before cutoff
+export const LEAVES_LATE_DAYS = 2          // median ≤ last 2 days before cutoff
+export const SOON_AFTER_BOOKING_HOURS = 72
+export const SOON_AFTER_BOOKING_SHARE = 0.5
+// Reminder response — reminders go out Sun–Wed evenings; a week counts as
+// answered when the player responded themselves between the week's first
+// reminder and 12h after its last one.
+export const MIN_REMINDER_WEEKS = 4
+export const REMINDER_GRACE_HOURS = 12
+export const ANSWERS_AFTER_REMINDERS_RATE = 0.5
 
 const YES = new Set(['Y', 'O', 'E'])
 const DIMS: PatternDimension[] = ['slot', 'day', 'format', 'captain', 'ground']
@@ -234,7 +283,90 @@ export function computePlayerPattern(
     playerId: player.id, name: player.name, status: player.status,
     offered, answered, yes, leave, withdrawals, picked, firstResponse,
     findings, flags, breakdown,
+    timing: emptyTiming(),
+    reminders: { weeks: 0, answeredWeeks: 0, label: null, pushOff: false },
   }
+}
+
+// Sunday (IST) that starts the reminder week an instant belongs to.
+function reminderWeekKey(iso: string): string {
+  const ist = new Date(Date.parse(iso) + 5.5 * 3_600_000)
+  ist.setUTCDate(ist.getUTCDate() - ist.getUTCDay())
+  return ist.toISOString().slice(0, 10)
+}
+
+export function computeReminderResponse(
+  reminderTimes: string[],
+  ownResponseTimes: string[],
+  pushSubscribed: boolean,
+  now: string,
+): ReminderResponse {
+  const weeks = new Map<string, { first: number; last: number }>()
+  for (const t of reminderTimes) {
+    const k = reminderWeekKey(t), ms = Date.parse(t)
+    const w = weeks.get(k)
+    if (!w) weeks.set(k, { first: ms, last: ms })
+    else { w.first = Math.min(w.first, ms); w.last = Math.max(w.last, ms) }
+  }
+  const grace = REMINDER_GRACE_HOURS * 3_600_000
+  const nowMs = Date.parse(now)
+  const answers = ownResponseTimes.map(t => Date.parse(t))
+  let count = 0, answered = 0
+  weeks.forEach(w => {
+    if (w.last + grace > nowMs) return          // this week's window is still open
+    count++
+    if (answers.some(a => a > w.first && a <= w.last + grace)) answered++
+  })
+  let label: ReminderLabel | null = null
+  if (count >= MIN_REMINDER_WEEKS) {
+    if (answered / count >= ANSWERS_AFTER_REMINDERS_RATE) label = 'answers_after_reminders'
+    else if (answered === 0) label = 'ignores_reminders'
+  }
+  return { weeks: count, answeredWeeks: answered, label, pushOff: !pushSubscribed }
+}
+
+function emptyTiming(): ResponseTiming {
+  return { timed: 0, medianDaysBeforeCutoff: null, label: null, asSoonAsBooked: false, bands: { ahead: 0, week: 0, lastDay: 0, afterCutoff: 0 } }
+}
+
+const HOUR = 3_600_000
+
+export function computeResponseTiming(
+  playerId: string,
+  offeredBookings: PatternBooking[],
+  firstResponseAt: Map<string, string>,
+): ResponseTiming {
+  const t = emptyTiming()
+  const daysBefore: number[] = []
+  let soon = 0
+  for (const b of offeredBookings) {
+    if (!b.bookedAt || !b.cutoffAt) continue
+    const at = firstResponseAt.get(`${playerId}|${b.id}`)
+    if (!at) continue
+    const booked = Date.parse(b.bookedAt), cutoff = Date.parse(b.cutoffAt), resp = Date.parse(at)
+    // Backfilled bookings (created after the game) and late bookings have no
+    // real window to answer in, so they say nothing about the player.
+    if (!(cutoff - booked > MIN_WINDOW_HOURS * HOUR)) continue
+    t.timed++
+    const d = (cutoff - resp) / (24 * HOUR)
+    daysBefore.push(d)
+    if (d < 0) t.bands.afterCutoff++
+    else if (d <= 1) t.bands.lastDay++
+    else if (d < PLANS_AHEAD_DAYS) t.bands.week++
+    else t.bands.ahead++
+    if (resp - booked <= SOON_AFTER_BOOKING_HOURS * HOUR) soon++
+  }
+  if (t.timed === 0) return t
+  daysBefore.sort((a, b) => a - b)
+  const mid = Math.floor(daysBefore.length / 2)
+  const median = daysBefore.length % 2 ? daysBefore[mid] : (daysBefore[mid - 1] + daysBefore[mid]) / 2
+  t.medianDaysBeforeCutoff = median
+  if (t.timed >= MIN_TIMED_RESPONSES) {
+    if (median >= PLANS_AHEAD_DAYS) t.label = 'plans_ahead'
+    else if (median <= LEAVES_LATE_DAYS) t.label = 'leaves_it_late'
+    t.asSoonAsBooked = soon / t.timed >= SOON_AFTER_BOOKING_SHARE
+  }
+  return t
 }
 
 export function computeAvailabilityPatterns(input: PatternInput): PlayerPattern[] {
@@ -256,10 +388,18 @@ export function computeAvailabilityPatterns(input: PatternInput): PlayerPattern[
   for (const p of input.players) {
     const first = firstDate.get(p.id) ?? null
     const offered = first ? sorted.filter(b => b.gameDate >= first) : []
-    out.push(computePlayerPattern(
+    const pattern = computePlayerPattern(
       p, offered, byPlayer.get(p.id) ?? new Map(),
       input.withdrawals.get(p.id) ?? 0, input.selected, first,
-    ))
+    )
+    if (input.firstResponseAt) pattern.timing = computeResponseTiming(p.id, offered, input.firstResponseAt)
+    if (input.reminders && input.now) {
+      pattern.reminders = computeReminderResponse(
+        input.reminders.get(p.id) ?? [], input.ownResponseTimes?.get(p.id) ?? [],
+        input.pushSubscribed?.has(p.id) ?? false, input.now,
+      )
+    }
+    out.push(pattern)
   }
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }
@@ -281,3 +421,19 @@ export const FLAG_LABEL: Record<ReliabilityFlag, string> = {
 }
 
 export const pct = (n: number) => `${Math.round(n * 100)}%`
+
+export function formatDays(d: number): string {
+  if (d < 0) return 'after the cutoff'
+  if (d < 1) return `${Math.max(1, Math.round(d * 24))}h before the cutoff`
+  return `${d < 10 ? d.toFixed(1) : Math.round(d)} days before the cutoff`
+}
+
+export const REMINDER_LABEL: Record<ReminderLabel, string> = {
+  answers_after_reminders: 'Answers after reminders',
+  ignores_reminders: "Doesn't answer reminders",
+}
+
+export const TIMING_LABEL: Record<TimingLabel, string> = {
+  plans_ahead: 'Plans ahead',
+  leaves_it_late: 'Leaves it late',
+}

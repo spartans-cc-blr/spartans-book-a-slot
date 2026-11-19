@@ -10,6 +10,9 @@ import Link from 'next/link'
 import {
   DIMENSION_LABEL,
   FLAG_LABEL,
+  TIMING_LABEL,
+  REMINDER_LABEL,
+  formatDays,
   describeFinding,
   pct,
   type PatternDimension,
@@ -23,7 +26,7 @@ const PERIODS: PatternPeriod[] = ['3', '6', '12', 'all']
 const DIMS: PatternDimension[] = ['captain', 'format', 'day', 'slot', 'ground']
 
 type StatusFilter = 'active' | 'inactive' | 'all'
-type TypeFilter = 'any' | PatternDimension | 'reliability' | 'everyone'
+type TypeFilter = 'any' | PatternDimension | 'timing' | 'reminders' | 'push_off' | 'reliability' | 'everyone'
 
 const pill = (on: boolean) =>
   `font-rajdhani text-xs font-semibold px-3 py-1 rounded-full border transition-colors ${
@@ -78,7 +81,7 @@ export function AvailabilityPatternsClient({ result, period }: { result: Availab
         ))}
       </div>
       <div className="flex flex-wrap gap-1.5 mb-3">
-        {(['any', 'captain', 'format', 'day', 'slot', 'ground', 'reliability', 'everyone'] as TypeFilter[]).map(t => (
+        {(['any', 'captain', 'format', 'day', 'slot', 'ground', 'timing', 'reminders', 'push_off', 'reliability', 'everyone'] as TypeFilter[]).map(t => (
           <button key={t} onClick={() => setType(t)} className={pill(type === t)}>
             {typeLabel(t)} <span className="opacity-70">{count(t)}</span>
           </button>
@@ -103,6 +106,8 @@ export function AvailabilityPatternsClient({ result, period }: { result: Availab
           <li>&quot;Mostly&quot; or &quot;only&quot;: at least 6 available responses, 70% (or 90%) of them in one value, and at least 1.5× their rate elsewhere.</li>
           <li>&quot;Rarely&quot; or &quot;never&quot;: offered at least 6 times, available at half their usual rate or less, while available at least 30% of the time elsewhere.</li>
           <li>Captain and ground patterns are also checked against the player&apos;s day and format habits, so a captain who only leads weekday T30 games isn&apos;t blamed for a player who just doesn&apos;t play weekday T30s. A player&apos;s own games as captain are left out.</li>
+          <li>Timing uses the player&apos;s own first answer for each game (not captain entries) against the cutoff: Thursday 08:00 before a weekend game, the start time for a weekday game. Games booked less than 3 days before the cutoff, or after the game, are left out. &quot;Plans ahead&quot;: usually answers a week or more before the cutoff. &quot;Leaves it late&quot;: usually in the last 2 days. Needs 6 timed answers; records start 28 Mar 2026.</li>
+          <li>Reminders go out Sunday to Wednesday evenings while a player has an unanswered game. A reminder week counts as answered if the player responded between the week&apos;s first reminder and 12 hours after its last. &quot;Answers after reminders&quot;: half or more of their reminder weeks; &quot;Doesn&apos;t answer reminders&quot;: none. Needs 4 completed reminder weeks; the log starts 8 Jul 2026. &quot;Push off&quot; means no push subscription now, so reminders only reach them as the Home page banner.</li>
           <li>Withdrawals are switches from Y/O/E to L by the player. Picked counts announced squads among the games they were available for.</li>
         </ul>
       </details>
@@ -114,12 +119,18 @@ function matchesType(p: PlayerPattern, t: TypeFilter): boolean {
   if (t === 'everyone') return true
   if (t === 'any') return p.findings.length > 0
   if (t === 'reliability') return p.flags.length > 0
+  if (t === 'timing') return p.timing.label !== null || p.timing.asSoonAsBooked
+  if (t === 'reminders') return p.reminders.label !== null
+  if (t === 'push_off') return p.reminders.pushOff
   return p.findings.some(f => f.dim === t)
 }
 
 function typeLabel(t: TypeFilter): string {
   if (t === 'any') return 'Any habit'
   if (t === 'reliability') return 'Reliability'
+  if (t === 'timing') return 'Timing'
+  if (t === 'reminders') return 'Reminders'
+  if (t === 'push_off') return 'Push off'
   if (t === 'everyone') return 'Everyone'
   return DIMENSION_LABEL[t]
 }
@@ -139,9 +150,10 @@ function PlayerCard({ p, focus }: { p: PlayerPattern; focus: TypeFilter }) {
         Answered {p.answered} of {p.offered} games · available {p.yes} · leave {p.leave}
         {p.yes > 0 && ` · picked ${p.picked} of ${p.yes}`}
         {p.withdrawals > 0 && ` · withdrew ${p.withdrawals}`}
+        {p.timing.medianDaysBeforeCutoff !== null && ` · usually answers ${formatDays(p.timing.medianDaysBeforeCutoff)}`}
       </p>
 
-      {(p.findings.length > 0 || p.flags.length > 0) && (
+      {(p.findings.length > 0 || p.flags.length > 0 || p.timing.label || p.timing.asSoonAsBooked || p.reminders.label || p.reminders.pushOff) && (
         <div className="flex flex-wrap gap-1.5 mt-2.5">
           {p.findings.map(f => (
             <span
@@ -156,6 +168,34 @@ function PlayerCard({ p, focus }: { p: PlayerPattern; focus: TypeFilter }) {
               {describeFinding(f)} <span className="font-normal opacity-80">({f.yes}/{f.offered} vs {pct(f.otherRate)})</span>
             </span>
           ))}
+          {p.timing.label && (
+            <span className={`font-rajdhani text-xs font-semibold px-2 py-0.5 rounded border ${
+              p.timing.label === 'plans_ahead'
+                ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-400'
+                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+            }`}>
+              {TIMING_LABEL[p.timing.label]} <span className="font-normal opacity-80">({p.timing.timed} answers)</span>
+            </span>
+          )}
+          {p.timing.asSoonAsBooked && (
+            <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded border bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-400">
+              Answers as soon as a game is booked
+            </span>
+          )}
+          {p.reminders.label && (
+            <span className={`font-rajdhani text-xs font-semibold px-2 py-0.5 rounded border ${
+              p.reminders.label === 'answers_after_reminders'
+                ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-400'
+                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+            }`}>
+              {REMINDER_LABEL[p.reminders.label]} <span className="font-normal opacity-80">({p.reminders.answeredWeeks} of {p.reminders.weeks} weeks)</span>
+            </span>
+          )}
+          {p.reminders.pushOff && (
+            <span className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded border bg-stone-100 dark:bg-zinc-800 border-stone-300 dark:border-zinc-700 text-stone-600 dark:text-zinc-400">
+              Push off
+            </span>
+          )}
           {p.flags.map((fl: ReliabilityFlag) => (
             <span key={fl} className="font-rajdhani text-xs font-semibold px-2 py-0.5 rounded border bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400">
               {FLAG_LABEL[fl]}
@@ -187,6 +227,31 @@ function PlayerCard({ p, focus }: { p: PlayerPattern; focus: TypeFilter }) {
               </table>
             </div>
           ) : null)}
+          {p.timing.timed > 0 && (
+            <div>
+              <p className="font-rajdhani text-[11px] font-bold uppercase tracking-wider text-[#78716C] dark:text-zinc-500 mb-1">When they answer</p>
+              <table className="w-full font-rajdhani text-xs">
+                <tbody>
+                  {([
+                    ['A week or more before', p.timing.bands.ahead],
+                    ['In the last week', p.timing.bands.week],
+                    ['In the last 24 hours', p.timing.bands.lastDay],
+                    ['After the cutoff', p.timing.bands.afterCutoff],
+                  ] as [string, number][]).map(([label, n]) => (
+                    <tr key={label} className="border-t border-[#EEEAE2] dark:border-ink-5">
+                      <td className="py-0.5 pr-2 text-[#44403C] dark:text-zinc-300">{label}</td>
+                      <td className="py-0.5 text-right tabular-nums text-[#78716C] dark:text-zinc-500">{n}/{p.timing.timed}</td>
+                      <td className="py-0.5 pl-2 w-20">
+                        <div className="h-1.5 rounded bg-[#EEEAE2] dark:bg-ink-5">
+                          <div className="h-1.5 rounded bg-sky-600 dark:bg-sky-400" style={{ width: `${Math.round((n / p.timing.timed) * 100)}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </details>
     </div>
