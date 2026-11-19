@@ -40,6 +40,12 @@ sheet's Council section, and the admin sidebar's Council group
   (`KARNATAKA_WEEKDAY_HOLIDAYS`), weekday dates only, 2026 so far. Only dates
   the published lists agree on are included; the ones they disagree on are
   named in that file's comment. **Add each new year's list there.**
+- **One-day tournament rule:** a weekday also counts as *Holiday* when it
+  hosted two or more games of the same format in the same tournament
+  (`oneDayTournamentDates()`, same file). Clubs only stage one-day events on
+  holidays, so this catches festivals missing from the list; weekday leagues
+  play one game per date. On 2026 data it picks out exactly the five listed
+  holidays the club played on, with no ordinary weekday game misclassified.
 - **Mostly / only:** ≥6 available responses in the dimension, ≥70% (≥90% for
   "only") of them in one value, and ≥1.5× the rate for other values.
 - **Rarely / never:** value offered ≥6 times, rate ≤ half the rate for other
@@ -97,7 +103,7 @@ are worked out" note sits at the bottom. Follows Light/Dark/System.
 |---|---|
 | `src/lib/availabilityPatternsCore.ts` (+ `.test.ts`) | Rules and thresholds |
 | `src/lib/availabilityPatterns.ts` | Server fetch |
-| `src/lib/holidays.ts` | Karnataka weekday public holidays (Holiday day type) |
+| `src/lib/holidays.ts` (+ `.test.ts`) | Karnataka weekday public holidays and the one-day-tournament rule (Holiday day type) |
 | `src/app/gc/availability-patterns/page.tsx` | Page and gate |
 | `src/components/gc/AvailabilityPatternsClient.tsx` | Filters and cards |
 | `src/components/ui/SiteNav.tsx`, `MobileTabBar.tsx`, `src/components/admin/AdminSidebar.tsx` | Nav entries |

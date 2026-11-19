@@ -29,3 +29,23 @@ export const KARNATAKA_WEEKDAY_HOLIDAYS: Record<string, string> = {
 export function isWeekdayHoliday(gameDate: string): boolean {
   return gameDate in KARNATAKA_WEEKDAY_HOLIDAYS
 }
+
+// A one-day tournament: two or more games of the same format in the same
+// tournament on one weekday date. Clubs only stage these on holidays, so the
+// date is treated as a holiday even if it is missing from the list above
+// (a regional festival, or a date the published lists disagree on). Ordinary
+// weekday leagues play one game per date. Pass weekday bookings only, or
+// filter the result by weekday afterwards.
+export function oneDayTournamentDates(
+  bookings: { gameDate: string; tournamentId: string | null; format: string | null }[],
+): Set<string> {
+  const counts = new Map<string, number>()
+  for (const b of bookings) {
+    if (!b.tournamentId || !b.format) continue
+    const key = `${b.gameDate}|${b.tournamentId}|${b.format}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const dates = new Set<string>()
+  counts.forEach((n, key) => { if (n >= 2) dates.add(key.split('|')[0]) })
+  return dates
+}
