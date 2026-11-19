@@ -90,6 +90,7 @@ Spartans Hub is a unified Club Operations Platform replacing three disconnected 
 |---|---|---|
 | `/gc-review` | Server → one `GCReviewClient` (client) per rolling weekend | `bookings` (next two rolling weekends, same scoping as `/captains-corner`), `availability`, `squad` (pending/approved/announced) |
 | `/gc/finance` | Server → `BalanceSheetView` (client) | Club balance sheet, summary only (no player balances or individual entries) — see `features/finance-balance-sheet.md` |
+| `/gc/availability-patterns` | Server → `AvailabilityPatternsClient` (client) | Each player's availability habits (slot/day/format/captain/ground) vs games offered, plus reliability flags; GC/admin only — see `features/availability-patterns.md` |
 | `/gc/feedback` | Server → `GCFeedbackClient` (client) | GC-collected player feedback campaigns — `feedback_campaigns`/`feedback_responses`/`feedback_claims`, active roster; see `features/gc-feedback.md` |
  
 ### Wrangler Routes (`isWrangler` or `isAdmin`; `/wrangler/grounds` also allows `isGC`)

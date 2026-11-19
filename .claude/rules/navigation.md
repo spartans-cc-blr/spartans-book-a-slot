@@ -1274,3 +1274,7 @@ Corner ▾** dropdown and of the mobile More sheet's Captains' Corner section;
 ### Finance in Council ⚖ (added November 2026)
 
 🏦 Finance (→ `/gc/finance`, `activePage="gc-finance"`) sits after Feedback in the desktop **Council ⚖** dropdown (which highlights for it) and in the mobile More sheet's Council section; `gc-finance` is in `isAdminOrGcHighlighted()`. The admin sidebar has 🏦 Finance (→ `/admin/finance`) under Wallet. See `features/finance-balance-sheet.md`.
+
+### Availability Patterns in Council ⚖ (added November 2026)
+
+🧭 Availability Patterns (→ `/gc/availability-patterns`, `activePage="gc-patterns"`) sits before Finance in the desktop **Council ⚖** dropdown (which highlights for it), in the mobile More sheet's Council section and in the admin sidebar's Council group; `gc-patterns` is in `isAdminOrGcHighlighted()`. See `features/availability-patterns.md`.
