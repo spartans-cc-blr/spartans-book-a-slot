@@ -23,7 +23,7 @@ export interface PatternBooking {
   gameDate: string          // YYYY-MM-DD
   slot: string              // '07:30'
   format: string            // 'T20' | 'T30' | ...
-  dayType: 'Sat' | 'Sun' | 'Weekday'
+  dayType: 'Sat' | 'Sun' | 'Weekday' | 'Holiday'   // Holiday = Mon–Fri public holiday
   captainId: string | null
   captainName: string | null
   captainPlayerId: string | null
@@ -120,7 +120,7 @@ const CONFOUNDED = new Set<PatternDimension>(['captain', 'ground'])
 function valueOf(b: PatternBooking, dim: PatternDimension, playerId: string): { key: string; label: string } | null {
   switch (dim) {
     case 'slot': return { key: b.slot, label: b.slot }
-    case 'day': return { key: b.dayType, label: b.dayType === 'Weekday' ? 'Weekdays' : b.dayType }
+    case 'day': return { key: b.dayType, label: b.dayType === 'Weekday' ? 'Weekdays' : b.dayType === 'Holiday' ? 'Holidays' : b.dayType }
     case 'format': return b.format ? { key: b.format, label: b.format } : null
     case 'captain':
       // A player's own captaincy says nothing about their preference.

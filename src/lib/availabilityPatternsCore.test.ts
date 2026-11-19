@@ -69,6 +69,20 @@ describe('computeAvailabilityPatterns', () => {
     expect(p.firstResponse).toBe(bookings[6].gameDate)
   })
 
+  it('treats weekday holidays as their own day type', () => {
+    // Never plays working weekdays, always plays on holidays.
+    const work = Array.from({ length: 8 }, (_, i) => bk(i, { id: `w${i}`, dayType: 'Weekday' }))
+    const hol = Array.from({ length: 3 }, (_, i) => bk(i + 10, { id: `h${i}`, dayType: 'Holiday' }))
+    const sat = Array.from({ length: 8 }, (_, i) => bk(i + 20, { id: `s${i}`, dayType: 'Sat' }))
+    const bookings = [...hol, ...sat, ...work].map((b, i) => ({ ...b, gameDate: `2026-05-${String(i + 1).padStart(2, '0')}` }))
+    const responses = [...hol, ...sat].map(b => ({ playerId: 'p1', bookingId: b.id, response: 'Y' }))
+    const p = run(bookings, responses)
+    const wk = p.findings.find(f => f.dim === 'day' && f.key === 'Weekday')
+    expect(wk?.kind).toBe('avoids')
+    expect(wk?.yes).toBe(0)
+    expect(p.breakdown.day.find(v => v.key === 'Holiday')).toMatchObject({ yes: 3, offered: 3 })
+  })
+
   it('sets reliability flags', () => {
     const bookings = Array.from({ length: 12 }, (_, i) => bk(i))
     const responses = bookings.slice(0, 10).map(b => ({ playerId: 'p1', bookingId: b.id, response: 'Y' }))

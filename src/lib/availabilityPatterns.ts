@@ -3,6 +3,7 @@
 // availabilityPatternsCore.ts. See .claude/rules/features/availability-patterns.md.
 import { createServiceClient } from '@/lib/supabase'
 import { istToday } from '@/lib/matchCompletion'
+import { isWeekdayHoliday } from '@/lib/holidays'
 import {
   computeAvailabilityPatterns,
   type PatternBooking,
@@ -93,7 +94,7 @@ export async function getAvailabilityPatterns(period: PatternPeriod): Promise<Av
       gameDate: b.game_date,
       slot: String(b.slot_time),
       format: String(b.format ?? ''),
-      dayType: dow === 6 ? 'Sat' : dow === 0 ? 'Sun' : 'Weekday',
+      dayType: dow === 6 ? 'Sat' : dow === 0 ? 'Sun' : isWeekdayHoliday(b.game_date) ? 'Holiday' : 'Weekday',
       captainId,
       captainName: cap?.name ?? null,
       captainPlayerId: cap?.player_id ?? null,

@@ -98,6 +98,7 @@ export function AvailabilityPatternsClient({ result, period }: { result: Availab
       <details className="mt-8 font-rajdhani text-xs text-[#78716C] dark:text-zinc-500">
         <summary className="cursor-pointer font-semibold">How patterns are worked out</summary>
         <ul className="mt-2 space-y-1 list-disc pl-5">
+          <li>Day is Sat, Sun, Weekdays (Mon–Fri) or Holidays (a Karnataka public holiday on a weekday).</li>
           <li>A game counts as offered from the player&apos;s first response onward. Y, O and E count as available; no response counts as not available.</li>
           <li>&quot;Mostly&quot; or &quot;only&quot;: at least 6 available responses, 70% (or 90%) of them in one value, and at least 1.5× their rate elsewhere.</li>
           <li>&quot;Rarely&quot; or &quot;never&quot;: offered at least 6 times, available at half their usual rate or less, while available at least 30% of the time elsewhere.</li>
