@@ -13,6 +13,7 @@ import { getNudgeForPlayer, getWeekendGapForPlayer } from '@/lib/availabilityNud
 import { WeekendAvailabilityGreeting } from '@/components/ui/WeekendAvailabilityGreeting'
 import { SelectedMatchCard } from '@/components/home/SelectedMatchCard'
 import { FixturesCard } from '@/components/fixtures/FixturesCard'
+import { PushOnCard } from '@/components/home/PushOnCard'
 import { getPendingFeesForPlayer } from '@/lib/pendingPlayerFees'
 
 export const revalidate = 60
@@ -36,6 +37,7 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     { data: mySelectedSquadRows },
     nudge,
     weekendGap,
+    { count: pushSubscriptionCount },
   ] = await Promise.all([
     // Upcoming fixtures count. Fetches slot_time/format (not just a bare
     // head-count) so a same-day match that has already ended can be
@@ -135,6 +137,9 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     // Day-agnostic weekend gap — powers the first-open-of-day greeting dialog.
     // Unlike `nudge` above, this isn't gated to Sun-Wed.
     getWeekendGapForPlayer(supabase, playerId, playerStatus),
+
+    // Push on any device? Drives the "Turn on notifications" card.
+    supabase.from('push_subscriptions').select('id', { count: 'exact', head: true }).eq('player_id', playerId),
   ])
 
   // Exclude a same-day match that has already ended — same "game_date
@@ -281,6 +286,8 @@ async function getPlayerData(playerId: string, playerStatus: string | null | und
     walletBalance, pendingFeeTotal, feeExempt, tournamentCount,
     matchesPlayedThisYear, lastPlayedOn,
     selectedToPlay,
+    // A failed count reads as "has push", so the card fails quiet.
+    hasPush: pushSubscriptionCount !== 0,
   }
 }
 
@@ -604,6 +611,9 @@ export default async function HomePage() {
                 </span>
               </Link>
             )}
+
+            {/* Turn on notifications — only for players with push off on every device */}
+            <PushOnCard hasPush={playerData.hasPush} />
 
             {/* Quick Actions */}
             <div className="rounded-xl p-5 mb-5" style={{ background: 'var(--home-card-bg)', border: '1px solid var(--home-card-border)'}}>

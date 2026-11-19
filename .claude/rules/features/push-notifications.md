@@ -290,6 +290,35 @@ Players who reinstall the PWA must re-subscribe once — the old subscription en
 
 ---
 
+## 13. "Turn on notifications" card on Home (added November 2026)
+
+Availability Patterns (`availability-patterns.md`) showed only 20 of 180
+players who were sent availability reminders had a push subscription; the
+rest only see reminders if they open the Hub. Players with push on answered
+in 45% of their reminder weeks, players without it in 6%.
+
+`PushOnCard` (`src/components/home/PushOnCard.tsx`) sits on the Home
+dashboard above Quick Actions, for registered players only.
+
+- **Server gate:** `getPlayerData()` counts the player's `push_subscriptions`
+  rows (head-only count). The card renders only when there are none on any
+  device, so someone with push on their phone isn't asked again on a laptop.
+  A failed count is treated as "has push", so the card stays hidden.
+- **Client modes:**
+  - iPhone/iPad outside the installed app: Share → Add to Home Screen
+    instructions, no button (web push needs the installed app, iOS 16.4+).
+  - Permission denied: tells the player to allow notifications in
+    browser/phone settings.
+  - Unsupported browser, or this device already has a subscription the
+    server hasn't recorded: hidden.
+  - Otherwise: a "Turn on" button using the shared `subscribeToPush()`
+    (`src/lib/pushSubscription.ts`), then a confirmation line.
+- "Not now" hides it for 14 days on that device (`hub-push-card-dismissed-at`
+  in localStorage; blocked storage keeps it hidden).
+- Separate from the fixtures `PushSubscribePrompt` (after saving
+  availability) and the install prompt (`pwa.md` §6); all three share the
+  subscribe flow.
+
 *The fixtures subscribe prompt now opens after a saved availability response, not on page load (`pwa.md` §7). Service worker details (cache versioning, badge icon, tag, focus-on-click) are in `pwa.md`.*
 
 *Maintained by: Muthu, Spartans CC BLR Coordinator*

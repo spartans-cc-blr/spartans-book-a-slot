@@ -94,7 +94,8 @@ sheet's Council section, and the admin sidebar's Council group
   On real data (6 months): only 20 of 180 reminded players have push on.
   Those 20 answered in 45% of their reminder weeks; the other 160 in 6%, and
   123 of them never. 14 players get *Answers after reminders*. Getting
-  players to turn push on is the clearest lever.
+  players to turn push on is the clearest lever. Players with push off
+  now see a "Turn on notifications" card on Home (`push-notifications.md` §13).
 - Thresholds are constants at the top of the core file; keep this section in
   sync when tuning them.
 
