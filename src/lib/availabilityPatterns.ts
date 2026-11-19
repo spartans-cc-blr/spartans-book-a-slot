@@ -3,6 +3,7 @@
 // availabilityPatternsCore.ts. See .claude/rules/features/availability-patterns.md.
 import { createServiceClient } from '@/lib/supabase'
 import { istToday } from '@/lib/matchCompletion'
+import { isWeekdayHoliday, oneDayTournamentDates } from '@/lib/holidays'
 import {
   computeAvailabilityPatterns,
   type PatternBooking,
@@ -62,7 +63,7 @@ export async function getAvailabilityPatterns(period: PatternPeriod): Promise<Av
   const rawBookings = await fetchAll<any>(() => {
     let q = supabase
       .from('bookings')
-      .select('id, game_date, slot_time, format, captain_id, ground_id, tournament:tournaments!bookings_tournament_id_fkey(captain_id, ground_id)')
+      .select('id, game_date, slot_time, format, captain_id, ground_id, tournament_id, tournament:tournaments!bookings_tournament_id_fkey(captain_id, ground_id)')
       .eq('status', 'confirmed')
       .lt('game_date', today)
       .order('id')
@@ -82,6 +83,10 @@ export async function getAvailabilityPatterns(period: PatternPeriod): Promise<Av
   )
   const grounds = new Map<string, string>((groundsRes.data ?? []).map((g: any) => [g.id, g.name]))
 
+  // Weekday dates that hosted a one-day tournament count as holidays too.
+  const oneDayDates = oneDayTournamentDates(
+    rawBookings.map(b => ({ gameDate: b.game_date, tournamentId: b.tournament_id ?? null, format: b.format ?? null })),
+  )
   const bookings: PatternBooking[] = rawBookings.map(b => {
     const t = Array.isArray(b.tournament) ? b.tournament[0] : b.tournament
     const captainId: string | null = b.captain_id ?? t?.captain_id ?? null
@@ -93,7 +98,7 @@ export async function getAvailabilityPatterns(period: PatternPeriod): Promise<Av
       gameDate: b.game_date,
       slot: String(b.slot_time),
       format: String(b.format ?? ''),
-      dayType: dow === 6 ? 'Sat' : dow === 0 ? 'Sun' : 'Weekday',
+      dayType: dow === 6 ? 'Sat' : dow === 0 ? 'Sun' : (isWeekdayHoliday(b.game_date) || oneDayDates.has(b.game_date)) ? 'Holiday' : 'Weekday',
       captainId,
       captainName: cap?.name ?? null,
       captainPlayerId: cap?.player_id ?? null,
