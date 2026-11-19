@@ -161,10 +161,42 @@ export async function getAvailabilityPatterns(period: PatternPeriod): Promise<Av
     }
   }
 
+  // Reminder response. Reminders (availability_nudge_log, Sun–Wed evenings)
+  // and the player's own responses are read by time, not by booking, because
+  // a reminder is answered on games that haven't been played yet.
+  const sinceIso = since ? new Date(since + 'T00:00:00+05:30').toISOString() : null
+  const [nudges, ownAnswers, subs] = await Promise.all([
+    fetchAll<any>(() => {
+      let q = supabase.from('availability_nudge_log').select('id, player_id, created_at').eq('status', 'sent').order('id')
+      if (sinceIso) q = q.gte('created_at', sinceIso)
+      return q
+    }),
+    fetchAll<any>(() => {
+      let q = supabase.from('availability_audit').select('id, player_id, created_at')
+        .eq('update_source', 'player').neq('new_response', 'CLEARED').order('id')
+      if (sinceIso) q = q.gte('created_at', sinceIso)
+      return q
+    }),
+    fetchAll<any>(() => supabase.from('push_subscriptions').select('id, player_id').order('id')),
+  ])
+  const group = (rows: any[]) => {
+    const m = new Map<string, string[]>()
+    for (const r of rows) {
+      const list = m.get(r.player_id) ?? []
+      list.push(r.created_at)
+      m.set(r.player_id, list)
+    }
+    return m
+  }
+  const reminders = group(nudges)
+  const ownResponseTimes = group(ownAnswers)
+  const pushSubscribed = new Set<string>(subs.map(s => s.player_id))
+
   const patterns = computeAvailabilityPatterns({
     bookings,
     players: players.map(p => ({ id: p.id, name: p.name, status: p.status })),
     responses, withdrawals, selected, firstResponseAt,
+    reminders, ownResponseTimes, pushSubscribed, now: new Date().toISOString(),
   })
 
   // Players with no response in the period have nothing to show.

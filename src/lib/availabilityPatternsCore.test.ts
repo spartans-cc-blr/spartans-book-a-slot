@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeAvailabilityPatterns, computeResponseTiming, describeFinding, type PatternBooking, type PatternResponse } from './availabilityPatternsCore'
+import { computeAvailabilityPatterns, computeResponseTiming, computeReminderResponse, describeFinding, type PatternBooking, type PatternResponse } from './availabilityPatternsCore'
 
 function bk(i: number, over: Partial<PatternBooking> = {}): PatternBooking {
   const d = new Date(Date.UTC(2026, 3, 4 + i)) // 4 Apr 2026 onward
@@ -134,5 +134,35 @@ describe('computeResponseTiming', () => {
       ? { ...g, bookedAt: new Date(Date.parse(g.cutoffAt!) + 24 * H).toISOString() }
       : { ...g, bookedAt: new Date(Date.parse(g.cutoffAt!) - 48 * H).toISOString() })
     expect(computeResponseTiming('p1', odd, answeredAt(1)).timed).toBe(0)
+  })
+})
+
+describe('computeReminderResponse', () => {
+  // Reminder weeks: Sun–Wed 20:45 IST = 15:15 UTC, starting Sun 5 Jul 2026.
+  const week = (w: number) => [0, 1, 2, 3].map(d => new Date(Date.UTC(2026, 6, 5 + w * 7 + d, 15, 15)).toISOString())
+  const reminders = [0, 1, 2, 3, 4].flatMap(week)
+  const now = '2026-09-01T00:00:00.000Z'
+  // An answer on the Monday night after the reminder (1h later).
+  const answerIn = (w: number) => new Date(Date.UTC(2026, 6, 6 + w * 7, 16, 15)).toISOString()
+
+  it('labels a player who usually answers after reminders', () => {
+    const r = computeReminderResponse(reminders, [0, 1, 2].map(answerIn), true, now)
+    expect(r).toMatchObject({ weeks: 5, answeredWeeks: 3, label: 'answers_after_reminders', pushOff: false })
+  })
+
+  it('labels a player who never answers in a reminder week', () => {
+    const r = computeReminderResponse(reminders, [], false, now)
+    expect(r).toMatchObject({ weeks: 5, answeredWeeks: 0, label: 'ignores_reminders', pushOff: true })
+  })
+
+  it('does not count an answer before the first reminder of the week', () => {
+    const early = new Date(Date.UTC(2026, 6, 4, 10)).toISOString() // Sat before week 0
+    expect(computeReminderResponse(week(0), [early], true, now).answeredWeeks).toBe(0)
+  })
+
+  it('leaves out a week whose window is still open, and needs 4 weeks for a label', () => {
+    const r = computeReminderResponse(reminders, [], true, '2026-08-05T20:00:00.000Z') // during week 4
+    expect(r.weeks).toBe(4)
+    expect(computeReminderResponse(week(0), [], true, now).label).toBeNull()
   })
 })

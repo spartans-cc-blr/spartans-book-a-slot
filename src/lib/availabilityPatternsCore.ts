@@ -58,6 +58,13 @@ export interface PatternInput {
   selected: Set<string>
   // `${playerId}|${bookingId}` -> ISO time of the player's own first response
   firstResponseAt?: Map<string, string>
+  // Reminder response: playerId -> ISO times of reminder pushes logged as
+  // sent, playerId -> ISO times of every response the player made themselves,
+  // players with a push subscription now, and the current time.
+  reminders?: Map<string, string[]>
+  ownResponseTimes?: Map<string, string[]>
+  pushSubscribed?: Set<string>
+  now?: string
 }
 
 export interface ValueBreakdown {
@@ -85,6 +92,15 @@ export type ReliabilityFlag = 'rarely_responds' | 'often_withdraws' | 'rarely_pi
 
 export type TimingLabel = 'plans_ahead' | 'leaves_it_late'
 
+export type ReminderLabel = 'answers_after_reminders' | 'ignores_reminders'
+
+export interface ReminderResponse {
+  weeks: number                     // completed reminder weeks (Sun–Wed cycles)
+  answeredWeeks: number             // answered within the week's reminder window
+  label: ReminderLabel | null
+  pushOff: boolean                  // no push subscription: reminders only reach the Home banner
+}
+
 export interface ResponseTiming {
   timed: number                     // responses with a usable booking window
   medianDaysBeforeCutoff: number | null
@@ -108,6 +124,7 @@ export interface PlayerPattern {
   flags: ReliabilityFlag[]
   breakdown: Record<PatternDimension, ValueBreakdown[]>
   timing: ResponseTiming
+  reminders: ReminderResponse
 }
 
 // Thresholds — tune here and in the doc's table together.
@@ -135,6 +152,12 @@ export const PLANS_AHEAD_DAYS = 7          // median ≥ a week before cutoff
 export const LEAVES_LATE_DAYS = 2          // median ≤ last 2 days before cutoff
 export const SOON_AFTER_BOOKING_HOURS = 72
 export const SOON_AFTER_BOOKING_SHARE = 0.5
+// Reminder response — reminders go out Sun–Wed evenings; a week counts as
+// answered when the player responded themselves between the week's first
+// reminder and 12h after its last one.
+export const MIN_REMINDER_WEEKS = 4
+export const REMINDER_GRACE_HOURS = 12
+export const ANSWERS_AFTER_REMINDERS_RATE = 0.5
 
 const YES = new Set(['Y', 'O', 'E'])
 const DIMS: PatternDimension[] = ['slot', 'day', 'format', 'captain', 'ground']
@@ -261,7 +284,45 @@ export function computePlayerPattern(
     offered, answered, yes, leave, withdrawals, picked, firstResponse,
     findings, flags, breakdown,
     timing: emptyTiming(),
+    reminders: { weeks: 0, answeredWeeks: 0, label: null, pushOff: false },
   }
+}
+
+// Sunday (IST) that starts the reminder week an instant belongs to.
+function reminderWeekKey(iso: string): string {
+  const ist = new Date(Date.parse(iso) + 5.5 * 3_600_000)
+  ist.setUTCDate(ist.getUTCDate() - ist.getUTCDay())
+  return ist.toISOString().slice(0, 10)
+}
+
+export function computeReminderResponse(
+  reminderTimes: string[],
+  ownResponseTimes: string[],
+  pushSubscribed: boolean,
+  now: string,
+): ReminderResponse {
+  const weeks = new Map<string, { first: number; last: number }>()
+  for (const t of reminderTimes) {
+    const k = reminderWeekKey(t), ms = Date.parse(t)
+    const w = weeks.get(k)
+    if (!w) weeks.set(k, { first: ms, last: ms })
+    else { w.first = Math.min(w.first, ms); w.last = Math.max(w.last, ms) }
+  }
+  const grace = REMINDER_GRACE_HOURS * 3_600_000
+  const nowMs = Date.parse(now)
+  const answers = ownResponseTimes.map(t => Date.parse(t))
+  let count = 0, answered = 0
+  weeks.forEach(w => {
+    if (w.last + grace > nowMs) return          // this week's window is still open
+    count++
+    if (answers.some(a => a > w.first && a <= w.last + grace)) answered++
+  })
+  let label: ReminderLabel | null = null
+  if (count >= MIN_REMINDER_WEEKS) {
+    if (answered / count >= ANSWERS_AFTER_REMINDERS_RATE) label = 'answers_after_reminders'
+    else if (answered === 0) label = 'ignores_reminders'
+  }
+  return { weeks: count, answeredWeeks: answered, label, pushOff: !pushSubscribed }
 }
 
 function emptyTiming(): ResponseTiming {
@@ -332,6 +393,12 @@ export function computeAvailabilityPatterns(input: PatternInput): PlayerPattern[
       input.withdrawals.get(p.id) ?? 0, input.selected, first,
     )
     if (input.firstResponseAt) pattern.timing = computeResponseTiming(p.id, offered, input.firstResponseAt)
+    if (input.reminders && input.now) {
+      pattern.reminders = computeReminderResponse(
+        input.reminders.get(p.id) ?? [], input.ownResponseTimes?.get(p.id) ?? [],
+        input.pushSubscribed?.has(p.id) ?? false, input.now,
+      )
+    }
     out.push(pattern)
   }
   return out.sort((a, b) => a.name.localeCompare(b.name))
@@ -359,6 +426,11 @@ export function formatDays(d: number): string {
   if (d < 0) return 'after the cutoff'
   if (d < 1) return `${Math.max(1, Math.round(d * 24))}h before the cutoff`
   return `${d < 10 ? d.toFixed(1) : Math.round(d)} days before the cutoff`
+}
+
+export const REMINDER_LABEL: Record<ReminderLabel, string> = {
+  answers_after_reminders: 'Answers after reminders',
+  ignores_reminders: "Doesn't answer reminders",
 }
 
 export const TIMING_LABEL: Record<TimingLabel, string> = {

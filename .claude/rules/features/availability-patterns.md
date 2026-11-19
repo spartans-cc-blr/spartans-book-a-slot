@@ -78,6 +78,23 @@ sheet's Council section, and the admin sidebar's Council group
   answers): 12 plan ahead, 11 leave it late, 1 answers as soon as booked.
   The median player answers about 3 days before the cutoff, i.e. after the
   Sunday/Monday reminders.
+- **Reminder response (added November 2026):** whether a player answers
+  after the availability-nudge reminders (`availability_nudge_log`,
+  status `sent`, Sun–Wed 20:45 IST; see `availability-nudge.md`).
+  `computeReminderResponse()` groups a player's reminders into weeks
+  (Sunday-start, IST); a week counts as answered when the player responded
+  themselves between the week's first reminder and 12 hours after its last.
+  Weeks whose window is still open are left out. With ≥4 completed weeks:
+  *Answers after reminders* (answered in ≥50% of weeks) or *Doesn't answer
+  reminders* (none). Responses are read by time, not by booking, because a
+  reminder is answered on games not yet played. The log starts 8 Jul 2026.
+  *Push off* is a separate fact chip: no `push_subscriptions` row now, so
+  reminders only reach that player as the Home page banner (current state,
+  not history).
+  On real data (6 months): only 20 of 180 reminded players have push on.
+  Those 20 answered in 45% of their reminder weeks; the other 160 in 6%, and
+  123 of them never. 14 players get *Answers after reminders*. Getting
+  players to turn push on is the clearest lever.
 - Thresholds are constants at the top of the core file; keep this section in
   sync when tuning them.
 
@@ -90,7 +107,7 @@ response is logged without its old value, so clears are not counted.
 `getAvailabilityPatterns(period)` reads `bookings` (with the tournament
 embed for captain/ground fallback), `captains`, `grounds`, non-expelled
 `players`, and, per 150-booking chunk, `availability`, announced `squad`
-rows, the withdrawal audit rows and every player-made audit row (for response timing). Every read pages past PostgREST's
+rows, the withdrawal audit rows and every player-made audit row (for response timing); plus, for the whole period, sent reminders, the player's own audit rows by time and current `push_subscriptions` (for reminder response). Every read pages past PostgREST's
 1000-row cap. Period: `?period=3|6|12|all` months, default 6.
 
 First run on real data (19 Nov 2026, 6 months, 76 games, 73 players): 33
@@ -101,9 +118,9 @@ habit findings (mostly day and format) and 26 reliability flags, 21 of them
 
 Period pills (URL links with `replace`), Active / Inactive / All, a filter by
 pattern type with counts (Any habit, Captain, Format, Day, Slot, Ground,
-Timing, Reliability, Everyone), name search, then one card per player: totals line,
+Timing, Reminders, Push off, Reliability, Everyone), name search, then one card per player: totals line,
 green "prefers" / red "avoids" chips with the numbers, sky/amber timing
-chips, amber reliability chips, a "usually answers N days before the cutoff"
+and reminder chips, a grey "Push off" chip, amber reliability chips, a "usually answers N days before the cutoff"
 note, and a collapsible per-dimension breakdown with bars (plus a "When they
 answer" band table). A "How patterns
 are worked out" note sits at the bottom. Follows Light/Dark/System.
@@ -131,8 +148,7 @@ are worked out" note sits at the bottom. Follows Light/Dark/System.
 ## 7. Not built yet
 
 - Captains' Corner chips for neutral habits (phase 2).
-- Opponent, tournament and ground-by-format dimensions; month-on-month drift;
-  whether a player answers right after a reminder push.
+- Opponent, tournament and ground-by-format dimensions; month-on-month drift.
 - Using patterns to steer the availability nudge.
 
 ---
