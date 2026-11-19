@@ -124,6 +124,7 @@ const NAV: NavEntry[] = [
       { href: '/gc-review', label: 'Squad Review', icon: '⚖️' },
       { href: '/captains-corner/my-players', label: 'Captaincy Records', icon: '📈' },
       { href: '/gc/feedback', label: 'Feedback', icon: '📋' },
+      { href: '/gc/availability-patterns', label: 'Availability Patterns', icon: '🧭' },
       { href: '/gc/finance', label: 'Finance', icon: '🏦' },
       { href: '/dugout/store-orders', label: 'Store Orders', icon: '🥎' },
       { href: '/wrangler/grounds', label: 'Grounds', icon: '📍' },
