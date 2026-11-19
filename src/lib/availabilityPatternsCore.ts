@@ -29,6 +29,11 @@ export interface PatternBooking {
   captainPlayerId: string | null
   groundId: string | null
   groundName: string | null
+  // Response-timing inputs (ISO timestamps). bookedAt is when the booking was
+  // created; cutoffAt is when player availability closes: Thursday 08:00 IST
+  // before a weekend game, the start time for a weekday game.
+  bookedAt?: string | null
+  cutoffAt?: string | null
 }
 
 export interface PatternPlayer {
@@ -51,6 +56,8 @@ export interface PatternInput {
   withdrawals: Map<string, number>
   // `${playerId}|${bookingId}` for every announced squad row
   selected: Set<string>
+  // `${playerId}|${bookingId}` -> ISO time of the player's own first response
+  firstResponseAt?: Map<string, string>
 }
 
 export interface ValueBreakdown {
@@ -76,6 +83,16 @@ export interface PatternFinding {
 
 export type ReliabilityFlag = 'rarely_responds' | 'often_withdraws' | 'rarely_picked'
 
+export type TimingLabel = 'plans_ahead' | 'leaves_it_late'
+
+export interface ResponseTiming {
+  timed: number                     // responses with a usable booking window
+  medianDaysBeforeCutoff: number | null
+  label: TimingLabel | null
+  asSoonAsBooked: boolean           // usually answers within 72h of booking
+  bands: { ahead: number; week: number; lastDay: number; afterCutoff: number }
+}
+
 export interface PlayerPattern {
   playerId: string
   name: string
@@ -90,6 +107,7 @@ export interface PlayerPattern {
   findings: PatternFinding[]
   flags: ReliabilityFlag[]
   breakdown: Record<PatternDimension, ValueBreakdown[]>
+  timing: ResponseTiming
 }
 
 // Thresholds — tune here and in the doc's table together.
@@ -109,6 +127,14 @@ export const WITHDRAW_MIN = 3
 export const WITHDRAW_RATE = 0.2
 export const PICK_MIN_YES = 8
 export const PICK_RATE = 0.25
+// Response timing — measured from the player's own first response (captain
+// proxy entries don't count) to the availability cutoff.
+export const MIN_TIMED_RESPONSES = 6
+export const MIN_WINDOW_HOURS = 72         // skip games booked < 3 days before cutoff
+export const PLANS_AHEAD_DAYS = 7          // median ≥ a week before cutoff
+export const LEAVES_LATE_DAYS = 2          // median ≤ last 2 days before cutoff
+export const SOON_AFTER_BOOKING_HOURS = 72
+export const SOON_AFTER_BOOKING_SHARE = 0.5
 
 const YES = new Set(['Y', 'O', 'E'])
 const DIMS: PatternDimension[] = ['slot', 'day', 'format', 'captain', 'ground']
@@ -234,7 +260,52 @@ export function computePlayerPattern(
     playerId: player.id, name: player.name, status: player.status,
     offered, answered, yes, leave, withdrawals, picked, firstResponse,
     findings, flags, breakdown,
+    timing: emptyTiming(),
   }
+}
+
+function emptyTiming(): ResponseTiming {
+  return { timed: 0, medianDaysBeforeCutoff: null, label: null, asSoonAsBooked: false, bands: { ahead: 0, week: 0, lastDay: 0, afterCutoff: 0 } }
+}
+
+const HOUR = 3_600_000
+
+export function computeResponseTiming(
+  playerId: string,
+  offeredBookings: PatternBooking[],
+  firstResponseAt: Map<string, string>,
+): ResponseTiming {
+  const t = emptyTiming()
+  const daysBefore: number[] = []
+  let soon = 0
+  for (const b of offeredBookings) {
+    if (!b.bookedAt || !b.cutoffAt) continue
+    const at = firstResponseAt.get(`${playerId}|${b.id}`)
+    if (!at) continue
+    const booked = Date.parse(b.bookedAt), cutoff = Date.parse(b.cutoffAt), resp = Date.parse(at)
+    // Backfilled bookings (created after the game) and late bookings have no
+    // real window to answer in, so they say nothing about the player.
+    if (!(cutoff - booked > MIN_WINDOW_HOURS * HOUR)) continue
+    t.timed++
+    const d = (cutoff - resp) / (24 * HOUR)
+    daysBefore.push(d)
+    if (d < 0) t.bands.afterCutoff++
+    else if (d <= 1) t.bands.lastDay++
+    else if (d < PLANS_AHEAD_DAYS) t.bands.week++
+    else t.bands.ahead++
+    if (resp - booked <= SOON_AFTER_BOOKING_HOURS * HOUR) soon++
+  }
+  if (t.timed === 0) return t
+  daysBefore.sort((a, b) => a - b)
+  const mid = Math.floor(daysBefore.length / 2)
+  const median = daysBefore.length % 2 ? daysBefore[mid] : (daysBefore[mid - 1] + daysBefore[mid]) / 2
+  t.medianDaysBeforeCutoff = median
+  if (t.timed >= MIN_TIMED_RESPONSES) {
+    if (median >= PLANS_AHEAD_DAYS) t.label = 'plans_ahead'
+    else if (median <= LEAVES_LATE_DAYS) t.label = 'leaves_it_late'
+    t.asSoonAsBooked = soon / t.timed >= SOON_AFTER_BOOKING_SHARE
+  }
+  return t
 }
 
 export function computeAvailabilityPatterns(input: PatternInput): PlayerPattern[] {
@@ -256,10 +327,12 @@ export function computeAvailabilityPatterns(input: PatternInput): PlayerPattern[
   for (const p of input.players) {
     const first = firstDate.get(p.id) ?? null
     const offered = first ? sorted.filter(b => b.gameDate >= first) : []
-    out.push(computePlayerPattern(
+    const pattern = computePlayerPattern(
       p, offered, byPlayer.get(p.id) ?? new Map(),
       input.withdrawals.get(p.id) ?? 0, input.selected, first,
-    ))
+    )
+    if (input.firstResponseAt) pattern.timing = computeResponseTiming(p.id, offered, input.firstResponseAt)
+    out.push(pattern)
   }
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }
@@ -281,3 +354,14 @@ export const FLAG_LABEL: Record<ReliabilityFlag, string> = {
 }
 
 export const pct = (n: number) => `${Math.round(n * 100)}%`
+
+export function formatDays(d: number): string {
+  if (d < 0) return 'after the cutoff'
+  if (d < 1) return `${Math.max(1, Math.round(d * 24))}h before the cutoff`
+  return `${d < 10 ? d.toFixed(1) : Math.round(d)} days before the cutoff`
+}
+
+export const TIMING_LABEL: Record<TimingLabel, string> = {
+  plans_ahead: 'Plans ahead',
+  leaves_it_late: 'Leaves it late',
+}

@@ -60,6 +60,24 @@ sheet's Council section, and the admin sidebar's Council group
   *Often withdraws* (≥3 self-switches from Y/O/E to L, ≥20% of
   available + withdrawn), *Rarely picked when available* (≥8 available,
   announced in ≤25% of them).
+- **Response timing (added November 2026):** how early or late a player
+  answers, from their own first response per game (earliest
+  `availability_audit` row with `update_source = 'player'`, clears excluded;
+  captain proxy entries don't count) measured against the availability
+  cutoff: Thursday 08:00 IST before a Sat/Sun game (the lock-availability
+  cron), the start time for a weekday or holiday game. An earlier lock from
+  a squad draft has no recorded time, so it isn't modelled. Games booked
+  less than 72 hours before the cutoff, or after the game (CricHeroes
+  backfills, 85 of them), have no real window and are skipped.
+  `computeResponseTiming()` gives the median days before the cutoff, bands
+  (a week or more ahead / last week / last 24 hours / after the cutoff) and,
+  with ≥6 timed answers: *Plans ahead* (median ≥7 days), *Leaves it late*
+  (median ≤2 days) and *Answers as soon as a game is booked* (≥50% within
+  72 hours of booking). The audit log starts 28 Mar 2026, so earlier
+  responses have no timing. On real data (6 months, 44 players with ≥6 timed
+  answers): 12 plan ahead, 11 leave it late, 1 answers as soon as booked.
+  The median player answers about 3 days before the cutoff, i.e. after the
+  Sunday/Monday reminders.
 - Thresholds are constants at the top of the core file; keep this section in
   sync when tuning them.
 
@@ -72,7 +90,7 @@ response is logged without its old value, so clears are not counted.
 `getAvailabilityPatterns(period)` reads `bookings` (with the tournament
 embed for captain/ground fallback), `captains`, `grounds`, non-expelled
 `players`, and, per 150-booking chunk, `availability`, announced `squad`
-rows and the withdrawal audit rows. Every read pages past PostgREST's
+rows, the withdrawal audit rows and every player-made audit row (for response timing). Every read pages past PostgREST's
 1000-row cap. Period: `?period=3|6|12|all` months, default 6.
 
 First run on real data (19 Nov 2026, 6 months, 76 games, 73 players): 33
@@ -83,9 +101,11 @@ habit findings (mostly day and format) and 26 reliability flags, 21 of them
 
 Period pills (URL links with `replace`), Active / Inactive / All, a filter by
 pattern type with counts (Any habit, Captain, Format, Day, Slot, Ground,
-Reliability, Everyone), name search, then one card per player: totals line,
-green "prefers" / red "avoids" chips with the numbers, amber reliability
-chips, and a collapsible per-dimension breakdown with bars. A "How patterns
+Timing, Reliability, Everyone), name search, then one card per player: totals line,
+green "prefers" / red "avoids" chips with the numbers, sky/amber timing
+chips, amber reliability chips, a "usually answers N days before the cutoff"
+note, and a collapsible per-dimension breakdown with bars (plus a "When they
+answer" band table). A "How patterns
 are worked out" note sits at the bottom. Follows Light/Dark/System.
 
 ## 5. Security
@@ -111,8 +131,8 @@ are worked out" note sits at the bottom. Follows Light/Dark/System.
 ## 7. Not built yet
 
 - Captains' Corner chips for neutral habits (phase 2).
-- Opponent, tournament and ground-by-format dimensions; response latency
-  (how soon after booking or nudge a player marks); month-on-month drift.
+- Opponent, tournament and ground-by-format dimensions; month-on-month drift;
+  whether a player answers right after a reminder push.
 - Using patterns to steer the availability nudge.
 
 ---
